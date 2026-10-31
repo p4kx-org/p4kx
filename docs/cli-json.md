@@ -1180,7 +1180,7 @@ all the same, and the exit code is 1 when `failed` or `warnings` is not empty. `
 makes the crafting data incomplete or ambiguous although every Record was read, each as an object
 with a `kind`: `unreadable_reward_records` with a `count` (Records that cannot be read although
 their struct type is that of a Record with a reward source, so a source may be missing) and
-`unknown_modifier_ranges` with a `count` (modifier ranges of blueprints whose struct type the reader does not know, so they are missing from the modifiers) and `details` (the struct types, ordered, without repeats),
+`unknown_modifier_ranges` with a `count` (modifier ranges of blueprints whose struct type the reader does not know, so they are missing from the modifiers) and `details` (the struct types, ordered, without repeats), `unknown_template_values` with a `count` (stored names in the contract templates that the catalog does not know, a state, a category, a comms timing or reason or a kind of objective property, each `null` in the catalog) and `details` (the kind, the value and the number of each, ordered),
 `ambiguous_dismantle` with a `count` (several dismantle processes, so no blueprint links one),
 `unreadable_vehicle_files` with a `count` (ships whose vehicle file exists and cannot be read, so they have no paints; a file the Archive lacks is no such ship) and `details` (the path and the reason of each file, ordered, without repeats; the JSON lists every file, stderr the first eight) and
 `unplaced_starmap_containers` with a `count` (unreadable containers, malformed or out-of-range Children and walk

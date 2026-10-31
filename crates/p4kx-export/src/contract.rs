@@ -37,6 +37,7 @@ pub(crate) use crate::contract_shops::Shop;
 pub(crate) use crate::contract_source::{BuildSource, Source};
 pub(crate) use crate::contract_starmap::StarmapObject;
 pub(crate) use crate::contract_store_slugs::ShipStoreSlug;
+pub(crate) use crate::contract_template::ContractTemplate;
 pub(crate) use crate::location_template::MissionLocationTemplate;
 pub(crate) use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 
@@ -153,6 +154,8 @@ pub(crate) struct Catalog<'a> {
     pub(crate) contract_ship_spawns: Vec<ShipSpawnPool>,
     /// The distinct location queries of the contracts, ordered by identifier.
     pub(crate) contract_location_queries: Vec<LocationQuery>,
+    /// The contract templates, the targets of `contracts[].templateGuid`, ordered by GUID.
+    pub(crate) contract_templates: Vec<ContractTemplate<'a>>,
     /// The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered
     /// by `slug`. A curated list, not read from the Archive.
     pub(crate) ship_store_slugs: Vec<ShipStoreSlug<'a>>,
@@ -252,6 +255,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) contract_ship_spawns: KindCompleteness<'a>,
     /// The completeness of `contractLocationQueries`.
     pub(crate) contract_location_queries: KindCompleteness<'a>,
+    /// The completeness of `contractTemplates`.
+    pub(crate) contract_templates: KindCompleteness<'a>,
     /// The completeness of `shipStoreSlugs`.
     pub(crate) ship_store_slugs: KindCompleteness<'a>,
 }
@@ -303,6 +308,7 @@ impl<'a> Completeness<'a> {
             mission_location_templates: completeness,
             contract_ship_spawns: completeness,
             contract_location_queries: completeness,
+            contract_templates: completeness,
             ship_store_slugs: completeness,
         }
     }

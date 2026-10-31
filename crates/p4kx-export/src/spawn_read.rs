@@ -4,8 +4,9 @@
 use p4kx_extraction::{StructValue, TagTree, Value};
 
 use crate::blueprint::as_struct;
+use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{items, one};
-use crate::record_fields::{boolean, integer, number, reference, text};
+use crate::record_fields::{boolean, guid_value, integer, nonnil_guid, number, reference, text};
 use crate::spawn_model::{
     LocationCondition, LocationCount, LocationQuery, ShipSpawnGroup, ShipSpawnOption,
     ShipSpawnPool, ShipSpawnSlot, TagPaths, TagTerm, content_guid,
@@ -216,17 +217,76 @@ impl<'x, 'f> Reader<'x, 'f> {
         parent: Option<&StructValue<'f>>,
         name: &str,
     ) -> Option<String> {
-        let Value::Reference(target) = parent?.field(name)? else {
+        self.variable_of(parent?.field(name)?)
+    }
+
+    /// Returns the `missionVariableName` of every property the weak pointers in the array `name`
+    /// point to inside this Record, in stored order; a pointer to nothing is left out.
+    pub(crate) fn property_variables(
+        &self,
+        parent: Option<&StructValue<'f>>,
+        name: &str,
+    ) -> Vec<String> {
+        items(parent, name)
+            .iter()
+            .filter_map(|pointer| self.variable_of(pointer))
+            .collect()
+    }
+
+    /// Returns the `id` of the objective token the weak pointer in the field `name` points to
+    /// inside this Record.
+    pub(crate) fn objective_id(
+        &self,
+        parent: Option<&StructValue<'f>>,
+        name: &str,
+    ) -> Option<CatalogGuid> {
+        let token = self.target(Self::place(parent?.field(name)?)?)?;
+        guid_value(Some(token), "id")
+            .and_then(nonnil_guid)
+            .map(CatalogGuid)
+    }
+
+    /// Returns the objective token that holds the property the weak pointer in the field `name`
+    /// points to, and the `missionVariableName` of the property, which an output property keeps in
+    /// its `property`.
+    pub(crate) fn output_link(
+        &self,
+        parent: Option<&StructValue<'f>>,
+        name: &str,
+    ) -> Option<(Option<CatalogGuid>, Option<String>)> {
+        let place = Self::place(parent?.field(name)?)?;
+        let output = self.target(place)?;
+        let (token, _) = place.rsplit_once(".properties[")?;
+        let id = self
+            .target(token)
+            .and_then(|token| guid_value(Some(token), "id"))
+            .and_then(nonnil_guid)
+            .map(CatalogGuid);
+        let variable = text(one(Some(output), "property"), "missionVariableName");
+        Some((id, variable.map(str::to_owned)))
+    }
+
+    fn variable_of(&self, pointer: &Value<'f>) -> Option<String> {
+        let property = self.target(Self::place(pointer)?)?;
+        text(Some(property), "missionVariableName").map(str::to_owned)
+    }
+
+    /// Returns where inside this Record the weak pointer `pointer` points.
+    fn place<'v>(pointer: &'v Value<'f>) -> Option<&'v str> {
+        let Value::Reference(target) = pointer else {
             return None;
         };
-        let place = target.location()?.as_str();
-        let property = place
+        let location = target.location()?;
+        Some(location.as_str())
+    }
+
+    /// Returns the struct at `place` inside this Record.
+    fn target(&self, place: &str) -> Option<&'x StructValue<'f>> {
+        match place
             .split('.')
-            .try_fold(Cursor::Struct(self.root), Cursor::step)?;
-        match property {
-            Cursor::Struct(property) => {
-                text(Some(property), "missionVariableName").map(str::to_owned)
-            }
+            .try_fold(Cursor::Struct(self.root), Cursor::step)?
+        {
+            Cursor::Struct(found) => Some(found),
             Cursor::Array(_) => None,
         }
     }

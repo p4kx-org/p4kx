@@ -112,3 +112,19 @@ fn a_token_is_a_whole_word_of_the_path_or_the_name() {
         "a name that starts with the token"
     );
 }
+
+#[test]
+fn a_contract_template_is_no_leftover_for_the_word_template_but_for_the_other_tokens() {
+    let template = |path: &str, name: &str| is_kind_leftover(Kind::ContractTemplates, path, name);
+    let folder = "libs/foundry/records/contracts/contracttemplates/";
+    assert!(!template(
+        &format!("{folder}handyman_template"),
+        "ContractTemplate.Handyman_Template"
+    ));
+    assert!(template(
+        &format!("{folder}dev_temp"),
+        "ContractTemplate.Dev_Temp"
+    ));
+    assert!(template(&format!("{folder}x"), "ContractTemplate.Debug"));
+    assert!(is_leftover(&format!("{folder}handyman_template"), "x"));
+}
