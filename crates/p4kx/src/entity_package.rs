@@ -17,6 +17,7 @@ use serde::Serialize;
 
 use crate::cli_entity::EntityPackageArgs;
 use crate::entity_glb::GlbOutputIsArchive;
+use crate::entity_json::is_zero;
 use crate::extract::cancel_on_interrupt;
 use crate::json;
 use crate::query_table::one_line;
@@ -46,6 +47,10 @@ struct PackageJson<'a> {
     vertices: usize,
     triangles: usize,
     lod_fallbacks: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    bones: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    skinned_meshes: usize,
     skipped: usize,
     #[serde(skip_serializing_if = "<[String]>::is_empty")]
     ignored: &'a [String],
@@ -152,6 +157,8 @@ impl<'a> PackageJson<'a> {
             vertices: summary.vertices,
             triangles: summary.triangles,
             lod_fallbacks: summary.lod_fallbacks,
+            bones: summary.bones,
+            skinned_meshes: summary.skinned_meshes,
             skipped: summary.issues.iter().filter(|issue| issue.skipped).count(),
             ignored: applied.ignored(),
             incompatible: crate::entity_ignored::incompatible(applied),
@@ -240,6 +247,13 @@ fn print_report(
             out,
             "Interior: {} object containers, {} objects, {} lights",
             summary.containers, summary.objects, summary.lights
+        )?;
+    }
+    if summary.bones > 0 {
+        writeln!(
+            out,
+            "rig in one file: {} bones, skinned meshes {}",
+            summary.bones, summary.skinned_meshes
         )?;
     }
     if summary.shared_meshes > 0 {

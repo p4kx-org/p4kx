@@ -182,3 +182,8 @@ pub(crate) fn record_reference(value: &Value<'_>) -> Option<CatalogGuid> {
         _ => None,
     }
 }
+
+/// Returns `guid` unless it is the nil GUID, which the Archive writes for an unset identifier.
+pub(crate) fn nonnil_guid(guid: Guid) -> Option<Guid> {
+    (guid != Guid::default()).then_some(guid)
+}

@@ -29,7 +29,7 @@ pub(crate) struct Counts {
     clippy::trivially_copy_pass_by_ref,
     reason = "serde passes a reference"
 )]
-const fn is_zero(count: &usize) -> bool {
+pub(crate) const fn is_zero(count: &usize) -> bool {
     *count == 0
 }
 

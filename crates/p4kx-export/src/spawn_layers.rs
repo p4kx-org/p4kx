@@ -63,6 +63,11 @@ pub(crate) struct Level {
 }
 
 impl Level {
+    /// Returns what this level alone states.
+    pub(crate) fn resolved(&self) -> Resolved {
+        resolve(&[self])
+    }
+
     /// Reads the properties in the array `properties` of `params` and the location prerequisites
     /// in the array `prerequisites` of `owner`, registering what they state in `pools`.
     ///

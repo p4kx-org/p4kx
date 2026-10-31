@@ -17,10 +17,17 @@ fn value(name: &str) -> TestStruct {
 
 /// Adds the structs of the fixture to `builder`.
 pub(super) fn structures(builder: DataForgeBuilder) -> DataForgeBuilder {
-    [contracts(), properties(), spawns(), locations()]
-        .into_iter()
-        .flatten()
-        .fold(builder, DataForgeBuilder::structure)
+    [
+        contracts(),
+        templates(),
+        super::template_structures::structs(),
+        properties(),
+        spawns(),
+        locations(),
+    ]
+    .into_iter()
+    .flatten()
+    .fold(builder, DataForgeBuilder::structure)
 }
 
 fn contracts() -> Vec<TestStruct> {
@@ -55,7 +62,65 @@ fn contracts() -> Vec<TestStruct> {
             .field("debugName", TestType::String)
             .array("additionalPrerequisites", pointer("ContractPrerequisite"))
             .field("paramOverrides", class("ContractParamOverrides")),
-        TestStruct::new("ContractTemplate").array("contractProperties", class("MissionProperty")),
+        TestStruct::new("ContractTemplate")
+            .field("owner", TestType::Reference)
+            .field("partialRewardPayout", pointer("PartialContractRewards"))
+            .array("modifiers", pointer("MissionModifier"))
+            .field("missionFlow", class("MissionFlow"))
+            .field(
+                "contractStartCommsNotification",
+                pointer("ContractCommsNotification"),
+            )
+            .array(
+                "contractEndCommsNotifications",
+                class("ContractEndCommsNotification"),
+            )
+            .field("notForRelease", TestType::Bool)
+            .field("contractDisplayInfo", class("ContractDisplayInfo"))
+            .field("contractClass", pointer("ContractClass"))
+            .array("contractProperties", class("MissionProperty"))
+            .array("objectiveTokens", class("ObjectiveToken")),
+    ]
+}
+
+/// The structs of the contract template Records beyond their properties.
+fn templates() -> Vec<TestStruct> {
+    vec![
+        TestStruct::new("ContractDisplayInfo")
+            .field("illegal", TestType::Bool)
+            .field("showLifeTimeInMobiGlas", TestType::Bool)
+            .field("preShowObjectives", TestType::Bool)
+            .array("displayString", TestType::Locale)
+            .field("type", TestType::Reference),
+        TestStruct::new("ContractClass"),
+        TestStruct::new("ContractClass_Contract")
+            .parent("ContractClass")
+            .field("additionalParams", class("ActiveContractSettings"))
+            .field("autoFinishSettings", class("ContractAutoFinishSettings")),
+        TestStruct::new("ActiveContractSettings")
+            .field("canBeShared", TestType::Bool)
+            .field("hasCompleteButton", TestType::Bool)
+            .field("handlesAbandonRequest", TestType::Bool)
+            .field("displayAlliedMarkers", TestType::Bool)
+            .field("onlyOwnerCanComplete", TestType::Bool),
+        TestStruct::new("ContractAutoFinishSettings")
+            .field("failIfSentToPrison", TestType::Bool)
+            .field("failIfBecameCriminal", TestType::Bool)
+            .field("failIfLeavePrison", TestType::Bool)
+            .field("contractDeadline", class("MissionDeadline")),
+        TestStruct::new("MissionDeadline")
+            .field("missionCompletionTime", TestType::Int32)
+            .field("missionAutoEnd", TestType::Bool)
+            .field("missionResultAfterTimerEnd", TestType::String)
+            .field("remainingTimeToShowTimer", TestType::Int32),
+        TestStruct::new("HaulingOrder_Resource")
+            .parent("HaulingOrder")
+            .field("resource", TestType::Reference)
+            .field("minSCU", TestType::Int32)
+            .field("maxSCU", TestType::Int32),
+        value("MissionPropertyValue_Boolean").field("value", TestType::Bool),
+        value("MissionPropertyValue_HaulingOrders")
+            .array("haulingOrderContent", pointer("HaulingOrder")),
     ]
 }
 

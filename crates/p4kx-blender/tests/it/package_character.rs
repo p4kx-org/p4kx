@@ -147,7 +147,6 @@ fn a_character_is_a_folder_of_a_manifest_and_one_skinned_mesh() -> TestResult {
     assert_eq!(names_in(&written.out.join("meshes"))?, ["m0001.glb"]);
     assert_eq!(names_in(&written.out.join("textures"))?.len(), 0);
     assert_eq!(written.manifest.version, FORMAT_VERSION);
-    assert_eq!(written.manifest.version, "1.7");
     let [node] = written.manifest.nodes.as_slice() else {
         return Err("one node".into());
     };
@@ -197,7 +196,8 @@ fn the_rig_lists_the_parts_morph_targets_and_animations_the_glb_holds() -> TestR
 
     let mesh = written.manifest.meshes.first().ok_or("mesh")?;
     let rig = mesh.rig.as_ref().ok_or("rig")?;
-    assert_eq!(rig.body, "male");
+    assert_eq!(rig.body.as_deref(), Some("male"));
+    assert_eq!(written.raw["meshes"][0]["rig"]["body"], "male");
     assert_eq!(
         rig.bones,
         glb.document.skins().next().ok_or("skin")?.joints().count()

@@ -221,6 +221,7 @@ fn the_kinds_follow_the_existing_ones_in_the_catalog_order() {
             "missionLocationTemplates",
             "contractShipSpawns",
             "contractLocationQueries",
+            "contractTemplates",
         ],
         "order of the catalog"
     );

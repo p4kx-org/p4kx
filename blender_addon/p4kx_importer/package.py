@@ -30,7 +30,7 @@ from .rig_model import Rig, RigError, parse_rig
 
 FORMAT_NAME = "p4kx-blender-package"
 SUPPORTED_MAJOR = 1
-SUPPORTED_MINOR = 7
+SUPPORTED_MINOR = 8
 MANIFEST_NAME = "scene.json"
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
 MAX_GLB_JSON_BYTES = 16 * 1024 * 1024

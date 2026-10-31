@@ -280,6 +280,7 @@ fn assemble<R>(
         mission_location_templates: collected.mission_location_templates,
         contract_ship_spawns: collected.contract_ship_spawns,
         contract_location_queries: collected.contract_location_queries,
+        contract_templates: collected.contract_templates,
         ship_store_slugs: resolved.exported,
         item_recovery: rules,
     };

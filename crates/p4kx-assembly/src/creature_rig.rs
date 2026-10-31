@@ -11,7 +11,7 @@ use p4kx_model::{Bone, BoneMatch, Model, Transform};
 
 use crate::character_path::{is_character_path, is_creature_path};
 use crate::placement::bone_pose;
-use crate::{EntityNode, Issue, IssueKind, LoadoutError, Part, Placement};
+use crate::{Assembly, EntityNode, Issue, IssueKind, LoadoutError, Part, Placement};
 
 /// Returns the bones of the root part's model at the level `level` of detail, or `None` when the
 /// root's geometry is no creature file (a character file below `Objects/Characters` outside the
@@ -27,6 +27,24 @@ pub(crate) fn skeleton_of<'a>(
     level: u32,
 ) -> Option<&'a [Bone]> {
     bones_of_root(parts, issues, level, is_creature_path)
+}
+
+impl Assembly {
+    /// Returns the parts with a skinned mesh of a creature that has a skeleton, the root included
+    /// when it draws a skin, or `None` when the Assembly writes no creature skeleton. That is the
+    /// case when the root's geometry is no creature file, its skeleton file is missing or
+    /// unreadable, or the skeleton has no bones. A creature with a skeleton and no skinned part
+    /// gives an empty iterator. [`Assembly::write_glb`] writes the bones as nodes when it is `Some`.
+    #[must_use]
+    pub fn creature_skins(&self) -> Option<impl Iterator<Item = &Part>> {
+        skeleton_of(&self.parts, &self.issues, self.lod)?;
+        let level = self.lod;
+        Some(self.parts.iter().filter(move |part| {
+            part.model
+                .as_deref()
+                .is_some_and(|model| is_skinned(model, level))
+        }))
+    }
 }
 
 /// Returns the bones the item ports of the skins anchor to: those of the root part's model when
