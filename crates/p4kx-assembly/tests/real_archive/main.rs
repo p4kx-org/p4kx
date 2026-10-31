@@ -65,6 +65,7 @@ mod real_prefabs;
 mod real_resolve;
 mod real_rig_logic;
 mod real_search;
+mod real_skin_port_helpers;
 mod real_skin_port_props;
 mod real_soc_lights;
 mod real_soc_palette;

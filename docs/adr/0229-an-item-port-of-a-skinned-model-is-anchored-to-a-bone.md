@@ -17,6 +17,9 @@ below it, at the arm's origin, inside the nose.
   has no such node, as a bone of its skeleton, ignoring case.
 - A bone resolves to its bind pose in the model's space, composed from the poses relative to its
   parents. The port's offset applies in the space of that bone, as for a node.
+- Only the bones of the first level of detail count; of several bones with the same name, the
+  first wins.
+- A node and a bone of the same name resolve to the node.
 - The placement is `helper` with the bone's name.
 - A helper that is neither a node nor a bone is still listed as `helper_not_found`, and the part
   sits at the parent's origin.

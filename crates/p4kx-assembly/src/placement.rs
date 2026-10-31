@@ -78,6 +78,9 @@ pub(crate) fn is_character_item(item_type: &str) -> bool {
 /// Returns the transform from the bind-pose space of the bone of `model` named `name`, ignoring
 /// ASCII case, to the model's space, or `None` when the model has no such bone or its pose is
 /// not finite.
+///
+/// Only the bones of the first level of detail count, and of several bones with the same name the
+/// first wins.
 pub(crate) fn bone_transform(model: &Model, name: &str) -> Option<Transform> {
     let bones = model
         .lods
