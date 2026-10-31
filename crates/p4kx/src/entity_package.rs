@@ -252,8 +252,8 @@ fn print_report(
     if summary.bones > 0 {
         writeln!(
             out,
-            "rig: {} bones, {} skinned meshes in {} file",
-            summary.bones, summary.skinned_meshes, summary.meshes
+            "rig in one file: {} bones, skinned meshes {}",
+            summary.bones, summary.skinned_meshes
         )?;
     }
     if summary.shared_meshes > 0 {

@@ -6,14 +6,20 @@
 use std::path::Path;
 
 use p4kx_assembly::{ArchiveModels, Assembly};
-use p4kx_blender::{Manifest, NodeKind, PackageInfo, PackageSummary, RigPartOrigin, write_package};
+use p4kx_blender::{
+    FORMAT_VERSION, IssueOrigin, Manifest, NodeKind, PackageInfo, PackageSummary, RigPartOrigin,
+    manifest_schema, write_package,
+};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{
-    CREATURE, CREATURE_COLLARED, CREATURE_DEFINITION, CREATURE_HORNED, CREATURE_NO_SKELETON,
-    CheckedGlb, check_glb, creature_entries,
+    CREATURE, CREATURE_COLLARED, CREATURE_DEFINITION, CREATURE_HORNED, CREATURE_LOADOUT_LOST,
+    CREATURE_NO_SKELETON, CheckedGlb, TestEntry, TestMtl, TestMtlMaterial, check_glb,
+    creature_entries,
 };
 
-use crate::support::{TestResult, assemble, fixture, glb_options, names_in, never};
+use crate::support::{
+    TestResult, assemble, assemble_with_interior, fixture, glb_options, names_in, never,
+};
 
 struct Written {
     _dir: tempfile::TempDir,
@@ -21,12 +27,25 @@ struct Written {
     assembly: Assembly,
     summary: PackageSummary,
     manifest: Manifest,
+    raw: serde_json::Value,
 }
 
 fn write(class: &str) -> Result<Written, Box<dyn std::error::Error>> {
-    let fixture = fixture(creature_entries())?;
+    write_from(creature_entries(), class, false)
+}
+
+fn write_from(
+    entries: Vec<TestEntry>,
+    class: &str,
+    interior: bool,
+) -> Result<Written, Box<dyn std::error::Error>> {
+    let fixture = fixture(entries)?;
     let archive = Archive::open(&fixture.path)?;
-    let assembly = assemble(&archive, class)?;
+    let assembly = if interior {
+        assemble_with_interior(&archive, class)?
+    } else {
+        assemble(&archive, class)?
+    };
     let models = ArchiveModels::new(&archive);
     let dir = tempfile::tempdir()?;
     let out = dir.path().join("creature");
@@ -39,13 +58,14 @@ fn write(class: &str) -> Result<Written, Box<dyn std::error::Error>> {
         &out,
         &never,
     )?;
-    let manifest = serde_json::from_str(&std::fs::read_to_string(out.join("scene.json"))?)?;
+    let text = std::fs::read_to_string(out.join("scene.json"))?;
     Ok(Written {
         _dir: dir,
         out,
         assembly,
         summary,
-        manifest,
+        manifest: serde_json::from_str(&text)?,
+        raw: serde_json::from_str(&text)?,
     })
 }
 
@@ -58,7 +78,7 @@ fn a_creature_with_its_skeleton_is_one_skinned_rig_mesh() -> TestResult {
     let written = write(CREATURE)?;
     let manifest = &written.manifest;
 
-    assert_eq!(manifest.version, "1.7");
+    assert_eq!(manifest.version, FORMAT_VERSION);
     assert_eq!(names_in(&written.out.join("meshes"))?, ["m0001.glb"]);
     assert!(manifest.textures.is_empty() && manifest.materials.is_empty());
     let [node] = manifest.nodes.as_slice() else {
@@ -154,5 +174,91 @@ fn a_creature_with_a_prop_on_a_skin_port_keeps_it_in_the_rig_file() -> TestResul
 
     assert_eq!(written.manifest.meshes.len(), 1);
     assert!(written.manifest.meshes[0].rig.is_some());
+    Ok(())
+}
+
+#[test]
+fn the_scene_json_of_a_creature_has_no_body_and_matches_the_schema() -> TestResult {
+    let written = write(CREATURE)?;
+
+    let rig = &written.raw["meshes"][0]["rig"];
+    assert!(rig.get("body").is_none(), "{rig}");
+    assert_eq!(rig["parts"][0]["origin"], "skin");
+    let validator = jsonschema::draft202012::new(&manifest_schema())?;
+    let violations: Vec<String> = validator
+        .iter_errors(&written.raw)
+        .take(5)
+        .map(|error| format!("{} at {}", error, error.instance_path()))
+        .collect();
+    assert_eq!(violations.len(), 0, "{violations:?}");
+    Ok(())
+}
+
+#[test]
+fn a_creature_with_bones_and_no_skin_stays_static() -> TestResult {
+    let written = write(CREATURE_LOADOUT_LOST)?;
+
+    assert_eq!(
+        written.assembly.creature_skins().map(Iterator::count),
+        Some(0),
+        "the skeleton is there and no part is skinned"
+    );
+    assert!(
+        written
+            .manifest
+            .meshes
+            .iter()
+            .all(|mesh| mesh.rig.is_none())
+    );
+    assert_eq!(written.summary.bones, 0, "the writer has no bones to bind");
+    Ok(())
+}
+
+#[test]
+fn the_interior_of_a_creature_is_left_out_and_listed() -> TestResult {
+    let written = write_from(creature_entries(), CREATURE, true)?;
+
+    assert!(written.assembly.interior().is_some());
+    let left_out: Vec<_> = written
+        .manifest
+        .issues
+        .iter()
+        .filter(|issue| issue.kind == "interior_not_written")
+        .collect();
+    assert_eq!(left_out.len(), 1, "{:?}", written.manifest.issues);
+    assert_eq!(left_out[0].origin, IssueOrigin::Assembly);
+    assert_eq!(written.manifest.nodes.len(), 1);
+    let plain = write(CREATURE)?;
+    assert!(
+        plain
+            .manifest
+            .issues
+            .iter()
+            .all(|issue| issue.kind != "interior_not_written")
+    );
+    Ok(())
+}
+
+#[test]
+fn a_texture_the_rig_file_cannot_embed_is_an_issue_of_the_manifest() -> TestResult {
+    let library = TestMtl::multi(&[
+        TestMtlMaterial::new("unused").texture("TexSlot1", "Objects/Test/missing_diff.tif"),
+        TestMtlMaterial::new("caps").texture("TexSlot1", "Objects/Test/missing_diff.tif"),
+        TestMtlMaterial::new("sides").texture("TexSlot1", "Objects/Test/missing_diff.tif"),
+    ]);
+    let mut entries = creature_entries();
+    entries.push(TestEntry::stored(
+        r"Data\objects\test\cube.mtl",
+        library.cryxml(),
+    ));
+
+    let written = write_from(entries, CREATURE, false)?;
+
+    let found = written
+        .manifest
+        .issues
+        .iter()
+        .any(|issue| issue.origin == IssueOrigin::Texture && issue.kind == "texture");
+    assert!(found, "{:?}", written.manifest.issues);
     Ok(())
 }

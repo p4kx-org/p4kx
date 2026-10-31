@@ -9,7 +9,8 @@ use p4kx_assembly::{Assembly, Part};
 use p4kx_gltf::{GlbOptions, GlbSummary, MaterialMode, TextureLoader};
 
 use crate::build::assembly_issue;
-use crate::manifest::{EntityRef, Manifest, Node, NodeKind, Source};
+use crate::items::entity_ref;
+use crate::manifest::{Issue, IssueOrigin, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigPart, RigPartOrigin};
 use crate::rig_package::{RigScene, rig_manifest, write_rig_package};
 use crate::{PackageInfo, PackageResult, PackageSummary};
@@ -17,8 +18,9 @@ use crate::{PackageInfo, PackageResult, PackageSummary};
 /// Writes the creature `assembly` as a package: `meshes/m0001.glb` is the Assembly as
 /// [`Assembly::write_glb_with`] writes it, its skeleton as bone nodes with the skins bound to it,
 /// and the parts that hang on its bones beside them. The textures are embedded in the file at
-/// `options.texture_mip`, as for a Character; the package has no texture files. Expects
-/// [`Assembly::creature_skins`] to be `Some`.
+/// `options.texture_mip`, as for a Character; the package has no texture files. An Interior of
+/// the Assembly is left out and listed as the issue `interior_not_written`. Expects
+/// [`Assembly::creature_skins`] to yield a part.
 pub(crate) fn write_creature_package(
     assembly: &Assembly,
     textures: &dyn TextureLoader,
@@ -29,27 +31,49 @@ pub(crate) fn write_creature_package(
 ) -> PackageResult<PackageSummary> {
     let options = options.with_materials(MaterialMode::Textures);
     let name = assembly.root().map_or("", Part::class_name);
+    let interior_left_out = assembly.interior().is_some();
+    let stripped;
+    let assembly = if interior_left_out {
+        stripped = assembly.clone().without_interior();
+        &stripped
+    } else {
+        assembly
+    };
     write_rig_package(
         out,
         name,
         cancelled,
         |writer| assembly.write_glb_with(&options, textures, writer),
-        |written| manifest(assembly, info, &options, written),
+        |written| manifest(assembly, interior_left_out, info, &options, written),
     )
 }
 
 fn manifest(
     assembly: &Assembly,
+    interior_left_out: bool,
     info: &PackageInfo,
     options: &GlbOptions,
     written: &GlbSummary,
 ) -> Manifest {
     let root = assembly.root();
+    let entity = entity_ref(root);
+    let mut issues: Vec<Issue> = assembly.issues().iter().map(assembly_issue).collect();
+    if interior_left_out {
+        issues.push(Issue {
+            origin: IssueOrigin::Assembly,
+            kind: "interior_not_written".to_owned(),
+            path: String::new(),
+            name: entity.class_name.clone(),
+            skipped: true,
+            reason: "the Interior of a creature with a skeleton is not written to a rig mesh"
+                .to_owned(),
+        });
+    }
     let scene = RigScene {
         source: Source {
             channel: info.channel.clone(),
             build: info.build.clone(),
-            entity: entity_of(root),
+            entity: entity.clone(),
             character: None,
         },
         node: Node {
@@ -57,7 +81,7 @@ fn manifest(
             name: root.map_or_else(String::new, |root| root.name().to_owned()),
             path: root.map_or_else(String::new, |root| root.path().to_owned()),
             parent: None,
-            entity: Some(entity_of(root)),
+            entity: Some(entity),
             light: None,
             mesh: None,
             translation: [0.0; 3],
@@ -66,22 +90,9 @@ fn manifest(
         },
         geometry: root.and_then(Part::geometry).map(str::to_owned),
         rig: rig(assembly, written),
-        issues: assembly.issues().iter().map(assembly_issue).collect(),
+        issues,
     };
     rig_manifest(scene, info, options, written)
-}
-
-fn entity_of(root: Option<&Part>) -> EntityRef {
-    root.map_or_else(
-        || EntityRef {
-            class_name: String::new(),
-            guid: String::new(),
-        },
-        |root| EntityRef {
-            class_name: root.class_name().to_owned(),
-            guid: root.guid().to_string(),
-        },
-    )
 }
 
 fn rig(assembly: &Assembly, written: &GlbSummary) -> Rig {

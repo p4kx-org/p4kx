@@ -23,12 +23,12 @@ fn a_creature_with_its_skeleton_is_one_rig_mesh_and_the_report_counts_the_bones(
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(
         run.stdout
-            .contains("rig: 3 bones, 1 skinned meshes in 1 file"),
+            .contains("rig in one file: 3 bones, skinned meshes 1"),
         "{}",
         run.stdout
     );
     let manifest = manifest(&out)?;
-    assert_eq!(manifest["version"], "1.7");
+    assert_eq!(manifest["version"], p4kx_blender::FORMAT_VERSION);
     assert_eq!(manifest["meshes"].as_array().map(Vec::len), Some(1));
     assert_eq!(manifest["meshes"][0]["rig"]["bones"], 3);
     assert!(manifest["meshes"][0]["rig"].get("body").is_none());
@@ -58,5 +58,36 @@ fn the_json_report_counts_bones_and_skinned_meshes_only_for_a_rig() -> TestResul
     let plain: Value = serde_json::from_str(&plain.stdout)?;
     assert!(plain.get("bones").is_none() && plain.get("skinned_meshes").is_none());
     assert!(manifest(&dir.path().join("plain"))?["meshes"][0]["rig"].is_null());
+    Ok(())
+}
+
+#[test]
+fn an_excluded_skin_leaves_a_static_package_and_a_replaced_one_keeps_the_rig() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = write_archive(dir.path(), creature_entries())?;
+
+    let excluded = dir.path().join("excluded");
+    let run = package(
+        &archive,
+        CREATURE,
+        &excluded,
+        &["--exclude", "Body_ItemPort"],
+        false,
+    )?;
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(manifest(&excluded)?["meshes"][0].get("rig").is_none());
+
+    let replaced = dir.path().join("replaced");
+    let run = package(
+        &archive,
+        CREATURE,
+        &replaced,
+        &["--replace", "Body_ItemPort=Test_Creature_Skin"],
+        false,
+    )?;
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let manifest = manifest(&replaced)?;
+    assert_eq!(manifest["options"]["replace"][0]["port"], "Body_ItemPort");
+    assert_eq!(manifest["meshes"][0]["rig"]["bones"], 3);
     Ok(())
 }

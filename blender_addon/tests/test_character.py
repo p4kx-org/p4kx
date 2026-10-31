@@ -39,7 +39,7 @@ def test_reads_a_character_with_its_rig() -> None:
 
 
 def test_reads_a_creature_as_an_entity_node_with_a_rig_that_has_no_body() -> None:
-    data = character_manifest(version="1.7")
+    data = character_manifest(version=f"1.{package.SUPPORTED_MINOR}")
     data["nodes"][0]["kind"] = "entity"
     rig = data["meshes"][0]["rig"]
     rig.pop("body")
@@ -54,7 +54,7 @@ def test_reads_a_creature_as_an_entity_node_with_a_rig_that_has_no_body() -> Non
 
 def test_the_add_on_reads_format_1_3() -> None:
     assert package.SUPPORTED_MINOR >= 3
-    assert parse(character_manifest(version="1.8")).warnings
+    assert parse(character_manifest(version=f"1.{package.SUPPORTED_MINOR + 1}")).warnings
 
 
 def test_a_character_node_without_a_rigged_mesh_is_skipped_with_its_children() -> None:

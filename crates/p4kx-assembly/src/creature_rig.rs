@@ -30,10 +30,11 @@ pub(crate) fn skeleton_of<'a>(
 }
 
 impl Assembly {
-    /// Returns the parts of a creature whose skin is bound to its skeleton, the root included
-    /// when it draws a skin, or `None` when the Assembly writes no creature skeleton: the root's
-    /// geometry is no creature file, its skeleton file is missing or unreadable, or it has no
-    /// bones. [`Assembly::write_glb`] writes the skeleton as bone nodes then.
+    /// Returns the parts with a skinned mesh of a creature that has a skeleton, the root included
+    /// when it draws a skin, or `None` when the Assembly writes no creature skeleton. That is the
+    /// case when the root's geometry is no creature file, its skeleton file is missing or
+    /// unreadable, or the skeleton has no bones. A creature with a skeleton and no skinned part
+    /// gives an empty iterator. [`Assembly::write_glb`] writes the bones as nodes when it is `Some`.
     #[must_use]
     pub fn creature_skins(&self) -> Option<impl Iterator<Item = &Part>> {
         skeleton_of(&self.parts, &self.issues, self.lod)?;

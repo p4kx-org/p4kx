@@ -74,7 +74,7 @@ def import_package(
             created[node.index] = _create_object(node, template, created, root)
             mesh = package.meshes[node.mesh] if node.mesh else None
             if mesh is not None and mesh.rig is not None:
-                _import_character(context, package, mesh, created[node.index], root, result)
+                _import_rigged(context, package, mesh, created[node.index], root, result)
         result.objects += 1
         result.instances += template is not None
     result.warnings.extend(package.warnings)
@@ -140,7 +140,7 @@ def _import_glb(
     return True
 
 
-def _import_character(
+def _import_rigged(
     context: bpy.types.Context,
     package: Package,
     mesh: Mesh,

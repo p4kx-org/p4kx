@@ -19,8 +19,8 @@ skin and the animations that the reader imports once, not as an instance, and a 
 describes it. The add-on imports every rigged mesh that way whatever the kind of the node that
 draws it.
 
-`Kopion_CombatPet` written this way holds 77 bones, one skinned mesh, a collar and a horn on item
-ports and 5 materials in one GLB, and imports in Blender 5.2 as one armature with 77 vertex groups
+`Kopion_CombatPet` (LIVE, build 4.10.197.2878, change 12913470) written this way holds 77 bones,
+one skinned mesh, a collar and a horn on item ports and 5 materials in one GLB of 120 MB at mip 0, and imports in Blender 5.2 as one armature with 77 vertex groups
 on the skinned mesh and the collar and horn parented below.
 
 ## Decision
@@ -29,8 +29,10 @@ on the skinned mesh and the collar and horn parented below.
   `Assembly::write_glb_with` does, with every part of the Assembly in it, and one node of the kind
   `entity` (the root, identity transform, its `entity` reference) drawing it. The mesh's `rig`
   lists the file's bones, skinned meshes, morph targets and the skinned parts. The `issues` are
-  those of the Assembly. A creature without a skeleton file, or a skeleton without bones, and every
-  other Entity keep the static meshes. The Interior of such a creature is not written.
+  those of the Assembly. A creature without a skeleton file, a skeleton without bones, or without a skinned
+  part (the writer binds no bones then) and every other Entity keep the static meshes. The
+  Interior of such a creature is not written; `--interior` gives the issue
+  `interior_not_written` and no Interior nodes.
 - **The materials are in the file.** As in the Character package the textures are embedded at
   `texture_mip` and the mesh lists no `materials`; `textures`, `materials` and `palettes` are
   empty. `--texture-mip` keeps its default 0, so a creature with big textures gives a large file
@@ -39,7 +41,9 @@ on the skinned mesh and the collar and horn parented below.
   `character` kind says that the package was made from a CHF or a body. The add-on needs no new
   rule: it already imports the mesh of any node whose mesh has a `rig` once.
 - **The rig says what a creature lacks (format 1.7).** `rig.body` is optional and absent for a
-  creature; `rig.skeleton` is the geometry file of the root, whose model holds the bones; the part
+  creature; `rig.skeleton` is the geometry file of the root, whose model holds the bones (the
+  Assembly keeps no separate skeleton path: a character definition names its skeleton inside
+  itself, and the root geometry is the one file both forms share); the part
   origin `skin` names a skin of a creature. Both are additive for a reader that ignores unknown
   values, but a reader of 1.6 requires a `body`, so the minor version rises to 1.7 and the add-on
   reads it (`SUPPORTED_MINOR` 7).
@@ -54,6 +58,8 @@ on the skinned mesh and the collar and horn parented below.
 - The shape of a package changes for creatures with skeletons: one mesh and one node instead of
   one mesh per part and a node per part. A reader that follows the manifest gets the parts from
   the GLB, whose node names are those of the parts.
+- The textures the file could not embed are `texture` issues in the manifest, for the Character
+  package too.
 - The report of `entity package` prints the bones and skinned meshes and its JSON has `bones` and
   `skinned_meshes` for such a creature; both are absent otherwise.
 - A creature written twice with different loadouts gives two packages that do not share meshes.

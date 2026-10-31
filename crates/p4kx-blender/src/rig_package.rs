@@ -12,8 +12,8 @@ use p4kx_gltf::{GlbOptions, GlbSummary, GltfError};
 use crate::build::{coordinates, generator};
 use crate::finite::sanitise;
 use crate::manifest::{
-    FORMAT_VERSION, Format, Issue, MANIFEST_FILE, MESHES_FOLDER, Manifest, Mesh, Node, Options,
-    Source,
+    FORMAT_VERSION, Format, Issue, IssueOrigin, MANIFEST_FILE, MESHES_FOLDER, Manifest, Mesh, Node,
+    Options, Source,
 };
 use crate::manifest_rig::Rig;
 use crate::plan::mesh_id;
@@ -39,6 +39,15 @@ pub(crate) fn rig_manifest(
     written: &GlbSummary,
 ) -> Manifest {
     let id = mesh_id(0);
+    let mut issues = scene.issues;
+    issues.extend(written.texture_fallbacks.iter().map(|fallback| Issue {
+        origin: IssueOrigin::Texture,
+        kind: "texture".to_owned(),
+        path: fallback.file.clone(),
+        name: fallback.material.clone(),
+        skipped: false,
+        reason: fallback.reason.clone(),
+    }));
     let mut node = scene.node;
     node.mesh = Some(id.clone());
     Manifest {
@@ -71,7 +80,7 @@ pub(crate) fn rig_manifest(
         textures: Vec::new(),
         materials: Vec::new(),
         palettes: Vec::new(),
-        issues: scene.issues,
+        issues,
     }
 }
 

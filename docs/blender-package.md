@@ -230,8 +230,8 @@ library entry point is `p4kx_blender::write_character_package`.
 ### Creatures
 
 `p4kx entity package` of a creature whose root geometry is a character file outside the human rigs
-and whose skeleton the Archive holds (`Assembly::creature_skins` is `Some`, ADR-0275) writes a
-package of version 1.7 with one mesh, the rig form of a Character
+and whose skeleton the Archive holds, with a skin bound to it (`Assembly::creature_skins` yields a
+part, ADR-0275), writes a package of version 1.7 with one mesh, the rig form of a Character
 ([ADR-0316](adr/0316-a-creature-with-its-skeleton-is-packaged-as-one-skinned-rig-mesh.md)):
 
 - `nodes` has one node of the kind `entity`, the root Entity at the identity transform, with its
@@ -244,10 +244,15 @@ package of version 1.7 with one mesh, the rig form of a Character
 - `rig` has no `body`; `skeleton` is the root's geometry file, `parts` lists the parts with a
   skinned mesh (`origin` is `skin`), `bones`, `skinned_meshes` and `morph_targets` count what the
   file holds.
-- The `issues` are those of the Assembly, bones the skeleton lacks included.
+- The `issues` are those of the Assembly, bones the skeleton lacks included, and the textures the
+  file could not embed (`origin` `texture`, `kind` `texture`). The Interior of `--interior` is not
+  written and is one issue, `interior_not_written`.
+- The textures are embedded at `--texture-mip` (default 0), so the file is large: about 110 to
+  120 MB for a creature of the LIVE Archive. `--texture-mip 1` makes it much smaller.
 
-A creature without a skeleton file, or whose skeleton has no bones, is written as before: static
-meshes, no `rig`, its issues listing the skeleton as missing or unreadable. The add-on imports the
+A creature without a skeleton file, whose skeleton has no bones, or that wears no skin (for
+example after `--exclude` of its skin port) is written as before: static meshes, no `rig`, its
+issues listing the skeleton as missing or unreadable. The add-on imports the
 rig mesh once for the node, as for a Character; the armature, the skinned meshes and the other
 parts come in below the node's empty.
 
