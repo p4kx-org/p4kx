@@ -487,7 +487,7 @@ https://crates.io/crates/option-ext/0.2.0 and from https://github.com/soc/option
 | `litemap` | 0.8.3 | Unicode License v3 | <https://github.com/unicode-org/icu4x> |
 | `litrs` | 1.0.1 | MIT License | <https://github.com/LukasKalbertodt/litrs> |
 | `lock_api` | 0.4.14 | MIT License | <https://github.com/Amanieu/parking_lot> |
-| `log` | 0.4.34 | MIT License | <https://github.com/rust-lang/log> |
+| `log` | 0.4.35 | MIT License | <https://github.com/rust-lang/log> |
 | `lzma-rs` | 0.3.0 | MIT License | <https://github.com/gendx/lzma-rs> |
 | `memchr` | 2.8.3 | MIT License | <https://github.com/BurntSushi/memchr> |
 | `mime` | 0.3.17 | MIT License | <https://github.com/hyperium/mime> |
@@ -3797,7 +3797,7 @@ THE SOFTWARE.
 Used by:
 
 - `bitflags` 2.13.2 (<https://github.com/bitflags/bitflags>)
-- `log` 0.4.34 (<https://github.com/rust-lang/log>)
+- `log` 0.4.35 (<https://github.com/rust-lang/log>)
 - `num-bigint` 0.4.8 (<https://github.com/rust-num/num-bigint>)
 - `num-integer` 0.1.47 (<https://github.com/rust-num/num-integer>)
 - `num-rational` 0.4.2 (<https://github.com/rust-num/num-rational>)

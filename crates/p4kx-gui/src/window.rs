@@ -3,9 +3,12 @@
 
 //! Placement of the main window and how it is remembered in the settings file.
 
+use eframe::egui_wgpu::wgpu::Backends;
+use eframe::egui_wgpu::{WgpuSetup, WgpuSetupCreateNew};
 use egui::{Rect, ViewportBuilder, ViewportInfo};
 use p4kx_settings::WindowGeometry;
 
+use crate::backends;
 use crate::theme::logo::window_icon;
 use crate::theme::window_metrics::{WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH};
 
@@ -34,14 +37,34 @@ pub fn viewport(geometry: Option<WindowGeometry>, title: &str) -> ViewportBuilde
 
 /// Returns the options of the native window around `viewport`: egui's own pass keeps one sample
 /// and no depth buffer, which is what the pipeline that blits the 3D view into it is made for.
+///
+/// The wgpu instance opens the backends `backends::choose` picks: `WGPU_BACKEND`, else Direct3D
+/// 12 when it works, else eframe's default backends.
 #[must_use]
 pub fn native_options(viewport: ViewportBuilder) -> eframe::NativeOptions {
-    eframe::NativeOptions {
+    native_options_with(viewport, Backends::from_env(), backends::dx12_usable)
+}
+
+/// Returns [`native_options`] for the backends named by `from_env` and the answer of `probe`
+/// about the wgpu setup the options start from.
+fn native_options_with(
+    viewport: ViewportBuilder,
+    from_env: Option<Backends>,
+    probe: impl FnOnce(&WgpuSetupCreateNew) -> bool,
+) -> eframe::NativeOptions {
+    let mut options = eframe::NativeOptions {
         viewport,
         multisampling: 0,
         depth_buffer: 0,
         ..eframe::NativeOptions::default()
+    };
+    if let WgpuSetup::CreateNew(setup) = &mut options.wgpu_options.wgpu_setup {
+        let chosen = backends::choose(from_env, setup.instance_descriptor.backends, || {
+            probe(setup)
+        });
+        setup.instance_descriptor.backends = chosen;
     }
+    options
 }
 
 /// Returns the geometry to remember for the window described by `info`.
@@ -101,14 +124,64 @@ mod tests {
     use egui::{Rect, ViewportInfo, pos2, vec2};
     use p4kx_settings::WindowGeometry;
 
-    use super::{geometry, native_options, viewport};
+    use eframe::egui_wgpu::WgpuSetup;
+    use eframe::egui_wgpu::wgpu::Backends;
+
+    use super::{geometry, native_options_with, viewport};
+
+    fn instance_backends(options: &eframe::NativeOptions) -> Option<Backends> {
+        match &options.wgpu_options.wgpu_setup {
+            WgpuSetup::CreateNew(setup) => Some(setup.instance_descriptor.backends),
+            WgpuSetup::Existing(_) => None,
+        }
+    }
 
     #[test]
     fn egui_s_pass_has_one_sample_and_no_depth_buffer() {
-        let options = native_options(viewport(None, "title"));
+        let options = native_options_with(viewport(None, "title"), None, |_| false);
 
         assert_eq!(options.multisampling, 0, "no multisampling");
         assert_eq!(options.depth_buffer, 0, "no depth buffer");
+    }
+
+    #[test]
+    fn a_working_direct3d_12_is_the_only_backend_of_the_instance() {
+        let options = native_options_with(viewport(None, "title"), None, |_| true);
+
+        assert_eq!(instance_backends(&options), Some(Backends::DX12));
+    }
+
+    #[test]
+    fn a_failing_direct3d_12_leaves_the_default_backends_of_the_instance() {
+        let default =
+            instance_backends(&native_options_with(viewport(None, "title"), None, |_| {
+                false
+            }));
+
+        let options = native_options_with(viewport(None, "title"), None, |_| false);
+
+        assert_eq!(instance_backends(&options), default);
+        assert_ne!(default, Some(Backends::DX12), "not Direct3D 12 alone");
+    }
+
+    #[test]
+    fn the_environment_backends_reach_the_instance_without_a_probe() {
+        let options =
+            native_options_with(viewport(None, "title"), Some(Backends::VULKAN), |_| false);
+
+        assert_eq!(instance_backends(&options), Some(Backends::VULKAN));
+    }
+
+    #[test]
+    fn the_probe_sees_the_setup_the_options_start_from() {
+        let mut power = None;
+
+        native_options_with(viewport(None, "title"), None, |setup| {
+            power = Some(setup.power_preference);
+            false
+        });
+
+        assert!(power.is_some(), "the probe got the wgpu setup");
     }
 
     #[test]
