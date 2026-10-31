@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::Arc;
-
 use p4kx_chunks::{ChunkFile, ChunkType, ivo};
 
 use crate::bone_map::check_joints;
@@ -17,7 +15,7 @@ use crate::skin::read_skin;
 use crate::{
     Bone, ChunkUsage, CompanionPath, CompanionResolver, CorruptChunk, LayerCache, Lod,
     LodSelection, MaterialReading, Mesh, Model, ModelChunk, ModelError, ModelFile, ModelIssue,
-    Node, PositionBox, Transform,
+    Node, PositionBox, RigLogicBytes, Transform,
 };
 
 const MATERIAL_TYPES: [ChunkType; 2] = [ivo::MTL_NAME_320, ivo::MTL_NAME];
@@ -90,7 +88,7 @@ pub(crate) fn build<B: AsRef<[u8]>>(
 
     let rig_logic = first_of(file, &[ivo::RIG_LOGIC]).and_then(|index| {
         read.push((ModelFile::Model, index));
-        file.chunk_data(index).map(Arc::from)
+        file.chunk_data(index).map(RigLogicBytes::new)
     });
 
     let Geometry {

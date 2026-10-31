@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::Arc;
-
 use p4kx_chunks::{ChunkFile, ChunkType, Container, ivo};
 
 use crate::build::build;
 use crate::crch::build as build_crch;
 use crate::{
     Bone, CompanionResolver, Influences, MaterialReading, MaterialStatus, ModelError, ModelIssue,
-    PositionBox, Transform,
+    PositionBox, RigLogicBytes, Transform,
 };
 
 /// A model read from a chunk file and its companions, in `CryEngine` coordinates: Z up, metres.
@@ -43,8 +41,8 @@ pub struct Model {
     /// Every chunk of the model file and its geometry companion, with how the model used it.
     pub chunks: Vec<ModelChunk>,
     /// The bytes of the model file's `RigLogic` chunk, which a consumer above this layer parses;
-    /// `None` for a model without one. The bytes are shared by every clone of the model.
-    pub rig_logic: Option<Arc<[u8]>>,
+    /// `None` for a model without one.
+    pub rig_logic: Option<RigLogicBytes>,
 }
 
 /// One node of a model's hierarchy.

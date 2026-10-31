@@ -5,11 +5,9 @@ use p4kx_character::{
     DnaMatrix, DnaRig, ExpressionBlend, ExpressionTarget, RigLogic, SkinBlendshapes,
 };
 use p4kx_gltf::MorphTarget;
-use p4kx_model::{Mesh, Model};
+use p4kx_model::{Mesh, Model, RigLogicBytes};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-/// The largest geometry file that is read for the blendshapes of a head's own rig, 64 MiB.
-pub(super) const MAX_SKIN_LEN: u64 = 64 << 20;
 const NO_VERTEX: u32 = u32::MAX;
 const CONTROL_PREFIX: &str = "ctl_";
 
@@ -51,7 +49,8 @@ fn normal(name: &str) -> String {
 pub(super) fn logic_of(model: &Model, path: &str) -> Result<RigLogic, String> {
     let data = model
         .rig_logic
-        .as_deref()
+        .as_ref()
+        .map(RigLogicBytes::as_slice)
         .ok_or_else(|| format!("{path} has no RigLogic chunk"))?;
     RigLogic::read(data).map_err(|error| format!("{path}: {error}"))
 }

@@ -10,7 +10,7 @@ use p4kx_character::{RigLogic, SkinBlendshapes};
 use p4kx_chunks::{ChunkFile, ivo};
 use p4kx_model::{Bone, Model};
 
-use super::expressions::{Expressions, MAX_SKIN_LEN, Morphs, targets_of};
+use super::expressions::{Expressions, Morphs, targets_of};
 use super::facial::{bones_of, own_facial};
 use super::lod_morphs::from_level_zero;
 use super::shape::{Outcome, outcome};
@@ -19,6 +19,8 @@ use crate::{IssueKind, ModelFailure, ModelProvider};
 /// The folder below `Data` that holds the `.RigLogic` file of every head rig.
 const LOGIC_FOLDER: &str = "Objects/Characters/RigLogic";
 const HEAD_SUFFIX: &str = "_head.skin";
+/// The largest geometry file read for the blendshapes of a head's own rig, 64 MiB.
+const MAX_OWN_RIG_GEOMETRY_LEN: u64 = 64 << 20;
 /// The largest `.RigLogic` file that is read, 4 MiB; the largest in LIVE has 0.5 MB.
 const MAX_LOGIC_LEN: u64 = 4 << 20;
 /// The prefix of the names of the facial bones, in lower case.
@@ -135,7 +137,7 @@ fn morphs(
     };
     let geometry = format!("{skin}m");
     let bytes = models
-        .file(&geometry, MAX_SKIN_LEN)
+        .file(&geometry, MAX_OWN_RIG_GEOMETRY_LEN)
         .map_err(|failure| format!("{geometry} cannot be read: {failure}"))?;
     let chunks =
         ChunkFile::parse(bytes.as_slice()).map_err(|error| format!("{geometry}: {error}"))?;

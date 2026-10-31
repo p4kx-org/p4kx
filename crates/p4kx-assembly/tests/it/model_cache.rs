@@ -12,7 +12,7 @@ use p4kx_assembly::{
 };
 use p4kx_extraction::Archive;
 use p4kx_extraction::model::MaterialStatus;
-use p4kx_testkit::{TestEntry, TestModel};
+use p4kx_testkit::{RIG_LOGIC_CHUNK, TestEntry, TestModel};
 
 const PATH: &str = "Objects/Test/cube.cgf";
 
@@ -169,5 +169,26 @@ fn the_least_recently_used_model_goes_first() -> TestResult {
     );
     assert_eq!(cache.len(), 1, "one fits");
     assert!(cache.bytes() <= one + one / 2);
+    Ok(())
+}
+
+#[test]
+fn the_rig_logic_chunk_of_a_model_counts_toward_the_bound() -> TestResult {
+    let chunk = [7_u8; 4096];
+    let size_of = |model: &TestModel| -> Result<usize, Box<dyn std::error::Error>> {
+        let fixture = fixture(vec![
+            TestEntry::stored(r"Data\Objects\Test\cube.cgf", model.cgf()),
+            TestEntry::stored(r"Data\Objects\Test\cube.cgfm", model.cgfm()),
+        ])?;
+        let archive = Archive::open(&fixture.path)?;
+        let cache = ModelCache::default();
+        CachedModels::new(&ArchiveModels::new(&archive), &cache).model(PATH, 1)?;
+        Ok(cache.bytes())
+    };
+
+    let plain = size_of(&TestModel::cube())?;
+    let with_chunk = size_of(&TestModel::cube().with_chunk(RIG_LOGIC_CHUNK, chunk))?;
+
+    assert_eq!(with_chunk - plain, chunk.len());
     Ok(())
 }
