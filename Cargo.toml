@@ -65,6 +65,7 @@ lewton = { version = "0.10.2", default-features = false }
 lzma-rs = "0.3.0"
 opus-pure = "=0.2.2"
 png = "0.18.1"
+pollster = "1.0.1"
 predicates = "3.1.4"
 peak_alloc = "0.3.0"
 proptest = "1.12.0"

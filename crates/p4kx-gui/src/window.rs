@@ -3,9 +3,12 @@
 
 //! Placement of the main window and how it is remembered in the settings file.
 
+use eframe::egui_wgpu::WgpuSetup;
+use eframe::egui_wgpu::wgpu::Backends;
 use egui::{Rect, ViewportBuilder, ViewportInfo};
 use p4kx_settings::WindowGeometry;
 
+use crate::backends;
 use crate::theme::logo::window_icon;
 use crate::theme::window_metrics::{WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH};
 
@@ -34,14 +37,26 @@ pub fn viewport(geometry: Option<WindowGeometry>, title: &str) -> ViewportBuilde
 
 /// Returns the options of the native window around `viewport`: egui's own pass keeps one sample
 /// and no depth buffer, which is what the pipeline that blits the 3D view into it is made for.
+///
+/// The wgpu instance opens the backends `backends::choose` picks: `WGPU_BACKEND`, else Direct3D
+/// 12 when it works, else eframe's default backends.
 #[must_use]
 pub fn native_options(viewport: ViewportBuilder) -> eframe::NativeOptions {
-    eframe::NativeOptions {
+    let mut options = eframe::NativeOptions {
         viewport,
         multisampling: 0,
         depth_buffer: 0,
         ..eframe::NativeOptions::default()
+    };
+    if let WgpuSetup::CreateNew(setup) = &mut options.wgpu_options.wgpu_setup {
+        let descriptor = &mut setup.instance_descriptor;
+        descriptor.backends = backends::choose(
+            Backends::from_env(),
+            descriptor.backends,
+            backends::dx12_usable,
+        );
     }
+    options
 }
 
 /// Returns the geometry to remember for the window described by `info`.

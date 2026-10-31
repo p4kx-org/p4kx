@@ -3792,6 +3792,7 @@ dependencies = [
  "p4kx-testkit",
  "p4kx-update",
  "png",
+ "pollster 1.0.1",
  "raw-window-handle",
  "rayon",
  "rfd",

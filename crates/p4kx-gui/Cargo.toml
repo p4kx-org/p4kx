@@ -36,6 +36,7 @@ eframe = { workspace = true, features = ["links"] }
 egui.workspace = true
 egui_extras.workspace = true
 fluent-bundle.workspace = true
+pollster.workspace = true
 rayon.workspace = true
 rfd.workspace = true
 rodio.workspace = true
