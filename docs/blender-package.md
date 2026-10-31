@@ -41,8 +41,9 @@ every texture and `--no-vertex-colours` leaves the vertex colours out of the mes
 `--interior` adds the Entity's Interior as for `entity glb --interior` (ADR-0086), see
 [Interiors and lights](#interiors-and-lights).
 
-A creature Entity is written as static meshes in a package, without bones or weights, although
-`entity glb` binds its skins to its skeleton (ADR-0275); the skinned form is #926.
+A creature Entity whose skeleton the Archive holds is written as one skinned rig mesh, see
+[Creatures](#creatures); without its skeleton it is written as static meshes, without bones or
+weights. The package holds no animations; `entity glb --animations` writes them (ADR-0307).
 
 `p4kx interior package <archive> <container>... --out <folder>` writes the Interior of a socpak
 container on its own, with `--lod`, `--texture-mip` and `--no-vertex-colours`: the same nodes,
@@ -83,7 +84,7 @@ written (there are no `null`s).
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.6` today. |
+| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.7` today. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
@@ -208,11 +209,11 @@ A Character package (version 1.3) is the folder above with one mesh and no textu
 
 | Field | Meaning |
 | --- | --- |
-| `body` | The body variant, `male` or `female`. |
-| `skeleton` | The skeleton file the bones come from, below `Data`. |
+| `body` | The body variant, `male` or `female`; absent for a creature (1.7). |
+| `skeleton` | The file the bones come from, below `Data`: the skeleton file of a Character, the geometry file of the root of a creature. |
 | `bones`, `skinned_meshes`, `morph_targets` | How many bones, skinned meshes and morph targets the file has. |
 | `embedded_textures` | How many PNG images the GLB embeds. |
-| `parts` | The skins worn on the skeleton, the body first: `name` (the node's name in the file), `origin` (`body` or `piece`), `file` (the skin in the Archive) and `morph_targets`. |
+| `parts` | The skins worn on the skeleton, the body first: `name` (the node's name in the file), `origin` (`body` or `piece`, and from 1.7 `skin`, a skin of a creature), `file` (the skin in the Archive) and `morph_targets`. |
 | `animations` | The animations in the file: `name`, `duration_seconds`, `additive` (its keys are offsets to a pose, which glTF cannot say), `channels` and `keys`. |
 
 Pieces that cannot be fitted to the body and animations that fit nothing are `issues` with the
@@ -225,6 +226,30 @@ The add-on imports a `character` node's mesh once for that node, not as an insta
 armature can be posed: the armature, the skinned meshes below it, the shape keys of the head and
 the actions are objects and data of the scene, with the armature below the node's empty. The
 library entry point is `p4kx_blender::write_character_package`.
+
+### Creatures
+
+`p4kx entity package` of a creature whose root geometry is a character file outside the human rigs
+and whose skeleton the Archive holds (`Assembly::creature_skins` is `Some`, ADR-0275) writes a
+package of version 1.7 with one mesh, the rig form of a Character
+([ADR-0316](adr/0316-a-creature-with-its-skeleton-is-packaged-as-one-skinned-rig-mesh.md)):
+
+- `nodes` has one node of the kind `entity`, the root Entity at the identity transform, with its
+  `entity` and `mesh` `m0001`; it is not a `character` node. `source.character` is absent.
+- `meshes/m0001.glb` is the Assembly as `entity glb` writes it: the skeleton as bone nodes, one glTF
+  skin over them, a skinned mesh per skin part, and the parts that hang on a bone or an item port
+  below their nodes. Its materials are in the file, with the textures embedded at `--texture-mip`;
+  the mesh lists no `materials`, `geometry` is the root's geometry file and `textures`,
+  `materials` and `palettes` are empty. The file has no animations and `rig.animations` is empty.
+- `rig` has no `body`; `skeleton` is the root's geometry file, `parts` lists the parts with a
+  skinned mesh (`origin` is `skin`), `bones`, `skinned_meshes` and `morph_targets` count what the
+  file holds.
+- The `issues` are those of the Assembly, bones the skeleton lacks included.
+
+A creature without a skeleton file, or whose skeleton has no bones, is written as before: static
+meshes, no `rig`, its issues listing the skeleton as missing or unreadable. The add-on imports the
+rig mesh once for the node, as for a Character; the armature, the skinned meshes and the other
+parts come in below the node's empty.
 
 ### Meshes
 
@@ -242,7 +267,7 @@ objects. The sharing is that of the Assembly ([ADR-0077](adr/0077-scene-meshes-a
 | `palette_id` | The id of that palette in `palettes` (1.1); absent without one. |
 | `instances` | How many nodes draw the mesh. |
 | `bytes`, `vertices`, `triangles` | Size of the file and of its geometry. |
-| `rig` | The skeleton, parts, morph targets and animations of a Character's mesh (1.3), see "Characters"; absent for a static mesh. |
+| `rig` | The skeleton, parts, morph targets and animations of a Character's mesh (1.3) or of a creature's (1.7), see "Characters" and "Creatures"; absent for a static mesh. |
 | `materials` | The materials of the mesh in the order of the glTF materials in its file: `index` is the index in the file's `materials` array, `name` the glTF material's name, and `textures` the ids of the `diffuse`, `normal` and `specular` textures that were written for it, each absent when the material names none or it could not be written, and, from 1.1, `material`, the id of the material's description in `materials`, absent for the engine's default material. Match by `index`; names can repeat. |
 
 The file is a plain GLB: one scene whose root node (named after the Entity's class name) has the
@@ -468,7 +493,9 @@ and the glTF material indices in the meshes; **1.2** adds the node kinds `contai
 with their children. **1.3** adds the node kind `character` and the mesh field `rig`
 (`character package`); a reader of 1.2 skips the node and warns about the minor version. **1.4**
 adds the material field `reads_vertex_colours`. **1.5** adds the material field `layer_shares`.
-**1.6** adds the material field `stencil` and the texture usage `stencil`.
+**1.6** adds the material field `stencil` and the texture usage `stencil`. **1.7** makes `rig.body`
+optional and adds the part origin `skin` (`entity package` of a creature with its skeleton); a
+reader of 1.6 expects a `body`, so it treats such a package as a higher minor version.
 
 The schema file is the schema of the version in `FORMAT_VERSION`: a change of the Rust types that
 changes the schema is a change of the format, and the checked-in schema changes with it. A schema
@@ -482,8 +509,10 @@ the rules above.
 
 - **Skeletons and animations.** Version 1.3 carries them in the GLB of a Character and lists them
   in the mesh's `rig` ([ADR-0107](adr/0107-a-character-is-written-as-one-rigged-glb-mesh-behind-a-character-node.md)).
-  A manifest-level `skeletons` array, clips as sidecar files and rigs on the meshes of an Entity
-  (a ship's moving parts) are not decided.
+  Version 1.7 does the same for a creature Entity, with a `rig` on the mesh of an `entity` node
+  ([ADR-0316](adr/0316-a-creature-with-its-skeleton-is-packaged-as-one-skinned-rig-mesh.md)).
+  A manifest-level `skeletons` array, clips as sidecar files and rigs on the meshes of other
+  Entities (a ship's moving parts) are not decided.
 - **Node trees of the add-on (#160).** Nothing is reserved: the descriptions of 1.1 are the
   inputs it builds from ([ADR-0100](adr/0100-the-add-on-builds-material-node-trees-from-the-package-descriptions-by-a-pure-mapping.md)).
 

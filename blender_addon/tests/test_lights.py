@@ -128,9 +128,9 @@ def test_children_of_a_skipped_node_are_skipped_too() -> None:
     assert any("portal" in warning for warning in result.warnings)
 
 
-def test_version_1_6_reads_without_a_warning_and_1_7_with_one() -> None:
-    assert parse(manifest(version="1.6")).warnings == []
-    assert len(parse(manifest(version="1.7")).warnings) == 1
+def test_version_1_7_reads_without_a_warning_and_1_8_with_one() -> None:
+    assert parse(manifest(version="1.7")).warnings == []
+    assert len(parse(manifest(version="1.8")).warnings) == 1
 
 
 def test_point_light_settings() -> None:

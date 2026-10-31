@@ -11,7 +11,7 @@ use p4kx_model::{Bone, BoneMatch, Model, Transform};
 
 use crate::character_path::{is_character_path, is_creature_path};
 use crate::placement::bone_pose;
-use crate::{EntityNode, Issue, IssueKind, LoadoutError, Part, Placement};
+use crate::{Assembly, EntityNode, Issue, IssueKind, LoadoutError, Part, Placement};
 
 /// Returns the bones of the root part's model at the level `level` of detail, or `None` when the
 /// root's geometry is no creature file (a character file below `Objects/Characters` outside the
@@ -27,6 +27,23 @@ pub(crate) fn skeleton_of<'a>(
     level: u32,
 ) -> Option<&'a [Bone]> {
     bones_of_root(parts, issues, level, is_creature_path)
+}
+
+impl Assembly {
+    /// Returns the parts of a creature whose skin is bound to its skeleton, the root included
+    /// when it draws a skin, or `None` when the Assembly writes no creature skeleton: the root's
+    /// geometry is no creature file, its skeleton file is missing or unreadable, or it has no
+    /// bones. [`Assembly::write_glb`] writes the skeleton as bone nodes then.
+    #[must_use]
+    pub fn creature_skins(&self) -> Option<impl Iterator<Item = &Part>> {
+        skeleton_of(&self.parts, &self.issues, self.lod)?;
+        let level = self.lod;
+        Some(self.parts.iter().filter(move |part| {
+            part.model
+                .as_deref()
+                .is_some_and(|model| is_skinned(model, level))
+        }))
+    }
 }
 
 /// Returns the bones the item ports of the skins anchor to: those of the root part's model when

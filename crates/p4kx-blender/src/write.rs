@@ -10,6 +10,7 @@ use p4kx_gltf::{AnimationSummary, GlbOptions, TextureLoader};
 
 use crate::build::{Inputs, manifest};
 use crate::collect::Collected;
+use crate::creature::write_creature_package;
 use crate::finite::sanitise;
 use crate::items::{Item, items};
 use crate::manifest::{
@@ -130,6 +131,11 @@ impl PackageSummary {
 /// Interior of `assembly`, if it has one, is written below an `Interior` node of the root: its
 /// containers, models, props and lights are nodes of the kinds `container`, `object` and `light`.
 ///
+/// An Assembly of a creature with its skeleton ([`Assembly::creature_skins`]) is written as one
+/// skinned rig mesh instead: `meshes/m0001.glb` holds the skeleton, the skins and the parts on
+/// its bones, with their textures embedded, and the one node draws it with a `rig`; `models` is
+/// not read then and `options.materials` is ignored as above.
+///
 /// Everything is written into a temporary folder next to `out`, which replaces `out` once the
 /// package is complete. `out` must not exist, or be an empty folder, or hold a package an earlier
 /// run wrote; an earlier package stays when the new one fails. `cancelled` is polled between the
@@ -154,6 +160,9 @@ pub fn write_package(
     out: &Path,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> PackageResult<PackageSummary> {
+    if assembly.creature_skins().is_some() {
+        return write_creature_package(assembly, textures, options, info, out, cancelled);
+    }
     let entity = assembly.root().map_or_else(
         || EntityRef {
             class_name: String::new(),

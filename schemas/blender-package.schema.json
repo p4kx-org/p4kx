@@ -824,7 +824,7 @@
               "type": "null"
             }
           ],
-          "description": "The skeleton, skinned parts, morph targets and animations of the file; present for a\nCharacter (version 1.3), absent for a static mesh."
+          "description": "The skeleton, skinned parts, morph targets and animations of the file; present for a\nCharacter (version 1.3) and a creature with its skeleton (1.7), absent for a static mesh."
         },
         "triangles": {
           "description": "The number of triangles of the mesh.",
@@ -1191,7 +1191,7 @@
       "type": "object"
     },
     "Rig": {
-      "description": "The skeleton, skins, morph targets and animations a mesh file carries.\n\nA mesh with a `rig` is a skinned Character: the GLB holds the bones as nodes, one glTF skin\nover them, a skinned mesh per part, the morph targets of the parts and the animations, and a\nreader imports it once, not as an instance.",
+      "description": "The skeleton, skins, morph targets and animations a mesh file carries.\n\nA mesh with a `rig` is a skinned Character or creature: the GLB holds the bones as nodes, one\nglTF skin over them, a skinned mesh per part, the morph targets of the parts and the\nanimations, and a reader imports it once, not as an instance.",
       "properties": {
         "animations": {
           "description": "The animations in the GLB file, in order.",
@@ -1201,8 +1201,11 @@
           "type": "array"
         },
         "body": {
-          "description": "The code of the body variant the Character is worn on, e.g. `male`.",
-          "type": "string"
+          "description": "The code of the body variant the Character is worn on, e.g. `male`; absent for a creature.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "bones": {
           "description": "The number of bones written as nodes.",
@@ -1211,7 +1214,7 @@
           "type": "integer"
         },
         "embedded_textures": {
-          "description": "The number of PNG images embedded in the GLB file; the textures of a Character are not\nwritten as files of the package.",
+          "description": "The number of PNG images embedded in the GLB file; the textures of a rig are not written as\nfiles of the package.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -1230,7 +1233,7 @@
           "type": "array"
         },
         "skeleton": {
-          "description": "The skeleton file the bones come from, below `Data`.",
+          "description": "The file the bones come from, below `Data`: the skeleton of a Character, the geometry of\nthe root of a creature.",
           "type": "string"
         },
         "skinned_meshes": {
@@ -1241,7 +1244,6 @@
         }
       },
       "required": [
-        "body",
         "skeleton",
         "bones",
         "skinned_meshes",
@@ -1291,7 +1293,7 @@
       "type": "object"
     },
     "RigPart": {
-      "description": "One skin worn on the skeleton of a Character.",
+      "description": "One skin worn on the skeleton of a Character or creature.",
       "properties": {
         "file": {
           "description": "The skin file the part was read from, below `Data`.",
@@ -1321,7 +1323,7 @@
       "type": "object"
     },
     "RigPartOrigin": {
-      "description": "Where a part of a Character comes from.",
+      "description": "Where a skinned part of a rig comes from.",
       "oneOf": [
         {
           "const": "body",
@@ -1331,6 +1333,11 @@
         {
           "const": "piece",
           "description": "The skin of a piece: the head, an item of the head or a piece of armour or clothing.",
+          "type": "string"
+        },
+        {
+          "const": "skin",
+          "description": "A skin of a creature, bound to the skeleton of its root.",
           "type": "string"
         }
       ]

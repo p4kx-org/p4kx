@@ -151,6 +151,18 @@ fn a_creature_with_its_skeleton_exports_to_a_valid_glb_and_package() -> TestResu
     let built = build(&scratch, "entity", Some(&pick.class), "package", &[])?;
     let measured = verify(&built)?;
     assert!(measured.meshes > 0, "{}: package meshes", pick.class);
+    assert_eq!(measured.meshes, 1, "{}: one rig mesh", pick.class);
+    let rig = &built.manifest["meshes"][0]["rig"];
+    assert!(
+        rig["bones"].as_u64().unwrap_or_default() > 0,
+        "{}",
+        pick.class
+    );
+    assert!(
+        rig.get("body").is_none(),
+        "{}: a creature has no body",
+        pick.class
+    );
     Ok(())
 }
 

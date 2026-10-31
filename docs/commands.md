@@ -248,7 +248,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   a folder that does not depend on Blender's file format: `scene.json` (format version, source
   Channel and Build, the node hierarchy with names and transforms), one GLB per distinct mesh
   and the textures of the materials as PNG, each written once. `--lod`, `--texture-mip`,
-  `--exclude` and `--replace` work as for `entity glb`. The folder is written beside the target
+  `--exclude` and `--replace` work as for `entity glb`. A creature whose skeleton the Archive
+  holds is written as one skinned GLB with the skeleton, the skins and the parts on its bones and
+  its textures embedded at `--texture-mip`, as a Character is (ADR-0316); without its skeleton it
+  stays a set of static meshes. The folder is written beside the target
   and moved into place when complete; it must not exist or must hold an earlier package. The
   format is described in [docs/blender-package.md](blender-package.md), the JSON Schema of
   `scene.json` is [schemas/blender-package.schema.json](../schemas/blender-package.schema.json).

@@ -35,9 +35,12 @@ class RigPart:
 
 @dataclass(frozen=True, slots=True)
 class Rig:
-    """What a Character's GLB file holds: bones, skinned parts, morph targets and animations."""
+    """What a rigged GLB file holds: bones, skinned parts, morph targets and animations.
 
-    body: str
+    ``body`` is the Character's body variant; a creature has none.
+    """
+
+    body: str | None
     bones: int
     skinned_meshes: int
     morph_targets: int
@@ -57,8 +60,8 @@ def parse_rig(value: object, where: str) -> Rig:
         for position, item in enumerate(_array(entry.get("animations"), f"{where}.animations"))
     )
     body, skeleton = entry.get("body"), entry.get("skeleton")
-    if not isinstance(body, str) or not isinstance(skeleton, str):
-        raise RigError(f"{where}: body and skeleton must be strings.")
+    if (body is not None and not isinstance(body, str)) or not isinstance(skeleton, str):
+        raise RigError(f"{where}: body, when present, and skeleton must be strings.")
     _count(entry, "embedded_textures", where)
     return Rig(
         body=body,
