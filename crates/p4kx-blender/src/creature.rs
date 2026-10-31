@@ -29,9 +29,7 @@ pub(crate) fn write_creature_package(
     out: &Path,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> PackageResult<PackageSummary> {
-    let options = options
-        .with_materials(MaterialMode::Textures)
-        .with_layer_vertex_colours();
+    let options = options.with_materials(MaterialMode::Textures);
     let name = assembly.root().map_or("", Part::class_name);
     let interior_left_out = assembly.interior().is_some();
     let stripped;
@@ -44,8 +42,9 @@ pub(crate) fn write_creature_package(
     write_rig_package(
         out,
         name,
+        &options,
         cancelled,
-        |writer| assembly.write_glb_with(&options, textures, writer),
+        |options, writer| assembly.write_glb_with(options, textures, writer),
         |written| manifest(assembly, interior_left_out, info, &options, written),
     )
 }

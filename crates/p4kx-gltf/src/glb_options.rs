@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_model::MAX_INFLUENCES;
+use p4kx_model::{MAX_INFLUENCES, Material};
 
 /// How an export writes the materials.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -18,6 +18,34 @@ pub enum MaterialMode {
     Textures,
 }
 
+/// Which materials get the vertex colours of their mesh as `COLOR_0`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum VertexColours {
+    /// None.
+    Off,
+    /// The materials whose colour they are
+    /// ([tinted glass](Material::tints_by_vertex_colours)); viewers multiply the base colour by
+    /// them.
+    #[default]
+    Tints,
+    /// Those and the layered surfaces whose layer shares they are, for consumers that read them as
+    /// shares, such as the Blender package.
+    TintsAndShares,
+}
+
+impl VertexColours {
+    /// Returns whether the primitives of `material` carry the vertex colours.
+    #[must_use]
+    pub fn admits(self, material: &Material) -> bool {
+        match self {
+            Self::Off => false,
+            Self::Tints => material.tints_by_vertex_colours(),
+            Self::TintsAndShares => material.reads_vertex_colours(),
+        }
+    }
+}
+
 /// The choices of a GLB export.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -29,16 +57,8 @@ pub struct GlbOptions {
     /// The mip level of the textures, 0 for the largest; a texture with fewer mips gives its
     /// smallest.
     pub texture_mip: u32,
-    /// Whether to write the vertex colours of the meshes that have any as `COLOR_0`, on the
-    /// primitives whose material takes them as its colour
-    /// ([tinted glass](p4kx_model::Material::tints_by_vertex_colours)); viewers multiply the base
-    /// colour of the material by them.
-    pub vertex_colours: bool,
-    /// Whether the vertex colours of a layered surface without a blend map are written too, though
-    /// they are the shares of its layers and no colour: a viewer would multiply them into the
-    /// base colour. Only for consumers that read them as shares, such as the Blender package.
-    /// Without [`vertex_colours`](Self::vertex_colours) it has no effect.
-    pub layer_vertex_colours: bool,
+    /// Which vertex colours to write as `COLOR_0`.
+    pub vertex_colours: VertexColours,
     /// The most bones a vertex is weighted to in the skins of the file, 1 to 8: the strongest ones
     /// are kept and their weights scaled to add up to 1. At most 4 writes `JOINTS_0` and
     /// `WEIGHTS_0` only, for viewers that ignore the second set.
@@ -54,8 +74,7 @@ impl Default for GlbOptions {
             lod: 0,
             materials: MaterialMode::Colours,
             texture_mip: 0,
-            vertex_colours: true,
-            layer_vertex_colours: false,
+            vertex_colours: VertexColours::Tints,
             max_influences: MAX_INFLUENCES,
             material_indices: false,
         }
@@ -99,17 +118,25 @@ impl GlbOptions {
     }
 
     /// Returns the options that also write the vertex colours of layered surfaces, the shares of
-    /// their layers.
+    /// their layers, unless vertex colours are off.
     #[must_use]
     pub const fn with_layer_vertex_colours(mut self) -> Self {
-        self.layer_vertex_colours = true;
+        if matches!(self.vertex_colours, VertexColours::Tints) {
+            self.vertex_colours = VertexColours::TintsAndShares;
+        }
         self
     }
 
     /// Returns the options without vertex colours.
     #[must_use]
     pub const fn without_vertex_colours(mut self) -> Self {
-        self.vertex_colours = false;
+        self.vertex_colours = VertexColours::Off;
         self
+    }
+
+    /// Returns whether any vertex colours are written.
+    #[must_use]
+    pub const fn writes_vertex_colours(&self) -> bool {
+        !matches!(self.vertex_colours, VertexColours::Off)
     }
 }

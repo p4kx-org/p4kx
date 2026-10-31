@@ -37,8 +37,8 @@ test asserts it. The choice is one function (`VertexStream::colour`).
 
 A mesh whose colours are all opaque white has none (`Mesh::colours` is `None`), because viewers
 multiply the material's base colour by `COLOR_0`. The GLB writer writes `COLOR_0` for the other
-meshes, on the primitives whose material takes them as its colour (ADR-0253, ADR-0318), unless asked not to
-(`GlbOptions::vertex_colours`, `--no-vertex-colours`).
+meshes, on the primitives whose material takes them as its colour (ADR-0253, ADR-0318), unless
+asked not to (`GlbOptions::vertex_colours`, `--no-vertex-colours`).
 
 ## Tangents
 

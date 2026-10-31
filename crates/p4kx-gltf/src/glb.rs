@@ -9,7 +9,7 @@ use p4kx_model::{Animation, Lod, Model};
 use crate::GltfError;
 use crate::animations::AnimationSummary;
 use crate::document::document;
-pub use crate::glb_options::{GlbOptions, MaterialMode};
+pub use crate::glb_options::{GlbOptions, MaterialMode, VertexColours};
 use crate::glb_plan::{Skeletal, animation_plans, own_binds, plan_layout, summarise, texture_set};
 use crate::instance::{Content, Instance, material_requests};
 use crate::layout::Layout;

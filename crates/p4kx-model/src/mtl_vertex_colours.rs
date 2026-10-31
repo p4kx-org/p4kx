@@ -33,7 +33,7 @@ impl Material {
 
     /// Returns whether the vertex colours are the shares of the layers of the material: a layered
     /// surface without a blend map. They are no colour; a viewer that multiplies them into the
-    /// base colour tints the surface.
+    /// base colour tints the surface. Excludes glass, so no material both tints and shares.
     #[must_use]
     pub fn shares_layers_by_vertex_colours(&self) -> bool {
         !self.is_glass() && self.is_surface_shader() && self.blends_layers_by_vertex_colours()

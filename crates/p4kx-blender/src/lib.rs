@@ -32,6 +32,7 @@ mod manifest;
 mod manifest_light;
 mod manifest_materials;
 mod manifest_rig;
+mod mesh_options;
 mod meshes;
 mod plan;
 mod rename;

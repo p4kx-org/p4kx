@@ -5,7 +5,6 @@ use gltf_json as json;
 use p4kx_model::{Animation, Influences};
 
 use crate::animations::{AnimationPlan, Targets, plan as plan_animations};
-use crate::colour_plan::Colours;
 use crate::document::skeleton_written;
 use crate::glb::{GlbOptions, GlbSummary};
 use crate::instance::{Content, Instance};
@@ -61,7 +60,7 @@ pub(crate) fn plan_layout<'m>(
                     .map(Vec::as_slice),
                 morphs: &[],
             };
-            layout.add_part(part, lod, Colours::of(options), &instance.plan, rigging);
+            layout.add_part(part, lod, options.vertex_colours, &instance.plan, rigging);
             if let Some(slot) = hidden.get_mut(part) {
                 *slot = layout.hidden_primitives - before;
             }

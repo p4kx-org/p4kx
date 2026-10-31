@@ -26,9 +26,9 @@ GLB cannot be right.
   `Material::shares_layers_by_vertex_colours` is true for a layered surface without a blend map.
   `Material::reads_vertex_colours` stays their union and is what the package states.
 - **GLB.** `COLOR_0` is written on the primitives of tinted glass only, so no viewer tints a hull
-  with mask data. `GlbOptions::layer_vertex_colours` (default off, `with_layer_vertex_colours`)
-  also writes them for layered surfaces, for a consumer that reads them as shares.
-- **Package.** The package writers (entity, interior and character meshes) set that option, so
+  with mask data. `GlbOptions::vertex_colours` is `VertexColours::Tints` by default; `with_layer_vertex_colours`
+  makes it `TintsAndShares`, which also writes them for layered surfaces, for a consumer that reads them as shares.
+- **Package.** The package writers (entity, interior, character and creature meshes) set that option, so
   the package meshes carry `COLOR_0` on exactly the primitives of `reads_vertex_colours`, as
   before; the format, the manifest and the add-on do not change.
 - `--no-vertex-colours` and `GlbOptions::vertex_colours` switch both off, as before.

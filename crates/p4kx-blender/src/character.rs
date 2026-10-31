@@ -84,11 +84,12 @@ pub fn write_character_package(
     write_rig_package(
         out,
         character.name,
+        options,
         cancelled,
-        |writer| {
+        |options, writer| {
             character.armour.write_glb_animated_with(
                 character.animations,
-                &options.with_layer_vertex_colours(),
+                options,
                 textures,
                 writer,
             )

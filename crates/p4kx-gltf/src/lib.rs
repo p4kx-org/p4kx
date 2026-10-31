@@ -33,7 +33,6 @@
 mod animations;
 mod axes;
 mod block_data;
-mod colour_plan;
 mod document;
 mod error;
 mod glb;
@@ -74,8 +73,8 @@ mod texture_roles;
 pub use animations::AnimationSummary;
 pub use error::GltfError;
 pub use glb::{
-    GlbOptions, GlbSummary, MaterialMode, write_glb, write_glb_animated, write_glb_animated_with,
-    write_glb_with,
+    GlbOptions, GlbSummary, MaterialMode, VertexColours, write_glb, write_glb_animated,
+    write_glb_animated_with, write_glb_with,
 };
 pub use layer_plan::draws_layer_diffuse;
 pub use layer_view::{layered_base_key, layered_base_texture, layered_base_textures};

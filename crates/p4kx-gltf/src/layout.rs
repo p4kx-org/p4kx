@@ -8,7 +8,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::axes::to_y_up;
 use crate::block_data::BlockData;
-use crate::colour_plan::Colours;
+use crate::glb_options::VertexColours;
 use crate::materials::MaterialPlan;
 use crate::morphs::{MorphLayout, MorphTarget};
 use crate::skin::SET_LEN;
@@ -105,15 +105,15 @@ impl<'m> Layout<'m> {
     }
 
     /// Plans the blocks of every mesh of `lod`, a level of the model instance `part`, that has
-    /// vertices and triangles, leaving out the submeshes whose material draws nothing; vertex
-    /// colours as `colours` says. A skinned mesh gets its bone weights when the
-    /// inverse bind matrices of `rigging` are given; its influences, when it has any, replace
-    /// those of the meshes.
+    /// vertices and triangles, leaving out the submeshes whose material draws nothing. The
+    /// primitives that `colours` admits carry the vertex colours. A skinned mesh gets its bone
+    /// weights when the inverse bind matrices of `rigging` are given; its influences, when it has
+    /// any, replace those of the meshes.
     pub(crate) fn add_part(
         &mut self,
         part: usize,
         lod: &'m Lod,
-        colours: Colours,
+        colours: VertexColours,
         materials: &MaterialPlan<'_>,
         rigging: Rigging<'m>,
     ) {
@@ -167,7 +167,7 @@ impl<'m> Layout<'m> {
         &mut self,
         part: usize,
         mesh: &'m Mesh,
-        write: Colours,
+        colours: VertexColours,
         materials: &MaterialPlan<'_>,
         skin: SkinSource<'m>,
     ) {
@@ -206,9 +206,9 @@ impl<'m> Layout<'m> {
             .map(|tangents| self.push(BlockData::Tangents(tangents)));
         let reading: Vec<bool> = primitives
             .iter()
-            .map(|&(_, id)| materials.writes_vertex_colours(id, write))
+            .map(|&(_, id)| materials.writes_vertex_colours(id, colours))
             .collect();
-        let colours = mesh
+        let colour_block = mesh
             .colours
             .as_ref()
             .filter(|colours| colours.len() == mesh.positions.len())
@@ -223,7 +223,7 @@ impl<'m> Layout<'m> {
             normals,
             uvs,
             tangents,
-            colours,
+            colours: colour_block,
             joints,
             weights,
             primitives,

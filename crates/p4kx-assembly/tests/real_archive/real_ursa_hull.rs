@@ -26,7 +26,7 @@ const RESPITE: &str = "rsi_ursa_medivac_black_white_grey_vip";
 const TINT_PALETTE_TREE: &str = "TintPaletteTree";
 const HULL_MATERIAL: &str = "Painted_Metal_Tiled";
 const GREY_TOLERANCE: f32 = 0.02;
-const TINTED_COLOUR_SPREAD: u8 = 64;
+const COLOURED_VERTEX_SPREAD: u8 = 64;
 
 /// Gives every part the one palette, as a paint item of the livery would.
 struct OnePalette {
@@ -72,7 +72,7 @@ fn has_coloured_vertices(assembly: &Assembly) -> bool {
         .filter_map(|mesh| mesh.colours.as_ref())
         .flatten()
         .any(|&[red, green, blue, _]| {
-            red.max(green).max(blue) - red.min(green).min(blue) >= TINTED_COLOUR_SPREAD
+            red.max(green).max(blue) - red.min(green).min(blue) >= COLOURED_VERTEX_SPREAD
         })
 }
 
@@ -89,10 +89,6 @@ fn layer_share_materials(assembly: &Assembly) -> BTreeSet<&str> {
 }
 
 #[test]
-#[expect(
-    clippy::print_stdout,
-    reason = "the names of the layered materials are the measurement; the test prints them"
-)]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_hull_of_the_ursa_medivac_is_grey_under_the_respite_livery() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
@@ -108,7 +104,6 @@ fn the_hull_of_the_ursa_medivac_is_grey_under_the_respite_livery() -> TestResult
 
     let shared = layer_share_materials(&assembly);
     assert!(shared.contains(HULL_MATERIAL), "the hull blends layers");
-    println!("{} layered materials: {shared:?}", shared.len());
     assert!(
         has_coloured_vertices(&assembly),
         "the vertex colours of the hull are coloured, which is why they must not tint it"
