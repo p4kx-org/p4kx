@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use p4kx_extraction::model::{LayerBudget, MaterialStatus, Model};
+use p4kx_extraction::model::{LayerBudget, MaterialStatus, Model, RigLogicBytes};
 
 use crate::provider::{ModelFailure, ModelProvider, ProvidedModel};
 
@@ -33,8 +33,8 @@ struct State {
 /// The least recently used models are dropped first. A model larger than the bound is not kept.
 /// The cache may be shared between threads and between builds.
 ///
-/// The bound counts the geometry buffers of the models only, not their nodes, names or chunk
-/// lists, so the memory held is somewhat above it. While a build runs, the models of the
+/// The bound counts the geometry buffers and the `RigLogic` chunk of the models, not their
+/// nodes, names or chunk lists, so the memory held is somewhat above it. While a build runs, the models of the
 /// Assembly being built and those of the cache are in memory together.
 #[derive(Debug)]
 pub struct ModelCache {
@@ -60,9 +60,11 @@ fn key_of(path: &str) -> String {
         .collect()
 }
 
-/// Returns the bytes of the geometry buffers of `model`, its vertex streams and indices only.
+/// Returns the bytes of the geometry buffers of `model`, its vertex streams and indices, and of
+/// its `RigLogic` chunk.
 fn bytes_of(model: &Model) -> usize {
     let size = |len: usize, each: usize| len.saturating_mul(each);
+    let chunk = model.rig_logic.as_ref().map_or(0, RigLogicBytes::len);
     model
         .lods
         .iter()
@@ -81,7 +83,7 @@ fn bytes_of(model: &Model) -> usize {
                 .saturating_add(size(mesh.second_uvs.as_ref().map_or(0, Vec::len), 8))
                 .saturating_add(size(mesh.indices.len(), 4))
         })
-        .fold(0, usize::saturating_add)
+        .fold(chunk, usize::saturating_add)
 }
 
 impl ModelCache {

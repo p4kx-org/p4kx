@@ -182,7 +182,13 @@ pub(crate) fn choose_models<'m>(
                 return None;
             }
             let Some(path) = draft.geometry_path() else {
-                issues.push(issue(draft, IssueKind::NoGeometry));
+                let kind = match (draft.node.choice, draft.node.fallback.as_ref()) {
+                    (GeometryChoice::WorldProp, Some(prop)) => IssueKind::WorldPropNotWorn {
+                        path: prop.path().to_owned(),
+                    },
+                    _ => IssueKind::NoGeometry,
+                };
+                issues.push(issue(draft, kind));
                 return None;
             };
             let path = path.to_owned();

@@ -38,7 +38,7 @@ mod shape;
 #[cfg(test)]
 mod test_models;
 mod uncover;
-mod unused;
+pub(crate) mod unused;
 mod vec3;
 mod wearable;
 mod zones;

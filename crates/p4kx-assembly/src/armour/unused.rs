@@ -12,7 +12,7 @@ const GROUP_NAME: &str = "animations";
 /// Replaces the `animation_not_used` issues by one per reason, in the order the reasons first
 /// occur and after the other issues. Reasons starting with `limit` count as one reason. An issue
 /// for one animation keeps its path and name; one for several is named `animations`.
-pub(super) fn summarise(issues: Vec<Issue>, budget: usize) -> Vec<Issue> {
+pub(crate) fn summarise(issues: Vec<Issue>, budget: usize) -> Vec<Issue> {
     let mut rest = Vec::with_capacity(issues.len().min(16));
     let mut groups: Vec<Issue> = Vec::new();
     for issue in issues {

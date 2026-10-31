@@ -16,6 +16,7 @@ use super::sample::{Control, evaluate, joint_samples, reduced, values_of, weight
 use super::shape::MAX_DNA_RIG_LEN;
 use super::unused::summarise;
 use super::{Armour, ArmourPart};
+use crate::animation_budget::{KeyFit, ValueBudget, limit_reason};
 use crate::{Issue, IssueKind, ModelFailure, ModelProvider};
 
 /// The most values, floats of key times and poses, the animations of one Character may write: 32
@@ -111,9 +112,7 @@ fn not_used(animation: &Animation, reason: String) -> Issue {
 }
 
 fn limit(values: usize, remaining: usize) -> String {
-    format!(
-        "limit: the animation needs {values} values, {remaining} of the budget of {MAX_ANIMATION_VALUES} are left"
-    )
+    limit_reason(values, remaining)
 }
 
 /// The Issue for an animation the facial part of which was refused, or that nothing of fits;
@@ -210,7 +209,7 @@ impl Armour {
     ) -> CharacterAnimations<'a> {
         let mut out = CharacterAnimations::default();
         let mut loaded: Option<Result<Loaded, String>> = None;
-        let mut remaining = budget;
+        let mut budget_left = ValueBudget::new(budget);
         for animation in animations {
             let bound = animation.bind(&self.skeleton.bones);
             let ids: HashSet<u32> = bound
@@ -221,13 +220,16 @@ impl Armour {
             let fitted = if bound.unbound.is_empty() {
                 Ok(None)
             } else {
-                self.face_fit(animation, (&ids, remaining), (&mut loaded, models))
+                self.face_fit(
+                    animation,
+                    (&ids, budget_left.remaining()),
+                    (&mut loaded, models),
+                )
             };
             let (mut driven, mut sampled, mut refusal) = (Vec::new(), None, None);
             match fitted {
                 Ok(Some(fitted)) => {
-                    remaining = remaining.saturating_sub(fitted.cost);
-                    out.values += fitted.cost;
+                    budget_left.spend(fitted.cost);
                     driven = fitted.driven;
                     sampled = Some(fitted.sampled);
                 }
@@ -238,23 +240,24 @@ impl Armour {
             if let Some(sampled) = sampled {
                 out.sampled.push(sampled);
             }
-            let cost = animation.key_count().saturating_mul(5);
             let mut reported = false;
-            if !bound.bound.is_empty() {
-                if cost <= remaining {
-                    remaining -= cost;
-                    out.values += cost;
+            match budget_left.fit_keys(animation, !bound.bound.is_empty()) {
+                KeyFit::Fits(cost) => {
+                    budget_left.spend(cost);
                     out.keys.push((animation, driven));
                     used = true;
-                } else {
-                    out.issues.push(not_used(animation, limit(cost, remaining)));
+                }
+                KeyFit::OverBudget(reason) => {
+                    out.issues.push(not_used(animation, reason));
                     reported = true;
                 }
+                KeyFit::NoBone => {}
             }
             let has_rig = self.face_part().is_some();
             out.issues
                 .extend(refused(animation, refusal, (used, reported), has_rig));
         }
+        out.values = budget_left.spent();
         out.issues = summarise(out.issues, budget);
         out
     }

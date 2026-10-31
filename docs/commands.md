@@ -236,7 +236,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `--json` the report has the shape described in [docs/cli-json.md](cli-json.md). A docked
   vehicle such as a Merlin or an Archimedes is
   placed as one part, without the parts of its own Loadout, unless `--expand-docked-vehicles`
-  places those parts too. `--interior` adds the ship's rooms:
+  places those parts too. With `--animations` a creature whose skins are bound to its skeleton also
+  gets the clips its animation database names, as glTF animations of the bones; without it the
+  GLB is static.
+  `--interior` adds the ship's rooms:
   the socpak containers the Records of the ship and of its attached Entities name, each at its
   bone of the Entity that names it, below an `Interior` node of that Entity; a docked vehicle
   brings its containers only with `--expand-docked-vehicles`. What cannot be resolved is listed,
@@ -701,7 +704,7 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | `get_audio_excerpt` | A short decoded excerpt of one WEM (`wem_id` or `path`, `start_seconds`, `duration_seconds`) as an `audio/wav` content block next to its metadata; at most 10 seconds and 1 MiB, see [ADR-0131](adr/0131-the-mcp-audio-excerpt-is-a-bounded-wav-and-the-only-tool-that-returns-audio.md) |
 | `image_preview` | A DDS texture (`path`) as one PNG image content block of at most 1 MiB, with its format, size and mip count as structured content: the mip chosen by `mip` or the largest that fits `max_side` (512 by default, at most 2048), a cubemap as a cross or one `face`, an array or volume as a sheet |
 | `mtl_summary` | A `.mtl` Entry (`path`), paged by sub-material: name, shader, surface type, flags, colours, opacity, glow, texture slots, shader parameters and layers |
-| `entity_loadout` | The default Loadout of an Entity (`entity`: class name, record path or GUID) as a list of ports, parents first: path, depth, source, what the port takes, the Entity attached and for each unresolved port the reason; `max_depth` (16 by default, at most 32) and a cursor bound it |
+| `entity_loadout` | The default Loadout of an Entity (`entity`: class name, record path or GUID) as a list of ports, parents first: path, depth, source, what the port takes, the Entity attached and for each unresolved port the reason; each Entity states its `issues` and, only when it has any, its `notes` (what the Archive cannot decide, such as an `assortment_requirement`, as in the CLI JSON); `max_depth` (16 by default, at most 32) and a cursor bound it |
 
 `list_entries`, `search_entries` (with `container`), `read_entry_text`, `read_entry_bytes`,
 `image_preview` and `mtl_summary` open socpak containers with `::`: `outer.socpak::inner.socpak::path`

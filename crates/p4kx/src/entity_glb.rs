@@ -6,7 +6,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use p4kx_assembly::{
-    ArchiveFiles, ArchiveModels, Assembly, AssemblyOptions, ForgePalettes, LoadoutResolver,
+    ArchiveFiles, ArchiveModels, Assembly, AssemblyOptions, CreatureAnimations, CreatureClips,
+    ForgePalettes, LoadoutResolver, creature_animations,
 };
 use p4kx_extraction::{
     ConversionError, DataForgeEntry, GlbOptions, GlbSummary, GltfError, MaterialMode, is_same_file,
@@ -16,6 +17,7 @@ use thiserror::Error;
 
 use crate::cli_entity::EntityGlbArgs;
 use crate::cli_entity::EntityMaterialsArg;
+use crate::entity_glb_animation::print_animations;
 use crate::entity_glb_json::GlbReport;
 use crate::entity_glb_report::print_report;
 
@@ -52,7 +54,13 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
     } else {
         assembly
     };
-    let summary = write(&assembly, &models, args)?;
+    let found = if args.animations {
+        creature_animations(&models, &assembly, tree)?
+    } else {
+        CreatureClips::default()
+    };
+    let animated = assembly.animate(&found.set.animations);
+    let summary = write(&assembly, &animated, &models, args)?;
     if as_json {
         return GlbReport {
             archive: archive.path(),
@@ -62,10 +70,12 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
             summary: &summary,
             applied: &applied,
             changes: &changes,
+            animations: (&found, &animated),
         }
         .print();
     }
-    let printed = print_report(&assembly, &summary, &args.out, tree, &changes);
+    let printed = print_report(&assembly, &summary, &args.out, tree, &changes)
+        .and_then(|()| print_animations(&summary, &found, &animated));
     match printed {
         Err(error) if error.kind() != io::ErrorKind::BrokenPipe => Err(error.into()),
         _ => Ok(()),
@@ -74,6 +84,7 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
 
 fn write(
     assembly: &Assembly,
+    animated: &CreatureAnimations<'_>,
     models: &ArchiveModels<'_>,
     args: &EntityGlbArgs,
 ) -> Result<GlbSummary> {
@@ -95,7 +106,7 @@ fn write(
     let textures = models.textures();
     Ok(write_replacing(out, |writer| {
         assembly
-            .write_glb_with(&options, &textures, writer)
+            .write_glb_animated_with(animated, &options, &textures, writer)
             .map_err(|error| match error {
                 GltfError::Write(source) => ConversionError::Write {
                     path: out.to_path_buf(),

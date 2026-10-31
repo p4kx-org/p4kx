@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use gltf_json as json;
 use json::{Index, Root};
-use p4kx_model::{Lod, Model, Transform};
+use p4kx_model::{Animation, Lod, Model, Transform};
 
 use crate::layout::Layout;
 use crate::materials::{MaterialPlan, MaterialTextures, Slot, build_material, display_name};
@@ -39,6 +39,7 @@ pub(crate) struct Content<'a, 'm> {
     pub(crate) wrappers: &'a [Wrapper<'m>],
     pub(crate) instances: &'a [Instance<'m>],
     pub(crate) rig: Option<&'a SceneRig<'m>>,
+    pub(crate) animations: &'a [&'m Animation],
 }
 
 pub(crate) type MaterialIds = BTreeMap<u16, Index<json::Material>>;

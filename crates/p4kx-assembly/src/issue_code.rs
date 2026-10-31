@@ -14,6 +14,7 @@ impl IssueKind {
             Self::GeometryMissing { .. } => "geometry_missing",
             Self::SubGeometryMissing { .. } => "sub_geometry_missing",
             Self::BodyGeometryMissing { .. } => "body_geometry_missing",
+            Self::WorldPropNotWorn { .. } => "world_prop_not_worn",
             Self::GeometryUnreadable { .. } => "geometry_unreadable",
             Self::MaterialLibrary { .. } => "material_library",
             Self::Palette { .. } => "palette",
@@ -63,6 +64,7 @@ impl IssueKind {
             Self::FaceJointsFailed { .. } => "face_joints_failed",
             Self::FaceAnimationFailed { .. } => "face_animation_failed",
             Self::AnimationNotUsed { .. } => "animation_not_used",
+            Self::AnimationsUnavailable { .. } => "animations_unavailable",
         }
     }
 
@@ -74,6 +76,7 @@ impl IssueKind {
             Self::Unresolved(_)
                 | Self::GeometryMissing { .. }
                 | Self::BodyGeometryMissing { .. }
+                | Self::WorldPropNotWorn { .. }
                 | Self::GeometryUnreadable { .. }
                 | Self::TooManyParts { .. }
                 | Self::TooManyVertices { .. }

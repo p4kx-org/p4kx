@@ -353,7 +353,7 @@ impl Assembly {
         write_scene_glb_with(&self.scene()?, options, textures, out)
     }
 
-    fn scene(&self) -> Result<Scene<'_>, GltfError> {
+    pub(crate) fn scene(&self) -> Result<Scene<'_>, GltfError> {
         let mut scene = creature_rig::skeleton_of(&self.parts, &self.issues, self.lod)
             .map_or_else(Scene::new, |skeleton| Scene::new().with_skeleton(skeleton));
         for part in &self.parts {
