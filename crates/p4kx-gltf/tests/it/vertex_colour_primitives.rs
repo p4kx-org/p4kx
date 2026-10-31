@@ -23,6 +23,13 @@ pub(crate) fn glass(name: &str, mask: &str) -> TestMtlMaterial {
 
 /// Returns the GLB of the testkit cube with vertex colours and the given materials.
 pub(crate) fn glb_bytes(materials: &[TestMtlMaterial]) -> Result<Vec<u8>, Box<dyn Error>> {
+    glb_bytes_with(materials, &GlbOptions::default())
+}
+
+fn glb_bytes_with(
+    materials: &[TestMtlMaterial],
+    options: &GlbOptions,
+) -> Result<Vec<u8>, Box<dyn Error>> {
     let cube = TestModel::cube().with_colours(vec![[10, 20, 30, 40]; 24]);
     let cgfm = cube.cgfm();
     let mtl = TestMtl::multi(materials).cryxml();
@@ -35,12 +42,19 @@ pub(crate) fn glb_bytes(materials: &[TestMtlMaterial]) -> Result<Vec<u8>, Box<dy
     };
     let model = Model::read("cube.cgf", &ChunkFile::parse(cube.cgf())?, &mut companions)?;
     let mut bytes = Vec::new();
-    write_glb(&model, &GlbOptions::default(), &mut bytes)?;
+    write_glb(&model, options, &mut bytes)?;
     Ok(bytes)
 }
 
 fn export(materials: &[TestMtlMaterial]) -> Result<CheckedGlb, Box<dyn Error>> {
     Ok(check_glb(&glb_bytes(materials)?)?)
+}
+
+fn export_with(
+    materials: &[TestMtlMaterial],
+    options: &GlbOptions,
+) -> Result<CheckedGlb, Box<dyn Error>> {
+    Ok(check_glb(&glb_bytes_with(materials, options)?)?)
 }
 
 fn has_colours(glb: &CheckedGlb) -> Result<Vec<bool>, Box<dyn Error>> {
@@ -98,20 +112,38 @@ fn colour_accessors(glb: &CheckedGlb) -> usize {
         .count()
 }
 
+fn layered(name: &str) -> TestMtlMaterial {
+    TestMtlMaterial::new(name)
+        .shader("HardSurface")
+        .layer_with(&[("Name", "a"), ("Path", "a/a.mtl")])
+        .layer_with(&[("Name", "b"), ("Path", "a/b.mtl")])
+}
+
 #[test]
-fn layered_surfaces_without_a_blend_map_read_the_colours() -> TestResult {
-    let layered = |name: &str| {
-        TestMtlMaterial::new(name)
-            .shader("HardSurface")
-            .layer_with(&[("Name", "a"), ("Path", "a/a.mtl")])
-            .layer_with(&[("Name", "b"), ("Path", "a/b.mtl")])
-    };
+fn layered_surfaces_without_a_blend_map_carry_their_shares_only_when_asked() -> TestResult {
     let blended = layered("blended").texture("TexSlot8", "a/m_blend.tif");
-    let glb = export(&[glass("unused", ""), layered("free"), blended])?;
+    let materials = [glass("unused", ""), layered("free"), blended];
+    let shares = GlbOptions::default().with_layer_vertex_colours();
     assert_eq!(
-        has_colours(&glb)?,
+        has_colours(&export_with(&materials, &shares)?)?,
         [true, false],
         "the blend map takes the layers' shares instead"
     );
+    assert_eq!(
+        has_colours(&export(&materials)?)?,
+        [false, false],
+        "a viewer would multiply the shares into the colour as a tint"
+    );
+    Ok(())
+}
+
+#[test]
+fn tinted_glass_keeps_its_colours_without_the_layer_shares() -> TestResult {
+    let glb = export(&[
+        glass("unused", ""),
+        glass("plain", ""),
+        glass("lens", "%PER_VERTEX_TINT"),
+    ])?;
+    assert_eq!(has_colours(&glb)?, [false, true]);
     Ok(())
 }

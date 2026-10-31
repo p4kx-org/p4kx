@@ -13,18 +13,30 @@ impl Material {
     /// mask names `PER_VERTEX_TINT`, and a layered surface that has no blend map (a `_blend`,
     /// `_mask` or `_opac` texture), whose layers then take their share from them.
     ///
-    /// The GLB writer writes `COLOR_0` for the primitives of such materials only, and the package
-    /// states the result as `reads_vertex_colours` for the Blender add-on, which builds its
-    /// vertex-colour nodes from it; the colours of any other material are mask data.
+    /// The package states the result as `reads_vertex_colours` for the Blender add-on, which
+    /// builds its vertex-colour nodes from it; the colours of any other material are mask data.
     #[must_use]
     pub fn reads_vertex_colours(&self) -> bool {
-        if self.is_glass() {
-            return self
+        self.tints_by_vertex_colours() || self.shares_layers_by_vertex_colours()
+    }
+
+    /// Returns whether the vertex colours are the colour of the material: glass whose generation
+    /// mask names `PER_VERTEX_TINT`. A viewer multiplies its base colour by them.
+    #[must_use]
+    pub fn tints_by_vertex_colours(&self) -> bool {
+        self.is_glass()
+            && self
                 .string_gen_mask
                 .split('%')
-                .any(|flag| flag == PER_VERTEX_TINT);
-        }
-        self.is_surface_shader() && self.blends_layers_by_vertex_colours()
+                .any(|flag| flag == PER_VERTEX_TINT)
+    }
+
+    /// Returns whether the vertex colours are the shares of the layers of the material: a layered
+    /// surface without a blend map. They are no colour; a viewer that multiplies them into the
+    /// base colour tints the surface.
+    #[must_use]
+    pub fn shares_layers_by_vertex_colours(&self) -> bool {
+        !self.is_glass() && self.is_surface_shader() && self.blends_layers_by_vertex_colours()
     }
 
     /// Returns whether at least one layer is blended over a base without a blend map: the layers
@@ -42,11 +54,20 @@ impl Material {
 mod tests {
     use std::fmt::Write as _;
 
-    use crate::MaterialLibrary;
+    use crate::{Material, MaterialLibrary};
 
     type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
     fn reads(shader: &str, mask: &str, textures: &[(&str, &str)], layers: usize) -> Result<bool> {
+        Ok(material(shader, mask, textures, layers)?.reads_vertex_colours())
+    }
+
+    fn material(
+        shader: &str,
+        mask: &str,
+        textures: &[(&str, &str)],
+        layers: usize,
+    ) -> Result<Material> {
         let mut slots = String::new();
         for (slot, file) in textures {
             write!(slots, r#"<Texture Map="{slot}" File="{file}"/>"#)?;
@@ -60,8 +81,24 @@ mod tests {
             <Textures>{slots}</Textures><MatLayers>{layer_list}</MatLayers></Material></SubMaterials></Material>"#
         );
         let library = MaterialLibrary::parse("a", xml.as_bytes())?;
-        let material = library.materials.first().ok_or("a material")?;
-        Ok(material.reads_vertex_colours())
+        Ok(library.materials.into_iter().next().ok_or("a material")?)
+    }
+
+    #[test]
+    fn only_tinted_glass_takes_them_as_its_colour() -> Result {
+        let tint = |shader: &str, mask: &str, layers| -> Result<(bool, bool)> {
+            let found = material(shader, mask, &[], layers)?;
+            Ok((
+                found.tints_by_vertex_colours(),
+                found.shares_layers_by_vertex_colours(),
+            ))
+        };
+        assert_eq!(tint("GlassPBR", "%PER_VERTEX_TINT", 0)?, (true, false));
+        assert_eq!(tint("GlassPBR", "", 0)?, (false, false));
+        assert_eq!(tint("HardSurface", "", 2)?, (false, true));
+        assert_eq!(tint("HardSurface", "%PER_VERTEX_TINT", 2)?, (false, true));
+        assert_eq!(tint("HardSurface", "", 1)?, (false, false));
+        Ok(())
     }
 
     #[test]

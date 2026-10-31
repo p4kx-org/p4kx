@@ -56,7 +56,7 @@ fn write_one(
     }
     let path = folder.join(format!("{id}.glb"));
     let mut glb = Vec::new();
-    let summary = write_scene_glb(&scene, &options.with_material_indices(), &mut glb)
+    let summary = write_scene_glb(&scene, &mesh_options(options), &mut glb)
         .map_err(|source| mesh_error(&id, &name, source))?;
     let file = File::create_new(&path).map_err(|source| PackageError::write(&path, source))?;
     let mut writer = BufWriter::new(file);
@@ -69,6 +69,12 @@ fn write_one(
         .sync_all()
         .map_err(|source| PackageError::write(&path, source))?;
     Ok(summary)
+}
+
+/// The GLB options of a mesh file: the add-on reads the vertex colours of layered surfaces as the
+/// shares of their layers, so they are written.
+const fn mesh_options(options: &GlbOptions) -> GlbOptions {
+    options.with_material_indices().with_layer_vertex_colours()
 }
 
 fn mesh_error(id: &str, name: &str, source: GltfError) -> PackageError {

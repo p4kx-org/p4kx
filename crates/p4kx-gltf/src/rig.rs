@@ -9,6 +9,7 @@ use p4kx_model::{Bone, BoneMatch, Influences, MaterialStatus, Model};
 
 use crate::GltfError;
 use crate::animations::{AnimationPlan, push_animations};
+use crate::colour_plan::Colours;
 use crate::document::{GENERATOR, NodeMeshes, push_accessor, push_images, push_meshes};
 use crate::glb::{GlbOptions, GlbSummary, MaterialMode, write_file};
 use crate::glb_plan::{summarise, texture_set};
@@ -179,7 +180,7 @@ pub fn write_rigged_glb_animated_with<'m>(
                 influences: Some(own.as_slice()),
                 morphs: pieces.get(part).map_or(&[], |piece| piece.morphs),
             };
-            layout.add_part(part, lod, options.vertex_colours, &instance.plan, rigging);
+            layout.add_part(part, lod, Colours::of(options), &instance.plan, rigging);
         }
     }
     let drawn_nodes: usize = instances

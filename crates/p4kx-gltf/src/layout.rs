@@ -8,6 +8,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::axes::to_y_up;
 use crate::block_data::BlockData;
+use crate::colour_plan::Colours;
 use crate::materials::MaterialPlan;
 use crate::morphs::{MorphLayout, MorphTarget};
 use crate::skin::SET_LEN;
@@ -105,14 +106,14 @@ impl<'m> Layout<'m> {
 
     /// Plans the blocks of every mesh of `lod`, a level of the model instance `part`, that has
     /// vertices and triangles, leaving out the submeshes whose material draws nothing; vertex
-    /// colours only when `colours_wanted` is set. A skinned mesh gets its bone weights when the
+    /// colours as `colours` says. A skinned mesh gets its bone weights when the
     /// inverse bind matrices of `rigging` are given; its influences, when it has any, replace
     /// those of the meshes.
     pub(crate) fn add_part(
         &mut self,
         part: usize,
         lod: &'m Lod,
-        colours_wanted: bool,
+        colours: Colours,
         materials: &MaterialPlan<'_>,
         rigging: Rigging<'m>,
     ) {
@@ -122,7 +123,7 @@ impl<'m> Layout<'m> {
                 .and_then(|all| all.get(position))
                 .map(Vec::as_slice);
             let before = self.meshes.len();
-            self.plan_mesh(part, mesh, colours_wanted, materials, (rigging.binds, own));
+            self.plan_mesh(part, mesh, colours, materials, (rigging.binds, own));
             if position == 0 && self.meshes.len() > before {
                 self.plan_morphs(mesh, rigging.morphs);
             }
@@ -166,7 +167,7 @@ impl<'m> Layout<'m> {
         &mut self,
         part: usize,
         mesh: &'m Mesh,
-        colours_wanted: bool,
+        write: Colours,
         materials: &MaterialPlan<'_>,
         skin: SkinSource<'m>,
     ) {
@@ -205,7 +206,7 @@ impl<'m> Layout<'m> {
             .map(|tangents| self.push(BlockData::Tangents(tangents)));
         let reading: Vec<bool> = primitives
             .iter()
-            .map(|&(_, id)| colours_wanted && materials.reads_vertex_colours(id))
+            .map(|&(_, id)| materials.writes_vertex_colours(id, write))
             .collect();
         let colours = mesh
             .colours

@@ -52,3 +52,8 @@ the hull and stay unused for glass.
 - Glass without `PER_VERTEX_TINT` is unchanged.
 - The game's own shader is not available; the rule rests on the vertex data. A glass whose vertex
   colours are masks but which carries the flag would draw dark in the masked parts.
+
+## Amendment (issue #1001)
+
+The GLB writes `COLOR_0` for tinted glass only; the package also writes it for layered surfaces,
+where the add-on reads it as layer shares. See ADR-0318.

@@ -33,9 +33,11 @@
 mod animations;
 mod axes;
 mod block_data;
+mod colour_plan;
 mod document;
 mod error;
 mod glb;
+mod glb_options;
 mod glb_plan;
 mod instance;
 mod layer_bake;

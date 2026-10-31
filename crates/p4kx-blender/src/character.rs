@@ -120,7 +120,12 @@ pub fn write_character_package(
     };
     let written = character
         .armour
-        .write_glb_animated_with(character.animations, options, textures, &mut writer)
+        .write_glb_animated_with(
+            character.animations,
+            &options.with_layer_vertex_colours(),
+            textures,
+            &mut writer,
+        )
         .map_err(|error| glb_error(error, &path, &id, character.name, &cancelled))?;
     writer
         .flush()
