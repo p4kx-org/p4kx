@@ -251,7 +251,7 @@ impl Drop for Offscreen {
 }
 
 fn request(instance: &wgpu::Instance, adapters: Adapters) -> Result<wgpu::Adapter, OffscreenError> {
-    let ask = |fallback| {
+    let ask = |instance: &wgpu::Instance, fallback| {
         block_on_for(
             instance.request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -264,10 +264,10 @@ fn request(instance: &wgpu::Instance, adapters: Adapters) -> Result<wgpu::Adapte
         .ok_or(OffscreenError::TimedOut)
     };
     match adapters {
-        Adapters::Software => ask(true)?,
-        Adapters::Best => match ask(false)? {
+        Adapters::Software => ask(instance, true)?,
+        Adapters::Best => match ask(instance, false)? {
             Ok(adapter) => Ok(adapter),
-            Err(_) => ask(true)?,
+            Err(_) => ask(&software_instance(), true)?,
         },
     }
     .map_err(OffscreenError::NoAdapter)

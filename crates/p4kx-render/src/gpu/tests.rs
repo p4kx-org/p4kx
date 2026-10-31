@@ -61,8 +61,15 @@ fn the_software_instance_sees_only_the_direct3d_12_backend() {
         software_instance().enumerate_adapters(wgpu::Backends::all()),
         WAIT,
     )
-    .unwrap_or_default();
+    .expect("the adapters are listed within the limit");
 
+    assert!(!adapters.is_empty(), "the instance lists an adapter");
+    assert!(
+        adapters
+            .iter()
+            .any(|adapter| adapter.get_info().device_type == wgpu::DeviceType::Cpu),
+        "WARP is listed: {adapters:?}"
+    );
     assert!(
         adapters
             .iter()
