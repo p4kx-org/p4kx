@@ -448,7 +448,9 @@ was reached). New kinds may be added in later versions.
  "vertices": 744831, "triangles": 818426, "lod_fallbacks": 0, "skipped": 0, "issues": [Issue, …]}
 ```
 
-`<entity>` is named as for `p4kx entity loadout`, with the same exit codes. `lod_fallbacks` counts
+`<entity>` is named as for `p4kx entity loadout`, with the same exit codes. A creature with its
+skeleton is written as one rig mesh (ADR-0316); the report then also has `bones` and
+`skinned_meshes`, which are absent otherwise. `lod_fallbacks` counts
 the models that lack the level of detail asked for and are written at the nearest lower one, as
 for `p4kx entity glb`, but a mesh that several nodes draw counts once. `nodes` counts the
 nodes of `scene.json`, `drawn_nodes` those with a mesh. `--interior` adds the Interior as for

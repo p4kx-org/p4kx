@@ -257,19 +257,20 @@ fn textures(inputs: &Inputs<'_>) -> Vec<Texture> {
         .collect()
 }
 
+/// Returns the manifest's issue for an issue of the Assembly.
+pub(crate) fn assembly_issue(issue: &AssemblyIssue) -> Issue {
+    Issue {
+        origin: IssueOrigin::Assembly,
+        kind: issue.kind().code().to_owned(),
+        path: issue.path().to_owned(),
+        name: issue.name().to_owned(),
+        skipped: issue.kind().skips(),
+        reason: issue.kind().to_string(),
+    }
+}
+
 fn issues(inputs: &Inputs<'_>) -> Vec<Issue> {
-    let mut issues: Vec<Issue> = inputs
-        .assembly_issues
-        .iter()
-        .map(|issue| Issue {
-            origin: IssueOrigin::Assembly,
-            kind: issue.kind().code().to_owned(),
-            path: issue.path().to_owned(),
-            name: issue.name().to_owned(),
-            skipped: issue.kind().skips(),
-            reason: issue.kind().to_string(),
-        })
-        .collect();
+    let mut issues: Vec<Issue> = inputs.assembly_issues.iter().map(assembly_issue).collect();
     for (wanted, outcome) in inputs.collected.wanted.iter().zip(inputs.outcomes) {
         if let Outcome::Failed(reason) = outcome {
             issues.push(Issue {

@@ -22,6 +22,7 @@
 mod build;
 mod character;
 mod collect;
+mod creature;
 mod describe;
 mod error;
 mod finite;
@@ -34,6 +35,7 @@ mod manifest_rig;
 mod meshes;
 mod plan;
 mod rename;
+mod rig_package;
 mod roles;
 mod schema;
 mod stage;
