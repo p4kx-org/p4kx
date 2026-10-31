@@ -45,7 +45,7 @@ use resources::{MaterialTexture, MeshBuffers};
 pub use shading::{Hologram, Shading};
 use slot::Slot;
 use target::Target;
-pub use teardown::{Released, abandoned_teardowns};
+pub use teardown::{Released, Stage, abandoned_teardowns};
 
 use super::assembly::{AssemblyScene, DrawList};
 use super::camera::Uniforms;
