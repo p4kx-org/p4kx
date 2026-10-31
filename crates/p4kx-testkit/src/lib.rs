@@ -51,6 +51,7 @@ mod entity_module_sample;
 mod entity_mount;
 mod entity_npc;
 mod entity_npc_face;
+mod entity_npc_generic;
 mod entity_npc_zones;
 mod entity_painted;
 mod entity_port;
@@ -196,6 +197,9 @@ pub use entity_npc_face::{
     NPC_FACIAL_BONE, NPC_RIG_LOGIC, NPC_SKELETON_FILE, NPC_SKELETON_SHIFT, npc_face_entries,
     npc_face_entries_posed_by, npc_face_entries_with, npc_face_logic, npc_face_shapes,
     npc_face_skeleton,
+};
+pub use entity_npc_generic::{
+    NPC_GENERIC_BODY_CLASS, NPC_GENERIC_CLASS, NPC_GENERIC_HEAD_CLASS, npc_generic_entries,
 };
 pub use entity_npc_zones::{
     NPC_ZONE_CLASS, NpcExtra, NpcZoneOptions, npc_jacketed_entries, npc_zone_entries,
