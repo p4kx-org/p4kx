@@ -28,6 +28,8 @@ pub enum TextureRole {
     Displacement,
     /// A gloss map (`_gloss`).
     Gloss,
+    /// The stencil map of a stencil decal: its red channel is the opacity of the motif.
+    Stencil,
     /// Any other map; the slot and file say more.
     Other,
 }
@@ -57,11 +59,17 @@ impl TextureRole {
 
 impl Material {
     /// Returns what the texture `file` in the slot `slot` of the material is used for like
-    /// [`TextureRole::of`]; the `_scalp` map of a hair cap is its density mask.
+    /// [`TextureRole::of`]; the `_scalp` map of a hair cap is its density mask and the map in the
+    /// stencil slot of a [stencil decal](Material::stencil_texture) is its stencil.
     #[must_use]
     pub fn texture_role(&self, slot: &str, file: &str) -> TextureRole {
         if self.is_hair_cap() && suffix(file) == "scalp" {
             TextureRole::Mask
+        } else if self
+            .stencil_texture()
+            .is_some_and(|texture| texture.map == slot && texture.file == file)
+        {
+            TextureRole::Stencil
         } else {
             TextureRole::of(slot, file)
         }

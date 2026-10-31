@@ -29,6 +29,9 @@ pub enum TextureUse {
     Displacement,
     /// A gloss map (`_gloss`).
     Gloss,
+    /// The stencil map of a stencil decal (`STENCIL_MAP`, 1.6): its red channel is the opacity of
+    /// the motif.
+    Stencil,
     /// Any other map; the slot and file say more.
     Other,
 }
@@ -47,6 +50,7 @@ impl From<p4kx_model::TextureRole> for TextureUse {
             TextureRole::Occlusion => Self::Occlusion,
             TextureRole::Displacement => Self::Displacement,
             TextureRole::Gloss => Self::Gloss,
+            TextureRole::Stencil => Self::Stencil,
             _ => Self::Other,
         }
     }
@@ -156,6 +160,28 @@ pub struct MaterialLayer {
     pub material: Option<String>,
 }
 
+/// How a stencil decal is coloured (1.6); the stencil map itself is the texture with the usage
+/// `stencil`.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct MaterialStencil {
+    /// The colour of the motif (`StencilDiffuseColor`), linear; absent when the file gives none or
+    /// it is malformed, and the material's `diffuse` counts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colour: Option<[f32; 3]>,
+    /// The opacity of the motif (`StencilOpacity`) from 0 to 1, 1 when the file gives none; it
+    /// multiplies the material's `opacity`.
+    pub opacity: f32,
+}
+
+impl From<p4kx_model::Stencil> for MaterialStencil {
+    fn from(stencil: p4kx_model::Stencil) -> Self {
+        Self {
+            colour: stencil.colour,
+            opacity: stencil.opacity,
+        }
+    }
+}
+
 /// A material as the game defines it: the inputs of a Blender or any other renderer's material.
 ///
 /// Colours are linear and exactly those of the file; a palette is not applied. The
@@ -217,8 +243,15 @@ pub struct MaterialDescription {
     /// Empty when the material has no layers; a package before 1.5 lacks it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub layer_shares: Vec<f32>,
+    /// How a stencil decal (`MeshDecal` with `STENCIL_MAP`) is coloured (1.6), the colour and
+    /// opacity of its motif; absent for any other material and in a package before 1.6. The motif
+    /// is the texture with the usage `stencil`; a decal without one and without a diffuse map draws
+    /// nothing, and one with a diffuse map is drawn by it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stencil: Option<MaterialStencil>,
     /// The palette entry the material takes: that of its first layer with a `PaletteTint` from 1
-    /// to 3, or the glass colour of a glass material that uses the tint palette.
+    /// to 3, the glass colour of a glass material that uses the tint palette, or the primary entry
+    /// of a stencil decal with `StencilTintOverride`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub palette: Option<PaletteEntry>,
     /// The tint palette the library names as its default, a Record path.

@@ -22,9 +22,6 @@ from .material_surface import (
     NEUTRAL_SMOOTHNESS_SHADERS,
     PARAM_PREFIX,
     SPECULAR_LEVEL_PER_F0,
-    STENCIL_COLOUR,
-    STENCIL_MAP,
-    STENCIL_OPACITY,
     TINT_PALETTE_DECAL,
     BuildContext,
     Surface,
@@ -97,11 +94,14 @@ class _Maker(LayerBlending, GlassSurface):
     def _colourless_decal(self) -> bool:
         """Returns whether the material is a decal that draws no colour.
 
-        That is a mesh decal without any texture slot, a ``DECAL`` material whose
-        ``DecalDiffuseOpacity`` is 0 and which only adds relief.
+        That is a mesh decal without any texture slot, a stencil decal with neither a stencil nor
+        a diffuse map (its motif is a livery's emblem the game fills in), a ``DECAL`` material
+        whose ``DecalDiffuseOpacity`` is 0 and which only adds relief.
         """
         desc = self.desc
         if self.family == "decal" and not desc.textures:
+            return True
+        if desc.stencil and not desc.slot("stencil") and not desc.slot("diffuse"):
             return True
         opacity = desc.number("DecalDiffuseOpacity")
         return "DECAL" in desc.gen_mask and opacity is not None and opacity <= 0.0
@@ -122,21 +122,13 @@ class _Maker(LayerBlending, GlassSurface):
             return palette.primary
         return entry
 
-    def _stencil_colour(self) -> Colour | None:
-        """Returns the ``StencilDiffuseColor`` of a decal with a stencil map."""
-        if not self._stenciled():
-            return None
-        return self.desc.colour_parameter(STENCIL_COLOUR)
-
-    def _stenciled(self) -> bool:
-        return self.family == "decal" and STENCIL_MAP in self.desc.gen_mask
-
     def _has_decal_placeholder(self) -> bool:
         return any(s.file.startswith(TINT_PALETTE_DECAL) for s in self.desc.textures)
 
     def _base(self) -> Surface:
         entry = self._entry()
-        factor = entry.tint if entry else self._stencil_colour() or self.desc.diffuse
+        stencil = self.desc.stencil
+        factor = entry.tint if entry else (stencil and stencil.colour) or self.desc.diffuse
         if entry:
             smooth = entry.glossiness / 255.0
         elif self.desc.shader.lower() in NEUTRAL_SMOOTHNESS_SHADERS:
@@ -277,7 +269,12 @@ class _Maker(LayerBlending, GlassSurface):
             return None
         source: Ref | None = None
         cap = desc.shader.lower() == "hairpbr" and "HAIR_CAP" in desc.gen_mask
-        if (slot := desc.slot("mask")) and (slot.texture or not cap):
+        if slot := desc.slot("stencil"):
+            # The red channel of a stencil map is the opacity of the motif.
+            red = b.add("ShaderNodeSeparateColor")
+            b.link(Ref(self._image(slot, 1.0), "Color"), red, "Color")
+            source = Ref(red, "Red")
+        elif (slot := desc.slot("mask")) and (slot.texture or not cap):
             bw = b.add("ShaderNodeRGBToBW")
             b.link(Ref(self._image(slot, 1.0), "Color"), bw, "Color")
             source = Ref(bw, "Val")
@@ -293,10 +290,10 @@ class _Maker(LayerBlending, GlassSurface):
             return None
         opacity = desc.opacity
         if self.family == "decal":
-            names = ["DecalDiffuseOpacity", *([STENCIL_OPACITY] if self._stenciled() else [])]
-            for name in names:
-                if (extra := desc.number(name)) is not None:
-                    opacity *= extra
+            if (extra := desc.number("DecalDiffuseOpacity")) is not None:
+                opacity *= extra
+            if desc.stencil:
+                opacity *= desc.stencil.opacity
         if source is None:
             if cap:
                 return 0.0

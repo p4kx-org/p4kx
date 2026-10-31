@@ -101,7 +101,7 @@ fn material<'a>(
     let textures = textures(element, budget)?;
     let layers = layers(element, budget);
     let elements = other_elements(element, budget);
-    Ok(Material {
+    let mut built = Material {
         name: text("Name"),
         flags: flags(element.attribute("MtlFlags")),
         shader: text("Shader"),
@@ -130,7 +130,11 @@ fn material<'a>(
         elements,
         truncated: budget.cut(),
         diffuse_map_is_grey: None,
-    })
+    };
+    if built.palette.is_none() && built.stencil().is_some_and(|stencil| stencil.palette_tint) {
+        built.palette = Some(PaletteSlot::Primary);
+    }
+    Ok(built)
 }
 
 /// Returns the palette colour a material takes: that of its first layer with a `PaletteTint`

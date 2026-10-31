@@ -6,4 +6,5 @@
 mod mapping;
 mod metals;
 mod reports;
+mod stencil;
 pub(crate) mod support;

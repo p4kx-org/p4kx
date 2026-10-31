@@ -3,6 +3,7 @@
 
 use p4kx_model::{DIFFUSE_SLOT, Material, TextureSlot, texture_suffix_lowercase as suffix};
 
+use crate::materials::is_hair_cards;
 use crate::texture_report::TextureRole;
 
 const DATA_PREFIX: &str = "data/";
@@ -62,13 +63,43 @@ pub(crate) fn sources(material: &Material) -> Sources {
 /// without a diffuse map whose `TexSlot1` ends in `_opac`, such as hair cards, has that opacity
 /// map in place of the diffuse map, see [`Source::opacity`].
 ///
-/// A hair cap ([`Material::is_hair_cap`]) always has its `_scalp` density map in that place.
+/// A hair cap ([`Material::is_hair_cap`]) always has its `_scalp` density map in that place. With
+/// `opacity_maps`, a stencil decal has its [stencil map](Material::stencil_texture) there too,
+/// red channel as the opacity.
 pub(crate) fn sources_with(material: &Material, opacity_maps: bool) -> Sources {
     if material.is_hair_cap() {
         collect(&material.textures, Some(SCALP_SUFFIX))
+    } else if opacity_maps && let Some(stencil) = material.stencil_texture() {
+        stencil_sources(&material.textures, stencil)
     } else {
         sources_of(&material.textures, opacity_maps)
     }
+}
+
+/// Returns whether `material` is drawn by an opacity map in place of a diffuse map: hair cards and
+/// a stencil decal with a stencil map.
+pub(crate) fn draws_by_opacity_map(material: &Material) -> bool {
+    is_hair_cards(material) || material.stencil_texture().is_some()
+}
+
+/// Returns the texture files of the slots `textures` with the stencil map `stencil` as the opacity
+/// map in place of the diffuse map.
+fn stencil_sources(textures: &[TextureSlot], stencil: &TextureSlot) -> Sources {
+    let mut found = collect(textures, None);
+    match canonical(&stencil.file) {
+        Some(path) => {
+            found.diffuse = Some(Source {
+                path,
+                file: stencil.file.clone(),
+                gloss: false,
+                opacity: true,
+            });
+        }
+        None => found
+            .refused
+            .push((TextureRole::Diffuse, stencil.file.clone())),
+    }
+    found
 }
 
 /// Returns the texture files of the slots `textures` like [`sources_with`].

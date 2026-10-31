@@ -213,7 +213,8 @@ pub(crate) fn display_name(material: &Material, slot: Slot) -> String {
 
 /// The alpha mode of `material`, its alpha factor and its alpha cutoff.
 fn alpha_of(material: &Material) -> (AlphaMode, f32, Option<f32>) {
-    let opacity = material.opacity.clamp(0.0, 1.0);
+    let stencil = material.stencil().map_or(1.0, |stencil| stencil.opacity);
+    let opacity = material.opacity.clamp(0.0, 1.0) * stencil;
     let decal = is_one_of(&material.shader, &DECAL_SHADERS);
     let glass = material.is_glass();
     if material.alpha_test > 0.0 {

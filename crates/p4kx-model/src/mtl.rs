@@ -85,8 +85,9 @@ pub struct Material {
     /// The texture slots in file order.
     pub textures: Vec<TextureSlot>,
     /// The palette colour the material takes: that of its first material layer with a
-    /// `PaletteTint` from 1 to 3, or the glass colour of a glass material that uses the tint
-    /// palette.
+    /// `PaletteTint` from 1 to 3, the glass colour of a glass material that uses the tint palette,
+    /// or the primary entry of a [stencil decal](Self::is_stencil_decal) whose
+    /// [`Stencil::palette_tint`](crate::Stencil::palette_tint) is set.
     pub palette: Option<PaletteSlot>,
     /// Whether a [`TintPalette`](crate::TintPalette) replaced the colours of the file.
     pub tinted: bool,
@@ -211,8 +212,9 @@ impl Material {
     /// Returns whether the material is a decal that draws no colour: a `MeshDecal` without any
     /// texture slot, a placeholder a livery fills in, a decal (`DECAL` in its generation mask)
     /// whose `DecalDiffuseOpacity` is 0, which only adds relief to the surface below, or a
-    /// [relief decal](Self::is_relief_decal), or a
-    /// [render-to-texture decal](Self::is_render_to_texture_decal).
+    /// [relief decal](Self::is_relief_decal), a
+    /// [render-to-texture decal](Self::is_render_to_texture_decal), or a
+    /// [stencil decal without a motif](Self::is_stencil_without_motif).
     #[must_use]
     pub fn is_colourless_decal(&self) -> bool {
         let empty_mesh_decal =
@@ -225,6 +227,7 @@ impl Material {
             || relief_only
             || self.is_relief_decal()
             || self.is_render_to_texture_decal()
+            || self.is_stencil_without_motif()
     }
 
     /// Returns whether the engine draws nothing with the material, or nothing a plain glTF

@@ -147,7 +147,7 @@ fn a_character_is_a_folder_of_a_manifest_and_one_skinned_mesh() -> TestResult {
     assert_eq!(names_in(&written.out.join("meshes"))?, ["m0001.glb"]);
     assert_eq!(names_in(&written.out.join("textures"))?.len(), 0);
     assert_eq!(written.manifest.version, FORMAT_VERSION);
-    assert_eq!(written.manifest.version, "1.5");
+    assert_eq!(written.manifest.version, "1.6");
     let [node] = written.manifest.nodes.as_slice() else {
         return Err("one node".into());
     };

@@ -54,7 +54,7 @@ fn plain(material: &Material) -> Shading {
     let colour = if metal {
         material.specular
     } else {
-        material.diffuse
+        stencil_colour(material).unwrap_or(material.diffuse)
     };
     Shading {
         colour: colour.map(|channel| channel.clamp(0.0, 1.0)),
@@ -63,6 +63,15 @@ fn plain(material: &Material) -> Shading {
         diffuse: material.diffuse,
         specular: material.specular,
     }
+}
+
+/// Returns the colour of the motif of a stencil decal that takes its own colour: its
+/// `StencilDiffuseColor`; a palette tint (which sets the diffuse colour) wins.
+fn stencil_colour(material: &Material) -> Option<[f32; 3]> {
+    material
+        .stencil()
+        .and_then(|stencil| stencil.colour)
+        .filter(|_| !material.tinted)
 }
 
 /// Returns the roughness of `material` from its shininess, or half where gloss comes from

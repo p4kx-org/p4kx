@@ -482,7 +482,7 @@
               "type": "null"
             }
           ],
-          "description": "The palette entry the material takes: that of its first layer with a `PaletteTint` from 1\nto 3, or the glass colour of a glass material that uses the tint palette."
+          "description": "The palette entry the material takes: that of its first layer with a `PaletteTint` from 1\nto 3, the glass colour of a glass material that uses the tint palette, or the primary entry\nof a stencil decal with `StencilTintOverride`."
         },
         "parameters": {
           "description": "The shader parameters (`PublicParams`) in file order, name and value as the file has them.",
@@ -514,6 +514,17 @@
           "maxItems": 3,
           "minItems": 3,
           "type": "array"
+        },
+        "stencil": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialStencil"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How a stencil decal (`MeshDecal` with `STENCIL_MAP`) is coloured (1.6), the colour and\nopacity of its motif; absent for any other material and in a package before 1.6. The motif\nis the texture with the usage `stencil`; a decal without one and without a diffuse map draws\nnothing, and one with a diffuse map is drawn by it."
         },
         "surface_type": {
           "description": "The physical surface type, e.g. `metal_dense`; empty when the file gives none.",
@@ -647,6 +658,33 @@
         "name",
         "path",
         "attributes"
+      ],
+      "type": "object"
+    },
+    "MaterialStencil": {
+      "description": "How a stencil decal is coloured (1.6); the stencil map itself is the texture with the usage\n`stencil`.",
+      "properties": {
+        "colour": {
+          "description": "The colour of the motif (`StencilDiffuseColor`), linear; absent when the file gives none or\nit is malformed, and the material's `diffuse` counts.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "The opacity of the motif (`StencilOpacity`) from 0 to 1, 1 when the file gives none; it\nmultiplies the material's `opacity`.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "opacity"
       ],
       "type": "object"
     },
@@ -1455,6 +1493,11 @@
         {
           "const": "gloss",
           "description": "A gloss map (`_gloss`).",
+          "type": "string"
+        },
+        {
+          "const": "stencil",
+          "description": "The stencil map of a stencil decal (`STENCIL_MAP`, 1.6): its red channel is the opacity of\nthe motif.",
           "type": "string"
         },
         {

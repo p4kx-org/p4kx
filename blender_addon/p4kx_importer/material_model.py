@@ -31,6 +31,7 @@ USAGES = frozenset(
         "occlusion",
         "displacement",
         "gloss",
+        "stencil",
         "other",
     }
 )
@@ -99,6 +100,14 @@ class Palette:
 
 
 @dataclass(frozen=True, slots=True)
+class Stencil:
+    """How a stencil decal is coloured: the colour (``None`` for the diffuse colour) and opacity."""
+
+    colour: Colour | None
+    opacity: float
+
+
+@dataclass(frozen=True, slots=True)
 class MaterialDesc:
     """The inputs of one game material, as the package describes them.
 
@@ -106,6 +115,7 @@ class MaterialDesc:
     an older package; read it through ``material_surface.reads_vertex_colours``.
     ``layer_shares`` is the package's ``layer_shares`` (format 1.5), one share per layer, ``None``
     in an older package or when it does not match the layers.
+    ``stencil`` is the package's ``stencil`` (format 1.6), present for a stencil decal only.
     """
 
     id: str
@@ -129,6 +139,7 @@ class MaterialDesc:
     parameters: dict[str, str] = field(default_factory=dict)
     stated_vertex_colours: bool | None = None
     layer_shares: tuple[float, ...] | None = None
+    stencil: Stencil | None = None
 
     def slot(self, usage: str) -> TextureSlot | None:
         """Returns the first texture slot of ``usage`` that has a written texture."""
@@ -223,7 +234,16 @@ def _material(item: object) -> MaterialDesc | None:
         parameters=_parameters(item.get("parameters")),
         stated_vertex_colours=stated if isinstance(stated, bool) else None,
         layer_shares=_layer_shares(item.get("layer_shares"), len(layers)),
+        stencil=_stencil(item.get("stencil")),
     )
+
+
+def _stencil(value: object) -> Stencil | None:
+    """Returns the stated stencil of a decal; a malformed opacity reads as 1."""
+    if not isinstance(value, dict):
+        return None
+    opacity = min(max(_float(value.get("opacity"), 1.0), 0.0), 1.0)
+    return Stencil(_colour(value.get("colour"), None), opacity)
 
 
 def _layer_shares(value: object, count: int) -> tuple[float, ...] | None:

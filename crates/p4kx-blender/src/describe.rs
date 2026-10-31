@@ -48,6 +48,7 @@ pub(crate) fn describe(
         alpha_mode: alpha_mode(material),
         reads_vertex_colours: material.reads_vertex_colours(),
         layer_shares: layer_shares(material, |_| false),
+        stencil: material.stencil().map(Into::into),
         palette: material.palette.and_then(entry),
         default_palette: default_palette.map(str::to_owned),
         textures: material
@@ -184,7 +185,49 @@ fn colour(value: &str) -> Option<[f32; 3]> {
 
 #[cfg(test)]
 mod tests {
-    use super::{colour, library_path, number};
+    use p4kx_model::MaterialLibrary;
+
+    use super::{colour, describe, library_path, number};
+    use crate::manifest_materials::{MaterialStencil, PaletteEntry, TextureUse};
+
+    fn stencil_decal(
+        params: &str,
+    ) -> Result<crate::MaterialDescription, Box<dyn std::error::Error>> {
+        let xml = format!(
+            r#"<Material><SubMaterials><Material Name="d" Shader="MeshDecal" StringGenMask="%VERTDATA%STENCIL_MAP">
+            <Textures><Texture Map="TexSlot7" File="a/logo_stencil.tif"/><Texture Map="TexSlot8" File="a/b_blend.tif"/></Textures>
+            <PublicParams {params}/></Material></SubMaterials></Material>"#
+        );
+        let library = MaterialLibrary::parse("a", xml.as_bytes())?;
+        let material = library.materials.first().ok_or("a material")?;
+        Ok(describe("x0001".to_owned(), "a", Some(0), material, None))
+    }
+
+    #[test]
+    fn a_stencil_decal_states_its_stencil_map_colour_and_opacity()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let description =
+            stencil_decal(r#"StencilDiffuseColor="0.1,0.2,0.3" StencilOpacity="0.5""#)?;
+        let usages: Vec<_> = description.textures.iter().map(|slot| slot.usage).collect();
+        assert_eq!(usages, [TextureUse::Stencil, TextureUse::Blend]);
+        assert_eq!(
+            description.stencil,
+            Some(MaterialStencil {
+                colour: Some([0.1, 0.2, 0.3]),
+                opacity: 0.5
+            })
+        );
+        assert_eq!(description.palette, None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_tint_override_states_the_primary_palette_entry() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let description = stencil_decal(r#"StencilTintOverride="1""#)?;
+        assert_eq!(description.palette, Some(PaletteEntry::Primary));
+        Ok(())
+    }
 
     #[test]
     fn a_library_path_has_no_data_prefix_extension_or_backslash() {

@@ -23,9 +23,13 @@ material whose blend map cannot be loaded.
 
 A texture whose file does not load (`BuildContext.loadable`, asked only for the textures a
 material names) counts as an unwritten slot, in the material and in its layer files, so the graph
-uses its factors. A decal with `STENCIL_MAP` in its generation mask and no palette entry takes
-`StencilDiffuseColor` (`r,g,b`) as its colour factor, and `StencilOpacity` scales its opacity; a
-palette entry still wins. The stencil mask and `StencilTintOverride` stay with #856.
+uses its factors.
+
+Amended by ADR-0298: a stencil decal (`MeshDecal` with `STENCIL_MAP`) is stated by the package
+(`stencil`, format 1.6), takes its alpha from the red channel of its `stencil` texture, its colour
+from `stencil.colour` (else `diffuse`) and its opacity times `stencil.opacity`; a palette entry still
+wins, and `StencilTintOverride` is the primary entry in the package's `palette`. A stencil decal
+with neither a stencil nor a diffuse map is a Transparent BSDF.
 
 ## Decision
 
@@ -50,7 +54,7 @@ ADR-0093 (its Specular IOR Level placeholder is replaced by the specular map rul
 | --- | --- | --- |
 | surface | `HardSurface`, `Illum`, `Layer`, `LayerBlend`, `LayerBlend_V2`, `Simple` | Principled BSDF; layers when the description has them |
 | glass | `GlassPBR` | Principled with Transmission Weight 1, IOR 1.45, blended; the `glass` palette entry is the colour; with `PER_VERTEX_TINT` the colour is multiplied by the vertex colours (ADR-0253); the surface is 15 % of that Principled BSDF and 85 % a Transparent BSDF in the colour, faded by the description's alpha, so EEVEE shows the scene behind it tinted (ADR-0258, ADR-0282) |
-| decal | `MeshDecal` | Principled, blended; a `$TintPaletteDecal` slot takes the palette's primary tint; `DecalDiffuseOpacity` scales the opacity |
+| decal | `MeshDecal` | Principled, blended; a `$TintPaletteDecal` slot takes the palette's primary tint; `DecalDiffuseOpacity` scales the opacity; a stencil decal is cut out by its `stencil` map (ADR-0298) |
 | hologram | `Hologram`, `HologramCIG` | Principled, the colour as emission (strength at least 1), blended |
 | nodraw | `NoDraw`, `NoDraw_Proxy`, `Proxy`, or the `no_draw` flag | Transparent BSDF |
 | unknown | anything else | the surface setup without layers, and a warning in the import report |
@@ -64,7 +68,8 @@ not lost for a script or a later add-on version.
 a Normal Map node (tangent space; the package's normal maps are already OpenGL, so nothing is
 inverted), `specular` the metal share, base colour and specular level (below), `gloss` the smoothness, `occlusion`
 multiplied into the colour, `detail` overlaid at 0.5, `mask` and the opacity alpha of the
-diffuse map the alpha, `blend` and `wear` the layer and wear factors. `displacement` and `other`
+diffuse map the alpha, `stencil` the alpha of a stencil decal (its red channel), `blend` and `wear`
+the layer and wear factors. `displacement` and `other`
 are not used. All but the diffuse map are linear (the package's `colour_space`). A `TexMod` of a
 slot becomes a Mapping node (tiling as scale, offset as location). Smoothness is the alpha of a
 normal map whose texture `alpha` is `smoothness` (the image's alpha mode is then channel packed
