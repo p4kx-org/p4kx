@@ -38,7 +38,9 @@ that no port flag gave a sub-geometry (ADR-0208 keeps its priority):
 The node records how its geometry was chosen (main, by a port flag, by the body), instead of
 comparing paths: a flag choice whose sub-geometry has the path of the main geometry keeps ADR-0208's
 priority. The head is found by one function, used by the resolver, `npc_head` and the body zones;
-`EntityNode::character_body` gives the body and its head, and `entity glb` reports both.
+`EntityNode::character_body` gives the body and its head, and `entity glb` reports both. The head
+does not always name the body: a generic head names none and the `Char_Body` Entity does
+(ADR-0311), so `character_body` also reports which Entity named it.
 
 Items of other types keep their main geometry: the mobiGlas has a prop model with the helpers its
 screens attach to and a `Male` variant without them. Armour, `character package` and `armour glb`

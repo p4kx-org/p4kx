@@ -41,21 +41,19 @@ A model is a world prop when it lies outside `Objects/Characters` and is no `.cd
 - **The body of a character is the one its head names, else the one its `Char_Body` Entity
   names:** the sub-type of the body Entity when it is `Male` or `Female`, else the body whose
   folder holds the model of the body Entity. A tree with neither is left as it is, as in ADR-0219.
-  The head keeps priority. `EntityNode::body_variant` is the one place that decides; the clothing
-  (`dress_body`) and the cut of the body skin under the clothing (`BodyCut`) both use it.
+  The head keeps priority. `EntityNode::naming` is the one place that decides; the clothing
+  (`dress_body`), the cut of the body skin under the clothing (`BodyCut`), `character_body` and
+  `npc_head` all use it, through `body_variant` and `character_body`.
+- **A generic head is a head with a body.** `character_body` and `npc_head` take the body from
+  `naming`, so a generic-head NPC has a character body and an NPC head. `CharacterBody::named_by`
+  tells which Entity named the body, and the `body` of the `entity glb` report says so with
+  `named_by` and `named_by_head`. A head that names no model gives no `head` piece.
 - **A worn item whose only geometry is a world prop has no geometry once the body is known.**
   Such an item is a `Char_` item without sub-geometry per body whose main geometry is a world
   prop. The Assembly lists the issue `world_prop_not_worn` with the path of the prop, apart from
   `no_geometry` (the Record names none) and `body_geometry_missing`. A part that a worn Record
   hides (ADR-0304) stays hidden by its Record whatever its geometry. An item whose main geometry is
   a character model keeps it. A character whose body is unknown keeps every main geometry.
-
-## What is left of #986
-
-#986 asks for the body zones and the NPC head of generic-head NPCs. The body zones are done here:
-without the cut, dressing the clothing lets the body skin show through it. `npc_head` and
-`EntityNode::character_body` still take the head: they need the head Entity, which a generic head
-does not give a model for. They stay in #986.
 
 ## Consequences
 
