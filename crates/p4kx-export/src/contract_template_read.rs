@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cell::RefCell;
+
 use p4kx_extraction::{CancelToken, DataForge, Filter, RecordTree, StructValue, TagTree};
 
 use crate::CatalogError;
-use crate::contract_hauling::HaulingSource;
+use crate::contract_hauling::{HaulingOrder, HaulingSource};
 use crate::contract_template::{ActiveSettings, AutoFinish, ContractTemplate, TemplateProperty};
 use crate::guid_text::CatalogGuid;
 use crate::mission_hauling::{objective_orders, property_orders};
@@ -18,18 +20,32 @@ use crate::spawn_layers::{Level, SpawnPools};
 use crate::spawn_model::SpawnLevel;
 use crate::spawn_read::Reader;
 use crate::template_extras::{end_comms, modifiers, owner, partial_payout, start_comms};
-use crate::template_flow::triggers;
+use crate::template_flow::FlowReader;
+use crate::template_issues::Unknowns;
 use crate::template_objective::ObjectiveState;
 use crate::template_objective_read::ObjectiveReader;
 use crate::texts::Texts;
 
 const PROPERTY_VALUE_PREFIX: &str = "MissionPropertyValue_";
 
-/// The contract templates of a DataForge and what was left out.
-pub(crate) type ContractTemplates<'f> = KindRead<ContractTemplate<'f>>;
+/// The contract templates of a DataForge, what was left out, the ship spawns and location queries
+/// their objectives state and the stored names the catalog does not know.
+pub(crate) struct ContractTemplates<'f> {
+    pub(crate) read: KindRead<ContractTemplate<'f>>,
+    pub(crate) pools: SpawnPools,
+    pub(crate) unknowns: Unknowns,
+}
+
+/// What a template is read with.
+struct Sources<'r, 'f> {
+    forge: &'r DataForge<'f>,
+    texts: &'r Texts<'f>,
+    tags: &'r TagTree,
+    unknowns: &'r Unknowns,
+}
 
 /// Reads the `ContractTemplate` Records `filter` matches, ordered by GUID; a development leftover
-/// is left out and counted.
+/// is left out and counted. A Record that nests its phases or conditions too deep is a failure.
 ///
 /// # Errors
 ///
@@ -41,42 +57,69 @@ pub(crate) fn read<'f>(
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
 ) -> Result<ContractTemplates<'f>, CatalogError> {
-    read_kind(
+    let unknowns = Unknowns::default();
+    let sources = Sources {
+        forge,
+        texts,
+        tags,
+        unknowns: &unknowns,
+    };
+    let read = read_kind(
         forge,
         Kind::ContractTemplates,
         (filter, cancel),
-        |tree| template(forge, tree, texts, tags),
-        |template| template.guid,
-    )
+        |tree| template(&sources, tree),
+        |(template, _)| template.guid,
+    )?;
+    let mut pools = SpawnPools::default();
+    let items = read
+        .items
+        .into_iter()
+        .map(|(template, found)| {
+            pools.merge(found);
+            template
+        })
+        .collect();
+    Ok(ContractTemplates {
+        read: KindRead {
+            items,
+            skipped: read.skipped,
+            failures: read.failures,
+        },
+        pools,
+        unknowns,
+    })
 }
 
 fn template<'f>(
-    forge: &DataForge<'f>,
+    sources: &Sources<'_, 'f>,
     tree: &RecordTree<'f>,
-    texts: &Texts<'f>,
-    tags: &TagTree,
-) -> Result<ContractTemplate<'f>, ReadError> {
+) -> Result<(ContractTemplate<'f>, SpawnPools), ReadError> {
+    let Sources {
+        forge,
+        texts,
+        tags,
+        unknowns,
+    } = *sources;
     let root = Some(tree.root());
     let display = one(root, "contractDisplayInfo");
     let class = one(root, "contractClass");
     let reader = Reader::new(tags, tree.root());
+    let pools = RefCell::new(SpawnPools::default());
     let spawns = Level::read(
         SpawnLevel::Template,
         &reader,
         (root, "contractProperties"),
         (None, ""),
-        &mut SpawnPools::default(),
+        &mut pools.borrow_mut(),
     )?
     .resolved();
-    let hauling = property_orders(root, "contractProperties");
-    let objective = objective_orders(root);
-    let hauling_orders = HaulingLevels {
-        properties: vec![(HaulingSource::Template, hauling.as_slice())],
-        template_objective: &objective,
-        broker_objective: &[],
-    }
-    .orders();
-    Ok(ContractTemplate {
+    let objectives = ObjectiveReader::new(&reader, texts, unknowns, &pools).objectives(root)?;
+    let flow = FlowReader {
+        reader: &reader,
+        unknowns,
+    };
+    let template = ContractTemplate {
         guid: CatalogGuid(tree.guid()),
         class_name: class_name(tree),
         record_path: tree.record_path(),
@@ -89,23 +132,33 @@ fn template<'f>(
         pre_show_objectives: boolean(display, "preShowObjectives"),
         class_type: class.map(|class| class.type_name().to_owned()),
         settings: one(class, "additionalParams").map(settings),
-        auto_finish: one(class, "autoFinishSettings").map(auto_finish),
+        auto_finish: one(class, "autoFinishSettings").map(|finish| auto_finish(finish, unknowns)),
         contract_properties: properties(root),
         ship_spawns: spawns.ship_spawns,
         location_queries: spawns.location_queries,
-        hauling_orders,
-        objectives: ObjectiveReader {
-            reader: &reader,
-            texts,
-        }
-        .objectives(root),
+        hauling_orders: hauling_orders(root),
+        objectives,
         partial_payout: partial_payout(root),
         modifiers: modifiers(&reader, root),
         owner: owner(forge, root),
-        mission_flow: triggers(&reader, root),
+        mission_flow: flow.triggers(root)?,
         start_comms: start_comms(&reader, root),
-        end_comms: end_comms(&reader, root),
-    })
+        end_comms: end_comms(&reader, unknowns, root),
+    };
+    Ok((template, pools.into_inner()))
+}
+
+/// Returns the hauling orders of the template `root`: its hauling properties and the orders of its
+/// hauling objectives.
+fn hauling_orders<'f>(root: Option<&StructValue<'f>>) -> Vec<HaulingOrder<'f>> {
+    let hauling = property_orders(root, "contractProperties");
+    let objective = objective_orders(root);
+    HaulingLevels {
+        properties: vec![(HaulingSource::Template, hauling.as_slice())],
+        template_objective: &objective,
+        broker_objective: &[],
+    }
+    .orders()
 }
 
 fn settings(settings: &StructValue<'_>) -> ActiveSettings {
@@ -119,7 +172,7 @@ fn settings(settings: &StructValue<'_>) -> ActiveSettings {
     }
 }
 
-fn auto_finish(settings: &StructValue<'_>) -> AutoFinish {
+fn auto_finish(settings: &StructValue<'_>, unknowns: &Unknowns) -> AutoFinish {
     let flag = |name: &str| boolean(Some(settings), name);
     let deadline = one(Some(settings), "contractDeadline");
     AutoFinish {
@@ -128,8 +181,11 @@ fn auto_finish(settings: &StructValue<'_>) -> AutoFinish {
         fail_if_leave_prison: flag("failIfLeavePrison"),
         completion_time: integer(deadline, "missionCompletionTime"),
         auto_end: boolean(deadline, "missionAutoEnd"),
-        result_after_timer_end: text(deadline, "missionResultAfterTimerEnd")
-            .and_then(ObjectiveState::parse),
+        result_after_timer_end: unknowns.parse(
+            "timer end result",
+            text(deadline, "missionResultAfterTimerEnd"),
+            ObjectiveState::parse,
+        ),
         remaining_time_to_show_timer: integer(deadline, "remainingTimeToShowTimer"),
     }
 }

@@ -10,13 +10,21 @@ fn pointer(name: &str) -> TestType {
     TestType::StrongPointer(name.to_owned())
 }
 
+fn weak(name: &str) -> TestType {
+    TestType::WeakPointer(name.to_owned())
+}
+
+fn value(name: &str) -> TestStruct {
+    TestStruct::new(name).parent("MissionPropertyValue")
+}
+
 fn class(name: &str) -> TestType {
     TestType::Class(name.to_owned())
 }
 
 /// Returns the structs of the fixture's template parts.
 pub(super) fn structs() -> Vec<TestStruct> {
-    [objectives(), handlers(), flow(), extras()]
+    [objectives(), properties(), handlers(), flow(), extras()]
         .into_iter()
         .flatten()
         .collect()
@@ -37,6 +45,7 @@ fn objectives() -> Vec<TestStruct> {
                 "overrideMissionDetailsDisplayInfo",
                 class("OverrideMissionDetailsDisplayInfo"),
             )
+            .array("properties", pointer("ObjectiveProperty"))
             .field("rewardContribution", pointer("ObjectiveRewardContribution"))
             .array("commsNotifications", class("CommsNotificationSelector"))
             .array("childMissionPhases", class("ObjectiveToken")),
@@ -70,6 +79,7 @@ fn handlers() -> Vec<TestStruct> {
             .field("module", TestType::String)
             .field("travelRadiusKM", TestType::Single)
             .field("disableTravelObjectives", TestType::Bool)
+            .field("location", weak("MissionProperty"))
             .field("travelObjectiveInfo", class("ObjectiveDisplayInfo"))
             .field("navPointSpawnInfo", pointer("NavPointSpawnInformation")),
         TestStruct::new("NavPointSpawnInformation")
@@ -111,7 +121,7 @@ fn flow() -> Vec<TestStruct> {
         TestStruct::new("MissionFlowCondition"),
         TestStruct::new("MissionFlowCondition_TokenState")
             .parent("MissionFlowCondition")
-            .field("objectiveToken", TestType::Reference)
+            .field("objectiveToken", weak("ObjectiveToken"))
             .field("tokenState", TestType::String),
         TestStruct::new("MissionFlowCondition_AND")
             .parent("MissionFlowCondition")
@@ -119,6 +129,9 @@ fn flow() -> Vec<TestStruct> {
         TestStruct::new("MissionFlowCondition_NOT")
             .parent("MissionFlowCondition")
             .field("condition", pointer("MissionFlowCondition")),
+        TestStruct::new("MissionFlowCondition_PropertyIsSet")
+            .parent("MissionFlowCondition")
+            .field("property", weak("MissionProperty")),
         TestStruct::new("MissionFlowCondition_Unknown").parent("MissionFlowCondition"),
         TestStruct::new("MissionFlowAction"),
         TestStruct::new("MissionFlowAction_StateChange")
@@ -129,7 +142,7 @@ fn flow() -> Vec<TestStruct> {
             .field("toState", TestType::String)
             .array("missionPhases", class("MissionRandomPhaseEntry")),
         TestStruct::new("MissionRandomPhaseEntry")
-            .field("objective", TestType::Reference)
+            .field("objective", weak("ObjectiveToken"))
             .field("probability", TestType::Single),
     ]
 }
@@ -155,17 +168,20 @@ fn extras() -> Vec<TestStruct> {
             .parent("MissionModifier")
             .field("modifierName", TestType::String)
             .field("enabled", TestType::Bool)
+            .field("locationProperty", weak("MissionProperty"))
             .field("clearanceToken", TestType::Reference),
         TestStruct::new("MissionModifier_RequestRentShip")
             .parent("MissionModifier")
             .field("modifierName", TestType::String)
             .field("enabled", TestType::Bool)
+            .field("locationProperty", weak("MissionProperty"))
             .field("itemRecordGUID", TestType::Reference)
             .field("durationSeconds", TestType::Int32)
             .field("clearRentalOnFail", TestType::Bool),
         TestStruct::new("MissionModifier_ShipKioskFilter")
             .parent("MissionModifier")
             .field("enabled", TestType::Bool)
+            .field("locationProperty", weak("MissionProperty"))
             .field("kioskFilterType", class("TagsDNF")),
         TestStruct::new("TagsDNF").array("terms", class("TagsDNFTerm")),
         TestStruct::new("TagsDNFTerm")
@@ -178,5 +194,49 @@ fn extras() -> Vec<TestStruct> {
             .field("reason", TestType::String)
             .field("delay", TestType::Int32)
             .field("communicationTags", TestType::Reference),
+    ]
+}
+
+fn properties() -> Vec<TestStruct> {
+    vec![
+        TestStruct::new("ObjectiveProperty"),
+        TestStruct::new("ObjectiveProperty_Referenced")
+            .parent("ObjectiveProperty")
+            .field("missionVariableName", TestType::String)
+            .field("extendedTextToken", TestType::String)
+            .field("property", weak("MissionProperty")),
+        TestStruct::new("ObjectiveProperty_Output")
+            .parent("ObjectiveProperty")
+            .field("property", class("MissionProperty")),
+        TestStruct::new("ObjectiveProperty_Embedded")
+            .parent("ObjectiveProperty")
+            .field("property", class("MissionProperty")),
+        TestStruct::new("ObjectiveProperty_Input")
+            .parent("ObjectiveProperty")
+            .field("property", class("MissionProperty"))
+            .field("linkedOutput", weak("ObjectiveProperty")),
+        value("MissionPropertyValue_Object"),
+        value("MissionPropertyValue_DeliveryOrder"),
+        value("MissionPropertyValue_NPCSpawnDescriptions"),
+        value("MissionPropertyValue_StringHash")
+            .array("options", class("MissionPropertyValueOption_StringHash")),
+        TestStruct::new("MissionPropertyValueOption_StringHash")
+            .field("textId", TestType::Locale)
+            .field("value", TestType::String)
+            .field("weighting", TestType::Int32)
+            .array("dependentProperties", weak("MissionProperty")),
+        value("MissionPropertyValue_Integer")
+            .array("options", class("MissionPropertyValueOption_Number")),
+        value("MissionPropertyValue_Float")
+            .array("options", class("MissionPropertyValueOption_Number")),
+        TestStruct::new("MissionPropertyValueOption_Number")
+            .field("textId", TestType::Locale)
+            .field("value", TestType::Single)
+            .field("variation", TestType::Single)
+            .field("weighting", TestType::Int32)
+            .array("dependentProperties", weak("MissionProperty")),
+        value("MissionPropertyValue_Tags")
+            .field("tags", class("TagList"))
+            .field("negativeTags", class("TagList")),
     ]
 }

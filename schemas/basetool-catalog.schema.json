@@ -3155,6 +3155,17 @@
               "description": "The struct name.",
               "type": "string"
             },
+            "toState": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ObjectiveState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `toState`, as for the other actions."
+            },
             "type": {
               "const": "other",
               "type": "string"
@@ -3317,7 +3328,7 @@
           "type": "object"
         },
         {
-          "description": "A condition of another struct, or one nested deeper than the catalog follows.",
+          "description": "A condition of another struct.",
           "properties": {
             "structName": {
               "description": "The struct name.",
@@ -5125,6 +5136,34 @@
         "name",
         "negativeTagGuids",
         "positiveTagGuids"
+      ],
+      "type": "object"
+    },
+    "LinkedOutput": {
+      "description": "The output property an input property takes the value of.",
+      "properties": {
+        "objectiveId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `id` of the objective that holds the output, an entry of `objectives`; `null` when the\npointer does not name one."
+        },
+        "variable": {
+          "description": "The `missionVariableName` of the output.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "objectiveId",
+        "variable"
       ],
       "type": "object"
     },
@@ -7220,6 +7259,55 @@
       ],
       "type": "object"
     },
+    "NumberOption": {
+      "description": "An option of an integer or float property.",
+      "properties": {
+        "dependentProperties": {
+          "description": "The `missionVariableName` of the properties the option makes dependent.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "displayName": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `textId`.",
+          "x-gameText": true
+        },
+        "value": {
+          "description": "The `value`, as stored.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "variation": {
+          "description": "The `variation` the game applies around the value, as stored.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weighting": {
+          "description": "The `weighting` of the option among the others.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "dependentProperties",
+        "displayName",
+        "value",
+        "variation",
+        "weighting"
+      ],
+      "type": "object"
+    },
     "ObjectiveCategory": {
       "description": "The category of an objective display. A value the catalog does not know is `null`.",
       "type": "string",
@@ -7519,6 +7607,74 @@
         "targetProperty",
         "travelObjective",
         "travelRadiusKm"
+      ],
+      "type": "object"
+    },
+    "ObjectiveProperty": {
+      "description": "A property of an objective token.",
+      "properties": {
+        "contractProperty": {
+          "description": "The `missionVariableName` of the property of the template the `property` of a referenced\nproperty points to; `null` for any other kind or a pointer to nothing.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How the objective holds the property."
+        },
+        "linkedOutput": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LinkedOutput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The output an input property takes, `null` for any other kind."
+        },
+        "token": {
+          "description": "The `extendedTextToken` of the property, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyValue"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The value of an output, embedded or input property, `null` for a referenced one."
+        },
+        "variable": {
+          "description": "The `missionVariableName` of the property, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "contractProperty",
+        "kind",
+        "linkedOutput",
+        "token",
+        "value",
+        "variable"
       ],
       "type": "object"
     },
@@ -7889,6 +8045,28 @@
       ],
       "type": "object"
     },
+    "PropertyKind": {
+      "description": "How an objective holds a mission property (`ObjectiveProperty_*`). A struct the catalog does\nnot know is `null`.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "The objective refers to a property of the template's `contractProperties`.",
+          "value": "referenced"
+        },
+        {
+          "description": "The objective produces the property.",
+          "value": "output"
+        },
+        {
+          "description": "The objective holds the property itself.",
+          "value": "embedded"
+        },
+        {
+          "description": "The objective takes the output of another objective's property.",
+          "value": "input"
+        }
+      ]
+    },
     "PropertyModifier": {
       "description": "A gameplay property of the crafted item with the ranges that scale it by quality.",
       "properties": {
@@ -7916,6 +8094,209 @@
         "ranges"
       ],
       "type": "object"
+    },
+    "PropertyValue": {
+      "description": "The value of a mission property (`MissionPropertyValue_*`), tagged by `type`.",
+      "oneOf": [
+        {
+          "description": "`MissionPropertyValue_Object`: an object the mission scripting provides.",
+          "properties": {
+            "type": {
+              "const": "object",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_DeliveryOrder`: a delivery order the mission scripting provides.",
+          "properties": {
+            "type": {
+              "const": "deliveryOrder",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Boolean`.",
+          "properties": {
+            "type": {
+              "const": "boolean",
+              "type": "string"
+            },
+            "value": {
+              "description": "The `value`.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_StringHash`.",
+          "properties": {
+            "options": {
+              "description": "The `options` in stored order.",
+              "items": {
+                "$ref": "#/$defs/StringOption"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "stringHash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "options"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Integer`.",
+          "properties": {
+            "options": {
+              "description": "The `options` in stored order.",
+              "items": {
+                "$ref": "#/$defs/NumberOption"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "integer",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "options"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Float`.",
+          "properties": {
+            "options": {
+              "description": "The `options` in stored order.",
+              "items": {
+                "$ref": "#/$defs/NumberOption"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "float",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "options"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Tags`.",
+          "properties": {
+            "negativeTags": {
+              "description": "The `negativeTags` as tag paths.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "tags": {
+              "description": "The `tags` as tag paths.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "tags",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "tags",
+            "negativeTags"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_ShipSpawnDescriptions`.",
+          "properties": {
+            "poolGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `guid` of the entry of `contractShipSpawns`; `null` for a description without a\ngroup."
+            },
+            "type": {
+              "const": "shipSpawnDescriptions",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Location` and `MissionPropertyValue_Locations`.",
+          "properties": {
+            "queryGuid": {
+              "$ref": "#/$defs/Guid",
+              "description": "The `guid` of the entry of `contractLocationQueries`."
+            },
+            "type": {
+              "const": "location",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "queryGuid"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A value of another struct, which the catalog does not read, e.g. the NPC and entity spawn\ndescriptions.",
+          "properties": {
+            "structName": {
+              "description": "The struct name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "other",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "structName"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "QualityCurve": {
       "description": "A normal distribution of quality.",
@@ -10207,6 +10588,45 @@
       ],
       "type": "object"
     },
+    "StringOption": {
+      "description": "An option of a string hash property.",
+      "properties": {
+        "dependentProperties": {
+          "description": "The `missionVariableName` of the properties the option makes dependent.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "displayName": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `textId`.",
+          "x-gameText": true
+        },
+        "value": {
+          "description": "The `value`, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "weighting": {
+          "description": "The `weighting` of the option among the others.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "dependentProperties",
+        "displayName",
+        "value",
+        "weighting"
+      ],
+      "type": "object"
+    },
     "SubHarvestable": {
       "description": "One sub harvestable of a config.",
       "properties": {
@@ -10444,7 +10864,7 @@
       "type": "object"
     },
     "TemplateModifier": {
-      "description": "A modifier of a template (`MissionModifier_*`), as stored.",
+      "description": "A modifier of a template (`MissionModifier_*`), tagged by `modifier`.",
       "oneOf": [
         {
           "description": "`MissionModifier_SecurityClearance`.",
@@ -10468,7 +10888,7 @@
               ]
             },
             "locationProperty": {
-              "description": "The `missionVariableName` of the `locationProperty`.",
+              "description": "The `missionVariableName` of the property the `locationProperty` points to.",
               "type": [
                 "string",
                 "null"
@@ -10487,7 +10907,10 @@
             }
           },
           "required": [
-            "modifier"
+            "modifier",
+            "enabled",
+            "locationProperty",
+            "modifierName"
           ],
           "type": "object"
         },
@@ -10528,7 +10951,7 @@
               "description": "The `itemRecordGUID`, the ship item that is rented; an entry of `items` or `ships`."
             },
             "locationProperty": {
-              "description": "The `missionVariableName` of the `locationProperty`.",
+              "description": "The `missionVariableName` of the property the `locationProperty` points to.",
               "type": [
                 "string",
                 "null"
@@ -10547,7 +10970,10 @@
             }
           },
           "required": [
-            "modifier"
+            "modifier",
+            "enabled",
+            "locationProperty",
+            "modifierName"
           ],
           "type": "object"
         },
@@ -10562,7 +10988,7 @@
               ]
             },
             "locationProperty": {
-              "description": "The `missionVariableName` of the `locationProperty`.",
+              "description": "The `missionVariableName` of the property the `locationProperty` points to.",
               "type": [
                 "string",
                 "null"
@@ -10589,6 +11015,9 @@
           },
           "required": [
             "modifier",
+            "enabled",
+            "locationProperty",
+            "modifierName",
             "terms"
           ],
           "type": "object"
@@ -10600,6 +11029,13 @@
               "description": "The `enabled` flag.",
               "type": [
                 "boolean",
+                "null"
+              ]
+            },
+            "locationProperty": {
+              "description": "The `missionVariableName` of the property the `locationProperty` points to.",
+              "type": [
+                "string",
                 "null"
               ]
             },
@@ -10621,6 +11057,9 @@
           },
           "required": [
             "modifier",
+            "enabled",
+            "locationProperty",
+            "modifierName",
             "structName"
           ],
           "type": "object"
@@ -10662,6 +11101,13 @@
         "id": {
           "$ref": "#/$defs/Guid",
           "description": "The `id` of the token; unique within the template."
+        },
+        "objectiveProperties": {
+          "description": "The `properties` in stored order.",
+          "items": {
+            "$ref": "#/$defs/ObjectiveProperty"
+          },
+          "type": "array"
         },
         "overrideDisplay": {
           "$ref": "#/$defs/OverrideDisplay",
@@ -10725,6 +11171,7 @@
         "display",
         "handler",
         "id",
+        "objectiveProperties",
         "overrideDisplay",
         "parentId",
         "phaseTag",

@@ -95,6 +95,16 @@ fn built(archive: &Archive) -> Result<(CatalogSummary, Value), Box<dyn Error>> {
     Ok((summary, catalog))
 }
 
+/// Returns the `guid` of every entry of the kind `kind` of `catalog`.
+pub(crate) fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, String> {
+    Ok(catalog[kind]
+        .as_array()
+        .ok_or_else(|| format!("{kind} is a list"))?
+        .iter()
+        .filter_map(|entry| entry["guid"].as_str())
+        .collect())
+}
+
 pub(crate) fn list(catalog: &Value, kind: Kind) -> Result<&Vec<Value>, String> {
     catalog[kind.name()]
         .as_array()

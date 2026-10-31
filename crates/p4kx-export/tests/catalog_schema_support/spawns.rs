@@ -139,6 +139,7 @@ pub(super) fn contract_templates() -> serde_json::Value {
                 "percentContribution": 100,
                 "doPartialRewardPayout": true
             },
+            "objectiveProperties": objective_properties(),
             "comms": [{
                 "trigger": "completed",
                 "timing": "simultaneous",
@@ -178,6 +179,7 @@ pub(super) fn contract_templates() -> serde_json::Value {
         }, {
             "modifier": "other",
             "structName": "MissionModifier_Unknown",
+            "locationProperty": null,
             "modifierName": null,
             "enabled": null
         }],
@@ -268,4 +270,106 @@ fn objective_handler() -> serde_json::Value {
             "objectiveMarker": null
         }
     })
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "one sample of every kind of value an objective property holds"
+)]
+fn objective_properties() -> serde_json::Value {
+    json!([{
+        "kind": "referenced",
+        "variable": "Place_BP",
+        "token": "Place",
+        "contractProperty": "Place_BP",
+        "value": null,
+        "linkedOutput": null
+    }, {
+        "kind": "input",
+        "variable": "In_BP",
+        "token": null,
+        "contractProperty": null,
+        "value": {"type": "deliveryOrder"},
+        "linkedOutput": {
+            "objectiveId": "ce628b01-6ec2-4add-9f47-078493d1f48e",
+            "variable": "Out_BP"
+        }
+    }, {
+        "kind": "embedded",
+        "variable": "Mood_BP",
+        "token": null,
+        "contractProperty": null,
+        "value": {"type": "stringHash", "options": [{
+            "displayName": {"key": "@mood", "en": "Calm", "de": null},
+            "value": "calm",
+            "weighting": 1,
+            "dependentProperties": ["Place_BP"]
+        }]},
+        "linkedOutput": null
+    }, {
+        "kind": "embedded",
+        "variable": "Count_BP",
+        "token": null,
+        "contractProperty": null,
+        "value": {"type": "integer", "options": [{
+            "displayName": {"key": null, "en": null, "de": null},
+            "value": 3.0,
+            "variation": 1.0,
+            "weighting": 1,
+            "dependentProperties": []
+        }]},
+        "linkedOutput": null
+    }, {
+        "kind": "embedded",
+        "variable": "Ships_BP",
+        "token": null,
+        "contractProperty": null,
+        "value": {
+            "type": "shipSpawnDescriptions",
+            "poolGuid": "e1000000-0000-4000-8000-000000000001"
+        },
+        "linkedOutput": null
+    }, {
+        "kind": "embedded",
+        "variable": "Tags_BP",
+        "token": null,
+        "contractProperty": null,
+        "value": {"type": "tags", "tags": ["Ship.Model.Mole"], "negativeTags": []},
+        "linkedOutput": null
+    }, {
+        "kind": "embedded",
+        "variable": "Where_BP",
+        "token": null,
+        "contractProperty": null,
+        "value": {"type": "location", "queryGuid": "e2000000-0000-4000-8000-000000000001"},
+        "linkedOutput": null
+    }, {
+        "kind": "embedded",
+        "variable": "Crew_BP",
+        "token": null,
+        "contractProperty": null,
+        "value": {"type": "other", "structName": "MissionPropertyValue_NPCSpawnDescriptions"},
+        "linkedOutput": null
+    }, {
+        "kind": "output",
+        "variable": "Out_BP",
+        "token": null,
+        "contractProperty": null,
+        "value": {"type": "boolean", "value": true},
+        "linkedOutput": null
+    }, {
+        "kind": "output",
+        "variable": "Obj_BP",
+        "token": null,
+        "contractProperty": null,
+        "value": {"type": "object"},
+        "linkedOutput": null
+    }, {
+        "kind": "output",
+        "variable": "Float_BP",
+        "token": null,
+        "contractProperty": null,
+        "value": {"type": "float", "options": []},
+        "linkedOutput": null
+    }])
 }

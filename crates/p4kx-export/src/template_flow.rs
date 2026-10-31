@@ -10,10 +10,10 @@ use crate::guid_text::CatalogGuid;
 use crate::mission_layers::one;
 use crate::record_fields::{number, structs, text};
 use crate::spawn_read::Reader;
+use crate::template_issues::{TemplateError, Unknowns};
 use crate::template_objective::ObjectiveState;
 
-/// The deepest nesting of conditions that is followed; the Records of LIVE nest three levels. A
-/// deeper condition is stated as `other`.
+/// The deepest nesting of conditions that is followed; a Record that nests deeper cannot be read.
 const MAX_CONDITION_DEPTH: usize = 16;
 
 const CONDITION_PREFIX: &str = "MissionFlowCondition_";
@@ -72,7 +72,7 @@ pub(crate) enum FlowCondition {
         /// The `missionVariableName` of the `property`.
         property_variable: Option<String>,
     },
-    /// A condition of another struct, or one nested deeper than the catalog follows.
+    /// A condition of another struct.
     #[serde(rename_all = "camelCase")]
     Other {
         /// The struct name.
@@ -111,6 +111,8 @@ pub(crate) enum FlowAction {
     Other {
         /// The struct name.
         struct_name: String,
+        /// The `toState`, as for the other actions.
+        to_state: Option<ObjectiveState>,
     },
 }
 
@@ -125,94 +127,108 @@ pub(crate) struct RandomPhase {
     pub(crate) probability: Option<f32>,
 }
 
-/// Reads the `triggers` of the `missionFlow` of the Record `reader` belongs to.
-pub(crate) fn triggers(
-    reader: &Reader<'_, '_>,
-    root: Option<&StructValue<'_>>,
-) -> Vec<FlowTrigger> {
-    structs(one(root, "missionFlow"), "triggers")
-        .map(|trigger| {
-            let trigger = Some(trigger);
-            FlowTrigger {
-                note: text(trigger, "description").map(str::to_owned),
-                condition: one(trigger, "condition")
-                    .map(|condition| read_condition(reader, condition, 0)),
-                action: one(trigger, "action").map(|action| read_action(reader, action)),
-            }
-        })
-        .collect()
+/// What the mission flow of one Record is read with: its weak pointers and the count of unknown
+/// names.
+pub(crate) struct FlowReader<'r, 'x, 'f> {
+    pub(crate) reader: &'r Reader<'x, 'f>,
+    pub(crate) unknowns: &'r Unknowns,
 }
 
-fn state(parent: Option<&StructValue<'_>>, name: &str) -> Option<ObjectiveState> {
-    text(parent, name).and_then(ObjectiveState::parse)
-}
-
-fn read_condition(
-    reader: &Reader<'_, '_>,
-    condition: &StructValue<'_>,
-    depth: usize,
-) -> FlowCondition {
-    let parent = Some(condition);
-    let name = condition.type_name();
-    let nested = |field: &str| -> Vec<FlowCondition> {
-        structs(parent, field)
-            .map(|inner| read_condition(reader, inner, depth.saturating_add(1)))
-            .collect()
-    };
-    if depth >= MAX_CONDITION_DEPTH {
-        return FlowCondition::Other {
-            struct_name: name.to_owned(),
-        };
-    }
-    match name.strip_prefix(CONDITION_PREFIX).unwrap_or(name) {
-        "TokenState" => FlowCondition::TokenState {
-            objective_id: reader.objective_id(parent, "objectiveToken"),
-            token_state: state(parent, "tokenState"),
-        },
-        "AllTokensState" => FlowCondition::AllTokensState {
-            token_state: state(parent, "tokenState"),
-        },
-        "AND" => FlowCondition::And {
-            conditions: nested("conditions"),
-        },
-        "OR" => FlowCondition::Or {
-            conditions: nested("conditions"),
-        },
-        "NOT" => FlowCondition::Not {
-            condition: one(parent, "condition")
-                .map(|inner| Box::new(read_condition(reader, inner, depth.saturating_add(1)))),
-        },
-        "PropertyIsSet" => FlowCondition::PropertyIsSet {
-            property_variable: reader.property_variable(parent, "property"),
-        },
-        _ => FlowCondition::Other {
-            struct_name: name.to_owned(),
-        },
-    }
-}
-
-fn read_action(reader: &Reader<'_, '_>, action: &StructValue<'_>) -> FlowAction {
-    let parent = Some(action);
-    let name = action.type_name();
-    match name.strip_prefix(ACTION_PREFIX).unwrap_or(name) {
-        "StateChange" => FlowAction::StateChange {
-            to_state: state(parent, "toState"),
-        },
-        "TokenStateChange" => FlowAction::TokenStateChange {
-            objective_id: reader.objective_id(parent, "objectiveToken"),
-            to_state: state(parent, "toState"),
-        },
-        "PickRandomMissionPhase" => FlowAction::PickRandomMissionPhase {
-            phases: structs(parent, "missionPhases")
-                .map(|phase| RandomPhase {
-                    objective_id: reader.objective_id(Some(phase), "objective"),
-                    probability: number(Some(phase), "probability"),
+impl FlowReader<'_, '_, '_> {
+    /// Reads the `triggers` of the `missionFlow` of `root`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TemplateError::ConditionsTooDeep`] for conditions nested deeper than the limit.
+    pub(crate) fn triggers(
+        &self,
+        root: Option<&StructValue<'_>>,
+    ) -> Result<Vec<FlowTrigger>, TemplateError> {
+        structs(one(root, "missionFlow"), "triggers")
+            .map(|trigger| {
+                let trigger = Some(trigger);
+                Ok(FlowTrigger {
+                    note: text(trigger, "description").map(str::to_owned),
+                    condition: one(trigger, "condition")
+                        .map(|condition| self.condition(condition, 0))
+                        .transpose()?,
+                    action: one(trigger, "action").map(|action| self.action(action)),
                 })
-                .collect(),
-            to_state: state(parent, "toState"),
-        },
-        _ => FlowAction::Other {
-            struct_name: name.to_owned(),
-        },
+            })
+            .collect()
+    }
+
+    fn state(&self, parent: Option<&StructValue<'_>>, name: &str) -> Option<ObjectiveState> {
+        self.unknowns
+            .parse("flow state", text(parent, name), ObjectiveState::parse)
+    }
+
+    fn condition(
+        &self,
+        condition: &StructValue<'_>,
+        depth: usize,
+    ) -> Result<FlowCondition, TemplateError> {
+        if depth > MAX_CONDITION_DEPTH {
+            return Err(TemplateError::ConditionsTooDeep(MAX_CONDITION_DEPTH));
+        }
+        let parent = Some(condition);
+        let name = condition.type_name();
+        let nested = |field: &str| -> Result<Vec<FlowCondition>, TemplateError> {
+            structs(parent, field)
+                .map(|inner| self.condition(inner, depth.saturating_add(1)))
+                .collect()
+        };
+        Ok(match name.strip_prefix(CONDITION_PREFIX).unwrap_or(name) {
+            "TokenState" => FlowCondition::TokenState {
+                objective_id: self.reader.objective_id(parent, "objectiveToken"),
+                token_state: self.state(parent, "tokenState"),
+            },
+            "AllTokensState" => FlowCondition::AllTokensState {
+                token_state: self.state(parent, "tokenState"),
+            },
+            "AND" => FlowCondition::And {
+                conditions: nested("conditions")?,
+            },
+            "OR" => FlowCondition::Or {
+                conditions: nested("conditions")?,
+            },
+            "NOT" => FlowCondition::Not {
+                condition: one(parent, "condition")
+                    .map(|inner| self.condition(inner, depth.saturating_add(1)).map(Box::new))
+                    .transpose()?,
+            },
+            "PropertyIsSet" => FlowCondition::PropertyIsSet {
+                property_variable: self.reader.property_variable(parent, "property"),
+            },
+            _ => FlowCondition::Other {
+                struct_name: name.to_owned(),
+            },
+        })
+    }
+
+    fn action(&self, action: &StructValue<'_>) -> FlowAction {
+        let parent = Some(action);
+        let name = action.type_name();
+        let to_state = self.state(parent, "toState");
+        match name.strip_prefix(ACTION_PREFIX).unwrap_or(name) {
+            "StateChange" => FlowAction::StateChange { to_state },
+            "TokenStateChange" => FlowAction::TokenStateChange {
+                objective_id: self.reader.objective_id(parent, "objectiveToken"),
+                to_state,
+            },
+            "PickRandomMissionPhase" => FlowAction::PickRandomMissionPhase {
+                phases: structs(parent, "missionPhases")
+                    .map(|phase| RandomPhase {
+                        objective_id: self.reader.objective_id(Some(phase), "objective"),
+                        probability: number(Some(phase), "probability"),
+                    })
+                    .collect(),
+                to_state,
+            },
+            _ => FlowAction::Other {
+                struct_name: name.to_owned(),
+                to_state,
+            },
+        }
     }
 }

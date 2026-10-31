@@ -11,6 +11,7 @@ use crate::mission_layers::one;
 use crate::record_fields::{boolean, integer, linked, number, structs, text};
 use crate::spawn_model::TagTerm;
 use crate::spawn_read::Reader;
+use crate::template_issues::Unknowns;
 
 /// The Record that owns a template: the team or developer that maintains it.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -59,31 +60,38 @@ pub(crate) struct PayoutReputation {
     pub(crate) reputation_reward_multiplier: Option<f32>,
 }
 
-/// A modifier of a template (`MissionModifier_*`), as stored.
+/// The fields every modifier shares.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub(crate) struct ModifierHeader {
+    /// The `modifierName`, `null` when empty.
+    pub(crate) modifier_name: Option<String>,
+    /// The `enabled` flag.
+    pub(crate) enabled: Option<bool>,
+    /// The `missionVariableName` of the property the `locationProperty` points to.
+    pub(crate) location_property: Option<String>,
+}
+
+/// A modifier of a template (`MissionModifier_*`), tagged by `modifier`.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "modifier", rename_all = "camelCase")]
 pub(crate) enum TemplateModifier {
     /// `MissionModifier_SecurityClearance`.
     #[serde(rename_all = "camelCase")]
     SecurityClearance {
-        /// The `modifierName`, `null` when empty.
-        modifier_name: Option<String>,
-        /// The `enabled` flag.
-        enabled: Option<bool>,
-        /// The `missionVariableName` of the `locationProperty`.
-        location_property: Option<String>,
+        /// The fields every modifier has.
+        #[serde(flatten)]
+        header: ModifierHeader,
         /// The `clearanceToken` Record.
         clearance_token_guid: Option<CatalogGuid>,
     },
     /// `MissionModifier_RequestRentShip`.
     #[serde(rename_all = "camelCase")]
     RequestRentShip {
-        /// The `modifierName`, `null` when empty.
-        modifier_name: Option<String>,
-        /// The `enabled` flag.
-        enabled: Option<bool>,
-        /// The `missionVariableName` of the `locationProperty`.
-        location_property: Option<String>,
+        /// The fields every modifier has.
+        #[serde(flatten)]
+        header: ModifierHeader,
         /// The `itemRecordGUID`, the ship item that is rented; an entry of `items` or `ships`.
         item_guid: Option<CatalogGuid>,
         /// The `durationSeconds` of the rental.
@@ -94,24 +102,20 @@ pub(crate) enum TemplateModifier {
     /// `MissionModifier_ShipKioskFilter`.
     #[serde(rename_all = "camelCase")]
     ShipKioskFilter {
-        /// The `modifierName`, `null` when empty.
-        modifier_name: Option<String>,
-        /// The `enabled` flag.
-        enabled: Option<bool>,
-        /// The `missionVariableName` of the `locationProperty`.
-        location_property: Option<String>,
+        /// The fields every modifier has.
+        #[serde(flatten)]
+        header: ModifierHeader,
         /// The `terms` of the `kioskFilterType`: a ship matches one of them.
         terms: Vec<TagTerm>,
     },
     /// A modifier of another struct.
     #[serde(rename_all = "camelCase")]
     Other {
+        /// The fields every modifier has.
+        #[serde(flatten)]
+        header: ModifierHeader,
         /// The struct name.
         struct_name: String,
-        /// The `modifierName`, `null` when empty.
-        modifier_name: Option<String>,
-        /// The `enabled` flag.
-        enabled: Option<bool>,
     },
 }
 
@@ -153,7 +157,8 @@ pub(crate) enum EndReason {
 }
 
 impl EndReason {
-    fn parse(stored: &str) -> Option<Self> {
+    /// Returns the reason the stored enum name `stored` stands for.
+    pub(crate) fn parse(stored: &str) -> Option<Self> {
         Some(match stored {
             "Complete" => Self::Complete,
             "Fail" => Self::Fail,
@@ -213,29 +218,25 @@ pub(crate) fn modifiers(
     structs(root, "modifiers")
         .map(|modifier| {
             let parent = Some(modifier);
-            let modifier_name = text(parent, "modifierName").map(str::to_owned);
-            let enabled = boolean(parent, "enabled");
-            let location_property = reader.property_variable(parent, "locationProperty");
+            let header = ModifierHeader {
+                modifier_name: text(parent, "modifierName").map(str::to_owned),
+                enabled: boolean(parent, "enabled"),
+                location_property: reader.property_variable(parent, "locationProperty"),
+            };
             let name = modifier.type_name();
             match name.strip_prefix("MissionModifier_").unwrap_or(name) {
                 "SecurityClearance" => TemplateModifier::SecurityClearance {
-                    modifier_name,
-                    enabled,
-                    location_property,
+                    header,
                     clearance_token_guid: linked(parent, "clearanceToken"),
                 },
                 "RequestRentShip" => TemplateModifier::RequestRentShip {
-                    modifier_name,
-                    enabled,
-                    location_property,
+                    header,
                     item_guid: linked(parent, "itemRecordGUID"),
                     duration_seconds: integer(parent, "durationSeconds"),
                     clear_rental_on_fail: boolean(parent, "clearRentalOnFail"),
                 },
                 "ShipKioskFilter" => TemplateModifier::ShipKioskFilter {
-                    modifier_name,
-                    enabled,
-                    location_property,
+                    header,
                     terms: structs(one(parent, "kioskFilterType"), "terms")
                         .map(|term| TagTerm {
                             positive_tags: reader.tag_array(Some(term), "positiveTags"),
@@ -244,9 +245,8 @@ pub(crate) fn modifiers(
                         .collect(),
                 },
                 _ => TemplateModifier::Other {
+                    header,
                     struct_name: name.to_owned(),
-                    modifier_name,
-                    enabled,
                 },
             }
         })
@@ -266,10 +266,18 @@ pub(crate) fn start_comms(
 }
 
 /// Reads the `contractEndCommsNotifications` of `root`.
-pub(crate) fn end_comms(reader: &Reader<'_, '_>, root: Option<&StructValue<'_>>) -> Vec<EndComms> {
+pub(crate) fn end_comms(
+    reader: &Reader<'_, '_>,
+    unknowns: &Unknowns,
+    root: Option<&StructValue<'_>>,
+) -> Vec<EndComms> {
     structs(root, "contractEndCommsNotifications")
         .map(|comms| EndComms {
-            reason: text(Some(comms), "reason").and_then(EndReason::parse),
+            reason: unknowns.parse(
+                "end comms reason",
+                text(Some(comms), "reason"),
+                EndReason::parse,
+            ),
             delay: integer(Some(comms), "delay"),
             communication_tag: reader.tag_path(Some(comms), "communicationTags"),
         })

@@ -9,6 +9,7 @@ use p4kx_extraction::{Archive, CancelToken, DataForge, Guid};
 
 use crate::collected::Collected;
 use crate::contract_loadout::EntityKind;
+use crate::contract_template_read::ContractTemplates;
 use crate::crafter_hosts::link_hosts;
 use crate::crafting_warning::CraftingWarning;
 use crate::loadout::{Wanted, loadouts};
@@ -32,8 +33,15 @@ pub(crate) fn add_contracts<'f>(
         options.cancel,
     )?;
     collected.add_contracts(missions.contracts, missions.skipped, missions.failures);
-    collected.add_spawns(missions.templates, missions.pools);
-    collected.add_contract_templates(missions.contract_templates);
+    let ContractTemplates {
+        read,
+        pools: template_pools,
+        unknowns,
+    } = missions.contract_templates;
+    let mut pools = missions.pools;
+    pools.merge(template_pools);
+    collected.add_spawns(missions.templates, pools);
+    collected.add_contract_templates(read, unknowns);
     Ok(())
 }
 

@@ -144,9 +144,8 @@ pub enum Kind {
     /// Contract location queries: the distinct location queries the contracts state. Derived from
     /// the contracts, so no record-path rule of its own.
     ContractLocationQueries,
-    /// Contract templates: every `ContractTemplate` Record, whatever its folder (most lie under
-    /// `contracts/contracttemplates`), selected by the struct; the
-    /// structure a contract names in `templateGuid`.
+    /// Contract templates: every `ContractTemplate` Record, whatever its folder, the structure a
+    /// contract names in `templateGuid`.
     ContractTemplates,
 }
 

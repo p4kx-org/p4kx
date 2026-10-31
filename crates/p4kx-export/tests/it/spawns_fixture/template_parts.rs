@@ -4,15 +4,14 @@
 //! The owner, payout, modifiers, mission flow, comms and objective texts of the fixture's
 //! contract template.
 
+use super::{OBJECTIVE_A, OBJECTIVE_B, OWNER, SCOPE, TAG_KILL, array, reference, text};
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 
-use super::{OBJECTIVE_A, OBJECTIVE_B, OWNER, SCOPE, TAG_KILL, array, reference, text};
-
-fn locale(key: &str) -> TestValue {
+pub(super) fn locale(key: &str) -> TestValue {
     TestValue::text(key)
 }
 
-const fn object(instance: TestInstance) -> TestValue {
+pub(super) const fn object(instance: TestInstance) -> TestValue {
     TestValue::Struct(instance)
 }
 
@@ -53,6 +52,7 @@ pub(super) fn modifiers() -> TestValue {
         object(
             TestInstance::new("MissionModifier_SecurityClearance")
                 .value("modifierName", text("GiveClearence"))
+                .value("locationProperty", TestValue::pointer("prop_home"))
                 .value("enabled", TestValue::Bool(true))
                 .value("clearanceToken", reference(OWNER)),
         ),
@@ -81,7 +81,11 @@ pub(super) fn modifiers() -> TestValue {
     ])
 }
 
-fn trigger(description: &str, condition: TestInstance, action: TestInstance) -> TestValue {
+pub(super) fn trigger(
+    description: &str,
+    condition: TestInstance,
+    action: TestInstance,
+) -> TestValue {
     object(
         TestInstance::new("MissionFlowTrigger")
             .value("description", text(description))
@@ -90,20 +94,26 @@ fn trigger(description: &str, condition: TestInstance, action: TestInstance) -> 
     )
 }
 
-fn token_state(state: &str) -> TestInstance {
-    TestInstance::new("MissionFlowCondition_TokenState").value("tokenState", text(state))
+/// A token state condition on the objective token `target`, a weak pointer; none leaves it null.
+pub(super) fn token_state(state: &str, target: Option<&str>) -> TestInstance {
+    let condition =
+        TestInstance::new("MissionFlowCondition_TokenState").value("tokenState", text(state));
+    match target {
+        Some(name) => condition.value("objectiveToken", TestValue::pointer(name)),
+        None => condition,
+    }
 }
 
-/// Three triggers: a nested condition with a state change, a random phase pick and a condition of
-/// an unknown struct.
+/// Five triggers: a nested condition with a state change, a random phase pick, a condition of an
+/// unknown struct, and two that point to a property and to a token the Record lacks.
 pub(super) fn flow() -> TestValue {
     let nested = TestInstance::new("MissionFlowCondition_AND").value(
         "conditions",
         array(vec![
-            object(token_state("Completed")),
+            object(token_state("Completed", Some("tok_a"))),
             object(
                 TestInstance::new("MissionFlowCondition_NOT")
-                    .value("condition", object(token_state("Failed"))),
+                    .value("condition", object(token_state("Failed", Some("tok_b")))),
             ),
         ]),
     );
@@ -113,23 +123,45 @@ pub(super) fn flow() -> TestValue {
             "missionPhases",
             array(vec![object(
                 TestInstance::new("MissionRandomPhaseEntry")
+                    .value("objective", TestValue::pointer("tok_c"))
                     .value("probability", TestValue::Single(0.25)),
             )]),
         );
     let state_change =
         |to: &str| TestInstance::new("MissionFlowAction_StateChange").value("toState", text(to));
+    let property_set = TestInstance::new("MissionFlowCondition_PropertyIsSet")
+        .value("property", TestValue::pointer("prop_place"));
     object(TestInstance::new("MissionFlow").value(
         "triggers",
         array(vec![
             trigger("All done -> Completed", nested, state_change("Completed")),
-            trigger("Pick", token_state("Active"), pick),
+            trigger("Pick", token_state("Active", None), pick),
             trigger(
                 "Odd",
                 TestInstance::new("MissionFlowCondition_Unknown"),
                 state_change("Sleeping"),
             ),
+            trigger(
+                "No id",
+                token_state("Failed", Some("tok_noid")),
+                state_change("Failed"),
+            ),
+            trigger("Property", property_set, state_change("Active")),
+            trigger(
+                "Outside",
+                token_state("Active", Some("outside")),
+                state_change("Active"),
+            ),
         ]),
     ))
+}
+
+/// Gives the instance `value` creates the name `name`, so a weak pointer can point to it.
+pub(super) fn named(value: TestValue, name: &str) -> TestValue {
+    match value {
+        TestValue::Struct(instance) => TestValue::Struct(instance.named(name)),
+        other => other,
+    }
 }
 
 /// The start message of the template.
@@ -154,7 +186,7 @@ pub(super) fn end_comms() -> TestValue {
     ])
 }
 
-fn display(short: &str) -> TestValue {
+pub(super) fn display(short: &str) -> TestValue {
     object(
         TestInstance::new("ObjectiveDisplayInfo")
             .value("category", text("Primary"))
@@ -188,6 +220,7 @@ pub(super) fn local_handler() -> TestInstance {
         .value("module", text("Libs/Subsumption/Missions/Goto.xml"))
         .value("travelRadiusKM", TestValue::Single(2.5))
         .value("disableTravelObjectives", TestValue::Bool(false))
+        .value("location", TestValue::pointer("prop_place"))
         .value("travelObjectiveInfo", display("@place_name"))
         .value(
             "navPointSpawnInfo",
@@ -249,6 +282,8 @@ pub(super) fn dress(token: TestInstance, id: u128) -> TestInstance {
             .value("variableName", text("PhaseB"))
             .value("weight", TestValue::Single(0.5))
     } else {
-        token.value("variableName", text(""))
+        token
+            .value("variableName", text(""))
+            .value("missionPhaseIdentifierTag", reference(0))
     }
 }

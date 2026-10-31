@@ -1,34 +1,73 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Guid, StructValue, Value};
+use std::cell::RefCell;
+
+use p4kx_extraction::{StructValue, Value};
 
 use crate::contract::LocalisedText;
 use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{items, key, one};
-use crate::record_fields::{boolean, guid_value, integer, linked, number, structs, text};
+use crate::record_fields::{
+    boolean, guid_value, integer, linked, nonnil_guid, number, structs, text,
+};
+use crate::spawn_layers::SpawnPools;
 use crate::spawn_read::Reader;
+use crate::template_issues::{TemplateError, Unknowns};
 use crate::template_objective::{
     CommsTiming, HaulingSettings, InstanceEntry, NavPoint, ObjectiveCategory, ObjectiveComms,
     ObjectiveDisplay, ObjectiveHandler, ObjectiveState, OverrideDisplay, RewardContribution,
     TemplateObjective,
 };
+use crate::template_property_read::PropertyReader;
 use crate::texts::Texts;
 
-/// The deepest nesting of `childMissionPhases` that is followed; the Records of LIVE nest five
-/// levels.
-const MAX_PHASE_DEPTH: usize = 32;
+/// The deepest nesting of `childMissionPhases` that is followed; a Record that nests deeper
+/// cannot be read.
+pub(crate) const MAX_PHASE_DEPTH: usize = 32;
 
-/// What the objectives of one Record are read with: its tags and weak pointers, and the texts.
+/// What the objectives of one Record are read with: its tags and weak pointers, the texts, the
+/// count of unknown names and the pools its properties register their spawns in.
 pub(crate) struct ObjectiveReader<'r, 'x, 'f> {
-    pub(crate) reader: &'r Reader<'x, 'f>,
-    pub(crate) texts: &'r Texts<'f>,
+    reader: &'r Reader<'x, 'f>,
+    texts: &'r Texts<'f>,
+    unknowns: &'r Unknowns,
+    properties: PropertyReader<'r, 'x, 'f>,
 }
 
-impl<'f> ObjectiveReader<'_, '_, 'f> {
+impl<'r, 'x, 'f> ObjectiveReader<'r, 'x, 'f> {
+    /// Creates the reader of the Record `reader` belongs to.
+    pub(crate) const fn new(
+        reader: &'r Reader<'x, 'f>,
+        texts: &'r Texts<'f>,
+        unknowns: &'r Unknowns,
+        pools: &'r RefCell<SpawnPools>,
+    ) -> Self {
+        Self {
+            reader,
+            texts,
+            unknowns,
+            properties: PropertyReader {
+                reader,
+                texts,
+                unknowns,
+                pools,
+            },
+        }
+    }
+
     /// Reads the `objectiveTokens` of `root` and the phases below them, each token before its
     /// phases; a token without an `id` and the phases below it are left out.
-    pub(crate) fn objectives(&self, root: Option<&StructValue<'f>>) -> Vec<TemplateObjective<'f>> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TemplateError::PhasesTooDeep`] for phases nested deeper than
+    /// [`MAX_PHASE_DEPTH`] and the error of the serialisation that makes the identifier of a
+    /// description.
+    pub(crate) fn objectives(
+        &self,
+        root: Option<&StructValue<'f>>,
+    ) -> Result<Vec<TemplateObjective<'f>>, Box<dyn std::error::Error + Send + Sync>> {
         let mut found = Vec::new();
         let mut pending: Vec<(&StructValue<'f>, Option<CatalogGuid>, usize)> =
             structs(root, "objectiveTokens")
@@ -37,21 +76,22 @@ impl<'f> ObjectiveReader<'_, '_, 'f> {
         pending.reverse();
         while let Some((token, parent_id, depth)) = pending.pop() {
             let Some(id) = guid_value(Some(token), "id")
-                .filter(|id| *id != Guid::default())
+                .and_then(nonnil_guid)
                 .map(CatalogGuid)
             else {
                 continue;
             };
-            found.push(self.objective(token, id, parent_id));
-            if depth < MAX_PHASE_DEPTH {
-                let mut phases: Vec<_> = structs(Some(token), "childMissionPhases")
-                    .map(|phase| (phase, Some(id), depth.saturating_add(1)))
-                    .collect();
-                phases.reverse();
-                pending.append(&mut phases);
+            found.push(self.objective(token, id, parent_id)?);
+            let mut phases: Vec<_> = structs(Some(token), "childMissionPhases")
+                .map(|phase| (phase, Some(id), depth.saturating_add(1)))
+                .collect();
+            if !phases.is_empty() && depth >= MAX_PHASE_DEPTH {
+                return Err(TemplateError::PhasesTooDeep(MAX_PHASE_DEPTH).into());
             }
+            phases.reverse();
+            pending.append(&mut phases);
         }
-        found
+        Ok(found)
     }
 
     fn objective(
@@ -59,10 +99,11 @@ impl<'f> ObjectiveReader<'_, '_, 'f> {
         token: &StructValue<'f>,
         id: CatalogGuid,
         parent_id: Option<CatalogGuid>,
-    ) -> TemplateObjective<'f> {
+    ) -> Result<TemplateObjective<'f>, serde_json::Error> {
+        let fields = token;
         let token = Some(token);
         let override_display = one(token, "overrideMissionDetailsDisplayInfo");
-        TemplateObjective {
+        Ok(TemplateObjective {
             id,
             parent_id,
             debug_name: owned(token, "debugName"),
@@ -83,17 +124,26 @@ impl<'f> ObjectiveReader<'_, '_, 'f> {
                     do_partial_reward_payout: boolean(Some(contribution), "doPartialRewardPayout"),
                 }
             }),
+            objective_properties: self.properties.properties(fields)?,
             comms: structs(token, "commsNotifications")
                 .map(|comms| self.comms(comms))
                 .collect(),
-        }
+        })
     }
 
     fn comms(&self, comms: &StructValue<'f>) -> ObjectiveComms {
         let comms = Some(comms);
         ObjectiveComms {
-            trigger: text(comms, "trigger").and_then(ObjectiveState::parse),
-            timing: text(comms, "commsTiming").and_then(CommsTiming::parse),
+            trigger: self.unknowns.parse(
+                "comms trigger",
+                text(comms, "trigger"),
+                ObjectiveState::parse,
+            ),
+            timing: self.unknowns.parse(
+                "comms timing",
+                text(comms, "commsTiming"),
+                CommsTiming::parse,
+            ),
             delay: integer(comms, "delay"),
             communication_tag: self.reader.tag_path(comms, "communicationTags"),
         }
@@ -105,7 +155,11 @@ impl<'f> ObjectiveReader<'_, '_, 'f> {
 
     fn display(&self, display: Option<&StructValue<'f>>) -> ObjectiveDisplay<'f> {
         ObjectiveDisplay {
-            category: text(display, "category").and_then(ObjectiveCategory::parse),
+            category: self.unknowns.parse(
+                "objective category",
+                text(display, "category"),
+                ObjectiveCategory::parse,
+            ),
             hide_on_hud: boolean(display, "hideOnHUD"),
             marker_label: self.text(display, "objectiveMarkerLabel"),
             short_description: self.text(display, "shortDescription"),

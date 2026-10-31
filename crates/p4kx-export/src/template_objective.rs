@@ -7,6 +7,7 @@ use serde::Serialize;
 use crate::contract::{LocalisedText, every_field_required};
 use crate::guid_text::CatalogGuid;
 use crate::spawn_model::TagPaths;
+use crate::template_property::ObjectiveProperty;
 
 /// The state of an objective token or of the mission, as the mission flow, the comms
 /// notifications and the flow actions name it. A value the catalog does not know is `null`.
@@ -282,6 +283,8 @@ pub(crate) struct TemplateObjective<'a> {
     pub(crate) override_display: OverrideDisplay<'a>,
     /// The `rewardContribution`, `null` when absent.
     pub(crate) reward_contribution: Option<RewardContribution>,
+    /// The `properties` in stored order.
+    pub(crate) objective_properties: Vec<ObjectiveProperty<'a>>,
     /// The `commsNotifications` in stored order.
     pub(crate) comms: Vec<ObjectiveComms>,
 }

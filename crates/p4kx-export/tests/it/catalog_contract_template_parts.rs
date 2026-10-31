@@ -14,6 +14,9 @@ type TestResult = Result<(), Box<dyn Error>>;
 
 const OWNER: &str = "80000000-0000-4000-8000-000000000001";
 const SCOPE: &str = "80000000-0000-4000-8000-000000000002";
+const OBJECTIVE_A: &str = "70000000-0000-4000-8000-000000000001";
+const OBJECTIVE_B: &str = "70000000-0000-4000-8000-000000000002";
+const OBJECTIVE_C: &str = "70000000-0000-4000-8000-000000000003";
 
 fn field<'c>(entry: &'c Value, pointer: &str) -> &'c Value {
     entry.pointer(pointer).unwrap_or(&Value::Null)
@@ -165,7 +168,7 @@ fn modifiers_are_a_closed_list_with_an_other_entry_for_an_unknown_struct() -> Te
             "modifier": "securityClearance",
             "modifierName": "GiveClearence",
             "enabled": true,
-            "locationProperty": null,
+            "locationProperty": "Home_BP",
             "clearanceTokenGuid": OWNER
         })
     );
@@ -197,7 +200,8 @@ fn modifiers_are_a_closed_list_with_an_other_entry_for_an_unknown_struct() -> Te
             "modifier": "other",
             "structName": "MissionModifier",
             "modifierName": null,
-            "enabled": null
+            "enabled": null,
+            "locationProperty": null
         })
     );
     Ok(())
@@ -219,16 +223,16 @@ fn the_mission_flow_nests_its_conditions_and_names_unknown_structs() -> TestResu
     let flow = template(&catalog)?["missionFlow"]
         .as_array()
         .ok_or("flow")?;
-    assert_eq!(flow.len(), 3);
+    assert_eq!(flow.len(), 6);
     assert_eq!(flow[0]["note"], "All done -> Completed");
     assert_eq!(
         flow[0]["condition"],
         json!({
             "type": "and",
             "conditions": [
-                {"type": "tokenState", "objectiveId": null, "tokenState": "completed"},
+                {"type": "tokenState", "objectiveId": OBJECTIVE_A, "tokenState": "completed"},
                 {"type": "not", "condition":
-                    {"type": "tokenState", "objectiveId": null, "tokenState": "failed"}}
+                    {"type": "tokenState", "objectiveId": OBJECTIVE_B, "tokenState": "failed"}}
             ]
         })
     );
@@ -240,9 +244,14 @@ fn the_mission_flow_nests_its_conditions_and_names_unknown_structs() -> TestResu
         flow[1]["action"],
         json!({
             "type": "pickRandomMissionPhase",
-            "phases": [{"objectiveId": null, "probability": 0.25}],
+            "phases": [{"objectiveId": OBJECTIVE_C, "probability": 0.25}],
             "toState": "active"
         })
+    );
+    assert_eq!(
+        flow[1]["condition"],
+        json!({"type": "tokenState", "objectiveId": null, "tokenState": "active"}),
+        "an unset weak pointer is null"
     );
     assert_eq!(
         flow[2]["condition"],
@@ -253,6 +262,44 @@ fn the_mission_flow_nests_its_conditions_and_names_unknown_structs() -> TestResu
         json!({"type": "stateChange", "toState": null}),
         "a state the catalog does not know is null"
     );
+    Ok(())
+}
+
+#[test]
+fn a_weak_pointer_names_the_objective_or_the_property_or_is_null() -> TestResult {
+    let catalog = build()?;
+    let flow = template(&catalog)?["missionFlow"]
+        .as_array()
+        .ok_or("flow")?;
+    assert_eq!(
+        field(&flow[0], "/condition/conditions/0/objectiveId"),
+        OBJECTIVE_A,
+        "a top level token"
+    );
+    assert_eq!(
+        field(&flow[0], "/condition/conditions/1/condition/objectiveId"),
+        OBJECTIVE_B,
+        "a phase below a token"
+    );
+    assert_eq!(
+        field(&flow[3], "/condition/objectiveId"),
+        &Value::Null,
+        "a token with a nil id"
+    );
+    assert_eq!(
+        flow[4]["condition"],
+        json!({"type": "propertyIsSet", "propertyVariable": "Place_BP"}),
+        "a property, by its variable name"
+    );
+    assert_eq!(
+        field(&flow[5], "/condition/objectiveId"),
+        &Value::Null,
+        "an instance that is no part of the Record"
+    );
+    let modifier = field(template(&catalog)?, "/modifiers/0/locationProperty");
+    assert_eq!(modifier, "Home_BP");
+    let handler = field(objective(&catalog, 2)?, "/handler");
+    assert_eq!(handler["locationProperty"], "Place_BP");
     Ok(())
 }
 

@@ -7,12 +7,12 @@
 use std::collections::HashSet;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, CraftingWarning, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
-type TestResult = Result<(), Box<dyn std::error::Error>>;
+use crate::real_archive_verification::{TestResult, guids, print_line};
 
 /// What the parts of the templates hold.
 #[derive(Default)]
@@ -26,15 +26,9 @@ struct Figures {
     payout_ranges: usize,
     modifiers: usize,
     comms: usize,
-}
-
-fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, String> {
-    Ok(catalog[kind]
-        .as_array()
-        .ok_or_else(|| format!("{kind} is a list"))?
-        .iter()
-        .filter_map(|entry| entry["guid"].as_str())
-        .collect())
+    properties: usize,
+    property_values: usize,
+    referenced_links: usize,
 }
 
 /// Collects the objective ids a condition names, `None` for a link that points to nothing.
@@ -98,6 +92,15 @@ fn check_objectives(
 ) {
     for objective in objectives {
         figures.comms += objective["comms"].as_array().map_or(0, Vec::len);
+        for property in objective["objectiveProperties"]
+            .as_array()
+            .into_iter()
+            .flatten()
+        {
+            figures.properties += 1;
+            figures.property_values += usize::from(!property["value"].is_null());
+            figures.referenced_links += usize::from(property["contractProperty"].is_string());
+        }
         figures.resolved_texts += texts_in(&objective["display"]) + texts_in(&objective["handler"]);
         let handler = &objective["handler"];
         if handler.is_null() {
@@ -157,20 +160,24 @@ fn check_template(
     Ok(())
 }
 
-#[expect(
-    clippy::print_stdout,
-    reason = "the figures are the result of the verification"
-)]
-fn print_line(line: &str) {
-    println!("{line}");
-}
-
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_parts_of_the_contract_templates_of_a_real_archive_resolve() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
     let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Value = serde_json::from_slice(built.json())?;
+    let unknown: Vec<&str> = built
+        .summary()
+        .warnings()
+        .iter()
+        .filter(|warning| warning.kind() == "unknown_template_values")
+        .flat_map(CraftingWarning::details)
+        .map(String::as_str)
+        .collect();
+    assert!(
+        unknown.is_empty(),
+        "stored names the catalog does not know: {unknown:?}"
+    );
     let scopes = guids(&catalog, "reputationScopes")?;
     let items = guids(&catalog, "items")?;
     let mut figures = Figures::default();
@@ -178,7 +185,7 @@ fn the_parts_of_the_contract_templates_of_a_real_archive_resolve() -> TestResult
         check_template(template, (&scopes, &items), &mut figures)?;
     }
     print_line(&format!(
-        "{} flow triggers ({} objective links, {} unresolved), {} handlers ({} property links), {} resolved texts, {} payout ranges, {} modifiers, {} comms",
+        "{} flow triggers ({} objective links, {} unresolved), {} handlers ({} property links), {} resolved texts, {} payout ranges, {} modifiers, {} comms, {} objective properties ({} with a value, {} referenced)",
         figures.flow_triggers,
         figures.flow_objective_links,
         figures.unresolved_objective_links,
@@ -188,6 +195,9 @@ fn the_parts_of_the_contract_templates_of_a_real_archive_resolve() -> TestResult
         figures.payout_ranges,
         figures.modifiers,
         figures.comms,
+        figures.properties,
+        figures.property_values,
+        figures.referenced_links,
     ));
     assert!(figures.flow_triggers > 500, "flow triggers");
     assert!(figures.flow_objective_links > 500, "flow links");
@@ -204,5 +214,11 @@ fn the_parts_of_the_contract_templates_of_a_real_archive_resolve() -> TestResult
     assert!(figures.payout_ranges > 100, "payout ranges");
     assert!(figures.modifiers > 50, "modifiers");
     assert!(figures.comms > 100, "comms");
+    assert!(figures.properties > 5_000, "objective properties");
+    assert!(figures.property_values > 300, "objective property values");
+    assert!(
+        figures.referenced_links > 4_500,
+        "referenced properties that name a property"
+    );
     Ok(())
 }

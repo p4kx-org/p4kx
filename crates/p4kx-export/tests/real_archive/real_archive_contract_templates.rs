@@ -11,16 +11,7 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
-type TestResult = Result<(), Box<dyn std::error::Error>>;
-
-fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, String> {
-    Ok(catalog[kind]
-        .as_array()
-        .ok_or_else(|| format!("{kind} is a list"))?
-        .iter()
-        .filter_map(|entry| entry["guid"].as_str())
-        .collect())
-}
+use crate::real_archive_verification::{TestResult, guids, print_line};
 
 /// Asserts that every `templateGuid` of a contract and every link of a template names an entry of
 /// its kind and that every objective names a parent among those of its template.
@@ -59,17 +50,42 @@ pub(crate) fn check_template_links(catalog: &Value) -> TestResult {
             if let Some(parent) = objective["parentId"].as_str() {
                 assert!(ids.contains(parent), "{name}: objective parent {parent}");
             }
+            for property in objective["objectiveProperties"]
+                .as_array()
+                .ok_or("properties")?
+            {
+                check_property(name, property, (&ids, &pools, &queries));
+            }
         }
     }
     Ok(())
 }
 
-#[expect(
-    clippy::print_stdout,
-    reason = "the figures are the result of the verification"
-)]
-fn print_line(line: &str) {
-    println!("{line}");
+/// Asserts that a property of an objective is of a known kind and that its links name an
+/// objective of the template or an entry of the shared kinds.
+fn check_property(
+    name: &str,
+    property: &Value,
+    (ids, pools, queries): (&HashSet<&str>, &HashSet<&str>, &HashSet<&str>),
+) {
+    assert!(
+        property["kind"].is_string(),
+        "{name}: a property of an unknown kind"
+    );
+    let linked = property.pointer("/linkedOutput/objectiveId");
+    if let Some(objective) = linked.and_then(Value::as_str) {
+        assert!(
+            ids.contains(objective),
+            "{name}: output of objective {objective}"
+        );
+    }
+    let value = &property["value"];
+    if let Some(guid) = value["poolGuid"].as_str() {
+        assert!(pools.contains(guid), "{name}: ship spawn pool {guid}");
+    }
+    if let Some(guid) = value["queryGuid"].as_str() {
+        assert!(queries.contains(guid), "{name}: location query {guid}");
+    }
 }
 
 #[test]

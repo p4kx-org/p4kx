@@ -15,7 +15,6 @@ use crate::contract::{
     ResourceGroup, Ship, Shop, StarmapObject, SubHarvestableMultiConfig,
 };
 use crate::contract_template::ContractTemplate;
-use crate::contract_template_read::ContractTemplates;
 use crate::crafting_warning::CraftingWarning;
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::location_template::{LocationTemplates, MissionLocationTemplate};
@@ -24,8 +23,10 @@ use crate::mission_kinds::MissionKinds;
 use crate::paint_port::VehicleFacts;
 use crate::picked::Picked;
 use crate::playability::PlayabilitySummary;
+use crate::record_read::KindRead;
 use crate::spawn_layers::SpawnPools;
 use crate::spawn_model::{LocationQuery, ShipSpawnPool};
+use crate::template_issues::Unknowns;
 use crate::{CatalogFailure, ItemClassSummary, Kind, KindSummary, QuantizationSummary};
 
 /// The entities of every kind, ordered by GUID, with the counts of the summary.
@@ -226,13 +227,23 @@ impl<'f> Collected<'f> {
         self.add_failures(templates.failures);
     }
 
-    /// Stores the contract templates, counts the ones left out as `skipped` and adds the failures.
-    pub(crate) fn add_contract_templates(&mut self, templates: ContractTemplates<'f>) {
+    /// Stores the contract templates, counts the ones left out as `skipped`, adds the failures and
+    /// warns of the stored names `unknowns` counted.
+    pub(crate) fn add_contract_templates(
+        &mut self,
+        templates: KindRead<ContractTemplate<'f>>,
+        unknowns: Unknowns,
+    ) {
         self.contract_templates = templates.items;
         if let Some(slot) = self.skipped.get_mut(Kind::ContractTemplates.index()) {
             *slot = templates.skipped;
         }
         self.add_failures(templates.failures);
+        let (count, details) = unknowns.into_details();
+        if count > 0 {
+            self.warnings
+                .push(CraftingWarning::UnknownTemplateValues { count, details });
+        }
     }
 
     /// Adds `failures` and orders all of them by the text of the GUID, one per Record.

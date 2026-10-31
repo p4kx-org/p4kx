@@ -85,7 +85,11 @@ fn the_nearest_level_that_states_a_variable_wins_and_an_empty_description_is_lef
 fn equal_ship_spawn_descriptions_share_one_entry() -> TestResult {
     let catalog = build()?;
     let pools = catalog["contractShipSpawns"].as_array().ok_or("pools")?;
-    assert_eq!(pools.len(), 4, "weights 1, 2, 3 and the template's 9");
+    assert_eq!(
+        pools.len(),
+        5,
+        "weights 1, 2, 3, the template's 9 and the 7 of an objective property"
+    );
     let option = &pools[0]["groups"][0]["slots"][0]["options"][0];
     assert_eq!(option["concurrentAmount"], 2);
     assert_eq!(option["tags"], serde_json::json!(["ShipModel"]));

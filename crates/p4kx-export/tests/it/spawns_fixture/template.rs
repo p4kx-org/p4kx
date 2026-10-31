@@ -7,11 +7,13 @@
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 
 use super::template_parts as parts;
+use super::template_properties as properties;
 use super::{
     ELSEWHERE_TEMPLATE, LEFTOVER_TEMPLATE, MISSION_TYPE, OBJECTIVE_A, OBJECTIVE_B, OBJECTIVE_C,
     OWNER, RESOURCE, TAG_KILL, TEMPLATE, array, location, property, reference, ships, text,
 };
-
+/// The template the fixture's contract names. The targets of the weak pointers (the properties
+/// and the objective tokens) are written before the values that point to them.
 pub(super) fn template() -> TestRecord {
     TestRecord::new(
         TEMPLATE,
@@ -22,18 +24,12 @@ pub(super) fn template() -> TestRecord {
     .value("notForRelease", TestValue::Bool(false))
     .value("contractDisplayInfo", display_info())
     .value("contractClass", contract_class())
-    .value("owner", reference(OWNER))
-    .value("partialRewardPayout", parts::payout())
-    .value("modifiers", parts::modifiers())
-    .value("missionFlow", parts::flow())
-    .value("contractStartCommsNotification", parts::start_comms())
-    .value("contractEndCommsNotifications", parts::end_comms())
     .value(
         "contractProperties",
         array(vec![
             ships("Wave_BP", "", Some(9)),
-            location("Place_BP", "Place", None),
-            location("Home_BP", "", None),
+            parts::named(location("Place_BP", "Place", None), "prop_place"),
+            parts::named(location("Home_BP", "", None), "prop_home"),
             property(
                 "Flag_BP",
                 "",
@@ -50,26 +46,43 @@ pub(super) fn template() -> TestRecord {
             ),
         ]),
     )
-    .value(
-        "objectiveTokens",
-        array(vec![
-            objective(
-                OBJECTIVE_A,
-                "Deliver",
-                true,
-                parts::hauling_handler(resource_order(RESOURCE, 8)),
-                vec![objective(
-                    OBJECTIVE_B,
-                    "",
-                    false,
-                    parts::instance_handler(),
-                    Vec::new(),
-                )],
-            ),
-            objective(OBJECTIVE_C, "Go", true, parts::local_handler(), Vec::new()),
-            TestValue::Struct(TestInstance::new("ObjectiveToken").value("debugName", text("NoId"))),
-        ]),
-    )
+    .value("objectiveTokens", objective_tokens())
+    .value("owner", reference(OWNER))
+    .value("partialRewardPayout", parts::payout())
+    .value("modifiers", parts::modifiers())
+    .value("missionFlow", parts::flow())
+    .value("contractStartCommsNotification", parts::start_comms())
+    .value("contractEndCommsNotifications", parts::end_comms())
+}
+
+/// Three objectives (a hauling one with an instance phase below it, and a local one) and a token
+/// without an id.
+fn objective_tokens() -> TestValue {
+    let phase = objective(
+        (OBJECTIVE_B, "tok_b"),
+        ("", false),
+        parts::instance_handler(),
+        (vec![properties::input_property()], Vec::new()),
+    );
+    array(vec![
+        objective(
+            (OBJECTIVE_A, "tok_a"),
+            ("Deliver", true),
+            parts::hauling_handler(resource_order(RESOURCE, 8)),
+            (properties::properties(), vec![phase]),
+        ),
+        objective(
+            (OBJECTIVE_C, "tok_c"),
+            ("Go", true),
+            parts::local_handler(),
+            (Vec::new(), Vec::new()),
+        ),
+        TestValue::Struct(
+            TestInstance::new("ObjectiveToken")
+                .named("tok_noid")
+                .value("debugName", text("NoId")),
+        ),
+    ])
 }
 
 fn display_info() -> TestValue {
@@ -111,20 +124,21 @@ fn resource_order(resource: u128, max_scu: i32) -> TestValue {
     )
 }
 
-/// An objective token with the handler `handler` and the phases `phases`; a phase with the id
-/// `OBJECTIVE_B` is tagged `Kill`.
+/// An objective token named `instance` for the weak pointers, with the handler `handler`, the
+/// properties and the phases; a phase with the id `OBJECTIVE_B` is tagged `Kill`.
 fn objective(
-    id: u128,
-    name: &str,
-    starts_active: bool,
+    (id, instance): (u128, &str),
+    (name, starts_active): (&str, bool),
     handler: TestInstance,
-    phases: Vec<TestValue>,
+    (properties, phases): (Vec<TestValue>, Vec<TestValue>),
 ) -> TestValue {
     let mut token = TestInstance::new("ObjectiveToken")
+        .named(instance)
         .value("id", TestValue::Guid(id))
         .value("debugName", text(name))
         .value("startsActive", TestValue::Bool(starts_active))
         .value("objectiveHandler", TestValue::Struct(handler))
+        .value("properties", array(properties))
         .value("childMissionPhases", array(phases));
     if id == OBJECTIVE_B {
         token = token.value("missionPhaseIdentifierTag", reference(TAG_KILL));

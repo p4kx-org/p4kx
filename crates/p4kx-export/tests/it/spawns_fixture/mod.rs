@@ -6,7 +6,9 @@
 
 mod structures;
 mod template;
+mod template_deep;
 mod template_parts;
+mod template_properties;
 mod template_structures;
 
 use std::error::Error;
@@ -23,6 +25,8 @@ pub(crate) const SUB: u128 = 0x3000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const TEMPLATE: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const LEFTOVER_TEMPLATE: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0002;
 pub(crate) const ELSEWHERE_TEMPLATE: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0003;
+pub(crate) const DEEP_PHASES: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0004;
+pub(crate) const DEEP_FLOW: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0005;
 pub(crate) const MISSION_TYPE: u128 = 0x5000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const RESOURCE: u128 = 0x6000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const OBJECTIVE_A: u128 = 0x7000_0000_0000_4000_8000_0000_0000_0001;
@@ -243,7 +247,7 @@ fn location_template(guid: u128, name: &str, disabled: bool) -> TestRecord {
                     "generalTags",
                     TestValue::Struct(
                         TestInstance::new("MissionLocationTags")
-                            .value("tags", array(vec![reference(TAG_HIJACKED)])),
+                            .value("tags", array(vec![reference(TAG_HIJACKED), reference(0)])),
                     ),
                 )
                 .value("producesTags", TestValue::Struct(term(&[TAG_SHIP], &[])))
@@ -265,7 +269,10 @@ fn location_template(guid: u128, name: &str, disabled: bool) -> TestRecord {
 }
 
 fn database() -> DataForgeBuilder {
-    let builder = structures::structures(DataForgeBuilder::new().version(8));
+    let builder = structures::structures(DataForgeBuilder::new().version(8)).instance(
+        "outside",
+        TestInstance::new("ObjectiveToken").value("id", TestValue::Guid(OBJECTIVE_C)),
+    );
     [
         TestRecord::new(DATABASE, "TagDatabase", "TagDatabase.TagDatabase", TAG_PATH).value(
             "tags",
@@ -284,6 +291,8 @@ fn database() -> DataForgeBuilder {
         template::leftover(),
         template_parts::owner(),
         template::elsewhere(),
+        template_deep::deep_phases(),
+        template_deep::deep_flow(),
         location_template(LOCATION_A, "a_hijacked", false),
         location_template(LOCATION_B, "b_hijacked", true),
         location_template(LOCATION_DEV, "dev_temp_hijacked", false),
