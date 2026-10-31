@@ -156,10 +156,25 @@ fn loadout_structs() -> Vec<TestStruct> {
                 "LoadoutAssortments",
                 TestType::ReferenceTo("SLoadoutAssortment".to_owned()),
             ),
-        TestStruct::new("SLoadoutAssortment").array("GroupedLoadouts", class("SGroupedLoadouts")),
+        TestStruct::new("SLoadoutAssortment")
+            .field("Requirement", pointer("SLoadoutRequirementBase"))
+            .array("GroupedLoadouts", class("SGroupedLoadouts")),
         TestStruct::new("SGroupedLoadouts")
             .field("Group", TestType::String)
+            .field("Requirement", pointer("SLoadoutRequirementBase"))
             .array("Loadouts", pointer("SItemPortLoadoutBaseParams")),
+        TestStruct::new("SLoadoutRequirementBase"),
+        TestStruct::new("SLoadoutRequirementTags")
+            .parent("SLoadoutRequirementBase")
+            .array("RequiredTags", TestType::ReferenceTo("Tag".to_owned()))
+            .array("BannedTags", TestType::ReferenceTo("Tag".to_owned())),
+        TestStruct::new("SLoadoutRequirementOR")
+            .parent("SLoadoutRequirementBase")
+            .array("Requirements", pointer("SLoadoutRequirementBase")),
+        TestStruct::new("SLoadoutRequirementNOT")
+            .parent("SLoadoutRequirementBase")
+            .field("RequirementToInvert", pointer("SLoadoutRequirementBase")),
+        TestStruct::new("Tag"),
         TestStruct::new("SItemPortLoadoutOutfitParams")
             .parent("SItemPortLoadoutBaseParams")
             .field("BaseLoadout", pointer("SItemPortLoadoutBaseParams"))

@@ -14,13 +14,13 @@ use p4kx_model::{
 };
 use p4kx_testkit::{TestModel, TestMtl, TestMtlMaterial};
 
-type TestResult = Result<(), Box<dyn Error>>;
+pub(super) type TestResult = Result<(), Box<dyn Error>>;
 
-const FIRST: &str = "objects/test/first";
+pub(super) const FIRST: &str = "objects/test/first";
 const SECOND: &str = "objects/test/second";
-const SET: &str = "materials/layers/set";
+pub(super) const SET: &str = "materials/layers/set";
 
-fn hull(submaterial: &str) -> Vec<u8> {
+pub(super) fn hull(submaterial: &str) -> Vec<u8> {
     layering(&[("materials/layers/set.mtl", submaterial)])
 }
 
@@ -34,7 +34,7 @@ fn layering(layers: &[(&str, &str)]) -> Vec<u8> {
     TestMtl::single(&material).cryxml()
 }
 
-fn set() -> Vec<u8> {
+pub(super) fn set() -> Vec<u8> {
     TestMtl::multi(&[
         TestMtlMaterial::new("first").diffuse([0.1; 3]),
         TestMtlMaterial::new("second").diffuse([0.9; 3]),
@@ -53,7 +53,7 @@ fn diffuse_of(status: &MaterialStatus) -> Result<Vec<Option<[f32; 3]>>, Box<dyn 
         .collect())
 }
 
-fn load(
+pub(super) fn load(
     name: &str,
     companions: &mut dyn p4kx_model::CompanionResolver,
     cache: &LayerCache,

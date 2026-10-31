@@ -168,6 +168,23 @@ fn check_textures(built: &Built) -> TestResult {
     Ok(())
 }
 
+fn check_layer_budget(built: &Built) -> TestResult {
+    let spent: Vec<&Value> = array(&built.manifest, "issues")?
+        .iter()
+        .filter(|issue| {
+            issue["reason"]
+                .as_str()
+                .is_some_and(|reason| reason.contains("budget"))
+        })
+        .collect();
+    assert!(
+        spent.is_empty(),
+        "{}: the layer-file budget ran out: {spent:?}",
+        built.name
+    );
+    Ok(())
+}
+
 /// Checks the package against the schema, its files against the manifest and every GLB, and
 /// measures it.
 pub(super) fn verify(built: &Built) -> Result<Measured, Box<dyn Error>> {
@@ -208,6 +225,7 @@ pub(super) fn verify(built: &Built) -> Result<Measured, Box<dyn Error>> {
         measured.undeduplicated_mesh_bytes += length * instances;
     }
     check_textures(built)?;
+    check_layer_budget(built)?;
     for (key, counted) in [("files", measured.files as u64), ("bytes", bytes)] {
         assert_eq!(
             built.report.get(key).and_then(Value::as_u64),

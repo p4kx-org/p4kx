@@ -33,7 +33,7 @@ Creature base Entities (`libs/foundry/records/actor/actors/*`) whose root geomet
   order, laid over each other like the layers of an outfit (`overlay`). The game's pick is
   random; the first alternative is the deterministic default, so an export is reproducible. A
   pick option is deliberately not offered here: #954 tracks one. The `Requirement` of an
-  assortment or group is not evaluated: #955.
+  assortment or group is read as ADR-0302 states.
 - **The first alternative is not replaced by the next readable one.** A group without
   alternatives gives nothing. A first alternative that is no Loadout is an `assortment` issue and
   the group gives nothing; the later alternatives are not tried, so an export never silently

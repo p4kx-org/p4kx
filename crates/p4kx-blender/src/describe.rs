@@ -4,8 +4,8 @@
 use p4kx_model::{Material, MaterialLayer as ModelLayer, PaletteSlot, RawElement, TextureSlot};
 
 use crate::manifest_materials::{
-    AlphaMode, Element, MaterialDescription, MaterialLayer, MaterialTexture, PaletteEntry,
-    Parameter,
+    AlphaMode, Element, MaterialDescription, MaterialLayer, MaterialStencil, MaterialTexture,
+    PaletteEntry, Parameter, TextureUse,
 };
 use crate::roles::classify_in;
 
@@ -48,6 +48,7 @@ pub(crate) fn describe(
         alpha_mode: alpha_mode(material),
         reads_vertex_colours: material.reads_vertex_colours(),
         layer_shares: layer_shares(material, |_| false),
+        stencil: MaterialStencil::of(material),
         palette: material.palette.and_then(entry),
         default_palette: default_palette.map(str::to_owned),
         textures: material
@@ -59,6 +60,18 @@ pub(crate) fn describe(
         parameters: parameters(&material.public_params),
         attributes: parameters(&material.other_attributes),
         elements: material.elements.iter().map(element).collect(),
+    }
+}
+
+/// States that the stencil decal `description` draws only what was written: with no stencil or
+/// diffuse texture written (`texture` set) it draws nothing, as the GLB does for a decal whose map
+/// cannot be drawn.
+pub(crate) fn settle_stencil(description: &mut MaterialDescription) {
+    let written = description.textures.iter().any(|slot| {
+        matches!(slot.usage, TextureUse::Stencil | TextureUse::Diffuse) && slot.texture.is_some()
+    });
+    if let Some(stencil) = &mut description.stencil {
+        stencil.drawn &= written;
     }
 }
 
@@ -184,7 +197,107 @@ fn colour(value: &str) -> Option<[f32; 3]> {
 
 #[cfg(test)]
 mod tests {
-    use super::{colour, library_path, number};
+    use p4kx_model::MaterialLibrary;
+
+    use super::{colour, describe, library_path, number, settle_stencil};
+    use crate::manifest_materials::{MaterialStencil, PaletteEntry, TextureUse};
+
+    type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+    const MAP: &str = r#"<Texture Map="TexSlot7" File="a/logo_stencil.tif"/><Texture Map="TexSlot8" File="a/b_blend.tif"/>"#;
+
+    fn stencil_decal(textures: &str, params: &str) -> Result<crate::MaterialDescription> {
+        let xml = format!(
+            r#"<Material><SubMaterials><Material Name="d" Shader="MeshDecal" StringGenMask="%VERTDATA%STENCIL_MAP">
+            <Textures>{textures}</Textures><PublicParams {params}/></Material></SubMaterials></Material>"#
+        );
+        let library = MaterialLibrary::parse("a", xml.as_bytes())?;
+        let material = library.materials.first().ok_or("a material")?;
+        Ok(describe("x0001".to_owned(), "a", Some(0), material, None))
+    }
+
+    fn written(description: &mut crate::MaterialDescription) {
+        for (at, slot) in description.textures.iter_mut().enumerate() {
+            slot.texture = Some(format!("t{:04}", at + 1));
+        }
+    }
+
+    #[test]
+    fn a_stencil_decal_states_its_stencil_map_colour_and_opacity() -> Result {
+        let description = stencil_decal(
+            MAP,
+            r#"StencilDiffuseColor="0.1,0.2,0.3" StencilOpacity="0.5""#,
+        )?;
+        let usages: Vec<_> = description.textures.iter().map(|slot| slot.usage).collect();
+        assert_eq!(usages, [TextureUse::Stencil, TextureUse::Blend]);
+        assert_eq!(
+            description.stencil,
+            Some(MaterialStencil {
+                drawn: true,
+                colour: Some([0.1, 0.2, 0.3]),
+                opacity: 0.5
+            })
+        );
+        assert_eq!(description.palette, None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_tint_override_states_the_primary_palette_entry() -> Result {
+        let description = stencil_decal(MAP, r#"StencilTintOverride="1""#)?;
+        assert_eq!(description.palette, Some(PaletteEntry::Primary));
+        Ok(())
+    }
+
+    #[test]
+    fn a_decal_drawn_by_its_diffuse_map_states_no_stencil_colour_and_no_palette() -> Result {
+        let diffuse = r#"<Texture Map="TexSlot1" File="a/b_diff.tif"/>"#;
+        let params =
+            r#"StencilDiffuseColor="0.1,0.2,0.3" StencilOpacity="0.5" StencilTintOverride="1""#;
+        let description = stencil_decal(diffuse, params)?;
+        assert_eq!(
+            description.stencil,
+            Some(MaterialStencil {
+                drawn: true,
+                colour: None,
+                opacity: 1.0
+            })
+        );
+        assert_eq!(description.palette, None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_decal_without_a_motif_is_not_drawn_and_takes_no_palette() -> Result {
+        let placeholder = r#"<Texture Map="TexSlot7" File="$TintPaletteDecal"/>"#;
+        let description = stencil_decal(placeholder, r#"StencilTintOverride="1""#)?;
+        assert_eq!(
+            description.stencil.map(|stencil| stencil.drawn),
+            Some(false)
+        );
+        assert_eq!(description.palette, None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_decal_whose_maps_could_not_be_written_is_not_drawn() -> Result {
+        let mut description = stencil_decal(MAP, "")?;
+        settle_stencil(&mut description);
+        assert_eq!(
+            description.stencil.map(|stencil| stencil.drawn),
+            Some(false)
+        );
+
+        written(&mut description);
+        description.stencil = stencil_decal(MAP, "")?.stencil;
+        settle_stencil(&mut description);
+        assert_eq!(description.stencil.map(|stencil| stencil.drawn), Some(true));
+
+        let mut by_diffuse = stencil_decal(r#"<Texture Map="TexSlot1" File="a/b_diff.tif"/>"#, "")?;
+        settle_stencil(&mut by_diffuse);
+        assert_eq!(by_diffuse.stencil.map(|stencil| stencil.drawn), Some(false));
+        Ok(())
+    }
 
     #[test]
     fn a_library_path_has_no_data_prefix_extension_or_backslash() {

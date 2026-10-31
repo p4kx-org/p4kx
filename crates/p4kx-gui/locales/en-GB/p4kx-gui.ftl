@@ -1196,6 +1196,10 @@ assembly-export-interior-heading = Interior
 assembly-export-interior = Include the rooms and props of the object containers
 assembly-export-changes = Loadout: { $excluded } left out, { $replaced } replaced
 assembly-export-changes-none = Loadout: the default one
+assembly-export-picks-heading = Loadout alternatives
+assembly-export-picks-hint = Body=1, Eggs=2 or 1
+assembly-export-picks-note = For creatures and NPCs, whose game picks one alternative per group at random. Name a group and its index, separated by commas; a bare index applies to every group that has it. Counting starts at 0; groups left out keep the first alternative.
+assembly-export-picks-invalid = Write each pick as group=index, for example Body=1, or as an index alone, separated by commas.
 assembly-export-lod-heading = Level of detail
 assembly-export-lod = LOD { $level }
 assembly-export-materials-heading = Materials
@@ -1239,6 +1243,10 @@ assembly-export-summary-fallbacks ={ $count ->
 assembly-export-summary-hidden = { $count ->
     [one] One submesh was left out because its material draws nothing.
    *[other] { $number } submeshes were left out because their material draws nothing.
+  }
+assembly-export-summary-missing-layers = { $count ->
+    [one] One layer file of the material libraries is missing or unreadable; its materials keep the colours of their own file.
+   *[other] { $number } layer files of the material libraries are missing or unreadable; their materials keep the colours of their own file.
   }
 assembly-export-report-heading = Parts that could not be resolved in full ({ $number })
 assembly-export-report-all = Every part was resolved.

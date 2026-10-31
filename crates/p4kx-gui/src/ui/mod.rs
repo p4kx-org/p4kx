@@ -12,6 +12,7 @@ mod archive_picker;
 mod assembly_export;
 mod assembly_export_notes;
 mod assembly_export_outcome;
+mod assembly_export_picks;
 mod assembly_export_progress;
 #[cfg(test)]
 mod assembly_export_running_tests;

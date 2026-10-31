@@ -94,5 +94,6 @@ expression: "serde_json::to_string_pretty(&shaped)?"
   "textured_materials": 0,
   "textures": 0,
   "triangles": 36,
+  "unresolved_layers": 0,
   "vertices": 72
 }

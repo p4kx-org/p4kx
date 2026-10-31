@@ -16,6 +16,7 @@ use thiserror::Error;
 use crate::cli_interior::{InteriorGlbArgs, InteriorMaterialsArg};
 use crate::entity_glb_json::IssueJson;
 use crate::json;
+use crate::layers_json::LayersJson;
 use crate::query_table::one_line;
 
 /// The output of `p4kx interior glb` is the Archive it reads.
@@ -49,6 +50,8 @@ struct GlbJson<'a> {
     triangles: usize,
     bytes: u64,
     skipped: usize,
+    #[serde(flatten)]
+    layers: LayersJson,
     issues: Vec<IssueJson<'a>>,
 }
 
@@ -113,6 +116,7 @@ pub(crate) fn run(args: &InteriorGlbArgs, as_json: bool) -> Result<()> {
             triangles: summary.triangles,
             bytes: summary.bytes,
             skipped,
+            layers: LayersJson::from(&interior.unresolved_layers()),
             issues: interior.issues().iter().map(IssueJson::from).collect(),
         })?;
         return Ok(());

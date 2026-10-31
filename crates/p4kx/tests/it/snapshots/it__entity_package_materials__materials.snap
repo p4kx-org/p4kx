@@ -187,7 +187,7 @@ expression: "pretty(&manifest, \"materials\")?"
     "glow": 0.0,
     "id": "x0002",
     "layers": [],
-    "library": "Objects/Test/layers/base",
+    "library": "objects/test/layers/base",
     "name": "layer",
     "no_draw": false,
     "opacity": 1.0,
@@ -258,7 +258,7 @@ expression: "pretty(&manifest, \"materials\")?"
     "glow": 0.0,
     "id": "x0003",
     "layers": [],
-    "library": "Objects/Test/layers/wear",
+    "library": "objects/test/layers/wear",
     "name": "layer",
     "no_draw": false,
     "opacity": 1.0,
@@ -337,7 +337,7 @@ expression: "pretty(&manifest, \"materials\")?"
         "path": "Objects/Test/layers/loop.mtl"
       }
     ],
-    "library": "Objects/Test/layers/loop",
+    "library": "objects/test/layers/loop",
     "name": "layer",
     "no_draw": false,
     "opacity": 1.0,
@@ -402,6 +402,10 @@ expression: "pretty(&manifest, \"materials\")?"
       0.04,
       0.04
     ],
+    "stencil": {
+      "drawn": true,
+      "opacity": 1.0
+    },
     "surface_type": "",
     "textures": [
       {

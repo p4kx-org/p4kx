@@ -17,7 +17,7 @@ pub(crate) fn zone_shirt(chunks: &[TestZoneChunk]) -> TestEntity {
     zone_shirt_hiding(chunks, &[])
 }
 
-fn zone_shirt_hiding(chunks: &[TestZoneChunk], hides: &[&str]) -> TestEntity {
+pub(crate) fn zone_shirt_hiding(chunks: &[TestZoneChunk], hides: &[&str]) -> TestEntity {
     TestEntity::new(0x30, ZONE_SHIRT, "entities/scitem/test_zone_shirt.xml")
         .attach_type("Char_Clothing_Torso_0")
         .geometry_variant("Male", format!("{MALE_ARMOUR}/m_suit.skin"), None)
@@ -50,12 +50,17 @@ pub fn jacketed_entries(
     jacket: &[TestZoneChunk],
     hides: &[&str],
 ) -> Vec<TestEntry> {
-    let jacket = TestEntity::new(0x34, ZONE_JACKET, "entities/scitem/test_zone_jacket.xml")
+    let jacket = zone_jacket(jacket, hides);
+    zone_entries_with(bodies, &zone_shirt_hiding(shirt.0, shirt.1), &[jacket])
+}
+
+/// Returns [`ZONE_JACKET`], which covers `chunks` and hides the items at the ports `hides`.
+pub(crate) fn zone_jacket(chunks: &[TestZoneChunk], hides: &[&str]) -> TestEntity {
+    TestEntity::new(0x35, ZONE_JACKET, "entities/scitem/test_zone_jacket.xml")
         .attach_type("Char_Clothing_Torso_1")
         .geometry_variant("Male", format!("{MALE_ARMOUR}/m_suit.skin"), None)
         .geometry_variant("Female", format!("{FEMALE_ARMOUR}/f_suit.skin"), None)
-        .component(clothing_component_hiding(jacket, hides));
-    zone_entries_with(bodies, &zone_shirt_hiding(shirt.0, shirt.1), &[jacket])
+        .component(clothing_component_hiding(chunks, hides))
 }
 
 /// Returns the Entries of [`zone_entries`] with `shirt` as the shirt, whose database also holds

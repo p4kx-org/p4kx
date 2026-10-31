@@ -85,6 +85,8 @@ pub(crate) struct NodeJson<'a> {
     docked_vehicle: bool,
     expanded: bool,
     issues: Vec<ErrorJson<'a>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    notes: Vec<ErrorJson<'a>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     vehicle: Option<VehicleJson<'a>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -103,6 +105,11 @@ impl<'a> From<&'a EntityNode> for NodeJson<'a> {
             expanded: node.is_expanded(),
             issues: node
                 .issues()
+                .iter()
+                .map(|error| ErrorJson::new(error, None))
+                .collect(),
+            notes: node
+                .notes()
                 .iter()
                 .map(|error| ErrorJson::new(error, None))
                 .collect(),

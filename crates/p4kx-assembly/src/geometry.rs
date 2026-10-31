@@ -3,7 +3,7 @@
 
 use p4kx_dataforge::{Guid, StructValue, Value, ValueError};
 
-use crate::provider::starts_with_path;
+use crate::path_match::starts_with_path;
 use crate::read::{struct_field, struct_items, text};
 
 /// The folder of the human body rigs, with a trailing separator.

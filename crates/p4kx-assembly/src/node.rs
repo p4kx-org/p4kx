@@ -7,6 +7,7 @@ use std::sync::Arc;
 use crate::entities::describe;
 use crate::merge::{merge_by_port, port_key};
 use crate::node_body::is_head_type;
+use crate::node_notes;
 use crate::port::PortDefinition;
 use crate::resolver::LoadoutResolver;
 use crate::spec::{EntitySpec, EntrySpec, LoadoutOrigin, LoadoutSpec, TargetSpec};
@@ -71,9 +72,11 @@ impl LoadoutResolver<'_> {
             port.visibility = visibility_of(&port, vehicle.as_deref());
             ports.push(port);
         }
+        let (issues, notes) = node_notes::split(issues);
         EntityNode {
             ports,
             issues,
+            notes,
             vehicle,
             landing_gear,
             ..shell(spec, attached_vehicle, true)
@@ -312,6 +315,7 @@ fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode 
         name: spec.name.clone(),
         ports: Vec::new(),
         issues: Vec::new(),
+        notes: Vec::new(),
         geometry: spec.geometry.clone(),
         fallback: None,
         choice: GeometryChoice::Main,
@@ -329,6 +333,7 @@ fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode 
         container: spec.container,
         object_containers: Arc::clone(&spec.object_containers),
         zones: Arc::clone(&spec.zones.chunks),
+        hidden_ports: Arc::clone(&spec.zones.hidden_ports),
     }
 }
 

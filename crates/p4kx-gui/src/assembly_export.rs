@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 pub(crate) use job::stop::{Observed, Stoppable, StoppableTextures};
 pub use job::{AssemblyExport, AssemblyExportProgress, AssemblyExportStage, AssemblyExportStatus};
 pub(crate) use job::{Request, Subject, failure_of, info_of, package_failure, start};
-use p4kx_assembly::LoadoutChanges;
+use p4kx_assembly::{ChangeError, LoadoutChanges, LoadoutPicks};
 use p4kx_extraction::{Guid, WriteRefused};
 use p4kx_settings::{AssemblyExportSettings, ModelMaterials};
 pub use summary::{AssemblyExportSummary, InteriorFacts, PartIssue};
@@ -35,6 +35,8 @@ pub struct AssemblyExportSetup {
     container: Vec<String>,
     name: String,
     changes: LoadoutChanges,
+    picks_text: String,
+    picks_error: Option<ChangeError>,
     interior: bool,
     has_interior: bool,
     lod: u32,
@@ -56,6 +58,7 @@ impl AssemblyExportSetup {
             container: Vec::new(),
             name: name.to_owned(),
             changes: changes.clone(),
+            picks_text: changes.picks().to_string(),
             interior: settings.interior,
             has_interior,
             ..Self::with_settings(settings)
@@ -83,6 +86,8 @@ impl AssemblyExportSetup {
             container: Vec::new(),
             name: String::new(),
             changes: LoadoutChanges::default(),
+            picks_text: String::new(),
+            picks_error: None,
             interior: false,
             has_interior: false,
             lod: nearest(settings.lod, &ASSEMBLY_LODS),
@@ -146,6 +151,32 @@ impl AssemblyExportSetup {
     #[must_use]
     pub const fn changes(&self) -> &LoadoutChanges {
         &self.changes
+    }
+
+    /// Returns the text of the Loadout picks, `<group>=<index>` parts separated by commas.
+    #[must_use]
+    pub fn picks_text(&self) -> &str {
+        &self.picks_text
+    }
+
+    /// Sets the text of the Loadout picks, which choose the alternatives of the groups of a
+    /// generated Loadout (see [`LoadoutPicks`]). A text that is no picks is kept for editing,
+    /// leaves the picks as they were and stops the setup from starting.
+    pub fn set_picks_text(&mut self, text: impl Into<String>) {
+        self.picks_text = text.into();
+        self.picks_error = match LoadoutPicks::from_list(&self.picks_text) {
+            Ok(picks) => {
+                self.changes.set_picks(picks);
+                None
+            }
+            Err(error) => Some(error),
+        };
+    }
+
+    /// Returns whether the text of the Loadout picks is no picks.
+    #[must_use]
+    pub const fn picks_invalid(&self) -> bool {
+        self.picks_error.is_some()
     }
 
     /// Returns whether the Entity names object containers, so that the export can carry its
@@ -251,10 +282,13 @@ impl AssemblyExportSetup {
     /// written.
     #[must_use]
     pub fn is_ready(&self) -> bool {
-        self.output.is_ready()
+        self.output.is_ready() && self.picks_error.is_none()
     }
 
     pub(crate) fn request(&self) -> Option<Request> {
+        if self.picks_error.is_some() {
+            return None;
+        }
         let file = self.output.path()?;
         let subject = self.entity.map_or_else(
             || Subject::Container {

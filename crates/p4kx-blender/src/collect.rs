@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, HashMap};
-use std::sync::Arc;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use p4kx_assembly::ModelProvider;
 use p4kx_gltf::{DrawnMaterial, drawn_materials, texture_path};
-use p4kx_model::{Material, MaterialLayer, MaterialLibrary, MaterialStatus, TintPalette};
+use p4kx_model::{LayerBudget, Material, MaterialLayer, MaterialLibrary, TintPalette};
 
 use crate::TextureUse;
 use crate::describe::{describe, layer_shares, library_path};
@@ -51,7 +50,8 @@ pub(crate) struct Collected {
     pub(crate) issues: Vec<Issue>,
     index_of: HashMap<String, usize>,
     keys: HashMap<MaterialKey, usize>,
-    layer_files: HashMap<String, Arc<MaterialStatus>>,
+    layer_budget: LayerBudget,
+    layer_issues: HashSet<(String, String, String)>,
     cut: BTreeMap<usize, (String, String)>,
     folder: String,
 }
@@ -64,7 +64,10 @@ impl Collected {
         level: u32,
         models: &dyn ModelProvider,
     ) -> Self {
-        let mut collected = Self::default();
+        let mut collected = Self {
+            layer_budget: models.layer_budget(),
+            ..Self::default()
+        };
         for index in 0..plan.len() {
             let item = plan.first(index).and_then(|position| items.get(position));
             let drawn = item
@@ -228,11 +231,7 @@ impl Collected {
         if path.is_empty() {
             return None;
         }
-        let status = Arc::clone(
-            self.layer_files
-                .entry(path.to_ascii_lowercase())
-                .or_insert_with(|| Arc::new(models.library("", path))),
-        );
+        let status = models.layer_library(path, &mut self.layer_budget);
         let Some(library) = status.library() else {
             let problem = status.problem().unwrap_or_default();
             self.layer_issue(parent, path, &problem);
@@ -247,13 +246,10 @@ impl Collected {
     }
 
     fn layer_issue(&mut self, parent: &Material, path: &str, reason: &str) {
-        let known = self.issues.iter().any(|issue| {
-            issue.kind == "layer_material"
-                && issue.path == path
-                && issue.name == parent.name
-                && issue.reason == reason
-        });
-        if known {
+        let first =
+            self.layer_issues
+                .insert((path.to_owned(), parent.name.clone(), reason.to_owned()));
+        if !first {
             return;
         }
         self.issues.push(Issue {

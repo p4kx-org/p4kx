@@ -28,6 +28,8 @@ pub enum TextureRole {
     Displacement,
     /// A gloss map (`_gloss`).
     Gloss,
+    /// The stencil map of a stencil decal: its red channel is the opacity of the motif.
+    Stencil,
     /// Any other map; the slot and file say more.
     Other,
 }
@@ -55,16 +57,41 @@ impl TextureRole {
     }
 }
 
+/// Returns whether `file` in the slot `slot` is a diffuse map: a file, not an engine placeholder
+/// such as `$RenderToTexture`, whose [role](TextureRole::of) is [`TextureRole::Diffuse`].
+#[must_use]
+pub fn is_diffuse_map(slot: &str, file: &str) -> bool {
+    let file = file.trim();
+    !file.is_empty()
+        && !file.starts_with('$')
+        && TextureRole::of(slot, file) == TextureRole::Diffuse
+}
+
 impl Material {
     /// Returns what the texture `file` in the slot `slot` of the material is used for like
-    /// [`TextureRole::of`]; the `_scalp` map of a hair cap is its density mask.
+    /// [`TextureRole::of`]; the `_scalp` map of a hair cap is its density mask and the map in the
+    /// stencil slot of a [stencil decal](Material::stencil_texture) is its stencil.
     #[must_use]
     pub fn texture_role(&self, slot: &str, file: &str) -> TextureRole {
         if self.is_hair_cap() && suffix(file) == "scalp" {
             TextureRole::Mask
+        } else if self.stencil_texture().is_some_and(|texture| {
+            texture.map.eq_ignore_ascii_case(slot) && texture.file.trim() == file.trim()
+        }) {
+            TextureRole::Stencil
         } else {
             TextureRole::of(slot, file)
         }
+    }
+
+    /// Returns whether a texture slot holds a diffuse map: a file, not an engine placeholder, whose
+    /// [role](TextureRole::of) is [`TextureRole::Diffuse`]. The GLB writer and the stencil rule
+    /// share this test.
+    #[must_use]
+    pub fn has_diffuse_map(&self) -> bool {
+        self.textures
+            .iter()
+            .any(|texture| is_diffuse_map(&texture.map, &texture.file))
     }
 
     /// Returns the roles of the material's textures that name a file, leaving out an engine

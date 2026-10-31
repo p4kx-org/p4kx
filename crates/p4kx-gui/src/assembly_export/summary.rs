@@ -74,6 +74,7 @@ pub struct AssemblyExportSummary {
     modelled: usize,
     written: GlbSummary,
     issues: Vec<PartIssue>,
+    missing_layers: usize,
     excluded: usize,
     replaced: usize,
     interior: Option<InteriorFacts>,
@@ -108,6 +109,7 @@ impl AssemblyExportSummary {
             modelled: assembly.modelled_parts(),
             written,
             issues: assembly.issues().iter().map(PartIssue::of).collect(),
+            missing_layers: assembly.unresolved_layers().count(),
             excluded: changes.exclusions().len(),
             replaced: changes.replacements().len(),
             interior: assembly.interior().map(|interior| InteriorFacts {
@@ -136,6 +138,7 @@ impl AssemblyExportSummary {
             modelled: interior.modelled_parts(),
             written,
             issues: interior.issues().iter().map(PartIssue::of).collect(),
+            missing_layers: interior.unresolved_layers().count(),
             excluded: 0,
             replaced: 0,
             interior: Some(InteriorFacts {
@@ -233,6 +236,13 @@ impl AssemblyExportSummary {
     #[must_use]
     pub fn skipped(&self) -> usize {
         self.issues.iter().filter(|issue| issue.skipped).count()
+    }
+
+    /// Returns how many layer files of the material libraries are missing or unreadable; their
+    /// materials keep the colours of their own file.
+    #[must_use]
+    pub const fn missing_layers(&self) -> usize {
+        self.missing_layers
     }
 
     /// Returns how many ports the changes left out.

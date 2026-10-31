@@ -34,6 +34,7 @@ pub struct EntityNode {
     pub(crate) name: String,
     pub(crate) ports: Vec<PortNode>,
     pub(crate) issues: Vec<LoadoutError>,
+    pub(crate) notes: Vec<LoadoutError>,
     pub(crate) geometry: Option<Geometry>,
     pub(crate) fallback: Option<Geometry>,
     pub(crate) choice: GeometryChoice,
@@ -48,9 +49,18 @@ pub struct EntityNode {
     pub(crate) container: Option<Guid>,
     pub(crate) object_containers: Arc<[ObjectContainerRef]>,
     pub(crate) zones: Arc<[ZoneChunk]>,
+    pub(crate) hidden_ports: Arc<[String]>,
 }
 
 impl EntityNode {
+    /// Returns the names of the ports whose items are not drawn when the Entity is worn, from the
+    /// `HiddenParts` of its Record: a hat hides the hair. The names are in lower case, as the
+    /// reader of the Record lowers them; compare them ignoring case.
+    #[must_use]
+    pub fn hidden_ports(&self) -> &[String] {
+        &self.hidden_ports
+    }
+
     /// Returns what the Entity offers a port: its item type, sub-type and size.
     #[must_use]
     pub fn item_facts(&self) -> ItemFacts {
@@ -161,6 +171,13 @@ impl EntityNode {
     #[must_use]
     pub fn issues(&self) -> &[LoadoutError] {
         &self.issues
+    }
+
+    /// Returns what the Loadout of the Entity only notes: nothing was kept from being read, as in
+    /// an undecided Requirement of a loadout assortment. One note per assortment.
+    #[must_use]
+    pub fn notes(&self) -> &[LoadoutError] {
+        &self.notes
     }
 
     /// Returns every port in the tree below this Entity, depth first in port order, with its

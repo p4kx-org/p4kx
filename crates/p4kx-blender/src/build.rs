@@ -6,6 +6,7 @@ use p4kx_gltf::{DrawnMaterial, GlbOptions, GlbSummary, TextureFile};
 
 use crate::PackageInfo;
 use crate::collect::{Collected, id_of as material_id};
+use crate::describe::settle_stencil;
 use crate::items::Item;
 use crate::manifest::{
     Basis, Coordinates, EntityRef, FORMAT_VERSION, Format, Generator, Issue, IssueOrigin,
@@ -194,6 +195,7 @@ fn materials(inputs: &Inputs<'_>) -> Vec<MaterialDescription> {
             for (texture, path) in description.textures.iter_mut().zip(&described.paths) {
                 texture.texture = path.as_deref().and_then(|path| written_path(inputs, path));
             }
+            settle_stencil(&mut description);
             description
         })
         .collect()

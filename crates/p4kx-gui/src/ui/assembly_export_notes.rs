@@ -55,10 +55,28 @@ fn file_notes(texts: &Texts, summary: &AssemblyExportSummary) -> Vec<(String, Co
         ];
         notes.push((texts.format(T::SummaryImages, &args), palette::GRAY_1));
     }
-    for (text, value) in [
-        (T::SummaryFallbacks, written.lod_fallbacks),
-        (T::SummaryHidden, written.hidden_primitives),
-    ] {
+    warnings(
+        texts,
+        &mut notes,
+        [
+            (T::SummaryFallbacks, written.lod_fallbacks),
+            (T::SummaryHidden, written.hidden_primitives),
+            (T::SummaryMissingLayers, summary.missing_layers()),
+        ],
+    );
+    if summary.issues().is_empty() {
+        notes.push((texts.get(T::ReportAll), palette::GRAY_1));
+    }
+    notes
+}
+
+/// Adds a warning for each of `counts` that is not 0.
+fn warnings<const N: usize>(
+    texts: &Texts,
+    notes: &mut Vec<(String, Color32)>,
+    counts: [(T, usize); N],
+) {
+    for (text, value) in counts {
         if value > 0 {
             let args = [
                 ("count", u64::try_from(value).unwrap_or(u64::MAX).into()),
@@ -67,10 +85,6 @@ fn file_notes(texts: &Texts, summary: &AssemblyExportSummary) -> Vec<(String, Co
             notes.push((texts.format(text, &args), palette::WARNING));
         }
     }
-    if summary.issues().is_empty() {
-        notes.push((texts.get(T::ReportAll), palette::GRAY_1));
-    }
-    notes
 }
 
 fn file_note(texts: &Texts, summary: &AssemblyExportSummary) -> (String, Color32) {
@@ -127,21 +141,14 @@ fn package_notes(
         ),
     ];
     notes.extend(interior_note(texts, summary));
-    if package.texture_failures > 0 {
-        let args = [
-            (
-                "count",
-                u64::try_from(package.texture_failures)
-                    .unwrap_or(u64::MAX)
-                    .into(),
-            ),
-            ("number", number(texts, package.texture_failures).into()),
-        ];
-        notes.push((
-            texts.format(T::SummaryPackageTextures, &args),
-            palette::WARNING,
-        ));
-    }
+    warnings(
+        texts,
+        &mut notes,
+        [
+            (T::SummaryPackageTextures, package.texture_failures),
+            (T::SummaryMissingLayers, summary.missing_layers()),
+        ],
+    );
     if summary.issues().is_empty() {
         notes.push((texts.get(T::ReportAll), palette::GRAY_1));
     }

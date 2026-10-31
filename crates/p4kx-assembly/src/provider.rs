@@ -6,7 +6,8 @@ use std::io::Read;
 use std::sync::Arc;
 
 use p4kx_extraction::model::{
-    LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, ModelError, PositionBox,
+    LayerBudget, LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, ModelError,
+    PositionBox,
 };
 use p4kx_extraction::{
     AnimationChoice, AnimationSet, Archive, ArchiveTextures, ConversionError, ModelSource,
@@ -16,6 +17,7 @@ use thiserror::Error;
 
 use crate::MAX_ASSEMBLY_VERTICES;
 use crate::cdf::is_character_definition;
+use crate::path_match::starts_with_path;
 use crate::skeleton::SkeletonProblem;
 
 mod character;
@@ -150,6 +152,20 @@ pub trait ModelProvider: Sync {
     /// the model first. A library that does not exist or cannot be read is a status.
     fn library(&self, entry: &str, name: &str) -> MaterialStatus;
 
+    /// Returns the budget of layer files one caller, such as one package, may read through
+    /// [`Self::layer_library`]; the default has the default limits.
+    fn layer_budget(&self) -> LayerBudget {
+        LayerBudget::default()
+    }
+
+    /// Reads the layer file at `path`, a path below `Data`, as a library for a caller that
+    /// describes the layer's whole material, charging `budget`. A source that shares its layer
+    /// files overrides it to fetch and parse each once. The default applies no budget: it reads
+    /// the file like any library, with no entry to look beside.
+    fn layer_library(&self, path: &str, _budget: &mut LayerBudget) -> Arc<MaterialStatus> {
+        Arc::new(self.library("", path))
+    }
+
     /// Reads the bytes of the file at `path`, a path below `Data`, such as the DNA rig a piece is
     /// shaped by. The default has no such files.
     ///
@@ -174,23 +190,6 @@ pub trait ModelProvider: Sync {
         let _ = (path, model);
         Ok(None)
     }
-}
-
-/// Returns whether `path` starts with `prefix`, ignoring ASCII case and treating `\` as `/`.
-pub(crate) fn starts_with_path(path: &str, prefix: &str) -> bool {
-    let mut own = path.bytes();
-    prefix.bytes().all(|byte| {
-        own.next().is_some_and(|found| {
-            let unify = |value: u8| {
-                if value == b'\\' {
-                    b'/'
-                } else {
-                    value.to_ascii_lowercase()
-                }
-            };
-            unify(found) == unify(byte)
-        })
-    })
 }
 
 /// Reads models and material libraries from the Entries of an Archive below `Data`.
@@ -304,6 +303,14 @@ impl ModelProvider for ArchiveModels<'_> {
 
     fn library(&self, entry: &str, name: &str) -> MaterialStatus {
         ModelSource::material_library(&self.index, entry, name, &self.layers, &self.verdicts)
+    }
+
+    fn layer_budget(&self) -> LayerBudget {
+        self.layers.budget()
+    }
+
+    fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
+        ModelSource::layer_library(&self.index, path, &self.layers, &self.verdicts, budget)
     }
 
     fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {

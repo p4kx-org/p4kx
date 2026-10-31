@@ -54,6 +54,14 @@ pub enum AssemblyExportText {
     Changes,
     /// Shown when the Loadout is the default one.
     ChangesNone,
+    /// The heading of the field of the Loadout picks.
+    PicksHeading,
+    /// The hint of the picks field while it is empty.
+    PicksHint,
+    /// What the picks do and how indices count.
+    PicksNote,
+    /// Shown when the text of the picks field is no picks.
+    PicksInvalid,
     /// The heading of the level of detail choice.
     LodHeading,
     /// One level of detail; takes `level`.
@@ -120,6 +128,9 @@ pub enum AssemblyExportText {
     SummaryFallbacks,
     /// Submeshes left out because their material draws nothing; takes `count` and `number`.
     SummaryHidden,
+    /// Layer files of the material libraries that are missing or unreadable; takes `count` and
+    /// `number`.
+    SummaryMissingLayers,
     /// The heading of the report of the parts that were not resolved in full; takes `number`.
     ReportHeading,
     /// Shown when every part was resolved.
@@ -132,7 +143,7 @@ pub enum AssemblyExportText {
 
 impl AssemblyExportText {
     /// Every text, for checks of the Fluent files.
-    pub(crate) const ALL: [Self; 59] = [
+    pub(crate) const ALL: [Self; 64] = [
         Self::FormHeading,
         Self::FormGlb,
         Self::FormPackage,
@@ -157,6 +168,10 @@ impl AssemblyExportText {
         Self::Interior,
         Self::Changes,
         Self::ChangesNone,
+        Self::PicksHeading,
+        Self::PicksHint,
+        Self::PicksNote,
+        Self::PicksInvalid,
         Self::LodHeading,
         Self::Lod,
         Self::MaterialsHeading,
@@ -188,6 +203,7 @@ impl AssemblyExportText {
         Self::SummaryImages,
         Self::SummaryFallbacks,
         Self::SummaryHidden,
+        Self::SummaryMissingLayers,
         Self::ReportHeading,
         Self::ReportAll,
         Self::ReportSkipped,
@@ -223,6 +239,10 @@ impl AssemblyExportText {
             Self::Interior => "assembly-export-interior",
             Self::Changes => "assembly-export-changes",
             Self::ChangesNone => "assembly-export-changes-none",
+            Self::PicksHeading => "assembly-export-picks-heading",
+            Self::PicksHint => "assembly-export-picks-hint",
+            Self::PicksNote => "assembly-export-picks-note",
+            Self::PicksInvalid => "assembly-export-picks-invalid",
             Self::LodHeading => "assembly-export-lod-heading",
             Self::Lod => "assembly-export-lod",
             Self::MaterialsHeading => "assembly-export-materials-heading",
@@ -254,6 +274,7 @@ impl AssemblyExportText {
             Self::SummaryImages => "assembly-export-summary-images",
             Self::SummaryFallbacks => "assembly-export-summary-fallbacks",
             Self::SummaryHidden => "assembly-export-summary-hidden",
+            Self::SummaryMissingLayers => "assembly-export-summary-missing-layers",
             Self::ReportHeading => "assembly-export-report-heading",
             Self::ReportAll => "assembly-export-report-all",
             Self::ReportSkipped => "assembly-export-report-skipped",

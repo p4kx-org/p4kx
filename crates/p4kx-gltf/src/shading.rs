@@ -54,7 +54,7 @@ fn plain(material: &Material) -> Shading {
     let colour = if metal {
         material.specular
     } else {
-        material.diffuse
+        stencil_colour(material).unwrap_or(material.diffuse)
     };
     Shading {
         colour: colour.map(|channel| channel.clamp(0.0, 1.0)),
@@ -63,6 +63,15 @@ fn plain(material: &Material) -> Shading {
         diffuse: material.diffuse,
         specular: material.specular,
     }
+}
+
+/// Returns the colour of the motif of a stencil decal drawn by its stencil map that takes its own
+/// colour: its `StencilDiffuseColor`; a palette tint (which sets the diffuse colour) wins.
+fn stencil_colour(material: &Material) -> Option<[f32; 3]> {
+    material
+        .stencil_motif()
+        .and_then(|stencil| stencil.colour)
+        .filter(|_| !material.tinted)
 }
 
 /// Returns the roughness of `material` from its shininess, or half where gloss comes from
@@ -202,4 +211,49 @@ fn layered(material: &Material) -> Option<Shading> {
     mixed.colour = mixed.colour.map(|channel| channel.clamp(0.0, 1.0));
     mixed.metal = metal_total >= 0.5;
     Some(mixed)
+}
+
+#[cfg(test)]
+mod tests {
+    use p4kx_model::{Material, MaterialLibrary, TintEntry, TintPalette};
+
+    use super::shading;
+
+    type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+    const MAP: &str = r#"<Texture Map="TexSlot7" File="a/b_stencil.tif"/>"#;
+    const PARAMS: &str = r#"StencilDiffuseColor="0.1,0.2,0.3" StencilTintOverride="1""#;
+
+    fn decal(textures: &str) -> Result<Material> {
+        let xml = format!(
+            r#"<Material><SubMaterials><Material Name="d" Shader="MeshDecal" StringGenMask="%STENCIL_MAP" Diffuse="1,1,1">
+            <Textures>{textures}</Textures><PublicParams {PARAMS}/></Material></SubMaterials></Material>"#
+        );
+        let library = MaterialLibrary::parse("a", xml.as_bytes())?;
+        Ok(library.materials.into_iter().next().ok_or("a material")?)
+    }
+
+    #[test]
+    fn a_stencil_decal_is_drawn_in_its_stencil_colour_and_a_palette_tint_wins() -> Result {
+        let material = decal(MAP)?;
+        assert_eq!(shading(&material).colour, [0.1, 0.2, 0.3]);
+
+        let entry = TintEntry {
+            tint: [0.5, 0.6, 0.7],
+            ..TintEntry::default()
+        };
+        let palette = TintPalette::new("p", [entry; 3], [1.0; 3]);
+        let tinted = palette
+            .apply(&material)
+            .ok_or("the decal takes the palette")?;
+        assert_eq!(shading(&tinted).colour, [0.5, 0.6, 0.7]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_decal_drawn_by_its_diffuse_map_keeps_its_own_colour() -> Result {
+        let by_diffuse = decal(r#"<Texture Map="TexSlot1" File="a/b_diff.tif"/>"#)?;
+        assert_eq!(shading(&by_diffuse).colour, [1.0; 3]);
+        Ok(())
+    }
 }

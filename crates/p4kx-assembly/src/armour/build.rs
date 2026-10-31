@@ -8,7 +8,7 @@ use p4kx_gltf::MorphTarget;
 use p4kx_model::{MaterialStatus, Model};
 
 use super::face_build::{Face, Found, settled};
-use super::head_move::{HeadMove, Worn, check_follows, followed, level_zero_meshes};
+use super::head_move::{HeadMove, Worn, check_follows, first_mesh_note, followed};
 use super::jobs::{Job, issue, planned};
 use super::materials::{drawn_with, read_libraries};
 use super::own_face::own_head;
@@ -195,9 +195,8 @@ fn worn(
         Some(moved) if job.follows_head => {
             let mut dressed = followed(&model, moved);
             issues.extend(dressed.kinds.drain(..).map(|kind| issue(job, kind)));
-            let meshes = level_zero_meshes(&dressed.model);
-            if meshes > 1 && !dressed.morphs.is_empty() {
-                issues.push(issue(job, IssueKind::FollowMorphsFirstMeshOnly { meshes }));
+            if let Some(kind) = first_mesh_note(&dressed) {
+                issues.push(issue(job, kind));
             }
             dressed
         }

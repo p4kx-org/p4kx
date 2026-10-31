@@ -12,8 +12,9 @@ use crate::waiting::wait_for;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use entity_picking::{TestResult, opened, select, settle};
+use entity_picking::{TestResult, opened, opened_sized, select, settle};
 use p4kx_gui::{AssemblyExport, AssemblyExportStatus, Language, Model, Place, WorkTab};
+use p4kx_testkit::layered_entries;
 
 fn start(harness: &mut Harness<'_, Model>, file: &Path) -> Result<bool, &'static str> {
     harness.state_mut().begin_assembly_export();
@@ -214,8 +215,7 @@ fn the_export_reads_the_archive_even_while_a_container_is_open_in_browse() -> Te
         "Data\\ObjectContainers\\room.socpak",
         container,
     ));
-    let (dir, mut harness) =
-        entity_picking::opened_sized(entries, Language::BritishEnglish, [1400.0, 900.0])?;
+    let (dir, mut harness) = opened_sized(entries, Language::BritishEnglish, [1400.0, 900.0])?;
     select(&mut harness, "TEST_Ship")?;
     harness.state_mut().set_work_tab(WorkTab::Archive);
     harness.run_steps(2);
@@ -310,5 +310,32 @@ fn a_file_inside_a_missing_folder_fails_with_the_reason() -> TestResult {
         "failed"
     );
     assert!(harness.query_by_label("Export failed").is_some());
+    Ok(())
+}
+
+#[test]
+fn the_summary_lists_the_layer_files_the_archive_lacks_in_both_languages() -> TestResult {
+    for (language, note) in [
+        (
+            Language::BritishEnglish,
+            "One layer file of the material libraries is missing or unreadable; its materials keep the colours of their own file.",
+        ),
+        (
+            Language::German,
+            "Eine Layer-Datei der Materialbibliotheken fehlt oder ist nicht lesbar; ihre Materialien behalten die Farben der eigenen Datei.",
+        ),
+    ] {
+        let (dir, mut harness) = opened_sized(layered_entries(), language, [1400.0, 900.0])?;
+        select(&mut harness, "TEST_Layered")?;
+
+        assert!(
+            start(&mut harness, &dir.path().join("layered.glb"))?,
+            "started"
+        );
+        finished(&mut harness)?;
+
+        assert_eq!(summary(&harness)?.missing_layers(), 1);
+        assert!(harness.query_by_label(note).is_some(), "{note}");
+    }
     Ok(())
 }

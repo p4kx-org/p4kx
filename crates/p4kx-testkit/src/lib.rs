@@ -54,6 +54,7 @@ mod entity_npc_zones;
 mod entity_painted;
 mod entity_port;
 mod entity_prop_rig;
+mod entity_requirement;
 mod entity_sample;
 mod entity_schema;
 mod entity_skin;
@@ -145,7 +146,7 @@ pub use entity::TestEntity;
 pub use entity_armour::{armour_entries, armour_female_skeleton, armour_male_skeleton};
 pub use entity_armour_loadout::{ARMOUR_XML_LOADOUT, armour_xml_loadout};
 pub use entity_assembly::{ASSEMBLY_GUN_PAINT, assembly_entries, hologram_entries};
-pub use entity_assortment::assortment_record;
+pub use entity_assortment::{TestGroup, assortment_record, assortment_record_requiring};
 pub use entity_bone::{
     BONE_THRUSTER, bone_thruster_definition, bone_thruster_entries, bone_thruster_housing,
 };
@@ -194,7 +195,9 @@ pub use entity_npc_face::{
     npc_face_entries_posed_by, npc_face_entries_with, npc_face_logic, npc_face_shapes,
     npc_face_skeleton,
 };
-pub use entity_npc_zones::{NPC_ZONE_CLASS, NpcZoneOptions, npc_zone_entries};
+pub use entity_npc_zones::{
+    NPC_ZONE_CLASS, NpcExtra, NpcZoneOptions, npc_jacketed_entries, npc_zone_entries,
+};
 pub use entity_painted::{
     PAINTED_FEMALE_PALETTE_GUID, PAINTED_LIBRARY_PALETTE, PAINTED_PALETTE_GUID, PAINTED_SUIT,
     painted_entries,
@@ -205,6 +208,7 @@ pub use entity_prop_rig::{
     PROP_ON_LOST_PORT, PROP_ON_SKIN_PORT, PROP_RIG_BAD_SKELETON, PROP_RIG_CREATURE, PROP_RIG_HUMAN,
     PROP_RIG_NO_SKELETON, PROP_RIG_STATIC, SKINNED_ON_SKIN_PORT, prop_rig_entries,
 };
+pub use entity_requirement::TestRequirement;
 pub use entity_sample::{SAMPLE_GUN, SAMPLE_MISSING, SAMPLE_MOUNT, SAMPLE_SHIP, sample_ship};
 pub use entity_schema::{entity_schema, tint_palette_record};
 pub use entity_skin::{SKIN_BODY, skin_attachment_entries};

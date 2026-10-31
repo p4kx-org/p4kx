@@ -19,6 +19,7 @@ mod layers;
 mod light;
 mod models;
 mod scan;
+mod unresolved;
 mod walk;
 mod watch;
 

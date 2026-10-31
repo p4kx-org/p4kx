@@ -40,7 +40,7 @@ def test_reads_a_character_with_its_rig() -> None:
 
 def test_the_add_on_reads_format_1_3() -> None:
     assert package.SUPPORTED_MINOR >= 3
-    assert parse(character_manifest(version="1.6")).warnings
+    assert parse(character_manifest(version="1.7")).warnings
 
 
 def test_a_character_node_without_a_rigged_mesh_is_skipped_with_its_children() -> None:

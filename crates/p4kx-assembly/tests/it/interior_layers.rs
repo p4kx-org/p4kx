@@ -41,5 +41,12 @@ fn a_missing_layer_file_of_a_library_is_an_issue_of_the_part() -> TestResult {
         )
     });
     assert!(reported, "the missing layer file is reported");
+    let unresolved = interior.unresolved_layers();
+    assert_eq!(
+        unresolved.count(),
+        1,
+        "named by three libraries, counted once"
+    );
+    assert_eq!(unresolved.first(), Some("materials/layers/absent.mtl"));
     Ok(())
 }

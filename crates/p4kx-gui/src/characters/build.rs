@@ -11,7 +11,7 @@ use p4kx_assembly::{
     ProvidedModel, Replaced,
 };
 use p4kx_extraction::DataForge;
-use p4kx_extraction::model::MaterialStatus;
+use p4kx_extraction::model::{LayerBudget, MaterialStatus};
 use p4kx_extraction::{CancelToken, Guid};
 
 use crate::assembly_export::{Stoppable, failure_of};
@@ -92,6 +92,14 @@ impl ModelProvider for Counting<'_> {
 
     fn library(&self, entry: &str, name: &str) -> MaterialStatus {
         self.inner.library(entry, name)
+    }
+
+    fn layer_budget(&self) -> LayerBudget {
+        self.inner.layer_budget()
+    }
+
+    fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
+        self.inner.layer_library(path, budget)
     }
 
     fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {

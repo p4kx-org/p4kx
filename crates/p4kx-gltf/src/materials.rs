@@ -6,20 +6,16 @@ use std::collections::{BTreeMap, BTreeSet};
 use gltf_json as json;
 use json::Index;
 use json::material::{
-    AlphaCutoff, AlphaMode, EmissiveFactor, PbrBaseColorFactor, PbrMetallicRoughness,
-    StrengthFactor,
+    AlphaCutoff, EmissiveFactor, PbrBaseColorFactor, PbrMetallicRoughness, StrengthFactor,
 };
 use json::validation::Checked::Valid;
 use p4kx_model::{Lod, Material, MaterialLibrary, TintPalette};
 
+use crate::material_alpha::{alpha_of, is_cut_out_by_base_image};
 use crate::shading::shading;
 use crate::texture_roles::sources_with;
 
-const GLASS_ALPHA: f32 = 0.3;
-
-const DECAL_SHADERS: [&str; 2] = ["MeshDecal", "Decal"];
-const HAIR_CARD_SHADERS: [&str; 1] = ["HairPBR"];
-const HAIR_CARD_CUTOFF: f32 = 0.5;
+pub(crate) const DECAL_SHADERS: [&str; 2] = ["MeshDecal", "Decal"];
 
 /// Which glTF material a material ID is drawn with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -211,51 +207,11 @@ pub(crate) fn display_name(material: &Material, slot: Slot) -> String {
     }
 }
 
-/// The alpha mode of `material`, its alpha factor and its alpha cutoff.
-fn alpha_of(material: &Material) -> (AlphaMode, f32, Option<f32>) {
-    let opacity = material.opacity.clamp(0.0, 1.0);
-    let decal = is_one_of(&material.shader, &DECAL_SHADERS);
-    let glass = material.is_glass();
-    if material.alpha_test > 0.0 {
-        (
-            AlphaMode::Mask,
-            1.0,
-            Some(material.alpha_test.clamp(0.0, 1.0)),
-        )
-    } else if material.is_hair_cap() {
-        (AlphaMode::Blend, 1.0, None)
-    } else if is_hair_cards(material) {
-        (AlphaMode::Mask, 1.0, Some(HAIR_CARD_CUTOFF))
-    } else if glass {
-        (AlphaMode::Blend, opacity.min(GLASS_ALPHA), None)
-    } else if decal || opacity < 1.0 {
-        (AlphaMode::Blend, opacity, None)
-    } else {
-        (AlphaMode::Opaque, 1.0, None)
-    }
-}
-
-/// Returns whether `material` draws hair cards: a `HairPBR` material without a diffuse map whose
-/// `TexSlot1` is an opacity map, which cuts the cards out.
-pub(crate) fn is_hair_cards(material: &Material) -> bool {
-    is_one_of(&material.shader, &HAIR_CARD_SHADERS)
-        && !material.is_hair_cap()
-        && sources_with(material, true)
-            .diffuse
-            .is_some_and(|source| source.opacity)
-}
-
-/// Returns whether `material` is drawn with transparency, so that the alpha channel of its
-/// diffuse texture counts.
-pub(crate) fn uses_alpha(material: &Material) -> bool {
-    alpha_of(material).0 != AlphaMode::Opaque
-}
-
 /// Returns the glTF material that draws `material` with `textures` over its plain colours.
 ///
 /// A hair cap is blended by its density map, which is the alpha of its base colour image; without
 /// that image, or in the colours mode, which has none, it is fully transparent, never an opaque
-/// shell over the skin.
+/// shell over the skin. A stencil decal with a stencil map is cut out by that map the same way.
 ///
 /// The diffuse colour multiplies a base colour texture that does not hold the colours already (one
 /// made with a specular map does). A normal texture needs no factor. The factors of the
@@ -281,7 +237,7 @@ pub(crate) fn build_material(
     let plain_metal = shade.metal && (!tinted || layered);
     let colour = if tinted { [1.0; 3] } else { shade.colour };
     let (mode, mut alpha, cutoff) = alpha_of(material);
-    if material.is_hair_cap() && textures.base.is_none() {
+    if is_cut_out_by_base_image(material) && textures.base.is_none() {
         alpha = 0.0;
     }
     let decal = is_one_of(&material.shader, &DECAL_SHADERS);
@@ -330,7 +286,7 @@ pub(crate) fn build_material(
     }
 }
 
-fn is_one_of(shader: &str, names: &[&str]) -> bool {
+pub(crate) fn is_one_of(shader: &str, names: &[&str]) -> bool {
     names.iter().any(|name| shader.eq_ignore_ascii_case(name))
 }
 

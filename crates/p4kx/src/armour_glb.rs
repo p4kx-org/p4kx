@@ -23,6 +23,7 @@ use crate::entity_glb::GlbOutputIsArchive;
 use crate::entity_glb_json::IssueJson;
 use crate::entity_glb_report::{print_issues, print_textures};
 use crate::json;
+use crate::layers_json::LayersJson;
 use crate::model_animations::{WrittenJson, write_notes};
 use crate::query_table::one_line;
 
@@ -59,6 +60,8 @@ struct GlbJson<'a> {
     triangles: usize,
     bytes: u64,
     skipped: usize,
+    #[serde(flatten)]
+    layers: LayersJson,
     animations: Vec<WrittenJson>,
     issues: Vec<IssueJson<'a>>,
 }
@@ -183,6 +186,7 @@ fn report<'a>(done: &Done<'a>, args: &ArmourGlbArgs) -> GlbJson<'a> {
         triangles: summary.triangles,
         bytes: summary.bytes,
         skipped: skipped(armour),
+        layers: LayersJson::from(&armour.unresolved_layers()),
         animations: summary.animations.iter().map(WrittenJson::of).collect(),
         issues: armour
             .issues()

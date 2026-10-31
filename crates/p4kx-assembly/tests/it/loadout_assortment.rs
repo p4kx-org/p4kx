@@ -7,7 +7,9 @@
 use std::collections::HashMap;
 use std::error::Error;
 
-use p4kx_assembly::{Attachment, EntityNode, LoadoutFileError, LoadoutFiles, LoadoutResolver};
+use p4kx_assembly::{
+    Attachment, EntityNode, LoadoutChanges, LoadoutFileError, LoadoutFiles, LoadoutResolver,
+};
 use p4kx_dataforge::DataForge;
 use p4kx_testkit::{
     CryXmlByteOrder, CryXmlSignature, DataForgeBuilder, TestElement, TestEntity, TestLoadout,
@@ -16,12 +18,12 @@ use p4kx_testkit::{
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-const ASSORTMENT: u128 = 0x100;
+pub(crate) const ASSORTMENT: u128 = 0x100;
 const OTHER: u128 = 0x101;
 const MISSING: u128 = 0x1ff;
 const BEAST: u128 = 0x1;
 
-struct Files(HashMap<String, Vec<u8>>);
+pub(crate) struct Files(HashMap<String, Vec<u8>>);
 
 impl LoadoutFiles for Files {
     fn read(&self, path: &str) -> Result<Vec<u8>, LoadoutFileError> {
@@ -32,11 +34,11 @@ impl LoadoutFiles for Files {
     }
 }
 
-fn body(class: &str) -> TestLoadout {
+pub(crate) fn body(class: &str) -> TestLoadout {
     TestLoadout::Manual(vec![TestLoadoutEntry::class("Body_ItemPort", class)])
 }
 
-fn generated(assortments: &[u128]) -> TestLoadout {
+pub(crate) fn generated(assortments: &[u128]) -> TestLoadout {
     TestLoadout::RandomGenerated(assortments.to_vec())
 }
 
@@ -55,10 +57,20 @@ fn beast_assortment() -> TestRecord {
     )
 }
 
-fn resolve(
+pub(crate) fn resolve(
     loadout: TestLoadout,
     files: Option<&Files>,
     records: Vec<TestRecord>,
+) -> Result<EntityNode, Box<dyn Error>> {
+    resolve_changed(loadout, files, records, None)
+}
+
+/// Resolves the Beast, with `changes` applied when given.
+pub(crate) fn resolve_changed(
+    loadout: TestLoadout,
+    files: Option<&Files>,
+    records: Vec<TestRecord>,
+    changes: Option<&LoadoutChanges>,
 ) -> Result<EntityNode, Box<dyn Error>> {
     let builder = [
         TestEntity::new(BEAST, "Beast", "entities/beast.xml").loadout(loadout),
@@ -80,7 +92,10 @@ fn resolve(
         resolver = resolver.with_files(files);
     }
     let beast = resolver.entities().find("Beast")?;
-    Ok(resolver.resolve(&beast)?)
+    match changes {
+        Some(changes) => Ok(resolver.resolve_with(&beast, changes)?),
+        None => Ok(resolver.resolve(&beast)?),
+    }
 }
 
 fn egg_files() -> Files {
@@ -97,7 +112,7 @@ fn egg_files() -> Files {
     )]))
 }
 
-fn attached(node: &EntityNode) -> Vec<(String, String)> {
+pub(crate) fn attached(node: &EntityNode) -> Vec<(String, String)> {
     node.walk()
         .into_iter()
         .filter_map(|(path, port)| match port.attachment() {
@@ -107,14 +122,14 @@ fn attached(node: &EntityNode) -> Vec<(String, String)> {
         .collect()
 }
 
-fn kinds(node: &EntityNode) -> Vec<&'static str> {
+pub(crate) fn kinds(node: &EntityNode) -> Vec<&'static str> {
     node.issues()
         .iter()
         .map(p4kx_assembly::LoadoutError::kind)
         .collect()
 }
 
-fn pair(port: &str, class: &str) -> (String, String) {
+pub(crate) fn pair(port: &str, class: &str) -> (String, String) {
     (port.to_owned(), class.to_owned())
 }
 

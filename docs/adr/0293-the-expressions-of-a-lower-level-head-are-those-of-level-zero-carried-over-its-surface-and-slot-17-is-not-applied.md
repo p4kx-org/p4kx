@@ -65,8 +65,8 @@ growth stays under five times.
 
 - The facial joints of the lower levels: their rigs have no delta records and their skeletons no
   facial bones, so the face animation drives the morph weights only (ADR-0098).
-- The hair, brows, lashes and beard at a lower level: they follow the head at level 0 only
-  (ADR-0200) and have no targets there; follow-up issue #961.
+- The hair, brows, lashes and beard at a lower level: they follow the head's targets there too
+  (ADR-0305, issue #961).
 - The search is a pass over the triangles of level 0 for each vertex, pruned by bounding spheres
   and parallel; no spatial grid is needed at the measured 5 to 13 ms.
 

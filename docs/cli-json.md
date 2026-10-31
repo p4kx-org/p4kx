@@ -154,6 +154,24 @@ contradicts another, names an Entity that no Record or several Records match, or
 with the root Entity or an Entity the port lies below, exits with code 2 and prints the reason; a
 replacement whose Record cannot be read exits with code 5.
 
+`--loadout-pick <group>=<index>` takes another alternative than the first from a group of a
+generated default Loadout (`SItemPortLoadoutRandomGeneratedParams`, which the game picks at
+random), see [ADR-0309](adr/0309-the-alternative-of-a-generated-loadout-group-is-picked-by-index.md).
+Several picks are separated by commas (`Body=1,Eggs=0`) or given as several options. The group is
+its `Group` name in the assortment, ignoring case, in every assortment that has it; the index
+counts from 0 and is digits only (no sign). A bare `--loadout-pick <index>` takes it in every
+group that has it, and a named pick wins over it. Groups that are not picked keep their first
+alternative, so without the option nothing changes.
+
+A named pick that cannot apply is an `assortment` issue of the Entity and the export still
+succeeds: an index beyond its group (the group keeps its first alternative), and a group name that
+no group of the whole Loadout has (`Bodyy=2`; the issue names the pick). A bare index beyond every
+group is no issue, because it means "every group that has it" and none having it is the defined
+result; a bare typo such as `9` therefore stays silent. A pick that is no `<group>=<index>` or
+index (`Body=`, `=2`, `Body=-1`, `Body=+1`) exits with code 2 before the Archive is opened.
+`entity glb`, `entity package` and `ui hologram` take the option too, and the MCP tool
+`entity_loadout` its `loadout_pick` parameter, a list of the same texts (commas allowed).
+
 An Entity that does not fit the port's item types, sub-types and sizes is attached all the same
 (ADR-0076): the command warns on stderr, exits with code 0, and lists the mismatch in
 `incompatible` (absent when empty): `{"port": "…", "entity": "…", "kind": "item_type" |
@@ -186,6 +204,7 @@ A **Node** is one Entity:
 | `docked_vehicle` | bool | The Entity is a docked vehicle: its `AttachDef.Type` starts with `NOITEM_Vehicle`, ignoring case, e.g. a snub craft in a ship's hangar; the root Entity is never marked, even if it is a vehicle |
 | `expanded` | bool | The Entity's ports are built; false only for a docked vehicle the resolver stopped at (the root Entity is always expanded) |
 | `issues` | array | Errors (without target) that do not stop the Entity: a part of its Loadout that cannot be read, an ambiguous class name, a vehicle implementation or Modification that is not read or applied in full, or the port limit |
+| `notes` | array | Only when not empty: notes in the form of `issues` that report no problem, as nothing was kept from being read. The only kind is `assortment_requirement` (the Requirement of a loadout assortment or of some of its groups names tags that only the game's spawn knows, so the Archive does not decide it; the assortment or group is used as if it applied; one note per assortment, ADR-0302) |
 | `vehicle` | Vehicle | Only for an Entity whose Record names a vehicle implementation that was read: the implementation with the Entity's Modification applied |
 | `landing_gear` | array | Only for an Entity whose `VehicleComponentParams.landingSystem` refers to a `VehicleLandingGearSystem` Record: its gears as objects with `bone`, `geometry` (the geometry path, empty when the Record gives none) and `mass` (kilograms or `null`) |
 | `ports` | array | One Port per port, see below for the order |
@@ -238,9 +257,12 @@ target: `reference` (the GUID) or `class_name`, the other `null`. The kinds are:
   the reason lists every candidate), `no_loadout_files` and `xml_loadout` (an XML Loadout or one
   it includes that is missing, corrupt, includes itself or nests deeper than 8 includes; what
   could be read is still listed), `assortment` (a loadout assortment of a generated default
-  Loadout is no assortment, names itself, directly or through another, or has a first alternative
-  that is no Loadout; the other assortments still apply; a generated Loadout resolves to the
-  first alternative of each group of its assortments, ADR-0289), and `vehicle_implementation` (the implementation file is
+  Loadout is no assortment, names itself, directly or through another, or has a chosen
+  alternative that is no Loadout; a `--loadout-pick` index beyond its named group, or a named
+  pick of a group that no group of the Loadout has; the other
+  assortments still apply; a generated Loadout resolves to the first alternative of each group of
+  its assortments unless `--loadout-pick` chooses another, ADR-0289, ADR-0309), and `vehicle_implementation` (the
+  implementation file is
   missing, corrupt or no `Vehicle` document, so `vehicle` is absent, or its Modification names a
   patch file that is missing (even when a fallback file is applied), corrupt, outside the implementation folder or too large to apply within the limits, a patch child or `id` that matches nothing in the base and has no base child of its name to replace, or no Modification of that name exists; the
   implementation without the patch is still listed). A landing system that refers to a Record that does not exist or cannot be read gives `dangling_reference` or `unreadable_record` among the issues.
@@ -269,9 +291,19 @@ order is attached. The same Archive always gives the same document.
  "texture_fallbacks": [], "default_material_ids": 0, "hidden_primitives": 0, "bones": 0,
  "skinned_meshes": 0, "lod_fallbacks": 0, "shared_meshes": 33, "shared_materials": 103,
  "shared_textures": 0, "vertices": 744831,
- "triangles": 818426, "bytes": 44750744, "skipped": 0, "placements": [Placement, …],
- "issues": [Issue, …]}
+ "triangles": 818426, "bytes": 44750744, "skipped": 0, "unresolved_layers": 0,
+ "placements": [Placement, …], "issues": [Issue, …]}
 ```
+
+`unresolved_layers` counts the layer files of the material libraries of all parts, their bone
+attachments and the Interior that the Archive lacks, that cannot be read or that exceed the load
+budget ([ADR-0291](adr/0291-layer-files-are-read-once-per-model-set-within-a-byte-budget.md)); the
+materials that name them keep the colours of their own file. A library lists a file once per
+`Submtl` it takes, as the Export as GLB summary counts it. Across libraries, spellings of one path
+that differ in case, in `\` and `/`, in a leading `Data/` or in the `.mtl` extension are one file,
+which counts as often as its most frequent library lists it. Each library lists at most 256 files, so the number is a lower bound.
+`first_unresolved_layer` is the first such path, as the layer names it; it is absent when
+`unresolved_layers` is 0 (the example shows the case without any).
 
 `<entity>` is named as for `p4kx entity loadout`, with the same exit codes. A docked vehicle is
 one part without the parts of its own Loadout; `--expand-docked-vehicles` places those too. A
@@ -280,7 +312,7 @@ and no error; the report lists the ports as `ignored` (absent when empty), as fo
 A replacement that does not fit its port is written all the same and listed in `incompatible` (absent
 when empty), as for `entity loadout`.
 `parts` counts the root Entity, every attached Entity that resolved and every landing gear of those
-Entities ([ADR-0210](adr/0210-landing-gear-are-parts-placed-at-their-bone.md)), `modelled_parts` those with a model, `hidden_parts` those on a port flagged `invisible` or below
+Entities ([ADR-0210](adr/0210-landing-gear-are-parts-placed-at-their-bone.md)), `modelled_parts` those with a model, `hidden_parts` those on a port flagged `invisible`, at a port a worn Entity hides by its `HiddenParts` (ADR-0304), or below
 one (kept, but with no model, no object containers and not drawn), and `nodes` the glTF nodes: one per part and the nodes of each model. A landing gear is written deployed: posed at the end of the clip of its
 skeleton's parameters that extends or deploys it; without one it keeps the pose of its model and an Issue says so. `lod_fallbacks` counts the
 models that lack the requested level and are written at the nearest lower one, or at their
@@ -360,7 +392,12 @@ with exit code 2 or 3 instead and writes nothing, ADR-0255), `sub_geometry_missi
 sub-geometry the port's flags choose is not in the Archive, so the part keeps the main geometry of
 its Entity; a note, `skipped` is false), `body_geometry_missing` (the sub-geometry tagged for the
 body of the character is not in the Archive; the part has no model, the placeholder main geometry
-is not drawn instead; `reason` names the body and the path), `gear_not_deployed` (a landing gear has no clip that
+is not drawn instead; `reason` names the body and the path), `part_hidden` (the worn clothing or
+armour at the port is hidden by the `HiddenParts` of another worn Entity of the same character, so
+the part has no model, ADR-0304; `name` is its class name and `reason` names the port and the part
+that hides it; a part below it is hidden with it, and an attachment that cannot be resolved at, or
+below, such a port is reported as `part_hidden` instead of `unresolved`),
+`gear_not_deployed` (a landing gear has no clip that
 deploys it, or the clip cannot be read or applied to its model; the gear keeps the pose of its
 model; a note, `skipped` is false), `attachments_left_out` (the geometry is
 a character definition, `.cdf`: its skin, else its first attachment, is the part's model, its bone
@@ -465,8 +502,12 @@ or wrong exits with code 7.
  "modelled_parts": 36, "props": 21, "lights": 46, "nodes": 205, "meshes": 37, "primitives": 158,
  "materials": 32, "default_material_ids": 0, "hidden_primitives": 12, "lod_fallbacks": 0,
  "shared_meshes": 8, "shared_materials": 118, "shared_textures": 0, "vertices": 170632,
- "triangles": 159528, "bytes": 9931796, "skipped": 1, "issues": [Issue, …]}
+ "triangles": 159528, "bytes": 9931796, "skipped": 1, "unresolved_layers": 0,
+ "issues": [Issue, …]}
 ```
+
+`unresolved_layers` and `first_unresolved_layer` (absent when there is none) are those of
+`p4kx entity glb`, for the material libraries of the parts.
 
 `containers` are the Entry paths of the chain as for `p4kx socpak list`, with the same exit codes
 (an Entry the Archive lacks is 2, a container that cannot be opened 3). `parts` counts the root
@@ -586,18 +627,21 @@ Archive lacks is exit code 2, a library that cannot be read 3; issues leave the 
  "nodes": 223, "bones": 220, "meshes": 3, "skinned_meshes": 3, "primitives": 51,
  "materials": 19, "textured_materials": 0, "textures": 0, "texture_pixels": 0,
  "vertices": 43317, "triangles": 68932, "bytes": 3671144, "skipped": 0,
+ "unresolved_layers": 0,
  "animations": [{"name": "…", "duration_seconds": 3.27, "additive": false, "channels": 233,
                  "keys": 10714, "skipped_tracks": []}],
  "issues": [Issue, …]}
 ```
 
 `--materials textures` (default `colours`) and `--texture-mip N` embed the textures as for
-`p4kx chf glb`, counted in `textured_materials`, `textures` and `texture_pixels`. `files` of
-`loadout` lists the XML Loadout files the Loadout is made of in the order they are laid over each
-other: an Entity whose default Loadout is an outfit gives its base Loadout and the Loadouts of its
-outfits that apply (ADR-0109, ADR-0181), and `outfit` beside `files` (absent for any other
-source) lists every outfit as for `p4kx entity loadout`. `head` is `null` unless the Loadout has a
-head (an Entity of item type `Char_Head`); then `class_name` is the head Entity, `body` the variant its sub-type
+`p4kx chf glb`, counted in `textured_materials`, `textures` and `texture_pixels`.
+`unresolved_layers` and `first_unresolved_layer` (absent when there is none) are those of
+`p4kx entity glb`, for the material libraries of the parts. `files` of `loadout` lists the XML
+Loadout files the Loadout is made of in the order they are laid over each other: an Entity whose
+default Loadout is an outfit gives its base Loadout and the Loadouts of its outfits that apply
+(ADR-0109, ADR-0181), and `outfit` beside `files` (absent for any other source) lists every outfit
+as for `p4kx entity loadout`. `head` is `null` unless the Loadout has a head (an Entity of item
+type `Char_Head`); then `class_name` is the head Entity, `body` the variant its sub-type
 names, which `--body` overrides, `bespoke_folder` the folder of the character's own head skins
 (or `null` when its material library is in no folder of its own) and `parts` the pieces of the
 head. `material` of a part is the material library it is drawn with, `null` when it has none.
@@ -1726,7 +1770,8 @@ reading and assembling, building the scene, drawing and reading the picture back
 the file. An Entity the Archive lacks, a bad option, a `--out` that is the Archive or lies in a
 Star Citizen installation and a `--size` that is empty or beyond what the device draws
 print no JSON and fail with exit code 2. A replacement that does not fit its port is drawn all the
-same and listed in `incompatible` (absent when empty), as for `entity loadout`. A machine without
+same and listed in `incompatible` (absent when empty), as for `entity loadout`; `--loadout-pick`
+works as there. A machine without
 a graphics adapter fails with `no graphics adapter` on stderr and exit code 1.
 
 ## `p4kx ui screens <archive> <entity> --json`
@@ -2372,8 +2417,8 @@ At `--lod 1` and up, whose rigs have none, the targets of level 0 are carried to
 the level (ADR-0293). The hair, brows, lashes and beard
 have a target for each expression that moves one of their vertices by at least a fifth of the
 target's largest move, named like the head's and moved as they follow the neutral shape
-(ADR-0200); the teeth and eyes have none. Only the first mesh of such a piece at LOD 0 gets
-targets: a piece with several meshes adds the note `follow_morphs_first_mesh_only`, and
+(ADR-0200), at every `--lod` (ADR-0305); the teeth and eyes have none. Only the first mesh of such
+a piece gets targets: a piece with several meshes adds the note `follow_morphs_first_mesh_only`, and
 `follow_weights_skipped` says that a facial animation sets no weights for a piece whose targets do
 not match the head's. These pieces are also bound to the facial joints of the head
 (ADR-0299); `follow_joints_skipped` says that one is not, because the head mesh has no weights or

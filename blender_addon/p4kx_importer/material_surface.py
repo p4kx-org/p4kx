@@ -20,11 +20,6 @@ NODRAW_SHADERS = frozenset({"nodraw", "nodraw_proxy", "proxy"})
 MAX_BLENDED_LAYERS = 4
 MASKED_LAYERS = 4
 TINT_PALETTE_DECAL = "$TintPaletteDecal"
-# Generation-mask flag: the decal draws a stencil; only then its stencil parameters count.
-STENCIL_MAP = "STENCIL_MAP"
-# Decal shader parameters: the stencil colour (``r,g,b``) and its opacity.
-STENCIL_COLOUR = "StencilDiffuseColor"
-STENCIL_OPACITY = "StencilOpacity"
 # Generation-mask flag: the vertex colours tint the material.
 PER_VERTEX_TINT = "PER_VERTEX_TINT"
 # Name Blender's glTF importer gives the attribute of COLOR_0.

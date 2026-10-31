@@ -14,6 +14,7 @@ use crate::cli_entity::EntityGlbArgs;
 use crate::entity_glb_body::{BodyJson, body_json};
 use crate::entity_glb_placements::{PlacementJson, painted, placements_json};
 use crate::json;
+use crate::layers_json::LayersJson;
 
 /// What the JSON report of one `entity glb` run is built from.
 pub(crate) struct GlbReport<'a> {
@@ -72,6 +73,7 @@ impl GlbReport<'_> {
                 .iter()
                 .filter(|issue| issue.kind().skips())
                 .count(),
+            layers: LayersJson::from(&assembly.unresolved_layers()),
             interior: interior_json(assembly),
             body: body_json(tree),
             ignored: applied.ignored(),
@@ -119,6 +121,8 @@ struct GlbJson<'a> {
     triangles: usize,
     bytes: u64,
     skipped: usize,
+    #[serde(flatten)]
+    layers: LayersJson,
     #[serde(skip_serializing_if = "Option::is_none")]
     interior: Option<InteriorJson>,
     #[serde(skip_serializing_if = "Option::is_none")]

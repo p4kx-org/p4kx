@@ -86,14 +86,37 @@ pub enum LoadoutError {
         /// Why it cannot be read.
         reason: String,
     },
-    /// A loadout assortment cannot be used: it names itself, is no assortment or has a first
-    /// alternative that is no Loadout. The other assortments still apply.
+    /// A loadout assortment cannot be used: it names itself, is no assortment, has a chosen
+    /// alternative that is no Loadout or is picked beyond its group. The other assortments still
+    /// apply.
     #[error("the loadout assortment {guid} cannot be used: {reason}")]
     Assortment {
         /// The GUID of the assortment Record.
         guid: Guid,
         /// Why it cannot be used.
         reason: String,
+    },
+    /// A named pick of a group that no group of the resolved Loadout has, e.g. a typo; it
+    /// changes nothing.
+    #[error("the pick {group}={index} names no group of the Loadout")]
+    UnknownPick {
+        /// The group as given.
+        group: String,
+        /// The index as given.
+        index: usize,
+    },
+    /// A note, not a problem: the Requirement of a loadout assortment or of some of its groups
+    /// depends on tags the Archive does not hold, so they are used as if they applied. Nothing
+    /// was kept from being read; [`EntityNode::notes`](crate::EntityNode::notes) lists it, never
+    /// `issues`.
+    #[error("{}", requirement_text(*assortment, groups, *guid))]
+    AssortmentRequirement {
+        /// The GUID of the assortment Record.
+        guid: Guid,
+        /// Whether the Requirement of the assortment itself is undecided.
+        assortment: bool,
+        /// The names of the groups whose Requirement is undecided, in order, without duplicates.
+        groups: Vec<String>,
     },
     /// The vehicle implementation of an Entity, or its Modification, is not read in full or not
     /// applied as it names; what could be read is still kept.
@@ -123,9 +146,17 @@ impl LoadoutError {
             Self::TooManyPorts => "too_many_ports",
             Self::NoLoadoutFiles { .. } => "no_loadout_files",
             Self::XmlLoadout { .. } => "xml_loadout",
-            Self::Assortment { .. } => "assortment",
+            Self::Assortment { .. } | Self::UnknownPick { .. } => "assortment",
+            Self::AssortmentRequirement { .. } => "assortment_requirement",
             Self::VehicleImplementation { .. } => "vehicle_implementation",
         }
+    }
+
+    /// Returns whether this only informs: it kept nothing from being read and belongs to
+    /// [`EntityNode::notes`](crate::EntityNode::notes), not to `issues`.
+    #[must_use]
+    pub const fn is_note(&self) -> bool {
+        matches!(self, Self::AssortmentRequirement { .. })
     }
 }
 
@@ -181,4 +212,17 @@ pub enum EntityLookupError {
         /// The Record's type.
         type_name: String,
     },
+}
+
+fn requirement_text(assortment: bool, groups: &[String], guid: Guid) -> String {
+    let what = match (assortment, groups) {
+        (true, []) => "the assortment".to_owned(),
+        (true, groups) => format!("the assortment and the groups {}", groups.join(", ")),
+        (false, [group]) => format!("the group {group}"),
+        (false, groups) => format!("the groups {}", groups.join(", ")),
+    };
+    format!(
+        "the Requirement of {what} of the loadout assortment {guid} depends on spawn tags; \
+         it is used as if it applied"
+    )
 }

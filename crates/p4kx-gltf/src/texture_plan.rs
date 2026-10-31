@@ -7,14 +7,15 @@ use p4kx_model::Material;
 
 use crate::layer_jobs::{fallback_guards, layer_jobs, layer_normals_last};
 use crate::layer_plan::Layered;
-use crate::materials::{MaterialPlan, Slot, display_name, is_hair_cards, uses_alpha};
+use crate::material_alpha::uses_alpha;
+use crate::materials::{MaterialPlan, Slot, display_name};
 use crate::shading::shading;
 use crate::texture_assemble::Wish;
 use crate::texture_loader::{TextureLoader, WithFallbacks};
 use crate::texture_make::{Budget, run_guarded};
 use crate::texture_pixels::Tints;
 use crate::texture_report::{TextureFallback, TextureRole};
-use crate::texture_roles::{Source, Sources, sources_with};
+use crate::texture_roles::{Source, Sources, draws_by_opacity_map, sources_with};
 
 /// The most images one GLB embeds.
 pub const MAX_TEXTURE_IMAGES: usize = 256;
@@ -300,7 +301,7 @@ fn jobs_of(
     material: &Material,
     add: &mut impl FnMut(Job) -> usize,
 ) -> (Wanted, Option<usize>, Vec<Failure>) {
-    let mut found = sources_with(material, is_hair_cards(material));
+    let mut found = sources_with(material, draws_by_opacity_map(material));
     if found.diffuse.as_ref().is_none_or(|diffuse| diffuse.opacity) {
         found.specular = None;
     }

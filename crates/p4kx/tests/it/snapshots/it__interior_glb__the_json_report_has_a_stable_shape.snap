@@ -1,5 +1,5 @@
 ---
-source: crates/p4kx/tests/interior_glb.rs
+source: crates/p4kx/tests/it/interior_glb.rs
 expression: "serde_json::to_string_pretty(&shaped)?"
 ---
 {
@@ -79,5 +79,6 @@ expression: "serde_json::to_string_pretty(&shaped)?"
   "shared_textures": 0,
   "skipped": 5,
   "triangles": 36,
+  "unresolved_layers": 0,
   "vertices": 72
 }

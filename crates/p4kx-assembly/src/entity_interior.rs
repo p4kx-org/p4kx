@@ -6,7 +6,7 @@ mod build;
 mod lookup;
 
 use p4kx_gltf::{GltfError, Scene, SceneNode};
-use p4kx_model::{Model, Transform};
+use p4kx_model::{MaterialStatus, Model, Transform};
 
 use crate::placement::{node_transform, offset};
 use crate::{Assembly, Interior, Issue, IssueKind, ObjectContainerRef};
@@ -77,6 +77,11 @@ impl EntityInterior {
     #[must_use]
     pub fn issues(&self) -> &[Issue] {
         &self.issues
+    }
+
+    /// Returns the material libraries of the parts of all containers.
+    pub(crate) fn libraries(&self) -> impl Iterator<Item = &MaterialStatus> {
+        self.containers.iter().flat_map(|c| c.interior.libraries())
     }
 
     fn total(&self, count: fn(&Interior) -> usize) -> usize {

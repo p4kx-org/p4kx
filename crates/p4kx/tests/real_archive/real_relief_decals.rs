@@ -36,7 +36,7 @@ struct Judged {
     hidden: bool,
 }
 
-fn ship_libraries(archive: &Archive) -> Vec<(String, String)> {
+pub(super) fn ship_libraries(archive: &Archive) -> Vec<(String, String)> {
     archive
         .entries()
         .iter()

@@ -66,7 +66,10 @@ mod mtl_relief;
 mod mtl_render_to_texture;
 mod mtl_roles;
 mod mtl_shader;
+mod mtl_size;
+mod mtl_stencil;
 mod mtl_texture;
+mod mtl_unresolved;
 mod mtl_vertex_colours;
 mod mtl_xml;
 mod nmc;
@@ -113,15 +116,17 @@ pub use mtl::{
 };
 pub use mtl_error::MaterialError;
 pub use mtl_layer_cache::{
-    LayerCache, LayerLimits, MAX_CACHED_LAYER_FILES, MAX_LAYER_BYTES, MAX_LAYER_FILES,
+    LayerBudget, LayerCache, LayerLimits, MAX_CACHED_LAYER_FILES, MAX_LAYER_BYTES, MAX_LAYER_FILES,
 };
 pub use mtl_layers::LayerSurface;
 pub use mtl_load::MaterialReading;
 pub use mtl_raw::{
     Attributes, MAX_LAYERS, MAX_RAW_DEPTH, MAX_RAW_ELEMENTS, MaterialLayer, RawElement,
 };
-pub use mtl_roles::TextureRole;
+pub use mtl_roles::{TextureRole, is_diffuse_map};
+pub use mtl_stencil::{STENCIL_SLOT, Stencil};
 pub use mtl_texture::{DIFFUSE_SLOT, texture_suffix, texture_suffix_lowercase};
+pub use mtl_unresolved::UnresolvedLayers;
 pub use object_container::{
     ChildContainer, ContainerBounds, MAX_CHILD_CONTAINERS, MAX_STREAMED_SOCS, MAX_STREAMING_DEPTH,
     ObjectContainer, ObjectContainerError,

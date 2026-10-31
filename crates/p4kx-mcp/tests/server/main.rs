@@ -17,6 +17,7 @@ mod dataforge_cache;
 mod dataforge_file;
 mod definitions;
 mod entity_loadout;
+mod entity_loadout_pick;
 mod entries;
 mod forge;
 mod image_preview;

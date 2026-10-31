@@ -9,7 +9,7 @@ use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, Scene, SceneNode, ScenePart, TextureLoader, write_scene_glb,
     write_scene_glb_with,
 };
-use p4kx_model::{MaterialStatus, Model, TintPalette, Transform};
+use p4kx_model::{MaterialStatus, Model, TintPalette, Transform, UnresolvedLayers};
 
 use crate::{AttachedModel, Issue, creature_rig};
 
@@ -192,8 +192,9 @@ impl Part {
         self.model.as_deref()
     }
 
-    /// Returns whether the part is hidden: it sits on a port flagged `invisible`, or below one,
-    /// and has no model, as the game does not draw it.
+    /// Returns whether the part is hidden: it sits on a port flagged `invisible` or at a port a
+    /// worn Entity hides by its `HiddenParts`, or below one, and has no model, as the game does
+    /// not draw it.
     #[must_use]
     pub const fn is_hidden(&self) -> bool {
         self.hidden
@@ -262,6 +263,21 @@ impl Assembly {
     #[must_use]
     pub fn issues(&self) -> &[Issue] {
         &self.issues
+    }
+
+    /// Returns the layer files that the material libraries of the parts, their bone attachments
+    /// and the Interior could not resolve; their materials keep the colours of their own file.
+    #[must_use]
+    pub fn unresolved_layers(&self) -> UnresolvedLayers {
+        let parts = self.parts.iter().flat_map(|part| {
+            std::iter::once(part.materials())
+                .chain(part.attachments.iter().map(AttachedModel::materials))
+        });
+        let mut all = UnresolvedLayers::of(parts);
+        if let Some(interior) = &self.interior {
+            all.extend(interior.libraries());
+        }
+        all
     }
 
     /// Returns the level of detail the models were read at.
