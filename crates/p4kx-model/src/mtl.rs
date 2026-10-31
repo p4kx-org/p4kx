@@ -86,11 +86,14 @@ pub struct Material {
     pub textures: Vec<TextureSlot>,
     /// The palette colour the material takes: that of its first material layer with a
     /// `PaletteTint` from 1 to 3, the glass colour of a glass material that uses the tint palette,
-    /// or the primary entry of a [stencil decal](Self::is_stencil_decal) whose
-    /// [`Stencil::palette_tint`](crate::Stencil::palette_tint) is set.
+    /// the decal colours of a [stencil decal](Self::is_stencil_decal) drawn by its stencil map
+    /// whose `StencilTintOverride` is 2, or the primary entry of one whose override is 1.
     pub palette: Option<PaletteSlot>,
     /// Whether a [`TintPalette`](crate::TintPalette) replaced the colours of the file.
     pub tinted: bool,
+    /// The colours the red, green and blue masks of a stencil decal take, set by a palette that
+    /// states decal colours when the material takes [`PaletteSlot::Decal`].
+    pub decal_colours: Option<[[f32; 3]; 3]>,
     /// The attributes of the material element that no field above holds, in file order.
     pub other_attributes: Attributes,
     /// The `PublicParams` attributes: the shader's parameters by name, in file order.
@@ -181,6 +184,7 @@ impl Material {
             textures: Vec::new(),
             palette: None,
             tinted: false,
+            decal_colours: None,
             other_attributes: Vec::new(),
             public_params: Vec::new(),
             layers: Vec::new(),

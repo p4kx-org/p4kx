@@ -1,9 +1,26 @@
 ---
-source: crates/p4kx/tests/entity_package_materials.rs
+source: crates/p4kx/tests/it/entity_package_materials.rs
 expression: "pretty(&manifest, \"palettes\")?"
 ---
 [
   {
+    "decal": [
+      [
+        1.0,
+        1.0,
+        1.0
+      ],
+      [
+        1.0,
+        1.0,
+        1.0
+      ],
+      [
+        1.0,
+        1.0,
+        1.0
+      ]
+    ],
     "glass": [
       1.0,
       1.0,

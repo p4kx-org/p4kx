@@ -18,7 +18,7 @@ from typing import Any
 _MATERIAL_ID = re.compile(r"^x[0-9]{4,}$")
 _PALETTE_ID = re.compile(r"^p[0-9]{4,}$")
 _TEXTURE_ID = re.compile(r"^t[0-9]{4,}$")
-PALETTE_ENTRIES = ("primary", "secondary", "tertiary", "glass")
+PALETTE_ENTRIES = ("primary", "secondary", "tertiary", "glass", "decal")
 USAGES = frozenset(
     {
         "diffuse",
@@ -79,7 +79,11 @@ class PaletteColours:
 
 @dataclass(frozen=True, slots=True)
 class Palette:
-    """A tint palette: three paint entries and the glass colour."""
+    """A tint palette: three paint entries, the glass colour and the decal colours.
+
+    ``decal`` is the package's ``decal`` (format 1.7): the colours of the red, green and blue masks
+    of a stencil map, ``None`` when the palette states none.
+    """
 
     id: str
     name: str
@@ -87,9 +91,10 @@ class Palette:
     secondary: PaletteColours
     tertiary: PaletteColours
     glass: Colour
+    decal: tuple[Colour, Colour, Colour] | None = None
 
     def entry(self, name: str | None) -> PaletteColours | None:
-        """Returns the paint entry called ``name``, or ``None`` for ``glass`` and unknown names."""
+        """Returns the paint entry ``name``, or ``None`` for ``glass``, ``decal`` and others."""
         if name == "primary":
             return self.primary
         if name == "secondary":
@@ -319,7 +324,25 @@ def _palette(item: object) -> Palette | None:
     glass = _colour(item.get("glass"), None)
     if primary is None or secondary is None or tertiary is None or glass is None:
         return None
-    return Palette(palette_id, _string(item.get("name")), primary, secondary, tertiary, glass)
+    return Palette(
+        palette_id,
+        _string(item.get("name")),
+        primary,
+        secondary,
+        tertiary,
+        glass,
+        _decal_colours(item.get("decal")),
+    )
+
+
+def _decal_colours(value: object) -> tuple[Colour, Colour, Colour] | None:
+    """Returns the three decal colours, or ``None`` when absent or any of them is malformed."""
+    if not isinstance(value, list):
+        return None
+    match [_colour(item, None) for item in value]:
+        case [tuple() as red, tuple() as green, tuple() as blue]:
+            return (red, green, blue)
+    return None
 
 
 def _palette_colours(item: object) -> PaletteColours | None:

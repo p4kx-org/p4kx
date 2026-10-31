@@ -46,6 +46,32 @@ pub(super) fn guarded<T>(device: &wgpu::Device, work: impl FnOnce() -> T) -> (T,
     (output, invalid.or(exhausted).is_some())
 }
 
+/// Returns an instance that sees every backend.
+pub(super) fn any_instance() -> wgpu::Instance {
+    wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle())
+}
+
+/// Returns an instance that sees only the backend that carries the software adapter.
+///
+/// On Windows that is Direct3D 12 (WARP): creating an instance loads the driver of every backend
+/// it sees, with the capture and overlay layers injected into them, and a software run needs
+/// neither. Elsewhere every backend stays, because the software adapter there (lavapipe) is a
+/// Vulkan one. A machine without the backend yields [`OffscreenError::NoAdapter`] when the
+/// adapter is requested.
+///
+/// [`OffscreenError::NoAdapter`]: super::OffscreenError::NoAdapter
+pub(super) fn software_instance() -> wgpu::Instance {
+    wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: SOFTWARE_BACKENDS,
+        ..wgpu::InstanceDescriptor::new_without_display_handle()
+    })
+}
+
+#[cfg(windows)]
+const SOFTWARE_BACKENDS: wgpu::Backends = wgpu::Backends::DX12;
+#[cfg(not(windows))]
+const SOFTWARE_BACKENDS: wgpu::Backends = wgpu::Backends::all();
+
 struct Unpark(Thread);
 
 impl Wake for Unpark {

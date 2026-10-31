@@ -84,7 +84,7 @@ written (there are no `null`s).
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.7` today. |
+| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.8` today. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
@@ -209,11 +209,11 @@ A Character package (version 1.3) is the folder above with one mesh and no textu
 
 | Field | Meaning |
 | --- | --- |
-| `body` | The body variant, `male` or `female`; absent for a creature (1.7). |
+| `body` | The body variant, `male` or `female`; absent for a creature (1.8). |
 | `skeleton` | The file the bones come from, below `Data`: the skeleton file of a Character, the geometry file of the root of a creature. |
 | `bones`, `skinned_meshes`, `morph_targets` | How many bones, skinned meshes and morph targets the file has. |
 | `embedded_textures` | How many PNG images the GLB embeds. |
-| `parts` | The skins worn on the skeleton, the body first: `name` (the node's name in the file), `origin` (`body` or `piece`, and from 1.7 `skin`, a skin of a creature), `file` (the skin in the Archive) and `morph_targets`. |
+| `parts` | The skins worn on the skeleton, the body first: `name` (the node's name in the file), `origin` (`body` or `piece`, and from 1.8 `skin`, a skin of a creature), `file` (the skin in the Archive) and `morph_targets`. |
 | `animations` | The animations in the file: `name`, `duration_seconds`, `additive` (its keys are offsets to a pose, which glTF cannot say), `channels` and `keys`. |
 
 Pieces that cannot be fitted to the body and animations that fit nothing are `issues` with the
@@ -231,7 +231,7 @@ library entry point is `p4kx_blender::write_character_package`.
 
 `p4kx entity package` of a creature whose root geometry is a character file outside the human rigs
 and whose skeleton the Archive holds, with a skin bound to it (`Assembly::creature_skins` yields a
-part, ADR-0275), writes a package of version 1.7 with one mesh, the rig form of a Character
+part, ADR-0275), writes a package of version 1.8 with one mesh, the rig form of a Character
 ([ADR-0316](adr/0316-a-creature-with-its-skeleton-is-packaged-as-one-skinned-rig-mesh.md)):
 
 - `nodes` has one node of the kind `entity`, the root Entity at the identity transform, with its
@@ -272,7 +272,7 @@ objects. The sharing is that of the Assembly ([ADR-0077](adr/0077-scene-meshes-a
 | `palette_id` | The id of that palette in `palettes` (1.1); absent without one. |
 | `instances` | How many nodes draw the mesh. |
 | `bytes`, `vertices`, `triangles` | Size of the file and of its geometry. |
-| `rig` | The skeleton, parts, morph targets and animations of a Character's mesh (1.3) or of a creature's (1.7), see "Characters" and "Creatures"; absent for a static mesh. |
+| `rig` | The skeleton, parts, morph targets and animations of a Character's mesh (1.3) or of a creature's (1.8), see "Characters" and "Creatures"; absent for a static mesh. |
 | `materials` | The materials of the mesh in the order of the glTF materials in its file: `index` is the index in the file's `materials` array, `name` the glTF material's name, and `textures` the ids of the `diffuse`, `normal` and `specular` textures that were written for it, each absent when the material names none or it could not be written, and, from 1.1, `material`, the id of the material's description in `materials`, absent for the engine's default material. Match by `index`; names can repeat. |
 
 The file is a plain GLB: one scene whose root node (named after the Entity's class name) has the
@@ -332,7 +332,7 @@ shader still has every value the file holds.
 | `reads_vertex_colours` | (1.4) `true` when the material reads the vertex colours of its mesh: `GlassPBR` with `PER_VERTEX_TINT`, or a layered surface without a blend map (`_blend`, `_mask`, `_opac`) that has a layer to blend over its base ([ADR-0253](adr/0253-glass-with-per-vertex-tint-takes-its-colour-from-the-vertex-colours.md)). The GLB meshes carry `COLOR_0` on the primitives of such materials only. Absent in 1.3 and older; the add-on then applies the rule it had before. |
 | `layer_shares` | (1.5) One number per entry of `layers`: the share the layer has without a blend map or vertex colours, by position and `WearBlendBase` (the rule the GLB shades by, [ADR-0097](adr/0097-layered-materials-are-drawn-as-the-blend-of-their-layer-files.md)). The first layer weighs `1 − WearBlendBase`, the others `WearBlendBase` between them; a layer without a `material` has 0 and the rest are renormalised. When nothing has weight, the first layer takes everything if it has a `material`, else all shares are 0 and the material keeps its own colours. Absent without layers and in 1.4 and older; the add-on then applies the same rule itself. |
 | `stencil` | (1.6) How a stencil decal, a `MeshDecal` with `STENCIL_MAP` in its `gen_mask`, is drawn: `drawn`, `colour` and `opacity`. The motif is the texture with the usage `stencil`, which exists only when no diffuse map is there. `drawn` is `false` when the decal has nothing to draw: its motif is a livery's emblem the game fills in at run time (`$TintPaletteDecal`), or its stencil and diffuse maps were not written; the GLB leaves the first kind out and the add-on draws nothing for both. `colour` (`StencilDiffuseColor`, linear; absent when the file gives none, and `diffuse` counts) and `opacity` (`StencilOpacity` from 0 to 1, 1 when absent), which multiplies the material's `opacity`, are stated for a decal drawn by its stencil map only; one with a diffuse map is drawn by that map, as any decal. Absent for any other material and in 1.5 and older, which draw a decal by its diffuse colour and map only. See [ADR-0100](adr/0100-the-add-on-builds-material-node-trees-from-the-package-descriptions-by-a-pure-mapping.md) and ADR-0298. |
-| `palette` | `primary`, `secondary`, `tertiary` or `glass`: the palette entry the material takes (the first layer with a `PaletteTint` from 1 to 3, the tint-palette glass colour, or `primary` for a stencil decal drawn by its stencil map whose `StencilTintOverride` is above 0). Absent when it takes none. |
+| `palette` | `primary`, `secondary`, `tertiary`, `glass` or `decal`: the palette entry the material takes (the first layer with a `PaletteTint` from 1 to 3, the tint-palette glass colour, or, for a stencil decal drawn by its stencil map, `primary` when its `StencilTintOverride` is above 0 and `decal` (1.7) when it rounds to 2). Absent when it takes none. |
 | `default_palette` | The Record path of the library's default palette. |
 | `textures` | The texture slots in file order, see below. |
 | `layers` | The layers in file order, see below. |
@@ -351,7 +351,8 @@ specular, `_mask`/`_opac` mask, `_blend` blend, `_detail` detail, `_wear` wear, 
 `HAIR_CAP` in its `gen_mask`, is a `mask`; its `file` is the map of the body folder of its library,
 see ADR-0213; the file in `TexSlot7` of a stencil decal without a diffuse map (`MeshDecal` with
 `STENCIL_MAP`, its name says nothing: `_stencil`, `_a`, `_diff`, ...) is the `stencil` map, whose
-red channel is the opacity of the motif, ADR-0298; for other files it is the slot: `TexSlot1` is
+red channel is the opacity of the motif, ADR-0298, and whose red, green and blue channels are three
+masks when the material's `palette` is `decal`, ADR-0310; for other files it is the slot: `TexSlot1` is
 `diffuse`, anything else `other`. `attributes` (`TexType`, `Used`, ...) and `elements` (the `TexMod`
 child with the tiling `TileU`/`TileV`, the offset `OffsetU`/`OffsetV` and the rotation of the
 slot's UVs) are as in the file. Which UV set a slot samples is decided by the shader and its
@@ -387,6 +388,17 @@ material with the shader `MeshDecal` (its stencil colours in `parameters`, the p
 applies a palette by taking the entry a material's or layer's `palette` names: the `tint` replaces
 the diffuse colour (or multiplies a layer's, with its `tint_colour`) and so on, as the game does;
 the package leaves the decision to the importer.
+
+`decal` (1.7) holds the three decal colours of the livery (`decalColorR`, `decalColorG`,
+`decalColorB`), each a linear colour, absent when the palette states none and in 1.6 and older. A
+material whose `palette` is `decal` is a stencil decal whose stencil map holds up to three masks:
+the red, green and blue channel. An importer treats the masks as layers with the mask as alpha, red
+below green below blue (provisional order): each colour counts by its mask and by what the masks
+above it leave of it, the colour of a texel is the weighted mean of the three colours, and the
+opacity is the strongest of the three masks (before `stencil.opacity` and the material's
+`opacity`). Without a `decal` in the palette the decal keeps its `stencil.colour` and the red
+channel as its opacity. Which colour a decal with `StencilTintOverride` 1 takes, and the order of
+overlapping masks, are not settled by the game data, see ADR-0310.
 
 ### Issues
 
@@ -498,9 +510,11 @@ and the glTF material indices in the meshes; **1.2** adds the node kinds `contai
 with their children. **1.3** adds the node kind `character` and the mesh field `rig`
 (`character package`); a reader of 1.2 skips the node and warns about the minor version. **1.4**
 adds the material field `reads_vertex_colours`. **1.5** adds the material field `layer_shares`.
-**1.6** adds the material field `stencil` and the texture usage `stencil`. **1.7** makes `rig.body`
-optional and adds the part origin `skin` (`entity package` of a creature with its skeleton); a
-reader of 1.6 expects a `body`, so it treats such a package as a higher minor version.
+**1.6** adds the material field `stencil` and the texture usage `stencil`. **1.7** adds the palette
+field `decal` and the material `palette` value `decal`.
+**1.8** makes `rig.body` optional and adds the part origin `skin` (`entity package` of a creature
+with its skeleton); a reader of 1.7 expects a `body`, so it treats such a package as a higher minor
+version.
 
 The schema file is the schema of the version in `FORMAT_VERSION`: a change of the Rust types that
 changes the schema is a change of the format, and the checked-in schema changes with it. A schema
@@ -514,7 +528,7 @@ the rules above.
 
 - **Skeletons and animations.** Version 1.3 carries them in the GLB of a Character and lists them
   in the mesh's `rig` ([ADR-0107](adr/0107-a-character-is-written-as-one-rigged-glb-mesh-behind-a-character-node.md)).
-  Version 1.7 does the same for a creature Entity, with a `rig` on the mesh of an `entity` node
+  Version 1.8 does the same for a creature Entity, with a `rig` on the mesh of an `entity` node
   ([ADR-0316](adr/0316-a-creature-with-its-skeleton-is-packaged-as-one-skinned-rig-mesh.md)).
   A manifest-level `skeletons` array, clips as sidecar files and rigs on the meshes of other
   Entities (a ship's moving parts) are not decided.

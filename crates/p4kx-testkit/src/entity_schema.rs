@@ -69,7 +69,10 @@ fn geometry_structs() -> Vec<TestStruct> {
             .field("entryA", class("TintEntry"))
             .field("entryB", class("TintEntry"))
             .field("entryC", class("TintEntry"))
-            .field("glassColor", class("SRGB8")),
+            .field("glassColor", class("SRGB8"))
+            .field("decalColorR", class("SRGB8"))
+            .field("decalColorG", class("SRGB8"))
+            .field("decalColorB", class("SRGB8")),
         TestStruct::new("TintEntry")
             .field("glossiness", TestType::UInt8)
             .field("tintColor", class("SRGB8"))
@@ -84,8 +87,9 @@ fn geometry_structs() -> Vec<TestStruct> {
 /// Returns the Record of type `TintPaletteTree` named `name`.
 ///
 /// The entries A to C have the sRGB bytes `tints` as tint colour and `glossiness`, the glass has
-/// the sRGB bytes `glass`, and the specular colour of every entry is (59, 59, 59). Its record path is `libs/foundry/records/tintpalettes/brand/test/<name>`; the database needs
-/// [`entity_schema`].
+/// the sRGB bytes `glass`, the three decal colours are white, and the specular colour of every
+/// entry is (59, 59, 59). Its record path is
+/// `libs/foundry/records/tintpalettes/brand/test/<name>`; the database needs [`entity_schema`].
 #[must_use]
 pub fn tint_palette_record(
     guid: u128,
@@ -93,6 +97,20 @@ pub fn tint_palette_record(
     tints: [[u8; 3]; 3],
     glass: [u8; 3],
     glossiness: [u8; 3],
+) -> TestRecord {
+    tint_palette_record_with_decal(guid, name, tints, glass, glossiness, [[255; 3]; 3])
+}
+
+/// Returns the Record of type `TintPaletteTree` named `name` like [`tint_palette_record`], with
+/// the sRGB bytes `decal` as `decalColorR`, `decalColorG` and `decalColorB`.
+#[must_use]
+pub fn tint_palette_record_with_decal(
+    guid: u128,
+    name: &str,
+    tints: [[u8; 3]; 3],
+    glass: [u8; 3],
+    glossiness: [u8; 3],
+    decal: [[u8; 3]; 3],
 ) -> TestRecord {
     let colour = |[r, g, b]: [u8; 3]| {
         TestValue::Struct(
@@ -115,7 +133,10 @@ pub fn tint_palette_record(
         .value("entryA", entry(tints[0], glossiness[0]))
         .value("entryB", entry(tints[1], glossiness[1]))
         .value("entryC", entry(tints[2], glossiness[2]))
-        .value("glassColor", colour(glass));
+        .value("glassColor", colour(glass))
+        .value("decalColorR", colour(decal[0]))
+        .value("decalColorG", colour(decal[1]))
+        .value("decalColorB", colour(decal[2]));
     TestRecord::new(
         guid,
         "TintPaletteTree",

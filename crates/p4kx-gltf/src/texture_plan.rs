@@ -36,6 +36,7 @@ pub(crate) enum Key {
         diffuse: String,
         specular: Option<(String, [u8; 3])>,
         tint: [u8; 3],
+        decal: Option<[[u8; 3]; 3]>,
         keep_alpha: bool,
     },
     Normal {
@@ -264,6 +265,9 @@ fn tints_of(material: &Material) -> Tints {
     Tints {
         diffuse: shade.diffuse.map(|channel| channel.clamp(0.0, 1.0)),
         specular: shade.specular.map(|channel| channel.clamp(0.0, 1.0)),
+        decal: material
+            .decal_colours
+            .map(|colours| colours.map(|colour| colour.map(|channel| channel.clamp(0.0, 1.0)))),
     }
 }
 
@@ -285,6 +289,10 @@ fn base_job(
             diffuse: diffuse.identity(),
             specular,
             tint,
+            decal: tints
+                .decal
+                .filter(|_| diffuse.opacity)
+                .map(|colours| colours.map(quantise)),
             keep_alpha: diffuse.opacity || uses_alpha(material),
         },
         diffuse: Some(diffuse.clone()),

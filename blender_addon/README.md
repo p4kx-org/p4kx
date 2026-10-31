@@ -27,7 +27,7 @@ importer that ships with Blender must be enabled.
   head as shape keys and the animations as actions, all below the empty of the `character` node
   ([ADR-0107](../docs/adr/0107-a-character-is-written-as-one-rigged-glb-mesh-behind-a-character-node.md)).
   The materials are those of Blender's glTF importer, with the textures embedded in the GLB.
-- Imports a creature with its skeleton, written by `p4kx entity package` (format 1.7), the same
+- Imports a creature with its skeleton, written by `p4kx entity package` (format 1.8), the same
   way: its `entity` node draws a mesh with a `rig` that has no body variant, so the armature, the
   skinned meshes and the parts on its bones come in once below the node's empty
   ([ADR-0316](../docs/adr/0316-a-creature-with-its-skeleton-is-packaged-as-one-skinned-rig-mesh.md)).

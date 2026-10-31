@@ -100,6 +100,11 @@ fn materials(manifest: &mut Manifest, found: &mut Vec<Issue>) {
 fn palettes(manifest: &mut Manifest, found: &mut Vec<Issue>) {
     for palette in &mut manifest.palettes {
         let mut bad = clean_each(&mut palette.glass);
+        if let Some(decal) = &mut palette.decal {
+            bad |= decal
+                .iter_mut()
+                .fold(false, |bad, colour| clean_each(colour) | bad);
+        }
         for entry in [
             &mut palette.primary,
             &mut palette.secondary,

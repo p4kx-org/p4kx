@@ -40,13 +40,13 @@ on the skinned mesh and the collar and horn parented below.
 - **The node is an `entity`, not a `character`.** A creature is an Entity with a GUID, and the
   `character` kind says that the package was made from a CHF or a body. The add-on needs no new
   rule: it already imports the mesh of any node whose mesh has a `rig` once.
-- **The rig says what a creature lacks (format 1.7).** `rig.body` is optional and absent for a
+- **The rig says what a creature lacks (format 1.8).** `rig.body` is optional and absent for a
   creature; `rig.skeleton` is the geometry file of the root, whose model holds the bones (the
   Assembly keeps no separate skeleton path: a character definition names its skeleton inside
   itself, and the root geometry is the one file both forms share); the part
   origin `skin` names a skin of a creature. Both are additive for a reader that ignores unknown
-  values, but a reader of 1.6 requires a `body`, so the minor version rises to 1.7 and the add-on
-  reads it (`SUPPORTED_MINOR` 7).
+  values, but a reader of 1.7 requires a `body`, so the minor version rises to 1.8 and the add-on
+  reads it (`SUPPORTED_MINOR` 8).
 - **No animations.** The file has none and `rig.animations` is empty, as ADR-0307 decided for
   `entity package`.
 - **One writer for both rig packages.** `rig_package` writes the folder, the file, the manifest

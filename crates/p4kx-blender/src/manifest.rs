@@ -15,7 +15,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 ///
 /// A new minor version only adds fields and values readers may ignore; a new major version changes
 /// the meaning of existing ones.
-pub const FORMAT_VERSION: &str = "1.7";
+pub const FORMAT_VERSION: &str = "1.8";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
@@ -307,7 +307,7 @@ pub struct Mesh {
     /// for a mesh with a `rig`, whose materials are in the file.
     pub materials: Vec<MeshMaterial>,
     /// The skeleton, skinned parts, morph targets and animations of the file; present for a
-    /// Character (version 1.3) and a creature with its skeleton (1.7), absent for a static mesh.
+    /// Character (version 1.3) and a creature with its skeleton (1.8), absent for a static mesh.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rig: Option<Rig>,
 }

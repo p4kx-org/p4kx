@@ -12,8 +12,8 @@ use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_gltf::{GlbOptions, GlbSummary, MaterialMode};
 use p4kx_model::srgb8_to_linear;
 use p4kx_testkit::{
-    CheckedGlb, LIVERY_DEFAULT_TINTS, LIVERY_GUN_TINTS, LIVERY_SHIP_TINTS, check_glb,
-    livery_entries,
+    CheckedGlb, LIVERY_DEFAULT_TINTS, LIVERY_GUN_TINTS, LIVERY_SHIP_DECALS, LIVERY_SHIP_TINTS,
+    check_glb, livery_entries,
 };
 
 fn linear(bytes: [u8; 3]) -> [f32; 3] {
@@ -94,6 +94,22 @@ fn each_part_takes_the_palette_its_entity_names_else_the_one_of_its_ancestor() -
         .and_then(|root| root.palette())
         .map(|palette| palette.primary.tint);
     assert_eq!(primary, Some(linear(LIVERY_SHIP_TINTS[0])));
+    Ok(())
+}
+
+#[test]
+fn a_palette_states_the_decal_colours_of_its_record() -> TestResult {
+    let fixture = fixture(livery_entries())?;
+    let archive = Archive::open(&fixture.path)?;
+
+    let assembly = assemble(&archive, true)?;
+
+    let decal = assembly
+        .root()
+        .and_then(|root| root.palette())
+        .and_then(|palette| palette.decal);
+
+    assert_eq!(decal, Some(LIVERY_SHIP_DECALS.map(linear)));
     Ok(())
 }
 

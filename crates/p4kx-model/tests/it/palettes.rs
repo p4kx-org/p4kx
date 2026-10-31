@@ -121,6 +121,47 @@ fn applying_a_palette_gives_glass_the_glass_colour_and_leaves_other_materials_al
     Ok(())
 }
 
+fn stencil_decal(over: &str) -> TestMtlMaterial {
+    TestMtlMaterial::new("logo")
+        .shader("MeshDecal")
+        .string_gen_mask("%STENCIL_MAP")
+        .texture("TexSlot7", "objects/test/logo_stencil.tif")
+        .public_param("StencilTintOverride", over)
+}
+
+#[test]
+fn a_stencil_decal_that_takes_the_decal_colours_gets_them_and_a_white_diffuse() -> TestResult {
+    let decals = [[0.1, 0.0, 0.0], [0.0, 0.2, 0.0], [0.0, 0.0, 0.3]];
+    let library = library(&[stencil_decal("2"), stencil_decal("1")])?;
+    let decal = library.material(0).ok_or("the decal")?;
+    let stand_in = library.material(1).ok_or("the primary decal")?;
+    assert_eq!(decal.palette, Some(PaletteSlot::Decal));
+
+    let tinted = palette()
+        .with_decal(decals)
+        .apply(decal)
+        .ok_or("a tinted decal")?;
+
+    assert_eq!(tinted.decal_colours, Some(decals));
+    assert_eq!(tinted.diffuse, [1.0; 3]);
+    assert!(tinted.tinted);
+    assert_eq!(
+        palette().apply(decal),
+        None,
+        "a palette without decal colours"
+    );
+    let primary = palette()
+        .with_decal(decals)
+        .apply(stand_in)
+        .ok_or("primary")?;
+    assert_eq!(
+        primary.diffuse, [0.1; 3],
+        "an override of 1 takes the primary entry"
+    );
+    assert_eq!(primary.decal_colours, None);
+    Ok(())
+}
+
 #[test]
 fn srgb_bytes_convert_to_linear_values() {
     assert!(srgb8_to_linear(0).abs() < f32::EPSILON);
