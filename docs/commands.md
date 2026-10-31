@@ -580,7 +580,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   (on the first mesh of each, at every LOD, ADR-0305; they multiply the size of the GLB by about 3.5 at
   every level, `--no-expressions` writes the small file); eyes and teeth have none. `--lod N` picks
   the level of detail of head and body, `--no-vertex-colours` leaves the vertex colours out (they
-  are written as `COLOR_0` only on primitives whose material reads them, ADR-0253). A head
+  are written as `COLOR_0` only on primitives whose colour they are, ADR-0318). A head
   that cannot be shaped (its rig is missing, belongs to another rig or does not match the skin) is
   listed and left out of the GLB, which is still written, and the exit code is 1; an item or a
   material the Archive does not have is listed, and a character without face DNA exits with 2. The
@@ -612,8 +612,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   [--texture-mip <n>] [--max-influences <n>]` writes it as one glTF 2.0 binary file (GLB), Y up and
   in metres (`--max-influences 4` keeps four bones per vertex, for viewers that read one set), with the
   normals, tangents and vertex
-  colours the meshes have, as `COLOR_0` on the primitives whose material reads them (glass with
-  `PER_VERTEX_TINT`, layered surfaces without a blend map; ADR-0253), `--no-vertex-colours` leaves
+  colours the meshes have, as `COLOR_0` on the primitives whose colour they are (glass with
+  `PER_VERTEX_TINT`; ADR-0318), `--no-vertex-colours` leaves
   the colours out, and lists the unknown
   chunks it skipped. `--lod` picks the level of detail, 0 by default; the LODs come from the
   companions `<name>_lod<n>.<extension>m`, and a level the model lacks exits with code 2.

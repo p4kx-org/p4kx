@@ -136,3 +136,8 @@ decoded for one image are the cost: at mip 0 a layered material can hold nine 20
   finding.
 - Put the layered normals first: every layered normal image costs a slot that a plain material's
   colour would use; rejected for the order above.
+
+## Amendment (issue #1001)
+
+The vertex colours of a layered ship hull are no longer multiplied into the colour by viewers of a
+GLB: it carries none for layered surfaces (ADR-0318). The package keeps them for the add-on.

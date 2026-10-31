@@ -2152,7 +2152,7 @@ one primitive per submesh and one material per sub-material the drawn submeshes 
 default material when any ID falls back to it), of the level of detail `--lod` names
 (LOD0 by default), in glTF axes (Y up) and metres; the counts do not say which of `NORMAL`,
 `TANGENT`, `TEXCOORD_0` and `COLOR_0` are written (`COLOR_0` only on the primitives whose
-material reads the vertex colours, ADR-0253);
+material takes them as its colour, ADR-0318);
 `bytes` is the length of the file. `default_material_ids` counts the material IDs drawn with the
 default material because the `.mtl` file is missing, unreadable or has no sub-material for them,
 and `hidden_primitives` the submeshes left out because their material draws nothing; `bones` the

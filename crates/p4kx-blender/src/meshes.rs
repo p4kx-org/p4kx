@@ -10,6 +10,7 @@ use p4kx_model::Transform;
 use rayon::prelude::*;
 
 use crate::items::Item;
+use crate::mesh_options::package_mesh_options;
 use crate::plan::{MeshPlan, mesh_id};
 use crate::{Cancelled, PackageError, PackageResult};
 
@@ -56,8 +57,12 @@ fn write_one(
     }
     let path = folder.join(format!("{id}.glb"));
     let mut glb = Vec::new();
-    let summary = write_scene_glb(&scene, &options.with_material_indices(), &mut glb)
-        .map_err(|source| mesh_error(&id, &name, source))?;
+    let summary = write_scene_glb(
+        &scene,
+        &package_mesh_options(options).with_material_indices(),
+        &mut glb,
+    )
+    .map_err(|source| mesh_error(&id, &name, source))?;
     let file = File::create_new(&path).map_err(|source| PackageError::write(&path, source))?;
     let mut writer = BufWriter::new(file);
     writer

@@ -102,7 +102,7 @@ def reads_vertex_colours(desc: MaterialDesc) -> bool:
     """Returns whether ``desc`` reads the vertex colours of its mesh.
 
     The package states it (``reads_vertex_colours``, the rule of ``Material::reads_vertex_colours``
-    in p4kx-model, which also decides which GLB primitives carry ``COLOR_0``). A package without
+    in p4kx-model, which also decides which primitives of the package meshes carry ``COLOR_0``). A package without
     the statement (before format 1.4) reads them for ``PER_VERTEX_TINT`` glass and for a layered
     surface without a blend or mask map, as the add-on did then.
     """

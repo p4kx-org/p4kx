@@ -11,6 +11,7 @@ use json::material::{
 use json::validation::Checked::Valid;
 use p4kx_model::{Lod, Material, MaterialLibrary, TintPalette};
 
+use crate::glb_options::VertexColours;
 use crate::material_alpha::{alpha_of, is_cut_out_by_base_image};
 use crate::shading::shading;
 use crate::texture_roles::sources_with;
@@ -128,10 +129,11 @@ impl<'m> MaterialPlan<'m> {
         self.slots.get(&id).is_some_and(Option::is_none)
     }
 
-    /// Returns whether the material drawn with `id` reads the vertex colours of its mesh.
-    pub(crate) fn reads_vertex_colours(&self, id: u16) -> bool {
+    /// Returns whether the primitive drawn with `id` carries the vertex colours of its mesh under
+    /// `colours`.
+    pub(crate) fn writes_vertex_colours(&self, id: u16, colours: VertexColours) -> bool {
         self.slot(id)
-            .is_some_and(|slot| self.material(slot).reads_vertex_colours())
+            .is_some_and(|slot| colours.admits(self.material(slot)))
     }
 
     /// Returns the slot of `id`, or `None` when nothing is drawn with it.
