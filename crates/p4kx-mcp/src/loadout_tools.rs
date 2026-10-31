@@ -40,12 +40,14 @@ impl Server {
         self.run(move |state| {
             capped("entity", &params.entity, MAX_PATH_LEN)?;
             let opened = state.archive(params.archive.as_deref())?;
+            let picks = loadout::picks_of(params.loadout_pick.as_deref().unwrap_or_default())?;
             let listing = (
                 "entity_loadout",
                 opened.version(),
                 &params.entity,
                 params.max_depth,
                 params.stop_at_docked_vehicles,
+                picks.normalised(),
             );
             let page = Page::new(&listing, params.cursor.as_deref(), params.limit)?;
             let held = Arc::clone(&opened);

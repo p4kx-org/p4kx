@@ -67,6 +67,7 @@ mod animation_folders;
 mod armour;
 mod assembly;
 mod assortment;
+mod assortment_group;
 mod assortment_requirement;
 mod attached;
 pub mod audio;
@@ -117,6 +118,7 @@ mod outfit;
 mod outfit_read;
 mod palette;
 mod path_match;
+mod pick;
 mod placement;
 mod plan;
 mod port;
@@ -173,6 +175,7 @@ pub use object_containers::{ContainerSource, ObjectContainerRef};
 pub use outfit::{Outfit, OutfitReport};
 pub use p4kx_character as character;
 pub use palette::{ForgePalettes, PaletteFailure, PaletteProvider};
+pub use pick::LoadoutPicks;
 pub use port::{PortDefinition, PortTransform, PortType};
 pub use prefab::{
     MAX_PREFAB_DEPTH, MAX_PREFAB_ISSUES, MAX_PREFAB_LIBRARY_LEN, MAX_PREFAB_OBJECTS,
