@@ -14,6 +14,8 @@ use crate::contract::{
     MiningGlobalParams, Paint, QualityDistribution, QualityQuantization, RefiningProcess,
     ResourceGroup, Ship, Shop, StarmapObject, SubHarvestableMultiConfig,
 };
+use crate::contract_template::ContractTemplate;
+use crate::contract_template_read::ContractTemplates;
 use crate::crafting_warning::CraftingWarning;
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::location_template::{LocationTemplates, MissionLocationTemplate};
@@ -48,6 +50,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) mission_location_templates: Vec<MissionLocationTemplate<'f>>,
     pub(crate) contract_ship_spawns: Vec<ShipSpawnPool>,
     pub(crate) contract_location_queries: Vec<LocationQuery>,
+    pub(crate) contract_templates: Vec<ContractTemplate<'f>>,
     pub(crate) port_items: Vec<CatalogGuid>,
     pub(crate) starmap_objects: Vec<StarmapObject<'f>>,
     pub(crate) mineable_elements: Vec<MineableElement<'f>>,
@@ -97,6 +100,7 @@ impl<'f> Collected<'f> {
             mission_location_templates: Vec::new(),
             contract_ship_spawns: Vec::new(),
             contract_location_queries: Vec::new(),
+            contract_templates: Vec::new(),
             port_items: Vec::new(),
             starmap_objects: Vec::new(),
             mineable_elements: Vec::new(),
@@ -213,12 +217,21 @@ impl<'f> Collected<'f> {
     /// Stores the location templates and the distinct ship spawn descriptions and location queries
     /// of the contracts, counts the templates left out as `skipped` and adds the failures.
     pub(crate) fn add_spawns(&mut self, templates: LocationTemplates<'f>, pools: SpawnPools) {
-        self.mission_location_templates = templates.templates;
+        self.mission_location_templates = templates.items;
         if let Some(slot) = self.skipped.get_mut(Kind::MissionLocationTemplates.index()) {
             *slot = templates.skipped;
         }
         self.contract_ship_spawns = pools.ships.into_values().collect();
         self.contract_location_queries = pools.locations.into_values().collect();
+        self.add_failures(templates.failures);
+    }
+
+    /// Stores the contract templates, counts the ones left out as `skipped` and adds the failures.
+    pub(crate) fn add_contract_templates(&mut self, templates: ContractTemplates<'f>) {
+        self.contract_templates = templates.items;
+        if let Some(slot) = self.skipped.get_mut(Kind::ContractTemplates.index()) {
+            *slot = templates.skipped;
+        }
         self.add_failures(templates.failures);
     }
 
@@ -285,6 +298,7 @@ impl<'f> Collected<'f> {
                     Kind::MissionLocationTemplates => self.mission_location_templates.len(),
                     Kind::ContractShipSpawns => self.contract_ship_spawns.len(),
                     Kind::ContractLocationQueries => self.contract_location_queries.len(),
+                    Kind::ContractTemplates => self.contract_templates.len(),
                     Kind::MineableElements => self.mineable_elements.len(),
                     Kind::RefiningProcesses => self.refining_processes.len(),
                     Kind::MineableCompositions => self.mineable_compositions.len(),

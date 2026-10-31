@@ -6,6 +6,7 @@
 #![recursion_limit = "256"]
 
 mod catalog_compression;
+mod catalog_contract_templates;
 mod catalog_contracts;
 mod catalog_contracts_cooldown;
 mod catalog_contracts_cooldown_overrides;

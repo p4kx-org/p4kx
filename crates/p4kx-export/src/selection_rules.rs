@@ -127,6 +127,10 @@ impl Kind {
                 prefixes: &["libs/foundry/records/missiondata/pu_locations/"],
                 type_name: "MissionLocationTemplate",
             },
+            Self::ContractTemplates => KindRule {
+                prefixes: &["libs/foundry/records/"],
+                type_name: "ContractTemplate",
+            },
             Self::CargoManifests => KindRule {
                 prefixes: &["libs/foundry/records/cargomanifest/"],
                 type_name: "CargoManifest",

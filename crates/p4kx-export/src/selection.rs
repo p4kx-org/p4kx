@@ -15,6 +15,11 @@ pub(crate) use crate::selection_rules::starts_with_folder;
 /// `contestant` does not.
 pub const EXCLUDED_TOKENS: [&str; 6] = ["test", "template", "dummy", "debug", "deprecated", "dev"];
 
+/// The leftover tokens of a contract template: [`EXCLUDED_TOKENS`] without `template`, which
+/// live templates such as `handyman_template` carry.
+const CONTRACT_TEMPLATE_EXCLUDED_TOKENS: [&str; 5] =
+    ["test", "dummy", "debug", "deprecated", "dev"];
+
 /// The extra tokens of a leftover ship.
 ///
 /// A Record of the ships kind whose record path or name holds one of them as a whole word, ignoring
@@ -139,11 +144,15 @@ pub enum Kind {
     /// Contract location queries: the distinct location queries the contracts state. Derived from
     /// the contracts, so no record-path rule of its own.
     ContractLocationQueries,
+    /// Contract templates: every `ContractTemplate` Record, whatever its folder (most lie under
+    /// `contracts/contracttemplates`), selected by the struct; the
+    /// structure a contract names in `templateGuid`.
+    ContractTemplates,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 43] = [
+    pub const ALL: [Self; 44] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -187,6 +196,7 @@ impl Kind {
         Self::MissionLocationTemplates,
         Self::ContractShipSpawns,
         Self::ContractLocationQueries,
+        Self::ContractTemplates,
     ];
 
     /// Returns the name of the kind's array in the catalog, e.g. `manufacturers`.
@@ -236,6 +246,7 @@ impl Kind {
             Self::MissionLocationTemplates => "missionLocationTemplates",
             Self::ContractShipSpawns => "contractShipSpawns",
             Self::ContractLocationQueries => "contractLocationQueries",
+            Self::ContractTemplates => "contractTemplates",
         }
     }
 
@@ -252,6 +263,7 @@ impl Kind {
                 | Self::DismantleProcesses
                 | Self::Contracts
                 | Self::MissionLocationTemplates
+                | Self::ContractTemplates
         )
     }
 
@@ -359,10 +371,16 @@ pub(crate) fn is_leftover(record_path: &str, name: &str) -> bool {
 }
 
 /// Returns whether a Record of `kind` with `record_path` and `name` is a development leftover:
-/// one of [`is_leftover`], or a ship with a [`SHIP_EXCLUDED_TOKENS`] word.
+/// one of [`is_leftover`], or a ship with a [`SHIP_EXCLUDED_TOKENS`] word. A contract template
+/// is a leftover by the words of [`EXCLUDED_TOKENS`] except `template`, which names live ones.
 pub(crate) fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
-    is_leftover(record_path, name)
-        || (kind == Kind::Ships && has_word(record_path, name, &SHIP_EXCLUDED_TOKENS))
+    match kind {
+        Kind::ContractTemplates => has_word(record_path, name, &CONTRACT_TEMPLATE_EXCLUDED_TOKENS),
+        Kind::Ships => {
+            is_leftover(record_path, name) || has_word(record_path, name, &SHIP_EXCLUDED_TOKENS)
+        }
+        _ => is_leftover(record_path, name),
+    }
 }
 
 #[cfg(test)]

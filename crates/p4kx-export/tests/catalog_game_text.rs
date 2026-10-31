@@ -60,8 +60,8 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 19,
-        "four descriptions, two display types, the contract title and description, mission type, contractor, faction name, pickup place, the process name, the deposit name, the names of a faction, a scope, a standing and a mission type, and the variant of a location template"
+        marked, 20,
+        "four descriptions, two display types, the contract title and description, mission type, contractor, faction name, pickup place, the process name, the deposit name, the names of a faction, a scope, a standing and a mission type, the variant of a location template, and the title of a contract template"
     );
     let mut starmap_properties = Vec::new();
     collect_properties(&starmap, &mut starmap_properties);

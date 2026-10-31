@@ -58,7 +58,7 @@ The rule is ADR-0054 (amending ADR-0002):
   `locationPrerequisites` (#902, ADR-0266). Later additions keep version 2 as long as they are
   additive. The contract field `fixedRewards` (#888, ADR-0268) is one, and so is `cooldownLayers`
   (#909, ADR-0271), and the contract fields `offeredAt`, `giverFaction` and `blueprintRewards`
-  (#915, ADR-0273).
+  (#915, ADR-0273), and so is the kind `contractTemplates` (#812, ADR-0313).
 - **A production import takes catalogs of the Channel `LIVE` only.** `PTU`, `EPTU`, `TECH-PREVIEW`
   and `HOTFIX` are confidential test Channels (ADR-0038).
 
@@ -176,6 +176,7 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `missionLocationTemplates` | The mission location templates with the tags a location query matches, ordered by GUID |
 | `contractShipSpawns` | The distinct ship spawn descriptions of the contracts, ordered by identifier |
 | `contractLocationQueries` | The distinct location queries of the contracts, ordered by identifier |
+| `contractTemplates` | The contract templates (`ContractTemplate`), the targets of `contracts[].templateGuid`, ordered by GUID |
 | `lootTables` | The loot tables (`LootTableV3Record`) with the weighted archetypes of each, ordered by GUID |
 | `lootArchetypes` | The loot archetypes (`LootArchetypeV3Record`) with the weighted selectors of each, ordered by GUID |
 | `lootPoolFilters` | The pool filters of the loot generation, ordered by GUID |
@@ -1094,7 +1095,7 @@ that the rule on equal `guid` and `subContractGuid` above drops.
 | `guid`, `subContractGuid` | The `id` of the contract and of the sub contract |
 | `recordGuid`, `recordPath` | The `ContractGenerator` Record |
 | `debugName`, `handler` | The `debugName` of the contract and of its handler |
-| `templateGuid` | The `ContractTemplate` Record the contract names |
+| `templateGuid` | The `ContractTemplate` Record the contract names, an entry of `contractTemplates` |
 | `notForRelease`, `workInProgress` | The flags as stored, `null` when absent; the catalog does not filter on them |
 | `title` | The resolved title (game text) |
 | `description` | The resolved description (game text; must not be passed on to third parties) |
@@ -1398,9 +1399,9 @@ the struct, `periodScenarioGuid`), each with `tiers`: `minPoints`, `badgeToAward
 `blueprintPoolGuids`, entries of `blueprintPools`. The progression texts and the multiplier rewards
 (empty on LIVE) are not exported.
 
-Not exported, for want of a consumer: contract templates, mission broker entries, NPC spawns and
-the sandbox triggers and perks of the reputation Records. Ship spawns and the
-locations of contracts are described in "Ship spawns and location queries".
+Not exported, for want of a consumer: mission broker entries, NPC spawns and the sandbox triggers
+and perks of the reputation Records. Contract templates are described in "Contract templates",
+ship spawns and the locations of contracts in "Ship spawns and location queries".
 
 ### Ship spawns and location queries
 
@@ -1471,8 +1472,37 @@ falls back to `en`) and `entityClusterMemberGuid`. Not exported: the NPC auto sp
 mission modules and limits and the security network manifest.
 
 Not exported: NPC spawn descriptions (`MissionPropertyValue_NPCSpawnDescriptions`), the
-`ObjectiveToken` structure of the templates, and SCMDB's own pools, waves and region lists, which
-are derived and not stated by the Archive.
+content of the `ObjectiveToken` structures of the templates (see "Contract templates" for what is
+listed), and SCMDB's own pools, waves and region lists, which are derived and not stated by the
+Archive.
+
+### Contract templates
+
+`contractTemplates` lists the `ContractTemplate` Records (#812, ADR-0313, additive, schema version
+2, no bump), ordered by GUID. `contracts[].templateGuid` is the `guid` of an entry; every one
+resolves. A template is the structure a contract lays the overrides of its handler, itself and its
+sub contract over. The Records are selected by the struct, in any folder: on LIVE (2026-10-31)
+496 Records, 488 of them under `contracts/contracttemplates`, 335 named by a contract, none left
+out. A development leftover is told by the words of the usual rule except `template`, which live
+templates such as `handyman_template` carry. Facts only; descriptions and lore are not exported.
+
+| Field | Meaning |
+|-------|---------|
+| `guid`, `className`, `recordPath` | The Record |
+| `notForRelease`, `workInProgress` | The flags as stored, `null` when absent |
+| `title` | The first display string (game text); `null` texts for the placeholder most templates have |
+| `missionTypeGuid` | The `MissionType` of the display info, an entry of `missionTypes` |
+| `illegal`, `showLifeTimeInMobiGlas`, `preShowObjectives` | The flags of the display info |
+| `classType`, `settings` | The struct of the contract class (`ContractClass_Contract`, one template is a `ContractClass_PVPBounty`) and its `ActiveContractSettings`: `canBeShared`, `hasCompleteButton`, `handlesAbandonRequest`, `displayAlliedMarkers`, `onlyOwnerCanComplete`; `null` when absent |
+| `autoFinish` | The `ContractAutoFinishSettings`: `failIfSentToPrison`, `failIfBecameCriminal`, `failIfLeavePrison` and the deadline as stored: `completionTime`, `autoEnd`, `resultAfterTimerEnd` (an enum name), `remainingTimeToShowTimer`; the Archive does not state the unit of the times; `null` without the block |
+| `contractProperties` | The mission properties in stored order: `variable`, `token` (`null` when empty) and `valueType`, the struct of the value without `MissionPropertyValue_` (`StringHash`, `Location`, `ShipSpawnDescriptions`, `HaulingOrders`, ...) |
+| `shipSpawns`, `locationQueries` | The links of ADR-0266, one per variable the template states, with `level` always `template`, into `contractShipSpawns` and `contractLocationQueries` |
+| `haulingOrders` | The hauling orders of the template as in "Hauling orders": the properties (`source` `template`) and the orders of its hauling objectives (`templateObjective`) |
+| `objectives` | The objective tokens depth first, each phase after its parent: `id`, `parentId` (`null` at the top level), `debugName`, `startsActive`, `handlerType` (the struct of the objective handler) and `phaseTag` (a tag path) |
+
+A token without an `id` (or a nil one) and the phases below it are left out; phases are followed to
+a depth of 32. Not exported: the objective handler and display content, comms notifications,
+mission flow triggers, partial reward payouts, reward contributions, modifiers and the owner team.
 
 ### Cargo manifests
 
@@ -2246,6 +2276,7 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `missionLocationTemplates` | `libs/foundry/records/missiondata/pu_locations/` | `MissionLocationTemplate` |
 | `contractShipSpawns` | None: derived from the properties of the contracts and their templates, no Records | |
 | `contractLocationQueries` | None: derived from the properties of the contracts and their templates, no Records | |
+| `contractTemplates` | `libs/foundry/records/` (every folder; see "Contract templates") | `ContractTemplate` |
 | `lootTables` | `libs/foundry/records/lootgeneration/loottables/` | `LootTableV3Record` |
 | `lootArchetypes` | `libs/foundry/records/lootgeneration/lootarchetypes/` | `LootArchetypeV3Record` |
 | `lootPoolFilters` | `libs/foundry/records/lootgeneration/filters/` | `PoolFilterRecord` |
@@ -2407,14 +2438,19 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   | reputationStandings | 213 | 17 | 44 |
   | missionTypes | 41 | 0 | 23 |
   | missionLocationTemplates | 3,211 | 274 | 3,160 |
+  | contractTemplates | 24 | 3 | 24 |
 
   A contract text that holds a `~mission(…)` token is rewritten by the exporter, so the
   verification only checks that such a text is present. The location templates have 3,297 name
   variants; 86 of them carry a placeholder key or none, which is not counted as a keyed text, so the
   German file lacks 3,246 of the 3,297 variants and 3,160 of the 3,211 keyed texts.
 
-  The `p4kx catalog` summary counts them over all texts of the catalog: English 72,462 resolved,
-  585 unresolved, German 31,353 resolved, 41,694 unresolved, 23,717 placeholders in each.
+  The contract templates have 24 keyed titles (most templates carry the placeholder
+  `@LOC_UNINITIALIZED`); the English file lacks 3 of them and the German file all 24, so the
+  baselines of the kind are 0.13 and 1.0.
+
+  The `p4kx catalog` summary counts them over all texts of the catalog: English 72,772 resolved,
+  588 unresolved, German 31,381 resolved, 41,979 unresolved, 23,717 placeholders in each.
 - Crafting, LIVE (the same on every Channel but for the counts): every blueprint has exactly one
   tier, equal to its `craftTimeSeconds`; 3 blueprints let the player choose fewer than offered
   (`BP_CRAFT_thp_light_legs_01_01_01`, `_03` and `_12`), 3 carry the factor 1.15 (the slaver arms

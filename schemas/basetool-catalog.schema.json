@@ -1,5 +1,53 @@
 {
   "$defs": {
+    "ActiveSettings": {
+      "description": "The `ActiveContractSettings` of a template, each flag as stored.",
+      "properties": {
+        "canBeShared": {
+          "description": "The `canBeShared` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "displayAlliedMarkers": {
+          "description": "The `displayAlliedMarkers` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "handlesAbandonRequest": {
+          "description": "The `handlesAbandonRequest` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "hasCompleteButton": {
+          "description": "The `hasCompleteButton` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "onlyOwnerCanComplete": {
+          "description": "The `onlyOwnerCanComplete` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "canBeShared",
+        "displayAlliedMarkers",
+        "handlesAbandonRequest",
+        "hasCompleteButton",
+        "onlyOwnerCanComplete"
+      ],
+      "type": "object"
+    },
     "AmmoStats": {
       "description": "The ammunition of a weapon.",
       "properties": {
@@ -139,6 +187,72 @@
       "required": [
         "damageResistance",
         "integrityMilestoneToBreak"
+      ],
+      "type": "object"
+    },
+    "AutoFinish": {
+      "description": "The `ContractAutoFinishSettings` of a template, each value as stored.",
+      "properties": {
+        "autoEnd": {
+          "description": "The `missionAutoEnd` flag of the deadline.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "completionTime": {
+          "description": "The `missionCompletionTime` of the deadline, as stored; the Archive does not state its\nunit. `null` when the template has no deadline.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "failIfBecameCriminal": {
+          "description": "The `failIfBecameCriminal` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "failIfLeavePrison": {
+          "description": "The `failIfLeavePrison` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "failIfSentToPrison": {
+          "description": "The `failIfSentToPrison` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "remainingTimeToShowTimer": {
+          "description": "The `remainingTimeToShowTimer` of the deadline, as stored.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "resultAfterTimerEnd": {
+          "description": "The `missionResultAfterTimerEnd` of the deadline as stored (an enum name).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "autoEnd",
+        "completionTime",
+        "failIfBecameCriminal",
+        "failIfLeavePrison",
+        "failIfSentToPrison",
+        "remainingTimeToShowTimer",
+        "resultAfterTimerEnd"
       ],
       "type": "object"
     },
@@ -873,6 +987,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `contractShipSpawns`."
         },
+        "contractTemplates": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `contractTemplates`."
+        },
         "contracts": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `contracts`."
@@ -1027,6 +1145,7 @@
         "contractLocationQueries",
         "contractScenarios",
         "contractShipSpawns",
+        "contractTemplates",
         "contracts",
         "crafters",
         "dismantleProcesses",
@@ -1606,6 +1725,159 @@
         "factionRewardTiers",
         "guid",
         "recordPath"
+      ],
+      "type": "object"
+    },
+    "ContractTemplate": {
+      "description": "A contract template: a `ContractTemplate` Record under `contracts/contracttemplates`, the\nstructure a contract names in `templateGuid` and lays its own overrides over.",
+      "properties": {
+        "autoFinish": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AutoFinish"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `autoFinishSettings` of the contract class, `null` when it has none."
+        },
+        "className": {
+          "description": "The Record name without its type, e.g. `AcePilot` for `ContractTemplate.AcePilot`.",
+          "type": "string"
+        },
+        "classType": {
+          "description": "The struct of the `contractClass`, e.g. `ContractClass_Contract`; `null` when absent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contractProperties": {
+          "description": "The mission properties of `contractProperties` in stored order: the variables the\ncontracts, handlers and sub contracts override.",
+          "items": {
+            "$ref": "#/$defs/TemplateProperty"
+          },
+          "type": "array"
+        },
+        "guid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The GUID of the Record; the `templateGuid` of the contracts that name it."
+        },
+        "haulingOrders": {
+          "description": "The hauling orders of the template: the hauling properties (`template`) and the orders of\nits hauling objectives (`templateObjective`).",
+          "items": {
+            "$ref": "#/$defs/HaulingOrder"
+          },
+          "type": "array"
+        },
+        "illegal": {
+          "description": "The `illegal` flag of the display info, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "locationQueries": {
+          "description": "The location queries the template states, resolved like `shipSpawns`.",
+          "items": {
+            "$ref": "#/$defs/LocationQueryLink"
+          },
+          "type": "array"
+        },
+        "missionTypeGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `MissionType` Record of the display info, an entry of `missionTypes`; the GUID is kept\nfor a Record the Archive lacks."
+        },
+        "notForRelease": {
+          "description": "The `notForRelease` flag as stored, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "objectives": {
+          "description": "The objective tokens in depth-first order, each phase after its parent.",
+          "items": {
+            "$ref": "#/$defs/TemplateObjective"
+          },
+          "type": "array"
+        },
+        "preShowObjectives": {
+          "description": "The `preShowObjectives` flag of the display info, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "recordPath": {
+          "description": "The record path, without `.xml`.",
+          "type": "string"
+        },
+        "settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ActiveSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `ActiveContractSettings` of the contract class, `null` when it has none."
+        },
+        "shipSpawns": {
+          "description": "The ship spawn descriptions the template states, one per variable, ordered by variable;\n`level` is always `template`.",
+          "items": {
+            "$ref": "#/$defs/ShipSpawnLink"
+          },
+          "type": "array"
+        },
+        "showLifeTimeInMobiGlas": {
+          "description": "The `showLifeTimeInMobiGlas` flag of the display info, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The first display string of the template; `null` text for a placeholder.",
+          "x-gameText": true
+        },
+        "workInProgress": {
+          "description": "The `workInProgress` flag as stored, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "autoFinish",
+        "className",
+        "classType",
+        "contractProperties",
+        "guid",
+        "haulingOrders",
+        "illegal",
+        "locationQueries",
+        "missionTypeGuid",
+        "notForRelease",
+        "objectives",
+        "preShowObjectives",
+        "recordPath",
+        "settings",
+        "shipSpawns",
+        "showLifeTimeInMobiGlas",
+        "title",
+        "workInProgress"
       ],
       "type": "object"
     },
@@ -8975,6 +9247,95 @@
       ],
       "type": "object"
     },
+    "TemplateObjective": {
+      "description": "An objective token of a template.",
+      "properties": {
+        "debugName": {
+          "description": "The `debugName`, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "handlerType": {
+          "description": "The struct of the `objectiveHandler`, e.g. `ObjectiveHandler_Hauling`; `null` when absent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/Guid",
+          "description": "The `id` of the token; unique within the template."
+        },
+        "parentId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `id` of the token whose `childMissionPhases` hold this one, `null` at the top level."
+        },
+        "phaseTag": {
+          "description": "The tag path of the `missionPhaseIdentifierTag`, `null` when absent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "startsActive": {
+          "description": "The `startsActive` flag, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "debugName",
+        "handlerType",
+        "id",
+        "parentId",
+        "phaseTag",
+        "startsActive"
+      ],
+      "type": "object"
+    },
+    "TemplateProperty": {
+      "description": "A mission property of a template: a variable and the kind of value it holds.",
+      "properties": {
+        "token": {
+          "description": "The `extendedTextToken`, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valueType": {
+          "description": "The struct of the value without its `MissionPropertyValue_` start, e.g. `Location` or\n`ShipSpawnDescriptions`; `null` when the property has no value.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variable": {
+          "description": "The `missionVariableName`, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "token",
+        "valueType",
+        "variable"
+      ],
+      "type": "object"
+    },
     "TractorBeamStats": {
       "description": "A tractor beam, from its `SWeaponActionFireTractorBeamParams`.",
       "properties": {
@@ -9272,6 +9633,13 @@
       },
       "type": "array"
     },
+    "contractTemplates": {
+      "description": "The contract templates, the targets of `contracts[].templateGuid`, ordered by GUID.",
+      "items": {
+        "$ref": "#/$defs/ContractTemplate"
+      },
+      "type": "array"
+    },
     "contracts": {
       "description": "The contracts and sub contracts with resolved titles, mission types and the reputation they\ngrant on success, ordered by the GUID of the contract and then of the sub contract.",
       "items": {
@@ -9561,6 +9929,7 @@
     "contractLocationQueries",
     "contractScenarios",
     "contractShipSpawns",
+    "contractTemplates",
     "contracts",
     "crafters",
     "craftingGlobal",

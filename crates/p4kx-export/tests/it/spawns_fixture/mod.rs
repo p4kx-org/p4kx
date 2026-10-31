@@ -5,6 +5,7 @@
 //! template, handler, contract and sub contract level, and two location templates.
 
 mod structures;
+mod template;
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -18,6 +19,12 @@ pub(crate) const GENERATOR: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const CONTRACT: u128 = 0x2000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const SUB: u128 = 0x3000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const TEMPLATE: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0001;
+pub(crate) const LEFTOVER_TEMPLATE: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0002;
+pub(crate) const ELSEWHERE_TEMPLATE: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0003;
+pub(crate) const MISSION_TYPE: u128 = 0x5000_0000_0000_4000_8000_0000_0000_0001;
+pub(crate) const RESOURCE: u128 = 0x6000_0000_0000_4000_8000_0000_0000_0001;
+pub(crate) const OBJECTIVE_A: u128 = 0x7000_0000_0000_4000_8000_0000_0000_0001;
+pub(crate) const OBJECTIVE_B: u128 = 0x7000_0000_0000_4000_8000_0000_0000_0002;
 pub(crate) const DATABASE: u128 = 0x9000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const TAG_ROOT: u128 = 0x9000_0000_0000_4000_8000_0000_0000_0002;
 pub(crate) const TAG_HIJACKED: u128 = 0x9000_0000_0000_4000_8000_0000_0000_0003;
@@ -214,23 +221,6 @@ fn generator() -> TestRecord {
     .value("generators", array(vec![TestValue::Struct(handler)]))
 }
 
-fn template() -> TestRecord {
-    TestRecord::new(
-        TEMPLATE,
-        "ContractTemplate",
-        "ContractTemplate.Hunt",
-        "libs/foundry/records/contracts/contracttemplates/hunt.xml",
-    )
-    .value(
-        "contractProperties",
-        array(vec![
-            ships("Wave_BP", "", Some(9)),
-            location("Place_BP", "Place", None),
-            location("Home_BP", "", None),
-        ]),
-    )
-}
-
 fn location_template(guid: u128, name: &str, disabled: bool) -> TestRecord {
     TestRecord::new(
         guid,
@@ -285,7 +275,9 @@ fn database() -> DataForgeBuilder {
         tag(TAG_SHIP, "ShipModel", vec![]),
         tag(TAG_KILL, "Kill", vec![]),
         generator(),
-        template(),
+        template::template(),
+        template::leftover(),
+        template::elsewhere(),
         location_template(LOCATION_A, "a_hijacked", false),
         location_template(LOCATION_B, "b_hijacked", true),
         location_template(LOCATION_DEV, "dev_temp_hijacked", false),

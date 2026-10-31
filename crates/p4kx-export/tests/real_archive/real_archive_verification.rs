@@ -20,13 +20,14 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_b_path, real_archive_path};
 use serde_json::Value;
 
+use crate::real_archive_contract_templates::check_template_links;
 use crate::real_archive_spawns::check_spawn_links;
 
 use crate::real_archive_texts::check_texts;
 
 pub(crate) type TestResult = Result<(), Box<dyn Error>>;
 
-const MINIMUM: [(Kind, usize); 41] = [
+const MINIMUM: [(Kind, usize); 42] = [
     (Kind::Manufacturers, 500),
     (Kind::Items, 10_000),
     (Kind::Ships, 200),
@@ -68,6 +69,7 @@ const MINIMUM: [(Kind, usize); 41] = [
     (Kind::MissionLocationTemplates, 2_000),
     (Kind::ContractShipSpawns, 400),
     (Kind::ContractLocationQueries, 1_500),
+    (Kind::ContractTemplates, 400),
 ];
 
 fn built(archive: &Archive) -> Result<(CatalogSummary, Value), Box<dyn Error>> {
@@ -99,12 +101,15 @@ pub(crate) fn list(catalog: &Value, kind: Kind) -> Result<&Vec<Value>, String> {
         .ok_or_else(|| format!("the {kind} array"))
 }
 
-fn has_excluded_token(text: &str) -> Option<&'static str> {
+/// Returns the leftover word of `text`; `template` is none for a contract template, which live
+/// Records such as `handyman_template` carry.
+fn has_excluded_token(kind: Kind, text: &str) -> Option<&'static str> {
     text.split(|c: char| !c.is_ascii_alphanumeric())
         .find_map(|word| {
-            EXCLUDED_TOKENS
-                .into_iter()
-                .find(|token| word.eq_ignore_ascii_case(token))
+            EXCLUDED_TOKENS.into_iter().find(|token| {
+                word.eq_ignore_ascii_case(token)
+                    && !(kind == Kind::ContractTemplates && *token == "template")
+            })
         })
 }
 
@@ -215,7 +220,7 @@ fn check_leftovers(catalog: &Value) -> TestResult {
             for field in ["recordPath", "className"] {
                 let text = entity[field].as_str().unwrap_or_default();
                 assert_eq!(
-                    has_excluded_token(text),
+                    has_excluded_token(kind, text),
                     None,
                     "development leftover in {kind}: {text}"
                 );
@@ -227,6 +232,7 @@ fn check_leftovers(catalog: &Value) -> TestResult {
 
 fn check_links(catalog: &Value) -> TestResult {
     check_spawn_links(catalog)?;
+    check_template_links(catalog)?;
     let guids = |kind: Kind| -> Result<HashSet<&str>, String> {
         Ok(list(catalog, kind)?
             .iter()
