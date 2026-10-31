@@ -11,6 +11,9 @@ publish.workspace = true
 [package.metadata.p4kx]
 layer = "testkit"
 
+[features]
+wgpu = ["dep:eframe", "dep:egui_kittest"]
+
 [dependencies]
 aes.workspace = true
 assert_cmd.workspace = true
@@ -18,6 +21,8 @@ cbc.workspace = true
 crc32c.workspace = true
 crc32fast.workspace = true
 dirs.workspace = true
+eframe = { workspace = true, optional = true }
+egui_kittest = { workspace = true, optional = true, features = ["wgpu"] }
 flate2.workspace = true
 gltf = { workspace = true, features = ["KHR_lights_punctual", "names"] }
 half.workspace = true

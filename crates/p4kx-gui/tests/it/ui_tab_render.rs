@@ -11,11 +11,11 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::PathBuf;
 
-use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::RendererOptions;
 use egui_kittest::Harness;
 use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::{Language, Model, UiDetail, UiMode, UiPower};
+use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 
 use crate::tagging::wait_until;
 use crate::ui_tabbing::{TestResult, drawn, listed_with, pick_file, pick_ship};

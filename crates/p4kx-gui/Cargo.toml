@@ -36,6 +36,7 @@ eframe = { workspace = true, features = ["links"] }
 egui.workspace = true
 egui_extras.workspace = true
 fluent-bundle.workspace = true
+log.workspace = true
 pollster.workspace = true
 rayon.workspace = true
 rfd.workspace = true
@@ -54,7 +55,7 @@ winresource.workspace = true
 
 [dev-dependencies]
 p4kx-gui = { path = ".", features = ["test-hooks"] }
-p4kx-testkit.workspace = true
+p4kx-testkit = { workspace = true, features = ["wgpu"] }
 egui_kittest = { workspace = true, features = ["wgpu"] }
 fluent-syntax.workspace = true
 png.workspace = true

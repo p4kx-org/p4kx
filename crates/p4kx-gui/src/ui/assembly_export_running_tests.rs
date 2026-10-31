@@ -9,11 +9,11 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::PathBuf;
 
-use super::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::RendererOptions;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
+use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 
 use crate::{AssemblyExport, AssemblyExportForm, AssemblyExportStage, Language, Model};
 

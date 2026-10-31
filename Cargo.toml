@@ -62,6 +62,7 @@ half = "2.7.1"
 insta = "1.49.0"
 jsonschema = { version = "0.59.0", default-features = false }
 lewton = { version = "0.10.2", default-features = false }
+log = "0.4.35"
 lzma-rs = "0.3.0"
 opus-pure = "=0.2.2"
 png = "0.18.1"

@@ -126,6 +126,8 @@ mod timing;
 mod vorbis;
 pub mod watchdog;
 mod wem;
+#[cfg(feature = "wgpu")]
+pub mod wgpu_setup;
 
 pub use animation::{TestAnimation, TestTrack};
 pub use animation_dba::TestDba;

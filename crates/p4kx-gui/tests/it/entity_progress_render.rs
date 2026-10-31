@@ -9,7 +9,6 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::PathBuf;
 
-use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::RendererOptions;
 use egui_kittest::Harness;
 use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
@@ -17,6 +16,7 @@ use p4kx_gui::{
     AssemblyExport, AssemblyExportForm, AssemblyExportStage, AssemblyExportStatus, Language, Model,
     WorkTab, ui,
 };
+use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 
 use crate::entity_picking::{TestResult, listed, select};
 

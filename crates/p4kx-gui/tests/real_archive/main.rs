@@ -24,8 +24,6 @@ mod real_archive;
 mod record_export_real_archive;
 mod record_language_real_archive;
 mod record_preview_real_archive;
-#[path = "../support/software_wgpu.rs"]
-mod software_wgpu;
 mod soundbank_preview_real_archive;
 mod tags_real_archive;
 mod xml_preview_real_archive;

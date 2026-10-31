@@ -105,9 +105,6 @@ mod regions;
 mod search;
 mod shortcuts;
 mod sidebar;
-#[cfg(test)]
-#[path = "../../tests/support/software_wgpu.rs"]
-mod software_wgpu;
 mod sound_grid;
 mod soundbank_preview;
 mod soundbank_table;
