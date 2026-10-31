@@ -154,6 +154,24 @@ contradicts another, names an Entity that no Record or several Records match, or
 with the root Entity or an Entity the port lies below, exits with code 2 and prints the reason; a
 replacement whose Record cannot be read exits with code 5.
 
+`--loadout-pick <group>=<index>` takes another alternative than the first from a group of a
+generated default Loadout (`SItemPortLoadoutRandomGeneratedParams`, which the game picks at
+random), see [ADR-0309](adr/0309-the-alternative-of-a-generated-loadout-group-is-picked-by-index.md).
+Several picks are separated by commas (`Body=1,Eggs=0`) or given as several options. The group is
+its `Group` name in the assortment, ignoring case, in every assortment that has it; the index
+counts from 0 and is digits only (no sign). A bare `--loadout-pick <index>` takes it in every
+group that has it, and a named pick wins over it. Groups that are not picked keep their first
+alternative, so without the option nothing changes.
+
+A named pick that cannot apply is an `assortment` issue of the Entity and the export still
+succeeds: an index beyond its group (the group keeps its first alternative), and a group name that
+no group of the whole Loadout has (`Bodyy=2`; the issue names the pick). A bare index beyond every
+group is no issue, because it means "every group that has it" and none having it is the defined
+result; a bare typo such as `9` therefore stays silent. A pick that is no `<group>=<index>` or
+index (`Body=`, `=2`, `Body=-1`, `Body=+1`) exits with code 2 before the Archive is opened.
+`entity glb`, `entity package` and `ui hologram` take the option too, and the MCP tool
+`entity_loadout` its `loadout_pick` parameter, a list of the same texts (commas allowed).
+
 An Entity that does not fit the port's item types, sub-types and sizes is attached all the same
 (ADR-0076): the command warns on stderr, exits with code 0, and lists the mismatch in
 `incompatible` (absent when empty): `{"port": "…", "entity": "…", "kind": "item_type" |
@@ -239,9 +257,11 @@ target: `reference` (the GUID) or `class_name`, the other `null`. The kinds are:
   the reason lists every candidate), `no_loadout_files` and `xml_loadout` (an XML Loadout or one
   it includes that is missing, corrupt, includes itself or nests deeper than 8 includes; what
   could be read is still listed), `assortment` (a loadout assortment of a generated default
-  Loadout is no assortment, names itself, directly or through another, or has a first alternative
-  that is no Loadout; the other assortments still apply; a generated Loadout resolves to the
-  first alternative of each group of its assortments, ADR-0289), and `vehicle_implementation` (the
+  Loadout is no assortment, names itself, directly or through another, or has a chosen
+  alternative that is no Loadout; a `--loadout-pick` index beyond its named group, or a named
+  pick of a group that no group of the Loadout has; the other
+  assortments still apply; a generated Loadout resolves to the first alternative of each group of
+  its assortments unless `--loadout-pick` chooses another, ADR-0289, ADR-0309), and `vehicle_implementation` (the
   implementation file is
   missing, corrupt or no `Vehicle` document, so `vehicle` is absent, or its Modification names a
   patch file that is missing (even when a fallback file is applied), corrupt, outside the implementation folder or too large to apply within the limits, a patch child or `id` that matches nothing in the base and has no base child of its name to replace, or no Modification of that name exists; the
@@ -272,7 +292,7 @@ order is attached. The same Archive always gives the same document.
  "skinned_meshes": 0, "lod_fallbacks": 0, "shared_meshes": 33, "shared_materials": 103,
  "shared_textures": 0, "vertices": 744831,
  "triangles": 818426, "bytes": 44750744, "skipped": 0, "unresolved_layers": 0,
- "placements": [Placement, …], "issues": [Issue, …]}
+ "placements": [Placement, …], "animations": [Animation, …], "issues": [Issue, …]}
 ```
 
 `unresolved_layers` counts the layer files of the material libraries of all parts, their bone
@@ -285,7 +305,17 @@ which counts as often as its most frequent library lists it. Each library lists 
 `first_unresolved_layer` is the first such path, as the layer names it; it is absent when
 `unresolved_layers` is 0 (the example shows the case without any).
 
-`<entity>` is named as for `p4kx entity loadout`, with the same exit codes. A docked vehicle is
+`<entity>` is named as for `p4kx entity loadout`, with the same exit codes. `animations` is absent
+without any; for a creature it lists each clip the GLB writes or leaves out, shaped as in `p4kx
+model glb`: `name`, `duration_seconds`, `additive`, `channels`, `keys` and `skipped_tracks`. A
+creature whose skins are bound to its skeleton gets, with `--animations`, the clips its animation database names
+(`animDatabase3P` of `SAnimatedCharacterComponentParams`, a Mannequin `.adb` with the databases
+nested in it), looked for by file name without extension in the animation folders (`#filepath`) and
+the track databases of its skeleton's parameter file ([ADR-0307](adr/0307-the-clips-of-a-creature-are-those-its-animation-database-names-and-are-written-on-the-bones-of-its-skeleton.md));
+`--animations` asks for them, without it the GLB is static. Names no clip has, such as blend spaces, are skipped, additive
+clips and clips that move no bone are left out as `animation_not_used` (one Issue per reason,
+`skipped` false), and a database, parameter file or folder the Archive lacks is
+`animations_unavailable` (`skipped` false), as is a limit that dropped databases, names or folders. A docked vehicle is
 one part without the parts of its own Loadout; `--expand-docked-vehicles` places those too. A
 change to a port below an unexpanded docked vehicle, as `entity loadout` lists it, is not applied
 and no error; the report lists the ports as `ignored` (absent when empty), as for `entity loadout`.
@@ -372,7 +402,10 @@ with exit code 2 or 3 instead and writes nothing, ADR-0255), `sub_geometry_missi
 sub-geometry the port's flags choose is not in the Archive, so the part keeps the main geometry of
 its Entity; a note, `skipped` is false), `body_geometry_missing` (the sub-geometry tagged for the
 body of the character is not in the Archive; the part has no model, the placeholder main geometry
-is not drawn instead; `reason` names the body and the path), `part_hidden` (the worn clothing or
+is not drawn instead; `reason` names the body and the path), `world_prop_not_worn` (a worn item
+of a character whose body is known names only a prop of the world, such as a cardboard box, as its
+geometry and has no sub-geometry per body; the part has no model, ADR-0311; `reason` names the
+path of the prop), `part_hidden` (the worn clothing or
 armour at the port is hidden by the `HiddenParts` of another worn Entity of the same character, so
 the part has no model, ADR-0304; `name` is its class name and `reason` names the port and the part
 that hides it; a part below it is hidden with it, and an attachment that cannot be resolved at, or
@@ -1750,7 +1783,8 @@ reading and assembling, building the scene, drawing and reading the picture back
 the file. An Entity the Archive lacks, a bad option, a `--out` that is the Archive or lies in a
 Star Citizen installation and a `--size` that is empty or beyond what the device draws
 print no JSON and fail with exit code 2. A replacement that does not fit its port is drawn all the
-same and listed in `incompatible` (absent when empty), as for `entity loadout`. A machine without
+same and listed in `incompatible` (absent when empty), as for `entity loadout`; `--loadout-pick`
+works as there. A machine without
 a graphics adapter fails with `no graphics adapter` on stderr and exit code 1.
 
 ## `p4kx ui screens <archive> <entity> --json`

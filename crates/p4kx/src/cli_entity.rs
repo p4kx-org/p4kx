@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use clap::{Args, Subcommand, ValueEnum};
-use p4kx_assembly::{ChangeError, LoadoutChanges};
+use p4kx_assembly::{ChangeError, LoadoutChanges, LoadoutPicks};
 
 use crate::cli_model::lod_range;
 use crate::cli_wwise::{AudioLanguageArgs, SoundExportArgs};
@@ -36,6 +36,15 @@ pub(crate) struct LoadoutChangeArgs {
     /// times.
     #[arg(long, value_name = "PORT=ENTITY")]
     pub(crate) replace: Vec<String>,
+    /// Takes another alternative of a group of a generated default Loadout (a creature's or an
+    /// NPC's, which the game picks at random) than the first, as `<group>=<index>`, e.g.
+    /// `Body=2`; the group is its name in the assortment, ignoring case. A bare `<index>` takes
+    /// it in every group that has it. Indices count from 0 (the first alternative). An index
+    /// beyond a named group, and a named group the Loadout does not have, is a Loadout issue and
+    /// the group keeps its first alternative. Several picks are separated by commas or given as
+    /// several options.
+    #[arg(long, value_name = "GROUP=INDEX", value_delimiter = ',')]
+    pub(crate) loadout_pick: Vec<String>,
 }
 
 impl LoadoutChangeArgs {
@@ -45,9 +54,15 @@ impl LoadoutChangeArgs {
             .exclude
             .iter()
             .fold(LoadoutChanges::new(), LoadoutChanges::exclude);
-        self.replace
+        let changes = self
+            .replace
             .iter()
-            .try_fold(changes, |changes, text| changes.replace_text(text))
+            .try_fold(changes, |changes, text| changes.replace_text(text))?;
+        let picks = self
+            .loadout_pick
+            .iter()
+            .try_fold(LoadoutPicks::new(), |picks, text| picks.add_text(text))?;
+        Ok(changes.with_picks(picks))
     }
 }
 
@@ -86,7 +101,8 @@ pub(crate) enum EntityAction {
     /// docked vehicle (a Merlin in a docking collar, say) is placed as one part, without the
     /// parts of its own Loadout, unless --expand-docked-vehicles is given; a change to a port
     /// below such a docked vehicle is not applied, is no error, and is warned about on stderr
-    /// and listed as `ignored` in the JSON.
+    /// and listed as `ignored` in the JSON. With --animations a creature is written with the
+    /// clips of its animation database.
     #[command(after_help = EXIT_CODES_HELP)]
     Glb(EntityGlbArgs),
     /// Writes an Entity as a Blender package, a folder that does not depend on Blender's file
@@ -141,6 +157,10 @@ pub(crate) struct EntityPackageArgs {
 
 /// Arguments of `p4kx entity glb`.
 #[derive(Debug, Args)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "one clap flag per option of the export"
+)]
 pub(crate) struct EntityGlbArgs {
     /// Path of the Data.p4k Archive.
     pub(crate) archive: PathBuf,
@@ -185,6 +205,13 @@ pub(crate) struct EntityGlbArgs {
     /// a docked vehicle is placed as one part.
     #[arg(long)]
     pub(crate) expand_docked_vehicles: bool,
+    /// Also writes the animations of a creature: every clip the animation database of a creature
+    /// whose skins are bound to its skeleton (`SAnimatedCharacterComponentParams.animDatabase3P`)
+    /// names, looked for in the animation folders of the skeleton's parameter file, as glTF
+    /// animations of the bones. Additive clips and clips that move no bone of the skeleton are
+    /// left out and listed. Without it the GLB is static.
+    #[arg(long)]
+    pub(crate) animations: bool,
     #[command(flatten)]
     pub(crate) changes: LoadoutChangeArgs,
 }

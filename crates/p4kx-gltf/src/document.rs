@@ -29,8 +29,8 @@ const PNG_MIME: &str = "image/png";
 ///
 /// Without wrappers and with one instance, the bones become nodes when a mesh of the level of
 /// detail is skinned and when the level has no mesh at all, as in a skeleton file; the skinned
-/// meshes then share one skin. The animations of `animations` are written after the nodes they
-/// move.
+/// meshes then share one skin. With wrappers, the scene's skeleton gets one skin and its bones
+/// become the last nodes. The animations of `animations` are written after the nodes they move.
 pub(crate) fn document(
     content: &Content<'_, '_>,
     layout: &Layout<'_>,
@@ -41,6 +41,7 @@ pub(crate) fn document(
         wrappers,
         instances,
         rig,
+        ..
     } = *content;
     let mut root = Root {
         asset: json::Asset {
@@ -83,6 +84,9 @@ pub(crate) fn document(
             &node_meshes,
             skin.as_ref(),
         );
+        if let Some(buffer) = buffer {
+            push_animations(&mut root, buffer, layout, animations);
+        }
     }
     root
 }

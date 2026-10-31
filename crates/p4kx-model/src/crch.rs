@@ -84,6 +84,7 @@ pub(crate) fn build<B: AsRef<[u8]>>(
         material_indices: Vec::new(),
         issues,
         chunks: usage(file, ModelFile::Model, &read),
+        rig_logic: None,
     })
 }
 

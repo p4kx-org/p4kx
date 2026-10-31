@@ -115,6 +115,26 @@ fn the_zones_a_worn_garment_covers_are_left_out_of_the_body() -> TestResult {
 }
 
 #[test]
+fn the_skin_of_a_generic_head_npc_is_cut_under_its_clothing() -> TestResult {
+    for variant in BodyVariant::ALL {
+        let options = NpcZoneOptions {
+            female: variant == BodyVariant::Female,
+            head_sub_type: Some("UNDEFINED"),
+            ..NpcZoneOptions::default()
+        };
+        let chunks = [TestZoneChunk::new("torso01_zone", 1)];
+
+        let assembly = wear_on(&BodyVariant::ALL.map(places), &chunks, options)?;
+
+        let drawn = drawn_nodes(&assembly)?;
+        assert_eq!(drawn.len(), variant.zone_names().len() - 1);
+        assert!(!drawn.contains(&node_of(variant, "torso01_zone")?));
+        assert_eq!(hidden_zones(&assembly), [["torso01_zone"]]);
+    }
+    Ok(())
+}
+
+#[test]
 fn a_garment_that_covers_nothing_leaves_the_body_whole() -> TestResult {
     let chunks = [TestZoneChunk::new("l_arm04_zone", 1).showing(&[0])];
 
@@ -175,10 +195,31 @@ fn a_body_whose_zones_lie_on_the_wrong_side_is_kept_whole_and_reported() -> Test
 }
 
 #[test]
-fn a_tree_without_a_head_keeps_the_body_whole_and_reports_no_zones() -> TestResult {
+fn a_tree_without_a_head_is_cut_by_the_body_its_body_entity_names() -> TestResult {
     let chunks = [TestZoneChunk::new("torso01_zone", 1)];
 
-    let assembly = wear(BodyVariant::Male, &chunks, true)?;
+    for variant in BodyVariant::ALL {
+        let assembly = wear(variant, &chunks, true)?;
+
+        let drawn = drawn_nodes(&assembly)?;
+        assert_eq!(drawn.len(), variant.zone_names().len() - 1);
+        assert!(!drawn.contains(&node_of(variant, "torso01_zone")?));
+        assert_eq!(hidden_zones(&assembly), [["torso01_zone"]]);
+    }
+    Ok(())
+}
+
+#[test]
+fn a_tree_without_a_head_or_a_body_entity_keeps_the_body_whole_and_reports_no_zones() -> TestResult
+{
+    let chunks = [TestZoneChunk::new("torso01_zone", 1)];
+    let options = NpcZoneOptions {
+        headless: true,
+        body_type: Some("Char_Clothing_Legs"),
+        ..NpcZoneOptions::default()
+    };
+
+    let assembly = wear_on(&BodyVariant::ALL.map(places), &chunks, options)?;
 
     let shirt = assembly
         .part_at("Body_ItemPort/Clothing_Torso_0")

@@ -4,15 +4,10 @@
 use p4kx_character::{
     DnaMatrix, DnaRig, ExpressionBlend, ExpressionTarget, RigLogic, SkinBlendshapes,
 };
-use p4kx_chunks::{ChunkFile, ivo};
 use p4kx_gltf::MorphTarget;
-use p4kx_model::Mesh;
+use p4kx_model::{Mesh, Model, RigLogicBytes};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::{ModelFailure, ModelProvider};
-
-/// The largest head skin, geometry file or skeleton file that is read for a head's rig, 64 MiB.
-pub(super) const MAX_SKIN_LEN: u64 = 64 << 20;
 const NO_VERTEX: u32 = u32::MAX;
 const CONTROL_PREFIX: &str = "ctl_";
 
@@ -49,22 +44,14 @@ fn normal(name: &str) -> String {
         .join("*")
 }
 
-/// Reads the names of the blendshapes from the `RigLogic` chunk of the head skin at `path`.
-pub(super) fn logic_of(path: &str, models: &dyn ModelProvider) -> Result<RigLogic, String> {
-    let bytes = models
-        .file(path, MAX_SKIN_LEN)
-        .map_err(|failure| match failure {
-            ModelFailure::Missing => format!("{path} does not exist"),
-            other => format!("{path} cannot be read: {other}"),
-        })?;
-    let chunks = ChunkFile::parse(bytes.as_slice()).map_err(|error| format!("{path}: {error}"))?;
-    let (index, _) = chunks
-        .chunks_of(ivo::RIG_LOGIC)
-        .next()
+/// Parses the `RigLogic` chunk the provider handed along with the head skin `model` read from
+/// `path`.
+pub(super) fn logic_of(model: &Model, path: &str) -> Result<RigLogic, String> {
+    let data = model
+        .rig_logic
+        .as_ref()
+        .map(RigLogicBytes::as_slice)
         .ok_or_else(|| format!("{path} has no RigLogic chunk"))?;
-    let data = chunks
-        .chunk_data(index)
-        .ok_or_else(|| format!("{path}: the RigLogic chunk lies outside the file"))?;
     RigLogic::read(data).map_err(|error| format!("{path}: {error}"))
 }
 

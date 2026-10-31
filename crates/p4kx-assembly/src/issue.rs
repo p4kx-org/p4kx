@@ -38,6 +38,13 @@ pub enum IssueKind {
         /// The path of the sub-geometry.
         path: String,
     },
+    /// A worn item names only a prop of the world (a cardboard box) as its geometry and no model
+    /// for the body, so the part has no model.
+    #[error("the geometry {path} is a prop of the world, not a model of the worn item")]
+    WorldPropNotWorn {
+        /// The path of the prop the Record names.
+        path: String,
+    },
     /// The geometry file cannot be read as a model, so the part has no model.
     #[error("the geometry {path} cannot be read: {reason}")]
     GeometryUnreadable {
@@ -373,5 +380,12 @@ pub enum IssueKind {
         count: usize,
         /// The names of the first few of them.
         examples: Vec<String>,
+    },
+    /// The animations a creature Entity names cannot be found or read, so none is written: its
+    /// animation database, the parameter file of its skeleton or the folder of its clips.
+    #[error("the animations are not written: {reason}")]
+    AnimationsUnavailable {
+        /// Why.
+        reason: String,
     },
 }

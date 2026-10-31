@@ -220,6 +220,7 @@ pub(crate) fn run(args: &HologramArgs, as_json: bool) -> Result<ExitCode> {
     if is_same_file(&args.out, &args.archive) {
         return Err(GlbOutputIsArchive(args.out.clone()).into());
     }
+    let changes = args.changes.changes()?;
     let archive = crate::key::open(&args.archive)?;
     crate::guard::ensure_writable(&args.out)?;
     let entry = DataForgeEntry::read(&archive)?;
@@ -228,7 +229,6 @@ pub(crate) fn run(args: &HologramArgs, as_json: bool) -> Result<ExitCode> {
     let mut resolver = LoadoutResolver::new(&forge)
         .with_files(&files)
         .stopping_at_docked_vehicles();
-    let changes = args.changes.changes()?;
     let record = resolver.entities().find(&args.entity)?;
     let applied = resolver.resolve_changed(&record, &changes)?;
     crate::entity_ignored::warn(&applied)?;

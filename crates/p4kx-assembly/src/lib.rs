@@ -63,10 +63,12 @@
 //! material choices of the Character ([`Look`]); [`Armour::write_glb_with`] embeds the textures.
 //! [`Head::with_expressions`] adds the head's expression blendshapes as morph targets.
 
+mod animation_budget;
 mod animation_folders;
 mod armour;
 mod assembly;
 mod assortment;
+mod assortment_group;
 mod assortment_requirement;
 mod attached;
 pub mod audio;
@@ -82,8 +84,10 @@ mod catalogue;
 mod cdf;
 mod cdf_bone;
 mod changes;
+mod character_path;
 mod chf_names;
 mod compat;
+mod creature_animation;
 mod creature_rig;
 mod entities;
 mod entity_interior;
@@ -116,6 +120,7 @@ mod outfit;
 mod outfit_read;
 mod palette;
 mod path_match;
+mod pick;
 mod placement;
 mod plan;
 mod port;
@@ -147,6 +152,7 @@ pub use catalogue::{EntityCatalogue, EntityKind, EntitySummary};
 pub use changes::{ChangeError, ChangedLoadout, LoadoutChanges, PortChange, ReplacementMismatch};
 pub use chf_names::archive_names;
 pub use compat::{AcceptedType, Incompatibility, ItemFacts, PortConstraints};
+pub use creature_animation::{CreatureAnimations, CreatureClips, creature_animations};
 pub use entities::{ENTITY_TYPE, Entities};
 pub use entity_interior::{EntityContainer, EntityInterior, INTERIOR_NODE};
 pub use error::{AssemblyError, EntityLookupError, LoadoutError};
@@ -172,6 +178,7 @@ pub use object_containers::{ContainerSource, ObjectContainerRef};
 pub use outfit::{Outfit, OutfitReport};
 pub use p4kx_character as character;
 pub use palette::{ForgePalettes, PaletteFailure, PaletteProvider};
+pub use pick::LoadoutPicks;
 pub use port::{PortDefinition, PortTransform, PortType};
 pub use prefab::{
     MAX_PREFAB_DEPTH, MAX_PREFAB_ISSUES, MAX_PREFAB_LIBRARY_LEN, MAX_PREFAB_OBJECTS,
