@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use clap::{Args, Subcommand, ValueEnum};
-use p4kx_assembly::{ChangeError, LoadoutChanges};
+use p4kx_assembly::{ChangeError, LoadoutChanges, LoadoutPicks};
 
 use crate::cli_model::lod_range;
 use crate::cli_wwise::{AudioLanguageArgs, SoundExportArgs};
@@ -36,6 +36,15 @@ pub(crate) struct LoadoutChangeArgs {
     /// times.
     #[arg(long, value_name = "PORT=ENTITY")]
     pub(crate) replace: Vec<String>,
+    /// Takes another alternative of a group of a generated default Loadout (a creature's or an
+    /// NPC's, which the game picks at random) than the first, as `<group>=<index>`, e.g.
+    /// `Body=2`; the group is its name in the assortment, ignoring case. A bare `<index>` takes
+    /// it in every group that has it. Indices count from 0 (the first alternative). An index
+    /// beyond a named group, and a named group the Loadout does not have, is a Loadout issue and
+    /// the group keeps its first alternative. Several picks are separated by commas or given as
+    /// several options.
+    #[arg(long, value_name = "GROUP=INDEX", value_delimiter = ',')]
+    pub(crate) loadout_pick: Vec<String>,
 }
 
 impl LoadoutChangeArgs {
@@ -45,9 +54,15 @@ impl LoadoutChangeArgs {
             .exclude
             .iter()
             .fold(LoadoutChanges::new(), LoadoutChanges::exclude);
-        self.replace
+        let changes = self
+            .replace
             .iter()
-            .try_fold(changes, |changes, text| changes.replace_text(text))
+            .try_fold(changes, |changes, text| changes.replace_text(text))?;
+        let picks = self
+            .loadout_pick
+            .iter()
+            .try_fold(LoadoutPicks::new(), |picks, text| picks.add_text(text))?;
+        Ok(changes.with_picks(picks))
     }
 }
 

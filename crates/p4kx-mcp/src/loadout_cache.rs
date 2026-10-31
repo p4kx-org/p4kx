@@ -3,7 +3,7 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use p4kx_assembly::EntityNode;
+use p4kx_assembly::{EntityNode, LoadoutPicks};
 
 use crate::error::ToolError;
 
@@ -12,13 +12,17 @@ const PORT_BUDGET: usize = 64 * 1024;
 /// How many trees are kept for one Archive, however small.
 const MAX_TREES: usize = 8;
 
-/// What decides a resolved tree: the Entity as the call wrote it and whether docked vehicles are
-/// left unresolved. The depth only cuts the tree when it is listed.
+/// What decides a resolved tree: the Entity as the call wrote it, whether docked vehicles are
+/// left unresolved and the Loadout picks. The depth only cuts the tree when it is listed.
 #[derive(Debug)]
 struct Key {
     entity: String,
     stop_at_docked: bool,
+    picks: LoadoutPicks,
 }
+
+/// The choices of a call besides the Entity that change the resolved tree.
+type Variant<'a> = (bool, &'a LoadoutPicks);
 
 type Kept<T> = Vec<(Key, usize, Arc<T>)>;
 
@@ -57,16 +61,16 @@ impl<T> Cache<T> {
     pub(crate) fn get_or_resolve(
         &self,
         entity: &str,
-        stop_at_docked: bool,
+        variant: Variant<'_>,
         resolve: impl FnOnce() -> Result<T, ToolError>,
     ) -> Result<Arc<T>, ToolError> {
-        if let Some(tree) = self.touch(entity, stop_at_docked) {
+        if let Some(tree) = self.touch(entity, variant) {
             return Ok(tree);
         }
         let tree = Arc::new(resolve()?);
         let weight = (self.weigh)(&tree);
         let mut kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(index) = position(&kept, entity, stop_at_docked) {
+        if let Some(index) = position(&kept, entity, variant) {
             let known = kept.remove(index);
             let tree = Arc::clone(&known.2);
             kept.insert(0, known);
@@ -75,7 +79,8 @@ impl<T> Cache<T> {
         if weight <= self.budget {
             let key = Key {
                 entity: entity.to_owned(),
-                stop_at_docked,
+                stop_at_docked: variant.0,
+                picks: variant.1.clone(),
             };
             kept.insert(0, (key, weight, Arc::clone(&tree)));
             kept.truncate(MAX_TREES);
@@ -93,9 +98,9 @@ impl<T> Cache<T> {
         Ok(tree)
     }
 
-    fn touch(&self, entity: &str, stop_at_docked: bool) -> Option<Arc<T>> {
+    fn touch(&self, entity: &str, variant: Variant<'_>) -> Option<Arc<T>> {
         let mut kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
-        let index = position(&kept, entity, stop_at_docked)?;
+        let index = position(&kept, entity, variant)?;
         let known = kept.remove(index);
         let tree = Arc::clone(&known.2);
         kept.insert(0, known);
@@ -104,9 +109,14 @@ impl<T> Cache<T> {
     }
 }
 
-fn position<T>(kept: &Kept<T>, entity: &str, stop_at_docked: bool) -> Option<usize> {
-    kept.iter()
-        .position(|(key, _, _)| key.entity == entity && key.stop_at_docked == stop_at_docked)
+fn position<T>(
+    kept: &Kept<T>,
+    entity: &str,
+    (stop_at_docked, picks): Variant<'_>,
+) -> Option<usize> {
+    kept.iter().position(|(key, _, _)| {
+        key.entity == entity && key.stop_at_docked == stop_at_docked && key.picks == *picks
+    })
 }
 
 #[cfg(test)]
@@ -114,8 +124,12 @@ mod tests {
     use std::cell::Cell;
     use std::sync::Arc;
 
+    use p4kx_assembly::LoadoutPicks;
+
     use super::Cache;
     use crate::error::ToolError;
+
+    const NONE: LoadoutPicks = LoadoutPicks::new();
 
     #[expect(
         clippy::unnecessary_wraps,
@@ -131,9 +145,9 @@ mod tests {
         let cache = Cache::<Vec<u8>>::new(100, Vec::len);
         let calls = Cell::new(0);
 
-        let first = cache.get_or_resolve("Titan", false, || resolved(&calls, 10))?;
-        let second = cache.get_or_resolve("Titan", false, || resolved(&calls, 10))?;
-        let docked = cache.get_or_resolve("Titan", true, || resolved(&calls, 10))?;
+        let first = cache.get_or_resolve("Titan", (false, &NONE), || resolved(&calls, 10))?;
+        let second = cache.get_or_resolve("Titan", (false, &NONE), || resolved(&calls, 10))?;
+        let docked = cache.get_or_resolve("Titan", (true, &NONE), || resolved(&calls, 10))?;
 
         assert_eq!(calls.get(), 2, "once per Entity and docked setting");
         assert!(Arc::ptr_eq(&first, &second));
@@ -142,14 +156,28 @@ mod tests {
     }
 
     #[test]
+    fn the_picks_are_part_of_the_key() -> Result<(), ToolError> {
+        let cache = Cache::<Vec<u8>>::new(100, Vec::len);
+        let calls = Cell::new(0);
+        let second = LoadoutPicks::new().group("Body", 1);
+
+        cache.get_or_resolve("Beast", (false, &NONE), || resolved(&calls, 10))?;
+        cache.get_or_resolve("Beast", (false, &second), || resolved(&calls, 10))?;
+        cache.get_or_resolve("Beast", (false, &second), || resolved(&calls, 10))?;
+
+        assert_eq!(calls.get(), 2, "once per set of picks");
+        Ok(())
+    }
+
+    #[test]
     fn the_port_budget_drops_the_least_recently_used_tree() -> Result<(), ToolError> {
         let cache = Cache::<Vec<u8>>::new(100, Vec::len);
         let calls = Cell::new(0);
 
-        cache.get_or_resolve("a", false, || resolved(&calls, 60))?;
-        cache.get_or_resolve("b", false, || resolved(&calls, 60))?;
-        cache.get_or_resolve("b", false, || resolved(&calls, 60))?;
-        cache.get_or_resolve("a", false, || resolved(&calls, 60))?;
+        cache.get_or_resolve("a", (false, &NONE), || resolved(&calls, 60))?;
+        cache.get_or_resolve("b", (false, &NONE), || resolved(&calls, 60))?;
+        cache.get_or_resolve("b", (false, &NONE), || resolved(&calls, 60))?;
+        cache.get_or_resolve("a", (false, &NONE), || resolved(&calls, 60))?;
 
         assert_eq!(calls.get(), 3, "a was dropped for b and resolved again");
         Ok(())
@@ -160,8 +188,8 @@ mod tests {
         let cache = Cache::<Vec<u8>>::new(100, Vec::len);
         let calls = Cell::new(0);
 
-        cache.get_or_resolve("huge", false, || resolved(&calls, 101))?;
-        cache.get_or_resolve("huge", false, || resolved(&calls, 101))?;
+        cache.get_or_resolve("huge", (false, &NONE), || resolved(&calls, 101))?;
+        cache.get_or_resolve("huge", (false, &NONE), || resolved(&calls, 101))?;
 
         assert_eq!(calls.get(), 2);
         Ok(())

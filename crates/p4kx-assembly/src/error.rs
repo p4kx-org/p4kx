@@ -86,14 +86,24 @@ pub enum LoadoutError {
         /// Why it cannot be read.
         reason: String,
     },
-    /// A loadout assortment cannot be used: it names itself, is no assortment or has a first
-    /// alternative that is no Loadout. The other assortments still apply.
+    /// A loadout assortment cannot be used: it names itself, is no assortment, has a chosen
+    /// alternative that is no Loadout or is picked beyond its group. The other assortments still
+    /// apply.
     #[error("the loadout assortment {guid} cannot be used: {reason}")]
     Assortment {
         /// The GUID of the assortment Record.
         guid: Guid,
         /// Why it cannot be used.
         reason: String,
+    },
+    /// A named pick of a group that no group of the resolved Loadout has, e.g. a typo; it
+    /// changes nothing.
+    #[error("the pick {group}={index} names no group of the Loadout")]
+    UnknownPick {
+        /// The group as given.
+        group: String,
+        /// The index as given.
+        index: usize,
     },
     /// A note, not a problem: the Requirement of a loadout assortment or of some of its groups
     /// depends on tags the Archive does not hold, so they are used as if they applied. Nothing
@@ -136,7 +146,7 @@ impl LoadoutError {
             Self::TooManyPorts => "too_many_ports",
             Self::NoLoadoutFiles { .. } => "no_loadout_files",
             Self::XmlLoadout { .. } => "xml_loadout",
-            Self::Assortment { .. } => "assortment",
+            Self::Assortment { .. } | Self::UnknownPick { .. } => "assortment",
             Self::AssortmentRequirement { .. } => "assortment_requirement",
             Self::VehicleImplementation { .. } => "vehicle_implementation",
         }
