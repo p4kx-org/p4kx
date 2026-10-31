@@ -236,7 +236,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `--json` the report has the shape described in [docs/cli-json.md](cli-json.md). A docked
   vehicle such as a Merlin or an Archimedes is
   placed as one part, without the parts of its own Loadout, unless `--expand-docked-vehicles`
-  places those parts too. `--interior` adds the ship's rooms:
+  places those parts too. With `--animations` a creature whose skins are bound to its skeleton also
+  gets the clips its animation database names, as glTF animations of the bones; without it the
+  GLB is static.
+  `--interior` adds the ship's rooms:
   the socpak containers the Records of the ship and of its attached Entities name, each at its
   bone of the Entity that names it, below an `Interior` node of that Entity; a docked vehicle
   brings its containers only with `--expand-docked-vehicles`. What cannot be resolved is listed,

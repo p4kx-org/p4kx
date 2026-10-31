@@ -9,9 +9,7 @@ use p4kx_model::{Animation, Lod, MAX_INFLUENCES, Model};
 use crate::GltfError;
 use crate::animations::AnimationSummary;
 use crate::document::document;
-use crate::glb_plan::{
-    Skeletal, own_binds, plan_layout, single_animation_plans, summarise, texture_set,
-};
+use crate::glb_plan::{Skeletal, animation_plans, own_binds, plan_layout, summarise, texture_set};
 use crate::instance::{Content, Instance, material_requests};
 use crate::layout::Layout;
 use crate::material_index::index_materials;
@@ -263,12 +261,14 @@ pub fn write_glb_animated_with(
         plan: MaterialPlan::new(model.materials.library(), lod),
         twin: None,
     };
+    let animations: Vec<&Animation> = animations.iter().collect();
     let content = Content {
         wrappers: &[],
         instances: &[instance],
         rig: None,
+        animations: &animations,
     };
-    write_instances(&content, animations, options, textures, 0, out)
+    write_instances(&content, options, textures, 0, out)
 }
 
 /// Returns how many meshes the twin instances reuse instead of writing them again.
@@ -288,7 +288,6 @@ fn shared_meshes(instances: &[Instance<'_>], layout: &Layout<'_>) -> usize {
 
 pub(crate) fn write_instances(
     content: &Content<'_, '_>,
-    animations: &[Animation],
     options: &GlbOptions,
     textures: &dyn TextureLoader,
     lod_fallbacks: usize,
@@ -298,6 +297,7 @@ pub(crate) fn write_instances(
         wrappers,
         instances,
         rig,
+        ..
     } = *content;
     let single = match (wrappers, instances) {
         ([], [instance]) => Some(instance),
@@ -312,9 +312,7 @@ pub(crate) fn write_instances(
         MaterialMode::Textures => texture_set(&layout, instances, options.texture_mip, textures),
         MaterialMode::Colours => TextureSet::default(),
     };
-    let animation_plans = single.map_or_else(Vec::new, |instance| {
-        single_animation_plans(&mut layout, instance, animations)
-    });
+    let animation_plans = animation_plans(&mut layout, content, single);
     layout.push_images(images.images.iter().map(|image| image.png.len() as u64));
     let mut root = document(content, &layout, &images, &animation_plans);
     if options.material_indices {

@@ -148,7 +148,7 @@ pub(crate) fn note_loadout(root: &EntityNode, issues: &mut Vec<Issue>) {
     issues.extend(notes);
 }
 
-fn is_skinned(model: &Model, level: u32) -> bool {
+pub(crate) fn is_skinned(model: &Model, level: u32) -> bool {
     model
         .nearest_lod(level)
         .is_some_and(|lod| lod.meshes.iter().any(|mesh| mesh.influences.is_some()))

@@ -78,6 +78,7 @@ mod diff;
 mod entity;
 mod entity_audio;
 mod entity_glb;
+mod entity_glb_animation;
 mod entity_glb_body;
 mod entity_glb_json;
 mod entity_glb_placements;

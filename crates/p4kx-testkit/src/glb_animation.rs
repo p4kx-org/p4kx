@@ -96,11 +96,13 @@ fn check_times(glb: &CheckedGlb, input: &Accessor<'_>, name: &str) -> Result<(),
             _ => None,
         };
         let matches = match (found, expected) {
+            // serde_json without `float_roundtrip` may read a float one f64 step off, so the
+            // bound is compared as the f32 it was written from.
             #[expect(
-                clippy::float_cmp,
-                reason = "the writer stores the exact first and last time"
+                clippy::cast_possible_truncation,
+                reason = "the writer stores the first and last time as f32 values"
             )]
-            (Some(found), Some(expected)) => found == f64::from(*expected),
+            (Some(found), Some(expected)) => (found as f32).to_bits() == expected.to_bits(),
             _ => false,
         };
         if !matches {
