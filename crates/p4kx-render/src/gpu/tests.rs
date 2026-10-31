@@ -5,14 +5,14 @@ use std::time::Duration;
 
 use p4kx_testkit::watchdog::{Guard, arm};
 
-use super::device::{block_on_for, guarded};
+use super::device::{block_on_for, guarded, software_instance};
 use super::resources::filled;
 
 const WAIT: Duration = Duration::from_secs(60);
 
 fn device_limited_to(max_buffer_size: u64, guard: &Guard) -> Option<(wgpu::Device, wgpu::Queue)> {
     guard.phase("adapter");
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
+    let instance = software_instance();
     let adapter = block_on_for(
         instance.request_adapter(&wgpu::RequestAdapterOptions {
             force_fallback_adapter: true,
@@ -49,6 +49,26 @@ fn a_future_that_never_resolves_gives_up_at_the_limit() {
 #[test]
 fn a_ready_future_returns_its_output() {
     assert_eq!(block_on_for(async { 7 }, Duration::from_secs(1)), Some(7));
+}
+
+#[cfg(windows)]
+#[test]
+fn the_software_instance_sees_only_the_direct3d_12_backend() {
+    let guard = arm("the_software_instance_sees_only_dx12");
+    guard.phase("enumerate adapters");
+
+    let adapters = block_on_for(
+        software_instance().enumerate_adapters(wgpu::Backends::all()),
+        WAIT,
+    )
+    .unwrap_or_default();
+
+    assert!(
+        adapters
+            .iter()
+            .all(|adapter| adapter.get_info().backend == wgpu::Backend::Dx12),
+        "{adapters:?}"
+    );
 }
 
 #[expect(

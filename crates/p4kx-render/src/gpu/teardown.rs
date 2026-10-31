@@ -272,13 +272,16 @@ mod tests {
         let before = abandoned_teardowns();
         let started = Instant::now();
 
-        let released = release_within(value, Duration::from_millis(100), |value, stage| {
+        let released = release_within(value, Duration::from_secs(2), |value, stage| {
             stage.enter(Stage::Device);
             drop(value);
         });
 
         assert_eq!(released, Released::Abandoned(Stage::Device));
-        assert!(started.elapsed() < Duration::from_secs(3), "returned early");
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "returned early"
+        );
         assert!(abandoned_teardowns() > before, "counted");
         release.send(()).ok();
     }

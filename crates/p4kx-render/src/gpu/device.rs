@@ -46,6 +46,28 @@ pub(super) fn guarded<T>(device: &wgpu::Device, work: impl FnOnce() -> T) -> (T,
     (output, invalid.or(exhausted).is_some())
 }
 
+/// Returns an instance that sees every backend.
+pub(super) fn any_instance() -> wgpu::Instance {
+    wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle())
+}
+
+/// Returns an instance that sees only the backend that carries the software adapter.
+///
+/// On Windows that is Direct3D 12 (WARP). Creating an instance loads the driver of every backend
+/// it sees, together with the capture and overlay layers injected into those drivers, and a
+/// software run has no use for either.
+pub(super) fn software_instance() -> wgpu::Instance {
+    let backends = if cfg!(windows) {
+        wgpu::Backends::DX12
+    } else {
+        wgpu::Backends::all()
+    };
+    wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends,
+        ..wgpu::InstanceDescriptor::new_without_display_handle()
+    })
+}
+
 struct Unpark(Thread);
 
 impl Wake for Unpark {
