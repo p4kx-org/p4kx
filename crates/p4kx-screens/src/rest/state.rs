@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use p4kx_dataforge::Guid;
@@ -22,18 +22,29 @@ pub(crate) struct AtRest {
     pub(super) alpha: HashMap<usize, f32>,
     pub(super) canvases: HashMap<usize, Guid>,
     pub(super) typed: HashMap<usize, Vec<(String, Rest)>>,
+    pub(super) localised: HashMap<usize, Vec<(String, String)>>,
+    pub(super) text_bound: HashSet<usize>,
     pub(super) state_tags: HashMap<usize, Vec<Guid>>,
     pub(super) geometry: HashMap<usize, GeometryModifiers>,
     pub(super) left_out: Vec<(usize, String)>,
     pub(super) unknown: Vec<(usize, String, String)>,
 }
 
-/// Returns a number that tells apart the parameters a canvas is entered with.
-pub(crate) fn key_of(inputs: &[(String, Rest)]) -> u64 {
-    if inputs.is_empty() {
+/// Returns whether two typed parameters are the same one: parameters of different kinds, a
+/// boolean and a number, have their own names even where the text of the name is equal.
+pub(crate) fn same_parameter(name: &str, value: &Rest, other: &str, other_value: &Rest) -> bool {
+    name == other && std::mem::discriminant(value) == std::mem::discriminant(other_value)
+}
+
+/// Returns a number that tells apart the typed and the localised parameters a canvas is entered
+/// with.
+pub(crate) fn key_of(inputs: &[(String, Rest)], texts: &[(String, String)]) -> u64 {
+    if inputs.is_empty() && texts.is_empty() {
         return 0;
     }
     let mut hasher = DefaultHasher::new();
+    texts.hash(&mut hasher);
+    inputs.len().hash(&mut hasher);
     for (name, value) in inputs {
         name.hash(&mut hasher);
         match value {
@@ -76,11 +87,18 @@ impl AtRest {
             }
             (field, value) if field.starts_with(PARAMETER) => {
                 let values = self.typed.entry(widget).or_default();
-                values.retain(|(name, _)| name != field);
+                values.retain(|(name, old)| !same_parameter(name, old, field, &value));
                 values.push((field.to_owned(), value));
             }
             _ => {}
         }
+    }
+
+    /// Sets the localised parameter `parameter` that widget `widget` hands to its canvas.
+    pub(super) fn localise(&mut self, widget: usize, parameter: &str, text: String) {
+        let values = self.localised.entry(widget).or_default();
+        values.retain(|(name, _)| name != parameter);
+        values.push((parameter.to_owned(), text));
     }
 
     /// Adds the state tag `tag` of widget `widget`; none adds nothing.
@@ -129,6 +147,17 @@ impl AtRest {
     /// Returns the parameters the bindings hand to the canvas of the widget `widget`.
     pub(crate) fn typed(&self, widget: usize) -> &[(String, Rest)] {
         self.typed.get(&widget).map_or(&[], Vec::as_slice)
+    }
+
+    /// Returns the localised parameters the bindings hand to the canvas of the widget `widget`.
+    pub(crate) fn localised(&self, widget: usize) -> &[(String, String)] {
+        self.localised.get(&widget).map_or(&[], Vec::as_slice)
+    }
+
+    /// Returns whether a localised binding fills the text of widget `widget`, whatever the value
+    /// it has at rest.
+    pub(crate) fn is_text_bound(&self, widget: usize) -> bool {
+        self.text_bound.contains(&widget)
     }
 
     /// Returns the state tags the bindings give widget `widget`, which its styles select on like

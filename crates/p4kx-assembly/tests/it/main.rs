@@ -42,6 +42,7 @@ mod character_definitions;
 mod character_item_ports;
 mod character_skeletons;
 mod clothing_hidden;
+mod creature_animation;
 mod creature_skeleton;
 mod docked_vehicles;
 mod entity_catalogue;

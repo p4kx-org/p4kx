@@ -6,6 +6,7 @@
 //! value unless the caller sets it (ADR-0110, ADR-0259).
 
 mod eval;
+mod fields;
 mod graph;
 mod ops;
 mod state;
@@ -16,8 +17,9 @@ use std::rc::Rc;
 
 use p4kx_dataforge::Guid;
 
+pub(crate) use eval::{Given, TEXT_FIELD};
 pub(crate) use graph::Operations;
-pub(crate) use state::{AtRest, key_of};
+pub(crate) use state::{AtRest, key_of, same_parameter};
 
 /// A value of the operations graph.
 #[derive(Debug, Clone, PartialEq)]

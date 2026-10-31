@@ -198,7 +198,7 @@ pub trait ModelProvider: Sync {
 /// is judged for its colour once.
 #[derive(Debug)]
 pub struct ArchiveModels<'a> {
-    archive: &'a Archive,
+    pub(crate) archive: &'a Archive,
     index: PathIndex<'a>,
     max_attachment_vertices: usize,
     layers: LayerCache,

@@ -93,11 +93,11 @@ pub(crate) struct AnimationPlan {
 /// bones of `targets`.
 pub(crate) fn plan<'m>(
     layout: &mut Layout<'m>,
-    animations: &'m [Animation],
+    animations: impl IntoIterator<Item = &'m Animation>,
     targets: &Targets<'_>,
 ) -> Vec<AnimationPlan> {
     animations
-        .iter()
+        .into_iter()
         .map(|animation| plan_animation(layout, animation, targets))
         .collect()
 }

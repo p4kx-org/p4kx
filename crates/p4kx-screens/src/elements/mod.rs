@@ -57,6 +57,11 @@ pub(crate) fn is_rendered(type_name: &str) -> bool {
         )
 }
 
+/// Returns whether no background fill is drawn for `widget`: a runtime image.
+pub(crate) fn draws_no_background(widget: &Widget) -> bool {
+    widget.type_name == runtime::RUNTIME_IMAGE
+}
+
 pub(crate) fn paint(
     cx: &mut Context<'_>,
     widget: &Widget,

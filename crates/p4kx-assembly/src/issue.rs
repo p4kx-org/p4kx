@@ -381,4 +381,11 @@ pub enum IssueKind {
         /// The names of the first few of them.
         examples: Vec<String>,
     },
+    /// The animations a creature Entity names cannot be found or read, so none is written: its
+    /// animation database, the parameter file of its skeleton or the folder of its clips.
+    #[error("the animations are not written: {reason}")]
+    AnimationsUnavailable {
+        /// Why.
+        reason: String,
+    },
 }

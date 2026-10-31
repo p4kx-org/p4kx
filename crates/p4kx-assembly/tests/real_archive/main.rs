@@ -28,6 +28,7 @@ mod real_chf_tail;
 mod real_child_containers;
 mod real_clothing_hidden;
 mod real_container_census;
+mod real_creature_animations;
 mod real_creature_census;
 mod real_creature_ports;
 mod real_creature_skeletons;
