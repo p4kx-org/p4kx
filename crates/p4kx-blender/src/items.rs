@@ -68,6 +68,20 @@ pub(crate) fn items(assembly: &Assembly) -> Vec<Item<'_>> {
     items
 }
 
+/// Returns the Entity reference of `root`, empty when there is no root part.
+pub(crate) fn entity_ref(root: Option<&Part>) -> EntityRef {
+    root.map_or_else(
+        || EntityRef {
+            class_name: String::new(),
+            guid: String::new(),
+        },
+        |part| EntityRef {
+            class_name: part.class_name().to_owned(),
+            guid: part.guid().to_string(),
+        },
+    )
+}
+
 /// Lists the nodes of an Interior on its own: the container is the root, below it its `.soc`
 /// files, models, props, lights and nested containers. A node comes after its parent.
 pub(crate) fn interior_items(interior: &Interior) -> Vec<Item<'_>> {

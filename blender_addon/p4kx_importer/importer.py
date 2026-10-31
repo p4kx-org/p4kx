@@ -53,10 +53,10 @@ def import_package(
     Each mesh used by a node is imported once into a hidden template collection; every node that
     draws it becomes an empty that instances that collection. A node of the kind ``light`` becomes
     a Blender light with the settings of ``lights.light_settings`` at ``light_strength``. A node
-    whose mesh has a ``rig`` is a Character: its GLB is imported once for that node, not
-    instanced, so that its armature, shape keys and actions can be posed and animated, and the
-    imported top-level objects become children of the node's empty. Raises ``PackageError`` when
-    the glTF importer of Blender is not available.
+    whose mesh has a ``rig`` is a Character or a creature: its GLB is imported once for that
+    node, not instanced, so that its armature, shape keys and actions can be posed and animated,
+    and the imported top-level objects become children of the node's empty. Raises
+    ``PackageError`` when the glTF importer of Blender is not available.
     """
     if not hasattr(bpy.ops.import_scene, "gltf"):
         raise PackageError("Enable Blender's 'glTF 2.0 format' add-on first.")
@@ -74,7 +74,7 @@ def import_package(
             created[node.index] = _create_object(node, template, created, root)
             mesh = package.meshes[node.mesh] if node.mesh else None
             if mesh is not None and mesh.rig is not None:
-                _import_character(context, package, mesh, created[node.index], root, result)
+                _import_rigged(context, package, mesh, created[node.index], root, result)
         result.objects += 1
         result.instances += template is not None
     result.warnings.extend(package.warnings)
@@ -140,7 +140,7 @@ def _import_glb(
     return True
 
 
-def _import_character(
+def _import_rigged(
     context: bpy.types.Context,
     package: Package,
     mesh: Mesh,

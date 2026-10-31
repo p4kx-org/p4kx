@@ -5,6 +5,7 @@
 
 mod package_bone_attachment;
 mod package_character;
+mod package_creature;
 mod package_interior;
 mod package_landing_gear;
 mod package_layer_limits;

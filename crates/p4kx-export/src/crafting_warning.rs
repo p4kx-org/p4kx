@@ -108,6 +108,15 @@ pub enum CraftingWarning {
     /// The radar parameters do not name the slot of the scan signature, so `scanSignature` of
     /// `mineableEntities` is `null` everywhere; the text says why. `signatures` is still exported.
     UnknownScanSignatureSlot(&'static str),
+    /// This many stored names in the contract templates (a state, a category, a comms timing or
+    /// reason, a kind of objective property) are not known to the catalog, so they are `null`.
+    /// `details` gives each kind and value with its number, ordered.
+    UnknownTemplateValues {
+        /// The number of names.
+        count: usize,
+        /// One entry per kind and value: the kind, the value and the number.
+        details: Vec<String>,
+    },
 }
 
 impl CraftingWarning {
@@ -132,6 +141,7 @@ impl CraftingWarning {
             Self::MissingShopInventories(_) => "missing_shop_inventories",
             Self::NoShopComponents => "no_shop_components",
             Self::UnknownScanSignatureSlot(_) => "unknown_scan_signature_slot",
+            Self::UnknownTemplateValues { .. } => "unknown_template_values",
         }
     }
 
@@ -151,6 +161,7 @@ impl CraftingWarning {
             | Self::AmbiguousLootEntityFiles { count, .. }
             | Self::UnreadableHarvestables { count, .. }
             | Self::UnreadableVehicleFiles { count, .. }
+            | Self::UnknownTemplateValues { count, .. }
             | Self::UnreadableShopInventories { count, .. } => Some(*count),
             Self::UnreadableShopRegistry
             | Self::MissingShopRegistry
@@ -171,6 +182,7 @@ impl CraftingWarning {
             | Self::AmbiguousLootEntityFiles { details, .. }
             | Self::UnreadableHarvestables { details, .. }
             | Self::UnreadableVehicleFiles { details, .. }
+            | Self::UnknownTemplateValues { details, .. }
             | Self::UnreadableShopInventories { details, .. } => details,
             _ => &[],
         }
@@ -267,6 +279,11 @@ impl fmt::Display for CraftingWarning {
             Self::MissingShopInventories(count) => write!(
                 f,
                 "{count} shop inventory files that shop containers name are not in the Archive; the shops that use them have no item list"
+            ),
+            Self::UnknownTemplateValues { count, details } => write!(
+                f,
+                "{count} stored names in the contract templates are not known; they are null{}",
+                Listed(details)
             ),
             Self::UnknownScanSignatureSlot(reason) => write!(
                 f,

@@ -252,6 +252,16 @@ impl Assembly {
         self.interior = Some(interior);
         self
     }
+
+    /// Returns the Assembly without its Interior and without the issues of the Interior.
+    #[must_use]
+    pub fn without_interior(mut self) -> Self {
+        if let Some(before) = self.interior.take() {
+            let kept = self.issues.len().saturating_sub(before.issues.len());
+            self.issues.truncate(kept);
+        }
+        self
+    }
 }
 
 #[cfg(test)]
