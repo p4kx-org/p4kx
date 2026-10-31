@@ -7,7 +7,8 @@
 use std::error::Error;
 
 use p4kx_assembly::{
-    ArchiveModels, Assembly, AssemblyOptions, Attachment, EntityNode, Geometry, LoadoutResolver,
+    ArchiveModels, Assembly, AssemblyOptions, Attachment, BodyVariant, EntityNode, Geometry,
+    LoadoutResolver, NpcHead,
 };
 use p4kx_dataforge::DataForge;
 use p4kx_extraction::{Archive, DataForgeEntry};
@@ -132,8 +133,66 @@ fn geometry_at(node: &EntityNode, port: &str) -> Result<Option<String>, Box<dyn 
 #[test]
 fn a_generic_head_leaves_the_body_to_the_sub_type_of_the_body_entity() -> TestResult {
     let tree = resolve("TEST_ByBodySubType")?;
-    assert!(tree.character_body().is_none());
     assert_eq!(geometry_at(&tree, "torso")?.as_deref(), Some(JACKET_MALE));
+    Ok(())
+}
+
+#[test]
+fn the_character_body_of_a_generic_head_is_named_by_the_body_entity() -> TestResult {
+    let cases = [
+        ("TEST_ByBodySubType", BodyVariant::Male, "TEST_BodyMale"),
+        ("TEST_ByBodyFolder", BodyVariant::Female, "TEST_BodyFluid"),
+        ("TEST_FemaleBody", BodyVariant::Female, "TEST_BodyFemale"),
+    ];
+    for (class, variant, namer) in cases {
+        let tree = resolve(class)?;
+        let body = tree.character_body().ok_or(class)?;
+        assert_eq!(body.variant(), variant, "{class}");
+        assert_eq!(body.head().class_name(), "TEST_HeadGeneric", "{class}");
+        assert_eq!(body.named_by().class_name(), namer, "{class}");
+        assert!(!body.is_named_by_head(), "{class}");
+    }
+    Ok(())
+}
+
+#[test]
+fn the_character_body_of_a_head_that_names_a_body_is_named_by_the_head() -> TestResult {
+    let tree = resolve("TEST_HeadWins")?;
+    let body = tree.character_body().ok_or("no body")?;
+    assert_eq!(body.variant(), BodyVariant::Female);
+    assert!(body.is_named_by_head());
+    assert_eq!(body.named_by().class_name(), "TEST_HeadFemale");
+    Ok(())
+}
+
+#[test]
+fn a_character_whose_head_and_body_name_no_body_has_no_character_body() -> TestResult {
+    assert!(
+        resolve("TEST_UnknownBodyWearer")?
+            .character_body()
+            .is_none()
+    );
+    assert!(resolve("TEST_NoBody")?.character_body().is_none());
+    Ok(())
+}
+
+#[test]
+fn the_npc_head_of_a_generic_head_takes_the_body_of_the_body_entity() -> TestResult {
+    let bytes = database();
+    let forge = DataForge::open(&bytes)?;
+    let mut resolver = LoadoutResolver::new(&forge);
+    let cases = [
+        ("TEST_ByBodySubType", Some(BodyVariant::Male)),
+        ("TEST_FemaleBody", Some(BodyVariant::Female)),
+        ("TEST_HeadWins", Some(BodyVariant::Female)),
+        ("TEST_UnknownBodyWearer", None),
+    ];
+    for (class, expected) in cases {
+        let entity = resolver.entities().find(class)?;
+        let tree = resolver.resolve(&entity)?;
+        let head = resolver.npc_head(&tree);
+        assert_eq!(head.as_ref().map(NpcHead::variant), expected, "{class}");
+    }
     Ok(())
 }
 

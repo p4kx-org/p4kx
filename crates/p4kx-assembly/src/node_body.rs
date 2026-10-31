@@ -13,37 +13,53 @@ const HEAD_TYPE: &str = "Char_Head";
 /// The item type of the body of a character.
 pub(crate) const BODY_TYPE: &str = "Char_Body";
 
-/// The body a character wears and the head Entity whose sub-type names it.
+/// The body a character wears, the head Entity of the character and the Entity that names the
+/// body: the head, or for a generic head the `Char_Body` Entity.
 #[derive(Debug, Clone, Copy)]
 pub struct CharacterBody<'n> {
     variant: BodyVariant,
     head: &'n EntityNode,
+    named_by: &'n EntityNode,
 }
 
 impl<'n> CharacterBody<'n> {
-    /// Returns the body variant the head's sub-type names.
+    /// Returns the body variant.
     #[must_use]
     pub const fn variant(&self) -> BodyVariant {
         self.variant
     }
 
-    /// Returns the head Entity that names the body.
+    /// Returns the head Entity of the character.
     #[must_use]
     pub const fn head(&self) -> &'n EntityNode {
         self.head
     }
+
+    /// Returns the Entity that names the body: the head, else the `Char_Body` Entity.
+    #[must_use]
+    pub const fn named_by(&self) -> &'n EntityNode {
+        self.named_by
+    }
+
+    /// Returns whether the head names the body, not the `Char_Body` Entity.
+    #[must_use]
+    pub fn is_named_by_head(&self) -> bool {
+        std::ptr::eq(self.head, self.named_by)
+    }
 }
 
 impl EntityNode {
-    /// Returns the body of the character in the tree below this Entity: the one the sub-type of
-    /// the first `Char_Head` Entity names; `None` for a tree without a head or with a head whose
-    /// sub-type names no body.
+    /// Returns the body of the character in the tree below this Entity (see
+    /// [`EntityNode::body_variant`] for how it is named) and its first `Char_Head` Entity; `None`
+    /// for a tree without a head or whose head and `Char_Body` Entity name no body.
     #[must_use]
     pub fn character_body(&self) -> Option<CharacterBody<'_>> {
         let head = find_head(self.ports())?;
+        let (variant, named_by) = self.naming(Some(head))?;
         Some(CharacterBody {
-            variant: variant_of(head)?,
+            variant,
             head,
+            named_by,
         })
     }
 
@@ -51,13 +67,21 @@ impl EntityNode {
     /// that names one: the sub-type of its `Char_Head` Entity (the generic head of most NPCs
     /// names none), the sub-type of its `Char_Body` Entity, the folder of the model of that body.
     pub(crate) fn body_variant(&self) -> Option<BodyVariant> {
-        self.character_body()
-            .map(|found| found.variant)
-            .or_else(|| {
-                let body = find_item(self.ports(), is_body_type)?;
-                BodyVariant::from_code(&body.attach_sub_type)
-                    .or_else(|| BodyVariant::of_model_path(body.geometry()?.path()))
-            })
+        let head = find_head(self.ports());
+        self.naming(head).map(|(variant, _)| variant)
+    }
+
+    /// Returns the body and the Entity that names it, trying `head` before the `Char_Body` Entity.
+    fn naming<'n>(&'n self, head: Option<&'n Self>) -> Option<(BodyVariant, &'n Self)> {
+        if let Some(head) = head
+            && let Some(variant) = variant_of(head)
+        {
+            return Some((variant, head));
+        }
+        let body = find_item(self.ports(), is_body_type)?;
+        BodyVariant::from_code(&body.attach_sub_type)
+            .or_else(|| BodyVariant::of_model_path(body.geometry()?.path()))
+            .map(|variant| (variant, body))
     }
 }
 

@@ -66,6 +66,8 @@ fn the_report_names_the_body_and_the_head_that_chose_it() -> TestResult {
     let report: Value = serde_json::from_slice(&output.stdout)?;
     assert_eq!(report["body"]["variant"], "female");
     assert_eq!(report["body"]["head"], "TEST_Head");
+    assert_eq!(report["body"]["named_by"], "TEST_Head");
+    assert_eq!(report["body"]["named_by_head"], true);
     Ok(())
 }
 

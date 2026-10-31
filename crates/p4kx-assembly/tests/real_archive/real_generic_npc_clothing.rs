@@ -195,6 +195,58 @@ fn the_character_items_that_name_only_a_world_prop_are_the_census_of_the_adr() -
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn the_character_body_and_the_npc_head_of_a_generic_npc_follow_its_body_entity() -> TestResult {
+    let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let forge = entry.open()?;
+    let files = ArchiveFiles::new(&archive);
+    let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
+    for (class, variant) in [(MALE, BodyVariant::Male), (FEMALE, BodyVariant::Female)] {
+        let record = resolver.entities().find(class)?;
+        let tree = resolver.resolve(&record)?;
+        let body = tree.character_body().ok_or(class)?;
+        assert_eq!(body.variant(), variant, "{class}");
+        assert!(!body.is_named_by_head(), "{class}");
+        let head = resolver.npc_head(&tree).ok_or(class)?;
+        assert_eq!(head.variant(), variant, "{class}");
+        assert_eq!(head.class_name(), body.head().class_name(), "{class}");
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn most_npc_archetypes_have_a_character_body_named_by_their_body_entity() -> TestResult {
+    let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let forge = entry.open()?;
+    let files = ArchiveFiles::new(&archive);
+    let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
+    let (mut by_head, mut by_body, mut none) = (0_usize, 0_usize, 0_usize);
+    for record in forge
+        .records()
+        .filter(|record| record.type_name().is_ok_and(|name| name == ENTITY_TYPE))
+        .filter(|record| record.name().is_ok_and(|name| name.contains(NPC_MARKER)))
+    {
+        let Ok(tree) = resolver.resolve(&record) else {
+            continue;
+        };
+        match tree.character_body() {
+            Some(body) if body.is_named_by_head() => by_head += 1,
+            Some(_) => by_body += 1,
+            None => none += 1,
+        }
+    }
+    assert!(by_body > 1000, "{by_body} by body, {none} none");
+    assert!(
+        by_body > by_head,
+        "{by_head} named by head, {by_body} by body"
+    );
+    Ok(())
+}
+
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_body_of_a_generic_npc_is_cut_under_its_clothing() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
     let entry = DataForgeEntry::read(&archive)?;
