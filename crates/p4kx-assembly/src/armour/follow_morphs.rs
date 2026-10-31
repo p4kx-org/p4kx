@@ -6,6 +6,7 @@ use p4kx_model::{Mesh, Model};
 use rayon::prelude::*;
 
 use super::follow::{Grid, Vec3};
+use super::head_move::first_mesh;
 
 /// The smallest move of a vertex, in metres, that a morph target of what follows the head keeps.
 const REST: f32 = 1e-5;
@@ -62,14 +63,6 @@ impl Seen {
             .get_mut(vertex as usize)
             .is_some_and(|mark| std::mem::replace(mark, round) != round)
     }
-}
-
-fn first_mesh(model: &Model) -> Option<&Mesh> {
-    model
-        .lods
-        .first()
-        .filter(|lod| lod.level == 0)
-        .and_then(|lod| lod.meshes.first())
 }
 
 impl Spread<'_> {
@@ -134,8 +127,8 @@ impl Spread<'_> {
 /// the head's vertices around it, as it does for the neutral shape, see
 /// [`follow`](super::follow::follow).
 ///
-/// A target that moves none of the vertices is left out; `of` lists the head target each kept
-/// target stands for. A model whose first level of detail is not 0 has none.
+/// `model`, `head` and `targets` are at the same level of detail. A target that moves none of the
+/// vertices is left out; `of` lists the head target each kept target stands for.
 pub(super) fn follow_morphs(model: &Model, head: &Mesh, targets: &[MorphTarget]) -> Followed {
     let Some(mesh) = first_mesh(model) else {
         return Followed::none();
@@ -167,3 +160,7 @@ pub(super) fn follow_morphs(model: &Model, head: &Mesh, targets: &[MorphTarget])
     let (of, targets) = made.into_iter().unzip();
     Followed { targets, of }
 }
+
+#[cfg(test)]
+#[path = "follow_morphs_tests.rs"]
+mod tests;

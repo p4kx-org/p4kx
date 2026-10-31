@@ -193,10 +193,10 @@ fn draw_picture(
     let bytes = write(&picture, &args.out)?;
     let total = started.elapsed();
     let adapter = offscreen.adapter_name().to_owned();
-    if offscreen.close() == Released::Abandoned {
+    if let Released::Abandoned(stage) = offscreen.close() {
         writeln!(
             io::stderr().lock(),
-            "warning: the graphics driver did not release the device in time; the picture is written"
+            "warning: the graphics driver did not release the device in time ({stage}); the picture is written"
         )?;
     }
     Ok(Outcome {

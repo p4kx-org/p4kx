@@ -21,10 +21,11 @@ too. A piece whose targets do not match the head's blendshapes takes no weights 
 `follow_weights_skipped`.
 
 **Scope.** Only the first mesh of the first level of detail of the piece gets targets, as in
-`p4kx_gltf::RigPiece::with_morphs`, and only at level 0, where the head's rig has expressions; a
-piece with several meshes at level 0 is listed as `follow_morphs_first_mesh_only`. The eyes and
-teeth are shaped by their own rigs and have no expression targets. Amendment (#726): the facial
-joints (ADR-0098) are followed too, by binding the hair to them (ADR-0299).
+`p4kx_gltf::RigPiece::with_morphs`; a piece with several meshes is listed as
+`follow_morphs_first_mesh_only`. The eyes and teeth are shaped by their own rigs and have no
+expression targets. Amendment (#726): the facial joints (ADR-0098) are followed too, by binding the
+hair to them (ADR-0299). Amendment (#961): at every level of detail, from the targets the head has
+there (ADR-0305).
 
 ## Consequences
 

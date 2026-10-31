@@ -49,9 +49,18 @@ pub struct EntityNode {
     pub(crate) container: Option<Guid>,
     pub(crate) object_containers: Arc<[ObjectContainerRef]>,
     pub(crate) zones: Arc<[ZoneChunk]>,
+    pub(crate) hidden_ports: Arc<[String]>,
 }
 
 impl EntityNode {
+    /// Returns the names of the ports whose items are not drawn when the Entity is worn, from the
+    /// `HiddenParts` of its Record: a hat hides the hair. The names are in lower case, as the
+    /// reader of the Record lowers them; compare them ignoring case.
+    #[must_use]
+    pub fn hidden_ports(&self) -> &[String] {
+        &self.hidden_ports
+    }
+
     /// Returns what the Entity offers a port: its item type, sub-type and size.
     #[must_use]
     pub fn item_facts(&self) -> ItemFacts {

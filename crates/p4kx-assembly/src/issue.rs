@@ -303,11 +303,11 @@ pub enum IssueKind {
         /// The name of the head rig the DNA names.
         rig: String,
     },
-    /// A piece that follows the head has several meshes at level 0; only the first follows the
-    /// head's expressions.
-    #[error("{meshes} meshes at level 0: only the first follows the expressions of the head")]
+    /// A piece that follows the head has several meshes at the level of detail built; only the
+    /// first follows the head's expressions.
+    #[error("{meshes} meshes: only the first follows the expressions of the head")]
     FollowMorphsFirstMeshOnly {
-        /// The meshes of the piece at level 0.
+        /// The meshes of the piece at the level of detail built.
         meshes: usize,
     },
     /// The morph targets of a piece that follows the head take no animation weights.

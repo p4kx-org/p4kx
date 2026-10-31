@@ -14,7 +14,8 @@ use crate::{BodyVariant, EntityNode, Issue, IssueKind};
 
 const BODY_TYPE: &str = "Char_Body";
 
-fn is_body(draft: &Draft<'_>) -> bool {
+/// Returns whether the part is the body of a character: an Entity of the type `Char_Body`.
+pub(crate) fn is_body(draft: &Draft<'_>) -> bool {
     draft.node.attach_type().eq_ignore_ascii_case(BODY_TYPE)
 }
 

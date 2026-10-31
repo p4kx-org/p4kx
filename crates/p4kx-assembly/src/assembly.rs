@@ -192,8 +192,9 @@ impl Part {
         self.model.as_deref()
     }
 
-    /// Returns whether the part is hidden: it sits on a port flagged `invisible`, or below one,
-    /// and has no model, as the game does not draw it.
+    /// Returns whether the part is hidden: it sits on a port flagged `invisible` or at a port a
+    /// worn Entity hides by its `HiddenParts`, or below one, and has no model, as the game does
+    /// not draw it.
     #[must_use]
     pub const fn is_hidden(&self) -> bool {
         self.hidden

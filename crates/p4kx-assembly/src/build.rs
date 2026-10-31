@@ -9,6 +9,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::build_attachments::attached;
 use crate::build_gear::load_models;
+use crate::build_hidden::hide_worn;
 use crate::build_models::{Loaded, choose_models};
 use crate::build_palettes::Palettes;
 use crate::build_place::{place, under_skin};
@@ -73,7 +74,8 @@ impl Assembly {
         palettes: Option<&dyn PaletteProvider>,
         options: &AssemblyOptions,
     ) -> Result<Self, AssemblyError> {
-        let flat = flatten(tree, options.max_parts);
+        let mut flat = flatten(tree, options.max_parts);
+        hide_worn(&mut flat);
         let mut issues = flat.issues;
         let mut drafts = flat.drafts;
         let loaded = load_models(&mut drafts, models, options, &mut issues)?;

@@ -565,7 +565,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   head, mixed by the DNA so that they move the character's own face and stored sparse;
   `--expression NAME` (repeatable) limits them, `--no-expressions` leaves them out. A lower level carries the
   targets of LOD 0 to its own vertices (ADR-0293). Hair, brows, lashes and beard get morph targets of their own that follow the head's
-  (on the first mesh of each, at LOD 0 only); eyes and teeth have none. `--lod N` picks
+  (on the first mesh of each, at every LOD, ADR-0305; they multiply the size of the GLB by about 3.5 at
+  every level, `--no-expressions` writes the small file); eyes and teeth have none. `--lod N` picks
   the level of detail of head and body, `--no-vertex-colours` leaves the vertex colours out (they
   are written as `COLOR_0` only on primitives whose material reads them, ADR-0253). A head
   that cannot be shaped (its rig is missing, belongs to another rig or does not match the skin) is

@@ -35,6 +35,8 @@ mod piece;
 mod read_models;
 mod sample;
 mod shape;
+#[cfg(test)]
+mod test_models;
 mod uncover;
 mod unused;
 mod vec3;

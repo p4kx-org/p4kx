@@ -60,6 +60,16 @@ impl Draft<'_> {
 pub(crate) struct Flat<'t> {
     pub(crate) drafts: Vec<Draft<'t>>,
     pub(crate) issues: Vec<Issue>,
+    pub(crate) unresolved: Vec<UnresolvedPort<'t>>,
+}
+
+/// An attachment that could not be resolved: its issue, the draft whose Loadout holds it and the
+/// name of its port.
+#[derive(Clone, Copy)]
+pub(crate) struct UnresolvedPort<'t> {
+    pub(crate) issue: usize,
+    pub(crate) owner: usize,
+    pub(crate) port: &'t str,
 }
 
 /// Lists the Entities of the tree below `root`, depth first in port order, at most
@@ -78,6 +88,7 @@ pub(crate) fn flatten(root: &EntityNode, max_parts: usize) -> Flat<'_> {
                 hidden: false,
             }],
             issues: Vec::new(),
+            unresolved: Vec::new(),
         },
         full: false,
         max_parts,
@@ -122,6 +133,11 @@ impl<'t> Walker<'t> {
                         Target::ClassName(name) => name.clone(),
                         Target::Unreadable => String::new(),
                     };
+                    self.flat.unresolved.push(UnresolvedPort {
+                        issue: self.flat.issues.len(),
+                        owner,
+                        port: port.name(),
+                    });
                     self.issue(
                         &path,
                         &name,

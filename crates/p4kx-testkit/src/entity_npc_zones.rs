@@ -3,12 +3,14 @@
 
 use crate::entity_armour::MALE_ARMOUR;
 use crate::entity_clothing::TestZoneChunk;
-use crate::entity_zones::{zone_entries_with, zone_shirt};
-use crate::{TestEntity, TestEntry, TestLoadout, TestLoadoutEntry, ZONE_SHIRT};
+use crate::entity_zones::{zone_entries_with, zone_jacket, zone_shirt, zone_shirt_hiding};
+use crate::{TestEntity, TestEntry, TestLoadout, TestLoadoutEntry, ZONE_JACKET, ZONE_SHIRT};
 
 /// The class name of the character of [`npc_zone_entries`].
 pub const NPC_ZONE_CLASS: &str = "TEST_ZoneNpc";
 
+const ZONE_POUCH: &str = "TEST_ZonePouch";
+const ZONE_GUN: &str = "TEST_ZoneGun";
 const MALE_SKIN: &str = "Objects/Characters/Human/male_v7/body/m_body.skin";
 const FEMALE_SKIN: &str = "Objects/Characters/Human/female_v2/body/f_body.skin";
 
@@ -41,11 +43,78 @@ pub fn npc_zone_entries(
     chunks: &[TestZoneChunk],
     options: NpcZoneOptions,
 ) -> Vec<TestEntry> {
-    let default_skin = if options.female {
-        FEMALE_SKIN
+    npc_entries(bodies, zone_shirt(chunks), None, &[], options)
+}
+
+/// Something more [`npc_jacketed_entries`] puts in the tree of the character.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NpcExtra {
+    /// A pouch (`Char_Clothing_Backpack`) on `Pouch_ItemPort` of the shirt.
+    Pouch,
+    /// A class that does not exist on the port of this name below the body.
+    Missing(&'static str),
+    /// A weapon (`WeaponPersonal`) on the port of this name below the body.
+    Weapon(&'static str),
+    /// A second character: a body on `Second_ItemPort` of the root that wears the shirt on
+    /// `Clothing_Torso_0`.
+    SecondWearer,
+}
+
+/// Returns the Entries of [`npc_zone_entries`] with [`ZONE_JACKET`] worn at `Clothing_Torso_1`
+/// too, and what `extras` add.
+///
+/// The shirt covers `shirt.0` and hides the items at the ports `shirt.1`; the jacket covers
+/// `jacket.0` and hides the items at the ports `jacket.1`.
+#[must_use]
+pub fn npc_jacketed_entries(
+    bodies: [&[[f32; 2]]; 2],
+    shirt: (&[TestZoneChunk], &[&str]),
+    jacket: (&[TestZoneChunk], &[&str]),
+    extras: &[NpcExtra],
+) -> Vec<TestEntry> {
+    npc_entries(
+        bodies,
+        zone_shirt_hiding(shirt.0, shirt.1),
+        Some(zone_jacket(jacket.0, jacket.1)),
+        extras,
+        NpcZoneOptions::default(),
+    )
+}
+
+/// Returns the shirt as the Loadout of a body holds it, with the pouch on its port if asked.
+fn shirt_entry(with_pouch: bool) -> TestLoadoutEntry {
+    let entry = TestLoadoutEntry::class("Clothing_Torso_0", ZONE_SHIRT);
+    if with_pouch {
+        entry.loadout(TestLoadout::Manual(vec![TestLoadoutEntry::class(
+            "Pouch_ItemPort",
+            ZONE_POUCH,
+        )]))
     } else {
-        MALE_SKIN
-    };
+        entry
+    }
+}
+
+/// Returns what `extra` puts below the body, if it puts something there.
+fn extra_entry(extra: &NpcExtra) -> Option<TestLoadoutEntry> {
+    match extra {
+        NpcExtra::Missing(port) => Some(TestLoadoutEntry::class(*port, "TEST_ZoneMissing")),
+        NpcExtra::Weapon(port) => Some(TestLoadoutEntry::class(*port, ZONE_GUN)),
+        NpcExtra::Pouch | NpcExtra::SecondWearer => None,
+    }
+}
+
+/// Returns the Entities the extras name: the pouch and the weapon.
+fn extra_entities() -> [TestEntity; 2] {
+    [
+        TestEntity::new(0x36, ZONE_POUCH, "entities/scitem/test_zone_pouch.xml")
+            .attach_type("Char_Clothing_Backpack"),
+        TestEntity::new(0x37, ZONE_GUN, "entities/scitem/test_zone_gun.xml")
+            .attach_type("WeaponPersonal"),
+    ]
+}
+
+/// Returns the head, the body and the spare body of the character.
+fn character_entities(options: NpcZoneOptions, default_skin: &str) -> [TestEntity; 3] {
     let head = TestEntity::new(
         0x31,
         "TEST_ZoneNpcHead",
@@ -60,8 +129,34 @@ pub fn npc_zone_entries(
     )
     .attach_type(options.body_type.unwrap_or("Char_Body"))
     .geometry(options.body_skin.unwrap_or(default_skin), None::<&str>);
-    let mut worn = vec![TestLoadoutEntry::class("Clothing_Torso_0", ZONE_SHIRT)];
-    let mut shirt = zone_shirt(chunks);
+    let spare = TestEntity::new(
+        0x34,
+        "TEST_ZoneNpcSpareBody",
+        "entities/scitem/test_zone_spare_body.xml",
+    )
+    .attach_type("Char_Body")
+    .geometry(default_skin, None::<&str>);
+    [head, body, spare]
+}
+
+fn npc_entries(
+    bodies: [&[[f32; 2]]; 2],
+    mut shirt: TestEntity,
+    jacket: Option<TestEntity>,
+    extras: &[NpcExtra],
+    options: NpcZoneOptions,
+) -> Vec<TestEntry> {
+    let default_skin = if options.female {
+        FEMALE_SKIN
+    } else {
+        MALE_SKIN
+    };
+    let characters = character_entities(options, default_skin);
+    let mut worn = vec![shirt_entry(extras.contains(&NpcExtra::Pouch))];
+    worn.extend(extras.iter().filter_map(extra_entry));
+    if jacket.is_some() {
+        worn.push(TestLoadoutEntry::class("Clothing_Torso_1", ZONE_JACKET));
+    }
     if options.headless {
         shirt = shirt.geometry(format!("{MALE_ARMOUR}/m_suit.skin"), None::<&str>);
     } else {
@@ -70,13 +165,6 @@ pub fn npc_zone_entries(
             TestLoadoutEntry::class("Head_ItemPort", "TEST_ZoneNpcHead"),
         );
     }
-    let spare = TestEntity::new(
-        0x34,
-        "TEST_ZoneNpcSpareBody",
-        "entities/scitem/test_zone_spare_body.xml",
-    )
-    .attach_type("Char_Body")
-    .geometry(default_skin, None::<&str>);
     let mut ports = vec![
         TestLoadoutEntry::class("Body_ItemPort", "TEST_ZoneNpcBody")
             .loadout(TestLoadout::Manual(worn)),
@@ -87,9 +175,20 @@ pub fn npc_zone_entries(
             "TEST_ZoneNpcSpareBody",
         ));
     }
+    if extras.contains(&NpcExtra::SecondWearer) {
+        ports.push(
+            TestLoadoutEntry::class("Second_ItemPort", "TEST_ZoneNpcSpareBody")
+                .loadout(TestLoadout::Manual(vec![shirt_entry(false)])),
+        );
+    }
     let npc = TestEntity::new(0x33, NPC_ZONE_CLASS, "entities/scitem/test_zone_npc.xml")
         .loadout(TestLoadout::Manual(ports));
-    let npc = [head, body, spare, npc];
+    let npc: Vec<TestEntity> = characters
+        .into_iter()
+        .chain([npc])
+        .chain(extra_entities())
+        .chain(jacket)
+        .collect();
     let mut entries = zone_entries_with(bodies, &shirt, &npc);
     if let Some(skin) = options.body_skin {
         entries.extend(copies_of(&entries, default_skin, skin));

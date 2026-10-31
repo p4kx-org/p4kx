@@ -73,6 +73,7 @@ pub mod audio;
 mod build;
 mod build_attachments;
 mod build_gear;
+mod build_hidden;
 mod build_models;
 mod build_palettes;
 mod build_place;
@@ -92,6 +93,7 @@ mod flatten;
 mod gear_clip;
 mod gear_pose;
 mod geometry;
+mod hide_rule;
 mod hologram;
 mod interior;
 #[cfg(feature = "verification")]

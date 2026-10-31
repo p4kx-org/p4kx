@@ -24,7 +24,7 @@ pub use assembly::{
 pub use camera::{Camera, HologramView, Matrix, Step, Uniforms};
 pub use gpu::{
     Adapters, AssemblyDraw, Colours, Frame, GpuReport, Hologram, Look, MAX_TEXTURE_SIDE, Offscreen,
-    OffscreenError, Picture, Rejected, Released, Renderer, Shading, Subject, Unavailable,
+    OffscreenError, Picture, Rejected, Released, Renderer, Shading, Stage, Subject, Unavailable,
     abandoned_teardowns, check_buffer, check_texture, target_extent,
 };
 pub use scene::{
