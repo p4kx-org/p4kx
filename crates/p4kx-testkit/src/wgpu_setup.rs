@@ -18,13 +18,21 @@ use egui_kittest::wgpu::default_wgpu_setup;
 /// that names no Direct3D 12 backend is kept as it is.
 #[must_use]
 pub fn software_wgpu_setup() -> WgpuSetup {
-    let mut setup = default_wgpu_setup();
-    #[cfg(windows)]
+    limited(default_wgpu_setup())
+}
+
+#[cfg(windows)]
+fn limited(mut setup: WgpuSetup) -> WgpuSetup {
     if let WgpuSetup::CreateNew(create) = &mut setup {
-        let limited = create.instance_descriptor.backends & Backends::DX12;
-        if !limited.is_empty() {
-            create.instance_descriptor.backends = limited;
+        let direct3d = create.instance_descriptor.backends & Backends::DX12;
+        if !direct3d.is_empty() {
+            create.instance_descriptor.backends = direct3d;
         }
     }
+    setup
+}
+
+#[cfg(not(windows))]
+const fn limited(setup: WgpuSetup) -> WgpuSetup {
     setup
 }
