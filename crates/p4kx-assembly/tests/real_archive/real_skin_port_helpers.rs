@@ -13,6 +13,9 @@ use p4kx_testkit::{real_archive_key, real_archive_path};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+/// The most Entity Records the scan may fail to resolve; LIVE has 0.
+const MAX_UNRESOLVED: usize = 0;
+
 /// Returns whether the port is defined by its Entity as a skin attachment.
 fn is_skin(port: &PortNode) -> bool {
     port.definition()
@@ -36,12 +39,14 @@ fn the_skin_ports_without_a_helper_are_counted() -> TestResult {
         .with_files(&files)
         .stopping_at_docked_vehicles();
     let mut skin_ports = 0_usize;
+    let mut unresolved = 0_usize;
     let mut without_helper = Vec::new();
     for record in forge
         .records()
         .filter(|record| record.type_name().is_ok_and(|name| name == ENTITY_TYPE))
     {
         let Ok(tree) = resolver.resolve(&record) else {
+            unresolved += 1;
             continue;
         };
         for port in tree.ports().iter().filter(|port| is_skin(port)) {
@@ -52,12 +57,17 @@ fn the_skin_ports_without_a_helper_are_counted() -> TestResult {
         }
     }
     println!(
-        "{skin_ports} skin ports in the Entity Records, {} without a helper",
+        "{skin_ports} skin ports in the Entity Records, {} without a helper, {unresolved} Records \
+         not resolved",
         without_helper.len()
     );
     for line in without_helper.iter().take(10) {
         println!("    {line}");
     }
     assert!(skin_ports > 0, "no skin port found");
+    assert!(
+        unresolved <= MAX_UNRESOLVED,
+        "{unresolved} Entity Records did not resolve"
+    );
     Ok(())
 }
