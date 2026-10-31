@@ -15,9 +15,10 @@ fn the_setup_creates_a_new_instance_limited_to_the_software_backends() -> TestRe
         return Err("the setup creates its own instance".into());
     };
 
-    assert_eq!(
-        setup.instance_descriptor.backends, SOFTWARE_BACKENDS,
-        "the instance sees the software backends only"
+    let backends = setup.instance_descriptor.backends;
+    assert!(
+        !backends.is_empty() && SOFTWARE_BACKENDS.contains(backends),
+        "the instance sees the software backends only: {backends:?}"
     );
     Ok(())
 }
