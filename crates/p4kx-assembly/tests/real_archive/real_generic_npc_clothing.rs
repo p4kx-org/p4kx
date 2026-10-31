@@ -8,7 +8,7 @@ use std::error::Error;
 
 use p4kx_assembly::{
     ArchiveFiles, ArchiveModels, Assembly, AssemblyOptions, Attachment, BodyVariant, EntityNode,
-    IssueKind, LoadoutResolver,
+    IssueKind, LoadoutResolver, Piece,
 };
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::{real_archive_key, real_archive_path};
@@ -210,6 +210,11 @@ fn the_character_body_and_the_npc_head_of_a_generic_npc_follow_its_body_entity()
         let head = resolver.npc_head(&tree).ok_or(class)?;
         assert_eq!(head.variant(), variant, "{class}");
         assert_eq!(head.class_name(), body.head().class_name(), "{class}");
+        assert_eq!(
+            head.pieces().first().map(Piece::name),
+            Some("head"),
+            "{class}"
+        );
     }
     Ok(())
 }

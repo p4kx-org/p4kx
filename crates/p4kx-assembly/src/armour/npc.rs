@@ -8,8 +8,10 @@ use crate::{Attachment, EntityNode, PortNode};
 
 const HEAD_SUFFIX: &str = "_head";
 
-/// The head of a story character as its Loadout gives it: the head Entity and what sits on its
-/// ports, as pieces to wear on the body.
+/// The head of a character as its Loadout gives it: the head Entity, when it names a model, and
+/// what sits on its ports, as pieces to wear on the body.
+///
+/// A story character's head and the generic head of other NPCs both qualify.
 ///
 /// A head whose material library lives in a folder of its own has a bespoke skin there, see
 /// [`Piece::bespoke_in`]; [`NpcHead::folder`] names that folder.
@@ -28,7 +30,8 @@ impl NpcHead {
         &self.class_name
     }
 
-    /// Returns the body variant the head's sub-type names, `Male` or `Female`.
+    /// Returns the body variant of the character, `Male` or `Female`: the one its head names,
+    /// else the one its `Char_Body` Entity names.
     #[must_use]
     pub const fn variant(&self) -> BodyVariant {
         self.variant
@@ -67,6 +70,11 @@ impl NpcHead {
     }
 }
 
+/// Returns whether the Entity names a model, main or per body.
+fn has_geometry(wearable: &Wearable) -> bool {
+    wearable.geometry().is_some() || !wearable.variants().is_empty()
+}
+
 /// Returns the folder part of `path`, with `/` as separator.
 fn folder_of(path: &str) -> Option<String> {
     let unified = path.replace('\\', "/");
@@ -90,7 +98,8 @@ impl LoadoutResolver<'_> {
     ///
     /// The sub-geometry an item takes is the one tagged with a flag of the head's port it sits
     /// at; the material library of an item is chosen by the tags of the Entities on its own ports,
-    /// e.g. a hair colour. `None` when the tree has no head or its sub-type names no body.
+    /// e.g. a hair colour. `None` when the tree has no head or neither the head nor the
+    /// `Char_Body` Entity names a body.
     pub fn npc_head(&mut self, tree: &EntityNode) -> Option<NpcHead> {
         let body = tree.character_body()?;
         let (head, variant) = (body.head(), body.variant());
@@ -118,10 +127,13 @@ impl LoadoutResolver<'_> {
             prefix,
             library,
         });
-        let mut pieces = vec![bespoke(
-            Piece::wearable(wearable).named("head"),
-            own.as_ref(),
-        )];
+        let mut pieces = Vec::new();
+        if has_geometry(&wearable) {
+            pieces.push(bespoke(
+                Piece::wearable(wearable).named("head"),
+                own.as_ref(),
+            ));
+        }
         for port in head.ports() {
             if let Some(piece) = self.item_piece(port, &spec.port_flags) {
                 pieces.push(bespoke(piece, own.as_ref()));
@@ -150,7 +162,7 @@ impl LoadoutResolver<'_> {
             }
         };
         let wearable = Wearable::from_spec(spec);
-        if wearable.geometry().is_none() && wearable.variants().is_empty() {
+        if !has_geometry(&wearable) {
             return None;
         }
         let tags = item

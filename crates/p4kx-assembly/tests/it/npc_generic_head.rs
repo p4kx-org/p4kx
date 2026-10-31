@@ -8,7 +8,7 @@ use std::error::Error;
 
 use p4kx_assembly::{
     ArchiveModels, Assembly, AssemblyOptions, Attachment, BodyVariant, EntityNode, Geometry,
-    LoadoutResolver, NpcHead,
+    LoadoutResolver, NpcHead, Piece,
 };
 use p4kx_dataforge::DataForge;
 use p4kx_extraction::{Archive, DataForgeEntry};
@@ -184,14 +184,34 @@ fn the_npc_head_of_a_generic_head_takes_the_body_of_the_body_entity() -> TestRes
     let cases = [
         ("TEST_ByBodySubType", Some(BodyVariant::Male)),
         ("TEST_FemaleBody", Some(BodyVariant::Female)),
+        ("TEST_ByBodyFolder", Some(BodyVariant::Female)),
         ("TEST_HeadWins", Some(BodyVariant::Female)),
         ("TEST_UnknownBodyWearer", None),
+        ("TEST_NoBody", None),
     ];
     for (class, expected) in cases {
         let entity = resolver.entities().find(class)?;
         let tree = resolver.resolve(&entity)?;
         let head = resolver.npc_head(&tree);
         assert_eq!(head.as_ref().map(NpcHead::variant), expected, "{class}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_generic_head_without_a_model_gives_no_head_piece_and_a_head_with_one_gives_it() -> TestResult {
+    let bytes = database();
+    let forge = DataForge::open(&bytes)?;
+    let mut resolver = LoadoutResolver::new(&forge);
+    for (class, pieces) in [
+        ("TEST_ByBodySubType", Vec::new()),
+        ("TEST_HeadWins", vec!["head"]),
+    ] {
+        let entity = resolver.entities().find(class)?;
+        let tree = resolver.resolve(&entity)?;
+        let head = resolver.npc_head(&tree).ok_or(class)?;
+        let names: Vec<&str> = head.pieces().iter().map(Piece::name).collect();
+        assert_eq!(names, pieces, "{class}");
     }
     Ok(())
 }
