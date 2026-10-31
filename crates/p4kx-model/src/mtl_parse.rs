@@ -7,7 +7,9 @@ use crate::mtl::{MAX_SUB_MATERIALS, MAX_TEXTURE_SLOTS};
 use crate::mtl_raw::{Budget, attributes, layers, other_elements, public_params, raw};
 use crate::mtl_shader::GLASS_SHADER;
 use crate::mtl_xml::XmlElement;
-use crate::{Material, MaterialError, MaterialFlags, MaterialLibrary, PaletteSlot, TextureSlot};
+use crate::{
+    Material, MaterialError, MaterialFlags, MaterialLibrary, PaletteSlot, StencilTint, TextureSlot,
+};
 
 const DEFAULT_DIFFUSE: [f32; 3] = [1.0; 3];
 const DEFAULT_SPECULAR: [f32; 3] = [0.04; 3];
@@ -117,6 +119,7 @@ fn material<'a>(
         textures,
         palette: palette_slot(element),
         tinted: false,
+        decal_colours: None,
         other_attributes: attributes(element)
             .into_iter()
             .filter(|(name, _)| {
@@ -132,11 +135,14 @@ fn material<'a>(
         diffuse_map_is_grey: None,
     };
     if built.palette.is_none()
-        && built
-            .stencil_motif()
-            .is_some_and(|stencil| stencil.palette_tint)
+        && let Some(stencil) = built.stencil_motif()
+        && stencil.tint != StencilTint::None
     {
-        built.palette = Some(PaletteSlot::Primary);
+        built.palette = Some(if stencil.tint == StencilTint::DecalColours {
+            PaletteSlot::Decal
+        } else {
+            PaletteSlot::Primary
+        });
     }
     Ok(built)
 }

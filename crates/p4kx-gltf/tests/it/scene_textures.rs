@@ -14,7 +14,9 @@ use p4kx_testkit::{TestMtlMaterial, check_glb};
 use crate::scene_support::{
     TestResult, base_colours, close, library, read_cube, translation, write,
 };
-use crate::textures::support::{Stub, plain, plate, plate_stub, texture, textured};
+use crate::textures::support::{
+    Stub, base_image, near, plain, plate, plate_stub, texture, textured,
+};
 
 fn scene_of<'m>(
     model: &'m Model,
@@ -287,5 +289,61 @@ fn a_specular_map_bakes_the_palette_colours_into_the_images_of_each_livery() -> 
         one.textures + 1,
         "the base colour image of the second livery has its own colours: {one:?} {two:?}"
     );
+    Ok(())
+}
+
+#[test]
+fn a_stencil_decal_that_takes_the_decal_colours_is_painted_with_those_of_each_livery() -> TestResult
+{
+    let model = read_cube()?;
+    let status = library(&[
+        plain("unused"),
+        plain("caps"),
+        TestMtlMaterial::new("logo")
+            .shader("MeshDecal")
+            .string_gen_mask("%STENCIL_MAP")
+            .texture("TexSlot7", "Objects/Test/logo_stencil.tif")
+            .public_param("StencilDiffuseColor", "0.1,0.2,0.3")
+            .public_param("StencilTintOverride", "2"),
+    ]);
+    let entry = TintEntry::default();
+    let palette = |name: &str, decal: [[f32; 3]; 3]| {
+        TintPalette::new(name, [entry; 3], [1.0; 3]).with_decal(decal)
+    };
+    let first = palette("first", [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
+    let second = palette("second", [[0.0, 0.0, 1.0]; 3]);
+    let stub = Stub::default().with(
+        "objects/test/logo_stencil.dds",
+        &texture([255, 0, 0, 255], false)?,
+    );
+
+    let (glb, summary) = write(
+        &scene_of_palettes(&model, &status, &[&first, &second, &first])?,
+        &textured(),
+        &stub,
+    )?;
+
+    assert_eq!(summary.textures, 2, "one image for each decal colour set");
+    let logos: Vec<_> = glb
+        .document
+        .materials()
+        .filter(|material| material.name() == Some("logo"))
+        .collect();
+    let pixels: Vec<_> = logos
+        .iter()
+        .map(|logo| base_image(&glb, logo).map(|image| image.pixel(0, 0)))
+        .collect::<Result<_, _>>()?;
+    assert!(
+        near(pixels[0], [255, 0, 0, 255]),
+        "the red mask is red: {pixels:?}"
+    );
+    assert!(near(pixels[1], [0, 0, 255, 255]), "{pixels:?}");
+    for logo in &logos {
+        assert_eq!(
+            logo.pbr_metallic_roughness().base_color_factor()[..3],
+            [1.0; 3],
+            "the colours are in the image"
+        );
+    }
     Ok(())
 }

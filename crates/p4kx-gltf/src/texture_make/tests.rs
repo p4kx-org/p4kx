@@ -86,6 +86,7 @@ pub(super) fn source(path: String, gloss: bool) -> Source {
 pub(super) const TINTS: Tints = Tints {
     diffuse: [1.0; 3],
     specular: [1.0; 3],
+    decal: None,
 };
 
 pub(super) fn normal_jobs(count: usize) -> Vec<Job> {

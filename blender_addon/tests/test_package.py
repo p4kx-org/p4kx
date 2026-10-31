@@ -45,9 +45,9 @@ def test_a_higher_major_version_is_refused_with_an_update_message() -> None:
 
 
 def test_a_higher_minor_version_reads_with_a_warning() -> None:
-    result = parse(manifest(version="1.7"))
+    result = parse(manifest(version="1.8"))
     assert len(result.warnings) == 1
-    assert "1.7" in result.warnings[0]
+    assert "1.8" in result.warnings[0]
     assert "Update" in result.warnings[0]
 
 

@@ -52,7 +52,7 @@ fn shape(material: &Material) -> String {
         "{} {} tint_override={:?} palette={} layers={} colour={} [{}]",
         material.shader,
         classes(material).unwrap_or("INVALID"),
-        stencil.map(|stencil| stencil.palette_tint),
+        stencil.map(|stencil| stencil.tint),
         material.palette.is_some(),
         material.layers.len(),
         stencil.is_some_and(|stencil| stencil.colour.is_some()),

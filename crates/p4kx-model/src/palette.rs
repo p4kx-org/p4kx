@@ -15,6 +15,9 @@ pub enum PaletteSlot {
     Tertiary,
     /// The glass colour, taken by a glass material that uses the tint palette.
     Glass,
+    /// The livery's decal colours ([`TintPalette::decal`]), which the red, green and blue masks of
+    /// a stencil decal take when its `StencilTintOverride` is 2.
+    Decal,
 }
 
 impl PaletteSlot {
@@ -67,6 +70,9 @@ pub struct TintPalette {
     pub tertiary: TintEntry,
     /// The colour of the tinted glass.
     pub glass: [f32; 3],
+    /// The decal colours `decalColorR`, `decalColorG` and `decalColorB`, the colours of the red,
+    /// green and blue masks of a stencil map; `None` when the palette states none.
+    pub decal: Option<[[f32; 3]; 3]>,
 }
 
 impl TintPalette {
@@ -80,17 +86,26 @@ impl TintPalette {
             secondary,
             tertiary,
             glass,
+            decal: None,
         }
     }
 
-    /// Returns the entry of `slot`, or `None` for [`PaletteSlot::Glass`].
+    /// Returns the palette with `decal` as its decal colours: red, green and blue.
+    #[must_use]
+    pub const fn with_decal(mut self, decal: [[f32; 3]; 3]) -> Self {
+        self.decal = Some(decal);
+        self
+    }
+
+    /// Returns the entry of `slot`, or `None` for [`PaletteSlot::Glass`] and
+    /// [`PaletteSlot::Decal`], which are colours.
     #[must_use]
     pub const fn entry(&self, slot: PaletteSlot) -> Option<&TintEntry> {
         match slot {
             PaletteSlot::Primary => Some(&self.primary),
             PaletteSlot::Secondary => Some(&self.secondary),
             PaletteSlot::Tertiary => Some(&self.tertiary),
-            PaletteSlot::Glass => None,
+            PaletteSlot::Glass | PaletteSlot::Decal => None,
         }
     }
 
@@ -98,19 +113,26 @@ impl TintPalette {
     ///
     /// A painted material gets the entry's colour as its diffuse colour, the entry's specular
     /// colour and its glossiness as the shininess; a glass material gets the glass colour as its
-    /// diffuse colour. Each layer with a `PaletteTint` keeps the entry it takes. The result is
+    /// diffuse colour; a stencil decal that takes the decal colours gets them as
+    /// [`Material::decal_colours`] and a white diffuse colour, and takes none when the palette
+    /// states none. Each layer with a `PaletteTint` keeps the entry it takes. The result is
     /// [`Material::tinted`].
     #[must_use]
     pub fn apply(&self, material: &Material) -> Option<Material> {
         let slot = material.palette?;
         let mut tinted = material.clone();
-        match self.entry(slot) {
-            Some(entry) => {
+        match slot {
+            PaletteSlot::Glass => tinted.diffuse = self.glass,
+            PaletteSlot::Decal => {
+                tinted.decal_colours = Some(self.decal?);
+                tinted.diffuse = [1.0; 3];
+            }
+            PaletteSlot::Primary | PaletteSlot::Secondary | PaletteSlot::Tertiary => {
+                let entry = self.entry(slot)?;
                 tinted.diffuse = entry.tint;
                 tinted.specular = entry.specular;
                 tinted.shininess = entry.glossiness;
             }
-            None => tinted.diffuse = self.glass,
         }
         for layer in &mut tinted.layers {
             layer.palette_entry = layer

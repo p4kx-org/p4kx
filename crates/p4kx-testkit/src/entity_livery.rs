@@ -4,6 +4,7 @@
 use crate::{
     DataForgeBuilder, SplitDds, TestEntity, TestEntry, TestLoadout, TestLoadoutEntry, TestModel,
     TestMtl, TestMtlMaterial, TestTextureFormat, entity_schema, tint_palette_record,
+    tint_palette_record_with_decal,
 };
 
 /// The record path of the palette the library `Objects/Test/livery_default` names as its default.
@@ -11,6 +12,10 @@ pub const LIVERY_DEFAULT_PALETTE: &str = "Libs/Foundry/Records/TintPalettes/bran
 
 /// The sRGB bytes of the tint colours A to C of the palette `p_ship` of `TEST_Livery`.
 pub const LIVERY_SHIP_TINTS: [[u8; 3]; 3] = [[255, 0, 0], [0, 255, 0], [0, 0, 255]];
+
+/// The sRGB bytes of the decal colours red, green and blue of the palette `p_ship` of
+/// `TEST_Livery`.
+pub const LIVERY_SHIP_DECALS: [[u8; 3]; 3] = [[100, 15, 25], [10, 10, 10], [144, 144, 144]];
 
 /// The sRGB bytes of the tint colours A to C of the palette `p_gun` of `TEST_Painted`.
 pub const LIVERY_GUN_TINTS: [[u8; 3]; 3] = [[0, 255, 255], [255, 0, 255], [255, 255, 0]];
@@ -99,7 +104,14 @@ fn entities() -> [TestEntity; 9] {
 
 fn database() -> DataForgeBuilder {
     let palettes = [
-        tint_palette_record(0x31, "p_ship", LIVERY_SHIP_TINTS, [255; 3], [51, 102, 153]),
+        tint_palette_record_with_decal(
+            0x31,
+            "p_ship",
+            LIVERY_SHIP_TINTS,
+            [255; 3],
+            [51, 102, 153],
+            LIVERY_SHIP_DECALS,
+        ),
         tint_palette_record(0x32, "p_gun", LIVERY_GUN_TINTS, [255; 3], [51, 102, 153]),
         tint_palette_record(
             0x33,
