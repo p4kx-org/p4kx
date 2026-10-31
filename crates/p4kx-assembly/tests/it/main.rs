@@ -58,6 +58,7 @@ mod head_dress;
 mod head_dress_follow;
 mod head_dress_joints;
 mod head_expressions;
+mod head_rig_logic_handoff;
 mod hologram_camera;
 mod interior;
 mod interior_check;
