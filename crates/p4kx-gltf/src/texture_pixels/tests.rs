@@ -24,7 +24,7 @@ fn base(specular: [f32; 3]) -> [u8; 3] {
 
 const DECALS: [[f32; 3]; 3] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
 
-fn decal_texel(masks: [u8; 3]) -> [u8; 4] {
+fn painted(masks: [u8; 3]) -> [u8; 4] {
     let [red, green, blue] = masks;
     let image = opacity_colour(&pixel([red, green, blue, OPAQUE]), Some(DECALS))
         .expect("a base colour image");
@@ -39,18 +39,25 @@ fn without_decal_colours_an_opacity_map_gives_white_with_its_red_as_alpha() {
 
 #[test]
 fn each_mask_of_a_stencil_map_takes_its_decal_colour() {
-    assert_eq!(decal_texel([OPAQUE, 0, 0]), [OPAQUE, 0, 0, OPAQUE]);
-    assert_eq!(decal_texel([0, OPAQUE, 0]), [0, OPAQUE, 0, OPAQUE]);
-    assert_eq!(decal_texel([0, 0, OPAQUE]), [0, 0, OPAQUE, OPAQUE]);
+    assert_eq!(painted([OPAQUE, 0, 0]), [OPAQUE, 0, 0, OPAQUE]);
+    assert_eq!(painted([0, OPAQUE, 0]), [0, OPAQUE, 0, OPAQUE]);
+    assert_eq!(painted([0, 0, OPAQUE]), [0, 0, OPAQUE, OPAQUE]);
+}
+
+#[test]
+fn a_texel_that_one_mask_covers_partly_takes_only_the_colour_of_that_mask() {
+    assert_eq!(painted([0, 128, 0]), [0, OPAQUE, 0, 128]);
+    assert_eq!(painted([0, 0, 64]), [0, 0, OPAQUE, 64]);
+    assert_eq!(painted([0, 0, 0])[3], 0, "no mask, no alpha");
 }
 
 #[test]
 fn the_alpha_of_a_decal_is_its_strongest_mask_and_the_later_mask_covers_the_earlier() {
-    let [red, green, blue, alpha] = decal_texel([OPAQUE, OPAQUE, 128]);
+    let [red, green, blue, alpha] = painted([OPAQUE, OPAQUE, 128]);
     assert_eq!(alpha, OPAQUE);
     assert_eq!(red, 0, "green covers red");
     assert!(green > 0 && blue > 0, "blue is blended over green");
-    assert_eq!(decal_texel([40, 0, 0])[3], 40);
+    assert_eq!(painted([40, 0, 0])[3], 40);
 }
 
 #[test]

@@ -20,6 +20,8 @@ NODRAW_SHADERS = frozenset({"nodraw", "nodraw_proxy", "proxy"})
 MAX_BLENDED_LAYERS = 4
 MASKED_LAYERS = 4
 TINT_PALETTE_DECAL = "$TintPaletteDecal"
+# The least total weight of the decal colours, so that a texel with no mask divides by a number.
+DECAL_WEIGHT_FLOOR = 1e-6
 # Generation-mask flag: the vertex colours tint the material.
 PER_VERTEX_TINT = "PER_VERTEX_TINT"
 # Name Blender's glTF importer gives the attribute of COLOR_0.

@@ -10,7 +10,7 @@ from collections.abc import Callable
 import pytest
 
 from p4kx_importer.graph_groups import LAYER_BLEND
-from p4kx_importer.graph_spec import GraphSpec
+from p4kx_importer.graph_spec import GraphSpec, Ref
 from p4kx_importer.material_graph import BuildContext, build_graph
 from p4kx_importer.material_model import parse_materials, parse_palettes
 from synthetic_materials import description, entry, layer, slot
@@ -251,32 +251,73 @@ def with_decal_colours(**fields: object) -> dict:
     }
 
 
-def test_a_stencil_decal_that_takes_the_decal_colours_paints_its_masks_with_them() -> None:
+def evaluate(graph: GraphSpec, ref: Ref, masks: tuple[float, float, float]) -> float | tuple:
+    """Evaluates the output ``ref`` of the nodes of a decal graph for a stencil texel ``masks``."""
+    node = graph.node(ref.key)
+
+    def value(socket: object) -> float | tuple:
+        link = graph.linked(node.key, socket)  # type: ignore[arg-type]
+        return evaluate(graph, link, masks) if link else node.inputs[socket]
+
+    if node.kind == "ShaderNodeSeparateColor":
+        return masks[("Red", "Green", "Blue").index(str(ref.socket))]
+    if node.kind == "ShaderNodeMath":
+        a, b = value(0), value(1)
+        operations = {
+            "ADD": lambda x, y: x + y,
+            "SUBTRACT": lambda x, y: x - y,
+            "MULTIPLY": lambda x, y: x * y,
+            "MAXIMUM": max,
+        }
+        return operations[node.props["operation"]](a, b)
+    assert node.kind == "ShaderNodeMix", node.kind
+    a, b = value("A"), value("B")
+    grey = lambda x: x if isinstance(x, tuple) else (x, x, x)  # noqa: E731
+    operations = {
+        "MULTIPLY": lambda x, y: x * y,
+        "ADD": lambda x, y: x + y,
+        "DIVIDE": lambda x, y: x / y,
+    }
+    return tuple(operations[node.props["blend_type"]](x, y) for x, y in zip(grey(a), grey(b)))
+
+
+DECAL_COLOURS = [[0.4, 0.0, 0.0], [0.0, 0.5, 0.0], [0.0, 0.0, 0.6]]
+
+
+def decal_graph() -> GraphSpec:
     raw = decal({"drawn": True, "colour": [0.1, 0.2, 0.3], "opacity": 1.0}, palette="decal")
-    graph = single([raw], with_decal_colours())
+    return single([raw], with_decal_colours())
+
+
+def test_a_stencil_decal_that_takes_the_decal_colours_paints_its_masks_with_them() -> None:
+    graph = decal_graph()
     base = graph.linked("bsdf", "Base Color")
     assert base is not None
-    blue_mix = graph.node(base.key)
-    assert blue_mix.kind == "ShaderNodeMix"
-    assert blue_mix.inputs["B"] == pytest.approx((0.0, 0.0, 0.6))
-    over = graph.linked(base.key, "A")
-    assert over is not None
-    green_mix = graph.node(over.key)
-    assert green_mix.inputs["A"] == pytest.approx((0.4, 0.0, 0.0))
-    assert green_mix.inputs["B"] == pytest.approx((0.0, 0.5, 0.0))
-    for mix, channel in ((blue_mix, "Blue"), (green_mix, "Green")):
-        factor = graph.linked(mix.key, "Factor")
-        assert factor is not None and factor.socket == channel
+    for masks, wanted in [
+        ((1.0, 0.0, 0.0), (0.4, 0.0, 0.0)),
+        ((0.0, 1.0, 0.0), (0.0, 0.5, 0.0)),
+        ((0.0, 0.0, 1.0), (0.0, 0.0, 0.6)),
+    ]:
+        assert evaluate(graph, base, masks) == pytest.approx(wanted)
+
+
+def test_a_texel_that_one_mask_covers_partly_takes_only_the_colour_of_that_mask() -> None:
+    graph = decal_graph()
+    base = graph.linked("bsdf", "Base Color")
+    assert base is not None
+    assert evaluate(graph, base, (0.0, 0.5, 0.0)) == pytest.approx((0.0, 0.5, 0.0))
+    assert evaluate(graph, base, (0.0, 0.0, 0.25)) == pytest.approx((0.0, 0.0, 0.6))
+    assert evaluate(graph, base, (0.0, 0.0, 0.0)) == pytest.approx((0.0, 0.0, 0.0))
+    lower = evaluate(graph, base, (1.0, 1.0, 0.5))
+    assert lower[0] == 0.0 and lower[1] > 0.0 and lower[2] > 0.0, "green and blue cover red"
 
 
 def test_the_alpha_of_a_decal_with_decal_colours_is_the_strongest_of_its_masks() -> None:
-    graph = single([decal(palette="decal")], with_decal_colours())
+    graph = decal_graph()
     link = graph.linked("bsdf", "Alpha")
     assert link is not None
-    outer = graph.node(link.key)
-    assert outer.kind == "ShaderNodeMath" and outer.props["operation"] == "MAXIMUM"
-    inner = graph.linked(link.key, 0)
-    assert inner is not None and graph.node(inner.key).props["operation"] == "MAXIMUM"
+    assert evaluate(graph, link, (0.2, 0.7, 0.4)) == pytest.approx(0.7)
+    assert evaluate(graph, link, (0.0, 0.0, 0.3)) == pytest.approx(0.3)
     assert len([n for n in graph.nodes if n.kind == "ShaderNodeTexImage"]) == 1
 
 

@@ -199,22 +199,30 @@ pub(crate) fn opacity_colour(
 }
 
 /// Returns the texel of a stencil decal with the masks `masks` painted in the linear `colours`.
+///
+/// The masks are layers whose alpha is the mask, red below green below blue. A colour counts by
+/// its mask and by what the masks above it leave of it, and the texel is the weighted mean of the
+/// colours, so a texel that one mask covers only partly takes none of the colours of the masks that
+/// are 0 there. The alpha is the strongest mask.
 fn decal_texel(colours: [[f32; 3]; 3], masks: [u8; 3]) -> [u8; RGBA] {
-    let [first, second, third] = colours;
-    let [red, green, blue] = masks;
-    let blend = |under: [f32; 3], over: [f32; 3], mask: u8| {
-        let share = f32::from(mask) / f32::from(OPAQUE);
-        let [low_red, low_green, low_blue] = under;
-        let [high_red, high_green, high_blue] = over;
-        [
-            share.mul_add(high_red - low_red, low_red),
-            share.mul_add(high_green - low_green, low_green),
-            share.mul_add(high_blue - low_blue, low_blue),
-        ]
-    };
-    let painted = blend(blend(first, second, green), third, blue);
-    let [r, g, b] = painted.map(encode);
-    [r, g, b, red.max(green).max(blue)]
+    let [red, green, blue] = masks.map(|mask| f32::from(mask) / f32::from(OPAQUE));
+    let weights = [
+        red * (1.0 - green) * (1.0 - blue),
+        green * (1.0 - blue),
+        blue,
+    ];
+    let [r, g, b] = mix(weights, colours).map(encode);
+    let [mask_red, mask_green, mask_blue] = masks;
+    [r, g, b, mask_red.max(mask_green).max(mask_blue)]
+}
+
+/// Returns the mean of `colours` weighted by `weights`; black when every weight is 0.
+fn mix(weights: [f32; 3], colours: [[f32; 3]; 3]) -> [f32; 3] {
+    let total = weights.iter().sum::<f32>().max(f32::EPSILON);
+    let [first, second, third] = weights;
+    let [[r0, g0, b0], [r1, g1, b1], [r2, g2, b2]] = colours;
+    let mean = |a: f32, b: f32, c: f32| first.mul_add(a, second.mul_add(b, third * c)) / total;
+    [mean(r0, r1, r2), mean(g0, g1, g2), mean(b0, b1, b2)]
 }
 
 /// Returns the normal map image of the engine's normal map `normal`: X and the reconstructed Z as

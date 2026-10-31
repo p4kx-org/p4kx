@@ -15,6 +15,7 @@ from .material_layers import LayerBlending
 from .package import BLENDER_NAME_BYTES
 from .material_model import WHITE, Colour, Layer, MaterialDesc, PaletteColours, TextureSlot
 from .material_surface import (
+    DECAL_WEIGHT_FLOOR,
     MAX_PROPERTIES,
     METAL_FROM,
     METAL_TO,
@@ -130,16 +131,30 @@ class _Maker(LayerBlending, GlassSurface):
     def _decal_paint(self, colours: tuple[Colour, Colour, Colour]) -> Ref:
         """Returns the colour of a stencil map painted with ``colours``.
 
-        The red colour, with the green and the blue colour blended over it by their masks.
+        The masks are layers, red below green below blue: each colour counts by its mask and by
+        what the masks above leave of it, and the result is the weighted mean, so a texel that
+        one mask covers partly takes none of the colours of the masks that are 0 there.
         """
         slot = self.desc.slot("stencil")
         assert slot is not None
         b = self.builder
         split = b.add("ShaderNodeSeparateColor")
         b.link(Ref(self._image(slot, 1.0), "Color"), split, "Color")
-        red, green, blue = colours
-        paint = b.mix(red, green, Ref(split, "Green"))
-        return b.mix(paint, blue, Ref(split, "Blue"))
+        mask_red, mask_green, mask_blue = (Ref(split, name) for name in ("Red", "Green", "Blue"))
+        below_green = b.math("SUBTRACT", 1.0, mask_green)
+        below_blue = b.math("SUBTRACT", 1.0, mask_blue)
+        weight_red = b.math("MULTIPLY", b.math("MULTIPLY", mask_red, below_green), below_blue)
+        weight_green = b.math("MULTIPLY", mask_green, below_blue)
+        weights = (weight_red, weight_green, mask_blue)
+        total = b.math("ADD", b.math("ADD", weight_red, weight_green), mask_blue)
+        floor = b.math("MAXIMUM", total, DECAL_WEIGHT_FLOOR)
+        weighted = [
+            b.mix(colour, weight, 1.0, blend="MULTIPLY")
+            for colour, weight in zip(colours, weights, strict=True)
+        ]
+        summed = b.mix(weighted[0], weighted[1], 1.0, blend="ADD")
+        return b.mix(b.mix(summed, weighted[2], 1.0, blend="ADD"), floor, 1.0, blend="DIVIDE")
+
 
     def _entry(self) -> PaletteColours | None:
         palette = self.context.palette

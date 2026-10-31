@@ -14,8 +14,20 @@ const MESH_DECAL: &str = "MeshDecal";
 const COLOUR: &str = "StencilDiffuseColor";
 const OPACITY: &str = "StencilOpacity";
 const TINT_OVERRIDE: &str = "StencilTintOverride";
-/// The `StencilTintOverride` from which the masks take the livery's decal colours.
+/// The `StencilTintOverride` whose masks take the livery's decal colours; LIVE has only 0, 1 and 2.
 const DECAL_COLOURS_OVERRIDE: f32 = 2.0;
+
+/// Where the colour of a stencil decal comes from, by its `StencilTintOverride`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum StencilTint {
+    /// The decal's own `StencilDiffuseColor` (the override is 0 or absent).
+    None,
+    /// The primary entry of the tint palette, a stand-in (the override is above 0 and not 2).
+    Primary,
+    /// The decal colours of the tint palette, one for each mask (the override rounds to 2).
+    DecalColours,
+}
 
 /// How a stencil decal is coloured: the parameters of its shader, which colour the motif the
 /// stencil map cuts out.
@@ -28,13 +40,19 @@ pub struct Stencil {
     /// The opacity of the motif (`StencilOpacity`), 1 when the material sets none; it multiplies the
     /// material's opacity.
     pub opacity: f32,
-    /// Whether the decal takes the tint of the palette in place of its own colour
-    /// (`StencilTintOverride` above 0). The material then takes the primary entry
-    /// ([`Material::palette`]), or the decal colours when [`Self::decal_colours`] is set.
-    pub palette_tint: bool,
-    /// Whether the red, green and blue masks of the stencil map take the livery's decal colours
-    /// (`StencilTintOverride` 2 or above).
-    pub decal_colours: bool,
+    /// Where the colour of the motif comes from; a palette colour is what the material takes
+    /// ([`Material::palette`]).
+    pub tint: StencilTint,
+}
+
+fn tint_of(value: f32) -> StencilTint {
+    if (value - DECAL_COLOURS_OVERRIDE).abs() < 0.5 {
+        StencilTint::DecalColours
+    } else if value > 0.0 {
+        StencilTint::Primary
+    } else {
+        StencilTint::None
+    }
 }
 
 impl Material {
@@ -58,12 +76,9 @@ impl Material {
             opacity: self
                 .public_param(OPACITY)
                 .map_or(1.0, |opacity| opacity[0].clamp(0.0, 1.0)),
-            palette_tint: self
+            tint: self
                 .public_param(TINT_OVERRIDE)
-                .is_some_and(|tint| tint[0] > 0.0),
-            decal_colours: self
-                .public_param(TINT_OVERRIDE)
-                .is_some_and(|tint| tint[0] >= DECAL_COLOURS_OVERRIDE),
+                .map_or(StencilTint::None, |tint| tint_of(tint[0])),
         })
     }
 
@@ -110,7 +125,7 @@ impl Material {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Material, MaterialLibrary, PaletteSlot};
+    use crate::{Material, MaterialLibrary, PaletteSlot, StencilTint};
 
     type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -143,16 +158,14 @@ mod tests {
         let stencil = material.stencil().ok_or("a stencil")?;
         assert_eq!(stencil.colour, Some([0.1, 0.2, 0.3]));
         assert!((stencil.opacity - 0.5).abs() < f32::EPSILON);
-        assert!(stencil.palette_tint);
-        assert!(!stencil.decal_colours);
+        assert_eq!(stencil.tint, StencilTint::Primary);
 
         let bare = decal("MeshDecal", "%STENCIL_MAP", "", "")?
             .stencil()
             .ok_or("a stencil")?;
         assert_eq!(bare.colour, None);
         assert!((bare.opacity - 1.0).abs() < f32::EPSILON);
-        assert!(!bare.palette_tint);
-        assert!(!bare.decal_colours);
+        assert_eq!(bare.tint, StencilTint::None);
         assert_eq!(decal("MeshDecal", "", "", "")?.stencil(), None);
         Ok(())
     }
@@ -214,8 +227,9 @@ mod tests {
         for (value, slot) in [
             ("0.5", PaletteSlot::Primary),
             ("1", PaletteSlot::Primary),
+            ("1.8", PaletteSlot::Decal),
             ("2", PaletteSlot::Decal),
-            ("3", PaletteSlot::Decal),
+            ("3", PaletteSlot::Primary),
         ] {
             assert_eq!(
                 with(&format!(r#"StencilTintOverride="{value}""#))?.palette,
@@ -223,7 +237,10 @@ mod tests {
                 "{value}"
             );
         }
-        assert_eq!(with(r#"StencilTintOverride="0""#)?.palette, None);
+        for none in ["0", "-1", "NaN", "inf"] {
+            let params = format!(r#"StencilTintOverride="{none}""#);
+            assert_eq!(with(&params)?.palette, None, "{none}");
+        }
         assert_eq!(with("")?.palette, None);
         Ok(())
     }

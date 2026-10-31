@@ -94,7 +94,7 @@ class Palette:
     decal: tuple[Colour, Colour, Colour] | None = None
 
     def entry(self, name: str | None) -> PaletteColours | None:
-        """Returns the paint entry called ``name``, or ``None`` for ``glass``, ``decal`` and others."""
+        """Returns the paint entry ``name``, or ``None`` for ``glass``, ``decal`` and others."""
         if name == "primary":
             return self.primary
         if name == "secondary":
@@ -337,12 +337,12 @@ def _palette(item: object) -> Palette | None:
 
 def _decal_colours(value: object) -> tuple[Colour, Colour, Colour] | None:
     """Returns the three decal colours, or ``None`` when absent or any of them is malformed."""
-    if not isinstance(value, list) or len(value) != 3:
+    if not isinstance(value, list):
         return None
-    colours = [_colour(item, None) for item in value]
-    if any(colour is None for colour in colours):
-        return None
-    return (colours[0], colours[1], colours[2])  # type: ignore[return-value]
+    match [_colour(item, None) for item in value]:
+        case [tuple() as red, tuple() as green, tuple() as blue]:
+            return (red, green, blue)
+    return None
 
 
 def _palette_colours(item: object) -> PaletteColours | None:

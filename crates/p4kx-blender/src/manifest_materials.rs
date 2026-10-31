@@ -30,7 +30,8 @@ pub enum TextureUse {
     /// A gloss map (`_gloss`).
     Gloss,
     /// The stencil map of a stencil decal (`STENCIL_MAP`, 1.6): its red channel is the opacity of
-    /// the motif.
+    /// the motif, or its three channels are three masks when the material's `palette` is `decal`
+    /// (1.7).
     Stencil,
     /// Any other map; the slot and file say more.
     Other,
@@ -262,8 +263,8 @@ pub struct MaterialDescription {
     pub stencil: Option<MaterialStencil>,
     /// The palette entry the material takes: that of its first layer with a `PaletteTint` from 1
     /// to 3, the glass colour of a glass material that uses the tint palette, or the primary entry
-    /// of a stencil decal with a `StencilTintOverride` of 1, or the decal colours of one with 2 or
-    /// more (1.7).
+    /// of a stencil decal with a `StencilTintOverride` above 0, or the decal colours of one whose
+    /// override rounds to 2 (1.7).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub palette: Option<PaletteEntry>,
     /// The tint palette the library names as its default, a Record path.

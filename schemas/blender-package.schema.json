@@ -482,7 +482,7 @@
               "type": "null"
             }
           ],
-          "description": "The palette entry the material takes: that of its first layer with a `PaletteTint` from 1\nto 3, the glass colour of a glass material that uses the tint palette, or the primary entry\nof a stencil decal with a `StencilTintOverride` of 1, or the decal colours of one with 2 or\nmore (1.7)."
+          "description": "The palette entry the material takes: that of its first layer with a `PaletteTint` from 1\nto 3, the glass colour of a glass material that uses the tint palette, or the primary entry\nof a stencil decal with a `StencilTintOverride` above 0, or the decal colours of one whose\noverride rounds to 2 (1.7)."
         },
         "parameters": {
           "description": "The shader parameters (`PublicParams`) in file order, name and value as the file has them.",
@@ -1525,7 +1525,7 @@
         },
         {
           "const": "stencil",
-          "description": "The stencil map of a stencil decal (`STENCIL_MAP`, 1.6): its red channel is the opacity of\nthe motif.",
+          "description": "The stencil map of a stencil decal (`STENCIL_MAP`, 1.6): its red channel is the opacity of\nthe motif, or its three channels are three masks when the material's `palette` is `decal`\n(1.7).",
           "type": "string"
         },
         {
