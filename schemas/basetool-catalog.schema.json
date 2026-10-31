@@ -1,5 +1,53 @@
 {
   "$defs": {
+    "ActiveSettings": {
+      "description": "The `ActiveContractSettings` of a template, each flag as stored.",
+      "properties": {
+        "canBeShared": {
+          "description": "The `canBeShared` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "displayAlliedMarkers": {
+          "description": "The `displayAlliedMarkers` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "handlesAbandonRequest": {
+          "description": "The `handlesAbandonRequest` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "hasCompleteButton": {
+          "description": "The `hasCompleteButton` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "onlyOwnerCanComplete": {
+          "description": "The `onlyOwnerCanComplete` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "canBeShared",
+        "displayAlliedMarkers",
+        "handlesAbandonRequest",
+        "hasCompleteButton",
+        "onlyOwnerCanComplete"
+      ],
+      "type": "object"
+    },
     "AmmoStats": {
       "description": "The ammunition of a weapon.",
       "properties": {
@@ -139,6 +187,76 @@
       "required": [
         "damageResistance",
         "integrityMilestoneToBreak"
+      ],
+      "type": "object"
+    },
+    "AutoFinish": {
+      "description": "The `ContractAutoFinishSettings` of a template, each value as stored.",
+      "properties": {
+        "autoEnd": {
+          "description": "The `missionAutoEnd` flag of the deadline.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "completionTime": {
+          "description": "The `missionCompletionTime` of the deadline, as stored; the Archive does not state its\nunit. `null` when the template has no deadline.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "failIfBecameCriminal": {
+          "description": "The `failIfBecameCriminal` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "failIfLeavePrison": {
+          "description": "The `failIfLeavePrison` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "failIfSentToPrison": {
+          "description": "The `failIfSentToPrison` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "remainingTimeToShowTimer": {
+          "description": "The `remainingTimeToShowTimer` of the deadline, as stored.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "resultAfterTimerEnd": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `missionResultAfterTimerEnd` of the deadline: the state the mission ends in."
+        }
+      },
+      "required": [
+        "autoEnd",
+        "completionTime",
+        "failIfBecameCriminal",
+        "failIfLeavePrison",
+        "failIfSentToPrison",
+        "remainingTimeToShowTimer",
+        "resultAfterTimerEnd"
       ],
       "type": "object"
     },
@@ -838,6 +956,24 @@
       ],
       "type": "object"
     },
+    "CommsTiming": {
+      "description": "When a comms notification is shown relative to its HUD notification. A value the catalog\ndoes not know is `null`.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "Both at once.",
+          "value": "simultaneous"
+        },
+        {
+          "description": "The comms message first.",
+          "value": "commsNotificationFirst"
+        },
+        {
+          "description": "The HUD notification first.",
+          "value": "hudNotificationFirst"
+        }
+      ]
+    },
     "Completeness": {
       "description": "The completeness of every kind.",
       "properties": {
@@ -872,6 +1008,10 @@
         "contractShipSpawns": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `contractShipSpawns`."
+        },
+        "contractTemplates": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `contractTemplates`."
         },
         "contracts": {
           "$ref": "#/$defs/KindCompleteness",
@@ -1027,6 +1167,7 @@
         "contractLocationQueries",
         "contractScenarios",
         "contractShipSpawns",
+        "contractTemplates",
         "contracts",
         "crafters",
         "dismantleProcesses",
@@ -1606,6 +1747,219 @@
         "factionRewardTiers",
         "guid",
         "recordPath"
+      ],
+      "type": "object"
+    },
+    "ContractTemplate": {
+      "description": "A contract template: a `ContractTemplate` Record under `contracts/contracttemplates`, the\nstructure a contract names in `templateGuid` and lays its own overrides over.",
+      "properties": {
+        "autoFinish": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AutoFinish"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `autoFinishSettings` of the contract class, `null` when it has none."
+        },
+        "className": {
+          "description": "The Record name without its type, e.g. `AcePilot` for `ContractTemplate.AcePilot`.",
+          "type": "string"
+        },
+        "classType": {
+          "description": "The struct of the `contractClass`, e.g. `ContractClass_Contract`; `null` when absent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contractProperties": {
+          "description": "The mission properties of `contractProperties` in stored order: the variables the\ncontracts, handlers and sub contracts override.",
+          "items": {
+            "$ref": "#/$defs/TemplateProperty"
+          },
+          "type": "array"
+        },
+        "endComms": {
+          "description": "The `contractEndCommsNotifications` in stored order.",
+          "items": {
+            "$ref": "#/$defs/EndComms"
+          },
+          "type": "array"
+        },
+        "guid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The GUID of the Record; the `templateGuid` of the contracts that name it."
+        },
+        "haulingOrders": {
+          "description": "The hauling orders of the template: the hauling properties (`template`) and the orders of\nits hauling objectives (`templateObjective`).",
+          "items": {
+            "$ref": "#/$defs/HaulingOrder"
+          },
+          "type": "array"
+        },
+        "illegal": {
+          "description": "The `illegal` flag of the display info, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "locationQueries": {
+          "description": "The location queries the template states, resolved like `shipSpawns`.",
+          "items": {
+            "$ref": "#/$defs/LocationQueryLink"
+          },
+          "type": "array"
+        },
+        "missionFlow": {
+          "description": "The `missionFlow` triggers in stored order.",
+          "items": {
+            "$ref": "#/$defs/FlowTrigger"
+          },
+          "type": "array"
+        },
+        "missionTypeGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `MissionType` Record of the display info, an entry of `missionTypes`; the GUID is kept\nfor a Record the Archive lacks."
+        },
+        "modifiers": {
+          "description": "The `modifiers` in stored order.",
+          "items": {
+            "$ref": "#/$defs/TemplateModifier"
+          },
+          "type": "array"
+        },
+        "notForRelease": {
+          "description": "The `notForRelease` flag as stored, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "objectives": {
+          "description": "The objective tokens in depth-first order, each phase after its parent.",
+          "items": {
+            "$ref": "#/$defs/TemplateObjective"
+          },
+          "type": "array"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemplateOwner"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `owner` of the Record, `null` when it names none."
+        },
+        "partialPayout": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartialPayout"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `partialRewardPayout`, `null` when the template has none."
+        },
+        "preShowObjectives": {
+          "description": "The `preShowObjectives` flag of the display info, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "recordPath": {
+          "description": "The record path, without `.xml`.",
+          "type": "string"
+        },
+        "settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ActiveSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `ActiveContractSettings` of the contract class, `null` when it has none."
+        },
+        "shipSpawns": {
+          "description": "The ship spawn descriptions the template states, one per variable, ordered by variable;\n`level` is always `template`.",
+          "items": {
+            "$ref": "#/$defs/ShipSpawnLink"
+          },
+          "type": "array"
+        },
+        "showLifeTimeInMobiGlas": {
+          "description": "The `showLifeTimeInMobiGlas` flag of the display info, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "startComms": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StartComms"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `contractStartCommsNotification`, `null` when absent."
+        },
+        "title": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The first display string of the template; `null` text for a placeholder.",
+          "x-gameText": true
+        },
+        "workInProgress": {
+          "description": "The `workInProgress` flag as stored, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "autoFinish",
+        "className",
+        "classType",
+        "contractProperties",
+        "endComms",
+        "guid",
+        "haulingOrders",
+        "illegal",
+        "locationQueries",
+        "missionFlow",
+        "missionTypeGuid",
+        "modifiers",
+        "notForRelease",
+        "objectives",
+        "owner",
+        "partialPayout",
+        "preShowObjectives",
+        "recordPath",
+        "settings",
+        "shipSpawns",
+        "showLifeTimeInMobiGlas",
+        "startComms",
+        "title",
+        "workInProgress"
       ],
       "type": "object"
     },
@@ -2219,6 +2573,61 @@
       ],
       "type": "object"
     },
+    "EndComms": {
+      "description": "A `ContractEndCommsNotification`: a message sent when the contract ends.",
+      "properties": {
+        "communicationTag": {
+          "description": "The tag path of the `communicationTags` tag.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "delay": {
+          "description": "The `delay`, as stored.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EndReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How the contract ended; `null` for a value the catalog does not know."
+        }
+      },
+      "required": [
+        "communicationTag",
+        "delay",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "EndReason": {
+      "description": "How a contract ended.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "The player completed it (`Complete`).",
+          "value": "complete"
+        },
+        {
+          "description": "It failed (`Fail`).",
+          "value": "fail"
+        },
+        {
+          "description": "The player abandoned it (`Abandon`).",
+          "value": "abandon"
+        }
+      ]
+    },
     "EscalatingClaims": {
       "description": "The `escalatingClaimsParams` of the item recovery rules.",
       "properties": {
@@ -2642,6 +3051,339 @@
         "currency",
         "max",
         "plusBonuses"
+      ],
+      "type": "object"
+    },
+    "FlowAction": {
+      "description": "An action of a mission flow trigger (`MissionFlowAction_*`), as stored.",
+      "oneOf": [
+        {
+          "description": "`MissionFlowAction_StateChange`: the mission changes state.",
+          "properties": {
+            "toState": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ObjectiveState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `toState`."
+            },
+            "type": {
+              "const": "stateChange",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionFlowAction_TokenStateChange`: an objective changes state.",
+          "properties": {
+            "objectiveId": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `objectiveToken`, `null` when it points to none."
+            },
+            "toState": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ObjectiveState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `toState`."
+            },
+            "type": {
+              "const": "tokenStateChange",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionFlowAction_PickRandomMissionPhase`: one of the phases becomes active.",
+          "properties": {
+            "phases": {
+              "description": "The `missionPhases` in stored order.",
+              "items": {
+                "$ref": "#/$defs/RandomPhase"
+              },
+              "type": "array"
+            },
+            "toState": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ObjectiveState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `toState`."
+            },
+            "type": {
+              "const": "pickRandomMissionPhase",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "phases"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An action of another struct.",
+          "properties": {
+            "structName": {
+              "description": "The struct name.",
+              "type": "string"
+            },
+            "toState": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ObjectiveState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `toState`, as for the other actions."
+            },
+            "type": {
+              "const": "other",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "structName"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "FlowCondition": {
+      "description": "A condition of a mission flow trigger (`MissionFlowCondition_*`), as stored. An objective\nis the `id` of an entry of `objectives`.",
+      "oneOf": [
+        {
+          "description": "`MissionFlowCondition_TokenState`: an objective is in a state.",
+          "properties": {
+            "objectiveId": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `objectiveToken`, `null` when it points to none."
+            },
+            "tokenState": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ObjectiveState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `tokenState`."
+            },
+            "type": {
+              "const": "tokenState",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionFlowCondition_AllTokensState`: every objective is in a state.",
+          "properties": {
+            "tokenState": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ObjectiveState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `tokenState`."
+            },
+            "type": {
+              "const": "allTokensState",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionFlowCondition_AND`: all of the conditions hold.",
+          "properties": {
+            "conditions": {
+              "description": "The `conditions` in stored order.",
+              "items": {
+                "$ref": "#/$defs/FlowCondition"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "and",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "conditions"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionFlowCondition_OR`: one of the conditions holds.",
+          "properties": {
+            "conditions": {
+              "description": "The `conditions` in stored order.",
+              "items": {
+                "$ref": "#/$defs/FlowCondition"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "or",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "conditions"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionFlowCondition_NOT`: the condition does not hold.",
+          "properties": {
+            "condition": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FlowCondition"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `condition`, `null` when absent."
+            },
+            "type": {
+              "const": "not",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionFlowCondition_PropertyIsSet`: a mission property has a value.",
+          "properties": {
+            "propertyVariable": {
+              "description": "The `missionVariableName` of the `property`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "propertyIsSet",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A condition of another struct.",
+          "properties": {
+            "structName": {
+              "description": "The struct name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "other",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "structName"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "FlowTrigger": {
+      "description": "A trigger of the mission flow: when its condition holds, its action runs.",
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FlowAction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `action`, `null` when absent."
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FlowCondition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `condition`, `null` when absent."
+        },
+        "note": {
+          "description": "The `description` as stored, a developer's note on the trigger; `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "action",
+        "condition",
+        "note"
       ],
       "type": "object"
     },
@@ -3152,6 +3894,138 @@
       ],
       "type": "object"
     },
+    "HaulingSettings": {
+      "description": "The `Hauling_ObjectiveSettings` of a hauling handler: the extended text tokens and the display\ninfo of each way the objective is phrased.",
+      "properties": {
+        "amountToken": {
+          "description": "The `amountExtendedTextToken`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "andObjective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `andObjective`."
+        },
+        "collectAndDeliverObjective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `collectAndDeliverObjective`."
+        },
+        "collectObjective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `collectObjective`."
+        },
+        "dropOffLocationToken": {
+          "description": "The `dropOffLocationExtendedTextToken`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "itemDeliverObjective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `itemDeliverObjective`."
+        },
+        "itemToken": {
+          "description": "The `itemExtendedTextToken`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "listItemObjective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `listItemObjective`."
+        },
+        "orObjective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `orObjective`."
+        },
+        "pickupLocationToken": {
+          "description": "The `pickupLocationExtendedTextToken`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resourceDeliverObjective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `resourceDeliverObjective`."
+        },
+        "totalToken": {
+          "description": "The `totalExtendedTextToken`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "amountToken",
+        "andObjective",
+        "collectAndDeliverObjective",
+        "collectObjective",
+        "dropOffLocationToken",
+        "itemDeliverObjective",
+        "itemToken",
+        "listItemObjective",
+        "orObjective",
+        "pickupLocationToken",
+        "resourceDeliverObjective",
+        "totalToken"
+      ],
+      "type": "object"
+    },
     "HaulingSource": {
       "description": "The level of the contract that states a hauling order. Of the property levels the nearest one\nwins per `variableName`; the objective orders are those of the template, else of the broker\nentry.",
       "type": "string",
@@ -3351,6 +4225,61 @@
         "curveFactor",
         "wavePeriod",
         "waveVariance"
+      ],
+      "type": "object"
+    },
+    "InstanceEntry": {
+      "description": "The fields of a `TransitToInstance` handler.",
+      "properties": {
+        "completePhaseOnPlayerEnter": {
+          "description": "The `completePhaseOnPlayerEnterInstance` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "enterTravelRadiusKm": {
+          "description": "The `instanceEnterTravelRadiusKM`.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "hudObjectiveText": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `instanceHUDObjectiveText`.",
+          "x-gameText": true
+        },
+        "objectiveMarker": {
+          "description": "The `transitToInstanceObjectiveMarker`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "searchTags": {
+          "description": "The `ocTagsToSearchInstanceEnter` as tag paths.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tagIdentifier": {
+          "description": "The tag path of the `instanceTagIdentifier`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "completePhaseOnPlayerEnter",
+        "enterTravelRadiusKm",
+        "hudObjectiveText",
+        "objectiveMarker",
+        "searchTags",
+        "tagIdentifier"
       ],
       "type": "object"
     },
@@ -4207,6 +5136,34 @@
         "name",
         "negativeTagGuids",
         "positiveTagGuids"
+      ],
+      "type": "object"
+    },
+    "LinkedOutput": {
+      "description": "The output property an input property takes the value of.",
+      "properties": {
+        "objectiveId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `id` of the objective that holds the output, an entry of `objectives`; `null` when the\npointer does not name one."
+        },
+        "variable": {
+          "description": "The `missionVariableName` of the output.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "objectiveId",
+        "variable"
       ],
       "type": "object"
     },
@@ -6268,6 +7225,481 @@
       ],
       "type": "object"
     },
+    "NavPoint": {
+      "description": "The `navPointSpawnInfo` of a handler: the entity the game spawns as the marker.",
+      "properties": {
+        "displayName": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `name` of the marker.",
+          "x-gameText": true
+        },
+        "entityClassGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `entityClassDefinition` Record, an entry of `items`."
+        },
+        "extendedTextTokens": {
+          "description": "The `extendedTextTokens` in stored order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "displayName",
+        "entityClassGuid",
+        "extendedTextTokens"
+      ],
+      "type": "object"
+    },
+    "NumberOption": {
+      "description": "An option of an integer or float property.",
+      "properties": {
+        "dependentProperties": {
+          "description": "The `missionVariableName` of the properties the option makes dependent.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "displayName": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `textId`.",
+          "x-gameText": true
+        },
+        "value": {
+          "description": "The `value`, as stored.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "variation": {
+          "description": "The `variation` the game applies around the value, as stored.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weighting": {
+          "description": "The `weighting` of the option among the others.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "dependentProperties",
+        "displayName",
+        "value",
+        "variation",
+        "weighting"
+      ],
+      "type": "object"
+    },
+    "ObjectiveCategory": {
+      "description": "The category of an objective display. A value the catalog does not know is `null`.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "A primary objective.",
+          "value": "primary"
+        }
+      ]
+    },
+    "ObjectiveComms": {
+      "description": "A `CommsNotificationSelector` of an objective.",
+      "properties": {
+        "communicationTag": {
+          "description": "The tag path of the `communicationTags` tag.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "delay": {
+          "description": "The `delay`, as stored.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "timing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommsTiming"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `commsTiming`."
+        },
+        "trigger": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The state of the objective that triggers the message."
+        }
+      },
+      "required": [
+        "communicationTag",
+        "delay",
+        "timing",
+        "trigger"
+      ],
+      "type": "object"
+    },
+    "ObjectiveDisplay": {
+      "description": "The display info of an objective or of one of its sub objectives: the texts and flags as\nstored.",
+      "properties": {
+        "category": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveCategory"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `category`; `null` when absent or a value the catalog does not know."
+        },
+        "hideOnHud": {
+          "description": "The `hideOnHUD` flag, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "longDescription": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `longDescription`.",
+          "x-gameText": true
+        },
+        "markerLabel": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `objectiveMarkerLabel`.",
+          "x-gameText": true
+        },
+        "shortDescription": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `shortDescription`.",
+          "x-gameText": true
+        }
+      },
+      "required": [
+        "category",
+        "hideOnHud",
+        "longDescription",
+        "markerLabel",
+        "shortDescription"
+      ],
+      "type": "object"
+    },
+    "ObjectiveHandler": {
+      "description": "An objective handler: the struct and the settings its fields hold. A field the struct does not\nhave is `null`; the orders of a hauling handler are `haulingOrders` of the template.",
+      "properties": {
+        "allPlayersLeftGracePeriod": {
+          "description": "The `allPlayersLeftGracePeriod`, as stored.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "disableReturnObjectives": {
+          "description": "The `disableReturnObjectives` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "disableTravelObjectives": {
+          "description": "The `disableTravelObjectives` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "hauling": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HaulingSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `objectiveSettings` of a hauling handler."
+        },
+        "haulingLimitProperty": {
+          "description": "The `missionVariableName` of the property the `haulingLimitProperty` points to.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hideMarkers": {
+          "description": "The `hideMarkers` flag of a hauling handler.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "instance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InstanceEntry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The fields of a `TransitToInstance` handler."
+        },
+        "locationProperty": {
+          "description": "The `missionVariableName` of the property the `location` points to.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maxDistance": {
+          "description": "The `maxDistance` of a near-location handler.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "minDistance": {
+          "description": "The `minDistance` of a near-location handler.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "module": {
+          "description": "The `module` file of the mission scripting, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "moduleHierarchyGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `moduleHierarchy` Record, `null` when absent."
+        },
+        "navPoint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NavPoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `navPointSpawnInfo`, `null` when absent."
+        },
+        "organizationProperty": {
+          "description": "The `missionVariableName` of the property the `organization` points to.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "returnObjective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `returnObjectiveInfo`, `null` when absent."
+        },
+        "securityManifestGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `securityManifestToOverride` Record."
+        },
+        "structName": {
+          "description": "The struct, e.g. `ObjectiveHandler_Hauling`.",
+          "type": "string"
+        },
+        "targetProperty": {
+          "description": "The `missionVariableName` of the property the `targetObject` points to.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "travelObjective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `travelObjectiveInfo`, `null` when absent."
+        },
+        "travelRadiusKm": {
+          "description": "The `travelRadiusKM`.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "allPlayersLeftGracePeriod",
+        "disableReturnObjectives",
+        "disableTravelObjectives",
+        "hauling",
+        "haulingLimitProperty",
+        "hideMarkers",
+        "instance",
+        "locationProperty",
+        "maxDistance",
+        "minDistance",
+        "module",
+        "moduleHierarchyGuid",
+        "navPoint",
+        "organizationProperty",
+        "returnObjective",
+        "securityManifestGuid",
+        "structName",
+        "targetProperty",
+        "travelObjective",
+        "travelRadiusKm"
+      ],
+      "type": "object"
+    },
+    "ObjectiveProperty": {
+      "description": "A property of an objective token.",
+      "properties": {
+        "contractProperty": {
+          "description": "The `missionVariableName` of the property of the template the `property` of a referenced\nproperty points to; `null` for any other kind or a pointer to nothing.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How the objective holds the property."
+        },
+        "linkedOutput": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LinkedOutput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The output an input property takes, `null` for any other kind."
+        },
+        "token": {
+          "description": "The `extendedTextToken` of the property, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyValue"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The value of an output, embedded or input property, `null` for a referenced one."
+        },
+        "variable": {
+          "description": "The `missionVariableName` of the property, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "contractProperty",
+        "kind",
+        "linkedOutput",
+        "token",
+        "value",
+        "variable"
+      ],
+      "type": "object"
+    },
+    "ObjectiveState": {
+      "description": "The state of an objective token or of the mission, as the mission flow, the comms\nnotifications and the flow actions name it. A value the catalog does not know is `null`.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "The objective is running.",
+          "value": "active"
+        },
+        {
+          "description": "The objective succeeded.",
+          "value": "completed"
+        },
+        {
+          "description": "The objective failed.",
+          "value": "failed"
+        },
+        {
+          "description": "The player abandoned the objective.",
+          "value": "abandoned"
+        }
+      ]
+    },
     "OfferedAt": {
       "description": "Everywhere a contract is offered, as its prerequisites state it and without a cap.",
       "properties": {
@@ -6297,6 +7729,26 @@
       ],
       "type": "object"
     },
+    "OverrideDisplay": {
+      "description": "The title and description an objective overrides in the mission details.",
+      "properties": {
+        "descriptionOverride": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `descriptionOverride`.",
+          "x-gameText": true
+        },
+        "titleOverride": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `titleOverride`.",
+          "x-gameText": true
+        }
+      },
+      "required": [
+        "descriptionOverride",
+        "titleOverride"
+      ],
+      "type": "object"
+    },
     "Paint": {
       "description": "A paint: an item of the type `Paints` and the ships it fits.",
       "properties": {
@@ -6315,6 +7767,94 @@
       "required": [
         "itemGuid",
         "shipGuids"
+      ],
+      "type": "object"
+    },
+    "PartialPayout": {
+      "description": "The `PartialContractRewards` of a template: what an abandoned or partly completed contract\nstill pays.",
+      "properties": {
+        "thresholds": {
+          "description": "The `percentageThresholds` in stored order.",
+          "items": {
+            "$ref": "#/$defs/PayoutRange"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "thresholds"
+      ],
+      "type": "object"
+    },
+    "PayoutRange": {
+      "description": "A `PartialContractRewardRange`: the share of the reward paid between two completion percentages.",
+      "properties": {
+        "currencyRewardMultiplier": {
+          "description": "The `currencyRewardMultiplier` applied to the payout, as stored.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "maxPercentage": {
+          "description": "The `maxPercentage` of the contract that is completed.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "minPercentage": {
+          "description": "The `minPercentage` of the contract that is completed.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reputationMultipliers": {
+          "description": "The `reputationMultipliers` in stored order.",
+          "items": {
+            "$ref": "#/$defs/PayoutReputation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "currencyRewardMultiplier",
+        "maxPercentage",
+        "minPercentage",
+        "reputationMultipliers"
+      ],
+      "type": "object"
+    },
+    "PayoutReputation": {
+      "description": "A `PartialContractRewardRepAdjustment`.",
+      "properties": {
+        "reputationRewardMultiplier": {
+          "description": "The `reputationRewardMultiplier` applied to the gain in that scope, as stored.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "scopeGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `reputationScope`, an entry of `reputationScopes`."
+        }
+      },
+      "required": [
+        "reputationRewardMultiplier",
+        "scopeGuid"
       ],
       "type": "object"
     },
@@ -6505,6 +8045,28 @@
       ],
       "type": "object"
     },
+    "PropertyKind": {
+      "description": "How an objective holds a mission property (`ObjectiveProperty_*`). A struct the catalog does\nnot know is `null`.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "The objective refers to a property of the template's `contractProperties`.",
+          "value": "referenced"
+        },
+        {
+          "description": "The objective produces the property.",
+          "value": "output"
+        },
+        {
+          "description": "The objective holds the property itself.",
+          "value": "embedded"
+        },
+        {
+          "description": "The objective takes the output of another objective's property.",
+          "value": "input"
+        }
+      ]
+    },
     "PropertyModifier": {
       "description": "A gameplay property of the crafted item with the ranges that scale it by quality.",
       "properties": {
@@ -6532,6 +8094,209 @@
         "ranges"
       ],
       "type": "object"
+    },
+    "PropertyValue": {
+      "description": "The value of a mission property (`MissionPropertyValue_*`), tagged by `type`.",
+      "oneOf": [
+        {
+          "description": "`MissionPropertyValue_Object`: an object the mission scripting provides.",
+          "properties": {
+            "type": {
+              "const": "object",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_DeliveryOrder`: a delivery order the mission scripting provides.",
+          "properties": {
+            "type": {
+              "const": "deliveryOrder",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Boolean`.",
+          "properties": {
+            "type": {
+              "const": "boolean",
+              "type": "string"
+            },
+            "value": {
+              "description": "The `value`.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_StringHash`.",
+          "properties": {
+            "options": {
+              "description": "The `options` in stored order.",
+              "items": {
+                "$ref": "#/$defs/StringOption"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "stringHash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "options"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Integer`.",
+          "properties": {
+            "options": {
+              "description": "The `options` in stored order.",
+              "items": {
+                "$ref": "#/$defs/NumberOption"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "integer",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "options"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Float`.",
+          "properties": {
+            "options": {
+              "description": "The `options` in stored order.",
+              "items": {
+                "$ref": "#/$defs/NumberOption"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "float",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "options"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Tags`.",
+          "properties": {
+            "negativeTags": {
+              "description": "The `negativeTags` as tag paths.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "tags": {
+              "description": "The `tags` as tag paths.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "tags",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "tags",
+            "negativeTags"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_ShipSpawnDescriptions`.",
+          "properties": {
+            "poolGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `guid` of the entry of `contractShipSpawns`; `null` for a description without a\ngroup."
+            },
+            "type": {
+              "const": "shipSpawnDescriptions",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Location` and `MissionPropertyValue_Locations`.",
+          "properties": {
+            "queryGuid": {
+              "$ref": "#/$defs/Guid",
+              "description": "The `guid` of the entry of `contractLocationQueries`."
+            },
+            "type": {
+              "const": "location",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "queryGuid"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A value of another struct, which the catalog does not read, e.g. the NPC and entity spawn\ndescriptions.",
+          "properties": {
+            "structName": {
+              "description": "The struct name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "other",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "structName"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "QualityCurve": {
       "description": "A normal distribution of quality.",
@@ -6846,6 +8611,35 @@
         "aimAssistDistanceMin",
         "aimAssistOutsideRangeBuffer",
         "pingCooldownTime"
+      ],
+      "type": "object"
+    },
+    "RandomPhase": {
+      "description": "A `MissionRandomPhaseEntry`.",
+      "properties": {
+        "objectiveId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `objective`, an entry of `objectives`; `null` when it points to none."
+        },
+        "probability": {
+          "description": "The `probability`, as stored.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "objectiveId",
+        "probability"
       ],
       "type": "object"
     },
@@ -7448,6 +9242,36 @@
         "flows",
         "irSignature",
         "name"
+      ],
+      "type": "object"
+    },
+    "RewardContribution": {
+      "description": "The `rewardContribution` of an objective: how much of the reward it stands for.",
+      "properties": {
+        "doPartialRewardPayout": {
+          "description": "The `doPartialRewardPayout` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "percentContribution": {
+          "description": "The `percentContribution`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "structName": {
+          "description": "The struct, e.g. `ObjectiveRewardContribution_PercentOfMission`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "doPartialRewardPayout",
+        "percentContribution",
+        "structName"
       ],
       "type": "object"
     },
@@ -8702,6 +10526,31 @@
       ],
       "type": "object"
     },
+    "StartComms": {
+      "description": "The `contractStartCommsNotification`: the message sent when the contract starts.",
+      "properties": {
+        "communicationTag": {
+          "description": "The tag path of the `communicationTags` tag.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "delay": {
+          "description": "The `delay`, as stored.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "communicationTag",
+        "delay"
+      ],
+      "type": "object"
+    },
     "Stated_boolean": {
       "description": "A value as stored, with the level that states it.",
       "properties": {
@@ -8736,6 +10585,45 @@
       "required": [
         "layer",
         "value"
+      ],
+      "type": "object"
+    },
+    "StringOption": {
+      "description": "An option of a string hash property.",
+      "properties": {
+        "dependentProperties": {
+          "description": "The `missionVariableName` of the properties the option makes dependent.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "displayName": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `textId`.",
+          "x-gameText": true
+        },
+        "value": {
+          "description": "The `value`, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "weighting": {
+          "description": "The `weighting` of the option among the others.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "dependentProperties",
+        "displayName",
+        "value",
+        "weighting"
       ],
       "type": "object"
     },
@@ -8972,6 +10860,378 @@
         "respawnTimeMultiplier",
         "subHarvestables",
         "tagGuids"
+      ],
+      "type": "object"
+    },
+    "TemplateModifier": {
+      "description": "A modifier of a template (`MissionModifier_*`), tagged by `modifier`.",
+      "oneOf": [
+        {
+          "description": "`MissionModifier_SecurityClearance`.",
+          "properties": {
+            "clearanceTokenGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `clearanceToken` Record."
+            },
+            "enabled": {
+              "description": "The `enabled` flag.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "locationProperty": {
+              "description": "The `missionVariableName` of the property the `locationProperty` points to.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "modifier": {
+              "const": "securityClearance",
+              "type": "string"
+            },
+            "modifierName": {
+              "description": "The `modifierName`, `null` when empty.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "modifier",
+            "enabled",
+            "locationProperty",
+            "modifierName"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionModifier_RequestRentShip`.",
+          "properties": {
+            "clearRentalOnFail": {
+              "description": "The `clearRentalOnFail` flag.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "durationSeconds": {
+              "description": "The `durationSeconds` of the rental.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "enabled": {
+              "description": "The `enabled` flag.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "itemGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `itemRecordGUID`, the ship item that is rented; an entry of `items` or `ships`."
+            },
+            "locationProperty": {
+              "description": "The `missionVariableName` of the property the `locationProperty` points to.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "modifier": {
+              "const": "requestRentShip",
+              "type": "string"
+            },
+            "modifierName": {
+              "description": "The `modifierName`, `null` when empty.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "modifier",
+            "enabled",
+            "locationProperty",
+            "modifierName"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionModifier_ShipKioskFilter`.",
+          "properties": {
+            "enabled": {
+              "description": "The `enabled` flag.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "locationProperty": {
+              "description": "The `missionVariableName` of the property the `locationProperty` points to.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "modifier": {
+              "const": "shipKioskFilter",
+              "type": "string"
+            },
+            "modifierName": {
+              "description": "The `modifierName`, `null` when empty.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "terms": {
+              "description": "The `terms` of the `kioskFilterType`: a ship matches one of them.",
+              "items": {
+                "$ref": "#/$defs/TagTerm"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "modifier",
+            "enabled",
+            "locationProperty",
+            "modifierName",
+            "terms"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A modifier of another struct.",
+          "properties": {
+            "enabled": {
+              "description": "The `enabled` flag.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "locationProperty": {
+              "description": "The `missionVariableName` of the property the `locationProperty` points to.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "modifier": {
+              "const": "other",
+              "type": "string"
+            },
+            "modifierName": {
+              "description": "The `modifierName`, `null` when empty.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "structName": {
+              "description": "The struct name.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "modifier",
+            "enabled",
+            "locationProperty",
+            "modifierName",
+            "structName"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TemplateObjective": {
+      "description": "An objective token of a template.",
+      "properties": {
+        "comms": {
+          "description": "The `commsNotifications` in stored order.",
+          "items": {
+            "$ref": "#/$defs/ObjectiveComms"
+          },
+          "type": "array"
+        },
+        "debugName": {
+          "description": "The `debugName`, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "display": {
+          "$ref": "#/$defs/ObjectiveDisplay",
+          "description": "The `displayInfo`."
+        },
+        "handler": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveHandler"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `objectiveHandler`, `null` when absent."
+        },
+        "id": {
+          "$ref": "#/$defs/Guid",
+          "description": "The `id` of the token; unique within the template."
+        },
+        "objectiveProperties": {
+          "description": "The `properties` in stored order.",
+          "items": {
+            "$ref": "#/$defs/ObjectiveProperty"
+          },
+          "type": "array"
+        },
+        "overrideDisplay": {
+          "$ref": "#/$defs/OverrideDisplay",
+          "description": "The `overrideMissionDetailsDisplayInfo`."
+        },
+        "parentId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `id` of the token whose `childMissionPhases` hold this one, `null` at the top level."
+        },
+        "phaseTag": {
+          "description": "The tag path of the `missionPhaseIdentifierTag`, `null` when absent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rewardContribution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RewardContribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `rewardContribution`, `null` when absent."
+        },
+        "startsActive": {
+          "description": "The `startsActive` flag, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "variableName": {
+          "description": "The `variableName` of a child mission phase, `null` for a top level token.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "weight": {
+          "description": "The `weight` of a child mission phase, `null` for a top level token.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "comms",
+        "debugName",
+        "display",
+        "handler",
+        "id",
+        "objectiveProperties",
+        "overrideDisplay",
+        "parentId",
+        "phaseTag",
+        "rewardContribution",
+        "startsActive",
+        "variableName",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "TemplateOwner": {
+      "description": "The Record that owns a template: the team or developer that maintains it.",
+      "properties": {
+        "className": {
+          "description": "The Record name without its type, e.g. `MDT`; `null` when the Archive lacks the Record.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "guid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The GUID of the `DevOwner` Record."
+        }
+      },
+      "required": [
+        "className",
+        "guid"
+      ],
+      "type": "object"
+    },
+    "TemplateProperty": {
+      "description": "A mission property of a template: a variable and the kind of value it holds.",
+      "properties": {
+        "token": {
+          "description": "The `extendedTextToken`, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valueType": {
+          "description": "The struct of the value without its `MissionPropertyValue_` start, e.g. `Location` or\n`ShipSpawnDescriptions`; `null` when the property has no value.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variable": {
+          "description": "The `missionVariableName`, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "token",
+        "valueType",
+        "variable"
       ],
       "type": "object"
     },
@@ -9272,6 +11532,13 @@
       },
       "type": "array"
     },
+    "contractTemplates": {
+      "description": "The contract templates, the targets of `contracts[].templateGuid`, ordered by GUID.",
+      "items": {
+        "$ref": "#/$defs/ContractTemplate"
+      },
+      "type": "array"
+    },
     "contracts": {
       "description": "The contracts and sub contracts with resolved titles, mission types and the reputation they\ngrant on success, ordered by the GUID of the contract and then of the sub contract.",
       "items": {
@@ -9561,6 +11828,7 @@
     "contractLocationQueries",
     "contractScenarios",
     "contractShipSpawns",
+    "contractTemplates",
     "contracts",
     "crafters",
     "craftingGlobal",

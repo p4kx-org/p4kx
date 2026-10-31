@@ -10,6 +10,7 @@ use crate::blueprint::as_struct;
 use crate::contract_missions::{ContractEntry, ContractFaction, PickupPlace};
 use crate::contract_offer::OfferedAt;
 use crate::contract_starmap::StarmapObject;
+use crate::contract_template_read::{self, ContractTemplates};
 use crate::guid_text::CatalogGuid;
 use crate::location_template::{self, LocationTemplates};
 use crate::mission_cooldown::ContractCooldown;
@@ -22,7 +23,7 @@ use crate::mission_places::{Places, Prerequisites, Where};
 use crate::mission_results::{granted_tags, link};
 use crate::mission_shared::{Found, Rewards, Shared};
 use crate::mission_titles::titles;
-use crate::record_fields::{boolean, guid_value, reference, text};
+use crate::record_fields::{boolean, guid_value, nonnil_guid, reference, text};
 use crate::selection::{Kind, is_leftover};
 use crate::spawn_layers::{HandlerSpawns, RecordSpawns, SpawnPools};
 use crate::texts::Texts;
@@ -43,6 +44,7 @@ pub(crate) struct Missions<'f> {
     pub(crate) failures: Vec<CatalogFailure>,
     pub(crate) pools: SpawnPools,
     pub(crate) templates: LocationTemplates<'f>,
+    pub(crate) contract_templates: ContractTemplates<'f>,
 }
 
 /// A Record that cannot be read: the error of the DataForge or of an identifier of a description.
@@ -88,12 +90,14 @@ pub(crate) fn read<'f>(
         .collect();
     let mut index = MissionIndex::read(forge, cancel)?;
     let (pools, failures) = index.take_template_results();
+    let tags = index.tags();
     let mut missions = Missions {
         contracts: Vec::new(),
         skipped: 0,
         failures,
         pools,
-        templates: location_template::read(forge, texts, index.tags(), filter, cancel)?,
+        templates: location_template::read(forge, texts, tags, filter, cancel)?,
+        contract_templates: contract_template_read::read(forge, texts, tags, filter, cancel)?,
     };
     if records.is_empty() {
         return Ok(missions);
@@ -385,5 +389,5 @@ impl<'f> Parent<'_, 'f> {
 }
 
 fn identity(structure: &StructValue<'_>) -> Option<p4kx_extraction::Guid> {
-    guid_value(Some(structure), "id").filter(|id| *id != p4kx_extraction::Guid::default())
+    guid_value(Some(structure), "id").and_then(nonnil_guid)
 }

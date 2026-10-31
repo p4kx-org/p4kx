@@ -58,7 +58,7 @@ The rule is ADR-0054 (amending ADR-0002):
   `locationPrerequisites` (#902, ADR-0266). Later additions keep version 2 as long as they are
   additive. The contract field `fixedRewards` (#888, ADR-0268) is one, and so is `cooldownLayers`
   (#909, ADR-0271), and the contract fields `offeredAt`, `giverFaction` and `blueprintRewards`
-  (#915, ADR-0273).
+  (#915, ADR-0273), and so is the kind `contractTemplates` (#812, ADR-0313).
 - **A production import takes catalogs of the Channel `LIVE` only.** `PTU`, `EPTU`, `TECH-PREVIEW`
   and `HOTFIX` are confidential test Channels (ADR-0038).
 
@@ -176,6 +176,7 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `missionLocationTemplates` | The mission location templates with the tags a location query matches, ordered by GUID |
 | `contractShipSpawns` | The distinct ship spawn descriptions of the contracts, ordered by identifier |
 | `contractLocationQueries` | The distinct location queries of the contracts, ordered by identifier |
+| `contractTemplates` | The contract templates (`ContractTemplate`), the targets of `contracts[].templateGuid`, ordered by GUID |
 | `lootTables` | The loot tables (`LootTableV3Record`) with the weighted archetypes of each, ordered by GUID |
 | `lootArchetypes` | The loot archetypes (`LootArchetypeV3Record`) with the weighted selectors of each, ordered by GUID |
 | `lootPoolFilters` | The pool filters of the loot generation, ordered by GUID |
@@ -1094,7 +1095,7 @@ that the rule on equal `guid` and `subContractGuid` above drops.
 | `guid`, `subContractGuid` | The `id` of the contract and of the sub contract |
 | `recordGuid`, `recordPath` | The `ContractGenerator` Record |
 | `debugName`, `handler` | The `debugName` of the contract and of its handler |
-| `templateGuid` | The `ContractTemplate` Record the contract names |
+| `templateGuid` | The `ContractTemplate` Record the contract names, an entry of `contractTemplates` |
 | `notForRelease`, `workInProgress` | The flags as stored, `null` when absent; the catalog does not filter on them |
 | `title` | The resolved title (game text) |
 | `description` | The resolved description (game text; must not be passed on to third parties) |
@@ -1398,9 +1399,9 @@ the struct, `periodScenarioGuid`), each with `tiers`: `minPoints`, `badgeToAward
 `blueprintPoolGuids`, entries of `blueprintPools`. The progression texts and the multiplier rewards
 (empty on LIVE) are not exported.
 
-Not exported, for want of a consumer: contract templates, mission broker entries, NPC spawns and
-the sandbox triggers and perks of the reputation Records. Ship spawns and the
-locations of contracts are described in "Ship spawns and location queries".
+Not exported, for want of a consumer: mission broker entries, NPC spawns and the sandbox triggers
+and perks of the reputation Records. Contract templates are described in "Contract templates",
+ship spawns and the locations of contracts in "Ship spawns and location queries".
 
 ### Ship spawns and location queries
 
@@ -1408,7 +1409,7 @@ Three kinds and three contract fields (#902, ADR-0266, additive, schema version 
 what a contract spawns and where it can take place, as the Archive stores it. The catalog never
 resolves what the game picks when the mission starts.
 
-On LIVE (2026-10-30) the kinds hold 564 ship spawn descriptions, 1,742 location queries and 2,092
+On LIVE (2026-10-31) the kinds hold 564 ship spawn descriptions, 1,742 location queries and 2,092
 location templates (12 more are development leftovers, skipped). They add about 5.1 MB of JSON
 (3.0 MB templates, 0.7 MB ship spawns, 1.4 MB queries) and the three contract fields about 2.2 MB
 (7,901 ship spawn links on 2,285 entries, 8,681 location query links on 4,732 entries, 479
@@ -1471,8 +1472,98 @@ falls back to `en`) and `entityClusterMemberGuid`. Not exported: the NPC auto sp
 mission modules and limits and the security network manifest.
 
 Not exported: NPC spawn descriptions (`MissionPropertyValue_NPCSpawnDescriptions`), the
-`ObjectiveToken` structure of the templates, and SCMDB's own pools, waves and region lists, which
-are derived and not stated by the Archive.
+content of the `ObjectiveToken` structures of the templates (see "Contract templates" for what is
+listed), and SCMDB's own pools, waves and region lists, which are derived and not stated by the
+Archive.
+
+### Contract templates
+
+`contractTemplates` lists the `ContractTemplate` Records (#812, ADR-0313, additive, schema version
+2, no bump), ordered by GUID. `contracts[].templateGuid` is the `guid` of an entry; every one
+resolves. A template is the structure a contract lays the overrides of its handler, itself and its
+sub contract over. The Records are selected by the struct, in any folder: on LIVE (2026-10-31)
+496 Records, 488 of them under `contracts/contracttemplates`, 335 named by a contract, none left
+out. A development leftover is told by the words of the usual rule except `template`, which live
+templates such as `handyman_template` carry. An entry states the fields of the Record as stored:
+identifiers, flags and numbers, links, and the texts the Archive keeps with them as game texts
+(`x-gameText`). Where a field holds one of several structs, the entry names the struct in a
+discriminator: `type` for the value of a property, a flow condition and a flow action, `modifier`
+for a modifier and `structName` for a handler; the other fields depend on it, and `other` stands for
+a struct the catalog does not read.
+
+| Field | Meaning |
+|-------|---------|
+| `guid`, `className`, `recordPath` | The Record |
+| `notForRelease`, `workInProgress` | The flags as stored, `null` when absent |
+| `title` | The first display string (game text); `null` texts for the placeholder most templates have |
+| `missionTypeGuid` | The `MissionType` of the display info, an entry of `missionTypes` |
+| `illegal`, `showLifeTimeInMobiGlas`, `preShowObjectives` | The flags of the display info |
+| `classType`, `settings` | The struct of the contract class (`ContractClass_Contract`, one template is a `ContractClass_PVPBounty`) and its `ActiveContractSettings`: `canBeShared`, `hasCompleteButton`, `handlesAbandonRequest`, `displayAlliedMarkers`, `onlyOwnerCanComplete`; `null` when absent |
+| `autoFinish` | The `ContractAutoFinishSettings`: `failIfSentToPrison`, `failIfBecameCriminal`, `failIfLeavePrison` and the deadline as stored: `completionTime`, `autoEnd`, `resultAfterTimerEnd` (an objective state), `remainingTimeToShowTimer`; the Archive does not state the unit of the times; `null` without the block |
+| `contractProperties` | The mission properties in stored order: `variable`, `token` (`null` when empty) and `valueType`, the struct of the value without `MissionPropertyValue_` (`StringHash`, `Location`, `ShipSpawnDescriptions`, `HaulingOrders`, ...) |
+| `shipSpawns`, `locationQueries` | The links of ADR-0266, one per variable the template states, with `level` always `template`, into `contractShipSpawns` and `contractLocationQueries` |
+| `haulingOrders` | The hauling orders of the template as in "Hauling orders": the properties (`source` `template`) and the orders of its hauling objectives (`templateObjective`) |
+| `objectives` | The objective tokens depth first, each phase after its parent (see "Objectives") |
+| `partialPayout` | The `PartialContractRewards`: `thresholds`, each `minPercentage`, `maxPercentage`, `currencyRewardMultiplier` and `reputationMultipliers` (`scopeGuid`, an entry of `reputationScopes`, and `reputationRewardMultiplier`); `null` without one |
+| `modifiers` | The modifiers in stored order, tagged by `modifier`: `securityClearance` (`clearanceTokenGuid`), `requestRentShip` (`itemGuid`, `durationSeconds`, `clearRentalOnFail`), `shipKioskFilter` (`terms`, each `positiveTags` and `negativeTags`) and `other` (`structName`); each with the shared `modifierName`, `enabled` and `locationProperty`, the variable of the property the weak pointer names |
+| `owner` | The `DevOwner` Record: `guid` and `className` (e.g. `MDT`); `null` without one |
+| `missionFlow` | The triggers in stored order (see "Mission flow") |
+| `startComms`, `endComms` | The `contractStartCommsNotification` (`delay`, `communicationTag` as a tag path; `null` without one) and the `contractEndCommsNotifications` (`reason` `complete`, `fail` or `abandon`, `delay`, `communicationTag`) |
+
+**Objectives.** Each entry has `id`, `parentId` (`null` at the top level), `debugName`,
+`startsActive`, `variableName` and `weight` (set on a child phase the flow may pick at random),
+`phaseTag` (a tag path), `display` (`category` `primary`, `hideOnHud`, `markerLabel`,
+`shortDescription`, `longDescription`; the three texts are game texts), `overrideDisplay`
+(`titleOverride` and `descriptionOverride`, game texts), `rewardContribution` (`structName`,
+`percentContribution`, `doPartialRewardPayout`; `null` without one), `comms` (`trigger` an objective
+state, `timing` `simultaneous`, `commsNotificationFirst` or `hudNotificationFirst`, `delay`,
+`communicationTag`), `objectiveProperties` (see "Objective properties") and the `handler`. Most
+texts of a template are the placeholder `@LOC_UNINITIALIZED`; such a text has a `null` key and no
+texts.
+
+The `handler` has `structName` (`ObjectiveHandler_Hauling`, `_Local`, `_NearLocation`,
+`_PlayerAttached`, `_TransitToInstance` or `_EntityAttached`) and the fields of the struct; a field
+the struct does not have is `null`: `module` (a mission scripting file), `moduleHierarchyGuid`,
+`disableTravelObjectives`, `disableReturnObjectives`, `travelRadiusKm`, `allPlayersLeftGracePeriod`,
+`locationProperty`, `organizationProperty`, `haulingLimitProperty` and `targetProperty` (the
+`missionVariableName` of the property the weak pointer names), `minDistance`, `maxDistance`,
+`hideMarkers`, `securityManifestGuid`, `navPoint` (`entityClassGuid`, `displayName`, a game text,
+and `extendedTextTokens`), `travelObjective` and `returnObjective` (displays as above), `hauling`
+(the `Hauling_ObjectiveSettings`: five extended text tokens and seven displays) and `instance`
+(`completePhaseOnPlayerEnter`, `enterTravelRadiusKm`, `hudObjectiveText`, a game text,
+`tagIdentifier`, `searchTags`, `objectiveMarker`). The orders of a hauling handler are
+`haulingOrders` of the template.
+
+**Objective properties.** An entry of `objectiveProperties` has `kind` (`referenced`, `output`,
+`embedded` or `input`, the struct `ObjectiveProperty_*`), `variable` and `token` (the
+`missionVariableName` and `extendedTextToken`, `null` when empty), `contractProperty` (for a
+referenced property the `missionVariableName` of the property of the template it points to),
+`value` (for an output, embedded or input property) and `linkedOutput` (for an input: the
+`objectiveId` of the objective that holds the output and its `variable`). The `value` is tagged by
+`type`: `object` and `deliveryOrder` (no fields), `boolean` (`value`), `stringHash` (`options`, each
+`displayName`, a game text, `value`, `weighting` and `dependentProperties`, the variables of the
+properties the option makes dependent), `integer` and `float` (`options`, each `displayName`,
+`value`, `variation`, `weighting` and `dependentProperties`), `tags` (`tags` and `negativeTags`),
+`shipSpawnDescriptions` (`poolGuid`, an entry of `contractShipSpawns`, `null` for a description
+without a group), `location` (`queryGuid`, an entry of `contractLocationQueries`) and `other`
+(`structName`; the NPC and entity spawn descriptions are among them). The ship spawns and location
+queries are read as for the contracts and added to their kinds.
+
+**Mission flow.** A trigger has `note` (the developer's `description`), a `condition` and an
+`action`, either `null` when absent. A condition is tagged by `type`: `tokenState` (`objectiveId`,
+the `id` of an entry of `objectives`, and `tokenState`), `allTokensState`, `and` and `or`
+(`conditions`), `not` (`condition`), `propertyIsSet` (`propertyVariable`) and `other`
+(`structName`). An action is tagged by `type`: `stateChange` (`toState`), `tokenStateChange`
+(`objectiveId`, `toState`), `pickRandomMissionPhase` (`phases`, each `objectiveId` and
+`probability`, and `toState`) and `other` (`structName` and `toState`). A state is `active`,
+`completed`, `failed` or `abandoned`. A stored enum name the catalog does not know is `null`, like
+the values of every closed set, and is counted in the warning `unknown_template_values` of the
+build. A weak pointer that points to nothing, to a token without an `id` or to a struct outside the
+Record has a `null` link.
+
+A token without an `id` (or a nil one) and the phases below it are left out. A Record whose phases
+nest deeper than 32 levels or whose conditions nest deeper than 16 cannot be read: it is a failure
+of the build and not an entry (none on LIVE).
 
 ### Cargo manifests
 
@@ -2246,6 +2337,7 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `missionLocationTemplates` | `libs/foundry/records/missiondata/pu_locations/` | `MissionLocationTemplate` |
 | `contractShipSpawns` | None: derived from the properties of the contracts and their templates, no Records | |
 | `contractLocationQueries` | None: derived from the properties of the contracts and their templates, no Records | |
+| `contractTemplates` | `libs/foundry/records/` (every folder; see "Contract templates") | `ContractTemplate` |
 | `lootTables` | `libs/foundry/records/lootgeneration/loottables/` | `LootTableV3Record` |
 | `lootArchetypes` | `libs/foundry/records/lootgeneration/lootarchetypes/` | `LootArchetypeV3Record` |
 | `lootPoolFilters` | `libs/foundry/records/lootgeneration/filters/` | `PoolFilterRecord` |
@@ -2386,7 +2478,8 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
 - Texts that carry a key (placeholder keys excluded), checked per kind against the Archive's own
   `global.ini` files (ADR-0270): a key a file holds resolves in the catalog, a key it lacks is
   `null` and the Basetool falls back to `en`. The verification prints the numbers per kind and
-  holds each kind to a baseline of the share it may lack. LIVE, every `name` and every game text
+  holds each kind to a baseline of the share it may lack: the share measured on LIVE, rounded up to
+  the hundredth. LIVE, every `name` and every game text
   field (`x-gameText`) that carries a key, wherever it sits in an entry:
 
   | Kind | Keyed texts | Missing in en | Missing in de |
@@ -2399,7 +2492,7 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   | resourceGroups | 12 | 0 | 0 |
   | gameplayProperties | 29 | 0 | 28 |
   | starmapObjects | 2,041 | 73 | 1,357 |
-  | contracts | 44,506 | 706 | 22,825 |
+  | contracts | 49,956 | 706 | 26,425 |
   | refiningProcesses | 9 | 0 | 9 |
   | mineableCompositions | 231 | 1 | 36 |
   | factionReputations | 37 | 0 | 27 |
@@ -2407,14 +2500,20 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   | reputationStandings | 213 | 17 | 44 |
   | missionTypes | 41 | 0 | 23 |
   | missionLocationTemplates | 3,211 | 274 | 3,160 |
+  | contractTemplates | 6,765 | 12 | 6,651 |
 
   A contract text that holds a `~mission(…)` token is rewritten by the exporter, so the
   verification only checks that such a text is present. The location templates have 3,297 name
   variants; 86 of them carry a placeholder key or none, which is not counted as a keyed text, so the
   German file lacks 3,246 of the 3,297 variants and 3,160 of the 3,211 keyed texts.
 
-  The `p4kx catalog` summary counts them over all texts of the catalog: English 72,462 resolved,
-  585 unresolved, German 31,353 resolved, 41,694 unresolved, 23,717 placeholders in each.
+  The contract templates have 6,765 keyed texts (the titles, the objective, handler, override and
+  option texts, the marker names; most are the placeholder `@LOC_UNINITIALIZED` and carry no key):
+  the English file lacks 12 of them (`@MissionPhaseDebug_*` among them) and the German file 6,651,
+  so the baselines of the kind are 0.01 and 0.99.
+
+  The `p4kx catalog` summary counts them over all texts of the catalog: English 79,504 resolved,
+  597 unresolved, German 31,495 resolved, 48,606 unresolved, 23,717 placeholders in each.
 - Crafting, LIVE (the same on every Channel but for the counts): every blueprint has exactly one
   tier, equal to its `craftTimeSeconds`; 3 blueprints let the player choose fewer than offered
   (`BP_CRAFT_thp_light_legs_01_01_01`, `_03` and `_12`), 3 carry the factor 1.15 (the slaver arms

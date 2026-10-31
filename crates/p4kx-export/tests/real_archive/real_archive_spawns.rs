@@ -12,20 +12,11 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
-type TestResult = Result<(), Box<dyn std::error::Error>>;
+use crate::real_archive_verification::{TestResult, guids, print_line};
 
 /// The contracts whose location prerequisite names a variable no location query states: the four
 /// PVP bounties of North Rock, whose `MissionLocation` is not a location property.
 const KNOWN_DANGLING: &str = "NorthRock_Bounty";
-
-fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, String> {
-    Ok(catalog[kind]
-        .as_array()
-        .ok_or_else(|| format!("{kind} is a list"))?
-        .iter()
-        .filter_map(|entry| entry["guid"].as_str())
-        .collect())
-}
 
 /// Asserts that every ship spawn link and location query link of a contract names an entry of
 /// its kind and that every location prerequisite names a variable of the contract's
@@ -60,14 +51,6 @@ pub(crate) fn check_spawn_links(catalog: &Value) -> TestResult {
         }
     }
     Ok(())
-}
-
-#[expect(
-    clippy::print_stdout,
-    reason = "the figures are the result of the verification"
-)]
-fn print_line(line: &str) {
-    println!("{line}");
 }
 
 #[test]

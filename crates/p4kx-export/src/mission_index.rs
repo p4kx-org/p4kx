@@ -319,7 +319,8 @@ fn available_locations(locality: Option<&StructValue<'_>>) -> Vec<Guid> {
         .collect()
 }
 
-fn title_key<'f>(display: Option<&StructValue<'f>>) -> Option<&'f str> {
+/// Returns the localisation key of the first display string of `display`, a `ContractDisplayInfo`.
+pub(crate) fn title_key<'f>(display: Option<&StructValue<'f>>) -> Option<&'f str> {
     match items(display, "displayString").first()? {
         Value::Struct(entry) => key(Some(entry), "value"),
         Value::Locale(text) | Value::String(text) => {

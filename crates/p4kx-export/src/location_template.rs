@@ -1,23 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{
-    CancelToken, DataForge, DataForgeError, Filter, Record, StructValue, TagTree, TreeBuilder,
-};
-use rayon::prelude::*;
+use p4kx_extraction::{CancelToken, DataForge, Filter, RecordTree, StructValue, TagTree};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::CatalogError;
 use crate::blueprint::as_struct;
 use crate::contract::{LocalisedText, every_field_required};
-use crate::guid_text::{CatalogGuid, sort_by_guid};
+use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{items, key, one};
 use crate::record_fields::{boolean, class_name, reference};
-use crate::selection::{Kind, is_kind_leftover};
+use crate::record_read::{KindRead, read_kind};
+use crate::selection::Kind;
 use crate::spawn_model::{TagPaths, TagTerm};
 use crate::spawn_read::Reader;
 use crate::texts::Texts;
-use crate::{CatalogError, CatalogFailure};
 
 /// A mission location template: a `MissionLocationTemplate` Record under
 /// `missiondata/pu_locations`, a place a location query can match by its tags.
@@ -63,17 +61,7 @@ pub(crate) struct LocationName<'a> {
 }
 
 /// The location templates of a DataForge and what was left out.
-pub(crate) struct LocationTemplates<'f> {
-    pub(crate) templates: Vec<MissionLocationTemplate<'f>>,
-    pub(crate) skipped: usize,
-    pub(crate) failures: Vec<CatalogFailure>,
-}
-
-enum Piece<'f> {
-    Template(Box<MissionLocationTemplate<'f>>),
-    Skipped,
-    Failed(CatalogFailure),
-}
+pub(crate) type LocationTemplates<'f> = KindRead<MissionLocationTemplate<'f>>;
 
 /// Reads the `MissionLocationTemplate` Records `filter` matches, ordered by GUID; a development
 /// leftover is left out and counted.
@@ -88,63 +76,26 @@ pub(crate) fn read<'f>(
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
 ) -> Result<LocationTemplates<'f>, CatalogError> {
-    let rule = Kind::MissionLocationTemplates.records();
-    let records: Vec<Record<'f>> = forge
-        .records()
-        .filter(|record| {
-            record
-                .record_path()
-                .is_ok_and(|path| rule.matches_path(path) && filter.is_none_or(|f| f.matches(path)))
-        })
-        .collect();
-    let pieces: Vec<Piece<'f>> = records
-        .par_iter()
-        .map_init(TreeBuilder::new, |trees, record| {
-            if cancel.is_some_and(CancelToken::is_cancelled) {
-                return Err(CatalogError::Cancelled);
-            }
-            Ok(piece(trees, record, texts, tags)
-                .unwrap_or_else(|source| Some(Piece::Failed(CatalogFailure::of(record, &source)))))
-        })
-        .filter_map(Result::transpose)
-        .collect::<Result<_, _>>()?;
-    let mut read = LocationTemplates {
-        templates: Vec::new(),
-        skipped: 0,
-        failures: Vec::new(),
-    };
-    for piece in pieces {
-        match piece {
-            Piece::Template(template) => read.templates.push(*template),
-            Piece::Skipped => read.skipped = read.skipped.saturating_add(1),
-            Piece::Failed(failure) => read.failures.push(failure),
-        }
-    }
-    sort_by_guid(&mut read.templates, |template| template.guid);
-    Ok(read)
+    read_kind(
+        forge,
+        Kind::MissionLocationTemplates,
+        (filter, cancel),
+        |tree| Ok(template(tree, texts, tags)),
+        |template| template.guid,
+    )
 }
 
-fn piece<'f>(
-    trees: &mut TreeBuilder<'f>,
-    record: &Record<'f>,
+fn template<'f>(
+    tree: &RecordTree<'f>,
     texts: &Texts<'f>,
     tags: &TagTree,
-) -> Result<Option<Piece<'f>>, DataForgeError> {
-    let rule = Kind::MissionLocationTemplates.records();
-    let path = record.record_path()?;
-    if record.type_name()? != rule.type_name {
-        return Ok(None);
-    }
-    if is_kind_leftover(Kind::MissionLocationTemplates, path, record.name()?) {
-        return Ok(Some(Piece::Skipped));
-    }
-    let tree = trees.build(record)?;
+) -> MissionLocationTemplate<'f> {
     let reader = Reader::new(tags, tree.root());
     let data = one(Some(tree.root()), "locationData");
-    Ok(Some(Piece::Template(Box::new(MissionLocationTemplate {
+    MissionLocationTemplate {
         guid: CatalogGuid(tree.guid()),
-        class_name: class_name(&tree),
-        record_path: path,
+        class_name: class_name(tree),
+        record_path: tree.record_path(),
         disabled: boolean(data, "disabled"),
         is_security_network_host: boolean(data, "isSecurityNetworkHost"),
         tags: reader.tag_list(data, "generalTags"),
@@ -153,7 +104,7 @@ fn piece<'f>(
         ai_spawn_tags: reader.tag_list(data, "aiSpawnTags"),
         names: names(&reader, texts, data),
         entity_cluster_member_guid: reference(data, "entityClusterMember"),
-    }))))
+    }
 }
 
 fn term(reader: &Reader<'_, '_>, data: Option<&StructValue<'_>>, name: &str) -> TagTerm {
