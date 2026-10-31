@@ -24,15 +24,18 @@ Entities outside the human rigs name none (weapons, gadgets, ships). Per databas
 in the folders and the ones that fit the skeleton: Quasigrazer 75 / 67, Vlk 5 to 45 / 5 to 37,
 Webhound 61 / 56, Yormandi 25 / 25, Vanduul 6 / 6, a powersuit 26 / 26. The Aloprat draws no skin,
 so nothing is read. A player database (`playerAnims.adb`) names clips none of which is in the
-folders of the skeleton it is paired with. The GLBs with clips are 8 to 44 MB.
+folders of the skeleton it is paired with. The player, Vanduul and powersuit databases nest more than
+64 databases, so the limit reports them. The GLBs with clips are 8 to 44 MB.
 
 ## Decision
 
 - **A creature gets the clips its animation database names.** `creature_animations` reads the
-  database and the databases nested in it (at most 16, breadth first, each name once), finds the
+  database and the databases nested in it (at most 64, breadth first, each name once), finds the
   skeleton's parameter file (the skeleton file itself, or the one a character definition names),
   and reads the clips below all its `#filepath` folders and its `$TracksDatabase`. A name no clip
-  has is skipped, so a blend space costs nothing but a second read of the folders. Nothing is read
+  has is filtered out against the file names below the folders before the clips are read, so a
+  blend space costs nothing (with a track database below them the names show only inside it, and
+  a name it lacks costs a second read). Nothing is read
   for an Entity that names no database or whose Assembly writes no skinned creature.
 - **A clip is written on the bone nodes.** `Assembly::animate` fits the clips to the skeleton of
   ADR-0275: an additive clip, a clip with no track for a bone of the skeleton and a clip beyond
@@ -43,7 +46,15 @@ folders of the skeleton it is paired with. The GLBs with clips are 8 to 44 MB.
 - **What cannot be found is a note.** A database, parameter file or folder the Archive lacks or
   cannot read is `animations_unavailable` on the root, `skipped` false, and the creature is
   written without clips.
-- **`entity glb` writes the clips by default**, `--no-animations` leaves them out. The report's
+- **Limits are reported.** At most 64 databases, 65,536 animation names and, per parameter file,
+  64 folders and 64 track databases are kept (the last folder or database is always the file's
+  last); what a limit drops is an `animations_unavailable` note, never silent.
+- **Memory.** The clips are decoded in full before they are fitted, so the memory of a run is
+  bounded by the clips of the Archive the names select, not by the budget of values. The budget
+  of `MAX_ANIMATION_VALUES` applies when the clips are fitted for writing. A cap on decoded keys
+  needs a change to the animation reader and is not part of this decision.
+- **`entity glb --animations` writes the clips**; without it the GLB stays static, as `chf glb`,
+  `character package` and `armour glb` do (owner's decision on #925). The report's
   `animations` lists them as `model glb` does.
 - **`entity package` stays static**, as in ADR-0275.
 

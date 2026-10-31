@@ -13,8 +13,8 @@ use p4kx_assembly::{
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_gltf::GlbOptions;
 use p4kx_testkit::{
-    CREATURE, CREATURE_ANIMATED, CREATURE_ANIMATION_DATABASE_LOST, CREATURE_ANIMATION_PARAMS_LOST,
-    check_glb, creature_entries,
+    CREATURE, CREATURE_ANIMATED, CREATURE_ANIMATION_DATABASE_LOST, CREATURE_ANIMATION_NESTED_LOST,
+    CREATURE_ANIMATION_PARAMS_LOST, check_glb, creature_entries,
 };
 
 /// What exporting a creature with its clips came to.
@@ -186,6 +186,27 @@ fn clips_beyond_the_budget_are_left_out_with_a_limit_reason() -> TestResult {
         )),
         "{:?}",
         fitted.issues()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_nested_database_that_cannot_be_read_is_listed_and_the_rest_is_still_written() -> TestResult {
+    let exported = export(CREATURE_ANIMATION_NESTED_LOST)?;
+
+    assert_eq!(names(&exported.clips), ["wave"]);
+    assert_eq!(exported.written, 1);
+    let [issue] = exported.clips.issues.as_slice() else {
+        return Err(format!("one issue, got {:?}", exported.clips.issues).into());
+    };
+    assert!(
+        matches!(issue.kind(), IssueKind::AnimationsUnavailable { reason } if reason.contains("broken.adb")),
+        "{issue:?}"
+    );
+    assert_eq!(
+        issue.path(),
+        "",
+        "an issue of the root Entity has no port path"
     );
     Ok(())
 }

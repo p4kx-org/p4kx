@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashSet;
+
 use p4kx_extraction::{AnimationChoice, AnimationSet, ConversionError};
 
+use super::clip_files;
 use super::database::{DatabaseProblem, clips};
 use crate::cdf::{self, MAX_CDF_BYTES, is_character_definition};
 use crate::creature_rig::{is_skinned, skeleton_of};
-use crate::gear_clip::{ChrParams, MAX_CHRPARAMS_BYTES, params_path, read_params};
+use crate::gear_clip::{
+    ChrParams, MAX_CHRPARAMS_BYTES, MAX_PARAM_SOURCES, params_path, read_params,
+};
 use crate::{ArchiveModels, Assembly, EntityNode, Issue, IssueKind, ModelFailure, ModelProvider};
 
 /// The clips of a creature Entity, read from the Archive, and what kept some from being read.
@@ -16,7 +21,8 @@ pub struct CreatureClips {
     /// The clips the Entity's animation database names that were found, as read by
     /// [`ArchiveModels::animations`].
     pub set: AnimationSet,
-    /// What could not be found or read, as [`IssueKind::AnimationsUnavailable`].
+    /// What could not be found or read, as [`IssueKind::AnimationsUnavailable`] of the root Entity,
+    /// whose [`Issue::path`] is empty.
     pub issues: Vec<Issue>,
 }
 
@@ -80,27 +86,13 @@ fn gather(
         reasons.push("the parameter file of the skeleton names no animation folder".to_owned());
         return Ok(AnimationSet::default());
     }
-    let names = match clips(models, database) {
-        Ok(read) => {
-            reasons.extend(read.unread.into_iter().map(|(file, reason)| {
-                format!(
-                    "the animation database {file}, nested in {database}, cannot be read: {reason}"
-                )
-            }));
-            read.names
-        }
-        Err(DatabaseProblem::Missing) => {
-            reasons.push(format!(
-                "the animation database {database} is not in the Archive"
-            ));
-            return Ok(AnimationSet::default());
-        }
-        Err(DatabaseProblem::Unreadable(reason)) => {
-            reasons.push(format!(
-                "the animation database {database} cannot be read: {reason}"
-            ));
-            return Ok(AnimationSet::default());
-        }
+    if params.capped {
+        reasons.push(format!(
+            "the parameter file of the skeleton lists more than {MAX_PARAM_SOURCES} animation folders or track databases, the others are left out"
+        ));
+    }
+    let Some(mut names) = database_names(models, database, reasons) else {
+        return Ok(AnimationSet::default());
     };
     let extra: Vec<String> = params
         .databases
@@ -108,6 +100,10 @@ fn gather(
         .filter_map(|path| models.entry_of(path))
         .collect();
     let folders: Vec<&str> = params.folders.iter().map(String::as_str).collect();
+    let files = clip_files::below(models, &folders);
+    if !files.has_database && extra.is_empty() {
+        names.retain(|name| files.stems.contains(&name.to_ascii_lowercase()));
+    }
     let set = read_named(models, &folders, names, &extra)?;
     if set.animations.is_empty() {
         reasons.push(format!(
@@ -115,6 +111,38 @@ fn gather(
         ));
     }
     Ok(set)
+}
+
+/// Returns the clip names of `database`, adding to `reasons` what it could not read or had to drop;
+/// `None` when the database itself gives none.
+fn database_names(
+    models: &ArchiveModels<'_>,
+    database: &str,
+    reasons: &mut Vec<String>,
+) -> Option<Vec<String>> {
+    match clips(models, database) {
+        Ok(read) => {
+            reasons.extend(read.unread.into_iter().map(|(file, reason)| {
+                format!(
+                    "the animation database {file}, nested in {database}, cannot be read: {reason}"
+                )
+            }));
+            reasons.extend(read.truncated);
+            Some(read.names)
+        }
+        Err(DatabaseProblem::Missing) => {
+            reasons.push(format!(
+                "the animation database {database} is not in the Archive"
+            ));
+            None
+        }
+        Err(DatabaseProblem::Unreadable(reason)) => {
+            reasons.push(format!(
+                "the animation database {database} cannot be read: {reason}"
+            ));
+            None
+        }
+    }
 }
 
 /// Reads the parameter file beside the skeleton of the root geometry `geometry`: the file itself
@@ -142,8 +170,8 @@ fn parameters(models: &ArchiveModels<'_>, geometry: &str) -> Result<ChrParams, S
     }
 }
 
-/// Reads the clips `names` below `folders` and the Entries `extra`; the names no clip has are left
-/// out, which costs a second read only when there are some.
+/// Reads the clips `names` below `folders` and the Entries `extra`. A name no clip has is left
+/// out; names that only a database can lack cost a second read.
 fn read_named(
     models: &ArchiveModels<'_>,
     folders: &[&str],
@@ -159,7 +187,8 @@ fn read_named(
             let AnimationChoice::Named(mut present) = choice else {
                 return Ok(AnimationSet::default());
             };
-            present.retain(|name| !missing.contains(name));
+            let missing: HashSet<&str> = missing.iter().map(String::as_str).collect();
+            present.retain(|name| !missing.contains(name.as_str()));
             if present.is_empty() {
                 return Ok(AnimationSet::default());
             }

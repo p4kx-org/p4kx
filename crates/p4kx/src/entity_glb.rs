@@ -54,10 +54,10 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
     } else {
         assembly
     };
-    let found = if args.no_animations {
-        CreatureClips::default()
-    } else {
+    let found = if args.animations {
         creature_animations(&models, &assembly, tree)?
+    } else {
+        CreatureClips::default()
     };
     let animated = assembly.animate(&found.set.animations);
     let summary = write(&assembly, &animated, &models, args)?;

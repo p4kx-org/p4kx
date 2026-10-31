@@ -11,13 +11,36 @@ use crate::{ArchiveModels, ModelFailure, ModelProvider};
 /// The most bytes of a skeleton's parameter file that are read.
 pub(crate) const MAX_CHRPARAMS_BYTES: u64 = 1 << 20;
 
+/// The most folders, and the most databases, of a parameter file that are kept; every folder costs
+/// a scan of the Archive's entries.
+pub(crate) const MAX_PARAM_SOURCES: usize = 64;
+
 /// What a skeleton's parameter file (`.chrparams`) lists: the folders and databases its animations
 /// are stored in, in file order, and the animations by name and file.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ChrParams {
+    /// The `#filepath` folders, at most [`MAX_PARAM_SOURCES`]; past it the last slot holds the
+    /// latest, so the last folder is always the file's last.
     pub(crate) folders: Vec<String>,
+    /// The `$TracksDatabase` files, capped like `folders`.
     pub(crate) databases: Vec<String>,
     pub(crate) clips: Vec<(String, String)>,
+    /// Whether folders or databases were dropped for the cap.
+    pub(crate) capped: bool,
+}
+
+/// Adds `path` to `list`, which holds at most [`MAX_PARAM_SOURCES`]; returns whether one was
+/// dropped for it.
+fn keep_last(list: &mut Vec<String>, path: String) -> bool {
+    if list.len() < MAX_PARAM_SOURCES {
+        list.push(path);
+        false
+    } else {
+        if let Some(last) = list.last_mut() {
+            *last = path;
+        }
+        true
+    }
 }
 
 /// Reads the parameter file in `bytes`.
@@ -35,23 +58,37 @@ pub(crate) fn read_params(bytes: &[u8]) -> Result<ChrParams, String> {
         folders: Vec::new(),
         databases: Vec::new(),
         clips: Vec::new(),
+        capped: false,
     };
     for list in root.children_named("AnimationList") {
         for clip in list.children_named("Animation") {
             let (Some(name), Some(file)) = (clip.attribute("name"), clip.attribute("path")) else {
                 continue;
             };
-            match name {
-                "#filepath" => params.folders.push(file.replace('\\', "/")),
-                "$TracksDatabase" => params.databases.push(file.replace('\\', "/")),
-                _ => params.clips.push((name.to_owned(), file.to_owned())),
-            }
+            let dropped = match name {
+                "#filepath" => keep_last(&mut params.folders, file.replace('\\', "/")),
+                "$TracksDatabase" => keep_last(&mut params.databases, file.replace('\\', "/")),
+                _ => {
+                    params.clips.push((name.to_owned(), file.to_owned()));
+                    false
+                }
+            };
+            params.capped |= dropped;
         }
     }
     Ok(params)
 }
 
 impl ChrParams {
+    /// Returns the last `#filepath` folder and the last `$TracksDatabase`, the only ones a landing
+    /// gear's clip is looked for in.
+    pub(crate) fn last_sources(&self) -> (Option<&str>, Option<&str>) {
+        (
+            self.folders.last().map(String::as_str),
+            self.databases.last().map(String::as_str),
+        )
+    }
+
     /// Returns the file of the clip that deploys the gear: the first whose name has `extend`,
     /// else the first with `deploy`, but never one that also names a retraction or compression.
     pub(crate) fn deploy_clip(&self) -> Option<&str> {
@@ -104,12 +141,11 @@ impl ArchiveModels<'_> {
     }
 
     fn read_clip(&self, params: &ChrParams, clip: &str) -> Result<Animation, ModelFailure> {
-        let extra: Vec<String> = params
-            .databases
-            .last()
+        let (folder, database) = params.last_sources();
+        let extra: Vec<String> = database
             .into_iter()
             .filter_map(|database| self.entry_of(database))
-            .chain(params.folders.last().into_iter().filter_map(|folder| {
+            .chain(folder.into_iter().filter_map(|folder| {
                 self.entry_of(&format!("{}/{clip}", folder.trim_end_matches('/')))
             }))
             .collect();
@@ -135,7 +171,7 @@ impl ArchiveModels<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::{params_path, read_params};
+    use super::{MAX_PARAM_SOURCES, params_path, read_params};
 
     const PARAMS: &str = r##"<Params><AnimationList>
         <Animation name="#filepath" path="Animations\Ships\Gear"/>
@@ -177,6 +213,55 @@ mod tests {
     fn a_document_that_is_no_parameter_file_is_refused() {
         assert!(read_params(b"<Other/>").is_err());
         assert!(read_params(b"not xml").is_err());
+    }
+
+    const SEVERAL: &str = r##"<Params><AnimationList>
+        <Animation name="#filepath" path="Animations\First"/>
+        <Animation name="$TracksDatabase" path="Animations/First.dba"/>
+        <Animation name="#filepath" path="Animations/Second"/>
+        <Animation name="$TracksDatabase" path="Animations/Second.dba"/>
+        </AnimationList></Params>"##;
+
+    #[test]
+    fn every_folder_and_database_is_kept_in_file_order() {
+        let params = read_params(SEVERAL.as_bytes()).expect("params");
+
+        assert_eq!(params.folders, ["Animations/First", "Animations/Second"]);
+        assert_eq!(
+            params.databases,
+            ["Animations/First.dba", "Animations/Second.dba"]
+        );
+        assert!(!params.capped);
+    }
+
+    #[test]
+    fn a_landing_gear_takes_the_last_folder_and_database() {
+        let params = read_params(SEVERAL.as_bytes()).expect("params");
+
+        assert_eq!(
+            params.last_sources(),
+            (Some("Animations/Second"), Some("Animations/Second.dba"))
+        );
+    }
+
+    #[test]
+    fn folders_beyond_the_cap_are_dropped_but_the_last_stays_last() {
+        let list: Vec<String> = (0..=MAX_PARAM_SOURCES)
+            .map(|at| format!(r##"<Animation name="#filepath" path="Animations/f{at}"/>"##))
+            .collect();
+        let text = format!(
+            "<Params><AnimationList>{}</AnimationList></Params>",
+            list.concat()
+        );
+
+        let params = read_params(text.as_bytes()).expect("params");
+
+        assert_eq!(params.folders.len(), MAX_PARAM_SOURCES);
+        assert!(params.capped);
+        assert_eq!(
+            params.last_sources().0,
+            Some(format!("Animations/f{MAX_PARAM_SOURCES}").as_str())
+        );
     }
 
     #[test]

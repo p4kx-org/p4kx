@@ -45,8 +45,9 @@ had no reason to change.
 - **A missing or unreadable skeleton file** (`skeleton_missing`, `skeleton_unreadable` on the
   root) keeps the creature static, as before. A scene without a skinned mesh adds no bones.
 - **The JSON report of `entity glb`** counts `bones` and `skinned_meshes`.
-- **Animations are not written.** (Superseded by ADR-0307.) An Entity names no animation: its clips are chosen through the
-  animation database of the creature, which the Assembly does not read. #925 records that.
+- **Animations are not written.** (Superseded by ADR-0307.) An Entity names no animation: its
+  clips are chosen through the animation database of the creature, which the Assembly does not
+  read. #925 records that.
 - **`entity package` stays static.** Its meshes are separate files that the add-on instances;
   a skinned creature needs the rig form of the Character package (#926).
 

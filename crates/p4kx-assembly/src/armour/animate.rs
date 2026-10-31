@@ -16,6 +16,7 @@ use super::sample::{Control, evaluate, joint_samples, reduced, values_of, weight
 use super::shape::MAX_DNA_RIG_LEN;
 use super::unused::summarise;
 use super::{Armour, ArmourPart};
+use crate::animation_budget::{key_cost, limit_reason};
 use crate::{Issue, IssueKind, ModelFailure, ModelProvider};
 
 /// The most values, floats of key times and poses, the animations of one Character may write: 32
@@ -111,9 +112,7 @@ fn not_used(animation: &Animation, reason: String) -> Issue {
 }
 
 fn limit(values: usize, remaining: usize) -> String {
-    format!(
-        "limit: the animation needs {values} values, {remaining} of the budget of {MAX_ANIMATION_VALUES} are left"
-    )
+    limit_reason(values, remaining)
 }
 
 /// The Issue for an animation the facial part of which was refused, or that nothing of fits;
@@ -238,7 +237,7 @@ impl Armour {
             if let Some(sampled) = sampled {
                 out.sampled.push(sampled);
             }
-            let cost = animation.key_count().saturating_mul(5);
+            let cost = key_cost(animation);
             let mut reported = false;
             if !bound.bound.is_empty() {
                 if cost <= remaining {

@@ -44,7 +44,8 @@ pub const CREATURE_ASSORTED: &str = "Test_Creature_Assorted";
 pub const CREATURE_LOADOUT_LOST: &str = "Test_Creature_LoadoutLost";
 
 pub use crate::entity_creature_animated::{
-    CREATURE_ANIMATED, CREATURE_ANIMATION_DATABASE_LOST, CREATURE_ANIMATION_PARAMS_LOST,
+    CREATURE_ANIMATED, CREATURE_ANIMATION_DATABASE_LOST, CREATURE_ANIMATION_NESTED_LOST,
+    CREATURE_ANIMATION_PARAMS_LOST,
 };
 
 /// A rigged Entity outside the characters folder, a prop with a skeleton file and the same skin.

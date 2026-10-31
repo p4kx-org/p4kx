@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! `p4kx entity glb` of a creature that names an animation database writes its clips, unless
-//! `--no-animations` is given, and lists what it could not write.
+//! `p4kx entity glb` of a creature that names an animation database writes its clips only when
+//! `--animations` is given, and lists what it could not write.
 
 use std::error::Error;
 use std::path::Path;
@@ -40,7 +40,7 @@ fn the_clips_of_a_creature_are_written_and_the_report_counts_them() -> TestResul
     let archive = write_archive(dir.path(), creature_entries())?;
     let out = dir.path().join("creature.glb");
 
-    let text = glb(&archive, CREATURE_ANIMATED, &out, &[])?;
+    let text = glb(&archive, CREATURE_ANIMATED, &out, &["--animations"])?;
 
     let checked = check_glb(&std::fs::read(&out)?)?;
     assert_eq!(checked.document.animations().len(), 1);
@@ -55,7 +55,12 @@ fn the_json_report_lists_the_written_animations_and_the_ones_left_out() -> TestR
     let archive = write_archive(dir.path(), creature_entries())?;
     let out = dir.path().join("creature.glb");
 
-    let text = glb(&archive, CREATURE_ANIMATED, &out, &["--json"]);
+    let text = glb(
+        &archive,
+        CREATURE_ANIMATED,
+        &out,
+        &["--animations", "--json"],
+    );
     let report: Value = serde_json::from_str(&text?)?;
 
     assert_eq!(report["animations"][0]["name"], "wave");
@@ -73,12 +78,12 @@ fn the_json_report_lists_the_written_animations_and_the_ones_left_out() -> TestR
 }
 
 #[test]
-fn no_animations_writes_the_creature_without_clips() -> TestResult {
+fn without_the_flag_the_creature_is_written_static_and_nothing_is_read() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = write_archive(dir.path(), creature_entries())?;
     let out = dir.path().join("creature.glb");
 
-    let text = glb(&archive, CREATURE_ANIMATED, &out, &["--no-animations"])?;
+    let text = glb(&archive, CREATURE_ANIMATED, &out, &[])?;
 
     let checked = check_glb(&std::fs::read(&out)?)?;
     assert_eq!(checked.document.animations().len(), 0);
@@ -95,7 +100,12 @@ fn a_database_the_archive_lacks_is_a_note_and_the_creature_is_still_written() ->
     let archive = write_archive(dir.path(), creature_entries())?;
     let out = dir.path().join("creature.glb");
 
-    let text = glb(&archive, CREATURE_ANIMATION_DATABASE_LOST, &out, &[])?;
+    let text = glb(
+        &archive,
+        CREATURE_ANIMATION_DATABASE_LOST,
+        &out,
+        &["--animations"],
+    )?;
 
     let checked = check_glb(&std::fs::read(&out)?)?;
     assert_eq!(checked.document.animations().len(), 0);

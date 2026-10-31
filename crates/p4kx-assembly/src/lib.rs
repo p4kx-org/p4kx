@@ -63,6 +63,7 @@
 //! material choices of the Character ([`Look`]); [`Armour::write_glb_with`] embeds the textures.
 //! [`Head::with_expressions`] adds the head's expression blendshapes as morph targets.
 
+mod animation_budget;
 mod animation_folders;
 mod armour;
 mod assembly;

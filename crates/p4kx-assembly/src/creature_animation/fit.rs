@@ -8,15 +8,16 @@ use p4kx_gltf::{
 };
 use p4kx_model::{Animation, Bone};
 
+use crate::animation_budget::{key_cost, limit_reason};
 use crate::armour::MAX_ANIMATION_VALUES;
 use crate::armour::unused::summarise;
 use crate::{Assembly, Issue, IssueKind, creature_rig};
 
-/// The floats one key may write: its time and a rotation, or a translation.
-const VALUES_PER_KEY: usize = 5;
-
+/// Why an additive clip is left out: glTF cannot say that its keys are offsets.
 const ADDITIVE: &str = "additive animation, its keys are offsets that need a base animation";
+/// Why a clip that moves nothing is left out.
 const NO_BONE: &str = "no track names a bone of the skeleton";
+/// Why every clip is left out of an Assembly that writes no skeleton.
 const NO_SKELETON: &str = "the Assembly has no creature skeleton to animate";
 
 /// The animations of a creature Assembly that fit its skeleton, ready to be written with it by
@@ -88,9 +89,7 @@ fn left_out(
     } else if animation.bind(bones).bound.is_empty() {
         Some(NO_BONE.to_owned())
     } else if cost > remaining {
-        Some(format!(
-            "limit: the animation needs {cost} values, {remaining} are left"
-        ))
+        Some(limit_reason(cost, remaining))
     } else {
         None
     }
@@ -118,7 +117,7 @@ impl Assembly {
         let skeleton = creature_rig::skeleton_of(&self.parts, &self.issues, self.lod);
         let mut remaining = budget;
         for animation in animations {
-            let cost = animation.key_count().saturating_mul(VALUES_PER_KEY);
+            let cost = key_cost(animation);
             if let Some(reason) = left_out(skeleton, animation, (cost, remaining)) {
                 fit.issues.push(not_used(animation, &reason));
             } else {

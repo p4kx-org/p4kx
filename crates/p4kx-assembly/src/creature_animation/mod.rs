@@ -10,6 +10,7 @@
 //! [`Assembly::animate`]: crate::Assembly::animate
 //! [`Assembly::write_glb_animated_with`]: crate::Assembly::write_glb_animated_with
 
+mod clip_files;
 mod component;
 mod database;
 mod fit;
