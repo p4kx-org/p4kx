@@ -62,6 +62,33 @@ fn a_stencil_decal_is_cut_out_by_the_red_of_its_stencil_map_in_the_stencil_colou
 }
 
 #[test]
+fn the_green_and_blue_of_the_stencil_map_do_not_select_the_second_and_third_colour() -> TestResult {
+    let logo = decal("logo")
+        .texture("TexSlot7", STENCIL_FILE)
+        .public_param("StencilDiffuseColor2", "0.9,0.0,0.0")
+        .public_param("StencilDiffuseColor3", "0.0,0.9,0.0");
+
+    let (glb, _) = export(
+        &[plain("unused"), plain("caps"), logo],
+        &stub()?,
+        &textured(),
+    )?;
+
+    let logo = material(&glb, "logo")?;
+    let base = base_image(&glb, &logo)?;
+    assert!(
+        near(base.pixel(0, 0), [255, 255, 255, 64]),
+        "a map with live green and blue channels is cut out by its red one: {:?}",
+        base.pixel(0, 0)
+    );
+    let [red, green, blue, _] = logo.pbr_metallic_roughness().base_color_factor();
+    for (found, wanted) in [(red, 0.1), (green, 0.2), (blue, 0.3)] {
+        assert!((found - wanted).abs() < 1e-6, "{found} vs {wanted}");
+    }
+    Ok(())
+}
+
+#[test]
 fn a_stencil_decal_whose_motif_the_game_fills_in_is_left_out() -> TestResult {
     let emblem = decal("emblem").texture("TexSlot7", "$TintPaletteDecal");
 

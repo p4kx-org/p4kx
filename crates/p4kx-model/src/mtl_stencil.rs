@@ -212,6 +212,18 @@ mod tests {
     }
 
     #[test]
+    fn every_tint_override_above_zero_takes_the_primary_palette_entry() -> Result {
+        use crate::PaletteSlot;
+        let map = r#"<Texture Map="TexSlot7" File="a/b_stencil.tif"/>"#;
+        for value in ["1", "2", "0.5"] {
+            let params = format!(r#"StencilTintOverride="{value}""#);
+            let material = decal("MeshDecal", "%STENCIL_MAP", map, &params)?;
+            assert_eq!(material.palette, Some(PaletteSlot::Primary), "{value}");
+        }
+        Ok(())
+    }
+
+    #[test]
     fn a_tint_override_without_a_stencil_map_takes_no_palette_entry() -> Result {
         let over = r#"StencilTintOverride="1""#;
         for textures in [
