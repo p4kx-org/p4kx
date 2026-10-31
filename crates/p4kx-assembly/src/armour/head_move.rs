@@ -9,6 +9,7 @@ use p4kx_model::{Mesh, Model};
 use super::ArmourPart;
 use super::face_build::Face;
 use super::follow::follow;
+use super::follow_joints::HeadSkin;
 use super::follow_morphs::{Followed, follow_morphs};
 use crate::{Issue, IssueKind};
 
@@ -75,10 +76,13 @@ fn first_mesh(model: &Model) -> Option<&Mesh> {
 /// that follow the expression targets of the head.
 pub(super) fn followed(model: &Arc<Model>, head: &HeadMove) -> Worn {
     let (model, moved) = match (first_mesh(&head.before), first_mesh(&head.after)) {
-        (Some(before), Some(after)) => (
-            Arc::new(follow(model, before, after)),
-            follow_morphs(model, before, &head.morphs),
-        ),
+        (Some(before), Some(after)) => {
+            let skin = HeadSkin::of(&head.before, before);
+            (
+                Arc::new(follow(model, before, after, skin.as_ref())),
+                follow_morphs(model, before, &head.morphs),
+            )
+        }
         _ => (Arc::clone(model), Followed::none()),
     };
     Worn {

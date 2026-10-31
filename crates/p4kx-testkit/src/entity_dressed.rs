@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::entity_armour::{armour_database, armour_files};
-use crate::entity_head::{MALE_HEAD_FOLDER, MALE_RIG, head_files, head_part, skin_entries};
-use crate::{
-    TestEntity, TestEntry, TestInstance, TestMtl, TestMtlMaterial, TestRecord, TestStruct,
-    TestType, TestValue,
+use crate::entity_armour::{armour_database, armour_files, armour_male_skeleton};
+use crate::entity_head::{
+    MALE_HEAD_FOLDER, MALE_RIG, head_files, head_logic, head_part, head_skin_on, skin_entries,
 };
-
+use crate::{
+    TestBone, TestEntity, TestEntry, TestInstance, TestMtl, TestMtlMaterial, TestRecord,
+    TestSkeleton, TestStruct, TestType, TestValue,
+};
 /// The GUID of the hair Entity: a skin for the male body, drawn with [`DRESSED_HAIR_MATERIAL`].
 pub const DRESSED_HAIR: u128 = 0x51;
 /// The GUID of the eyes Entity, whose male skin is nested in a sub-node tagged `Protos_head`.
@@ -20,6 +21,10 @@ pub const DRESSED_GONE_HAIR: u128 = 0x54;
 pub const DRESSED_HEAD_MATERIAL: u128 = 0x61;
 /// The GUID of a material that no lookup table lists.
 pub const DRESSED_UNKNOWN_MATERIAL: u128 = 0x62;
+/// The facial bone of the head of [`dressed_jaw_entries`], below `head`, which the hair skin lacks.
+pub const DRESSED_JAW_BONE: &str = "jaw";
+/// The index of [`DRESSED_JAW_BONE`] in the skeleton of the head skin.
+pub const DRESSED_JAW_INDEX: u16 = 3;
 /// The material library of the head that [`DRESSED_HEAD_MATERIAL`] stands for: three
 /// `shader_head` skins with a diffuse map and the average colour `0.5, 0.25, 0.125`.
 pub const DRESSED_HEAD_MATERIAL_FILE: &str =
@@ -161,5 +166,32 @@ pub fn dressed_entries(rig: Option<Vec<u8>>) -> Vec<TestEntry> {
                 .public_param("IrisColor", "0.25,0.25,0.25"),
         ),
     ));
+    entries
+}
+
+/// Returns the Entries of [`dressed_entries`] with a head skin whose every vertex is weighted to
+/// [`DRESSED_JAW_BONE`], a bone 0.1 m above `head` that the male body and the hair skin lack.
+#[must_use]
+pub fn dressed_jaw_entries(rig: Option<Vec<u8>>) -> Vec<TestEntry> {
+    let stem = head_part("head");
+    let replaced = [format!("{stem}.skin"), format!("{stem}.skinm")];
+    let mut bones = armour_male_skeleton().bones().to_vec();
+    bones.push(TestBone {
+        name: DRESSED_JAW_BONE.to_owned(),
+        parent: Some(2),
+        rotation: [0.0, 0.0, 0.0, 1.0],
+        translation: [0.0, 0.0, 0.1],
+    });
+    let model = head_skin_on(&TestSkeleton::new(bones), DRESSED_JAW_INDEX, &head_logic());
+    let mut entries: Vec<TestEntry> = dressed_entries(rig)
+        .into_iter()
+        .filter(|entry| {
+            !replaced
+                .iter()
+                .any(|path| entry.path().eq_ignore_ascii_case(path))
+        })
+        .collect();
+    entries.push(TestEntry::stored(&replaced[0], model.cgf()));
+    entries.push(TestEntry::stored(&replaced[1], model.cgfm()));
     entries
 }

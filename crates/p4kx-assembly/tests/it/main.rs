@@ -56,6 +56,7 @@ mod head_build;
 mod head_character;
 mod head_dress;
 mod head_dress_follow;
+mod head_dress_joints;
 mod head_expressions;
 mod hologram_camera;
 mod interior;

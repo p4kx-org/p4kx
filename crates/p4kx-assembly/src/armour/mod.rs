@@ -15,6 +15,7 @@ mod face_build;
 mod facial;
 mod flat_layers;
 mod follow;
+mod follow_joints;
 mod follow_morphs;
 mod forge_items;
 mod head;

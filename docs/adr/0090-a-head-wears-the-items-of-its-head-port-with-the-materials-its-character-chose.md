@@ -104,4 +104,4 @@ the textures by default at mip 1, which keeps the default Characters at some 40 
 - Export the eyes and teeth unshaped: the eyes of a Character with another head shape would sit in
   the base head's sockets.
 - Skin the hair to the facial bones: the hair follows the shape of the head and, with morph
-  targets, its expressions (ADR-0200); binding it to the facial joints is not done.
+  targets, its expressions (ADR-0200), and, since ADR-0299, it is bound to the facial joints.

@@ -29,8 +29,10 @@ pub struct Influences {
 
 impl Influences {
     /// Returns the influences of the (bone, weight) pairs `pairs`: zero weights dropped, a bone
-    /// listed twice added up, the rest ordered by weight, the first of equal weights first.
-    pub(crate) fn from_pairs(pairs: impl Iterator<Item = (u16, u8)>) -> Self {
+    /// listed twice added up, the rest ordered by weight, the first of equal weights first. Pairs
+    /// beyond [`MAX_INFLUENCES`] distinct bones are dropped.
+    #[must_use]
+    pub fn from_pairs(pairs: impl Iterator<Item = (u16, u8)>) -> Self {
         let mut merged = [(0_u16, 0_u8); MAX_INFLUENCES];
         let mut len = 0;
         for (joint, weight) in pairs.filter(|&(_, weight)| weight > 0) {

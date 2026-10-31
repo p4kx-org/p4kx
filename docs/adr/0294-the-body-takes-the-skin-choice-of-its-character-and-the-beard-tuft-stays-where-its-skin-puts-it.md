@@ -38,5 +38,5 @@ the head, so the following kernel does not cause the tuft.
 
 ## Consequences
 
-Body and head share the tone the Character chose. Binding hair and beard to the facial joints
-(#726) is separate.
+Body and head share the tone the Character chose. Binding hair and beard to the facial joints is
+ADR-0299 (#726); the tuft's own bones then weigh as the anchor of that binding.

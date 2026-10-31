@@ -36,6 +36,7 @@ mod real_dressed_head;
 mod real_entity_interior;
 mod real_face_tags;
 mod real_followups;
+mod real_hair_joints;
 mod real_head;
 mod real_head_animation;
 mod real_head_expressions;

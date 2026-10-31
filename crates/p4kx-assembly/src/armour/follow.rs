@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use p4kx_model::{Mesh, Model};
 use rayon::prelude::*;
 
+use super::follow_joints::{HeadSkin, bind};
+
 pub(super) type Vec3 = [f32; 3];
 
 /// The distance beyond which a head vertex no longer moves a vertex of hair, in metres.
@@ -15,7 +17,7 @@ const HALF: f32 = 0.05;
 /// Keeps the weight of a vertex that lies on the head finite, in metres.
 const SOFTEN: f32 = 0.004;
 /// The weight of the anchor that does not move.
-const ANCHOR: f32 = 1.0 / (HALF * HALF);
+pub(super) const ANCHOR: f32 = 1.0 / (HALF * HALF);
 
 type Cell = [i32; 3];
 
@@ -70,8 +72,22 @@ impl<'a> Grid<'a> {
     pub(super) fn weigh(&self, moves: &[Vec3], position: Vec3) -> (f32, Vec3) {
         let mut weights = ANCHOR;
         let mut sum = [0.0_f32; 3];
+        self.visit(position, |at, weight| {
+            weights += weight;
+            if let Some(by) = moves.get(at) {
+                for (total, value) in sum.iter_mut().zip(by) {
+                    *total += weight * value;
+                }
+            }
+        });
+        (weights, sum)
+    }
+
+    /// Calls `each` with the index and the weight of every vertex within [`RANGE`] of `position`,
+    /// in a fixed order; the weight is that of [`Self::weigh`], without the anchor's.
+    pub(super) fn visit(&self, position: Vec3, mut each: impl FnMut(usize, f32)) {
         let Some(cell) = cell_of(position) else {
-            return (weights, sum);
+            return;
         };
         for near in around(cell) {
             let Some(list) = self.cells.get(&near) else {
@@ -91,16 +107,9 @@ impl<'a> Grid<'a> {
                     continue;
                 }
                 let fade = 1.0 - squared / (RANGE * RANGE);
-                let weight = fade * fade / SOFTEN.mul_add(SOFTEN, squared);
-                weights += weight;
-                if let Some(by) = moves.get(at) {
-                    for (total, value) in sum.iter_mut().zip(by) {
-                        *total += weight * value;
-                    }
-                }
+                each(at, fade * fade / SOFTEN.mul_add(SOFTEN, squared));
             }
         }
-        (weights, sum)
     }
 
     /// Returns the cells of the grid within one cell of `position`.
@@ -152,12 +161,23 @@ fn follow_mesh(mesh: &mut Mesh, field: &Field<'_>) {
 /// counting more, and fades out against a fixed anchor, so hair that hangs far from the head
 /// stays where it was. `before` and `after` must be the same mesh; with different vertex counts
 /// the model is returned as it is.
-pub(super) fn follow(model: &Model, before: &Mesh, after: &Mesh) -> Model {
+///
+/// With the skin `skin` of the head, the vertices are also bound to the head's joints, see
+/// [`bind`].
+pub(super) fn follow(
+    model: &Model,
+    before: &Mesh,
+    after: &Mesh,
+    skin: Option<&HeadSkin<'_>>,
+) -> Model {
     let mut moved = model.clone();
     if before.positions.len() != after.positions.len() {
         return moved;
     }
     let field = Field::new(&before.positions, &after.positions);
+    if let Some(skin) = skin {
+        bind(&mut moved, &field.grid, skin);
+    }
     if let Some(lod) = moved.lods.first_mut() {
         for mesh in &mut lod.meshes {
             follow_mesh(mesh, &field);
