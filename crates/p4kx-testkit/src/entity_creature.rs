@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::entity_creature_animated::{animated_entities, animated_structs, animation_entries};
 use crate::{
     DataForgeBuilder, TestBone, TestEntity, TestEntry, TestLoadout, TestLoadoutEntry, TestModel,
     TestNode, TestPort, TestRecord, TestSkeleton, assortment_record, entity_schema,
@@ -42,6 +43,11 @@ pub const CREATURE_ASSORTED: &str = "Test_Creature_Assorted";
 /// Like [`CREATURE`], but its body port is unset and its Loadout is an XML file no one reads.
 pub const CREATURE_LOADOUT_LOST: &str = "Test_Creature_LoadoutLost";
 
+pub use crate::entity_creature_animated::{
+    CREATURE_ANIMATED, CREATURE_ANIMATION_DATABASE_LOST, CREATURE_ANIMATION_NESTED_LOST,
+    CREATURE_ANIMATION_PARAMS_LOST,
+};
+
 /// A rigged Entity outside the characters folder, a prop with a skeleton file and the same skin.
 pub const RIGGED_PROP: &str = "Test_Rigged_Prop";
 
@@ -75,16 +81,19 @@ pub(crate) fn skeleton_file(bones: Vec<TestBone>) -> Vec<u8> {
         .cgf()
 }
 
+/// Returns a creature Entity of the root geometry `geometry` that wears the skin
+/// `Test_Creature_Skin` on its skin port `Body_ItemPort`.
+pub(crate) fn skinned_creature(id: u128, class: &str, geometry: &str) -> TestEntity {
+    TestEntity::new(id, class, format!("entities/{class}.xml"))
+        .geometry(geometry, None)
+        .port(TestPort::new("Body_ItemPort").skin())
+        .loadout(TestLoadout::Manual(vec![TestLoadoutEntry::class(
+            "Body_ItemPort",
+            "Test_Creature_Skin",
+        )]))
+}
+
 fn database() -> DataForgeBuilder {
-    let creature = |id, class: &str, geometry: &str| {
-        TestEntity::new(id, class, format!("entities/{class}.xml"))
-            .geometry(geometry, None)
-            .port(TestPort::new("Body_ItemPort").skin())
-            .loadout(TestLoadout::Manual(vec![TestLoadoutEntry::class(
-                "Body_ItemPort",
-                "Test_Creature_Skin",
-            )]))
-    };
     let skin = TestEntity::new(
         0x10,
         "Test_Creature_Skin",
@@ -106,23 +115,23 @@ fn database() -> DataForgeBuilder {
     )
     .geometry("Objects/Test/horn.cgf", None);
     [
-        creature(0x1, CREATURE, &format!("{FOLDER}/creature_skel.chr")),
-        creature(
+        skinned_creature(0x1, CREATURE, &format!("{FOLDER}/creature_skel.chr")),
+        skinned_creature(
             0x2,
             CREATURE_SHORT_SKELETON,
             &format!("{FOLDER}/short_skel.chr"),
         ),
-        creature(
+        skinned_creature(
             0x3,
             CREATURE_DEFINITION,
             &format!("{FOLDER}/definition.cdf"),
         ),
-        creature(
+        skinned_creature(
             0x4,
             CREATURE_NO_SKELETON,
             &format!("{FOLDER}/no_skeleton.cdf"),
         ),
-        creature(0x6, RIGGED_PROP, "Objects/Props/Test/prop_skel.chr"),
+        skinned_creature(0x6, RIGGED_PROP, "Objects/Props/Test/prop_skel.chr"),
         horned,
         horn,
         skin,
@@ -130,9 +139,14 @@ fn database() -> DataForgeBuilder {
     .into_iter()
     .chain(collar_entities())
     .chain(unset_body_entities())
-    .fold(entity_schema(DataForgeBuilder::new()), |builder, entity| {
-        builder.record(entity.record())
-    })
+    .chain(animated_entities())
+    .fold(
+        animated_structs().into_iter().fold(
+            entity_schema(DataForgeBuilder::new()),
+            DataForgeBuilder::structure,
+        ),
+        |builder, entity| builder.record(entity.record()),
+    )
     .record(creature_assortment())
 }
 
@@ -221,7 +235,9 @@ fn noded_skin() -> TestModel {
 ///
 /// The creatures [`CREATURE`], [`CREATURE_SHORT_SKELETON`], [`CREATURE_DEFINITION`],
 /// [`CREATURE_NO_SKELETON`] and [`CREATURE_HORNED`], and the prop [`RIGGED_PROP`], each hold the
-/// same two-bone skin on the skin port `Body_ItemPort`.
+/// same two-bone skin on the skin port `Body_ItemPort`. The creatures [`CREATURE_ANIMATED`],
+/// [`CREATURE_ANIMATION_DATABASE_LOST`] and [`CREATURE_ANIMATION_PARAMS_LOST`] name an animation
+/// database as well.
 #[must_use]
 pub fn creature_entries() -> Vec<TestEntry> {
     let skin = TestModel::two_bone_skin();
@@ -269,4 +285,7 @@ pub fn creature_entries() -> Vec<TestEntry> {
             definition("absent_skel.chr").into_bytes(),
         ),
     ]
+    .into_iter()
+    .chain(animation_entries())
+    .collect()
 }

@@ -3,20 +3,8 @@
 
 use p4kx_dataforge::{Guid, StructValue, Value, ValueError};
 
-use crate::path_match::starts_with_path;
+use crate::character_path::is_rigged_path_outside_human_rigs;
 use crate::read::{struct_field, struct_items, text};
-
-/// The folder of the human body rigs, with a trailing separator.
-const HUMAN_RIGS: &str = "Objects/Characters/Human/";
-
-/// The folder of the character models, with a trailing separator.
-const CHARACTERS: &str = "Objects/Characters/";
-
-/// The folder an Archive path starts with that a Record's path leaves out.
-const DATA_FOLDER: &str = "Data/";
-
-/// The extensions of the files that hold a character: definition, skeleton and skin.
-const CHARACTER_EXTENSIONS: [&str; 3] = ["cdf", "chr", "skin"];
 
 /// The deepest nesting of sub-geometry nodes that is read.
 const MAX_NESTED_SUB_GEOMETRY: usize = 4;
@@ -168,45 +156,6 @@ impl MaterialVariant {
     }
 }
 
-/// Returns `path` without a leading separator and without the `Data/` folder.
-fn below_data(path: &str) -> &str {
-    let relative = path.trim_start_matches(['/', '\\']);
-    if starts_with_path(relative, DATA_FOLDER) {
-        relative.get(DATA_FOLDER.len()..).unwrap_or_default()
-    } else {
-        relative
-    }
-}
-
-/// Returns whether `relative` ends in the extension of a character file.
-fn has_character_extension(relative: &str) -> bool {
-    relative.rsplit_once('.').is_some_and(|(_, extension)| {
-        CHARACTER_EXTENSIONS
-            .iter()
-            .any(|wanted| wanted.eq_ignore_ascii_case(extension))
-    })
-}
-
-/// Returns whether `path` names a `.cdf`, `.chr` or `.skin` file outside the human body rigs.
-pub(crate) fn is_rigged_path_outside_human_rigs(path: &str) -> bool {
-    let relative = below_data(path);
-    has_character_extension(relative) && !starts_with_path(relative, HUMAN_RIGS)
-}
-
-/// Returns whether `path` names a `.cdf`, `.chr` or `.skin` file in the characters folder, the
-/// human body rigs included.
-pub(crate) fn is_character_path(path: &str) -> bool {
-    let relative = below_data(path);
-    starts_with_path(relative, CHARACTERS) && has_character_extension(relative)
-}
-
-/// Returns whether `path` names a character file outside the human body rigs that lies in the
-/// characters folder: the creatures and other non-human characters, not the animated parts of
-/// weapons, gadgets, ships and buildings.
-pub(crate) fn is_creature_path(path: &str) -> bool {
-    is_character_path(path) && !starts_with_path(below_data(path), HUMAN_RIGS)
-}
-
 impl Geometry {
     /// Returns the model file as the Record spells it, a path below `Data`, e.g.
     /// `Objects\Spaceships\Ships\AEGS\Gladius\AEGS_Gladius.cga`.
@@ -305,7 +254,7 @@ fn read_palette(data: &StructValue<'_>) -> Option<PaletteRef> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Geometry, HUMAN_RIGS};
+    use super::Geometry;
     use crate::BodyVariant;
 
     fn geometry(path: &str) -> Geometry {
@@ -317,51 +266,10 @@ mod tests {
     }
 
     #[test]
-    fn the_human_skeletons_lie_in_the_human_rig_folder() {
+    fn the_human_skeleton_and_skin_are_no_rigged_files_outside_the_human_rigs() {
         for body in BodyVariant::ALL {
-            assert!(body.skeleton().starts_with(HUMAN_RIGS), "{body:?}");
             assert!(!geometry(body.skeleton()).is_rigged_file_outside_human_rigs());
             assert!(!geometry(body.skin()).is_rigged_file_outside_human_rigs());
-        }
-    }
-
-    #[test]
-    fn creatures_are_the_character_files_in_the_characters_folder_outside_the_human_rigs() {
-        for path in [
-            "Objects/Characters/Creatures/x/x_skel.chr",
-            "Data\\Objects\\Characters\\Vanduul\\drone\\body.skin",
-        ] {
-            assert!(super::is_creature_path(path), "{path}");
-        }
-        for path in [
-            "Objects/Characters/Human/male_v7/export/bhm_skeleton_v7.chr",
-            "Objects/FPS_Weapons/Weapons_V7/x/rifle.cdf",
-            "Objects/Spaceships/Thrusters/nozzle.cdf",
-            "Objects/Characters/Creatures/x/x.cgf",
-        ] {
-            assert!(!super::is_creature_path(path), "{path}");
-        }
-    }
-
-    #[test]
-    fn character_paths_are_the_character_files_below_the_characters_folder() {
-        for path in [
-            "Objects/Characters/Creatures/x/x_skel.chr",
-            "Data/Objects/Characters/Human/male_v7/export/bhm_skeleton_v7.chr",
-            "objects\\characters\\human\\male_v7\\body\\m_body.SKIN",
-            "Data\\Objects\\Characters\\Vanduul\\drone\\x.Cdf",
-            "/Objects/Characters/Human/heads/male/head.skin",
-        ] {
-            assert!(super::is_character_path(path), "{path}");
-        }
-        for path in [
-            "Objects/Characters/Human/male_v7/body/m_body.cgf",
-            "Objects/Characters/Human/male_v7/body/skin",
-            "Objects/FPS_Weapons/Weapons_V7/x/rifle.cdf",
-            "Data/Objects/Spaceships/Thrusters/nozzle.chr",
-            "Characters/Creatures/x/x.chr",
-        ] {
-            assert!(!super::is_character_path(path), "{path}");
         }
     }
 

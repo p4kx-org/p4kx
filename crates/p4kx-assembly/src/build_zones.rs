@@ -7,31 +7,23 @@ use std::sync::Arc;
 use p4kx_model::Model;
 
 use crate::armour::{covered, uncovered};
-use crate::build::{file_key, issue};
+use crate::build::issue;
 use crate::build_models::Loaded;
 use crate::flatten::Draft;
+use crate::node_body::{BODY_TYPE, is_body_type};
 use crate::{BodyVariant, EntityNode, Issue, IssueKind};
-
-const BODY_TYPE: &str = "Char_Body";
 
 /// Returns whether the part is the body of a character: an Entity of the type `Char_Body`.
 pub(crate) fn is_body(draft: &Draft<'_>) -> bool {
-    draft.node.attach_type().eq_ignore_ascii_case(BODY_TYPE)
+    is_body_type(draft.node.attach_type())
 }
 
-/// Returns the folder of `path` as a file key, without the file name.
-fn folder_key(path: &str) -> String {
-    let key = file_key(path);
-    key.rsplit_once('\\')
-        .map_or_else(String::new, |(folder, _)| folder.to_owned())
-}
-
-/// Whether the model of `draft` lies in the folder of the default body skin of `variant`, so a
-/// skin of the other body is not cut by this variant's zone table.
+/// Whether the model of `draft` lies in the folder of the body of `variant`, so a skin of the
+/// other body is not cut by this variant's zone table.
 fn is_of_variant(draft: &Draft<'_>, variant: BodyVariant) -> bool {
     draft
         .geometry_path()
-        .is_some_and(|path| folder_key(path) == folder_key(variant.skin()))
+        .is_some_and(|path| BodyVariant::of_model_path(path) == Some(variant))
 }
 
 /// The cut of a character's body: the zones its worn Entities cover, by the rule of the
@@ -43,11 +35,12 @@ pub(crate) struct BodyCut<'t> {
 }
 
 impl<'t> BodyCut<'t> {
-    /// Returns the cut for the body the head in `tree` names, from the Entities among `drafts`
-    /// that have a model; `None` when the tree has no head or the Entities cover no zone.
+    /// Returns the cut for the body `tree` wears ([`EntityNode::body_variant`]), from the Entities
+    /// among `drafts` that have a model; `None` when the tree has no body or the Entities cover no
+    /// zone.
     ///
     /// The body is the one `Char_Body` part with a model whose skin lies in the folder of the
-    /// variant's body skin. A cut that finds none, several, or one of another variant is reported
+    /// variant's body. A cut that finds none, several, or one of another variant is reported
     /// in `issues` as [`IssueKind::BodyZonesUnknown`] and not made.
     pub(crate) fn of(
         tree: &EntityNode,
@@ -55,7 +48,7 @@ impl<'t> BodyCut<'t> {
         chosen: &[Option<&Loaded>],
         issues: &mut Vec<Issue>,
     ) -> Option<Self> {
-        let variant = tree.character_body()?.variant();
+        let variant = tree.body_variant()?;
         let covered = covered(
             drafts
                 .iter()

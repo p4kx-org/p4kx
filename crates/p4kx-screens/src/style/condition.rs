@@ -139,9 +139,10 @@ fn any_in_all_of(conditions: &[Condition], test: &dyn Fn(&Condition) -> bool) ->
     })
 }
 
-/// Returns whether `conditions` select the text a text field holds, a widget of the type `kind`
-/// below the field: they require that type, or name no type and select by the parent.
-pub(crate) fn selects_text(conditions: &[Condition], kind: &str) -> bool {
+/// Returns whether `conditions` select the inner part of a widget, such as the text of a text
+/// field or the shape of an icon, a widget of the type `kind` below it: they require that type,
+/// or name no type and select by the parent.
+pub(crate) fn selects_part(conditions: &[Condition], kind: &str) -> bool {
     requires_type(conditions, kind) || (requires_parent(conditions) && !names_type(conditions))
 }
 

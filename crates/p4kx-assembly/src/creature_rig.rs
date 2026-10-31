@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use p4kx_model::{Bone, BoneMatch, Model, Transform};
 
-use crate::geometry::{is_character_path, is_creature_path};
+use crate::character_path::{is_character_path, is_creature_path};
 use crate::placement::bone_pose;
 use crate::{EntityNode, Issue, IssueKind, LoadoutError, Part, Placement};
 
@@ -148,7 +148,7 @@ pub(crate) fn note_loadout(root: &EntityNode, issues: &mut Vec<Issue>) {
     issues.extend(notes);
 }
 
-fn is_skinned(model: &Model, level: u32) -> bool {
+pub(crate) fn is_skinned(model: &Model, level: u32) -> bool {
     model
         .nearest_lod(level)
         .is_some_and(|lod| lod.meshes.iter().any(|mesh| mesh.influences.is_some()))
