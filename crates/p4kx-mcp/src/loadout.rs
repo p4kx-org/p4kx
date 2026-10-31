@@ -96,6 +96,10 @@ pub(crate) struct EntityShape {
     pub(crate) issues: Vec<ErrorShape>,
     /// The number of such reasons.
     pub(crate) issue_count: usize,
+    /// What the Loadout cannot decide without the game's spawn, in the form of `issues` but no
+    /// problem: nothing was kept from being read. Absent when there is none; at most 64.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) notes: Vec<ErrorShape>,
 }
 
 /// The ports of a tree by what they hold.
@@ -295,6 +299,12 @@ fn entity_shape(node: &EntityNode) -> EntityShape {
             .map(|error| error_shape(error, None))
             .collect(),
         issue_count: node.issues().len(),
+        notes: node
+            .notes()
+            .iter()
+            .take(MAX_ISSUES)
+            .map(|error| error_shape(error, None))
+            .collect(),
     }
 }
 
