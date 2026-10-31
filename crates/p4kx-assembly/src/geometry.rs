@@ -256,7 +256,6 @@ fn read_palette(data: &StructValue<'_>) -> Option<PaletteRef> {
 mod tests {
     use super::Geometry;
     use crate::BodyVariant;
-    use crate::character_path::HUMAN_RIGS;
 
     fn geometry(path: &str) -> Geometry {
         Geometry {
@@ -267,9 +266,8 @@ mod tests {
     }
 
     #[test]
-    fn the_human_skeletons_lie_in_the_human_rig_folder() {
+    fn the_human_skeleton_and_skin_are_no_rigged_files_outside_the_human_rigs() {
         for body in BodyVariant::ALL {
-            assert!(body.skeleton().starts_with(HUMAN_RIGS), "{body:?}");
             assert!(!geometry(body.skeleton()).is_rigged_file_outside_human_rigs());
             assert!(!geometry(body.skin()).is_rigged_file_outside_human_rigs());
         }

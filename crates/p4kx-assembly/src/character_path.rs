@@ -6,7 +6,7 @@
 use crate::path_match::starts_with_path;
 
 /// The folder of the human body rigs, with a trailing separator.
-pub(crate) const HUMAN_RIGS: &str = "Objects/Characters/Human/";
+const HUMAN_RIGS: &str = "Objects/Characters/Human/";
 
 /// The folder of the character models, with a trailing separator.
 const CHARACTERS: &str = "Objects/Characters/";
@@ -18,7 +18,7 @@ const DATA_FOLDER: &str = "Data/";
 const CHARACTER_EXTENSIONS: [&str; 3] = ["cdf", "chr", "skin"];
 
 /// Returns `path` without a leading separator and without the `Data/` folder.
-fn below_data(path: &str) -> &str {
+pub(crate) fn below_data(path: &str) -> &str {
     let relative = path.trim_start_matches(['/', '\\']);
     if starts_with_path(relative, DATA_FOLDER) {
         relative.get(DATA_FOLDER.len()..).unwrap_or_default()

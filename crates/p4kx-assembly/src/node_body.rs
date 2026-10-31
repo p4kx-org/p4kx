@@ -7,8 +7,11 @@ use crate::resolver::LoadoutResolver;
 use crate::tree::GeometryChoice;
 use crate::{Attachment, BodyVariant, EntityNode, MaterialVariant, PortNode};
 
+/// The item type of the head of a character.
 const HEAD_TYPE: &str = "Char_Head";
-const BODY_TYPE: &str = "Char_Body";
+
+/// The item type of the body of a character.
+pub(crate) const BODY_TYPE: &str = "Char_Body";
 
 /// The body a character wears and the head Entity whose sub-type names it.
 #[derive(Debug, Clone, Copy)]
@@ -43,20 +46,31 @@ impl EntityNode {
             head,
         })
     }
+
+    /// Returns the body the character in the tree below this Entity wears, by the first source
+    /// that names one: the sub-type of its `Char_Head` Entity (the generic head of most NPCs
+    /// names none), the sub-type of its `Char_Body` Entity, the folder of the model of that body.
+    pub(crate) fn body_variant(&self) -> Option<BodyVariant> {
+        self.character_body()
+            .map(|found| found.variant)
+            .or_else(|| {
+                let body = find_item(self.ports(), is_body_type)?;
+                BodyVariant::from_code(&body.attach_sub_type)
+                    .or_else(|| BodyVariant::of_model_path(body.geometry()?.path()))
+            })
+    }
 }
 
 impl LoadoutResolver<'_> {
     /// Gives the worn Entities of a character the sub-geometry of the character's body.
     ///
-    /// The body is the one the sub-type of the `Char_Head` Entity in the tree names; a head
-    /// that names none (the generic head of most NPCs) leaves it to the `Char_Body` Entity: its
-    /// sub-type, else the folder of its model. An Entity whose item type starts with `Char_`
+    /// The body is [`EntityNode::body_variant`]. An Entity whose item type starts with `Char_`
     /// (armour, clothing, head parts), whose Record names geometry per body (`Male`, `Female`)
     /// and that no port flag gave a sub-geometry takes the one tagged for the body; one without a
     /// sub-geometry for the body has no geometry, and neither has one whose only geometry is a
     /// world prop. A tree without a body is left as it is.
     pub(crate) fn dress_body(&mut self, root: &mut EntityNode) {
-        let Some(body) = wearer_body(root) else {
+        let Some(body) = root.body_variant() else {
             return;
         };
         self.dress_ports(&mut root.ports, body);
@@ -86,15 +100,7 @@ impl LoadoutResolver<'_> {
                 .any(|other| variant.has_tag(other.tag()))
         });
         if !per_body {
-            if child
-                .geometry
-                .as_ref()
-                .is_some_and(|main| is_world_prop_path(main.path()))
-            {
-                child.choice = GeometryChoice::Body(body);
-                child.fallback = None;
-                child.geometry = None;
-            }
+            leave_out_world_prop(child);
             return;
         }
         child.choice = GeometryChoice::Body(body);
@@ -111,6 +117,19 @@ impl LoadoutResolver<'_> {
                 });
                 worn
             });
+    }
+}
+
+/// Takes the geometry of a worn item without sub-geometry per body when it is a world prop and
+/// keeps it in `fallback`, so that the Assembly can say which prop it left out.
+fn leave_out_world_prop(child: &mut EntityNode) {
+    if child
+        .geometry
+        .as_ref()
+        .is_some_and(|main| is_world_prop_path(main.path()))
+    {
+        child.choice = GeometryChoice::WorldProp;
+        child.fallback = child.geometry.take();
     }
 }
 
@@ -139,20 +158,8 @@ pub(crate) fn find_head(ports: &[PortNode]) -> Option<&EntityNode> {
     find_item(ports, is_head_type)
 }
 
-/// Returns the body a character wears: the one its head names, else the one of its `Char_Body`
-/// Entity, by sub-type or by the folder of its model.
-fn wearer_body(root: &EntityNode) -> Option<BodyVariant> {
-    root.character_body()
-        .map(|found| found.variant)
-        .or_else(|| {
-            let body = find_item(root.ports(), is_body_type)?;
-            BodyVariant::from_code(&body.attach_sub_type)
-                .or_else(|| BodyVariant::of_model_path(body.geometry()?.path()))
-        })
-}
-
 /// Returns whether `item_type` is the item type of a body, `Char_Body`.
-const fn is_body_type(item_type: &str) -> bool {
+pub(crate) const fn is_body_type(item_type: &str) -> bool {
     item_type.eq_ignore_ascii_case(BODY_TYPE)
 }
 
