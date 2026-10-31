@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::io::Write;
 
-use p4kx_model::{Bone, MaterialStatus, Model, TintPalette, Transform};
+use p4kx_model::{Animation, Bone, MaterialStatus, Model, TintPalette, Transform};
 
 use crate::GltfError;
 use crate::glb::{GlbOptions, GlbSummary, MaterialMode, write_instances};
@@ -112,6 +112,7 @@ impl<'m> SceneNode<'m> {
 pub struct Scene<'m> {
     nodes: Vec<SceneNode<'m>>,
     skeleton: Option<&'m [Bone]>,
+    animations: Vec<&'m Animation>,
 }
 
 impl<'m> Scene<'m> {
@@ -121,7 +122,20 @@ impl<'m> Scene<'m> {
         Self {
             nodes: Vec::new(),
             skeleton: None,
+            animations: Vec::new(),
         }
+    }
+
+    /// Writes `animations` as glTF animations of the bones of the scene's skeleton.
+    ///
+    /// Each track moves the bone node with its controller ID; rotation and translation keys become
+    /// one channel each, as in [`write_glb_animated`](crate::write_glb_animated). Tracks without
+    /// a bone are left out and listed in [`GlbSummary::animations`]. Nothing is written when the
+    /// scene has no skeleton or no skinned mesh, because then no bone nodes exist.
+    #[must_use]
+    pub fn with_animations(mut self, animations: impl IntoIterator<Item = &'m Animation>) -> Self {
+        self.animations.extend(animations);
+        self
     }
 
     /// Binds the skinned meshes of the scene's models to `skeleton`, by bone name.
@@ -274,8 +288,9 @@ pub fn write_scene_glb_with(
         wrappers: &wrappers,
         instances: &instances,
         rig: rig.as_ref(),
+        animations: &scene.animations,
     };
-    write_instances(&content, &[], options, textures, fallbacks, out)
+    write_instances(&content, options, textures, fallbacks, out)
 }
 
 /// Returns for each node whether it holds a light and also a model or children, so that the

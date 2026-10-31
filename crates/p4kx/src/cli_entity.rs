@@ -101,7 +101,8 @@ pub(crate) enum EntityAction {
     /// docked vehicle (a Merlin in a docking collar, say) is placed as one part, without the
     /// parts of its own Loadout, unless --expand-docked-vehicles is given; a change to a port
     /// below such a docked vehicle is not applied, is no error, and is warned about on stderr
-    /// and listed as `ignored` in the JSON.
+    /// and listed as `ignored` in the JSON. With --animations a creature is written with the
+    /// clips of its animation database.
     #[command(after_help = EXIT_CODES_HELP)]
     Glb(EntityGlbArgs),
     /// Writes an Entity as a Blender package, a folder that does not depend on Blender's file
@@ -156,6 +157,10 @@ pub(crate) struct EntityPackageArgs {
 
 /// Arguments of `p4kx entity glb`.
 #[derive(Debug, Args)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "one clap flag per option of the export"
+)]
 pub(crate) struct EntityGlbArgs {
     /// Path of the Data.p4k Archive.
     pub(crate) archive: PathBuf,
@@ -200,6 +205,13 @@ pub(crate) struct EntityGlbArgs {
     /// a docked vehicle is placed as one part.
     #[arg(long)]
     pub(crate) expand_docked_vehicles: bool,
+    /// Also writes the animations of a creature: every clip the animation database of a creature
+    /// whose skins are bound to its skeleton (`SAnimatedCharacterComponentParams.animDatabase3P`)
+    /// names, looked for in the animation folders of the skeleton's parameter file, as glTF
+    /// animations of the bones. Additive clips and clips that move no bone of the skeleton are
+    /// left out and listed. Without it the GLB is static.
+    #[arg(long)]
+    pub(crate) animations: bool,
     #[command(flatten)]
     pub(crate) changes: LoadoutChangeArgs,
 }

@@ -167,6 +167,7 @@ impl<'f> LoadoutResolver<'f> {
             container: None,
             object_containers: Vec::new().into(),
             zones: ZoneList::default(),
+            animation_database: None,
         };
         let mut walk = Walk::new(spec.guid, None);
         Ok(self.node(&spec, None, &mut walk))

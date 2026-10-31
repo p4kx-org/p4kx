@@ -7,7 +7,7 @@ use p4kx_model::{Animation, Influences};
 use crate::animations::{AnimationPlan, Targets, plan as plan_animations};
 use crate::document::skeleton_written;
 use crate::glb::{GlbOptions, GlbSummary};
-use crate::instance::Instance;
+use crate::instance::{Content, Instance};
 use crate::layout::{Layout, Rigging};
 use crate::materials::Slot;
 use crate::skin::inverse_binds;
@@ -69,10 +69,47 @@ pub(crate) fn plan_layout<'m>(
     layout
 }
 
-pub(crate) fn single_animation_plans<'m>(
+/// Plans the animations of `content`: on the skeleton of the one model written alone, else on the
+/// skeleton of the scene.
+pub(crate) fn animation_plans<'m>(
+    layout: &mut Layout<'m>,
+    content: &Content<'_, 'm>,
+    single: Option<&Instance<'m>>,
+) -> Vec<AnimationPlan> {
+    match single {
+        Some(instance) => single_animation_plans(layout, instance, content.animations),
+        None => scene_animation_plans(layout, content),
+    }
+}
+
+/// Plans the animations of a scene whose skinned meshes are bound to the skeleton of `rig`: they
+/// move the bone nodes, which come after the nodes of the wrappers and of every model instance.
+/// Nothing is planned when no mesh is skinned, as no bones are written then.
+fn scene_animation_plans<'m>(
+    layout: &mut Layout<'m>,
+    content: &Content<'_, 'm>,
+) -> Vec<AnimationPlan> {
+    let Some(rig) = content.rig.filter(|_| layout.inverse_binds.is_some()) else {
+        return Vec::new();
+    };
+    let nodes = content.wrappers.len()
+        + content
+            .instances
+            .iter()
+            .map(|instance| instance.model.nodes.len())
+            .sum::<usize>();
+    let targets = Targets {
+        bones: rig.bones,
+        first_bone_node: Some(nodes),
+        model_nodes: nodes,
+    };
+    plan_animations(layout, content.animations.iter().copied(), &targets)
+}
+
+fn single_animation_plans<'m>(
     layout: &mut Layout<'m>,
     instance: &Instance<'m>,
-    animations: &'m [Animation],
+    animations: &[&'m Animation],
 ) -> Vec<AnimationPlan> {
     let Some(lod) = instance.lod else {
         return Vec::new();
@@ -88,7 +125,7 @@ pub(crate) fn single_animation_plans<'m>(
         first_bone_node: written.then_some(model.nodes.len()),
         model_nodes: model.nodes.len(),
     };
-    plan_animations(layout, animations, &targets)
+    plan_animations(layout, animations.iter().copied(), &targets)
 }
 
 pub(crate) fn texture_set(
