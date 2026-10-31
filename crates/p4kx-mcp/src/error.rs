@@ -4,7 +4,7 @@
 use std::error::Error;
 use std::path::PathBuf;
 
-use p4kx_assembly::{EntityLookupError, LoadoutError};
+use p4kx_assembly::{ChangeError, EntityLookupError, LoadoutError};
 use p4kx_extraction::model::MaterialError;
 use p4kx_extraction::{ArchiveError, ConversionError, DataForgeError, EntryReadError, FilterError};
 use p4kx_settings::{KeyChoiceError, SettingsError};
@@ -100,6 +100,9 @@ pub(crate) enum ToolError {
     /// The Loadout of the Entity cannot be resolved at all.
     #[error("cannot resolve the Loadout")]
     Loadout(#[from] LoadoutError),
+    /// The Loadout picks of the call are no picks.
+    #[error("the Loadout picks are not valid")]
+    Picks(#[source] ChangeError),
     /// The Entry holds binary data where text was asked for.
     #[error("the Entry {0} holds binary data, not text; read it with read_entry_bytes")]
     Binary(String),
@@ -262,6 +265,17 @@ pub(crate) enum ToolError {
         /// The message with the marked line of the Query.
         marked: String,
     },
+}
+
+impl From<ChangeError> for ToolError {
+    /// A Loadout that cannot be resolved stays [`ToolError::Loadout`]; any other change error
+    /// comes from the picks.
+    fn from(error: ChangeError) -> Self {
+        match error {
+            ChangeError::Loadout(error) => Self::Loadout(error),
+            other => Self::Picks(other),
+        }
+    }
 }
 
 impl ToolError {

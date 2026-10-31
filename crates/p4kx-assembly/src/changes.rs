@@ -4,9 +4,10 @@
 use thiserror::Error;
 
 use crate::plan::{path_key, under};
-use crate::{EntityLookupError, Incompatibility, LoadoutError};
+use crate::{EntityLookupError, Incompatibility, LoadoutError, LoadoutPicks};
 
-/// Own configuration of a Loadout: branches to leave out and Entities to attach instead.
+/// Own configuration of a Loadout: branches to leave out, Entities to attach instead and the
+/// alternatives of generated Loadouts to take ([`LoadoutPicks`]).
 ///
 /// A port is named by its path of port names from the root Entity, joined by `/` and matched
 /// ignoring ASCII case, the path [`EntityNode::walk`](crate::EntityNode::walk) lists, e.g.
@@ -16,6 +17,7 @@ use crate::{EntityLookupError, Incompatibility, LoadoutError};
 pub struct LoadoutChanges {
     exclusions: Vec<String>,
     replacements: Vec<(String, String)>,
+    picks: LoadoutPicks,
 }
 
 impl LoadoutChanges {
@@ -39,6 +41,24 @@ impl LoadoutChanges {
     pub fn replace(mut self, port: impl Into<String>, entity: impl Into<String>) -> Self {
         self.replacements.push((port.into(), entity.into()));
         self
+    }
+
+    /// Takes the alternatives `picks` names from the groups of generated Loadouts.
+    #[must_use]
+    pub fn with_picks(mut self, picks: LoadoutPicks) -> Self {
+        self.picks = picks;
+        self
+    }
+
+    /// Returns the picks of the alternatives of generated Loadouts.
+    #[must_use]
+    pub const fn picks(&self) -> &LoadoutPicks {
+        &self.picks
+    }
+
+    /// Replaces the picks of the alternatives of generated Loadouts, in place.
+    pub fn set_picks(&mut self, picks: LoadoutPicks) {
+        self.picks = picks;
     }
 
     /// Splits `text` of the form `<port>=<entity>` and adds it as a replacement.
@@ -151,6 +171,11 @@ impl LoadoutChanges {
     /// Returns whether the changes leave the Loadout as it is.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
+        self.has_no_port_changes() && self.picks.is_empty()
+    }
+
+    /// Returns whether no port is excluded or replaced.
+    pub(crate) const fn has_no_port_changes(&self) -> bool {
         self.exclusions.is_empty() && self.replacements.is_empty()
     }
 
@@ -264,6 +289,12 @@ pub enum ChangeError {
     /// A replacement is not of the form `<port>=<entity>`.
     #[error("{text:?} is not of the form <port>=<entity>")]
     InvalidReplacement {
+        /// The text as given.
+        text: String,
+    },
+    /// A pick is neither `<group>=<index>` nor an index.
+    #[error("{text:?} is not of the form <group>=<index> or an index")]
+    InvalidPick {
         /// The text as given.
         text: String,
     },

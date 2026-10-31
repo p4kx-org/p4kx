@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{
-    ArchiveFiles, Attachment, EntityNode, LoadoutError, LoadoutResolver, PortDefinition, PortNode,
-    PortVisibility, Target,
+    ArchiveFiles, Attachment, EntityNode, LoadoutChanges, LoadoutError, LoadoutPicks,
+    LoadoutResolver, PortDefinition, PortNode, PortVisibility, Target,
 };
 use p4kx_extraction::DataForge;
 use schemars::JsonSchema;
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::archives::Opened;
 use crate::budget::{fill_within, json_len};
-use crate::error::ToolError;
+use crate::error::{ToolError, capped};
 use crate::page::Page;
 
 /// The deepest port nesting a call returns when it gives no depth.
@@ -22,6 +22,8 @@ pub(crate) const MAX_DEPTH: u32 = 32;
 const MAX_TEXT_CHARS: usize = 256;
 /// The most characters of a port path.
 const MAX_PATH_CHARS: usize = 1024;
+/// The most picks a call may list.
+const MAX_PICKS: usize = 64;
 /// The most issues listed per Entity.
 const MAX_ISSUES: usize = 64;
 /// The most item types listed per port.
@@ -43,6 +45,12 @@ pub(crate) struct LoadoutParams {
     pub(crate) max_depth: Option<u32>,
     /// Leave the Loadouts of docked vehicles unresolved; they are listed as ports.
     pub(crate) stop_at_docked_vehicles: Option<bool>,
+    /// Alternatives of the groups of generated default Loadouts (creatures, NPCs) to take instead
+    /// of the first, each `<group>=<index>` such as `Body=2`, or a bare `<index>` for every group
+    /// that has it; indices count from 0. Several picks may share a text, separated by commas.
+    /// An index beyond a named group, and a named group the Loadout lacks, is an issue of the
+    /// Entity and the group keeps its first alternative.
+    pub(crate) loadout_pick: Option<Vec<String>>,
     /// The `next_cursor` of the previous page; omit it for the first page.
     pub(crate) cursor: Option<String>,
     /// The page size in ports, 100 by default, at most 1000.
@@ -88,6 +96,10 @@ pub(crate) struct EntityShape {
     pub(crate) issues: Vec<ErrorShape>,
     /// The number of such reasons.
     pub(crate) issue_count: usize,
+    /// What the Loadout cannot decide without the game's spawn, in the form of `issues` but no
+    /// problem: nothing was kept from being read. Absent when there is none; at most 64.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) notes: Vec<ErrorShape>,
 }
 
 /// The ports of a tree by what they hold.
@@ -185,16 +197,19 @@ pub(crate) fn resolve(
     page: Page,
 ) -> Result<LoadoutResult, ToolError> {
     let stop_at_docked = params.stop_at_docked_vehicles == Some(true);
+    let picks = picks_of(params.loadout_pick.as_deref().unwrap_or_default())?;
+    let key = picks.normalised();
     let tree = opened
         .loadouts()
-        .get_or_resolve(&params.entity, stop_at_docked, || {
+        .get_or_resolve(&params.entity, (stop_at_docked, &key), || {
             let files = ArchiveFiles::new(opened.archive());
             let mut resolver = LoadoutResolver::new(forge).with_files(&files);
             if stop_at_docked {
                 resolver = resolver.stopping_at_docked_vehicles();
             }
             let record = resolver.entities().find(&params.entity)?;
-            Ok(resolver.resolve(&record)?)
+            let changes = LoadoutChanges::new().with_picks(picks.clone());
+            Ok(resolver.resolve_with(&record, &changes)?)
         })?;
     let max_depth = usize::try_from(
         params
@@ -235,6 +250,21 @@ pub(crate) fn resolve(
     Ok(result)
 }
 
+/// Reads the picks of a call: each text `<group>=<index>` or a bare `<index>`, several to a text
+/// separated by commas.
+pub(crate) fn picks_of(texts: &[String]) -> Result<LoadoutPicks, ToolError> {
+    if texts.len() > MAX_PICKS {
+        return Err(ToolError::Refused(format!(
+            "loadout_pick lists {} picks; at most {MAX_PICKS} are accepted",
+            texts.len()
+        )));
+    }
+    for text in texts {
+        capped("loadout_pick", text, MAX_TEXT_CHARS)?;
+    }
+    Ok(LoadoutPicks::from_list(&texts.join(","))?)
+}
+
 fn depth(path: &str) -> usize {
     path.matches('/').count() + 1
 }
@@ -269,6 +299,12 @@ fn entity_shape(node: &EntityNode) -> EntityShape {
             .map(|error| error_shape(error, None))
             .collect(),
         issue_count: node.issues().len(),
+        notes: node
+            .notes()
+            .iter()
+            .take(MAX_ISSUES)
+            .map(|error| error_shape(error, None))
+            .collect(),
     }
 }
 

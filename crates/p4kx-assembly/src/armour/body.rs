@@ -1,6 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::character_path::below_data;
+use crate::path_match::starts_with_path;
+
+/// The folder of the male body, with a trailing separator.
+macro_rules! male_folder {
+    () => {
+        "Objects/Characters/Human/male_v7/"
+    };
+}
+
+/// The folder of the female body, with a trailing separator.
+macro_rules! female_folder {
+    () => {
+        "Objects/Characters/Human/female_v2/"
+    };
+}
+
 /// A body variant of the human Characters: the skeleton, the default body and the tag that
 /// selects the geometry of armour and clothing for it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -46,8 +63,28 @@ impl BodyVariant {
     #[must_use]
     pub const fn skeleton(self) -> &'static str {
         match self {
-            Self::Male => "Objects/Characters/Human/male_v7/export/bhm_skeleton_v7.chr",
-            Self::Female => "Objects/Characters/Human/female_v2/export/bhf_skeleton_v2.chr",
+            Self::Male => concat!(male_folder!(), "export/bhm_skeleton_v7.chr"),
+            Self::Female => concat!(female_folder!(), "export/bhf_skeleton_v2.chr"),
+        }
+    }
+
+    /// Returns the variant whose folder holds the model `path`, ignoring ASCII case, the
+    /// separator, a leading separator and a leading `Data/`.
+    #[must_use]
+    pub(crate) fn of_model_path(path: &str) -> Option<Self> {
+        let path = below_data(path);
+        Self::ALL
+            .into_iter()
+            .find(|variant| starts_with_path(path, variant.folder()))
+    }
+
+    /// Returns the folder below `Data` that holds the models of the body, with a trailing
+    /// separator.
+    #[must_use]
+    pub(crate) const fn folder(self) -> &'static str {
+        match self {
+            Self::Male => male_folder!(),
+            Self::Female => female_folder!(),
         }
     }
 
@@ -55,8 +92,8 @@ impl BodyVariant {
     #[must_use]
     pub const fn skin(self) -> &'static str {
         match self {
-            Self::Male => "Objects/Characters/Human/male_v7/body/m_body.skin",
-            Self::Female => "Objects/Characters/Human/female_v2/body/f_body.skin",
+            Self::Male => concat!(male_folder!(), "body/m_body.skin"),
+            Self::Female => concat!(female_folder!(), "body/f_body.skin"),
         }
     }
 
@@ -84,6 +121,37 @@ impl BodyVariant {
 #[cfg(test)]
 mod tests {
     use super::BodyVariant;
+
+    #[test]
+    fn the_skeleton_and_the_skin_lie_in_the_folder_of_the_body() {
+        for variant in BodyVariant::ALL {
+            assert!(
+                variant.skeleton().starts_with(variant.folder()),
+                "{variant:?}"
+            );
+            assert!(variant.skin().starts_with(variant.folder()), "{variant:?}");
+        }
+    }
+
+    #[test]
+    fn a_model_in_the_folder_of_a_body_names_that_body() {
+        assert_eq!(
+            BodyVariant::of_model_path("objects\\characters\\human\\female_v2\\body\\f_body.skin"),
+            Some(BodyVariant::Female)
+        );
+        assert_eq!(
+            BodyVariant::of_model_path("Objects/Characters/Human/male_v7/body/m_body.skin"),
+            Some(BodyVariant::Male)
+        );
+        assert_eq!(
+            BodyVariant::of_model_path("Objects/Characters/Creatures/x.skin"),
+            None
+        );
+        assert_eq!(
+            BodyVariant::of_model_path("/Data/Objects/Characters/Human/female_v2/x.skin"),
+            Some(BodyVariant::Female)
+        );
+    }
 
     #[test]
     fn a_code_finds_its_variant_whatever_the_case() {

@@ -7,7 +7,9 @@
 use std::collections::HashMap;
 use std::error::Error;
 
-use p4kx_assembly::{Attachment, EntityNode, LoadoutFileError, LoadoutFiles, LoadoutResolver};
+use p4kx_assembly::{
+    Attachment, EntityNode, LoadoutChanges, LoadoutFileError, LoadoutFiles, LoadoutResolver,
+};
 use p4kx_dataforge::DataForge;
 use p4kx_testkit::{
     CryXmlByteOrder, CryXmlSignature, DataForgeBuilder, TestElement, TestEntity, TestLoadout,
@@ -60,6 +62,16 @@ pub(crate) fn resolve(
     files: Option<&Files>,
     records: Vec<TestRecord>,
 ) -> Result<EntityNode, Box<dyn Error>> {
+    resolve_changed(loadout, files, records, None)
+}
+
+/// Resolves the Beast, with `changes` applied when given.
+pub(crate) fn resolve_changed(
+    loadout: TestLoadout,
+    files: Option<&Files>,
+    records: Vec<TestRecord>,
+    changes: Option<&LoadoutChanges>,
+) -> Result<EntityNode, Box<dyn Error>> {
     let builder = [
         TestEntity::new(BEAST, "Beast", "entities/beast.xml").loadout(loadout),
         TestEntity::new(0x2, "Body_Red", "entities/body_red.xml"),
@@ -80,7 +92,10 @@ pub(crate) fn resolve(
         resolver = resolver.with_files(files);
     }
     let beast = resolver.entities().find("Beast")?;
-    Ok(resolver.resolve(&beast)?)
+    match changes {
+        Some(changes) => Ok(resolver.resolve_with(&beast, changes)?),
+        None => Ok(resolver.resolve(&beast)?),
+    }
 }
 
 fn egg_files() -> Files {

@@ -6,6 +6,7 @@ use std::path::Path;
 use egui::{Align, Layout, Ui};
 use p4kx_settings::ModelMaterials;
 
+use super::assembly_export_picks::picks;
 use super::extraction::{foot, group_label, path_field, refusal_notice};
 use super::{Dialog, Requests, regions};
 use crate::theme::desktop::MODAL_GROUP_GAP;
@@ -103,6 +104,8 @@ fn choices(ui: &mut Ui, texts: &Texts, setup: &mut AssemblyExportSetup) -> Optio
     ui.label(plain(subject, FS_XS, Weight::Regular).color(palette::GRAY_2_TEXT));
     if !setup.is_container() {
         loadout_line(ui, texts, setup);
+        ui.add_space(MODAL_GROUP_GAP);
+        picks(ui, texts, setup);
     }
     ui.add_space(MODAL_GROUP_GAP);
     ui.horizontal_top(|ui| {
