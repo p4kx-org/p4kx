@@ -111,7 +111,7 @@ pub use mtl::{
 };
 pub use mtl_error::MaterialError;
 pub use mtl_layer_cache::{
-    LayerCache, LayerLimits, MAX_CACHED_LAYER_FILES, MAX_LAYER_BYTES, MAX_LAYER_FILES,
+    LayerBudget, LayerCache, LayerLimits, MAX_CACHED_LAYER_FILES, MAX_LAYER_BYTES, MAX_LAYER_FILES,
 };
 pub use mtl_layers::LayerSurface;
 pub use mtl_load::MaterialReading;

@@ -2,9 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use p4kx_archive::Archive;
-use p4kx_model::{LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, PositionBox};
+use p4kx_model::{
+    LayerBudget, LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, PositionBox,
+};
 
 use crate::ConversionError;
 use crate::chunk_source::ChunkSource;
@@ -146,6 +149,24 @@ impl ModelSource {
             MaterialReading::Drawn,
             cache,
         )
+    }
+
+    /// Reads the layer file at `path`, a path below `Data`, as a library through `cache`, which
+    /// fetches and parses it once for every caller; see [`LayerCache::library`].
+    #[must_use]
+    pub fn layer_library(
+        index: &PathIndex<'_>,
+        path: &str,
+        cache: &LayerCache,
+        verdicts: &TextureVerdicts,
+        budget: &mut LayerBudget,
+    ) -> Arc<MaterialStatus> {
+        let mut companions = ArchiveCompanions {
+            index,
+            folder: "",
+            verdicts,
+        };
+        cache.library(path, &mut companions, budget)
     }
 
     /// Returns the model, giving up the source.

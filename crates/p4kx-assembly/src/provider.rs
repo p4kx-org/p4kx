@@ -6,7 +6,8 @@ use std::io::Read;
 use std::sync::Arc;
 
 use p4kx_extraction::model::{
-    LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, ModelError, PositionBox,
+    LayerBudget, LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, ModelError,
+    PositionBox,
 };
 use p4kx_extraction::{
     AnimationChoice, AnimationSet, Archive, ArchiveTextures, ConversionError, ModelSource,
@@ -149,6 +150,14 @@ pub trait ModelProvider: Sync {
     /// Reads the material library `name` for a model at `entry`; a bare name is looked for beside
     /// the model first. A library that does not exist or cannot be read is a status.
     fn library(&self, entry: &str, name: &str) -> MaterialStatus;
+
+    /// Reads the layer file at `path`, a path below `Data`, as a library for a caller that
+    /// describes the layer's whole material, charging `budget`. A source that shares its layer
+    /// files overrides it to fetch and parse each once; the default reads it like any library.
+    fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
+        let _ = budget;
+        Arc::new(self.library("", path))
+    }
 
     /// Reads the bytes of the file at `path`, a path below `Data`, such as the DNA rig a piece is
     /// shaped by. The default has no such files.
@@ -304,6 +313,10 @@ impl ModelProvider for ArchiveModels<'_> {
 
     fn library(&self, entry: &str, name: &str) -> MaterialStatus {
         ModelSource::material_library(&self.index, entry, name, &self.layers, &self.verdicts)
+    }
+
+    fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
+        ModelSource::layer_library(&self.index, path, &self.layers, &self.verdicts, budget)
     }
 
     fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {

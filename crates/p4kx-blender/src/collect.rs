@@ -2,11 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{BTreeMap, HashMap};
-use std::sync::Arc;
 
 use p4kx_assembly::ModelProvider;
 use p4kx_gltf::{DrawnMaterial, drawn_materials, texture_path};
-use p4kx_model::{Material, MaterialLayer, MaterialLibrary, MaterialStatus, TintPalette};
+use p4kx_model::{LayerBudget, Material, MaterialLayer, MaterialLibrary, TintPalette};
 
 use crate::TextureUse;
 use crate::describe::{describe, layer_shares, library_path};
@@ -51,7 +50,7 @@ pub(crate) struct Collected {
     pub(crate) issues: Vec<Issue>,
     index_of: HashMap<String, usize>,
     keys: HashMap<MaterialKey, usize>,
-    layer_files: HashMap<String, Arc<MaterialStatus>>,
+    layer_budget: LayerBudget,
     cut: BTreeMap<usize, (String, String)>,
     folder: String,
 }
@@ -228,11 +227,7 @@ impl Collected {
         if path.is_empty() {
             return None;
         }
-        let status = Arc::clone(
-            self.layer_files
-                .entry(path.to_ascii_lowercase())
-                .or_insert_with(|| Arc::new(models.library("", path))),
-        );
+        let status = models.layer_library(path, &mut self.layer_budget);
         let Some(library) = status.library() else {
             let problem = status.problem().unwrap_or_default();
             self.layer_issue(parent, path, &problem);

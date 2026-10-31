@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use p4kx_extraction::model::{MaterialStatus, Model};
+use p4kx_extraction::model::{LayerBudget, MaterialStatus, Model};
 
 use crate::provider::{ModelFailure, ModelProvider, ProvidedModel};
 
@@ -242,6 +242,10 @@ impl ModelProvider for CachedModels<'_> {
 
     fn library(&self, entry: &str, name: &str) -> MaterialStatus {
         self.inner.library(entry, name)
+    }
+
+    fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
+        self.inner.layer_library(path, budget)
     }
 
     fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {

@@ -6,7 +6,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 
 use crate::mtl_load::request_path;
-use crate::{CompanionPath, CompanionResolver, LayerSurface, Material, MaterialLibrary};
+use crate::{
+    CompanionPath, CompanionResolver, LayerSurface, Material, MaterialLibrary, MaterialStatus,
+};
 
 /// The most distinct layer files one load of a material library may be charged for; layers beyond
 /// are reported as unresolved.
@@ -28,8 +30,8 @@ pub struct LayerLimits {
     pub bytes_per_load: usize,
     /// The layer files a cache keeps before it starts over.
     pub cached_files: usize,
-    /// The bytes of the layer files a cache keeps before it starts over; the surfaces it holds
-    /// are copied from those bytes, so they bound its memory.
+    /// The bytes of the layer files a cache keeps before it starts over; the libraries it holds
+    /// are parsed from those bytes, so they bound its memory.
     pub cached_bytes: usize,
 }
 
@@ -47,13 +49,20 @@ impl Default for LayerLimits {
 /// What one load of a material library may still be charged for. A file counts once per load,
 /// whether the cache held it or not, so which layers resolve does not depend on the load order.
 #[derive(Debug)]
-pub(crate) struct Budget {
+pub struct LayerBudget {
     files: usize,
     bytes: usize,
     charged: HashSet<String>,
 }
 
-impl Budget {
+impl Default for LayerBudget {
+    /// Returns a budget with the default per-load limits.
+    fn default() -> Self {
+        Self::new(LayerLimits::default())
+    }
+}
+
+impl LayerBudget {
     fn new(limits: LayerLimits) -> Self {
         Self {
             files: limits.files_per_load,
@@ -75,40 +84,11 @@ impl Budget {
     }
 }
 
-/// The surfaces of the sub-materials of one layer file; the parsed file is dropped.
-#[derive(Debug)]
-struct LayerFile {
-    single: bool,
-    surfaces: Vec<(String, LayerSurface)>,
-}
-
-impl LayerFile {
-    fn of(library: &MaterialLibrary) -> Self {
-        Self {
-            single: library.single,
-            surfaces: library
-                .materials
-                .iter()
-                .map(|material| (material.name.clone(), LayerSurface::of(material)))
-                .collect(),
-        }
-    }
-
-    fn pick(&self, submaterial: &str) -> Option<&LayerSurface> {
-        let at = pick_position(
-            self.single,
-            submaterial,
-            self.surfaces.iter().map(|(name, _)| name.as_str()),
-        )?;
-        self.surfaces.get(at).map(|(_, surface)| surface)
-    }
-}
-
-/// What fetching a layer file came to: the bytes it held and its surfaces when it was readable.
+/// What fetching a layer file came to: the bytes it held and the library, or why there is none.
 #[derive(Debug)]
 struct Fetched {
     bytes: usize,
-    file: Option<LayerFile>,
+    status: Arc<MaterialStatus>,
 }
 
 type Table = HashMap<String, Arc<OnceLock<Fetched>>>;
@@ -152,12 +132,11 @@ impl LayerSurface {
     }
 }
 
-/// The layer files read so far, as their surfaces.
+/// The layer files read so far, as parsed libraries.
 ///
-/// The loads of several material libraries share it, from several threads at once, so that a file
-/// many libraries layer in is fetched and parsed once; it keeps the surfaces of the files, not
-/// their parsed materials. The lock guards only the table of files; a file is fetched and parsed
-/// outside it, once per key.
+/// The loads of several material libraries and the Blender package share it, from several threads
+/// at once, so that a file many libraries layer in is fetched and parsed once. The lock guards
+/// only the table of files; a file is fetched and parsed outside it, once per key.
 #[derive(Debug, Default)]
 pub struct LayerCache {
     limits: LayerLimits,
@@ -194,8 +173,10 @@ impl LayerCache {
         self.table().is_empty()
     }
 
-    pub(crate) fn budget(&self) -> Budget {
-        Budget::new(self.limits)
+    /// Returns a budget with the per-load limits of this cache.
+    #[must_use]
+    pub fn budget(&self) -> LayerBudget {
+        LayerBudget::new(self.limits)
     }
 
     /// Returns the surface of the sub-material `submaterial` of the layer file at `path`, `None`
@@ -206,12 +187,39 @@ impl LayerCache {
         path: &str,
         submaterial: &str,
         companions: &mut dyn CompanionResolver,
-        budget: &mut Budget,
+        budget: &mut LayerBudget,
     ) -> Option<LayerSurface> {
-        let request = request_path(path)?;
+        let status = self.library(path, companions, budget);
+        let library = status.library()?;
+        library
+            .materials
+            .get(library.layer_position(submaterial)?)
+            .map(LayerSurface::of)
+    }
+
+    /// Returns the layer file at `path` as a material library, read without its own layers and
+    /// diffuse maps: a path that is unsafe, a file that is missing or unreadable, or one that
+    /// `budget` does not admit is a status, not a failure. The file is fetched and parsed once
+    /// per cache, whatever the loads that ask for it.
+    #[must_use]
+    pub fn library(
+        &self,
+        path: &str,
+        companions: &mut dyn CompanionResolver,
+        budget: &mut LayerBudget,
+    ) -> Arc<MaterialStatus> {
+        let Some(request) = request_path(path) else {
+            return Arc::new(MaterialStatus::Unreadable {
+                path: path.to_owned(),
+                reason: "the path leaves the Data folder or is no plain path".to_owned(),
+            });
+        };
         let key = request.to_ascii_lowercase();
         if !budget.admits(&key) {
-            return None;
+            return Arc::new(MaterialStatus::Unreadable {
+                path: path.to_owned(),
+                reason: "one load reads no more layer files than its budget allows".to_owned(),
+            });
         }
         let cell = self.cell(&key);
         let mut fetching = false;
@@ -224,7 +232,7 @@ impl LayerCache {
                 .fetch_add(fetched.bytes, Ordering::Relaxed);
         }
         budget.charge(&key, fetched.bytes);
-        fetched.file.as_ref()?.pick(submaterial).cloned()
+        Arc::clone(&fetched.status)
     }
 
     fn table(&self) -> MutexGuard<'_, Table> {
@@ -247,14 +255,29 @@ impl LayerCache {
 }
 
 fn fetch(request: &str, companions: &mut dyn CompanionResolver) -> Fetched {
-    let bytes = companions
-        .resolve(CompanionPath::Material(request))
-        .ok()
-        .flatten();
+    let path = request.to_owned();
+    let (bytes, status) = match companions.resolve(CompanionPath::Material(request)) {
+        Ok(None) => (0, MaterialStatus::Missing { path }),
+        Err(error) => (
+            0,
+            MaterialStatus::Unreadable {
+                path,
+                reason: error.to_string(),
+            },
+        ),
+        Ok(Some(bytes)) => (
+            bytes.len(),
+            match MaterialLibrary::parse(request, &bytes) {
+                Ok(library) => MaterialStatus::Loaded(library),
+                Err(error) => MaterialStatus::Unreadable {
+                    path,
+                    reason: error.to_string(),
+                },
+            },
+        ),
+    };
     Fetched {
-        bytes: bytes.as_ref().map_or(0, Vec::len),
-        file: bytes
-            .and_then(|bytes| MaterialLibrary::parse(request, &bytes).ok())
-            .map(|library| LayerFile::of(&library)),
+        bytes,
+        status: Arc::new(status),
     }
 }

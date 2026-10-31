@@ -8,6 +8,7 @@ mod package_character;
 mod package_interior;
 mod package_landing_gear;
 mod package_layer_limits;
+mod package_layer_reader;
 mod package_layer_shares;
 mod package_layout;
 mod package_materials;

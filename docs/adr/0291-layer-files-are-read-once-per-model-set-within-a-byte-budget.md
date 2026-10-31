@@ -35,7 +35,7 @@ and the MCP model tools), `Drawn` reads them (every drawing caller, and the defa
 
 ## Consequences
 
-The Blender package still reads each layer file as a full material through the model provider,
+The Blender package read each layer file as a full material through the model provider (ADR-0301 replaces that),
 because it describes the layer's whole material in the manifest, which a `LayerSurface` does not
 hold; only the `Submtl` pick is shared. Follow-up: #959. The CLI JSON and GUI summaries of
 Assemblies do not list `unresolved_layers` yet (the Assembly reports them as issues); follow-up:

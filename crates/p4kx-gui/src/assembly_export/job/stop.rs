@@ -2,10 +2,11 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::{self, Write};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use p4kx_assembly::{ArchiveModels, ModelFailure, ModelProvider, ProvidedModel};
-use p4kx_extraction::model::MaterialStatus;
+use p4kx_extraction::model::{LayerBudget, MaterialStatus};
 use p4kx_extraction::{
     CancelToken, ConversionError, LoadedTexture, TextureLoadError, TextureLoader,
 };
@@ -25,6 +26,10 @@ impl ModelProvider for Stoppable<'_, '_> {
 
     fn library(&self, entry: &str, name: &str) -> MaterialStatus {
         self.models.library(entry, name)
+    }
+
+    fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
+        self.models.layer_library(path, budget)
     }
 
     fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {
