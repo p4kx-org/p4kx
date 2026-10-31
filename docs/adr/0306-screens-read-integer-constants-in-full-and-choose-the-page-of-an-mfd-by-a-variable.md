@@ -18,10 +18,10 @@ page. They left open whether the game fills the blocks differently or hides them
   4. The comparison constant is an `Int64` field of the Record. The reader took the field as a
   float and did not know that width, so the constant read as 0, and `currentmode = 0` equalled it.
   Of the 192 integer comparisons in these Records, 134 in 51 canvases have a constant other than
-  0; all were read as 0. With the constant read, the powered MFD instantiates the self-status
-  modes that the state at rest selects and none of the others: the turret layout, the missile
-  mode, the nav readout and the guns mode are gone, and with them the blocks. So neither a fill
-  that differs nor a tag hides the blocks: the widget is not part of the page.
+  0; all were read as 0. With the constant read, the powered MFD instantiates only the
+  self-status modes that the state at rest selects: the 206 widgets in 18 canvases of the union
+  of all modes (ADR-0296) become 37 in 5, and the turret layout is gone with its blocks. So
+  neither a fill that differs nor a tag hides the blocks: the widget is not part of the page.
 - **Page choice.** The MFD content `m_eng_mfdcontent` holds the page in `canvas_LandscapeMFDView`
   and `canvas_PortraitMFDView`, whose `CanvasReferenceRecord` is bound to the string variables
   `landscapecanvasguid` and `portraitcanvasguid` (the Record GUID of the page). Without them the
@@ -75,10 +75,10 @@ Renders of `m_mfd_screen` with `--var powerstate=1`, `--var landscapecanvasguid=
 screenshots; the Titan has no screenshot on disk, so its pages are compared with the written
 description.
 
-- **Aegis, default page (self status).** The two blocks and the rectangle are gone: the page
-  draws its frame and nothing else, as the game draws no solid block. Its contents (GIMBAL and
-  GROUP above the diagram, the three ammunition counts below it) come from run-time values and
-  the 3D diagram, which stay undrawn.
+- **Aegis, default page (self status).** The two blocks and the rectangle are gone, as the game
+  shows no solid block; the render is the tab bar and an empty screen. The contents of the page
+  in the game (GIMBAL and GROUP above the diagram, the three ammunition counts below it) come
+  from run-time values, the mode of the seat and the 3D diagram, which stay undrawn.
 - **Aegis, POWER MANAGEMENT.** The render draws the readout row, the `OUTPUT` and `BATTERY`
   blocks with their icons and the tab bar with an arrow at each end and `POWER MANAGEMENT` in a
   teal bar, as the Gladius shows it. It differs in the readout values (zero: the values are
