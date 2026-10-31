@@ -533,11 +533,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   refused (ADR-0277). The canvas a canvas widget holds is the one a style
   entry, a boolean binding or a game variable picks (ADR-0277, ADR-0306): the powered MFD
   `m_mfd_screen` shows the page named by `--var landscapecanvasguid=<record path or GUID>` (the
-  Records `screens/power/mc_s_power_master`, `weapons/mc_s_weaponconfig_master`,
-  `scanning/mc_s_scan_master`, `diag/mc_s_diag_master`, `shields/mc_s_shields_master`,
-  `config/mc_s_config_master`, `comms/mc_s_comms_master` and `self/mc_s_self_master` below
-  `mfdscreens/mc_mfdcomponents`), `portraitcanvasguid` in the portrait view, and its tab bar
-  names the page by `--var mfdviewname=<name or @key>`. The UI tab keeps its state and typed
+  `mc_s_*_master` Records below `mfdscreens/mc_mfdcomponents/screens`, among them `power`,
+  `weapons`, `scanning`, `diag`, `shields`, `config`, `comms` and `self`), `portraitcanvasguid` in the portrait view, and its tab bar
+  names the page by `--var mfdviewname=<name or @key>`, an `@key` being looked up in the
+  language (`--lang`). The UI tab keeps its state and typed
   variables across sessions.
 - `p4kx chf to-json <file> [--out <file>] [--archive <Data.p4k>]` converts a CHF character file, e.g. one saved by the
   character customiser, to indented JSON on stdout or in `--out`: its inner versions (7 and 8

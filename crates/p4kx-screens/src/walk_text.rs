@@ -6,16 +6,12 @@ use std::rc::Rc;
 use crate::canvas::Canvas;
 use crate::rest::TEXT_FIELD;
 use crate::style::Modifiers;
-use crate::text::FontStyleInfo;
+use crate::text::{FontStyleInfo, is_editor_label};
 use crate::walk::Walk;
 use crate::widget::Widget;
 
-/// The first of the parameters a text field takes values for.
+/// The only parameter of a text field read as its text; `ParamInput1` and up are not read.
 const FIRST_PARAMETER: &str = "ParamInput0";
-
-/// The key of the label a new text field has in the editor, which the text fields of the MFD
-/// that a binding fills keep.
-const EDITOR_LABEL: &str = "ui_leaderboards_Loadout";
 
 impl Walk<'_, '_, '_, '_> {
     pub(crate) fn font_of(
@@ -53,7 +49,7 @@ impl Walk<'_, '_, '_, '_> {
             .last()
             .is_some_and(|state| state.is_text_bound(index));
         let label = canvas.widgets.get(index)?.text.as_ref()?.source.as_str();
-        (bound && label.strip_prefix('@') == Some(EDITOR_LABEL)).then(String::new)
+        (bound && is_editor_label(label)).then(String::new)
     }
 
     fn parameter_text(&self, canvas: &Canvas, index: usize) -> Option<String> {

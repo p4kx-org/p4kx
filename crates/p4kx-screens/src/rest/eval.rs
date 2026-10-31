@@ -15,12 +15,14 @@ use crate::variables::Variable;
 /// Finds the canvas a game variable names, by GUID or record path.
 pub(crate) type CanvasLookup<'a> = &'a dyn Fn(&str) -> Result<Guid, String>;
 
-/// What a canvas is evaluated under: the typed and the localised parameters its widget hands it
-/// and the game variables the caller sets.
+/// What a canvas is evaluated under.
 #[derive(Clone, Copy)]
 pub(crate) struct Given<'a> {
+    /// The boolean, number and string parameters its widget hands it.
     pub(crate) inputs: &'a [(String, Rest)],
+    /// The localised parameters its widget hands it, by parameter name.
     pub(crate) texts: &'a [(String, String)],
+    /// The game variables the caller sets, the last of a name winning.
     pub(crate) variables: &'a [Variable],
 }
 
@@ -289,39 +291,23 @@ const fn whole_if(value: f64, whole: bool) -> f64 {
 }
 
 impl AtRest {
-    /// Evaluates the field bindings of `operations` with the game variables at the values of
-    /// `variables`, else at zero, and the component parameters at `inputs`, else at their
-    /// defaults. No game variable names a canvas.
-    #[cfg(test)]
-    pub(crate) fn of(
-        operations: &Operations,
-        inputs: &[(String, Rest)],
-        variables: &[Variable],
-    ) -> Self {
-        let given = Given {
-            inputs,
-            texts: &[],
-            variables,
-        };
-        Self::resolving(operations, &given, &|_| Err(GAME_NAMES_CANVAS.to_owned()))
-    }
-
     /// Takes the text a localised field of a text or of a canvas parameter has at rest: a value
-    /// that is a text of its own, not a placeholder the game fills in.
+    /// that is a text of its own, not a placeholder the game fills in. A field whose input is not
+    /// evaluated is not marked as filled and keeps its label.
     fn bind_text(&mut self, eval: &mut Eval<'_>, binding: &Binding) {
         if !(binding.field.starts_with(PARAMETER) || binding.field == TEXT_FIELD) {
             return;
         }
-        self.text_bound.insert(binding.widget);
-        if let Ok(Rest::Text(text)) = eval.input(binding.input, 0)
-            && !is_placeholder(&text)
-        {
-            self.localise(binding.widget, &binding.field, text);
+        if let Ok(Rest::Text(text)) = eval.input(binding.input, 0) {
+            self.text_bound.insert(binding.widget);
+            if !is_placeholder(&text) {
+                self.localise(binding.widget, &binding.field, text);
+            }
         }
     }
 
-    /// Evaluates as [`AtRest::of`] under `given`, with the canvases that game variables name
-    /// found by `lookup`.
+    /// Evaluates the field bindings of `operations` under `given`, with the canvases that game
+    /// variables name found by `lookup`.
     pub(crate) fn resolving(
         operations: &Operations,
         given: &Given<'_>,

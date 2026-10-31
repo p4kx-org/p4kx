@@ -89,6 +89,17 @@ impl Walk<'_, '_, '_, '_> {
         self.rests.push(state);
     }
 
+    /// Returns the game variable the caller set for the binding `binding` of `canvas`, the last
+    /// of its name: one that names no namespace or the Record name of `canvas`.
+    pub(crate) fn variable_for(&self, binding: &str, canvas: &Canvas) -> Option<&Variable> {
+        let name = canvas.name();
+        self.variables
+            .iter()
+            .rev()
+            .filter(|variable| variable.in_namespace(name))
+            .find(|variable| variable.matches(binding))
+    }
+
     /// Remembers the paths the game variables of `canvas` are bound to, so that a setting that no
     /// canvas of the screen reads can be told.
     pub(crate) fn note_variables(&mut self, canvas: &Canvas) {

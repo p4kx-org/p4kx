@@ -43,8 +43,12 @@ page. They left open whether the game fills the blocks differently or hides them
 
 ## Decision
 
-- **Integer constants are read in every integer width** (`Int64` and `UInt64` too), by the
-  reader's number function and by the switch exceptions of the graph.
+- **Integer constants are read exactly, in every integer width** (`Int64` and `UInt64` too), by
+  the reader's number function, by the constants of the graph and by the switch exceptions. An
+  integer of 64 bits is taken up to 2^53, which an `f64` holds exactly; a larger one, and a
+  field that holds no number the reader knows, is not read as 0: the operation is listed as not
+  evaluated and the widget keeps its own state. (The `i32` reader, `int`, is narrower and
+  gives nothing for a wider value.)
 - **A string variable names the canvas of a canvas widget.** A `CanvasReferenceRecord` bound to a
   game variable that the caller sets (`--var landscapecanvasguid=<record path or GUID>`) takes
   that canvas, read as `compose` reads a canvas name. A name that is no canvas, or ambiguous, is
@@ -54,19 +58,28 @@ page. They left open whether the game fills the blocks differently or hides them
   time`.
 - **A localised variable is the text of a text field.** `LocalizedVariable` is evaluated like a
   string variable; a `LocalizedField` of a text (`Text`, `ParamInput0` and so on) that evaluates to
-  a text sets that text on the widget, which draws it in place of its label, and hands it to a
+  a text sets that text on the widget, which draws it in place of its label (a text is drawn as
+  it is, an `@key` is looked up in the language like any label), and hands it to a
   nested canvas as a localised parameter. A `LocalizedComponentParameter` takes the text its canvas
   hands it, else its default, so a field whose parameter is the placeholder `@LOC_PLACEHOLDER`
-  draws nothing, as a field filled in by the game does. A localised field whose input is not
-  evaluated leaves the label as it is.
+  draws nothing, as a field filled in by the game does; a real label stays under a placeholder
+  (see Guesses). A localised field whose input is not evaluated leaves the label as it is and is
+  not counted as filled.
+- **The editor label of a filled field shows nothing.** A text field whose text a binding fills
+  and that still holds the label `@ui_leaderboards_Loadout`, the label an editor gives a new
+  field, draws nothing until the value is set. On LIVE 7 labels of the 4995 Records below
+  `ui/buildingblocks` carry it, all in the three MFD header canvases and all on filled fields.
+  `EDITOR_LABEL` sits beside the placeholder keys of the text module; it is no placeholder for
+  every field, since the key is a real string of the leaderboards.
 - **Parameters are told apart by kind** as well as by name, in the state of a canvas and when a
   widget merges its own parameters with the bound ones.
 - **An icon holds a part**, as a text field does (ADR-0296): the entries that require the type
   `CustomShape` or name no type and select by the parent apply to its shape, so the arrows of the
   bar take their colour.
-- **A runtime image has no background.** The picture the game renders replaces the box. The
-  ship diagram (`Own Vehicle Hologram`) had the pale fill of `UI_Generic_Flag_01`, which drew a
-  light-blue rectangle over the page.
+- **A runtime image draws no background fill.** The ship diagram (`Own Vehicle Hologram`) had
+  the pale fill of `UI_Generic_Flag_01`, which drew a light-blue rectangle over the page, also
+  with `--brand rsi` on `gen_mc_s_playerdiagram`, where the powered render is now empty. Which
+  of two readings is true is a guess (see Guesses).
 
 ## Compared with the game (owner screenshots of the Gladius and the Constellation, LIVE)
 
@@ -108,15 +121,24 @@ description.
 - That the pale fill of a runtime image is not drawn, or is the tint of the hologram and not a
   box fill. Both read the same in every screenshot (no rectangle); the data does not tell which.
   The render draws no fill.
-- That a text field with a bound `ParamInput0` draws that value in place of its label. 94 of the
-  text fields of the MFD Records that bind it have the label `@LOC_PLACEHOLDER` and the others a
-  placeholder such as `Loadout` or `0`; the page name in the screenshots shows the value is drawn.
+- That a text field with a bound `ParamInput0` draws that value in place of its label. Of the
+  labels of the text fields of the MFD Records that bind it, 94 are `@LOC_PLACEHOLDER`, 18
+  `@LOC_EMPTY` and 7 the editor label; the others are words such as "Capacity" or "No Data" on
+  fields whose parameter defaults to a placeholder, about 50 of them. The page name in the
+  screenshots shows that a value is drawn in place of the label; whether such a word stays when
+  the value is a placeholder is not shown, so it stays.
+- That the editor label is the only label to hide on an unfilled field. A structural rule (any
+  label on an unfilled field that is not a real key) is not supported by the data: the words
+  above are real keys on unfilled fields, and the game may show them.
 - That `mfdviewname` and the page canvases pair up as the tab bar of the game shows them
   (`POWER MANAGEMENT` for `mc_s_power_master`): the game sets both at run time; the names come
   from the screenshots.
 
 ## Considered Options
 
+- Reading the pale fill of a runtime image as the tint of the hologram, not as a box fill: the
+  render would then colour the picture the game draws, which is run-time; nothing is drawn
+  either way, so the two readings give one picture, and no tint is invented.
 - Hiding the cast backdrops by a rule of the renderer: the data decides it, since the widget is
   not instantiated; a rule would have hidden it for the wrong reason and left the other modes.
 - Keeping one typed value per parameter name: the notification of the power page and any canvas

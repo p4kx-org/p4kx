@@ -5,27 +5,26 @@
 
 use p4kx_dataforge::DataForge;
 use p4kx_gfx::RgbaImage;
-use p4kx_screens::{Composed, ScreenComposer, TextSources, Variable};
+use p4kx_screens::{Composed, ImageSources, ScreenComposer, Variable};
 use p4kx_testkit::{
-    TestCanvas, TestDim, TestInstance, TestOp, TestValue, TestWidget, screens_text_sample,
+    TestCanvas, TestColour, TestCondition, TestDim, TestInstance, TestModifier, TestOp,
+    TestStyleEntry, TestValue, TestWidget, tag_record,
 };
 
+use crate::images::{texture, vector};
 use crate::support::{
     RED, SCREEN, TestResult, database, empty_at, guid_text, near, pixel, red_at, stage,
 };
-use crate::text::fonts;
-use crate::text_part::field_entry;
 
 const PAGE: u128 = SCREEN + 0x400;
-const CLEAR: [u8; 4] = [0, 0, 0, 0];
 
-type Failure = Box<dyn std::error::Error>;
+pub(crate) type Failure = Box<dyn std::error::Error>;
 
 const fn square(widget: TestWidget) -> TestWidget {
     widget.size(TestDim::Fixed(10.0), TestDim::Fixed(10.0))
 }
 
-fn variables(settings: &[&str]) -> Result<Vec<Variable>, Failure> {
+pub(crate) fn variables(settings: &[&str]) -> Result<Vec<Variable>, Failure> {
     settings
         .iter()
         .map(|setting| Ok(setting.parse::<Variable>()?))
@@ -67,6 +66,66 @@ fn the_constant_of_an_integer_comparison_is_read_whatever_its_width() -> TestRes
     Ok(())
 }
 
+const WIDE: i64 = 5_000_000_000;
+
+#[test]
+fn an_integer_constant_above_the_32_bit_range_is_read_exactly() -> TestResult {
+    let screen = TestCanvas::new(SCREEN, "wide", 10.0, 10.0)
+        .operation("mode", TestOp::IntVar)
+        .operation("wide", TestOp::IntIs("mode", "Equal", WIDE))
+        .widget(square(TestWidget::display("layout").background(RED)))
+        .operation("show", TestOp::BoolField("layout", "Instantiated", "wide"));
+    assert!(empty_at(&image_of(&screen, &["variable=4"])?, 5, 5));
+    assert!(
+        red_at(&image_of(&screen, &["variable=5000000000"])?, 5, 5),
+        "the constant is not narrowed to 32 bits"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_integer_constant_beyond_exact_range_is_listed_and_not_read_as_zero() -> TestResult {
+    let screen = TestCanvas::new(SCREEN, "huge", 10.0, 10.0)
+        .operation("mode", TestOp::IntVar)
+        .operation("huge", TestOp::IntIs("mode", "NotEqual", i64::MAX))
+        .widget(square(TestWidget::display("layout").background(RED)))
+        .operation("show", TestOp::BoolField("layout", "Instantiated", "huge"));
+    let composed = compose(vec![screen.record()], &[])?;
+    assert!(
+        red_at(&composed.rasterize(&stage())?.image, 5, 5),
+        "the widget keeps its own state, which a zero constant would have changed"
+    );
+    assert!(
+        composed
+            .report()
+            .unsupported
+            .iter()
+            .any(|entry| entry.element == "Binding" && entry.reason.contains("BooleanFromInteger")),
+        "{:?}",
+        composed.report().unsupported
+    );
+    Ok(())
+}
+
+#[test]
+fn the_exceptions_of_an_integer_switch_are_read_in_every_width() -> TestResult {
+    let screen = TestCanvas::new(SCREEN, "switch", 10.0, 10.0)
+        .operation("mode", TestOp::IntVar)
+        .operation("shown", TestOp::IntSwitch("mode", vec![4, WIDE]))
+        .widget(square(TestWidget::display("layout").background(RED)))
+        .operation("show", TestOp::BoolField("layout", "Instantiated", "shown"));
+    assert!(
+        red_at(&image_of(&screen, &[])?, 5, 5),
+        "zero is no exception"
+    );
+    assert!(empty_at(&image_of(&screen, &["variable=4"])?, 5, 5));
+    assert!(
+        empty_at(&image_of(&screen, &["variable=5000000000"])?, 5, 5),
+        "an exception above 32 bits is kept"
+    );
+    Ok(())
+}
+
 fn pager() -> TestCanvas {
     TestCanvas::new(SCREEN, "pager", 10.0, 10.0)
         .operation("page", TestOp::TextVar)
@@ -100,6 +159,41 @@ fn a_variable_that_names_a_canvas_puts_it_in_the_canvas_widget() -> TestResult {
 }
 
 #[test]
+fn a_namespaced_variable_reaches_the_canvas_widgets_of_that_canvas_only() -> TestResult {
+    let records = || vec![pager().record(), page().record()];
+    let own = format!("pager::variable={}", guid_text(PAGE));
+    let composed = compose(records(), &[&own])?;
+    assert!(red_at(&composed.rasterize(&stage())?.image, 5, 5), "{own}");
+    let other = format!("elsewhere::variable={}", guid_text(PAGE));
+    let composed = compose(records(), &[&other])?;
+    assert!(empty_at(&composed.rasterize(&stage())?.image, 5, 5));
+    assert_eq!(composed.report().unknown_variables().count(), 1);
+    Ok(())
+}
+
+#[test]
+fn a_name_shared_by_two_canvases_is_listed_as_ambiguous() -> TestResult {
+    let twin = TestCanvas::new(PAGE + 1, "page_one", 10.0, 10.0)
+        .widget(square(TestWidget::display("content").background(RED)));
+    let composed = compose(
+        vec![pager().record(), page().record(), twin.record()],
+        &["variable=libs/foundry/records/ui/buildingblocks/test/page_one"],
+    )?;
+    assert!(empty_at(&composed.rasterize(&stage())?.image, 5, 5));
+    assert!(
+        composed
+            .report()
+            .unsupported
+            .iter()
+            .any(|entry| entry.reason.contains("CanvasReferenceRecord")
+                && entry.reason.contains("2 canvas Records share")),
+        "{:?}",
+        composed.report().unsupported
+    );
+    Ok(())
+}
+
+#[test]
 fn a_name_that_is_no_canvas_is_listed_and_draws_nothing() -> TestResult {
     let composed = compose(
         vec![pager().record(), page().record()],
@@ -116,78 +210,6 @@ fn a_name_that_is_no_canvas_is_listed_and_draws_nothing() -> TestResult {
                 && entry.reason.contains("no/such/page")),
         "{:?}",
         composed.report().unsupported
-    );
-    Ok(())
-}
-
-fn labelled_field(name: &'static str, label: &'static str) -> TestWidget {
-    TestWidget::new("BuildingBlocks_WidgetTextField", name)
-        .parent("root")
-        .size(TestDim::Fixed(20.0), TestDim::Fixed(20.0))
-        .with(
-            "labelProperties",
-            TestValue::Struct(
-                TestInstance::new("BuildingBlocks_ComponentLabelProperties")
-                    .value("label", TestValue::text(label)),
-            ),
-        )
-}
-
-fn text_of(canvas: &TestCanvas, settings: &[&str]) -> Result<RgbaImage, Failure> {
-    let bytes = screens_text_sample().record(canvas.record()).build();
-    let forge = DataForge::open(&bytes)?;
-    let fonts = fonts()?;
-    let composed = ScreenComposer::new(&forge)
-        .with_variables(&variables(settings)?)
-        .with_texts(TextSources {
-            fonts: &fonts,
-            localise: None,
-        })
-        .compose(&guid_text(SCREEN), None)?;
-    Ok(composed.rasterize(&stage())?.image)
-}
-
-const EDITOR_LABEL: &str = "@ui_leaderboards_Loadout";
-
-fn titled(label: &'static str, source: TestOp) -> TestCanvas {
-    TestCanvas::new(SCREEN, "title", 20.0, 20.0)
-        .embedded(field_entry())
-        .operation("source", source)
-        .widget(TestWidget::display("root"))
-        .widget(labelled_field("title", label))
-        .operation("bind", TestOp::LocalField("title", "ParamInput0", "source"))
-}
-
-#[test]
-fn a_localised_variable_gives_the_text_a_field_draws_in_place_of_its_label() -> TestResult {
-    let canvas = titled(EDITOR_LABEL, TestOp::NamedLocalVar("mfdviewname"));
-    assert_eq!(
-        pixel(&text_of(&canvas, &[])?, 2, 4),
-        CLEAR,
-        "the editor label of a field that is filled in shows nothing yet"
-    );
-    let named = text_of(&canvas, &["mfdviewname=A"])?;
-    assert!(near(pixel(&named, 2, 4), [255, 0, 0, 255], 2), "the name");
-    Ok(())
-}
-
-#[test]
-fn the_default_of_a_localised_parameter_is_the_text_unless_it_is_a_placeholder() -> TestResult {
-    let named = text_of(
-        &titled(EDITOR_LABEL, TestOp::TextParam("ParamInput0", "A")),
-        &[],
-    )?;
-    assert!(
-        near(pixel(&named, 2, 4), [255, 0, 0, 255], 2),
-        "the default"
-    );
-    let kept = text_of(
-        &titled("A", TestOp::TextParam("ParamInput0", "@LOC_PLACEHOLDER")),
-        &[],
-    )?;
-    assert!(
-        near(pixel(&kept, 2, 4), [255, 0, 0, 255], 2),
-        "a placeholder leaves a real label as it is"
     );
     Ok(())
 }
@@ -231,6 +253,63 @@ fn parameters_of_different_kinds_with_one_name_do_not_replace_each_other() -> Te
     assert!(
         empty_at(&composed.rasterize(&stage())?.image, 5, 5),
         "the number does not take the place of the false boolean"
+    );
+    Ok(())
+}
+
+const RED_FILL: TestColour = RED;
+const ARROW: u128 = SCREEN + 0x600;
+const WHITE: [u8; 4] = [255, 255, 255, 255];
+
+fn icon(name: &'static str, at: f32) -> TestWidget {
+    TestWidget::new("BuildingBlocks_WidgetIcon", name)
+        .parent("root")
+        .size(TestDim::Fixed(10.0), TestDim::Fixed(10.0))
+        .offset(at, 0.0)
+        .with(
+            "iconProperties",
+            TestValue::Struct(
+                TestInstance::new("BuildingBlocks_ComponentIconProperties")
+                    .value("show", TestValue::Bool(true))
+                    .value("iconPreset", TestValue::text("TestBoxX"))
+                    .value("customIcon", TestValue::text("")),
+            ),
+        )
+        .with(
+            "svgFill",
+            TestValue::Struct(
+                TestInstance::new("BuildingBlocks_SvgFill")
+                    .value("svgPath", TestValue::text(""))
+                    .value("renderShape", TestValue::Bool(true))
+                    .value("enableColorOverlay", TestValue::Bool(true)),
+            ),
+        )
+}
+
+#[test]
+fn the_shape_of_an_icon_takes_the_colour_of_an_entry_that_selects_it_by_the_parent() -> TestResult {
+    let arrow_colour = TestStyleEntry::new("arrow colour")
+        .when(TestCondition::Type("CustomShape"))
+        .when(TestCondition::Parent(vec![TestCondition::Tag(ARROW)]))
+        .set(TestModifier::Fill(RED_FILL));
+    let canvas = TestCanvas::new(SCREEN, "arrows", 30.0, 10.0)
+        .embedded(arrow_colour)
+        .widget(TestWidget::display("root"))
+        .widget(icon("tagged", 0.0).tag(ARROW))
+        .widget(icon("plain", 15.0));
+    let bytes = database([canvas.record(), tag_record(ARROW, "Arrow")]);
+    let forge = DataForge::open(&bytes)?;
+    let composed = ScreenComposer::new(&forge)
+        .with_images(ImageSources {
+            texture: &texture,
+            vector: &vector,
+        })
+        .compose(&guid_text(SCREEN), None)?;
+    let image = composed.rasterize(&stage())?.image;
+    assert!(red_at(&image, 5, 5), "the entry colours the shape");
+    assert!(
+        near(pixel(&image, 20, 5), WHITE, 2),
+        "an icon without the tag keeps the colour of its graphic"
     );
     Ok(())
 }

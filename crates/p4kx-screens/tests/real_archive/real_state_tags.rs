@@ -19,13 +19,11 @@ const MFD: &str = "libs/foundry/records/ui/buildingblocks/ships/displays/mfdscre
 const POWER_PAGE: &str = "libs/foundry/records/ui/buildingblocks/ships/displays/mfdscreens/mc_mfdcomponents/screens/power/mc_s_power_master";
 const BRAND: &str = "aegs";
 /// The texts the powered MFD draws on LIVE on its power page once entries that select by the
-/// parent colour them: 16, the tab bar and the readouts among them; the floor leaves room for a
+/// parent colour them: 16, the tab bar and the readouts among them; the floor leaves two for a
 /// changed Archive. The report holds no text, so the tab bar itself is covered by these counts and
 /// by the PNG.
-const MIN_TEXTS_POWERED: usize = 10;
+const MIN_TEXTS_POWERED: usize = 14;
 const NO_COLOUR: &str = "text has no colour";
-/// None on LIVE; 16 without the parent entries.
-const MAX_WITHOUT_COLOUR: usize = 10;
 
 fn assert_texts_coloured(report: &Report) {
     assert!(
@@ -39,9 +37,9 @@ fn assert_texts_coloured(report: &Report) {
         .filter(|entry| entry.reason == NO_COLOUR)
         .map(|entry| entry.count)
         .sum();
-    assert!(
-        without_colour <= MAX_WITHOUT_COLOUR,
-        "{without_colour} texts without a colour"
+    assert_eq!(
+        without_colour, 0,
+        "none on LIVE; 16 without the parent entries"
     );
 }
 

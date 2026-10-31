@@ -9,6 +9,22 @@ use super::draw::Notes;
 
 const PLACEHOLDERS: [&str; 3] = ["LOC_EMPTY", "LOC_UNINITIALIZED", "LOC_PLACEHOLDER"];
 
+/// The key of the label an editor gives a new text field.
+///
+/// On LIVE 7 labels of the 4995 Records
+/// below `ui/buildingblocks` carry it, in the header canvases of the three MFD brands, and every
+/// one of them is the text field whose text a binding fills (the page name, a warning, a
+/// countdown); the game never shows it there.
+///
+/// The key is a real string of the leaderboards, so it is a placeholder only on a field that a
+/// binding fills (`is_editor_label`), not for `is_placeholder`.
+pub const EDITOR_LABEL: &str = "ui_leaderboards_Loadout";
+
+/// Returns whether the label `source`, a key with its `@`, is [`EDITOR_LABEL`].
+pub(crate) fn is_editor_label(source: &str) -> bool {
+    source.strip_prefix('@') == Some(EDITOR_LABEL)
+}
+
 /// Returns whether `text` is empty or a key the game fills in at run time.
 pub(crate) fn is_placeholder(text: &str) -> bool {
     let key = text.strip_prefix('@').unwrap_or(text);

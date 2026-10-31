@@ -172,19 +172,14 @@ impl Walk<'_, '_, '_, '_> {
     }
 
     /// Returns the canvases that the game variables set by the caller name for the canvas widgets
-    /// of `canvas`.
+    /// of `canvas`. A name that is no canvas, or an ambiguous one, is left out here; it is listed
+    /// when the canvas is entered, where its binding is evaluated.
     fn named_canvases(&self, canvas: &Canvas) -> Vec<Guid> {
-        let name = canvas.name();
         canvas
             .operations
             .canvas_variables()
             .filter_map(|binding| {
-                let variable = self
-                    .variables
-                    .iter()
-                    .rev()
-                    .filter(|variable| variable.in_namespace(name))
-                    .find(|variable| variable.matches(binding))?;
+                let variable = self.variable_for(binding, canvas)?;
                 find_canvas(self.store.forge(), variable.value()).ok()
             })
             .collect()

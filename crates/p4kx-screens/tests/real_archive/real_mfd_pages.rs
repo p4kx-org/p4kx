@@ -6,9 +6,13 @@
 use std::error::Error;
 use std::ops::Range;
 
-use p4kx_extraction::{Archive, ArchiveImages, DataForgeEntry};
+use p4kx_extraction::gfx::Localise;
+use p4kx_extraction::{
+    Archive, ArchiveImages, DataForgeEntry, Language, LocalizationEntry, UiMovie,
+    decode_line_breaks,
+};
 use p4kx_gfx::{Background, CanvasSize, RasterOptions, RgbaImage};
-use p4kx_screens::{Composed, ImageSources, MAX_SVG_BYTES, ScreenComposer, Variable};
+use p4kx_screens::{Composed, ImageSources, MAX_SVG_BYTES, ScreenComposer, TextSources, Variable};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -60,12 +64,74 @@ fn has_bright_ink(image: &RgbaImage, columns: Range<u32>, rows: Range<u32>) -> b
         })
 }
 
+/// Widgets and canvases of the powered MFD on LIVE: the default page 37 in 5, the power page 155
+/// in 8 (Aegis). The union of all modes, before the integer constants were read, was 206 in 18.
+const DEFAULT_PAGE: (Range<usize>, usize) = (33..42, 5);
+const POWER_PAGE_WIDGETS: Range<usize> = 148..163;
+const POWER_PAGE_CANVASES: usize = 8;
+/// The columns and rows of the footer of the RSI MFD where its page name stands.
+const RSI_NAME_COLUMNS: Range<u32> = 260..540;
+const RSI_NAME_ROWS: Range<u32> = 550..585;
+
+/// Checks one page of the MFD of a brand: no old block, the arrows and the bar of the tab bar, the
+/// size of the page, the footer of the RSI.
+fn assert_page(
+    brand: &str,
+    (page, on_default): (&str, bool),
+    composed: &Composed,
+    image: &RgbaImage,
+) {
+    let report = composed.report();
+    if on_default {
+        assert_eq!(alpha_at(image, BACKDROP), 0, "{brand}: no backdrop");
+        assert_eq!(alpha_at(image, DIAGRAM), 0, "{brand}: no diagram box");
+    }
+    assert_eq!(
+        report.unknown_variables().count(),
+        0,
+        "{brand} {page}: every variable is read"
+    );
+    if brand != "aegs" {
+        assert_eq!(
+            has_bright_ink(image, RSI_NAME_COLUMNS, RSI_NAME_ROWS),
+            !on_default,
+            "{page}: the RSI footer names the page only when told"
+        );
+        return;
+    }
+    assert!(alpha_at(image, TAB_BAR) > 0, "{page}: the tab bar is drawn");
+    assert!(
+        has_bright_ink(image, ARROW_COLUMNS, ARROW_ROWS),
+        "{page}: the arrows of the tab bar take a colour of the style"
+    );
+    let (widgets, canvases) = if on_default {
+        (DEFAULT_PAGE.0, DEFAULT_PAGE.1)
+    } else {
+        (POWER_PAGE_WIDGETS, POWER_PAGE_CANVASES)
+    };
+    assert!(
+        widgets.contains(&report.widgets) && report.canvases == canvases,
+        "{page}: {} widgets in {} canvases",
+        report.widgets,
+        report.canvases
+    );
+}
+
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_powered_mfd_draws_no_solid_block_and_a_tab_bar_on_every_page() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
+    let font_file = ScreenComposer::new(&forge).font_file();
+    let movie = UiMovie::from_archive(&archive, &format!("Data/{font_file}"))?;
+    let fonts = movie.movie().assets().fonts;
+    let texts = LocalizationEntry::read(&archive, Language::English)?;
+    let ini = texts.parse()?;
+    let lookup = |key: &str| {
+        ini.resolve(key)
+            .map(|text| decode_line_breaks(text).into_owned())
+    };
     let images = ArchiveImages::new(&archive);
     let texture = |path: &str, side: u32, pixels: u64| {
         images
@@ -85,38 +151,26 @@ fn the_powered_mfd_draws_no_solid_block_and_a_tab_bar_on_every_page() -> TestRes
             &["powerstate=1", &named, "mfdviewname=POWER MANAGEMENT"],
         ),
     ];
-    let mut widgets = Vec::new();
     for brand in ["aegs", "rsi"] {
         for (page, settings) in pages {
             let composed = ScreenComposer::new(&forge)
+                .with_texts(TextSources {
+                    fonts: &fonts,
+                    localise: Some(&lookup as Localise<'_>),
+                })
                 .with_images(ImageSources {
                     texture: &texture,
                     vector: &vector,
                 })
                 .with_variables(&variables(settings)?)
                 .compose(MFD, Some(brand))?;
-            let image = raster(&composed)?;
-            if settings.len() == 1 {
-                assert_eq!(alpha_at(&image, BACKDROP), 0, "{brand}: no backdrop");
-                assert_eq!(alpha_at(&image, DIAGRAM), 0, "{brand}: no diagram box");
-            }
-            assert_eq!(composed.report().unknown_variables().count(), 0);
-            if brand == "aegs" {
-                assert!(
-                    alpha_at(&image, TAB_BAR) > 0,
-                    "{page}: the tab bar is drawn"
-                );
-                assert!(
-                    has_bright_ink(&image, ARROW_COLUMNS, ARROW_ROWS),
-                    "{page}: the arrows of the tab bar take a colour of the style"
-                );
-                widgets.push(composed.report().widgets);
-            }
+            assert_page(
+                brand,
+                (page, settings.len() == 1),
+                &composed,
+                &raster(&composed)?,
+            );
         }
     }
-    assert!(
-        widgets.first() != widgets.last(),
-        "the variable chose another page: {widgets:?}"
-    );
     Ok(())
 }

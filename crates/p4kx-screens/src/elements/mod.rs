@@ -14,7 +14,6 @@ mod unsupported;
 mod vector;
 
 pub(crate) use canvas::{is_canvas_widget, nested as nested_canvas};
-pub(crate) use runtime::RUNTIME_IMAGE;
 pub(crate) use standard::{is_standard, tags_of as standard_tags};
 
 use crate::context::Context;
@@ -53,9 +52,14 @@ pub(crate) fn is_rendered(type_name: &str) -> bool {
                 | ICON
                 | FOREGROUND_OVERLAY
                 | BODY_BACKGROUND
-                | RUNTIME_IMAGE
+                | runtime::RUNTIME_IMAGE
                 | runtime::LINE
         )
+}
+
+/// Returns whether no background fill is drawn for `widget`: a runtime image.
+pub(crate) fn draws_no_background(widget: &Widget) -> bool {
+    widget.type_name == runtime::RUNTIME_IMAGE
 }
 
 pub(crate) fn paint(
@@ -73,7 +77,7 @@ pub(crate) fn paint(
         IMAGE => image::paint(cx, widget, look, area, alpha),
         CUSTOM_SHAPE | ICON => vector::paint(cx, widget, look, area, alpha),
         FOREGROUND_OVERLAY | BODY_BACKGROUND => overlay::paint(cx, widget, look, area, alpha),
-        RUNTIME_IMAGE => runtime::image(cx, widget),
+        runtime::RUNTIME_IMAGE => runtime::image(cx, widget),
         runtime::LINE => runtime::line(cx, widget),
         name if runtime::is_scene(name) => runtime::scene(cx, widget),
         name if STRUCTURAL.contains(&name) || runtime::is_silent(name) || is_standard(name) => {}

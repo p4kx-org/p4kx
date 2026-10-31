@@ -179,7 +179,7 @@ pub(crate) fn resolve_part(
             break;
         }
         if applies_to_lists(entry, selects_part, (subject, above), tags, budget) {
-            merge(&mut resolved, &entry.modifiers.for_text());
+            merge(&mut resolved, &entry.modifiers.for_part());
         }
     }
     resolved

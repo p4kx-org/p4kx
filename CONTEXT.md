@@ -597,6 +597,19 @@ padding, margin, bounds) and the parameters of nested canvases (ADR-0110, ADR-02
 set game variables, among them the one that names the page of an MFD (ADR-0259, ADR-0306).
 _Avoid_: default state, idle (the game has no such state)
 
+**Page**:
+The canvas that an MFD (`m_mfd_screen`) shows in its content: one of the `mc_s_*_master` canvases
+(power, weapons, scanning, diagnostics, shields, configuration, communications, self status). The
+game names it in the string variable `landscapecanvasguid`, or `portraitcanvasguid` in the portrait
+view; without it the page is self status (ADR-0306).
+_Avoid_: view, tab, screen (a Screen is the whole canvas of a display)
+
+**Tab bar**:
+The footer of every page of an MFD, drawn by the `Header / Footer` canvas of the brand: the name of
+the page in a bar between an arrow at each end (`< PAGE NAME >`), the name being the localised
+variable `mfdviewname` (ADR-0306).
+_Avoid_: header (the canvas is called so, but it is the footer), footer bar
+
 **Text field**:
 A definition of a UI movie that shows a text (`DefineEditText`), with a font, size, colour,
 alignment and optionally HTML markup or a localisation key (`@key`); a static text (`DefineText`)

@@ -35,11 +35,6 @@ pub(crate) fn rest_structs() -> Vec<TestStruct> {
     };
     let structs = vec![
         TestStruct::new(OPERATION),
-        operation("BooleanVariable").field("binding", TestType::String),
-        operation("NumberVariable").field("binding", TestType::String),
-        operation("IntegerVariable").field("binding", TestType::String),
-        operation("StringVariable").field("binding", TestType::String),
-        operation("LocalizedVariable").field("binding", TestType::String),
         operation("BooleanComponentParameter")
             .field("parameter", TestType::String)
             .field("defaultValue", TestType::Bool),
@@ -53,16 +48,6 @@ pub(crate) fn rest_structs() -> Vec<TestStruct> {
         operation("BooleanInvert").field("input", operation_input()),
         operation("BooleanEvaluateAnd").array("inputs", operation_input()),
         operation("BooleanEvaluateOr").array("inputs", operation_input()),
-        operation("BooleanFromInteger")
-            .field("value", TestType::Int64)
-            .field("type", TestType::String)
-            .field("inputL", operation_input())
-            .field("inputR", operation_input()),
-        operation("BooleanFromNumber")
-            .field("number", TestType::Single)
-            .field("type", TestType::String)
-            .field("input", operation_input())
-            .field("inputB", operation_input()),
         operation("NumberFromBoolean")
             .field("isTrue", TestType::Single)
             .field("isFalse", TestType::Single)
@@ -86,7 +71,38 @@ pub(crate) fn rest_structs() -> Vec<TestStruct> {
         parameter("Number", TestType::Single),
         parameter("Localization", TestType::Locale),
     ];
-    structs.into_iter().chain(later_structs()).collect()
+    structs
+        .into_iter()
+        .chain(variable_structs())
+        .chain(comparison_structs())
+        .chain(later_structs())
+        .collect()
+}
+
+fn variable_structs() -> impl Iterator<Item = TestStruct> {
+    ["Boolean", "Number", "Integer", "String", "Localized"]
+        .into_iter()
+        .map(|kind| operation(&format!("{kind}Variable")).field("binding", TestType::String))
+}
+
+fn comparison_structs() -> impl Iterator<Item = TestStruct> {
+    [
+        operation("BooleanFromInteger")
+            .field("value", TestType::Int64)
+            .field("type", TestType::String)
+            .field("inputL", operation_input())
+            .field("inputR", operation_input()),
+        operation("BooleanFromIntegerSwitch")
+            .field("defaultValue", TestType::Bool)
+            .array("exceptions", TestType::Int64)
+            .field("input", operation_input()),
+        operation("BooleanFromNumber")
+            .field("number", TestType::Single)
+            .field("type", TestType::String)
+            .field("input", operation_input())
+            .field("inputB", operation_input()),
+    ]
+    .into_iter()
 }
 
 fn later_structs() -> impl Iterator<Item = TestStruct> {
@@ -153,7 +169,9 @@ pub enum TestOp {
     /// Any of the operations.
     Or(Vec<&'static str>),
     /// The integer of the operation compared to a constant: `Equal`, `Greater`, ...
-    IntIs(&'static str, &'static str, i32),
+    IntIs(&'static str, &'static str, i64),
+    /// True for the integer of the operation unless it is one of the exceptions, else false.
+    IntSwitch(&'static str, Vec<i64>),
     /// The number of the operation compared to a constant.
     NumIs(&'static str, &'static str, f32),
     /// The number `on` when the boolean operation holds, else `off`.
@@ -204,6 +222,23 @@ fn field(kind: &str, widget: &str, name: &str, source: &str) -> TestInstance {
         .value("input", input(source))
 }
 
+fn int_is(source: &str, how: &str, value: i64) -> TestInstance {
+    TestInstance::new("BuildingBlocks_BindingsBooleanFromInteger")
+        .value("value", TestValue::Int64(value))
+        .value("type", TestValue::text(how))
+        .value("inputL", input(source))
+}
+
+fn int_switch(source: &str, exceptions: &[i64]) -> TestInstance {
+    TestInstance::new("BuildingBlocks_BindingsBooleanFromIntegerSwitch")
+        .value("defaultValue", TestValue::Bool(true))
+        .value(
+            "exceptions",
+            TestValue::Array(exceptions.iter().copied().map(TestValue::Int64).collect()),
+        )
+        .value("input", input(source))
+}
+
 impl TestOp {
     fn instance(&self) -> TestInstance {
         match self {
@@ -223,12 +258,8 @@ impl TestOp {
                 .value("inputs", names(sources)),
             Self::Or(sources) => TestInstance::new("BuildingBlocks_BindingsBooleanEvaluateOr")
                 .value("inputs", names(sources)),
-            Self::IntIs(source, how, value) => {
-                TestInstance::new("BuildingBlocks_BindingsBooleanFromInteger")
-                    .value("value", TestValue::Int64(i64::from(*value)))
-                    .value("type", TestValue::text(*how))
-                    .value("inputL", input(source))
-            }
+            Self::IntIs(source, how, value) => int_is(source, how, *value),
+            Self::IntSwitch(source, exceptions) => int_switch(source, exceptions),
             Self::NumIs(source, how, number) => {
                 TestInstance::new("BuildingBlocks_BindingsBooleanFromNumber")
                     .value("number", TestValue::Single(*number))

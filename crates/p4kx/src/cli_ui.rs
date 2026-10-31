@@ -88,7 +88,7 @@ pub(crate) enum UiAction {
         /// text, as the binding takes it. A name that no canvas of the screen reads is reported,
         /// and the variables in force are listed in the report. The powered MFD shows the page
         /// that `--var landscapecanvasguid=<record path or GUID>` names (`portraitcanvasguid` in
-        /// the portrait view) and writes `--var mfdviewname=<name>` in its tab bar.
+        /// the portrait view) and writes `--var mfdviewname=<name or @key>` in its tab bar; an `@key` is looked up in the language.
         #[arg(
             long = "var",
             value_name = "NAME=VALUE",

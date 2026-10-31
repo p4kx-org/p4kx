@@ -44,6 +44,7 @@ pub(crate) fn key_of(inputs: &[(String, Rest)], texts: &[(String, String)]) -> u
     }
     let mut hasher = DefaultHasher::new();
     texts.hash(&mut hasher);
+    inputs.len().hash(&mut hasher);
     for (name, value) in inputs {
         name.hash(&mut hasher);
         match value {
