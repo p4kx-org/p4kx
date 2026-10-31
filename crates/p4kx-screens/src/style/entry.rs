@@ -30,7 +30,7 @@ pub(crate) struct Modifiers {
 
 impl Modifiers {
     /// Returns the modifiers a text draws with: colours, background and text settings.
-    pub(crate) fn for_text(&self) -> Self {
+    pub(crate) fn for_part(&self) -> Self {
         Self {
             background: self.background.clone(),
             fill: self.fill.clone(),

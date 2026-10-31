@@ -18,5 +18,5 @@ pub(crate) use entry::{Entry, Modifiers, inline_entries, modifiers, parse_entrie
 pub(crate) use geometry::{Behaviour, GeometryModifiers};
 pub(crate) use matching::{Subject, TagPaths};
 pub(crate) use picture::PictureModifiers;
-pub(crate) use sheet::{CanvasStyles, StyleCache, merge, resolve, resolve_text};
+pub(crate) use sheet::{CanvasStyles, StyleCache, merge, resolve, resolve_part};
 pub(crate) use text::TextModifiers;
