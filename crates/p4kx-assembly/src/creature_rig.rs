@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The skeleton the skins of a creature Entity are bound to: the bones of the root Entity's own
-//! model, when its geometry is a character file outside the human rigs.
+//! The skeleton of a character Entity: the bones of the root Entity's own model. The skins of a
+//! creature (a character file outside the human rigs) are bound to it; the item ports of the skins
+//! of any character root, a human rig included, anchor to it.
 
 use std::sync::Arc;
 
 use p4kx_model::{Bone, BoneMatch, Model, Transform};
 
-use crate::geometry::is_creature_path;
+use crate::geometry::{is_character_path, is_creature_path};
 use crate::placement::bone_pose;
 use crate::{EntityNode, Issue, IssueKind, LoadoutError, Part, Placement};
 
@@ -25,16 +26,43 @@ pub(crate) fn skeleton_of<'a>(
     issues: &[Issue],
     level: u32,
 ) -> Option<&'a [Bone]> {
-    let model = rig_model(parts, issues)?;
+    bones_of_root(parts, issues, level, is_creature_path)
+}
+
+/// Returns the bones the item ports of the skins anchor to: those of the root part's model when
+/// its geometry is any character file, a human body rig included, at the level `level` of detail.
+/// The skins of a human root are not bound to these bones, but the props on its ports hang on them.
+pub(crate) fn anchor_bones_of<'a>(
+    parts: &'a [Part],
+    issues: &[Issue],
+    level: u32,
+) -> Option<&'a [Bone]> {
+    bones_of_root(parts, issues, level, is_character_path)
+}
+
+/// Returns the bones of the root part's model at the level `level` when [`rig_model`] finds one
+/// for `accepts`, or `None` when the level is missing or the model has no bones.
+fn bones_of_root<'a>(
+    parts: &'a [Part],
+    issues: &[Issue],
+    level: u32,
+    accepts: fn(&str) -> bool,
+) -> Option<&'a [Bone]> {
+    let model = rig_model(parts, issues, accepts)?;
     let bones = model.bones_of(model.nearest_lod(level)?);
     (!bones.is_empty()).then_some(bones)
 }
 
-/// Returns the model of the root part when it is a creature whose skeleton file is present, the
-/// model whose bones the skins and the item ports of the skins are bound to.
-fn rig_model<'a>(parts: &'a [Part], issues: &[Issue]) -> Option<&'a Arc<Model>> {
+/// Returns the model of the root part when its geometry is a file `accepts` and its skeleton file
+/// is present: the model whose bones the skins of a creature are bound to and the item ports of
+/// the skins anchor to.
+fn rig_model<'a>(
+    parts: &'a [Part],
+    issues: &[Issue],
+    accepts: fn(&str) -> bool,
+) -> Option<&'a Arc<Model>> {
     let root = parts.first()?;
-    if !root.geometry.as_deref().is_some_and(is_creature_path)
+    if !root.geometry.as_deref().is_some_and(accepts)
         || issues.iter().any(|issue| {
             issue.path.is_empty()
                 && matches!(
@@ -48,8 +76,8 @@ fn rig_model<'a>(parts: &'a [Part], issues: &[Issue]) -> Option<&'a Arc<Model>> 
     root.model.as_ref()
 }
 
-/// Anchors the item port of a skin part to the bone `helper` of the creature skeleton `bones`
-/// (from [`skeleton_of`]): the bind pose of the bone in the space of `parent`, a skin part.
+/// Anchors the item port of a skin part to the bone `helper` of the character skeleton `bones`
+/// (from [`anchor_bones_of`]): the bind pose of the bone in the space of `parent`, a skin part.
 /// Returns `None` when `parent` is no skin part or the skeleton lacks the bone.
 pub(crate) fn skin_port_anchor(
     bones: &[Bone],

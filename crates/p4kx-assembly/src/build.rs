@@ -15,6 +15,7 @@ use crate::build_place::{place, under_skin};
 use crate::build_zones::BodyCut;
 use crate::creature_rig;
 use crate::flatten::{Draft, flatten};
+use crate::placement::{is_character_item, is_unskinned};
 use crate::{
     Assembly, AssemblyError, AssemblyOptions, EntityNode, Issue, IssueKind, ModelProvider,
     ObjectContainerRef, PaletteProvider, Part, SkeletonProblem,
@@ -92,9 +93,10 @@ impl Assembly {
             let (palette, unresolved) = palettes.of_part(draft, *model, &materials);
             issues.extend(unresolved.into_iter().map(|kind| issue(draft, kind)));
             let rig = under_skin(draft, &parts)
-                .then(|| creature_rig::skeleton_of(&parts, &issues, options.lod))
+                .then(|| creature_rig::anchor_bones_of(&parts, &issues, options.lod))
                 .flatten();
-            let (local, placement) = place(draft, &parts, *model, rig, &mut issues);
+            let prop = is_prop(draft, *model, options.lod);
+            let (local, placement) = place(draft, &parts, *model, rig, prop, &mut issues);
             let world = world_of(draft, &parts, &local);
             parts.push(Part {
                 name: draft.name.clone(),
@@ -129,6 +131,13 @@ impl Assembly {
             containers: containers_of(&drafts),
         })
     }
+}
+
+/// Returns whether the part is a prop: an Entity that is no character item and whose model at the
+/// level `level` of detail has no skinned mesh, so no weights that follow the skeleton.
+fn is_prop(draft: &Draft<'_>, model: Option<&Loaded>, level: u32) -> bool {
+    !is_character_item(draft.node.attach_type())
+        && model.is_some_and(|loaded| is_unskinned(&loaded.model, level))
 }
 
 /// Returns the transform of a part to the Assembly's: its parent's world transform and its own.

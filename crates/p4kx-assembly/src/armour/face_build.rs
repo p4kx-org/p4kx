@@ -9,7 +9,8 @@ use p4kx_model::{BoneMatch, Model, extend_skeleton};
 use super::ArmourPart;
 use super::facial::{FaceLink, FaceSource, Facial, bones_of};
 use super::jobs::{Job, issue};
-use super::mount::{is_unskinned, place};
+use super::mount::place;
+use crate::placement::is_unskinned;
 use crate::{Issue, IssueKind};
 
 /// What a shaped head brings to the skeleton: where its rig's joints are among its bones, and the

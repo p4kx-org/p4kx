@@ -4,6 +4,9 @@ Decided for issue #881, on top of ADR-0229 (an item port of a skinned model is a
 bone) and ADR-0275 (the skins of a creature are written bound to the skeleton of its root).
 Evidence: the LIVE Archive, `Kopion_CombatPet`.
 
+Amended by ADR-0297: the skeleton the item ports anchor to is the one of any character root, a
+human body rig included.
+
 ## What the data says
 
 The collar port of a Kopion (`Collar_ItemPort`) belongs to the skin on `Body_ItemPort` and names

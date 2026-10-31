@@ -7,20 +7,12 @@ use p4kx_model::{Bone, BoneMatch, Model};
 use super::ArmourPart;
 use super::jobs::{Job, issue};
 use super::piece::Mount;
-use crate::placement::{bone_transform, node_transform, offset};
+use crate::placement::{bone_transform, is_unskinned, node_transform, offset};
 use crate::{Issue, IssueKind};
 
 /// The turn about X in degrees from the frame of a bone, which has Z up, to the frame of the
 /// helper of an item, which has Y up (ADR-0231).
 const BONE_TO_HELPER: [f32; 3] = [90.0, 0.0, 0.0];
-
-/// Returns whether the model has a mesh at the level `level` of detail and none of its meshes is
-/// skinned.
-pub(super) fn is_unskinned(model: &Model, level: u32) -> bool {
-    model
-        .nearest_lod(level)
-        .is_some_and(|lod| lod.meshes.iter().all(|mesh| mesh.influences.is_none()))
-}
 
 /// Hangs the unskinned parts that have a mount on the bone of the skeleton their port is
 /// attached to; a helper that is no bone of its holder is listed and leaves the part at the origin.

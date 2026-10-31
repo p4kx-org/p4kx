@@ -59,7 +59,7 @@ fn definition(skeleton: &str) -> String {
     )
 }
 
-fn bone(name: &str, parent: Option<u16>) -> TestBone {
+pub(crate) fn bone(name: &str, parent: Option<u16>) -> TestBone {
     TestBone {
         name: name.to_owned(),
         parent,
@@ -68,7 +68,7 @@ fn bone(name: &str, parent: Option<u16>) -> TestBone {
     }
 }
 
-fn skeleton_file(bones: Vec<TestBone>) -> Vec<u8> {
+pub(crate) fn skeleton_file(bones: Vec<TestBone>) -> Vec<u8> {
     TestModel::cube()
         .helpers_only()
         .with_skeleton(&TestSkeleton::new(bones))

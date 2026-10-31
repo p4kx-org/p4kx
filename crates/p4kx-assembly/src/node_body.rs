@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::placement::is_character_item;
 use crate::resolver::LoadoutResolver;
 use crate::tree::GeometryChoice;
 use crate::{Attachment, BodyVariant, EntityNode, MaterialVariant, PortNode};
 
 const HEAD_TYPE: &str = "Char_Head";
-const CHARACTER_PREFIX: &str = "Char_";
 
 /// The body a character wears and the head Entity whose sub-type names it.
 #[derive(Debug, Clone, Copy)]
@@ -99,12 +99,6 @@ impl LoadoutResolver<'_> {
                 worn
             });
     }
-}
-
-fn is_character_item(item_type: &str) -> bool {
-    item_type
-        .get(..CHARACTER_PREFIX.len())
-        .is_some_and(|start| start.eq_ignore_ascii_case(CHARACTER_PREFIX))
 }
 
 /// Returns whether `item_type` is the item type of a head, `Char_Head`.

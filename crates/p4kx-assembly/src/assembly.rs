@@ -71,12 +71,13 @@ pub enum Placement {
     /// The part is the root of the Assembly.
     Root,
     /// The part sits at the helper its port names in the parent's model: a node, else a bone of
-    /// its skeleton in bind pose.
+    /// its skeleton in bind pose; below a skin part, else a bone of the root's skeleton.
     Helper(String),
     /// The part sits at the node of the parent's model named like its port.
     PortNode,
     /// The part is a skin: it is drawn in the parent's bind pose and follows the skeleton by its
-    /// weights, so its port's helper and offset do not move it.
+    /// weights, so its port's helper and offset do not move it. A rigid prop on a skin port has no
+    /// weights and hangs on a bone instead, see [`Placement::Helper`].
     Skin,
     /// The part sits at the parent's origin: its port names no helper or the model lacks it,
     /// or the parent has no model.

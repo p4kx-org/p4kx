@@ -56,6 +56,25 @@ pub(crate) fn node_transform(model: &Model, name: &str) -> Option<Transform> {
     None
 }
 
+/// Returns whether the model has a level of detail near `level` and none of its meshes is skinned;
+/// a level without meshes counts as unskinned.
+pub(crate) fn is_unskinned(model: &Model, level: u32) -> bool {
+    model
+        .nearest_lod(level)
+        .is_some_and(|lod| lod.meshes.iter().all(|mesh| mesh.influences.is_none()))
+}
+
+/// The item type prefix of the items a character wears.
+const CHARACTER_PREFIX: &str = "Char_";
+
+/// Returns whether `item_type` is the item type of a character item: a body, head, clothing,
+/// armour or accessory.
+pub(crate) fn is_character_item(item_type: &str) -> bool {
+    item_type
+        .get(..CHARACTER_PREFIX.len())
+        .is_some_and(|start| start.eq_ignore_ascii_case(CHARACTER_PREFIX))
+}
+
 /// Returns the transform from the bind-pose space of the bone of `model` named `name`, ignoring
 /// ASCII case, to the model's space, or `None` when the model has no such bone or its pose is
 /// not finite.

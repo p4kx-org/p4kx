@@ -88,6 +88,8 @@ mod port_flag_sources;
 mod port_invisible;
 mod prefab;
 mod prefab_lookup;
+mod prop_on_skin_port;
+mod prop_on_skin_port_edges;
 mod vehicle_api;
 mod vehicle_depth;
 mod vehicle_empty_ports;

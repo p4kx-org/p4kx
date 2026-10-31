@@ -3,6 +3,8 @@
 Decided for issue #771. Evidence: the LIVE Archive,
 `NPC_Archetypes-Male-Human-MissionGivers-MilesEckhart`.
 
+Amended by ADR-0297: a rigid prop that is no character item hangs on the bone its skin port names.
+
 ## What the data says
 
 The body `m_body_01` holds clothing on ports whose attachment is an
