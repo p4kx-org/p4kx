@@ -30,7 +30,8 @@ pub enum TextureUse {
     /// A gloss map (`_gloss`).
     Gloss,
     /// The stencil map of a stencil decal (`STENCIL_MAP`, 1.6): its red channel is the opacity of
-    /// the motif.
+    /// the motif, or its three channels are three masks when the material's `palette` is `decal`
+    /// (1.7).
     Stencil,
     /// Any other map; the slot and file say more.
     Other,
@@ -80,6 +81,9 @@ pub enum PaletteEntry {
     Tertiary,
     /// The glass colour.
     Glass,
+    /// The decal colours of the palette (`decal`, 1.7): the colours of the red, green and blue
+    /// masks of the stencil map.
+    Decal,
 }
 
 /// A name and a value as the material file gives them.
@@ -259,7 +263,8 @@ pub struct MaterialDescription {
     pub stencil: Option<MaterialStencil>,
     /// The palette entry the material takes: that of its first layer with a `PaletteTint` from 1
     /// to 3, the glass colour of a glass material that uses the tint palette, or the primary entry
-    /// of a stencil decal with `StencilTintOverride`.
+    /// of a stencil decal with a `StencilTintOverride` above 0, or the decal colours of one whose
+    /// override rounds to 2 (1.7).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub palette: Option<PaletteEntry>,
     /// The tint palette the library names as its default, a Record path.
@@ -306,4 +311,8 @@ pub struct Palette {
     pub tertiary: PaletteColours,
     /// The colour of the tinted glass, linear.
     pub glass: [f32; 3],
+    /// The colours of the red, green and blue masks of a stencil map, linear (1.7); absent when
+    /// the palette states none and in a package before 1.7.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decal: Option<[[f32; 3]; 3]>,
 }

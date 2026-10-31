@@ -56,20 +56,56 @@ impl fmt::Display for Stage {
 
 /// The stage a worker is in, readable by the caller that waits for it.
 #[derive(Debug, Clone)]
-pub(super) struct StageCell(Arc<Mutex<Stage>>);
+pub(super) struct StageCell {
+    stage: Arc<Mutex<Stage>>,
+    entered: mpsc::Sender<()>,
+}
 
 impl StageCell {
-    fn new() -> Self {
-        Self(Arc::new(Mutex::new(Stage::Idle)))
+    /// Returns the cell and the receiver that gets one message per stage entered.
+    fn new() -> (Self, mpsc::Receiver<()>) {
+        let (entered, entries) = mpsc::channel();
+        let cell = Self {
+            stage: Arc::new(Mutex::new(Stage::Idle)),
+            entered,
+        };
+        (cell, entries)
     }
 
-    /// Records that the worker is now in `stage`.
+    /// Records that the worker is now in `stage` and tells the waiting caller.
     pub(super) fn enter(&self, stage: Stage) {
-        *self.0.lock().unwrap_or_else(PoisonError::into_inner) = stage;
+        *self.stage.lock().unwrap_or_else(PoisonError::into_inner) = stage;
+        self.entered.send(()).ok();
     }
 
+    #[cfg(test)]
     fn current(&self) -> Stage {
-        *self.0.lock().unwrap_or_else(PoisonError::into_inner)
+        read(&self.stage)
+    }
+
+    /// Returns the stage for the caller, which holds no sender.
+    fn view(&self) -> Arc<Mutex<Stage>> {
+        Arc::clone(&self.stage)
+    }
+}
+
+fn read(stage: &Mutex<Stage>) -> Stage {
+    *stage.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Waits at most `limit` for the worker to finish, counted from the moment it entered its first
+/// stage, so that the start-up of the thread does not count against it. `work` must enter a stage
+/// before it can block; `entries` disconnects when the worker ends.
+fn wait_for(
+    finished: &mpsc::Receiver<()>,
+    entries: &mpsc::Receiver<()>,
+    stage: &Mutex<Stage>,
+    limit: Duration,
+) -> Released {
+    entries.recv().ok();
+    match finished.recv_timeout(limit) {
+        Err(mpsc::RecvTimeoutError::Timeout) => Released::Abandoned(read(stage)),
+        Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => Released::Dropped,
     }
 }
 
@@ -94,19 +130,16 @@ pub(super) fn release_within<T: Send + 'static>(
     work: impl FnOnce(T, &StageCell) + Send + 'static,
 ) -> Released {
     let (done, finished) = mpsc::channel();
-    let stage = StageCell::new();
-    let worker_stage = stage.clone();
+    let (stage, entries) = StageCell::new();
+    let view = stage.view();
     let spawned = thread::Builder::new()
         .name("p4kx-gpu-teardown".to_owned())
         .spawn(move || {
-            work(value, &worker_stage);
+            work(value, &stage);
             done.send(()).ok();
         });
     let released = spawned.map_or(Released::Dropped, |_worker| {
-        match finished.recv_timeout(limit) {
-            Err(mpsc::RecvTimeoutError::Timeout) => Released::Abandoned(stage.current()),
-            Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => Released::Dropped,
-        }
+        wait_for(&finished, &entries, &view, limit)
     });
     if matches!(released, Released::Abandoned(_)) {
         ABANDONED.fetch_add(1, Ordering::Relaxed);
@@ -210,7 +243,7 @@ mod tests {
     #[test]
     fn the_stages_run_their_work_in_order_and_are_entered_before_it() {
         let log: Arc<Mutex<Vec<(&'static str, Stage)>>> = Arc::default();
-        let stage = StageCell::new();
+        let (stage, _entries) = StageCell::new();
         let record = |name: &'static str| {
             let log = Arc::clone(&log);
             let stage = stage.clone();
@@ -278,7 +311,10 @@ mod tests {
         });
 
         assert_eq!(released, Released::Abandoned(Stage::Device));
-        assert!(started.elapsed() < Duration::from_secs(3), "returned early");
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "waited past the limit"
+        );
         assert!(abandoned_teardowns() > before, "counted");
         release.send(()).ok();
     }
@@ -287,7 +323,8 @@ mod tests {
     fn work_that_never_leaves_the_first_stage_is_abandoned_in_it() {
         let (hold, wait) = mpsc::channel::<()>();
 
-        let released = release_within((), Duration::from_millis(100), move |(), _| {
+        let released = release_within((), Duration::from_millis(100), move |(), stage| {
+            stage.enter(Stage::Idle);
             wait.recv().ok();
         });
 

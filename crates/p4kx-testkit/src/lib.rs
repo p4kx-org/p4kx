@@ -51,6 +51,7 @@ mod entity_module_sample;
 mod entity_mount;
 mod entity_npc;
 mod entity_npc_face;
+mod entity_npc_generic;
 mod entity_npc_zones;
 mod entity_painted;
 mod entity_port;
@@ -180,8 +181,8 @@ pub use entity_interior_sample::{
 pub use entity_layer_chain::{LAYER_CHAIN_LENGTH, layer_chain_entries};
 pub use entity_layered::{LAYERED_MISSING_TEXTURE, LAYERED_TINTS, layered_entries};
 pub use entity_livery::{
-    LIVERY_DEFAULT_PALETTE, LIVERY_DEFAULT_TINTS, LIVERY_GUN_TINTS, LIVERY_SHIP_TINTS,
-    livery_entries,
+    LIVERY_DEFAULT_PALETTE, LIVERY_DEFAULT_TINTS, LIVERY_GUN_TINTS, LIVERY_SHIP_DECALS,
+    LIVERY_SHIP_TINTS, livery_entries,
 };
 pub use entity_loadout::{TestLoadout, TestLoadoutEntry};
 pub use entity_module_sample::{ENTITY_MODULE_CARRIER, ENTITY_MODULE_CLASS, entity_module_entries};
@@ -196,6 +197,9 @@ pub use entity_npc_face::{
     NPC_FACIAL_BONE, NPC_RIG_LOGIC, NPC_SKELETON_FILE, NPC_SKELETON_SHIFT, npc_face_entries,
     npc_face_entries_posed_by, npc_face_entries_with, npc_face_logic, npc_face_shapes,
     npc_face_skeleton,
+};
+pub use entity_npc_generic::{
+    NPC_GENERIC_BODY_CLASS, NPC_GENERIC_CLASS, NPC_GENERIC_HEAD_CLASS, npc_generic_entries,
 };
 pub use entity_npc_zones::{
     NPC_ZONE_CLASS, NpcExtra, NpcZoneOptions, npc_jacketed_entries, npc_zone_entries,
@@ -212,7 +216,7 @@ pub use entity_prop_rig::{
 };
 pub use entity_requirement::TestRequirement;
 pub use entity_sample::{SAMPLE_GUN, SAMPLE_MISSING, SAMPLE_MOUNT, SAMPLE_SHIP, sample_ship};
-pub use entity_schema::{entity_schema, tint_palette_record};
+pub use entity_schema::{entity_schema, tint_palette_record, tint_palette_record_with_decal};
 pub use entity_skin::{SKIN_BODY, skin_attachment_entries};
 pub use entity_vehicle::landing_system_record;
 pub use entity_zones::{

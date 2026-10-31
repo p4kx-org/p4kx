@@ -113,6 +113,7 @@ const fn entry(slot: PaletteSlot) -> Option<PaletteEntry> {
         PaletteSlot::Secondary => Some(PaletteEntry::Secondary),
         PaletteSlot::Tertiary => Some(PaletteEntry::Tertiary),
         PaletteSlot::Glass => Some(PaletteEntry::Glass),
+        PaletteSlot::Decal => Some(PaletteEntry::Decal),
         _ => None,
     }
 }
@@ -243,9 +244,11 @@ mod tests {
     }
 
     #[test]
-    fn a_tint_override_states_the_primary_palette_entry() -> Result {
-        let description = stencil_decal(MAP, r#"StencilTintOverride="1""#)?;
-        assert_eq!(description.palette, Some(PaletteEntry::Primary));
+    fn a_tint_override_states_the_primary_entry_or_the_decal_colours() -> Result {
+        let one = stencil_decal(MAP, r#"StencilTintOverride="1""#)?;
+        assert_eq!(one.palette, Some(PaletteEntry::Primary));
+        let two = stencil_decal(MAP, r#"StencilTintOverride="2""#)?;
+        assert_eq!(two.palette, Some(PaletteEntry::Decal));
         Ok(())
     }
 

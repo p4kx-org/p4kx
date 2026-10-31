@@ -8,6 +8,9 @@ use thiserror::Error;
 use crate::read::{as_struct, struct_field, text, unsigned};
 
 const TINT_PALETTE_TREE: &str = "TintPaletteTree";
+/// The fields of the palette root that hold the colours of the red, green and blue masks of a
+/// stencil map.
+const DECAL_COLOURS: [&str; 3] = ["decalColorR", "decalColorG", "decalColorB"];
 
 /// Why a [`PaletteProvider`] cannot supply a palette.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -118,11 +121,16 @@ fn read_record(record: &Record<'_>) -> Result<TintPalette, PaletteFailure> {
     let glass = struct_field(root, "glassColor")
         .and_then(read_colour)
         .ok_or_else(|| unreadable("the palette has no readable glassColor"))?;
-    Ok(TintPalette::new(
+    let palette = TintPalette::new(
         text(root, "name"),
         [entry("entryA")?, entry("entryB")?, entry("entryC")?],
         glass,
-    ))
+    );
+    let decal = DECAL_COLOURS.map(|name| struct_field(root, name).and_then(read_colour));
+    Ok(match decal {
+        [Some(red), Some(green), Some(blue)] => palette.with_decal([red, green, blue]),
+        _ => palette,
+    })
 }
 
 fn read_entry(entry: &StructValue<'_>) -> Option<TintEntry> {

@@ -367,10 +367,15 @@ its bone and `invalid_offset` for one that is not finite, and the limits `too_ma
 for an attached Entity) followed by the path inside it ([ADR-0086](adr/0086-an-entity-places-its-object-containers-at-its-bones.md)).
 Without the flag `interior` is absent.
 
-When the tree has a `Char_Head` Entity whose sub-type names a body, the report has `body`, an
+When the tree has a `Char_Head` Entity and a body can be named, the report has `body`, an
 object with `variant` (`male` or `female`), the body the clothing of the character was chosen for,
-and `head`, the class name of the head Entity that names it ([ADR-0219](adr/0219-the-clothing-of-a-character-takes-the-sub-geometry-of-its-body.md));
-otherwise `body` is absent. The text report has the line `body <variant>, named by the head <class name>`.
+`head`, the class name of the head Entity, `named_by`, the class name of the Entity that names the
+body, and `named_by_head`, whether that is the head. The head names the body by its sub-type; a
+generic head names none, and the `Char_Body` Entity names it by its sub-type or the folder of its
+model, so `named_by` is that Entity and `named_by_head` is `false`
+([ADR-0219](adr/0219-the-clothing-of-a-character-takes-the-sub-geometry-of-its-body.md));
+otherwise `body` is absent. The text report has the line
+`body <variant>, named by the head <class name>`, or `named by the body <class name>`.
 
 `placements` has one object per part, the root first and every part after its parent, with
 `path` (as for an Issue), `placement` (`root`, `helper`, `port_node`, `skin` or `origin`). A `skin`
@@ -654,8 +659,9 @@ Loadout files the Loadout is made of in the order they are laid over each other:
 default Loadout is an outfit gives its base Loadout and the Loadouts of its outfits that apply
 (ADR-0109, ADR-0181), and `outfit` beside `files` (absent for any other source) lists every outfit
 as for `p4kx entity loadout`. `head` is `null` unless the Loadout has a head (an Entity of item
-type `Char_Head`); then `class_name` is the head Entity, `body` the variant its sub-type
-names, which `--body` overrides, `bespoke_folder` the folder of the character's own head skins
+type `Char_Head`) and a body can be named; then `class_name` is the head Entity, `body` the variant
+its sub-type names, else (a generic head) the one the sub-type or model folder of the Loadout's
+`Char_Body` Entity names, which `--body` overrides, `bespoke_folder` the folder of the character's own head skins
 (or `null` when its material library is in no folder of its own) and `parts` the pieces of the
 head. `material` of a part is the material library it is drawn with, `null` when it has none.
 

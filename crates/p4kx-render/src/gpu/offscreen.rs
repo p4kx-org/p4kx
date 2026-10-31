@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
-use super::device::block_on_for;
+use super::device::{any_instance, block_on_for, software_instance};
 use super::readback::{BYTES_PER_PIXEL, DEVICE_WAIT};
 use super::teardown::{Gpu, Released};
 use super::{Frame, GpuReport, Renderer, Unavailable};
@@ -135,7 +135,10 @@ impl Offscreen {
     /// Returns [`OffscreenError`] when there is no adapter, the device cannot be created or it
     /// is too limited for the renderer.
     pub fn new(adapters: Adapters) -> Result<Self, OffscreenError> {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
+        let instance = match adapters {
+            Adapters::Best => any_instance(),
+            Adapters::Software => software_instance(),
+        };
         let adapter = request(&instance, adapters)?;
         let info = adapter.get_info();
         let (device, queue) = block_on_for(
@@ -248,7 +251,7 @@ impl Drop for Offscreen {
 }
 
 fn request(instance: &wgpu::Instance, adapters: Adapters) -> Result<wgpu::Adapter, OffscreenError> {
-    let ask = |fallback| {
+    let ask = |instance: &wgpu::Instance, fallback| {
         block_on_for(
             instance.request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -261,10 +264,10 @@ fn request(instance: &wgpu::Instance, adapters: Adapters) -> Result<wgpu::Adapte
         .ok_or(OffscreenError::TimedOut)
     };
     match adapters {
-        Adapters::Software => ask(true)?,
-        Adapters::Best => match ask(false)? {
+        Adapters::Software => ask(instance, true)?,
+        Adapters::Best => match ask(instance, false)? {
             Ok(adapter) => Ok(adapter),
-            Err(_) => ask(true)?,
+            Err(_) => ask(&software_instance(), true)?,
         },
     }
     .map_err(OffscreenError::NoAdapter)

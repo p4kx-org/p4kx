@@ -16,6 +16,7 @@ const PARALLEL_IMAGES: usize = 4;
 const WHITE: Tints = Tints {
     diffuse: [1.0; 3],
     specular: [1.0; 3],
+    decal: None,
 };
 
 fn job_of(material: &Material) -> Option<Job> {
