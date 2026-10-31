@@ -7,7 +7,7 @@ use crate::build::build;
 use crate::crch::build as build_crch;
 use crate::{
     Bone, CompanionResolver, Influences, MaterialReading, MaterialStatus, ModelError, ModelIssue,
-    PositionBox, Transform,
+    PositionBox, RigLogicBytes, Transform,
 };
 
 /// A model read from a chunk file and its companions, in `CryEngine` coordinates: Z up, metres.
@@ -40,6 +40,9 @@ pub struct Model {
     pub issues: Vec<ModelIssue>,
     /// Every chunk of the model file and its geometry companion, with how the model used it.
     pub chunks: Vec<ModelChunk>,
+    /// The bytes of the model file's `RigLogic` chunk, which a consumer above this layer parses;
+    /// `None` for a model without one.
+    pub rig_logic: Option<RigLogicBytes>,
 }
 
 /// One node of a model's hierarchy.

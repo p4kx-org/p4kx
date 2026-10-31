@@ -402,7 +402,10 @@ with exit code 2 or 3 instead and writes nothing, ADR-0255), `sub_geometry_missi
 sub-geometry the port's flags choose is not in the Archive, so the part keeps the main geometry of
 its Entity; a note, `skipped` is false), `body_geometry_missing` (the sub-geometry tagged for the
 body of the character is not in the Archive; the part has no model, the placeholder main geometry
-is not drawn instead; `reason` names the body and the path), `part_hidden` (the worn clothing or
+is not drawn instead; `reason` names the body and the path), `world_prop_not_worn` (a worn item
+of a character whose body is known names only a prop of the world, such as a cardboard box, as its
+geometry and has no sub-geometry per body; the part has no model, ADR-0311; `reason` names the
+path of the prop), `part_hidden` (the worn clothing or
 armour at the port is hidden by the `HiddenParts` of another worn Entity of the same character, so
 the part has no model, ADR-0304; `name` is its class name and `reason` names the port and the part
 that hides it; a part below it is hidden with it, and an attachment that cannot be resolved at, or

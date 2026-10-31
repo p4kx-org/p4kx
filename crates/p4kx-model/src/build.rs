@@ -15,7 +15,7 @@ use crate::skin::read_skin;
 use crate::{
     Bone, ChunkUsage, CompanionPath, CompanionResolver, CorruptChunk, LayerCache, Lod,
     LodSelection, MaterialReading, Mesh, Model, ModelChunk, ModelError, ModelFile, ModelIssue,
-    Node, PositionBox, Transform,
+    Node, PositionBox, RigLogicBytes, Transform,
 };
 
 const MATERIAL_TYPES: [ChunkType; 2] = [ivo::MTL_NAME_320, ivo::MTL_NAME];
@@ -86,6 +86,11 @@ pub(crate) fn build<B: AsRef<[u8]>>(
         material_library(file.chunk_data(index).unwrap_or_default())
     });
 
+    let rig_logic = first_of(file, &[ivo::RIG_LOGIC]).and_then(|index| {
+        read.push((ModelFile::Model, index));
+        file.chunk_data(index).map(RigLogicBytes::new)
+    });
+
     let Geometry {
         lods,
         base_name,
@@ -113,6 +118,7 @@ pub(crate) fn build<B: AsRef<[u8]>>(
         material_indices,
         issues,
         chunks,
+        rig_logic,
     })
 }
 

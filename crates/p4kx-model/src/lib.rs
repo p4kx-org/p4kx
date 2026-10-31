@@ -77,6 +77,7 @@ mod object_container;
 mod palette;
 mod prefab;
 mod reader;
+mod rig_logic_bytes;
 mod second_uv;
 mod skeleton;
 mod skin;
@@ -136,6 +137,7 @@ pub use prefab::{
     MAX_GROUP_DEPTH, MAX_LIBRARY_OBJECTS, MAX_LIBRARY_PREFABS, Prefab, PrefabError, PrefabLibrary,
     PrefabObject, PrefabRef,
 };
+pub use rig_logic_bytes::RigLogicBytes;
 pub use soc_entities::{
     MAX_SOC_ENTITIES, MAX_SOC_PLACED, SocClassEntity, SocEntities, SocEntitiesError, SocPalette,
     SocProp,

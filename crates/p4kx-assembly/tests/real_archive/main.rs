@@ -38,6 +38,7 @@ mod real_dressed_head;
 mod real_entity_interior;
 mod real_face_tags;
 mod real_followups;
+mod real_generic_npc_clothing;
 mod real_hair_expressions;
 mod real_hair_joints;
 mod real_head;

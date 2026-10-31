@@ -24,6 +24,9 @@ pub(crate) enum GeometryChoice {
     Flag,
     /// The body of the character wearing the Entity chose a sub-geometry.
     Body(BodyVariant),
+    /// The Entity is worn, has no sub-geometry per body and names only a world prop; the prop
+    /// is not drawn and `fallback` holds it.
+    WorldProp,
 }
 
 /// One Entity in a Loadout tree: its Record and its ports with what they hold.
