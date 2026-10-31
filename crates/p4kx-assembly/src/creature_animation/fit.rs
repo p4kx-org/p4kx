@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::io::Write;
 
 use p4kx_gltf::{
@@ -8,7 +9,7 @@ use p4kx_gltf::{
 };
 use p4kx_model::{Animation, Bone};
 
-use crate::animation_budget::{key_cost, limit_reason};
+use crate::animation_budget::{KeyFit, ValueBudget};
 use crate::armour::MAX_ANIMATION_VALUES;
 use crate::armour::unused::summarise;
 use crate::{Assembly, Issue, IssueKind, creature_rig};
@@ -74,24 +75,21 @@ fn not_used(animation: &Animation, reason: &str) -> Issue {
     }
 }
 
-/// Returns why `animation`, which costs `cost` values of the `remaining` ones, is not written on
-/// the bones of `skeleton`; `None` when it is.
+/// Returns the values `animation` costs when it is written on the bones of `skeleton` within
+/// `budget`, or why it is not.
 fn left_out(
     skeleton: Option<&[Bone]>,
     animation: &Animation,
-    (cost, remaining): (usize, usize),
-) -> Option<String> {
-    let Some(bones) = skeleton else {
-        return Some(NO_SKELETON.to_owned());
-    };
+    budget: &ValueBudget,
+) -> Result<usize, Cow<'static, str>> {
+    let bones = skeleton.ok_or(Cow::Borrowed(NO_SKELETON))?;
     if animation.additive {
-        Some(ADDITIVE.to_owned())
-    } else if animation.bind(bones).bound.is_empty() {
-        Some(NO_BONE.to_owned())
-    } else if cost > remaining {
-        Some(limit_reason(cost, remaining))
-    } else {
-        None
+        return Err(Cow::Borrowed(ADDITIVE));
+    }
+    match budget.fit_keys(animation, !animation.bind(bones).bound.is_empty()) {
+        KeyFit::Fits(cost) => Ok(cost),
+        KeyFit::NoBone => Err(Cow::Borrowed(NO_BONE)),
+        KeyFit::OverBudget(reason) => Err(Cow::Owned(reason)),
     }
 }
 
@@ -115,17 +113,17 @@ impl Assembly {
     ) -> CreatureAnimations<'a> {
         let mut fit = CreatureAnimations::default();
         let skeleton = creature_rig::skeleton_of(&self.parts, &self.issues, self.lod);
-        let mut remaining = budget;
+        let mut left = ValueBudget::new(budget);
         for animation in animations {
-            let cost = key_cost(animation);
-            if let Some(reason) = left_out(skeleton, animation, (cost, remaining)) {
-                fit.issues.push(not_used(animation, &reason));
-            } else {
-                remaining -= cost;
-                fit.values += cost;
-                fit.fitted.push(animation);
+            match left_out(skeleton, animation, &left) {
+                Ok(cost) => {
+                    left.spend(cost);
+                    fit.fitted.push(animation);
+                }
+                Err(reason) => fit.issues.push(not_used(animation, &reason)),
             }
         }
+        fit.values = left.spent();
         fit.issues = summarise(fit.issues, budget);
         fit
     }
