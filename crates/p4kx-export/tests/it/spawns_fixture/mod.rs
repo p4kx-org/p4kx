@@ -6,6 +6,8 @@
 
 mod structures;
 mod template;
+mod template_parts;
+mod template_structures;
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -25,6 +27,9 @@ pub(crate) const MISSION_TYPE: u128 = 0x5000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const RESOURCE: u128 = 0x6000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const OBJECTIVE_A: u128 = 0x7000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const OBJECTIVE_B: u128 = 0x7000_0000_0000_4000_8000_0000_0000_0002;
+pub(crate) const OBJECTIVE_C: u128 = 0x7000_0000_0000_4000_8000_0000_0000_0003;
+pub(crate) const OWNER: u128 = 0x8000_0000_0000_4000_8000_0000_0000_0001;
+pub(crate) const SCOPE: u128 = 0x8000_0000_0000_4000_8000_0000_0000_0002;
 pub(crate) const DATABASE: u128 = 0x9000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const TAG_ROOT: u128 = 0x9000_0000_0000_4000_8000_0000_0000_0002;
 pub(crate) const TAG_HIJACKED: u128 = 0x9000_0000_0000_4000_8000_0000_0000_0003;
@@ -277,6 +282,7 @@ fn database() -> DataForgeBuilder {
         generator(),
         template::template(),
         template::leftover(),
+        template_parts::owner(),
         template::elsewhere(),
         location_template(LOCATION_A, "a_hijacked", false),
         location_template(LOCATION_B, "b_hijacked", true),

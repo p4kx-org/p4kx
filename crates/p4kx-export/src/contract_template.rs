@@ -8,6 +8,11 @@ use crate::contract::{LocalisedText, every_field_required};
 use crate::contract_hauling::HaulingOrder;
 use crate::guid_text::CatalogGuid;
 use crate::spawn_model::{LocationQueryLink, ShipSpawnLink};
+use crate::template_extras::{
+    EndComms, PartialPayout, StartComms, TemplateModifier, TemplateOwner,
+};
+use crate::template_flow::FlowTrigger;
+use crate::template_objective::{ObjectiveState, TemplateObjective};
 
 /// A contract template: a `ContractTemplate` Record under `contracts/contracttemplates`, the
 /// structure a contract names in `templateGuid` and lays its own overrides over.
@@ -55,7 +60,19 @@ pub(crate) struct ContractTemplate<'a> {
     /// its hauling objectives (`templateObjective`).
     pub(crate) hauling_orders: Vec<HaulingOrder<'a>>,
     /// The objective tokens in depth-first order, each phase after its parent.
-    pub(crate) objectives: Vec<TemplateObjective>,
+    pub(crate) objectives: Vec<TemplateObjective<'a>>,
+    /// The `partialRewardPayout`, `null` when the template has none.
+    pub(crate) partial_payout: Option<PartialPayout>,
+    /// The `modifiers` in stored order.
+    pub(crate) modifiers: Vec<TemplateModifier>,
+    /// The `owner` of the Record, `null` when it names none.
+    pub(crate) owner: Option<TemplateOwner>,
+    /// The `missionFlow` triggers in stored order.
+    pub(crate) mission_flow: Vec<FlowTrigger>,
+    /// The `contractStartCommsNotification`, `null` when absent.
+    pub(crate) start_comms: Option<StartComms>,
+    /// The `contractEndCommsNotifications` in stored order.
+    pub(crate) end_comms: Vec<EndComms>,
 }
 
 /// The `ActiveContractSettings` of a template, each flag as stored.
@@ -91,8 +108,8 @@ pub(crate) struct AutoFinish {
     pub(crate) completion_time: Option<i64>,
     /// The `missionAutoEnd` flag of the deadline.
     pub(crate) auto_end: Option<bool>,
-    /// The `missionResultAfterTimerEnd` of the deadline as stored (an enum name).
-    pub(crate) result_after_timer_end: Option<String>,
+    /// The `missionResultAfterTimerEnd` of the deadline: the state the mission ends in.
+    pub(crate) result_after_timer_end: Option<ObjectiveState>,
     /// The `remainingTimeToShowTimer` of the deadline, as stored.
     pub(crate) remaining_time_to_show_timer: Option<i64>,
 }
@@ -109,23 +126,4 @@ pub(crate) struct TemplateProperty {
     /// The struct of the value without its `MissionPropertyValue_` start, e.g. `Location` or
     /// `ShipSpawnDescriptions`; `null` when the property has no value.
     pub(crate) value_type: Option<String>,
-}
-
-/// An objective token of a template.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct TemplateObjective {
-    /// The `id` of the token; unique within the template.
-    pub(crate) id: CatalogGuid,
-    /// The `id` of the token whose `childMissionPhases` hold this one, `null` at the top level.
-    pub(crate) parent_id: Option<CatalogGuid>,
-    /// The `debugName`, `null` when empty.
-    pub(crate) debug_name: Option<String>,
-    /// The `startsActive` flag, `null` when absent.
-    pub(crate) starts_active: Option<bool>,
-    /// The struct of the `objectiveHandler`, e.g. `ObjectiveHandler_Hauling`; `null` when absent.
-    pub(crate) handler_type: Option<String>,
-    /// The tag path of the `missionPhaseIdentifierTag`, `null` when absent.
-    pub(crate) phase_tag: Option<String>,
 }

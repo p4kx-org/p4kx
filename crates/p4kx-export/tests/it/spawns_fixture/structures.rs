@@ -20,6 +20,7 @@ pub(super) fn structures(builder: DataForgeBuilder) -> DataForgeBuilder {
     [
         contracts(),
         templates(),
+        super::template_structures::structs(),
         properties(),
         spawns(),
         locations(),
@@ -62,6 +63,18 @@ fn contracts() -> Vec<TestStruct> {
             .array("additionalPrerequisites", pointer("ContractPrerequisite"))
             .field("paramOverrides", class("ContractParamOverrides")),
         TestStruct::new("ContractTemplate")
+            .field("owner", TestType::Reference)
+            .field("partialRewardPayout", pointer("PartialContractRewards"))
+            .array("modifiers", pointer("MissionModifier"))
+            .field("missionFlow", class("MissionFlow"))
+            .field(
+                "contractStartCommsNotification",
+                pointer("ContractCommsNotification"),
+            )
+            .array(
+                "contractEndCommsNotifications",
+                class("ContractEndCommsNotification"),
+            )
             .field("notForRelease", TestType::Bool)
             .field("contractDisplayInfo", class("ContractDisplayInfo"))
             .field("contractClass", pointer("ContractClass"))
@@ -100,19 +113,6 @@ fn templates() -> Vec<TestStruct> {
             .field("missionAutoEnd", TestType::Bool)
             .field("missionResultAfterTimerEnd", TestType::String)
             .field("remainingTimeToShowTimer", TestType::Int32),
-        TestStruct::new("ObjectiveToken")
-            .field("id", TestType::Guid)
-            .field("debugName", TestType::String)
-            .field("startsActive", TestType::Bool)
-            .field("objectiveHandler", pointer("ObjectiveHandler"))
-            .field("missionPhaseIdentifierTag", TestType::Reference)
-            .array("childMissionPhases", class("ObjectiveToken")),
-        TestStruct::new("ObjectiveHandler"),
-        TestStruct::new("ObjectiveHandler_Local").parent("ObjectiveHandler"),
-        TestStruct::new("ObjectiveHandler_Hauling")
-            .parent("ObjectiveHandler")
-            .array("haulingOrders", pointer("HaulingOrder")),
-        TestStruct::new("HaulingOrder"),
         TestStruct::new("HaulingOrder_Resource")
             .parent("HaulingOrder")
             .field("resource", TestType::Reference)

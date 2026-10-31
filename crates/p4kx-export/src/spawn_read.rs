@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{StructValue, TagTree, Value};
+use p4kx_extraction::{Guid, StructValue, TagTree, Value};
 
 use crate::blueprint::as_struct;
+use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{items, one};
-use crate::record_fields::{boolean, integer, number, reference, text};
+use crate::record_fields::{boolean, guid_value, integer, number, reference, text};
 use crate::spawn_model::{
     LocationCondition, LocationCount, LocationQuery, ShipSpawnGroup, ShipSpawnOption,
     ShipSpawnPool, ShipSpawnSlot, TagPaths, TagTerm, content_guid,
@@ -200,11 +201,15 @@ impl<'x, 'f> Reader<'x, 'f> {
     /// does not hold.
     fn path(&self, value: &Value<'f>) -> Option<String> {
         match value {
-            Value::Reference(target) if target.location().is_none() => Some(
-                self.tags
-                    .path_of(target.guid())
-                    .map_or_else(|| target.guid().to_string(), str::to_owned),
-            ),
+            Value::Reference(target)
+                if target.location().is_none() && target.guid() != Guid::default() =>
+            {
+                Some(
+                    self.tags
+                        .path_of(target.guid())
+                        .map_or_else(|| target.guid().to_string(), str::to_owned),
+                )
+            }
             _ => None,
         }
     }
@@ -216,17 +221,34 @@ impl<'x, 'f> Reader<'x, 'f> {
         parent: Option<&StructValue<'f>>,
         name: &str,
     ) -> Option<String> {
+        let property = self.target(parent, name)?;
+        text(Some(property), "missionVariableName").map(str::to_owned)
+    }
+
+    /// Returns the `id` of the objective token the weak pointer in the field `name` points to
+    /// inside this Record.
+    pub(crate) fn objective_id(
+        &self,
+        parent: Option<&StructValue<'f>>,
+        name: &str,
+    ) -> Option<CatalogGuid> {
+        let token = self.target(parent, name)?;
+        guid_value(Some(token), "id")
+            .filter(|id| *id != Guid::default())
+            .map(CatalogGuid)
+    }
+
+    /// Returns the struct the weak pointer in the field `name` points to inside this Record.
+    fn target(&self, parent: Option<&StructValue<'f>>, name: &str) -> Option<&'x StructValue<'f>> {
         let Value::Reference(target) = parent?.field(name)? else {
             return None;
         };
         let place = target.location()?.as_str();
-        let property = place
+        match place
             .split('.')
-            .try_fold(Cursor::Struct(self.root), Cursor::step)?;
-        match property {
-            Cursor::Struct(property) => {
-                text(Some(property), "missionVariableName").map(str::to_owned)
-            }
+            .try_fold(Cursor::Struct(self.root), Cursor::step)?
+        {
+            Cursor::Struct(found) => Some(found),
             Cursor::Array(_) => None,
         }
     }

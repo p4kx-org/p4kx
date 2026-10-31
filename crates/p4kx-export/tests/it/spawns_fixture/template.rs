@@ -6,9 +6,10 @@
 
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 
+use super::template_parts as parts;
 use super::{
-    ELSEWHERE_TEMPLATE, LEFTOVER_TEMPLATE, MISSION_TYPE, OBJECTIVE_A, OBJECTIVE_B, RESOURCE,
-    TAG_KILL, TEMPLATE, array, location, property, reference, ships, text,
+    ELSEWHERE_TEMPLATE, LEFTOVER_TEMPLATE, MISSION_TYPE, OBJECTIVE_A, OBJECTIVE_B, OBJECTIVE_C,
+    OWNER, RESOURCE, TAG_KILL, TEMPLATE, array, location, property, reference, ships, text,
 };
 
 pub(super) fn template() -> TestRecord {
@@ -21,6 +22,12 @@ pub(super) fn template() -> TestRecord {
     .value("notForRelease", TestValue::Bool(false))
     .value("contractDisplayInfo", display_info())
     .value("contractClass", contract_class())
+    .value("owner", reference(OWNER))
+    .value("partialRewardPayout", parts::payout())
+    .value("modifiers", parts::modifiers())
+    .value("missionFlow", parts::flow())
+    .value("contractStartCommsNotification", parts::start_comms())
+    .value("contractEndCommsNotifications", parts::end_comms())
     .value(
         "contractProperties",
         array(vec![
@@ -50,9 +57,16 @@ pub(super) fn template() -> TestRecord {
                 OBJECTIVE_A,
                 "Deliver",
                 true,
-                Some(resource_order(RESOURCE, 8)),
-                vec![objective(OBJECTIVE_B, "", false, None, Vec::new())],
+                parts::hauling_handler(resource_order(RESOURCE, 8)),
+                vec![objective(
+                    OBJECTIVE_B,
+                    "",
+                    false,
+                    parts::instance_handler(),
+                    Vec::new(),
+                )],
             ),
+            objective(OBJECTIVE_C, "Go", true, parts::local_handler(), Vec::new()),
             TestValue::Struct(TestInstance::new("ObjectiveToken").value("debugName", text("NoId"))),
         ]),
     )
@@ -97,21 +111,15 @@ fn resource_order(resource: u128, max_scu: i32) -> TestValue {
     )
 }
 
-/// An objective token; `hauling` makes it a hauling objective with that order, a token without
-/// one is local, and a phase of `phases` is tagged `Kill` when its id is `OBJECTIVE_B`.
+/// An objective token with the handler `handler` and the phases `phases`; a phase with the id
+/// `OBJECTIVE_B` is tagged `Kill`.
 fn objective(
     id: u128,
     name: &str,
     starts_active: bool,
-    hauling: Option<TestValue>,
+    handler: TestInstance,
     phases: Vec<TestValue>,
 ) -> TestValue {
-    let handler = hauling.map_or_else(
-        || TestInstance::new("ObjectiveHandler_Local"),
-        |order| {
-            TestInstance::new("ObjectiveHandler_Hauling").value("haulingOrders", array(vec![order]))
-        },
-    );
     let mut token = TestInstance::new("ObjectiveToken")
         .value("id", TestValue::Guid(id))
         .value("debugName", text(name))
@@ -121,7 +129,7 @@ fn objective(
     if id == OBJECTIVE_B {
         token = token.value("missionPhaseIdentifierTag", reference(TAG_KILL));
     }
-    TestValue::Struct(token)
+    TestValue::Struct(parts::dress(token, id))
 }
 
 /// A template whose path marks it as a development leftover.

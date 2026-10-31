@@ -74,6 +74,10 @@ pub(super) fn location_queries() -> serde_json::Value {
     }])
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one sample that holds every field of the kind"
+)]
 pub(super) fn contract_templates() -> serde_json::Value {
     json!([{
         "guid": "e4000000-0000-4000-8000-000000000001",
@@ -100,7 +104,7 @@ pub(super) fn contract_templates() -> serde_json::Value {
             "failIfLeavePrison": false,
             "completionTime": 300,
             "autoEnd": true,
-            "resultAfterTimerEnd": "Failed",
+            "resultAfterTimerEnd": "failed",
             "remainingTimeToShowTimer": 15
         },
         "contractProperties": [{
@@ -121,8 +125,147 @@ pub(super) fn contract_templates() -> serde_json::Value {
             "parentId": null,
             "debugName": "AcePilot",
             "startsActive": true,
-            "handlerType": "ObjectiveHandler_Local",
-            "phaseTag": null
-        }]
+            "variableName": null,
+            "weight": null,
+            "phaseTag": null,
+            "handler": objective_handler(),
+            "display": objective_display(),
+            "overrideDisplay": {
+                "titleOverride": {"key": null, "en": null, "de": null},
+                "descriptionOverride": {"key": null, "en": null, "de": null}
+            },
+            "rewardContribution": {
+                "structName": "ObjectiveRewardContribution_PercentOfMission",
+                "percentContribution": 100,
+                "doPartialRewardPayout": true
+            },
+            "comms": [{
+                "trigger": "completed",
+                "timing": "simultaneous",
+                "delay": 0,
+                "communicationTag": "Comms.Tag"
+            }]
+        }],
+        "partialPayout": {"thresholds": [{
+            "minPercentage": 76,
+            "maxPercentage": 99,
+            "currencyRewardMultiplier": 0.76,
+            "reputationMultipliers": [{
+                "scopeGuid": "d1000000-0000-4000-8000-000000000001",
+                "reputationRewardMultiplier": 0.76
+            }]
+        }]},
+        "modifiers": [{
+            "modifier": "securityClearance",
+            "modifierName": null,
+            "enabled": true,
+            "locationProperty": "Place_BP",
+            "clearanceTokenGuid": "ed53fbee-2677-4746-b6f4-dc9aded2d544"
+        }, {
+            "modifier": "requestRentShip",
+            "modifierName": "RentalMiner",
+            "enabled": true,
+            "locationProperty": null,
+            "itemGuid": null,
+            "durationSeconds": 3600,
+            "clearRentalOnFail": true
+        }, {
+            "modifier": "shipKioskFilter",
+            "modifierName": null,
+            "enabled": true,
+            "locationProperty": null,
+            "terms": [{"positiveTags": ["Ship.Model.Mole"], "negativeTags": []}]
+        }, {
+            "modifier": "other",
+            "structName": "MissionModifier_Unknown",
+            "modifierName": null,
+            "enabled": null
+        }],
+        "owner": {"guid": "300dcbf0-d201-465b-a7be-af7e15a0a512", "className": "MDT"},
+        "missionFlow": [{
+            "note": "When [Hauling] completed -> Mission Completed",
+            "condition": {"type": "and", "conditions": [
+                {"type": "tokenState", "objectiveId": "ce628b01-6ec2-4add-9f47-078493d1f48e", "tokenState": "completed"},
+                {"type": "not", "condition": {"type": "propertyIsSet", "propertyVariable": "Flag_BP"}},
+                {"type": "or", "conditions": [{"type": "allTokensState", "tokenState": "failed"}]},
+                {"type": "other", "structName": "MissionFlowCondition_Unknown"}
+            ]},
+            "action": {"type": "stateChange", "toState": "completed"}
+        }, {
+            "note": null,
+            "condition": null,
+            "action": {"type": "tokenStateChange", "objectiveId": null, "toState": "active"}
+        }, {
+            "note": null,
+            "condition": null,
+            "action": {"type": "pickRandomMissionPhase", "toState": null, "phases": [
+                {"objectiveId": "ce628b01-6ec2-4add-9f47-078493d1f48e", "probability": 0.5}
+            ]}
+        }, {
+            "note": null,
+            "condition": null,
+            "action": {"type": "other", "structName": "MissionFlowAction_Unknown"}
+        }],
+        "startComms": {"delay": 0, "communicationTag": "Comms.Tag"},
+        "endComms": [{"reason": "complete", "delay": 0, "communicationTag": null}]
     }])
+}
+
+fn objective_display() -> serde_json::Value {
+    json!({
+        "category": "primary",
+        "hideOnHud": false,
+        "markerLabel": {"key": null, "en": null, "de": null},
+        "shortDescription": {"key": "@obj_short", "en": "Deliver", "de": null},
+        "longDescription": {"key": null, "en": null, "de": null}
+    })
+}
+
+fn objective_handler() -> serde_json::Value {
+    json!({
+        "structName": "ObjectiveHandler_Hauling",
+        "module": "Libs/Subsumption/Missions/GoTo.xml",
+        "moduleHierarchyGuid": null,
+        "disableTravelObjectives": false,
+        "disableReturnObjectives": false,
+        "travelRadiusKm": 5.0,
+        "allPlayersLeftGracePeriod": 30.0,
+        "locationProperty": "Place_BP",
+        "organizationProperty": null,
+        "haulingLimitProperty": null,
+        "targetProperty": null,
+        "minDistance": null,
+        "maxDistance": null,
+        "hideMarkers": false,
+        "securityManifestGuid": null,
+        "navPoint": {
+            "entityClassGuid": null,
+            "displayName": {"key": null, "en": null, "de": null},
+            "extendedTextTokens": []
+        },
+        "travelObjective": objective_display(),
+        "returnObjective": null,
+        "hauling": {
+            "itemToken": "item",
+            "pickupLocationToken": null,
+            "amountToken": null,
+            "totalToken": null,
+            "dropOffLocationToken": null,
+            "andObjective": null,
+            "orObjective": null,
+            "collectObjective": null,
+            "collectAndDeliverObjective": null,
+            "resourceDeliverObjective": null,
+            "itemDeliverObjective": objective_display(),
+            "listItemObjective": null
+        },
+        "instance": {
+            "completePhaseOnPlayerEnter": true,
+            "enterTravelRadiusKm": 4.0,
+            "hudObjectiveText": {"key": null, "en": null, "de": null},
+            "tagIdentifier": "Instance.Tag",
+            "searchTags": [],
+            "objectiveMarker": null
+        }
+    })
 }

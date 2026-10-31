@@ -55,7 +55,7 @@ const BASELINES: [Baseline; 17] = [
     baseline_of(Kind::ReputationStandings, 0.08, 0.21),
     baseline_of(Kind::MissionTypes, 0.0, 0.57),
     baseline_of(Kind::MissionLocationTemplates, 0.09, 0.99),
-    baseline_of(Kind::ContractTemplates, 0.13, 1.0),
+    baseline_of(Kind::ContractTemplates, 0.01, 0.99),
 ];
 
 /// The start of a mission token (`~mission(Contractor|Key)`) in a contract text; the exporter

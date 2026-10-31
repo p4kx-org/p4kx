@@ -1484,7 +1484,7 @@ resolves. A template is the structure a contract lays the overrides of its handl
 sub contract over. The Records are selected by the struct, in any folder: on LIVE (2026-10-31)
 496 Records, 488 of them under `contracts/contracttemplates`, 335 named by a contract, none left
 out. A development leftover is told by the words of the usual rule except `template`, which live
-templates such as `handyman_template` carry. Facts only; descriptions and lore are not exported.
+templates such as `handyman_template` carry. Facts and the texts the Archive stores with them, flagged `x-gameText`.
 
 | Field | Meaning |
 |-------|---------|
@@ -1494,15 +1494,54 @@ templates such as `handyman_template` carry. Facts only; descriptions and lore a
 | `missionTypeGuid` | The `MissionType` of the display info, an entry of `missionTypes` |
 | `illegal`, `showLifeTimeInMobiGlas`, `preShowObjectives` | The flags of the display info |
 | `classType`, `settings` | The struct of the contract class (`ContractClass_Contract`, one template is a `ContractClass_PVPBounty`) and its `ActiveContractSettings`: `canBeShared`, `hasCompleteButton`, `handlesAbandonRequest`, `displayAlliedMarkers`, `onlyOwnerCanComplete`; `null` when absent |
-| `autoFinish` | The `ContractAutoFinishSettings`: `failIfSentToPrison`, `failIfBecameCriminal`, `failIfLeavePrison` and the deadline as stored: `completionTime`, `autoEnd`, `resultAfterTimerEnd` (an enum name), `remainingTimeToShowTimer`; the Archive does not state the unit of the times; `null` without the block |
+| `autoFinish` | The `ContractAutoFinishSettings`: `failIfSentToPrison`, `failIfBecameCriminal`, `failIfLeavePrison` and the deadline as stored: `completionTime`, `autoEnd`, `resultAfterTimerEnd` (an objective state), `remainingTimeToShowTimer`; the Archive does not state the unit of the times; `null` without the block |
 | `contractProperties` | The mission properties in stored order: `variable`, `token` (`null` when empty) and `valueType`, the struct of the value without `MissionPropertyValue_` (`StringHash`, `Location`, `ShipSpawnDescriptions`, `HaulingOrders`, ...) |
 | `shipSpawns`, `locationQueries` | The links of ADR-0266, one per variable the template states, with `level` always `template`, into `contractShipSpawns` and `contractLocationQueries` |
 | `haulingOrders` | The hauling orders of the template as in "Hauling orders": the properties (`source` `template`) and the orders of its hauling objectives (`templateObjective`) |
-| `objectives` | The objective tokens depth first, each phase after its parent: `id`, `parentId` (`null` at the top level), `debugName`, `startsActive`, `handlerType` (the struct of the objective handler) and `phaseTag` (a tag path) |
+| `objectives` | The objective tokens depth first, each phase after its parent (see "Objectives") |
+| `partialPayout` | The `PartialContractRewards`: `thresholds`, each `minPercentage`, `maxPercentage`, `currencyRewardMultiplier` and `reputationMultipliers` (`scopeGuid`, an entry of `reputationScopes`, and `reputationRewardMultiplier`); `null` without one |
+| `modifiers` | The modifiers in stored order, tagged by `modifier`: `securityClearance` (`clearanceTokenGuid`), `requestRentShip` (`itemGuid`, `durationSeconds`, `clearRentalOnFail`), `shipKioskFilter` (`terms`, each `positiveTags` and `negativeTags`) and `other` (`structName`); each with `modifierName`, `enabled` and, but for `other`, `locationProperty`, the variable of the property the weak pointer names |
+| `owner` | The `DevOwner` Record: `guid` and `className` (e.g. `MDT`); `null` without one |
+| `missionFlow` | The triggers in stored order (see "Mission flow") |
+| `startComms`, `endComms` | The `contractStartCommsNotification` (`delay`, `communicationTag` as a tag path; `null` without one) and the `contractEndCommsNotifications` (`reason` `complete`, `fail` or `abandon`, `delay`, `communicationTag`) |
+
+**Objectives.** Each entry has `id`, `parentId` (`null` at the top level), `debugName`,
+`startsActive`, `variableName` and `weight` (set on a child phase the flow may pick at random),
+`phaseTag` (a tag path), `display` (`category` `primary`, `hideOnHud`, `markerLabel`,
+`shortDescription`, `longDescription`; the three texts are game texts), `overrideDisplay`
+(`titleOverride` and `descriptionOverride`, game texts), `rewardContribution` (`structName`,
+`percentContribution`, `doPartialRewardPayout`; `null` without one), `comms` (`trigger` an objective
+state, `timing` `simultaneous`, `commsNotificationFirst` or `hudNotificationFirst`, `delay`,
+`communicationTag`) and the `handler`. Most texts of a template are the placeholder
+`@LOC_UNINITIALIZED`; such a text has a `null` key and no texts.
+
+The `handler` has `structName` (`ObjectiveHandler_Hauling`, `_Local`, `_NearLocation`,
+`_PlayerAttached`, `_TransitToInstance` or `_EntityAttached`) and the fields of the struct; a field
+the struct does not have is `null`: `module` (a mission scripting file), `moduleHierarchyGuid`,
+`disableTravelObjectives`, `disableReturnObjectives`, `travelRadiusKm`, `allPlayersLeftGracePeriod`,
+`locationProperty`, `organizationProperty`, `haulingLimitProperty` and `targetProperty` (the
+`missionVariableName` of the property the weak pointer names), `minDistance`, `maxDistance`,
+`hideMarkers`, `securityManifestGuid`, `navPoint` (`entityClassGuid`, `displayName`, a game text,
+and `extendedTextTokens`), `travelObjective` and `returnObjective` (displays as above), `hauling`
+(the `Hauling_ObjectiveSettings`: five extended text tokens and seven displays) and `instance`
+(`completePhaseOnPlayerEnter`, `enterTravelRadiusKm`, `hudObjectiveText`, a game text,
+`tagIdentifier`, `searchTags`, `objectiveMarker`). The orders of a hauling handler are
+`haulingOrders` of the template. The `properties` of an objective (references to the template's
+properties, outputs and embedded values) are not exported.
+
+**Mission flow.** A trigger has `note` (the developer's `description`), a `condition` and an
+`action`, either `null` when absent. A condition is tagged by `type`: `tokenState` (`objectiveId`,
+the `id` of an entry of `objectives`, and `tokenState`), `allTokensState`, `and` and `or`
+(`conditions`), `not` (`condition`), `propertyIsSet` (`propertyVariable`) and `other`
+(`structName`; also a condition nested deeper than 16 levels). An action is tagged by `type`:
+`stateChange` (`toState`), `tokenStateChange` (`objectiveId`, `toState`), `pickRandomMissionPhase`
+(`phases`, each `objectiveId` and `probability`, and `toState`) and `other`. A state is `active`,
+`completed`, `failed` or `abandoned`; a value the catalog does not know is `null`, like the
+values of every closed set. A weak pointer that points to nothing has a `null` link.
 
 A token without an `id` (or a nil one) and the phases below it are left out; phases are followed to
-a depth of 32. Not exported: the objective handler and display content, comms notifications,
-mission flow triggers, partial reward payouts, reward contributions, modifiers and the owner team.
+a depth of 32. Not exported: the `properties` of the objectives and the content of the mission
+properties beyond their value kind.
 
 ### Cargo manifests
 
@@ -2438,19 +2477,20 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   | reputationStandings | 213 | 17 | 44 |
   | missionTypes | 41 | 0 | 23 |
   | missionLocationTemplates | 3,211 | 274 | 3,160 |
-  | contractTemplates | 24 | 3 | 24 |
+  | contractTemplates | 6,750 | 12 | 6,636 |
 
   A contract text that holds a `~mission(…)` token is rewritten by the exporter, so the
   verification only checks that such a text is present. The location templates have 3,297 name
   variants; 86 of them carry a placeholder key or none, which is not counted as a keyed text, so the
   German file lacks 3,246 of the 3,297 variants and 3,160 of the 3,211 keyed texts.
 
-  The contract templates have 24 keyed titles (most templates carry the placeholder
-  `@LOC_UNINITIALIZED`); the English file lacks 3 of them and the German file all 24, so the
-  baselines of the kind are 0.13 and 1.0.
+  The contract templates have 6,750 keyed texts (the titles, the objective, handler and override
+  texts, the marker names; most are the placeholder `@LOC_UNINITIALIZED` and carry no key): the
+  English file lacks 12 of them (`@MissionPhaseDebug_*` among them) and the German file 6,636, so
+  the baselines of the kind are 0.01 and 0.99.
 
-  The `p4kx catalog` summary counts them over all texts of the catalog: English 72,772 resolved,
-  588 unresolved, German 31,381 resolved, 41,979 unresolved, 23,717 placeholders in each.
+  The `p4kx catalog` summary counts them over all texts of the catalog: English 79,489 resolved,
+  597 unresolved, German 31,495 resolved, 48,591 unresolved, 23,717 placeholders in each.
 - Crafting, LIVE (the same on every Channel but for the counts): every blueprint has exactly one
   tier, equal to its `craftTimeSeconds`; 3 blueprints let the player choose fewer than offered
   (`BP_CRAFT_thp_light_legs_01_01_01`, `_03` and `_12`), 3 carry the factor 1.15 (the slaver arms

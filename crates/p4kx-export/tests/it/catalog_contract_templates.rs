@@ -16,7 +16,7 @@ type TestResult = Result<(), Box<dyn Error>>;
 
 const TEMPLATE_GUID: &str = "40000000-0000-4000-8000-000000000001";
 
-fn build() -> Result<Value, Box<dyn Error>> {
+pub(crate) fn build() -> Result<Value, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(
         spawns_fixture::write_archive(dir.path())?,
@@ -28,7 +28,7 @@ fn build() -> Result<Value, Box<dyn Error>> {
     )?)
 }
 
-fn template(catalog: &Value) -> Result<&Value, String> {
+pub(crate) fn template(catalog: &Value) -> Result<&Value, String> {
     catalog["contractTemplates"]
         .as_array()
         .into_iter()
@@ -90,7 +90,7 @@ fn display_info_class_settings_and_deadline_are_exported_as_stored() -> TestResu
     assert_eq!(entry["autoFinish"]["failIfSentToPrison"], true);
     assert_eq!(entry["autoFinish"]["completionTime"], 300);
     assert_eq!(entry["autoFinish"]["autoEnd"], true);
-    assert_eq!(entry["autoFinish"]["resultAfterTimerEnd"], "Failed");
+    assert_eq!(entry["autoFinish"]["resultAfterTimerEnd"], "failed");
     assert_eq!(entry["autoFinish"]["remainingTimeToShowTimer"], 15);
     Ok(())
 }
@@ -193,28 +193,35 @@ fn objectives_follow_the_phases_depth_first_and_skip_a_token_without_an_id() -> 
     let objectives = template(&catalog)?["objectives"]
         .as_array()
         .ok_or("objectives")?;
-    assert_eq!(objectives.len(), 2, "the token without an id is left out");
-    assert_eq!(
-        objectives[0],
-        json!({
-            "id": "70000000-0000-4000-8000-000000000001",
-            "parentId": null,
-            "debugName": "Deliver",
-            "startsActive": true,
-            "handlerType": "ObjectiveHandler_Hauling",
-            "phaseTag": null
+    let ids: Vec<(&str, Option<&str>, &str)> = objectives
+        .iter()
+        .map(|objective| {
+            (
+                objective["id"].as_str().unwrap_or_default(),
+                objective["parentId"].as_str(),
+                objective["debugName"].as_str().unwrap_or_default(),
+            )
         })
-    );
+        .collect();
     assert_eq!(
-        objectives[1],
-        json!({
-            "id": "70000000-0000-4000-8000-000000000002",
-            "parentId": "70000000-0000-4000-8000-000000000001",
-            "debugName": null,
-            "startsActive": false,
-            "handlerType": "ObjectiveHandler_Local",
-            "phaseTag": "Kill"
-        })
+        ids,
+        [
+            ("70000000-0000-4000-8000-000000000001", None, "Deliver"),
+            (
+                "70000000-0000-4000-8000-000000000002",
+                Some("70000000-0000-4000-8000-000000000001"),
+                ""
+            ),
+            ("70000000-0000-4000-8000-000000000003", None, "Go"),
+        ],
+        "the token without an id is left out"
     );
+    assert_eq!(objectives[0]["startsActive"], true);
+    assert_eq!(objectives[1]["startsActive"], false);
+    assert_eq!(objectives[1]["phaseTag"], "Kill");
+    assert_eq!(objectives[0]["phaseTag"], Value::Null);
+    assert_eq!(objectives[1]["variableName"], "PhaseB");
+    assert_eq!(objectives[1]["weight"], 0.5);
+    assert_eq!(objectives[0]["variableName"], Value::Null);
     Ok(())
 }
