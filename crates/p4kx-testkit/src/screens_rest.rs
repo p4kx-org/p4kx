@@ -39,6 +39,7 @@ pub(crate) fn rest_structs() -> Vec<TestStruct> {
         operation("NumberVariable").field("binding", TestType::String),
         operation("IntegerVariable").field("binding", TestType::String),
         operation("StringVariable").field("binding", TestType::String),
+        operation("LocalizedVariable").field("binding", TestType::String),
         operation("BooleanComponentParameter")
             .field("parameter", TestType::String)
             .field("defaultValue", TestType::Bool),
@@ -53,7 +54,7 @@ pub(crate) fn rest_structs() -> Vec<TestStruct> {
         operation("BooleanEvaluateAnd").array("inputs", operation_input()),
         operation("BooleanEvaluateOr").array("inputs", operation_input()),
         operation("BooleanFromInteger")
-            .field("value", TestType::Int32)
+            .field("value", TestType::Int64)
             .field("type", TestType::String)
             .field("inputL", operation_input())
             .field("inputR", operation_input()),
@@ -137,6 +138,8 @@ pub enum TestOp {
     IntVar,
     /// A string game variable, empty at rest.
     TextVar,
+    /// A localised game variable bound to the name, empty at rest.
+    NamedLocalVar(&'static str),
     /// A boolean component parameter with its default.
     BoolParam(&'static str, bool),
     /// A number component parameter with its default.
@@ -163,6 +166,8 @@ pub enum TestOp {
     NumField(&'static str, &'static str, &'static str),
     /// The text of the widget, which the text operation sets.
     TextOf(&'static str, &'static str),
+    /// The localised field (`ParamInput0`, ...) of the widget, which the text operation sets.
+    LocalField(&'static str, &'static str, &'static str),
     /// The canvas Record `guid` when the boolean operation holds, else the canvas Record `other`.
     CanvasFromBool(&'static str, u128, u128),
     /// The `CanvasReferenceRecord` of the canvas widget, which the canvas operation sets.
@@ -208,6 +213,7 @@ impl TestOp {
             Self::NumVar => variable("Number", "variable"),
             Self::IntVar => variable("Integer", "variable"),
             Self::TextVar => variable("String", "variable"),
+            Self::NamedLocalVar(name) => variable("Localized", name),
             Self::BoolParam(name, default) => param("Boolean", name, TestValue::Bool(*default)),
             Self::NumParam(name, default) => param("Number", name, TestValue::Single(*default)),
             Self::TextParam(name, default) => param("Localized", name, TestValue::text(*default)),
@@ -219,7 +225,7 @@ impl TestOp {
                 .value("inputs", names(sources)),
             Self::IntIs(source, how, value) => {
                 TestInstance::new("BuildingBlocks_BindingsBooleanFromInteger")
-                    .value("value", TestValue::Int32(*value))
+                    .value("value", TestValue::Int64(i64::from(*value)))
                     .value("type", TestValue::text(*how))
                     .value("inputL", input(source))
             }
@@ -239,6 +245,7 @@ impl TestOp {
             Self::BoolField(widget, name, source) => field("Boolean", widget, name, source),
             Self::NumField(widget, name, source) => field("Number", widget, name, source),
             Self::TextOf(widget, source) => field("Localized", widget, "Text", source),
+            Self::LocalField(widget, name, source) => field("Localized", widget, name, source),
             Self::CanvasFromBool(source, on, off) => {
                 TestInstance::new("BuildingBlocks_BindingsStringFromBooleanCanvas")
                     .value("isTrue", TestValue::Reference(*on))

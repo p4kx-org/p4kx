@@ -23,7 +23,10 @@
 //! each canvas, calculated with every game variable at zero and the parameters its canvas widget
 //! hands it, decide which widgets are instantiated and active and what their alpha is
 //! (ADR-0110). [`ScreenComposer::with_variables`] sets game variables to other values, such as
-//! `powerstate` to 1 for a screen that is on (ADR-0259); the [`Report`] lists them.
+//! `powerstate` to 1 for a screen that is on (ADR-0259); the [`Report`] lists them. A variable
+//! that holds a canvas Record path or GUID, such as `landscapecanvasguid` of the MFD, picks the
+//! canvas of the canvas widget bound to it, and a localised variable such as `mfdviewname` is the
+//! text of the text field bound to it (ADR-0306).
 //!
 //! Texts are drawn as glyph outlines of the fonts in [`TextSources`], which a caller reads from
 //! `fonts_en.gfx`: the font style of a widget and the cascade pick the font, size, letter and line
@@ -84,6 +87,7 @@ mod walk_canvas;
 mod walk_instance;
 mod walk_measure;
 mod walk_notes;
+mod walk_part;
 mod walk_rest;
 mod walk_style;
 mod walk_text;

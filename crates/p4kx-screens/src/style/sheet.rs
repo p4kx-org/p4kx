@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use p4kx_dataforge::{DataForge, Guid};
 
-use super::condition::{Uses, selects_text};
+use super::condition::{Uses, selects_part};
 use super::entry::{Entry, Modifiers, parse_entries};
 use super::matching::{Subject, TagPaths, applies, applies_to_lists};
 use crate::canvas::Canvas;
@@ -158,11 +158,12 @@ pub(crate) fn resolve(
     resolved
 }
 
-/// Resolves the entries of `sheets` that select the text a text field holds: those that require
-/// the type `Text` of the widget they select and those that name no type and select by the parent
-/// (ADR-0296), by the selector lists that do so only. Other untyped entries and inline styles are
-/// left to the field, and only the modifiers a text draws with apply.
-pub(crate) fn resolve_text(
+/// Resolves the entries of `sheets` that select the inner part of a widget, the text of a text
+/// field or the shape of an icon: those that require the type of the part and those that name no
+/// type and select by the parent (ADR-0296), by the selector lists that do so only. Other untyped
+/// entries and inline styles are left to the widget, and only the modifiers a part draws with
+/// apply.
+pub(crate) fn resolve_part(
     sheets: &[Rc<CanvasStyles>],
     (subject, above): (&Subject, &[Subject]),
     tags: &TagPaths,
@@ -177,7 +178,7 @@ pub(crate) fn resolve_text(
         if *budget == 0 {
             break;
         }
-        if applies_to_lists(entry, selects_text, (subject, above), tags, budget) {
+        if applies_to_lists(entry, selects_part, (subject, above), tags, budget) {
             merge(&mut resolved, &entry.modifiers.for_text());
         }
     }

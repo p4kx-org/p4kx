@@ -17,6 +17,8 @@ pub(crate) fn float(structure: &StructValue<'_>, name: &str) -> Option<f32> {
         Value::Double(value) => Some(*value as f32),
         Value::Int32(value) => Some(*value as f32),
         Value::UInt32(value) => Some(*value as f32),
+        Value::Int64(value) => Some(*value as f32),
+        Value::UInt64(value) => Some(*value as f32),
         Value::Int16(value) => Some(f32::from(*value)),
         Value::UInt16(value) => Some(f32::from(*value)),
         Value::Int8(value) => Some(f32::from(*value)),

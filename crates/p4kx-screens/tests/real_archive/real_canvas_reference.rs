@@ -12,6 +12,7 @@ use p4kx_testkit::{real_archive_key, real_archive_path};
 type TestResult = Result<(), Box<dyn Error>>;
 
 const MFD: &str = "libs/foundry/records/ui/buildingblocks/ships/displays/mfdscreens/mc_mfdcomponents/screens/general/m_mfd_screen";
+const POWER_PAGE: &str = "libs/foundry/records/ui/buildingblocks/ships/displays/mfdscreens/mc_mfdcomponents/screens/power/mc_s_power_master";
 const BRAND: &str = "aegs";
 
 #[test]
@@ -20,17 +21,20 @@ fn the_canvases_an_mfd_swaps_in_are_entered_and_a_namespace_reaches_one_of_them(
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
-    let power = [Variable::new("powerstate", "1")?];
+    let power = [
+        Variable::new("powerstate", "1")?,
+        Variable::new("landscapecanvasguid", POWER_PAGE)?,
+    ];
     let on = ScreenComposer::new(&forge)
         .with_variables(&power)
         .compose(MFD, Some(BRAND))?;
     assert!(
-        on.report().canvases >= 15,
+        on.report().canvases >= 8,
         "{} canvases",
         on.report().canvases
     );
     assert!(
-        on.report().widgets >= 150,
+        on.report().widgets >= 100,
         "{} widgets",
         on.report().widgets
     );

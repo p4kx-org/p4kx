@@ -6,6 +6,7 @@
 
 mod real_canvas_reference;
 mod real_images;
+mod real_mfd_pages;
 mod real_radar;
 mod real_screens;
 mod real_state_tags;

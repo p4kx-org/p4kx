@@ -10,7 +10,7 @@ use super::draw::Notes;
 const PLACEHOLDERS: [&str; 3] = ["LOC_EMPTY", "LOC_UNINITIALIZED", "LOC_PLACEHOLDER"];
 
 /// Returns whether `text` is empty or a key the game fills in at run time.
-pub(super) fn is_placeholder(text: &str) -> bool {
+pub(crate) fn is_placeholder(text: &str) -> bool {
     let key = text.strip_prefix('@').unwrap_or(text);
     key.is_empty() || PLACEHOLDERS.contains(&key)
 }

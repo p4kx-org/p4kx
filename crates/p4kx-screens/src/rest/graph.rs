@@ -8,6 +8,9 @@ use super::ops::{Arith, Cmp};
 use crate::bindings::index_at;
 use crate::reader::{as_struct, flag, float, int, items, reference, text};
 
+/// The field of a canvas widget that names its canvas.
+pub(super) const CANVAS_FIELD: &str = "CanvasReferenceRecord";
+
 /// An input of a node: the node of `operations` it points at, if it is connected.
 pub(crate) type Input = Option<usize>;
 
@@ -22,6 +25,11 @@ pub(crate) enum Node {
     Param {
         parameter: String,
         default: Rest,
+    },
+    /// A localised component parameter: the text a canvas hands it, else the default.
+    TextParam {
+        parameter: String,
+        default: String,
     },
     Invert(Input),
     All(Vec<Input>),
@@ -84,6 +92,8 @@ pub(crate) enum FieldKind {
     Number,
     Integer,
     Text,
+    /// A localised text, set only where a game variable names it.
+    Localised,
     Other,
 }
 
@@ -128,6 +138,7 @@ fn field_kind(short: &str) -> Option<FieldKind> {
         "NumberField" => Some(FieldKind::Number),
         "IntegerField" => Some(FieldKind::Integer),
         "StringField" => Some(FieldKind::Text),
+        "LocalizedField" => Some(FieldKind::Localised),
         "ColorField" => Some(FieldKind::Other),
         _ => None,
     }
@@ -142,7 +153,7 @@ fn source(short: &str, op: &StructValue<'_>) -> Option<Node> {
     Some(match short {
         "BooleanVariable" => variable(Rest::Bool(false)),
         "NumberVariable" | "IntegerVariable" => variable(Rest::Num(0.0)),
-        "StringVariable" => variable(Rest::Text(String::new())),
+        "StringVariable" | "LocalizedVariable" => variable(Rest::Text(String::new())),
         "BooleanComponentParameter" => Node::Param {
             parameter: parameter(),
             default: Rest::Bool(flag(op, "defaultValue").unwrap_or(false)),
@@ -150,6 +161,10 @@ fn source(short: &str, op: &StructValue<'_>) -> Option<Node> {
         "NumberComponentParameter" | "IntegerComponentParameter" => Node::Param {
             parameter: parameter(),
             default: Rest::Num(number(op, "defaultValue")),
+        },
+        "LocalizedComponentParameter" => Node::TextParam {
+            parameter: parameter(),
+            default: text(op, "defaultValue").unwrap_or_default().to_owned(),
         },
         "StringComponentParameter" => Node::Param {
             parameter: parameter(),
@@ -167,6 +182,8 @@ fn whole(value: &Value<'_>) -> Option<f64> {
         Value::UInt32(value) => Some(f64::from(*value)),
         Value::UInt16(value) => Some(f64::from(*value)),
         Value::UInt8(value) => Some(f64::from(*value)),
+        Value::Int64(value) => i32::try_from(*value).ok().map(f64::from),
+        Value::UInt64(value) => u32::try_from(*value).ok().map(f64::from),
         _ => None,
     }
 }
@@ -314,6 +331,20 @@ impl Operations {
             Node::Variable { binding, .. } => Some(binding.as_str()),
             _ => None,
         })
+    }
+
+    /// Returns the names of the game variables whose text names the canvas of a canvas widget.
+    pub(crate) fn canvas_variables(&self) -> impl Iterator<Item = &str> {
+        self.bindings
+            .iter()
+            .filter(|binding| binding.kind == FieldKind::Text && binding.field == CANVAS_FIELD)
+            .filter_map(|binding| match self.nodes.get(binding.input?)? {
+                Node::Variable {
+                    binding,
+                    zero: Rest::Text(_),
+                } => Some(binding.as_str()),
+                _ => None,
+            })
     }
 
     /// Returns the canvases the graph can put in a canvas widget.

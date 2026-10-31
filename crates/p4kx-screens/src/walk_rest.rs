@@ -7,10 +7,10 @@ use std::rc::Rc;
 use p4kx_dataforge::Guid;
 
 use crate::bindings::ParamValues;
-use crate::canvas::Canvas;
+use crate::canvas::{Canvas, find_canvas};
 use crate::elements;
 use crate::report::VariableInForce;
-use crate::rest::{AtRest, RestParams};
+use crate::rest::{AtRest, Given, RestParams, same_parameter};
 use crate::style::{Modifiers, Subject};
 use crate::variables::Variable;
 use crate::walk::Walk;
@@ -53,7 +53,8 @@ impl Walk<'_, '_, '_, '_> {
     /// puts the result in force; the first time a state is made, what it leaves out is listed.
     pub(crate) fn enter_rest(&mut self, canvas: &Canvas) {
         let inputs = self.typed.last().cloned().unwrap_or_default();
-        let key = (canvas.guid, crate::rest::key_of(&inputs));
+        let texts = self.params.last().cloned().unwrap_or_default();
+        let key = (canvas.guid, crate::rest::key_of(&inputs, &texts));
         let state = if let Some(known) = self.at_rest.get(&key) {
             Rc::clone(known)
         } else {
@@ -73,7 +74,14 @@ impl Walk<'_, '_, '_, '_> {
                         .collect(),
                 )
             };
-            let state = Rc::new(AtRest::of(&canvas.operations, &inputs, &variables));
+            let forge = self.store.forge();
+            let lookup = |text: &str| find_canvas(forge, text).map_err(|error| error.to_string());
+            let given = Given {
+                inputs: &inputs,
+                texts: &texts,
+                variables: &variables,
+            };
+            let state = Rc::new(AtRest::resolving(&canvas.operations, &given, &lookup));
             self.note_rest(canvas, &state);
             self.at_rest.insert(key, Rc::clone(&state));
             state
@@ -213,7 +221,7 @@ impl Walk<'_, '_, '_, '_> {
     }
 
     /// Returns the values widget `index` hands to its nested canvas: the bound parameters over
-    /// the ones the widget names.
+    /// the ones the widget names, the localised ones included.
     pub(crate) fn handover(&self, index: usize, widget: &Widget) -> Handover {
         let bound = self
             .rests
@@ -225,13 +233,32 @@ impl Walk<'_, '_, '_, '_> {
             widget
                 .typed
                 .iter()
-                .filter(|(name, _)| !bound.iter().any(|(other, _)| other == name))
+                .filter(|(name, value)| {
+                    !bound
+                        .iter()
+                        .any(|(other, other_value)| same_parameter(name, value, other, other_value))
+                })
                 .chain(bound)
                 .cloned()
                 .collect()
         };
+        let named = self
+            .rests
+            .last()
+            .map_or(&[][..], |state| state.localised(index));
+        let text = if named.is_empty() {
+            Rc::clone(&widget.params)
+        } else {
+            widget
+                .params
+                .iter()
+                .filter(|(name, _)| !named.iter().any(|(other, _)| other == name))
+                .chain(named)
+                .cloned()
+                .collect()
+        };
         Handover {
-            text: Rc::clone(&widget.params),
+            text,
             typed,
             stylesheet: widget.stylesheet,
         }

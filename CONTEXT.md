@@ -593,7 +593,8 @@ _Avoid_: CSS, theme
 What a Screen shows before the game sets anything: every game variable has its zero value, and
 the `operations` of each canvas, evaluated on that, decide which widgets are instantiated and
 active, their alpha, the number fields of their layout (size, anchor, pivot, scale, position,
-padding, margin, bounds) and the parameters of nested canvases (ADR-0110, ADR-0296).
+padding, margin, bounds) and the parameters of nested canvases (ADR-0110, ADR-0296). A caller may
+set game variables, among them the one that names the page of an MFD (ADR-0259, ADR-0306).
 _Avoid_: default state, idle (the game has no such state)
 
 **Text field**:

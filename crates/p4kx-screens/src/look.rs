@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use crate::colour::ColorSpec;
 use crate::corners::Corner;
+use crate::elements::RUNTIME_IMAGE;
 use crate::style::Modifiers;
 use crate::text::{FontStyleInfo, Shaped};
 use crate::widget::Widget;
@@ -40,13 +41,16 @@ pub(crate) struct Look<'a> {
 impl<'a> Look<'a> {
     /// Returns the look of `widget` under `style`; `pixel` is how many units of the layout a
     /// pixel of the canvas takes, which font sizes are counted in.
+    ///
+    /// A runtime image has no background: the picture the game renders replaces its box.
     pub(crate) fn of(
         widget: &'a Widget,
         style: &'a Modifiers,
         pixel: f32,
         font: Option<Rc<FontStyleInfo>>,
     ) -> Self {
-        let enabled = style.enable_background.unwrap_or(widget.background_enabled);
+        let enabled = style.enable_background.unwrap_or(widget.background_enabled)
+            && widget.type_name != RUNTIME_IMAGE;
         let border = |side: usize| {
             let own = widget.border.get(side);
             let width = style

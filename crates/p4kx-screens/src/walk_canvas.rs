@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use p4kx_dataforge::Guid;
 
-use crate::canvas::Canvas;
+use crate::canvas::{Canvas, find_canvas};
 use crate::colour::Palette;
 use crate::fit::fit;
 use crate::layout::Frame;
@@ -139,6 +139,7 @@ impl Walk<'_, '_, '_, '_> {
             let mut reachable: Vec<Guid> = sheet
                 .canvases()
                 .chain(canvas.operations.canvas_choices())
+                .chain(self.named_canvases(&canvas))
                 .collect();
             for widget in &canvas.widgets {
                 if let Some(style) = widget.stylesheet {
@@ -168,6 +169,25 @@ impl Walk<'_, '_, '_, '_> {
             }
         }
         self.shape = uses;
+    }
+
+    /// Returns the canvases that the game variables set by the caller name for the canvas widgets
+    /// of `canvas`.
+    fn named_canvases(&self, canvas: &Canvas) -> Vec<Guid> {
+        let name = canvas.name();
+        canvas
+            .operations
+            .canvas_variables()
+            .filter_map(|binding| {
+                let variable = self
+                    .variables
+                    .iter()
+                    .rev()
+                    .filter(|variable| variable.in_namespace(name))
+                    .find(|variable| variable.matches(binding))?;
+                find_canvas(self.store.forge(), variable.value()).ok()
+            })
+            .collect()
     }
 
     fn note_unsupported(&mut self, sheet_guid: Guid, sheet: &CanvasStyles) {

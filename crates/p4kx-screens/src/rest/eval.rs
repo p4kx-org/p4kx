@@ -6,13 +6,29 @@ use std::cmp::Ordering;
 use p4kx_dataforge::Guid;
 
 use super::Rest;
-use super::graph::{FieldKind, Input, Node, Operations};
+use super::fields::{is_evaluated, layout_problem, tag_of};
+use super::graph::{Binding, CANVAS_FIELD, FieldKind, Input, Node, Operations};
 use super::state::{AtRest, PARAMETER, STATE_TAG, key_of};
-use crate::style::GeometryModifiers;
+use crate::text::is_placeholder;
 use crate::variables::Variable;
 
+/// Finds the canvas a game variable names, by GUID or record path.
+pub(crate) type CanvasLookup<'a> = &'a dyn Fn(&str) -> Result<Guid, String>;
+
+/// What a canvas is evaluated under: the typed and the localised parameters its widget hands it
+/// and the game variables the caller sets.
+#[derive(Clone, Copy)]
+pub(crate) struct Given<'a> {
+    pub(crate) inputs: &'a [(String, Rest)],
+    pub(crate) texts: &'a [(String, String)],
+    pub(crate) variables: &'a [Variable],
+}
+
+/// The field of a text widget that holds its text.
+pub(crate) const TEXT_FIELD: &str = "Text";
+
 const MAX_DEPTH: usize = 128;
-const CANVAS_FIELD: &str = "CanvasReferenceRecord";
+const GAME_NAMES_CANVAS: &str = "a canvas that only the game names at run time";
 const TOO_DEEP: &str = "nested too deep";
 const NOT_FINITE: &str = "a number that is not finite";
 
@@ -28,7 +44,9 @@ struct Eval<'a> {
     nodes: &'a [Node],
     kinds: &'a [String],
     inputs: &'a [(String, Rest)],
+    texts: &'a [(String, String)],
     variables: &'a [Variable],
+    lookup: CanvasLookup<'a>,
     memo: Vec<Memo>,
 }
 
@@ -107,19 +125,25 @@ impl Eval<'_> {
         unknown.map_or(Ok(Rest::Bool(wanted)), Err)
     }
 
-    /// Evaluates the canvas the node `input` picks.
+    /// Evaluates the canvas the node `input` picks: the branch of a boolean choice, or the canvas
+    /// a game variable that the caller sets names.
     fn canvas(&mut self, input: Input, depth: usize) -> Result<Guid, String> {
         let nodes = self.nodes;
-        let Some(Node::CanvasChoice { canvases, input }) = input.and_then(|at| nodes.get(at))
-        else {
-            return Err("a canvas that only the game names at run time".to_owned());
-        };
-        let at = usize::from(!self.flag(*input, depth + 1)?);
-        canvases
-            .get(at)
-            .copied()
-            .flatten()
-            .ok_or_else(|| "a branch that names no canvas".to_owned())
+        match input.and_then(|at| nodes.get(at)) {
+            Some(Node::CanvasChoice { canvases, input }) => {
+                let at = usize::from(!self.flag(*input, depth + 1)?);
+                canvases
+                    .get(at)
+                    .copied()
+                    .flatten()
+                    .ok_or_else(|| "a branch that names no canvas".to_owned())
+            }
+            Some(node @ Node::Variable { .. }) => match self.node(node, depth + 1)? {
+                Rest::Text(named) if !named.trim().is_empty() => (self.lookup)(&named),
+                _ => Err(GAME_NAMES_CANVAS.to_owned()),
+            },
+            _ => Err(GAME_NAMES_CANVAS.to_owned()),
+        }
     }
 
     fn node(&mut self, node: &Node, depth: usize) -> Outcome {
@@ -135,6 +159,12 @@ impl Eval<'_> {
                 .iter()
                 .find(|(name, given)| name == parameter && fits(given, default))
                 .map_or_else(|| default.clone(), |(_, given)| given.clone())),
+            Node::TextParam { parameter, default } => Ok(Rest::Text(
+                self.texts
+                    .iter()
+                    .find(|(name, _)| name == parameter)
+                    .map_or_else(|| default.clone(), |(_, given)| given.clone()),
+            )),
             Node::Invert(input) => Ok(Rest::Bool(!self.flag(*input, depth)?)),
             Node::All(inputs) => self.all(inputs, true, depth),
             Node::Any(inputs) => self.all(inputs, false, depth),
@@ -254,41 +284,6 @@ fn fits(given: &Rest, default: &Rest) -> bool {
         || matches!((given, default), (Rest::Tag(_), Rest::Text(_)))
 }
 
-/// Reads the tag a node gave: a tag node's tag, or the empty text of a string parameter, which
-/// names none.
-fn tag_of(value: Rest) -> Result<Option<Guid>, String> {
-    match value {
-        Rest::Tag(tag) => Ok(tag),
-        Rest::Text(text) if text.is_empty() => Ok(None),
-        _ => Err("a tag that only the game names at run time".to_owned()),
-    }
-}
-
-/// Returns whether a binding of the field `field` of the kind `kind` is evaluated at rest.
-fn is_evaluated(kind: FieldKind, field: &str) -> bool {
-    match (kind, field) {
-        (FieldKind::Other, _) => false,
-        (FieldKind::Boolean, "Instantiated" | "IsActive") | (FieldKind::Number, "Alpha") => true,
-        (FieldKind::Number | FieldKind::Integer, field) if GeometryModifiers::has_field(field) => {
-            true
-        }
-        (_, field) => field.starts_with(PARAMETER),
-    }
-}
-
-/// Returns why `value` cannot be the value of the layout field `field`; `None` for any other
-/// field and for a value it takes.
-fn layout_problem(field: &str, value: &Rest) -> Option<&'static str> {
-    if !GeometryModifiers::has_field(field) {
-        return None;
-    }
-    match value {
-        Rest::Num(number) if GeometryModifiers::takes(field, *number) => None,
-        Rest::Num(_) => Some("a number the layout field does not take"),
-        _ => Some("a value that is not a number"),
-    }
-}
-
 const fn whole_if(value: f64, whole: bool) -> f64 {
     if whole { value.trunc() } else { value }
 }
@@ -296,14 +291,49 @@ const fn whole_if(value: f64, whole: bool) -> f64 {
 impl AtRest {
     /// Evaluates the field bindings of `operations` with the game variables at the values of
     /// `variables`, else at zero, and the component parameters at `inputs`, else at their
-    /// defaults.
+    /// defaults. No game variable names a canvas.
+    #[cfg(test)]
     pub(crate) fn of(
         operations: &Operations,
         inputs: &[(String, Rest)],
         variables: &[Variable],
     ) -> Self {
+        let given = Given {
+            inputs,
+            texts: &[],
+            variables,
+        };
+        Self::resolving(operations, &given, &|_| Err(GAME_NAMES_CANVAS.to_owned()))
+    }
+
+    /// Takes the text a localised field of a text or of a canvas parameter has at rest: a value
+    /// that is a text of its own, not a placeholder the game fills in.
+    fn bind_text(&mut self, eval: &mut Eval<'_>, binding: &Binding) {
+        if !(binding.field.starts_with(PARAMETER) || binding.field == TEXT_FIELD) {
+            return;
+        }
+        self.text_bound.insert(binding.widget);
+        if let Ok(Rest::Text(text)) = eval.input(binding.input, 0)
+            && !is_placeholder(&text)
+        {
+            self.localise(binding.widget, &binding.field, text);
+        }
+    }
+
+    /// Evaluates as [`AtRest::of`] under `given`, with the canvases that game variables name
+    /// found by `lookup`.
+    pub(crate) fn resolving(
+        operations: &Operations,
+        given: &Given<'_>,
+        lookup: CanvasLookup<'_>,
+    ) -> Self {
+        let Given {
+            inputs,
+            texts,
+            variables,
+        } = *given;
         let mut found = Self {
-            key: key_of(inputs),
+            key: key_of(inputs, texts),
             ..Self::default()
         };
         if operations.bindings.is_empty() {
@@ -313,10 +343,16 @@ impl AtRest {
             nodes: &operations.nodes,
             kinds: &operations.kinds,
             inputs,
+            texts,
             variables,
+            lookup,
             memo: operations.nodes.iter().map(|_| Memo::Fresh).collect(),
         };
         for binding in &operations.bindings {
+            if binding.kind == FieldKind::Localised {
+                found.bind_text(&mut eval, binding);
+                continue;
+            }
             if binding.kind == FieldKind::Text && binding.field == CANVAS_FIELD {
                 match eval.canvas(binding.input, 0) {
                     Ok(canvas) => {

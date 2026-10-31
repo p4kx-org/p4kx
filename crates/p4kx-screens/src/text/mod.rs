@@ -18,6 +18,7 @@ use p4kx_gfx::{Font, Localise};
 
 pub(crate) use draw::Shaped;
 pub(crate) use fonts::{FontStyleInfo, FontStyles};
+pub(crate) use source::is_placeholder;
 pub(crate) use spec::{Case, Horizontal, TEXT, TEXT_FIELD, TextSpec, Vertical};
 
 use fonts::FontBook;
