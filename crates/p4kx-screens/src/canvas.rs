@@ -30,33 +30,12 @@ pub(crate) struct BrandStyle {
     pub(crate) entries: Rc<[Entry]>,
 }
 
-/// How a canvas relates its own size to the box it is laid out in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Coordinates {
-    Auto,
-    Raw,
-    AspectOverridesWidth,
-    AspectOverridesHeight,
-}
-
-impl Coordinates {
-    fn parse(name: Option<&str>) -> Self {
-        match name {
-            Some("useRaw") => Self::Raw,
-            Some("aspectOverridesWidth") => Self::AspectOverridesWidth,
-            Some("aspectOverridesHeight") => Self::AspectOverridesHeight,
-            _ => Self::Auto,
-        }
-    }
-}
-
 /// A canvas read from its Record: the widgets of its scene followed by those of its library.
 #[derive(Debug)]
 pub(crate) struct Canvas {
     pub(crate) guid: Guid,
     pub(crate) record_path: String,
     pub(crate) size: [f32; 2],
-    pub(crate) coordinates: Coordinates,
     pub(crate) world_root: Option<[f32; 2]>,
     pub(crate) widgets: Vec<Widget>,
     pub(crate) scene_len: usize,
@@ -116,7 +95,7 @@ impl Canvas {
                 float(size, "y").unwrap_or(0.0),
             ]
         });
-        let coordinates = Coordinates::parse(text(root, "coordinateMethod"));
+        let raw = text(root, "coordinateMethod") == Some("useRaw");
         let parse = |value| as_struct(value).map(|widget| Widget::parse(widget, guid));
         let scene: Vec<Widget> = items(root, "scene").iter().filter_map(parse).collect();
         let scene_len = scene.len();
@@ -131,13 +110,10 @@ impl Canvas {
             text_bindings: text_bindings(root, scene_len),
             operations: Operations::read(root, scene_len),
             arrays: static_arrays(root),
-            world_root: (coordinates == Coordinates::Raw)
-                .then(|| world_root(&widgets, &roots))
-                .flatten(),
+            world_root: raw.then(|| world_root(&widgets, &roots)).flatten(),
             guid,
             record_path: tree.record_path().to_owned(),
             size,
-            coordinates,
             roots,
             children,
             scene_len,

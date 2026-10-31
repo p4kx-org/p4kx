@@ -3,7 +3,7 @@
 
 use p4kx_gfx::Affine;
 
-use crate::canvas::{Canvas, Coordinates};
+use crate::canvas::Canvas;
 use crate::paint::Area;
 use crate::widget::CanvasSizing;
 
@@ -40,9 +40,8 @@ const fn scaling(scale: f32, x: f32, y: f32) -> (Affine, f32) {
 ///
 /// A raw canvas whose root widget is a few units large (a world-space canvas, such as a HUD) is
 /// scaled to fit that root into the frame; a canvas that a canvas widget scales
-/// ([`CanvasSizing::Scale`]) is laid out at its own size and scaled to fit the widget; the
-/// coordinate methods `aspectOverridesWidth` and `aspectOverridesHeight` take the width from the
-/// height and the height from the width by the aspect of the canvas.
+/// ([`CanvasSizing::Scale`]) is laid out at its own size and scaled to fit the widget; any other
+/// canvas, the aspect-override coordinate methods included, is laid out in the whole frame.
 pub(crate) fn fit(canvas: &Canvas, frame: Area, sizing: CanvasSizing) -> Fit {
     let plain = Fit {
         layout: frame,
@@ -85,21 +84,5 @@ pub(crate) fn fit(canvas: &Canvas, frame: Area, sizing: CanvasSizing) -> Fit {
             };
         }
     }
-    match canvas.coordinates {
-        Coordinates::AspectOverridesWidth if valid => Fit {
-            layout: Area {
-                width: frame.height * width / height,
-                ..frame
-            },
-            ..plain
-        },
-        Coordinates::AspectOverridesHeight if valid => Fit {
-            layout: Area {
-                height: frame.width * height / width,
-                ..frame
-            },
-            ..plain
-        },
-        _ => plain,
-    }
+    plain
 }

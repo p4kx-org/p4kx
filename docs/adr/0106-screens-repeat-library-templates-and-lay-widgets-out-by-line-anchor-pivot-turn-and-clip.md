@@ -3,8 +3,8 @@
 Decided for issue #538, on top of ADR-0089 (screens) and ADR-0101 (texts). It closes the layout
 gaps that `p4kx ui render --screen` listed: lists, clones and templates, stack, grid and wrapping
 containers, pivot, anchor, rotation, overflow, bounds, sizes that come from the content and the
-unit of raw canvases. Nothing here was observed in the game; every rule is read from the Records
-and from what the names of the fields say, and the open ones are listed at the end.
+unit of raw canvases. The rules are read from the Records and the field names; the section
+"Compared with the game" records what in-game screenshots confirm, refute or leave open.
 
 ## What was found, on LIVE with `p4kx dcb export` over the 4920 Records below `ui/buildingblocks`
 
@@ -49,11 +49,12 @@ and from what the names of the fields say, and the open ones are listed at the e
   the size of the frame divided by that scale and drawn under the scale, so a nested canvas keeps
   the pixel of its host. A raw canvas nested in a widget of another size therefore keeps its
   pixels, as the issue #535 review asked to decide, unless the canvas is a world-space canvas,
-  which fits its root into the box of the widget, or the widget scales it. `Scale` lays a canvas widget's canvas out at the canvas size and fits it
-  into the box, centred; `Size` lays it out in the box. `aspectOverridesWidth` takes the width
-  of the box from its height by the aspect of the canvas, `aspectOverridesHeight` the height from
-  its width, at the start of the box; the names are the only evidence for them, and for a screen
-  of its own size they change nothing.
+  which fits its root into the box of the widget, or the widget scales it.
+  - `Scale` lays a canvas widget's canvas out at the canvas size and fits it into the box,
+    centred.
+  - `Size` lays it out in the box.
+  - `aspectOverridesWidth` and `aspectOverridesHeight` lay it out in the whole box, with no scale
+    (see "Compared with the game").
 - **Templates.** The widgets of the `library` follow the scene in the widget list of a canvas; a
   scene widget with the parent `library[n]` is a child of that template. A template is not drawn
   where it stands. A clone draws its target as its only child, laid out in the box of the clone
@@ -78,7 +79,7 @@ and from what the names of the fields say, and the open ones are listed at the e
   shrink), and are spread by the axis justification. A container that wraps starts a new line
   when the next item does not fit; `WrapReverse` puts the lines in the reverse order and starts
   them at the end of the cross axis, so a `Start` cross justification packs them at the end (a
-  guess from the name). The lines
+  guess from the name, not yet decidable). The lines
   are as high as their highest item, are placed across by the cross justification (and grow to fill
   the container for `Stretch`), and an item sits in its line by the item alignment (`Stretch`
   fills the line). A container that does not wrap has one line. Minimum and maximum sizes bound
@@ -94,8 +95,8 @@ and from what the names of the fields say, and the open ones are listed at the e
   container, and an item out of the flow at its anchor. The pivot is also the centre of the turn
   and the scale of any widget.
 - **Turn and scale.** `orientation` and `orientationOffset` add up; the turn about x, y and z is
-  projected orthographically on the screen, z turning clockwise for positive angles (the sign is
-  unverified for angles that are not multiples of 180), so a turn of 180 about x flips a widget
+  projected orthographically on the screen, z turning clockwise for positive angles, so a turn of
+  180 about x flips a widget
   over and one of 90 about x leaves nothing to see. `scale` is applied before the turn. The
   transform applies to the widget, its children and its nested canvases. A zero or non-finite
   transform draws nothing or is replaced by the default and listed; `inheritsRotation` and
@@ -120,9 +121,56 @@ and from what the names of the fields say, and the open ones are listed at the e
 Textures and vector graphics (#537), progress meters, windows, edit boxes, dust and light
 widgets, the values of list rows and everything that a binding sets at run time, states and
 animations, the perspective of turns about x and y, the fade of overflow, gradient backgrounds,
-borders that differ on rounded boxes, spacer containers, `inheritsRotation` and `inheritsScale`,
-the position of nested canvases in the aspect modes, and the measuring of automatic texts, which
-is done twice (#564).
+borders that differ on rounded boxes, spacer containers, and `inheritsRotation` and
+`inheritsScale`.
+
+## Compared with the game (#576)
+
+The reference was the cockpit MFDs of the Aegis Gladius and the RSI Constellation on LIVE, in
+screenshots of the powered ship in a hangar. The screens sit on angled consoles, so only what sits in one place on the glass can be compared,
+not proportions to the pixel. The pages draw their rows and numbers from run-time data, so a
+canvas rendered at rest shows its frame and no rows; a guess that only a row can decide is
+compared by its Records and what the screenshot shows of the same widgets.
+
+- **The sign of positive z turns: confirmed.** The off panel of the power page (`GAMA` variant)
+  turns the arrow `GAMA_MFD_PipBox_Selector_Arrow.svg`, which points right, by +90 degrees about z.
+  In the game it points down under the warning triangle, and so does the render of the same
+  canvas. The plus and minus 45 degree stripes and corner pieces are not told apart by the
+  screenshots.
+- **Whether `Stretch` also stretches fixed-size items: not decidable.** Only the annunciators of
+  the HUD and of the physical screens and two screens of a cargo vehicle use the `Stretch` axis
+  justification; their items are fixed-size icons, and the annunciators are dark in every
+  screenshot. A head-on shot of an annunciator with several lit warnings would decide it.
+- **The single-line flex model, with the cross justification and the item alignment as two
+  settings: not decidable.** In the containers where the two differ (23 on the MFDs, 35 in the
+  HUDs) the items are either as high as the container or have no content at rest (list rows,
+  texts bound to values), so both readings give the same picture in every screenshot. A list row
+  with an item smaller than its row, shown head-on, would decide it.
+- **The cross start of `WrapReverse`: not decidable.** One canvas of the MFDs and HUDs uses it,
+  the countermeasure list of the Drake HUD, which no screenshot shows. A Drake HUD with more
+  countermeasure entries than fit in one column would decide it.
+- **The cross sizing of a stack: not decidable, and no difference to any screen seen.** The
+  stacks on the MFDs (heat bar, ammunition bars, fuel bars) hold children of a percentage or fixed
+  size across, which both readings size alike. Only a stack with an automatic-size child across
+  would tell them apart; none was found on the MFDs.
+- **The placement of aspect-mode canvases: decided.** 82 of the MFD canvases use
+  `aspectOverridesWidth`, among them the header and footer of every page. The footer
+  (`<  PAGE NAME  >`) is 1920 x 1080 units in a box of about 800 x 66 pixels. In the game it fills
+  the width of the screen, with the name in a bar in the middle and the chevrons at both ends, and
+  its 33-unit font is about half as high as the bar, as at one pixel per unit. So the aspect
+  modes lay a canvas out in the whole box, with no scale.
+- **The radar, the annunciator and the HUD.** The Gladius HUD draws nothing at rest, since its
+  parts are bound to game variables, so it stays uncompared; the annunciators are dark. What the
+  HUD screenshots show of the 1 to 5 degree turns of the HUD bounds cannot be separated from the
+  perspective of the projected HUD.
+
+The four open guesses and the screenshot that decides each are listed in issue #972.
+
+Outside the guesses: rendered at rest, the MFD frame draws large light-blue blocks at both lower
+corners and the ship diagram of the self-status page a light-blue rectangle, which the game does
+not show; issue #969 covers both.
+
+The text shaped to measure a widget is kept under the widget's key and reused by the paint pass.
 
 ## Considered Options
 

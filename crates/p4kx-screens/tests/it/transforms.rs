@@ -303,26 +303,33 @@ fn a_scaled_canvas_keeps_its_own_size_and_is_scaled_into_the_box() -> TestResult
     Ok(())
 }
 
-#[test]
-fn aspect_overrides_width_takes_the_width_from_the_height() -> TestResult {
-    let image = render_with(
-        &host(100.0, 20.0, "Size"),
-        vec![inner("aspectOverridesWidth").record()],
-    )?;
-    assert!(red_at(&image, 38, 10), "twice the height wide: 40 pixels");
-    assert!(empty_at(&image, 45, 10), "and no wider");
+/// Checks that a canvas of `method` fills a box of `size`: `inside` is red, `outside` is empty.
+fn assert_fills_box(
+    method: &'static str,
+    size: (f32, f32),
+    inside: (u32, u32),
+    outside: (u32, u32),
+) -> TestResult {
+    let image = render_with(&host(size.0, size.1, "Size"), vec![inner(method).record()])?;
+    assert!(
+        red_at(&image, inside.0, inside.1),
+        "{method}: fills the box"
+    );
+    assert!(
+        empty_at(&image, outside.0, outside.1),
+        "{method}: ends at the box"
+    );
     Ok(())
 }
 
 #[test]
-fn aspect_overrides_height_takes_the_height_from_the_width() -> TestResult {
-    let image = render_with(
-        &host(40.0, 50.0, "Size"),
-        vec![inner("aspectOverridesHeight").record()],
-    )?;
-    assert!(red_at(&image, 20, 18), "half the width high: 20 pixels");
-    assert!(empty_at(&image, 20, 25), "and no higher");
-    Ok(())
+fn aspect_overrides_width_lays_the_canvas_out_in_the_whole_box() -> TestResult {
+    assert_fills_box("aspectOverridesWidth", (80.0, 20.0), (75, 10), (85, 10))
+}
+
+#[test]
+fn aspect_overrides_height_lays_the_canvas_out_in_the_whole_box() -> TestResult {
+    assert_fills_box("aspectOverridesHeight", (40.0, 50.0), (20, 45), (20, 55))
 }
 
 #[test]
