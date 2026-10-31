@@ -16,12 +16,13 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 
+use crate::software_wgpu::software_wgpu_setup;
 use cataloging::{TestResult, makers, opened};
 use eframe::egui_wgpu::RendererOptions;
 use egui::{Color32, CornerRadius, Rect, TextureHandle, TextureOptions, Ui, pos2, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state, default_wgpu_setup};
+use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::theme::desktop::HEADER_HEIGHT;
 use p4kx_gui::theme::logo::{self, ICO_SIZES, Variant};
 use p4kx_gui::theme::tokens::{Weight, font};
@@ -243,7 +244,7 @@ fn save(path: &Path, width: u32, height: u32, image: &[u8]) -> TestResult {
 )]
 fn renderer() -> Option<WgpuTestRenderer> {
     let state =
-        catch_unwind(|| create_render_state(default_wgpu_setup(), RendererOptions::PREDICTABLE))
+        catch_unwind(|| create_render_state(software_wgpu_setup(), RendererOptions::PREDICTABLE))
             .ok();
     if state.is_none() {
         eprintln!("no graphics adapter: the test checks nothing");

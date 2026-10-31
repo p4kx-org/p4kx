@@ -9,9 +9,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::RendererOptions;
 use egui_kittest::Harness;
-use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state, default_wgpu_setup};
+use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::{
     AssemblyView, EntitiesStatus, GpuReport, Language, LoadoutSession, Model, ViewerSupport,
     WorkTab, install_viewer, ui,
@@ -195,7 +196,7 @@ fn save_png(
 )]
 fn a_capital_ship_is_drawn_in_the_window() -> TestResult {
     let Ok(state) = std::panic::catch_unwind(|| {
-        create_render_state(default_wgpu_setup(), RendererOptions::PREDICTABLE)
+        create_render_state(software_wgpu_setup(), RendererOptions::PREDICTABLE)
     }) else {
         note("no graphics adapter: the test checks nothing");
         return Ok(());
