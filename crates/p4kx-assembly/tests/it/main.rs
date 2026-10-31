@@ -75,6 +75,7 @@ mod loadout_entries;
 mod loadout_fit;
 mod loadout_followups;
 mod loadout_nested;
+mod loadout_pick;
 mod loadout_stop;
 mod loadout_tree;
 mod model_cache;

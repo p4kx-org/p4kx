@@ -16,7 +16,7 @@ use p4kx_testkit::{ENTITY_INTERIOR_CLASS, entity_interior_entries};
 
 use crate::entity_picking::{TestResult, listed, select};
 
-fn save(name: &str, width: u32, height: u32, image: &[u8]) -> TestResult {
+pub(crate) fn save(name: &str, width: u32, height: u32, image: &[u8]) -> TestResult {
     let Some(folder) = std::env::var_os("P4KX_RENDER_DIR").map(PathBuf::from) else {
         return Ok(());
     };
@@ -36,7 +36,7 @@ fn save(name: &str, width: u32, height: u32, image: &[u8]) -> TestResult {
     clippy::print_stderr,
     reason = "tells the test run why a test checked nothing"
 )]
-fn renderer() -> Option<WgpuTestRenderer> {
+pub(crate) fn renderer() -> Option<WgpuTestRenderer> {
     let state =
         catch_unwind(|| create_render_state(default_wgpu_setup(), RendererOptions::PREDICTABLE))
             .ok();
@@ -46,7 +46,7 @@ fn renderer() -> Option<WgpuTestRenderer> {
     state.map(WgpuTestRenderer::from_render_state)
 }
 
-fn render(harness: &mut Harness<'_, Model>, name: &str) -> TestResult {
+pub(crate) fn render(harness: &mut Harness<'_, Model>, name: &str) -> TestResult {
     harness.run_steps(12);
     let image = harness.render()?;
     let (width, height) = (image.width(), image.height());

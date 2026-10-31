@@ -31,6 +31,7 @@ pub(crate) fn run(args: &EntityArgs, as_json: bool) -> Result<ExitCode> {
 
 /// Prints the Loadout tree of an Entity.
 fn loadout(args: &EntityLoadoutArgs, as_json: bool) -> Result<()> {
+    let changes = args.changes.changes()?;
     let archive = crate::key::open(&args.archive)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
@@ -39,7 +40,6 @@ fn loadout(args: &EntityLoadoutArgs, as_json: bool) -> Result<()> {
     if args.stop_at_docked_vehicles {
         resolver = resolver.stopping_at_docked_vehicles();
     }
-    let changes = args.changes.changes()?;
     let entity = resolver.entities().find(&args.entity)?;
     let applied = resolver.resolve_changed(&entity, &changes)?;
     crate::entity_ignored::warn(&applied)?;
