@@ -6,7 +6,10 @@ use p4kx_dataforge::{Guid, Reference, StructValue, Value};
 use super::Rest;
 use super::ops::{Arith, Cmp};
 use crate::bindings::index_at;
-use crate::reader::{as_struct, flag, float, int, items, reference, text};
+use crate::reader::{as_struct, exact, flag, int, items, reference, text};
+
+/// The field of a canvas widget that names its canvas.
+pub(super) const CANVAS_FIELD: &str = "CanvasReferenceRecord";
 
 /// An input of a node: the node of `operations` it points at, if it is connected.
 pub(crate) type Input = Option<usize>;
@@ -22,6 +25,11 @@ pub(crate) enum Node {
     Param {
         parameter: String,
         default: Rest,
+    },
+    /// A localised component parameter: the text a canvas hands it, else the default.
+    TextParam {
+        parameter: String,
+        default: String,
     },
     Invert(Input),
     All(Vec<Input>),
@@ -84,6 +92,8 @@ pub(crate) enum FieldKind {
     Number,
     Integer,
     Text,
+    /// A localised text, set only where a game variable names it.
+    Localised,
     Other,
 }
 
@@ -118,8 +128,10 @@ fn operations_at(structure: &StructValue<'_>, name: &str) -> Vec<Input> {
         .collect()
 }
 
-fn number(structure: &StructValue<'_>, name: &str) -> f64 {
-    float(structure, name).map_or(0.0, f64::from)
+/// Reads a number field exactly: an absent field is 0, one that holds no number the reader takes
+/// gives `None`, so that its node is listed as not evaluated.
+fn number(structure: &StructValue<'_>, name: &str) -> Option<f64> {
+    structure.field(name).map_or(Some(0.0), exact)
 }
 
 fn field_kind(short: &str) -> Option<FieldKind> {
@@ -128,6 +140,7 @@ fn field_kind(short: &str) -> Option<FieldKind> {
         "NumberField" => Some(FieldKind::Number),
         "IntegerField" => Some(FieldKind::Integer),
         "StringField" => Some(FieldKind::Text),
+        "LocalizedField" => Some(FieldKind::Localised),
         "ColorField" => Some(FieldKind::Other),
         _ => None,
     }
@@ -142,14 +155,18 @@ fn source(short: &str, op: &StructValue<'_>) -> Option<Node> {
     Some(match short {
         "BooleanVariable" => variable(Rest::Bool(false)),
         "NumberVariable" | "IntegerVariable" => variable(Rest::Num(0.0)),
-        "StringVariable" => variable(Rest::Text(String::new())),
+        "StringVariable" | "LocalizedVariable" => variable(Rest::Text(String::new())),
         "BooleanComponentParameter" => Node::Param {
             parameter: parameter(),
             default: Rest::Bool(flag(op, "defaultValue").unwrap_or(false)),
         },
         "NumberComponentParameter" | "IntegerComponentParameter" => Node::Param {
             parameter: parameter(),
-            default: Rest::Num(number(op, "defaultValue")),
+            default: Rest::Num(number(op, "defaultValue")?),
+        },
+        "LocalizedComponentParameter" => Node::TextParam {
+            parameter: parameter(),
+            default: text(op, "defaultValue").unwrap_or_default().to_owned(),
         },
         "StringComponentParameter" => Node::Param {
             parameter: parameter(),
@@ -157,18 +174,6 @@ fn source(short: &str, op: &StructValue<'_>) -> Option<Node> {
         },
         _ => return None,
     })
-}
-
-fn whole(value: &Value<'_>) -> Option<f64> {
-    match value {
-        Value::Int32(value) => Some(f64::from(*value)),
-        Value::Int16(value) => Some(f64::from(*value)),
-        Value::Int8(value) => Some(f64::from(*value)),
-        Value::UInt32(value) => Some(f64::from(*value)),
-        Value::UInt16(value) => Some(f64::from(*value)),
-        Value::UInt8(value) => Some(f64::from(*value)),
-        _ => None,
-    }
 }
 
 fn node(short: &str, op: &StructValue<'_>) -> Option<Node> {
@@ -182,19 +187,22 @@ fn node(short: &str, op: &StructValue<'_>) -> Option<Node> {
         "BooleanEvaluateOr" => Node::Any(operations_at(op, "inputs")),
         "BooleanFromInteger" => Node::Compare {
             cmp: Cmp::parse(text(op, "type"))?,
-            constant: number(op, "value"),
+            constant: number(op, "value")?,
             left: operation_at(op, "inputL"),
             right: operation_at(op, "inputR"),
         },
         "BooleanFromNumber" => Node::Compare {
             cmp: Cmp::parse(text(op, "type"))?,
-            constant: number(op, "number"),
+            constant: number(op, "number")?,
             left: input(),
             right: operation_at(op, "inputB"),
         },
         "BooleanFromIntegerSwitch" => Node::Switch {
             default: flag(op, "defaultValue").unwrap_or(false),
-            exceptions: items(op, "exceptions").iter().filter_map(whole).collect(),
+            exceptions: items(op, "exceptions")
+                .iter()
+                .map(exact)
+                .collect::<Option<Vec<_>>>()?,
             input: input(),
         },
         "BooleanFromStringIsEmpty" => Node::TextEmpty(input()),
@@ -234,7 +242,7 @@ fn numeric(short: &str, op: &StructValue<'_>) -> Option<Node> {
     let whole = short.starts_with("Integer");
     Some(match short {
         "NumberFromBoolean" | "IntegerFromBoolean" => Node::Choose {
-            numbers: [number(op, "isTrue"), number(op, "isFalse")],
+            numbers: [number(op, "isTrue")?, number(op, "isFalse")?],
             input: input(),
             branches: [
                 operation_at(op, "inputTrue"),
@@ -252,14 +260,14 @@ fn numeric(short: &str, op: &StructValue<'_>) -> Option<Node> {
             };
             Node::Arith {
                 op: arith,
-                amount: number(op, "amount"),
+                amount: number(op, "amount")?,
                 left,
                 right,
                 whole,
             }
         }
         "NumberClamp" => Node::Clamp {
-            bounds: [number(op, "minValue"), number(op, "maxValue")],
+            bounds: [number(op, "minValue")?, number(op, "maxValue")?],
             input: input(),
             inputs: [
                 operation_at(op, "inputMinValue"),
@@ -314,6 +322,20 @@ impl Operations {
             Node::Variable { binding, .. } => Some(binding.as_str()),
             _ => None,
         })
+    }
+
+    /// Returns the names of the game variables whose text names the canvas of a canvas widget.
+    pub(crate) fn canvas_variables(&self) -> impl Iterator<Item = &str> {
+        self.bindings
+            .iter()
+            .filter(|binding| binding.kind == FieldKind::Text && binding.field == CANVAS_FIELD)
+            .filter_map(|binding| match self.nodes.get(binding.input?)? {
+                Node::Variable {
+                    binding,
+                    zero: Rest::Text(_),
+                } => Some(binding.as_str()),
+                _ => None,
+            })
     }
 
     /// Returns the canvases the graph can put in a canvas widget.
