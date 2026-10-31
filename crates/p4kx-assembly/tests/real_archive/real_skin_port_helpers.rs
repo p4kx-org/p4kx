@@ -13,9 +13,6 @@ use p4kx_testkit::{real_archive_key, real_archive_path};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-/// The most Entity Records the scan may fail to resolve; LIVE has 0.
-const MAX_UNRESOLVED: usize = 0;
-
 /// Returns whether the port is defined by its Entity as a skin attachment.
 fn is_skin(port: &PortNode) -> bool {
     port.definition()
@@ -28,6 +25,7 @@ fn lacks_helper(port: &PortNode) -> bool {
         .is_some_and(|definition| definition.transform().is_none())
 }
 
+/// Counts the skin ports without a helper; every Entity Record must resolve, as all of LIVE does.
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_skin_ports_without_a_helper_are_counted() -> TestResult {
@@ -65,9 +63,6 @@ fn the_skin_ports_without_a_helper_are_counted() -> TestResult {
         println!("    {line}");
     }
     assert!(skin_ports > 0, "no skin port found");
-    assert!(
-        unresolved <= MAX_UNRESOLVED,
-        "{unresolved} Entity Records did not resolve"
-    );
+    assert_eq!(unresolved, 0, "Entity Records did not resolve");
     Ok(())
 }
