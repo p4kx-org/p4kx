@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use p4kx_model::{Bone, BoneMatch, Model, Transform};
 
-use crate::geometry::{is_character_path, is_creature_path};
+use crate::character_path::{is_character_path, is_creature_path};
 use crate::placement::bone_pose;
 use crate::{EntityNode, Issue, IssueKind, LoadoutError, Part, Placement};
 

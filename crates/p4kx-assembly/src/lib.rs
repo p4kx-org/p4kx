@@ -83,6 +83,7 @@ mod catalogue;
 mod cdf;
 mod cdf_bone;
 mod changes;
+mod character_path;
 mod chf_names;
 mod compat;
 mod creature_rig;

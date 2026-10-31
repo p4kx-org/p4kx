@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::character_path::is_world_prop_path;
 use crate::placement::is_character_item;
 use crate::resolver::LoadoutResolver;
 use crate::tree::GeometryChoice;
 use crate::{Attachment, BodyVariant, EntityNode, MaterialVariant, PortNode};
 
+/// The item type of the head of a character.
 const HEAD_TYPE: &str = "Char_Head";
+
+/// The item type of the body of a character.
+pub(crate) const BODY_TYPE: &str = "Char_Body";
 
 /// The body a character wears and the head Entity whose sub-type names it.
 #[derive(Debug, Clone, Copy)]
@@ -41,18 +46,31 @@ impl EntityNode {
             head,
         })
     }
+
+    /// Returns the body the character in the tree below this Entity wears, by the first source
+    /// that names one: the sub-type of its `Char_Head` Entity (the generic head of most NPCs
+    /// names none), the sub-type of its `Char_Body` Entity, the folder of the model of that body.
+    pub(crate) fn body_variant(&self) -> Option<BodyVariant> {
+        self.character_body()
+            .map(|found| found.variant)
+            .or_else(|| {
+                let body = find_item(self.ports(), is_body_type)?;
+                BodyVariant::from_code(&body.attach_sub_type)
+                    .or_else(|| BodyVariant::of_model_path(body.geometry()?.path()))
+            })
+    }
 }
 
 impl LoadoutResolver<'_> {
     /// Gives the worn Entities of a character the sub-geometry of the character's body.
     ///
-    /// The body is the one the sub-type of the `Char_Head` Entity in the tree names. An Entity
-    /// whose item type starts with `Char_` (armour, clothing, head parts), whose Record names
-    /// geometry per body (`Male`, `Female`) and that no port flag gave a sub-geometry takes the
-    /// one tagged for the body; one without a sub-geometry for the body has no geometry. A tree
-    /// without a head is left as it is.
+    /// The body is [`EntityNode::body_variant`]. An Entity whose item type starts with `Char_`
+    /// (armour, clothing, head parts), whose Record names geometry per body (`Male`, `Female`)
+    /// and that no port flag gave a sub-geometry takes the one tagged for the body; one without a
+    /// sub-geometry for the body has no geometry, and neither has one whose only geometry is a
+    /// world prop. A tree without a body is left as it is.
     pub(crate) fn dress_body(&mut self, root: &mut EntityNode) {
-        let Some(body) = root.character_body().map(|found| found.variant) else {
+        let Some(body) = root.body_variant() else {
             return;
         };
         self.dress_ports(&mut root.ports, body);
@@ -82,6 +100,7 @@ impl LoadoutResolver<'_> {
                 .any(|other| variant.has_tag(other.tag()))
         });
         if !per_body {
+            leave_out_world_prop(child);
             return;
         }
         child.choice = GeometryChoice::Body(body);
@@ -101,24 +120,47 @@ impl LoadoutResolver<'_> {
     }
 }
 
+/// Takes the geometry of a worn item without sub-geometry per body when it is a world prop and
+/// keeps it in `fallback`, so that the Assembly can say which prop it left out.
+fn leave_out_world_prop(child: &mut EntityNode) {
+    if child
+        .geometry
+        .as_ref()
+        .is_some_and(|main| is_world_prop_path(main.path()))
+    {
+        child.choice = GeometryChoice::WorldProp;
+        child.fallback = child.geometry.take();
+    }
+}
+
 /// Returns whether `item_type` is the item type of a head, `Char_Head`.
 pub(crate) const fn is_head_type(item_type: &str) -> bool {
     item_type.eq_ignore_ascii_case(HEAD_TYPE)
 }
 
-/// Returns the first Entity of the item type `Char_Head` below `ports`, depth first.
-pub(crate) fn find_head(ports: &[PortNode]) -> Option<&EntityNode> {
+/// Returns the first Entity below `ports`, depth first, whose item type `is_type` accepts.
+fn find_item(ports: &[PortNode], is_type: fn(&str) -> bool) -> Option<&EntityNode> {
     ports.iter().find_map(|port| {
         if let Attachment::Entity(node) = port.attachment() {
-            if is_head_type(node.attach_type()) {
+            if is_type(node.attach_type()) {
                 return Some(&**node);
             }
-            if let Some(found) = find_head(node.ports()) {
+            if let Some(found) = find_item(node.ports(), is_type) {
                 return Some(found);
             }
         }
-        find_head(port.nested())
+        find_item(port.nested(), is_type)
     })
+}
+
+/// Returns the first Entity of the item type `Char_Head` below `ports`, depth first.
+pub(crate) fn find_head(ports: &[PortNode]) -> Option<&EntityNode> {
+    find_item(ports, is_head_type)
+}
+
+/// Returns whether `item_type` is the item type of a body, `Char_Body`.
+pub(crate) const fn is_body_type(item_type: &str) -> bool {
+    item_type.eq_ignore_ascii_case(BODY_TYPE)
 }
 
 /// Returns the body the sub-type of the head Entity `head` names.

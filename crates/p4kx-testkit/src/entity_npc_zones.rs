@@ -22,6 +22,9 @@ pub struct NpcZoneOptions {
     /// Leaves the head out; the shirt then names the male suit skin as its main geometry, so that
     /// it has a model without a body to choose by.
     pub headless: bool,
+    /// Gives the head this sub-type instead of the one of the body, e.g. `UNDEFINED` as the
+    /// generic head of most NPCs has; the body Entity then carries the sub-type of its body.
+    pub head_sub_type: Option<&'static str>,
     /// Gives the body Entity a copy of the body skin under this path below `Data` instead of the
     /// default skin file.
     pub body_skin: Option<&'static str>,
@@ -115,13 +118,14 @@ fn extra_entities() -> [TestEntity; 2] {
 
 /// Returns the head, the body and the spare body of the character.
 fn character_entities(options: NpcZoneOptions, default_skin: &str) -> [TestEntity; 3] {
+    let sex = if options.female { "Female" } else { "Male" };
     let head = TestEntity::new(
         0x31,
         "TEST_ZoneNpcHead",
         "entities/scitem/test_zone_head.xml",
     )
     .attach_type("Char_Head")
-    .sub_type(if options.female { "Female" } else { "Male" });
+    .sub_type(options.head_sub_type.unwrap_or(sex));
     let body = TestEntity::new(
         0x32,
         "TEST_ZoneNpcBody",
@@ -129,6 +133,11 @@ fn character_entities(options: NpcZoneOptions, default_skin: &str) -> [TestEntit
     )
     .attach_type(options.body_type.unwrap_or("Char_Body"))
     .geometry(options.body_skin.unwrap_or(default_skin), None::<&str>);
+    let body = if options.head_sub_type.is_some() {
+        body.sub_type(sex)
+    } else {
+        body
+    };
     let spare = TestEntity::new(
         0x34,
         "TEST_ZoneNpcSpareBody",

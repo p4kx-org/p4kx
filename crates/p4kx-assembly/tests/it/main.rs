@@ -85,6 +85,7 @@ mod npc_body_zones;
 mod npc_clothing;
 mod npc_face;
 mod npc_face_tags;
+mod npc_generic_head;
 mod npc_head;
 mod npc_hidden_parts;
 mod port_flag_fallback;
