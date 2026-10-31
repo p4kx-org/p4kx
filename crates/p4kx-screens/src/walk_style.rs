@@ -26,8 +26,8 @@ impl Walk<'_, '_, '_, '_> {
         self.push_chain(&(&subject.kind, &subject.tags, place, kids.finish()));
     }
 
-    /// Resolves the style of widget `index`: the entries, then the text part of a text field,
-    /// then the bound layout numbers under them, then the overrides of the instance.
+    /// Resolves the style of widget `index`: the entries, then the inner part of a text field or
+    /// an icon, then the bound layout numbers under them, then the overrides of the instance.
     pub(crate) fn style_of(
         &mut self,
         canvas: &Canvas,
@@ -52,7 +52,7 @@ impl Walk<'_, '_, '_, '_> {
             self.tags,
             &mut self.budget,
         );
-        if let Some(part) = self.text_part(widget, &subject) {
+        if let Some(part) = self.inner_part(widget, &subject) {
             merge(&mut style, &part);
         }
         self.under_bound_geometry(index, &mut style);

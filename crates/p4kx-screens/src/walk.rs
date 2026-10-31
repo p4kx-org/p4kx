@@ -258,6 +258,9 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
         let mut look = Look::of(widget, style, self.pixel, font);
         look.bound_text = self.bound_text(canvas, sibling.index);
         look.shaped = shaped;
+        if elements::draws_no_background(widget) {
+            look.background = None;
+        }
         elements::paint(self.cx, widget, &look, area, alpha);
         let clipped = widget.overflow.clips();
         if clipped {
