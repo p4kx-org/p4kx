@@ -537,8 +537,13 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   in force and those the screen does not read. `--var CANVAS::NAME=VALUE` limits a setting to the
   canvases of that Record name, which are not told apart when several share it; `a::b::c` is
   refused (ADR-0277). The canvas a canvas widget holds is the one a style
-  entry or a boolean binding picks (ADR-0277). The UI tab keeps its state and typed variables
-  across sessions.
+  entry, a boolean binding or a game variable picks (ADR-0277, ADR-0306): the powered MFD
+  `m_mfd_screen` shows the page named by `--var landscapecanvasguid=<record path or GUID>` (the
+  `mc_s_*_master` Records below `mfdscreens/mc_mfdcomponents/screens`, among them `power`,
+  `weapons`, `scanning`, `diag`, `shields`, `config`, `comms` and `self`), `portraitcanvasguid` in the portrait view, and its tab bar
+  names the page by `--var mfdviewname=<name or @key>`, an `@key` being looked up in the
+  language (`--lang`). The UI tab keeps its state and typed
+  variables across sessions.
 - `p4kx chf to-json <file> [--out <file>] [--archive <Data.p4k>]` converts a CHF character file, e.g. one saved by the
   character customiser, to indented JSON on stdout or in `--out`: its inner versions (7 and 8
   are read), body type, face DNA with every face part named, item ports and material choices.
