@@ -5,8 +5,8 @@
 //!
 //! The tests assume `WGPU_BACKEND` is not set, as the setup inherits it.
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::WgpuSetup;
-use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 

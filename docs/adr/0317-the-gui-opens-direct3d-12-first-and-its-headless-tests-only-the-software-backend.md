@@ -13,13 +13,18 @@ application uses eframe's default backends, so both were exposed to the same lay
 
 ## Decision
 
-**Tests.** All headless GUI tests take their wgpu setup from `p4kx_testkit::wgpu_setup::
-software_wgpu_setup()`. It is the setup of `egui_kittest`, which prefers a software adapter, with
-the instance limited on Windows to Direct3D 12 (WARP) and left at all backends elsewhere (lavapipe
-is a Vulkan adapter). The module sits behind the `wgpu` feature of the testkit, so no other user of
-the testkit builds eframe; `p4kx-gui` enables it as a dev-dependency. The setup inherits
+**Tests.** All headless GUI tests take their wgpu setup from one file,
+`crates/p4kx-gui/tests/support/software_wgpu.rs`. `software_wgpu_setup()` is the setup of
+`egui_kittest`, which prefers a software adapter, with the instance limited on Windows to Direct3D
+12 (WARP) and left at all backends elsewhere (lavapipe is a Vulkan adapter). The setup inherits
 `WGPU_BACKEND`: a value that names no Direct3D 12 backend is kept. A Windows test checks that the
 instance lists an adapter of device type Cpu (WARP on Direct3D 12) and no other backend.
+
+The file is included with `#[path]` by the `it` and `real_archive` test binaries and by the unit
+tests of the lib, which cannot share a module otherwise. The testkit is no home for it: its
+dependencies count as normal dependencies of a workspace crate, so `egui_kittest` and its
+`difflib`, which ship no licence file, would enter the third-party notices, and `cargo about`
+could only list them with an invented copyright.
 
 **Window.** The owner chose to open Direct3D 12 only, with a fallback. `window::native_options`
 asks `backends::choose` for the backends of the instance, in this order:

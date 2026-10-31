@@ -16,13 +16,13 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::{RenderState, RendererOptions};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::{GpuReport, Language, Model, ViewerSupport, install_viewer};
-use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 use viewing::{Site, TestResult, entries, opened_at};
 
 pub(crate) const BACKGROUND: [u8; 3] = [0x0F, 0x0F, 0x0F];

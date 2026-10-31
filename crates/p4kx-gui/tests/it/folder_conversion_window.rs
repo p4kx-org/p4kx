@@ -14,6 +14,7 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 
+use crate::software_wgpu::software_wgpu_setup;
 use crate::waiting::{RunQuiet, wait_for};
 use eframe::egui_wgpu::{RenderState, RendererOptions};
 use egui::accesskit::Role;
@@ -22,7 +23,6 @@ use egui_kittest::kittest::Queryable;
 use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::ui::{self, Dialog};
 use p4kx_gui::{ExtractionStatus, Language, Model};
-use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 use p4kx_testkit::{CryXmlByteOrder, CryXmlSignature, TestElement};
 use tempfile::TempDir;
 

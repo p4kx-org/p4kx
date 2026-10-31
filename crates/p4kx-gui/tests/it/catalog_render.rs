@@ -16,6 +16,7 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::PathBuf;
 
+use crate::software_wgpu::software_wgpu_setup;
 use cataloging::{TestResult, makers, opened};
 use eframe::egui_wgpu::{RenderState, RendererOptions};
 use egui::Rect;
@@ -23,7 +24,6 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::{CatalogExportStage, CatalogExportStatus, Language, Model, ui};
-use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 
 const SIZES: [[f32; 2]; 2] = [[1280.0, 800.0], [640.0, 400.0]];
 const LANGUAGES: [(Language, &str); 2] =

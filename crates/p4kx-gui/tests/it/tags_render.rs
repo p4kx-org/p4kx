@@ -13,6 +13,7 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::PathBuf;
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::RendererOptions;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
@@ -21,7 +22,6 @@ use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::theme::tags_metrics::TAGS_NAME_MIN_WIDTH;
 use p4kx_gui::{Language, Model, WorkTab, ui};
 use p4kx_testkit::TestEntry;
-use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 use tagging::{TestResult, archive, forge, forge_many, wait_until};
 
 const PRIMARY: [u8; 3] = [0xE7, 0x7E, 0x23];

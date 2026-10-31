@@ -16,6 +16,7 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 
+use crate::software_wgpu::software_wgpu_setup;
 use cataloging::{TestResult, makers, opened};
 use eframe::egui_wgpu::RendererOptions;
 use egui::{Color32, CornerRadius, Rect, TextureHandle, TextureOptions, Ui, pos2, vec2};
@@ -27,7 +28,6 @@ use p4kx_gui::theme::logo::{self, ICO_SIZES, Variant};
 use p4kx_gui::theme::tokens::{Weight, font};
 use p4kx_gui::theme::{self, palette};
 use p4kx_gui::{Model, ui};
-use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 
 const LOGO_PNG_SIZE: u32 = 512;
 const SOCIAL_WIDTH: u16 = 1280;

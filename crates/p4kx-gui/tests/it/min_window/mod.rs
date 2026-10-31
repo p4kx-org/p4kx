@@ -19,6 +19,7 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::PathBuf;
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::RendererOptions;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
@@ -27,7 +28,6 @@ use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::{
     Language, LocalizationStatus, Model, QueryStatus, TagsStatus, UiFilesStatus, WorkTab, ui,
 };
-use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 use p4kx_testkit::{GlobalIniBuilder, TestEntry};
 
 use crate::entity_picking::{TestResult, entries, listed, select};

@@ -3922,8 +3922,6 @@ dependencies = [
  "crc32c",
  "crc32fast",
  "dirs",
- "eframe",
- "egui_kittest",
  "flate2",
  "gltf",
  "half",

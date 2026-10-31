@@ -11,6 +11,7 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::PathBuf;
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::RendererOptions;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
@@ -18,7 +19,6 @@ use egui_kittest::kittest::Queryable;
 use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::theme::window_metrics::{SIDEBAR_RAIL_WIDTH, WORK_MIN_WIDTH};
 use p4kx_gui::{Language, ListStatus, Model, SoundsListStatus};
-use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 use tempfile::TempDir;
 
 use crate::entity_sounds::{TestResult, opened_with, wait_until};

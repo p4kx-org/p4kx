@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::RendererOptions;
 use egui_kittest::Harness;
 use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
@@ -17,7 +18,6 @@ use p4kx_gui::{
     WorkTab, install_viewer, ui,
 };
 use p4kx_settings::ModelMaterials;
-use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
 type TestResult = Result<(), Box<dyn Error>>;

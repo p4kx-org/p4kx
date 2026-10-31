@@ -16,12 +16,12 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::PathBuf;
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::{RenderState, RendererOptions};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::{Language, Model, ui};
-use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct};
 
 type TestResult = Result<(), Box<dyn Error>>;

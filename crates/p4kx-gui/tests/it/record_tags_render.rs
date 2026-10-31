@@ -15,6 +15,7 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::PathBuf;
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::RendererOptions;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
@@ -22,7 +23,6 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use exporting::{TestResult, opened, select_node, wait_until};
 use p4kx_gui::{Browser, Language, Model, PreviewTab, RecordForm, RecordPreviewStatus, ui};
-use p4kx_testkit::wgpu_setup::software_wgpu_setup;
 
 fn save(name: &str, width: u32, height: u32, image: &[u8]) -> TestResult {
     let Some(folder) = std::env::var_os("P4KX_RENDER_DIR").map(PathBuf::from) else {

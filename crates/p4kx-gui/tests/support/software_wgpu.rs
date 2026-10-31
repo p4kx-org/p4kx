@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The wgpu setup of the headless GUI tests, behind the `wgpu` feature so that the other users of
-//! this crate do not build eframe.
+//! The wgpu setup of the headless GUI tests, shared by the test binaries that include this file.
 
 use eframe::egui_wgpu::WgpuSetup;
 #[cfg(windows)]
@@ -16,8 +15,7 @@ use egui_kittest::wgpu::default_wgpu_setup;
 /// other programs inject into them. Elsewhere every backend stays, as the software adapter there
 /// (lavapipe) is a Vulkan one. The setup inherits `WGPU_BACKEND` from the environment: a value
 /// that names no Direct3D 12 backend is kept as it is.
-#[must_use]
-pub fn software_wgpu_setup() -> WgpuSetup {
+pub(crate) fn software_wgpu_setup() -> WgpuSetup {
     limited(default_wgpu_setup())
 }
 

@@ -145,6 +145,8 @@ mod renamed_records_window;
 mod rendering;
 mod search;
 mod search_window;
+#[path = "../support/software_wgpu.rs"]
+mod software_wgpu;
 mod software_wgpu_setup;
 mod soundbank_preview;
 mod sounding;
