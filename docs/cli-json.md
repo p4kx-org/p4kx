@@ -382,12 +382,15 @@ otherwise `body` is absent. The text report has the line
 is a part on a skin port, with or without a helper: it is drawn in the parent's bind pose with its
 helper and offset ignored, and without an Issue; a rigid prop on a skin port that is no character
 item (the mobiGlas) is a `helper` at the bone its port names in the skeleton of the root
-(ADR-0297). Otherwise the part sits at the helper its port names in the parent's model, else at
-that bone of the root's skeleton when the parent is a skin part, or, for a landing gear, at the
-node of its Entity's model named like the gear's bone; at the node of the parent's model named
-like the port, or at the parent's origin, which is also where a port with no helper and no node of
-its name lands, without an Issue, and where a landing gear lands whose Entity has no model. `helper`
-(the helper's name, or the bone of a landing gear; only for `helper`), `modelled`
+(ADR-0297).
+
+A part on any other port sits at the helper its port names in the parent's model, else at that
+bone of the root's skeleton when the parent is a skin part; failing that, at the node of the
+parent's model named like the port, or at the parent's origin, which is also where a port with no
+helper and no node of its name lands, without an Issue. A landing gear sits at the node of its
+Entity's model named like the gear's bone, and at the origin when its Entity has no model.
+
+A placement object also has `helper` (the helper's name, or the bone of a landing gear; only for `helper`), `modelled`
 (the part has a model) and `hidden` (the part is hidden, see `hidden_parts`; a part below a hidden
 one has no model to anchor to, so its `placement` may read `origin`; so is a landing gear of a
 hidden Entity).

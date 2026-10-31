@@ -22,3 +22,11 @@ off to the side. Moving them back by 0.05 centred them on the body.
 - Its placement is the new `Placement::Skin`, code `skin`, so a package tells a skin from a part
   that sits at the origin because it found no helper.
 - Every other attachment (`Bone`, `Entity`, `StatObj`) is placed as before.
+
+## Skin ports without a helper
+
+A scan of the LIVE Entity Records found 6785 item ports with a `Skin` attachment and none without
+a `Helper/Helper` node, so the rule "the attachment type decides, not the helper" is for data the
+Archive does not hold today. A synthetic test (`a_skin_without_a_helper_node_is_still_a_skin`)
+covers it; the ignored real-Archive test `the_skin_ports_without_a_helper_are_counted` repeats the
+scan. Every skin port names a helper, for example `Clothing_Legs` of `m_body_01` with `Hips`.

@@ -9,7 +9,7 @@ use p4kx_assembly::Placement;
 use p4kx_extraction::Archive;
 use p4kx_testkit::{
     DataForgeBuilder, TestBone, TestEntity, TestEntry, TestLoadout, TestLoadoutEntry, TestModel,
-    TestPort, TestSkeleton, entity_schema,
+    TestNode, TestPort, TestSkeleton, entity_schema,
 };
 
 const ARM: &str = "TEST_Arm";
@@ -107,6 +107,35 @@ fn a_bone_below_a_rotated_chain_composes_every_parent() -> TestResult {
         laser.world().translation(),
         [first_x + second_x, first_y + second_y, 0.0],
     );
+    Ok(())
+}
+
+#[test]
+fn a_node_of_the_model_beats_a_bone_of_the_same_name() -> TestResult {
+    let node = |name: &str, x: f32, kind: u16| TestNode {
+        name: name.to_owned(),
+        parent: None,
+        local: [
+            [1.0, 0.0, 0.0, x],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ],
+        kind,
+    };
+    let nodes = vec![
+        node("root", 0.0, 0),
+        node("mesh", 0.0, 0),
+        node("TIP", 5.0, 2),
+    ];
+    let skin = TestModel::two_bone_skin().with_nodes(nodes);
+    let fixture = fixture(entries(&skin, &[("on_tip", "tip", [0.0; 3])]))?;
+    let archive = Archive::open(&fixture.path)?;
+
+    let assembly = assemble(&archive, ARM, 0)?;
+
+    let laser = assembly.part_at("on_tip").ok_or("the part")?;
+    assert_eq!(laser.placement(), &Placement::Helper("tip".to_owned()));
+    assert_near(laser.world().translation(), [5.0, 0.0, 0.0]);
     Ok(())
 }
 
