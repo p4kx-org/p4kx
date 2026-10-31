@@ -29,6 +29,7 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
     if is_same_file(&args.out, &args.archive) {
         return Err(GlbOutputIsArchive(args.out.clone()).into());
     }
+    let changes = args.changes.changes()?;
     let archive = crate::key::open(&args.archive)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
@@ -37,7 +38,6 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
     if !args.expand_docked_vehicles {
         resolver = resolver.stopping_at_docked_vehicles();
     }
-    let changes = args.changes.changes()?;
     let record = resolver.entities().find(&args.entity)?;
     let applied = resolver.resolve_changed(&record, &changes)?;
     crate::entity_ignored::warn(&applied)?;

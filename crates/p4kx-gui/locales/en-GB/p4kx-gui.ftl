@@ -1196,6 +1196,10 @@ assembly-export-interior-heading = Interior
 assembly-export-interior = Include the rooms and props of the object containers
 assembly-export-changes = Loadout: { $excluded } left out, { $replaced } replaced
 assembly-export-changes-none = Loadout: the default one
+assembly-export-picks-heading = Loadout alternatives
+assembly-export-picks-hint = Body=1, Eggs=2 or 1
+assembly-export-picks-note = For creatures and NPCs, whose game picks one alternative per group at random. Name a group and its index, separated by commas; a bare index applies to every group that has it. Counting starts at 0; groups left out keep the first alternative.
+assembly-export-picks-invalid = Write each pick as group=index, for example Body=1, or as an index alone, separated by commas.
 assembly-export-lod-heading = Level of detail
 assembly-export-lod = LOD { $level }
 assembly-export-materials-heading = Materials
