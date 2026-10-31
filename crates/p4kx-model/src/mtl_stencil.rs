@@ -14,6 +14,8 @@ const MESH_DECAL: &str = "MeshDecal";
 const COLOUR: &str = "StencilDiffuseColor";
 const OPACITY: &str = "StencilOpacity";
 const TINT_OVERRIDE: &str = "StencilTintOverride";
+/// The `StencilTintOverride` from which the masks take the livery's decal colours.
+const DECAL_COLOURS_OVERRIDE: f32 = 2.0;
 
 /// How a stencil decal is coloured: the parameters of its shader, which colour the motif the
 /// stencil map cuts out.
@@ -28,8 +30,11 @@ pub struct Stencil {
     pub opacity: f32,
     /// Whether the decal takes the tint of the palette in place of its own colour
     /// (`StencilTintOverride` above 0). The material then takes the primary entry
-    /// ([`Material::palette`]); the palette's own decal colours are not read.
+    /// ([`Material::palette`]), or the decal colours when [`Self::decal_colours`] is set.
     pub palette_tint: bool,
+    /// Whether the red, green and blue masks of the stencil map take the livery's decal colours
+    /// (`StencilTintOverride` 2 or above).
+    pub decal_colours: bool,
 }
 
 impl Material {
@@ -56,6 +61,9 @@ impl Material {
             palette_tint: self
                 .public_param(TINT_OVERRIDE)
                 .is_some_and(|tint| tint[0] > 0.0),
+            decal_colours: self
+                .public_param(TINT_OVERRIDE)
+                .is_some_and(|tint| tint[0] >= DECAL_COLOURS_OVERRIDE),
         })
     }
 
@@ -102,7 +110,7 @@ impl Material {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Material, MaterialLibrary};
+    use crate::{Material, MaterialLibrary, PaletteSlot};
 
     type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -136,6 +144,7 @@ mod tests {
         assert_eq!(stencil.colour, Some([0.1, 0.2, 0.3]));
         assert!((stencil.opacity - 0.5).abs() < f32::EPSILON);
         assert!(stencil.palette_tint);
+        assert!(!stencil.decal_colours);
 
         let bare = decal("MeshDecal", "%STENCIL_MAP", "", "")?
             .stencil()
@@ -143,6 +152,7 @@ mod tests {
         assert_eq!(bare.colour, None);
         assert!((bare.opacity - 1.0).abs() < f32::EPSILON);
         assert!(!bare.palette_tint);
+        assert!(!bare.decal_colours);
         assert_eq!(decal("MeshDecal", "", "", "")?.stencil(), None);
         Ok(())
     }
@@ -198,28 +208,23 @@ mod tests {
     }
 
     #[test]
-    fn a_tint_override_with_a_stencil_map_takes_the_primary_palette_entry() -> Result {
-        use crate::PaletteSlot;
+    fn a_tint_override_with_a_stencil_map_takes_the_primary_entry_or_the_decal_colours() -> Result {
         let map = r#"<Texture Map="TexSlot7" File="a/b_stencil.tif"/>"#;
         let with = |params: &str| decal("MeshDecal", "%STENCIL_MAP", map, params);
-        assert_eq!(
-            with(r#"StencilTintOverride="1""#)?.palette,
-            Some(PaletteSlot::Primary)
-        );
+        for (value, slot) in [
+            ("0.5", PaletteSlot::Primary),
+            ("1", PaletteSlot::Primary),
+            ("2", PaletteSlot::Decal),
+            ("3", PaletteSlot::Decal),
+        ] {
+            assert_eq!(
+                with(&format!(r#"StencilTintOverride="{value}""#))?.palette,
+                Some(slot),
+                "{value}"
+            );
+        }
         assert_eq!(with(r#"StencilTintOverride="0""#)?.palette, None);
         assert_eq!(with("")?.palette, None);
-        Ok(())
-    }
-
-    #[test]
-    fn every_tint_override_above_zero_takes_the_primary_palette_entry() -> Result {
-        use crate::PaletteSlot;
-        let map = r#"<Texture Map="TexSlot7" File="a/b_stencil.tif"/>"#;
-        for value in ["1", "2", "0.5"] {
-            let params = format!(r#"StencilTintOverride="{value}""#);
-            let material = decal("MeshDecal", "%STENCIL_MAP", map, &params)?;
-            assert_eq!(material.palette, Some(PaletteSlot::Primary), "{value}");
-        }
         Ok(())
     }
 

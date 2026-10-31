@@ -303,7 +303,7 @@ fn make_base(
     outcome.tinted = specular.is_some();
     if job.diffuse.as_ref().is_some_and(|source| source.opacity) {
         return Some(
-            opacity_colour(&diffuse.image)
+            opacity_colour(&diffuse.image, job.tints.decal)
                 .map_err(|error| error.to_string())
                 .and_then(|image| encode(&image)),
         );

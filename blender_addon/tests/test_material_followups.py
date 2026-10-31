@@ -237,6 +237,66 @@ def test_a_palette_entry_wins_over_the_stencil_colour() -> None:
     assert graph.node("bsdf").inputs["Base Color"] == pytest.approx((0.5, 0.5, 0.5))
 
 
+def with_decal_colours(**fields: object) -> dict:
+    """A palette that states the decal colours red, green and blue."""
+    return {
+        "id": "p0001",
+        "name": "p",
+        "primary": entry([0.5, 0.5, 0.5], 100.0),
+        "secondary": entry([0.5, 0.5, 0.5], 100.0),
+        "tertiary": entry([0.5, 0.5, 0.5], 100.0),
+        "glass": [1.0, 1.0, 1.0],
+        "decal": [[0.4, 0.0, 0.0], [0.0, 0.5, 0.0], [0.0, 0.0, 0.6]],
+        **fields,
+    }
+
+
+def test_a_stencil_decal_that_takes_the_decal_colours_paints_its_masks_with_them() -> None:
+    raw = decal({"drawn": True, "colour": [0.1, 0.2, 0.3], "opacity": 1.0}, palette="decal")
+    graph = single([raw], with_decal_colours())
+    base = graph.linked("bsdf", "Base Color")
+    assert base is not None
+    blue_mix = graph.node(base.key)
+    assert blue_mix.kind == "ShaderNodeMix"
+    assert blue_mix.inputs["B"] == pytest.approx((0.0, 0.0, 0.6))
+    over = graph.linked(base.key, "A")
+    assert over is not None
+    green_mix = graph.node(over.key)
+    assert green_mix.inputs["A"] == pytest.approx((0.4, 0.0, 0.0))
+    assert green_mix.inputs["B"] == pytest.approx((0.0, 0.5, 0.0))
+    for mix, channel in ((blue_mix, "Blue"), (green_mix, "Green")):
+        factor = graph.linked(mix.key, "Factor")
+        assert factor is not None and factor.socket == channel
+
+
+def test_the_alpha_of_a_decal_with_decal_colours_is_the_strongest_of_its_masks() -> None:
+    graph = single([decal(palette="decal")], with_decal_colours())
+    link = graph.linked("bsdf", "Alpha")
+    assert link is not None
+    outer = graph.node(link.key)
+    assert outer.kind == "ShaderNodeMath" and outer.props["operation"] == "MAXIMUM"
+    inner = graph.linked(link.key, 0)
+    assert inner is not None and graph.node(inner.key).props["operation"] == "MAXIMUM"
+    assert len([n for n in graph.nodes if n.kind == "ShaderNodeTexImage"]) == 1
+
+
+def test_a_decal_takes_its_stencil_colour_when_the_palette_states_no_decal_colours() -> None:
+    palette = with_decal_colours()
+    del palette["decal"]
+    raw = decal({"drawn": True, "colour": [0.1, 0.2, 0.3], "opacity": 1.0}, palette="decal")
+    graph = single([raw], palette)
+    assert graph.node("bsdf").inputs["Base Color"] == pytest.approx((0.1, 0.2, 0.3))
+    assert alpha_texture(graph) == ("ShaderNodeSeparateColor", "Red")
+    assert single([raw]).node("bsdf").inputs["Base Color"] == pytest.approx((0.1, 0.2, 0.3))
+
+
+def test_a_malformed_decal_of_a_palette_reads_as_none() -> None:
+    for bad in ("red", [[0.1] * 3, [0.2] * 3], [[0.1] * 3, [0.2] * 3, "x"]):
+        palettes = parse_palettes([with_decal_colours(decal=bad)], [])
+        assert palettes["p0001"].decal is None
+    assert parse_palettes([with_decal_colours()], [])["p0001"].decal is not None
+
+
 def test_the_stencil_opacity_and_the_material_opacity_scale_the_alpha() -> None:
     graph = single([decal({"drawn": True, "opacity": 0.5}, opacity=0.8)])
     kind, _ = alpha_texture(graph)

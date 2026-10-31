@@ -54,6 +54,9 @@ pub(crate) struct Tints {
     pub(crate) diffuse: [f32; 3],
     /// The specular colour, which multiplies the specular map.
     pub(crate) specular: [f32; 3],
+    /// The colours of the red, green and blue masks of a stencil map, which the opacity map of a
+    /// stencil decal that takes the decal colours is painted with.
+    pub(crate) decal: Option<[[f32; 3]; 3]>,
 }
 
 pub(crate) fn linear(value: u8) -> f32 {
@@ -177,13 +180,41 @@ pub(crate) fn base_colour(
 
 /// Returns the base colour image of the opacity map `opacity`: white, with the red channel of the
 /// map as the alpha channel, so that the material's diffuse colour is the colour of the surface.
-pub(crate) fn opacity_colour(opacity: &RgbaImage) -> Result<RgbaImage, TextureError> {
+///
+/// With `decal`, the colours of the red, green and blue masks, the image is painted instead: the
+/// red colour, with the green and the blue colour blended over it by their masks, and the
+/// strongest mask as the alpha channel.
+pub(crate) fn opacity_colour(
+    opacity: &RgbaImage,
+    decal: Option<[[f32; 3]; 3]>,
+) -> Result<RgbaImage, TextureError> {
     fill(opacity.width(), opacity.height(), |y, out| {
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
-            let [red, ..] = texel(opacity, x, y);
-            *target = [OPAQUE, OPAQUE, OPAQUE, red];
+            let [red, green, blue, _] = texel(opacity, x, y);
+            *target = decal.map_or([OPAQUE, OPAQUE, OPAQUE, red], |colours| {
+                decal_texel(colours, [red, green, blue])
+            });
         }
     })
+}
+
+/// Returns the texel of a stencil decal with the masks `masks` painted in the linear `colours`.
+fn decal_texel(colours: [[f32; 3]; 3], masks: [u8; 3]) -> [u8; RGBA] {
+    let [first, second, third] = colours;
+    let [red, green, blue] = masks;
+    let blend = |under: [f32; 3], over: [f32; 3], mask: u8| {
+        let share = f32::from(mask) / f32::from(OPAQUE);
+        let [low_red, low_green, low_blue] = under;
+        let [high_red, high_green, high_blue] = over;
+        [
+            share.mul_add(high_red - low_red, low_red),
+            share.mul_add(high_green - low_green, low_green),
+            share.mul_add(high_blue - low_blue, low_blue),
+        ]
+    };
+    let painted = blend(blend(first, second, green), third, blue);
+    let [r, g, b] = painted.map(encode);
+    [r, g, b, red.max(green).max(blue)]
 }
 
 /// Returns the normal map image of the engine's normal map `normal`: X and the reconstructed Z as

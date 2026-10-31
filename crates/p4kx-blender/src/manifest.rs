@@ -15,7 +15,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 ///
 /// A new minor version only adds fields and values readers may ignore; a new major version changes
 /// the meaning of existing ones.
-pub const FORMAT_VERSION: &str = "1.6";
+pub const FORMAT_VERSION: &str = "1.7";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";

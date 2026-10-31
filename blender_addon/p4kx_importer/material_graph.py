@@ -116,6 +116,31 @@ class _Maker(LayerBlending, GlassSurface):
         self.builder.spec.alpha_mode = "blend"
         return self.builder.spec
 
+    def _decal_colours(self) -> tuple[Colour, Colour, Colour] | None:
+        """Returns the decal colours the masks of the stencil map take, if the material takes them.
+
+        That is a stencil decal the package states with the palette entry ``decal`` whose palette
+        states decal colours; any other decal keeps its stencil colour.
+        """
+        palette = self.context.palette
+        if self.desc.palette != "decal" or palette is None or not self.desc.slot("stencil"):
+            return None
+        return palette.decal
+
+    def _decal_paint(self, colours: tuple[Colour, Colour, Colour]) -> Ref:
+        """Returns the colour of a stencil map painted with ``colours``.
+
+        The red colour, with the green and the blue colour blended over it by their masks.
+        """
+        slot = self.desc.slot("stencil")
+        assert slot is not None
+        b = self.builder
+        split = b.add("ShaderNodeSeparateColor")
+        b.link(Ref(self._image(slot, 1.0), "Color"), split, "Color")
+        red, green, blue = colours
+        paint = b.mix(red, green, Ref(split, "Green"))
+        return b.mix(paint, blue, Ref(split, "Blue"))
+
     def _entry(self) -> PaletteColours | None:
         palette = self.context.palette
         if palette is None:
@@ -156,6 +181,8 @@ class _Maker(LayerBlending, GlassSurface):
         if slot := desc.slot("diffuse"):
             texture = Ref(self._image(slot, tiling), "Color")
             diffuse = texture if factor == WHITE else b.mix(texture, factor, 1.0, blend="MULTIPLY")
+        elif decal := self._decal_colours():
+            diffuse = self._decal_paint(decal)
         if slot := desc.slot("occlusion"):
             diffuse = b.mix(diffuse, Ref(self._image(slot, tiling), "Color"), 1.0, blend="MULTIPLY")
         if slot := desc.slot("detail"):
@@ -273,10 +300,14 @@ class _Maker(LayerBlending, GlassSurface):
         source: Ref | None = None
         cap = desc.shader.lower() == "hairpbr" and "HAIR_CAP" in desc.gen_mask
         if slot := desc.slot("stencil"):
-            # The red channel of a stencil map is the opacity of the motif.
-            red = b.add("ShaderNodeSeparateColor")
-            b.link(Ref(self._image(slot, 1.0), "Color"), red, "Color")
-            source = Ref(red, "Red")
+            # The red channel of a stencil map is the opacity of the motif; with decal colours,
+            # the strongest of its three masks.
+            split = b.add("ShaderNodeSeparateColor")
+            b.link(Ref(self._image(slot, 1.0), "Color"), split, "Color")
+            source = Ref(split, "Red")
+            if self._decal_colours():
+                strongest = b.math("MAXIMUM", source, Ref(split, "Green"))
+                source = b.math("MAXIMUM", strongest, Ref(split, "Blue"))
         elif (slot := desc.slot("mask")) and (slot.texture or not cap):
             bw = b.add("ShaderNodeRGBToBW")
             b.link(Ref(self._image(slot, 1.0), "Color"), bw, "Color")

@@ -117,6 +117,7 @@ fn material<'a>(
         textures,
         palette: palette_slot(element),
         tinted: false,
+        decal_colours: None,
         other_attributes: attributes(element)
             .into_iter()
             .filter(|(name, _)| {
@@ -132,11 +133,14 @@ fn material<'a>(
         diffuse_map_is_grey: None,
     };
     if built.palette.is_none()
-        && built
-            .stencil_motif()
-            .is_some_and(|stencil| stencil.palette_tint)
+        && let Some(stencil) = built.stencil_motif()
+        && stencil.palette_tint
     {
-        built.palette = Some(PaletteSlot::Primary);
+        built.palette = Some(if stencil.decal_colours {
+            PaletteSlot::Decal
+        } else {
+            PaletteSlot::Primary
+        });
     }
     Ok(built)
 }

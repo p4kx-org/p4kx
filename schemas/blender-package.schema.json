@@ -482,7 +482,7 @@
               "type": "null"
             }
           ],
-          "description": "The palette entry the material takes: that of its first layer with a `PaletteTint` from 1\nto 3, the glass colour of a glass material that uses the tint palette, or the primary entry\nof a stencil decal with `StencilTintOverride`."
+          "description": "The palette entry the material takes: that of its first layer with a `PaletteTint` from 1\nto 3, the glass colour of a glass material that uses the tint palette, or the primary entry\nof a stencil decal with a `StencilTintOverride` of 1, or the decal colours of one with 2 or\nmore (1.7)."
         },
         "parameters": {
           "description": "The shader parameters (`PublicParams`) in file order, name and value as the file has them.",
@@ -1052,6 +1052,24 @@
     "Palette": {
       "description": "A tint palette: the colours a livery gives the materials that take a palette entry.\n\nA palette is written once; meshes reference it by id.",
       "properties": {
+        "decal": {
+          "description": "The colours of the red, green and blue masks of a stencil map, linear (1.7); absent when\nthe palette states none and in a package before 1.7.",
+          "items": {
+            "items": {
+              "format": "float",
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "glass": {
           "description": "The colour of the tinted glass, linear.",
           "items": {
@@ -1150,6 +1168,11 @@
         {
           "const": "glass",
           "description": "The glass colour.",
+          "type": "string"
+        },
+        {
+          "const": "decal",
+          "description": "The decal colours of the palette (`decal`, 1.7): the colours of the red, green and blue\nmasks of the stencil map.",
           "type": "string"
         }
       ]

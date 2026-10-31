@@ -14,11 +14,43 @@ fn base(specular: [f32; 3]) -> [u8; 3] {
     let tints = Tints {
         diffuse: [1.0; 3],
         specular,
+        decal: None,
     };
     let image = base_colour(&pixel(DARK_DIFFUSE), Some(&pixel(LIGHT_MAP)), tints, false)
         .expect("a base colour image");
     let [red, green, blue, _] = texel(&image, 0, 0);
     [red, green, blue]
+}
+
+const DECALS: [[f32; 3]; 3] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+
+fn decal_texel(masks: [u8; 3]) -> [u8; 4] {
+    let [red, green, blue] = masks;
+    let image = opacity_colour(&pixel([red, green, blue, OPAQUE]), Some(DECALS))
+        .expect("a base colour image");
+    texel(&image, 0, 0)
+}
+
+#[test]
+fn without_decal_colours_an_opacity_map_gives_white_with_its_red_as_alpha() {
+    let image = opacity_colour(&pixel([64, 200, 180, OPAQUE]), None).expect("an image");
+    assert_eq!(texel(&image, 0, 0), [OPAQUE, OPAQUE, OPAQUE, 64]);
+}
+
+#[test]
+fn each_mask_of_a_stencil_map_takes_its_decal_colour() {
+    assert_eq!(decal_texel([OPAQUE, 0, 0]), [OPAQUE, 0, 0, OPAQUE]);
+    assert_eq!(decal_texel([0, OPAQUE, 0]), [0, OPAQUE, 0, OPAQUE]);
+    assert_eq!(decal_texel([0, 0, OPAQUE]), [0, 0, OPAQUE, OPAQUE]);
+}
+
+#[test]
+fn the_alpha_of_a_decal_is_its_strongest_mask_and_the_later_mask_covers_the_earlier() {
+    let [red, green, blue, alpha] = decal_texel([OPAQUE, OPAQUE, 128]);
+    assert_eq!(alpha, OPAQUE);
+    assert_eq!(red, 0, "green covers red");
+    assert!(green > 0 && blue > 0, "blue is blended over green");
+    assert_eq!(decal_texel([40, 0, 0])[3], 40);
 }
 
 #[test]

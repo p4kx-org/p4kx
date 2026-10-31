@@ -178,8 +178,8 @@ pub use entity_interior_sample::{
 pub use entity_layer_chain::{LAYER_CHAIN_LENGTH, layer_chain_entries};
 pub use entity_layered::{LAYERED_MISSING_TEXTURE, LAYERED_TINTS, layered_entries};
 pub use entity_livery::{
-    LIVERY_DEFAULT_PALETTE, LIVERY_DEFAULT_TINTS, LIVERY_GUN_TINTS, LIVERY_SHIP_TINTS,
-    livery_entries,
+    LIVERY_DEFAULT_PALETTE, LIVERY_DEFAULT_TINTS, LIVERY_GUN_TINTS, LIVERY_SHIP_DECALS,
+    LIVERY_SHIP_TINTS, livery_entries,
 };
 pub use entity_loadout::{TestLoadout, TestLoadoutEntry};
 pub use entity_module_sample::{ENTITY_MODULE_CARRIER, ENTITY_MODULE_CLASS, entity_module_entries};
@@ -210,7 +210,7 @@ pub use entity_prop_rig::{
 };
 pub use entity_requirement::TestRequirement;
 pub use entity_sample::{SAMPLE_GUN, SAMPLE_MISSING, SAMPLE_MOUNT, SAMPLE_SHIP, sample_ship};
-pub use entity_schema::{entity_schema, tint_palette_record};
+pub use entity_schema::{entity_schema, tint_palette_record, tint_palette_record_with_decal};
 pub use entity_skin::{SKIN_BODY, skin_attachment_entries};
 pub use entity_vehicle::landing_system_record;
 pub use entity_zones::{

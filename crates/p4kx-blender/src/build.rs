@@ -219,6 +219,7 @@ fn palettes(inputs: &Inputs<'_>) -> Vec<Palette> {
             secondary: colours(&palette.secondary),
             tertiary: colours(&palette.tertiary),
             glass: palette.glass,
+            decal: palette.decal,
         })
         .collect()
 }

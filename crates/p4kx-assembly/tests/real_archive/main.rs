@@ -70,6 +70,7 @@ mod real_soc_survey;
 mod real_streamed_localised;
 mod real_trigger_discovery;
 mod real_txtp;
+mod real_ursa_decals;
 mod real_vehicle;
 mod real_vehicle_numbers;
 mod real_vehicle_support;
