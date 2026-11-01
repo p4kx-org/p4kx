@@ -209,3 +209,27 @@ fn a_full_path_over_the_windows_limit_is_reported_for_its_entry() -> TestResult 
     );
     Ok(())
 }
+
+#[test]
+fn an_entry_is_written_with_the_case_of_its_path_and_a_second_run_adds_no_duplicate() -> TestResult
+{
+    let dir = tempfile::tempdir()?;
+    let names = paths(&["Mixed.TXT", "MixedFolder\\Inner.Txt"]);
+    run(dir.path(), &names)?;
+    let archive =
+        Archive::open_with_key(dir.path().join("Data.p4k"), Some(p4kx_testkit::test_key()))?;
+    let entries: Vec<_> = archive.entries().iter().collect();
+
+    let second = extract(
+        &archive,
+        &entries,
+        &dir.path().join("out"),
+        &ExtractOptions::default(),
+    );
+
+    assert!(second.is_complete(), "{second:?}");
+    assert_eq!(written(dir.path())?, ["Mixed.TXT", "MixedFolder"]);
+    let inner = dir.path().join("out").join("Data").join("MixedFolder");
+    assert_eq!(fs::read_dir(inner)?.count(), 1, "no second spelling");
+    Ok(())
+}

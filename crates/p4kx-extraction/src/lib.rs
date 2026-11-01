@@ -28,6 +28,7 @@ mod dataforge_file;
 mod dataforge_pick;
 mod dataforge_source;
 mod dependent;
+mod disk_case;
 mod entry_content;
 mod entry_path;
 mod entry_tree;

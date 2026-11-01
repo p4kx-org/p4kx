@@ -11,6 +11,7 @@ use p4kx_model::{
 
 use crate::ConversionError;
 use crate::chunk_source::ChunkSource;
+use crate::disk_case::CaseIndex;
 use crate::model_companions::{ArchiveCompanions, DiskCompanions};
 use crate::path_index::PathIndex;
 use crate::texture_grey::TextureVerdicts;
@@ -242,6 +243,7 @@ impl ModelSource {
             folder,
             read: vec![path.to_path_buf()],
             absent: None,
+            case: CaseIndex::default(),
         };
         let read = Model::read_with_materials(
             &file_name,
