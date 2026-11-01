@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 130" width="130" height="130">
+<title>P4KX</title>
+<rect width="130" height="130" rx="24" fill="#0F0F0F"/>
+<path d="M42,30 H28 V100 H42" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linejoin="miter"/>
+<path d="M88,30 H102 V100 H88" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linejoin="miter"/>
+<line x1="50" y1="42" x2="80" y2="88" stroke="#C45C00" stroke-width="11" stroke-linecap="round"/>
+<line x1="80" y1="42" x2="50" y2="88" stroke="#E77E23" stroke-width="11" stroke-linecap="round"/>
+</svg>

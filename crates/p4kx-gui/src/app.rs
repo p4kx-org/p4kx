@@ -14,7 +14,7 @@ use crate::ui::Dialog;
 use crate::ui_file_dialog::UiFileDialog;
 use crate::{
     CATALOG_FILE, CatalogText, CharacterText, ComparisonText, HeadSource, Model, QueryExportFormat,
-    QueryText, Text, ViewerSupport, ui, window,
+    QueryText, Text, ViewerSupport, smoke::Frames, ui, window,
 };
 
 /// The eframe application: a [`Model`] drawn by [`ui::show`], with the open dialog and the
@@ -26,6 +26,7 @@ pub struct App {
     window: Option<WindowGeometry>,
     language_chosen: bool,
     dialog: Option<(Dialog, Receiver<Option<PathBuf>>)>,
+    smoke: Option<Frames>,
 }
 
 impl App {
@@ -43,6 +44,27 @@ impl App {
             window,
             language_chosen: false,
             dialog: None,
+            smoke: None,
+        }
+    }
+
+    /// Makes the window close itself once it has drawn `frames`, for a smoke run.
+    #[must_use]
+    pub const fn with_smoke(mut self, frames: Frames) -> Self {
+        self.smoke = Some(frames);
+        self
+    }
+
+    /// Counts a drawn frame of a smoke run, keeps the frames coming and closes the window after
+    /// the last one.
+    fn advance_smoke(&mut self, ctx: &egui::Context) {
+        let Some(frames) = &mut self.smoke else {
+            return;
+        };
+        if frames.drawn() {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        } else {
+            ctx.request_repaint();
         }
     }
 
@@ -316,6 +338,7 @@ impl eframe::App for App {
             self.save_settings();
         }
         self.window = ui.input(|input| window::geometry(self.window, input.viewport()));
+        self.advance_smoke(ui.ctx());
     }
 
     fn on_exit(&mut self) {

@@ -98,6 +98,7 @@ mod interior_view;
 mod interior_view_bar;
 mod interior_view_render;
 mod labels;
+mod linux_platform;
 mod localization_keys;
 mod localization_window;
 mod localizing;
