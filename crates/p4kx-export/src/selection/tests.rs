@@ -49,6 +49,7 @@ fn every_kind_but_the_older_loot_kinds_and_the_crafters_is_found_alike_by_path_a
             match kind {
                 Kind::LegacyLootTables => assert_eq!(by_path, Some(Kind::LootTables)),
                 Kind::LegacyLootArchetypes => assert_eq!(by_path, Some(Kind::LootArchetypes)),
+                Kind::MissionBrokerEntries => assert_eq!(by_path, Some(Kind::ContractTemplates)),
                 _ => assert_eq!(by_path, by_record, "{kind} by path at {path}"),
             }
         }

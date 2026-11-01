@@ -342,6 +342,7 @@ fn every_kind_states_its_completeness() -> TestResult {
             "contractShipSpawns": {"status": "complete"},
             "contractLocationQueries": {"status": "complete"},
             "contractTemplates": {"status": "complete"},
+            "missionBrokerEntries": {"status": "complete"},
             "lootTables": {"status": "complete"},
             "lootArchetypes": {"status": "complete"},
             "lootPoolFilters": {"status": "complete"},

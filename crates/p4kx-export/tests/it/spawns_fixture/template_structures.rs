@@ -132,6 +132,13 @@ fn flow() -> Vec<TestStruct> {
         TestStruct::new("MissionFlowCondition_PropertyIsSet")
             .parent("MissionFlowCondition")
             .field("property", weak("MissionProperty")),
+        TestStruct::new("MissionFlowCondition_AllTokensState")
+            .parent("MissionFlowCondition")
+            .field("tokenState", TestType::String),
+        TestStruct::new("MissionFlowCondition_AnyTokensState")
+            .parent("MissionFlowCondition")
+            .field("tokenState", TestType::String),
+        TestStruct::new("MissionFlowCondition_OnMissionStart").parent("MissionFlowCondition"),
         TestStruct::new("MissionFlowCondition_Unknown").parent("MissionFlowCondition"),
         TestStruct::new("MissionFlowAction"),
         TestStruct::new("MissionFlowAction_StateChange")

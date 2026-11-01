@@ -46,6 +46,7 @@ pub(super) fn contracts() -> serde_json::Value {
         "debugName": "Deliver_A",
         "handler": "Delivery_Career",
         "templateGuid": "40000000-0000-4000-8000-000000000001",
+        "brokerEntryGuid": "b1000000-0000-4000-8000-000000000001",
         "notForRelease": false,
         "workInProgress": null,
         "title": {"key": "@title_a", "en": "Deliver Scrap to [LOCATION]", "de": null},

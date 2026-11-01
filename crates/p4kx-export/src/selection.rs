@@ -147,11 +147,14 @@ pub enum Kind {
     /// Contract templates: every `ContractTemplate` Record, whatever its folder, the structure a
     /// contract names in `templateGuid`.
     ContractTemplates,
+    /// Mission broker entries: every `MissionBrokerEntry` Record, whatever its folder, the offers
+    /// of the mission board.
+    MissionBrokerEntries,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 44] = [
+    pub const ALL: [Self; 45] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -196,6 +199,7 @@ impl Kind {
         Self::ContractShipSpawns,
         Self::ContractLocationQueries,
         Self::ContractTemplates,
+        Self::MissionBrokerEntries,
     ];
 
     /// Returns the name of the kind's array in the catalog, e.g. `manufacturers`.
@@ -246,6 +250,7 @@ impl Kind {
             Self::ContractShipSpawns => "contractShipSpawns",
             Self::ContractLocationQueries => "contractLocationQueries",
             Self::ContractTemplates => "contractTemplates",
+            Self::MissionBrokerEntries => "missionBrokerEntries",
         }
     }
 
@@ -263,6 +268,7 @@ impl Kind {
                 | Self::Contracts
                 | Self::MissionLocationTemplates
                 | Self::ContractTemplates
+                | Self::MissionBrokerEntries
         )
     }
 

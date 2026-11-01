@@ -5,6 +5,7 @@
 
 use serde_json::json;
 
+mod brokers;
 mod contracts;
 mod crafters;
 mod harvest;
@@ -63,6 +64,7 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "contractShipSpawns": {"status": "complete"},
             "contractLocationQueries": {"status": "complete"},
             "contractTemplates": {"status": "complete"},
+            "missionBrokerEntries": {"status": "complete"},
             "lootTables": {"status": "complete"},
             "lootArchetypes": {"status": "complete"},
             "lootPoolFilters": {"status": "complete"},
@@ -293,6 +295,7 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
         "contractShipSpawns": spawns::ship_spawns(),
         "contractLocationQueries": spawns::location_queries(),
         "contractTemplates": spawns::contract_templates(),
+        "missionBrokerEntries": brokers::broker_entries(),
         "lootTables": loot::tables(),
         "lootArchetypes": loot::archetypes(),
         "lootPoolFilters": loot::filters(),

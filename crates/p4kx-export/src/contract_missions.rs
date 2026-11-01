@@ -34,6 +34,9 @@ pub(crate) struct ContractEntry<'a> {
     pub(crate) handler: Option<&'a str>,
     /// The GUID of the `ContractTemplate` Record the contract names, `null` when it names none.
     pub(crate) template_guid: Option<CatalogGuid>,
+    /// The GUID of the `MissionBrokerEntry` Record the contract names in `missionBrokerEntry`, an
+    /// entry of `missionBrokerEntries`; `null` when it names none.
+    pub(crate) broker_entry_guid: Option<CatalogGuid>,
     /// Whether the contract is marked `notForRelease`, `null` when the flag is absent.
     pub(crate) not_for_release: Option<bool>,
     /// Whether the contract is marked `workInProgress`, `null` when the flag is absent.

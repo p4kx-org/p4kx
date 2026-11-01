@@ -21,6 +21,7 @@ pub(super) fn structures(builder: DataForgeBuilder) -> DataForgeBuilder {
         contracts(),
         templates(),
         super::template_structures::structs(),
+        super::broker_structures::structs(),
         properties(),
         spawns(),
         locations(),
@@ -55,6 +56,7 @@ fn contracts() -> Vec<TestStruct> {
             .field("id", TestType::Guid)
             .field("debugName", TestType::String)
             .field("template", TestType::Reference)
+            .field("missionBrokerEntry", TestType::Reference)
             .field("paramOverrides", class("ContractParamOverrides"))
             .array("subContracts", class("SubContract")),
         TestStruct::new("SubContract")

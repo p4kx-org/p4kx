@@ -19,9 +19,10 @@ use crate::selection::Kind;
 use crate::spawn_layers::{Level, SpawnPools};
 use crate::spawn_model::SpawnLevel;
 use crate::spawn_read::Reader;
-use crate::template_extras::{end_comms, modifiers, owner, partial_payout, start_comms};
+use crate::template_extras::{end_comms, owner, partial_payout, start_comms};
 use crate::template_flow::FlowReader;
 use crate::template_issues::Unknowns;
+use crate::template_modifier::modifiers;
 use crate::template_objective::ObjectiveState;
 use crate::template_objective_read::ObjectiveReader;
 use crate::texts::Texts;
@@ -133,13 +134,13 @@ fn template<'f>(
         class_type: class.map(|class| class.type_name().to_owned()),
         settings: one(class, "additionalParams").map(settings),
         auto_finish: one(class, "autoFinishSettings").map(|finish| auto_finish(finish, unknowns)),
-        contract_properties: properties(root),
+        contract_properties: properties(root, "contractProperties"),
         ship_spawns: spawns.ship_spawns,
         location_queries: spawns.location_queries,
         hauling_orders: hauling_orders(root),
         objectives,
         partial_payout: partial_payout(root),
-        modifiers: modifiers(&reader, root),
+        modifiers: modifiers(&reader, unknowns, root)?,
         owner: owner(forge, root),
         mission_flow: flow.triggers(root)?,
         start_comms: start_comms(&reader, root),
@@ -161,7 +162,8 @@ fn hauling_orders<'f>(root: Option<&StructValue<'f>>) -> Vec<HaulingOrder<'f>> {
     .orders()
 }
 
-fn settings(settings: &StructValue<'_>) -> ActiveSettings {
+/// Reads the `ActiveContractSettings` flags of the struct `settings`.
+pub(crate) fn settings(settings: &StructValue<'_>) -> ActiveSettings {
     let flag = |name: &str| boolean(Some(settings), name);
     ActiveSettings {
         can_be_shared: flag("canBeShared"),
@@ -190,13 +192,15 @@ fn auto_finish(settings: &StructValue<'_>, unknowns: &Unknowns) -> AutoFinish {
     }
 }
 
-fn properties(root: Option<&StructValue<'_>>) -> Vec<TemplateProperty> {
+/// Reads the mission properties the array field `field` of `root` holds: the variable, the token
+/// and the kind of value of each.
+pub(crate) fn properties(root: Option<&StructValue<'_>>, field: &str) -> Vec<TemplateProperty> {
     let owned = |property: &StructValue<'_>, name: &str| {
         text(Some(property), name)
             .filter(|value| !value.is_empty())
             .map(str::to_owned)
     };
-    structs(root, "contractProperties")
+    structs(root, field)
         .map(|property| TemplateProperty {
             variable: owned(property, "missionVariableName"),
             token: owned(property, "extendedTextToken"),

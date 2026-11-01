@@ -260,6 +260,128 @@
       ],
       "type": "object"
     },
+    "Availability": {
+      "description": "When and to whom an entry is offered.",
+      "properties": {
+        "applyCompletionTagsOnAbandoned": {
+          "description": "The `applyCompletionTagsOnAbandoned` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "applyCompletionTagsOnFailed": {
+          "description": "The `applyCompletionTagsOnFailed` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "availableInPrison": {
+          "description": "The `availableInPrison` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "canReacceptAfterAbandoning": {
+          "description": "The `canReacceptAfterAbandoning` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "canReacceptAfterFailing": {
+          "description": "The `canReacceptAfterFailing` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "initiallyActive": {
+          "description": "The `initiallyActive` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "lawfulMission": {
+          "description": "The `lawfulMission` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "notifyOnAvailable": {
+          "description": "The `notifyOnAvailable` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "onceOnly": {
+          "description": "The `onceOnly` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "requestOnly": {
+          "description": "The `requestOnly` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "showAsOffer": {
+          "description": "The `showAsOffer` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "tutorial": {
+          "description": "The `tutorial` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "wantedLevelMax": {
+          "description": "The highest wanted level (`reputationPrerequisites.wantedLevel.maxValue`) the player may\nhave.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "wantedLevelMin": {
+          "description": "The lowest wanted level (`reputationPrerequisites.wantedLevel.minValue`) the player may\nhave.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "applyCompletionTagsOnAbandoned",
+        "applyCompletionTagsOnFailed",
+        "availableInPrison",
+        "canReacceptAfterAbandoning",
+        "canReacceptAfterFailing",
+        "initiallyActive",
+        "lawfulMission",
+        "notifyOnAvailable",
+        "onceOnly",
+        "requestOnly",
+        "showAsOffer",
+        "tutorial",
+        "wantedLevelMax",
+        "wantedLevelMin"
+      ],
+      "type": "object"
+    },
     "Blueprint": {
       "description": "A crafting blueprint: a `CraftingBlueprintRecord` Record under `crafting/blueprints/crafting`.",
       "properties": {
@@ -530,6 +652,442 @@
         "craftTimeSeconds",
         "mandatory",
         "optional"
+      ],
+      "type": "object"
+    },
+    "BrokerEntry": {
+      "description": "A mission broker entry: a `MissionBrokerEntry` Record, an offer of the mission board. A\ncontract names it in `brokerEntryGuid`; one without a template takes its title, type and\nlocation from it. The grouped fields (`names`, `links`, `module` and `tags`) are written flat.",
+      "properties": {
+        "associatedMissionGuids": {
+          "description": "The `associatedMissions`, entries of `missionBrokerEntries`, in stored order.",
+          "items": {
+            "$ref": "#/$defs/Guid"
+          },
+          "type": "array"
+        },
+        "availability": {
+          "$ref": "#/$defs/Availability",
+          "description": "When and to whom the entry is offered."
+        },
+        "buyInAmount": {
+          "description": "The `missionBuyInAmount`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "className": {
+          "description": "The Record name without its type.",
+          "type": "string"
+        },
+        "commsChannelName": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `commsChannelName`.",
+          "x-gameText": true
+        },
+        "completionTags": {
+          "description": "The `completionTags` the entry grants.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "cooldowns": {
+          "$ref": "#/$defs/Cooldowns",
+          "description": "The cooldowns and the respawn time."
+        },
+        "debugName": {
+          "description": "The `playerFacingDebugName`, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `description`.",
+          "x-gameText": true
+        },
+        "difficulty": {
+          "description": "The `missionDifficulty`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "excludedAreaTags": {
+          "description": "The `excludedAreaTags`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "finish": {
+          "$ref": "#/$defs/Finish",
+          "description": "The failure conditions and the deadline."
+        },
+        "giverFragmentTags": {
+          "description": "The `missionGiverFragmentTags` as stored, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "giverGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `missionGiverRecord`, a mission giver Record; no kind lists these."
+        },
+        "guid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The GUID of the Record; the `brokerEntryGuid` of the contracts that name it."
+        },
+        "haulingOrders": {
+          "description": "The orders of the hauling objectives of the entry (`source` `brokerObjective`).",
+          "items": {
+            "$ref": "#/$defs/HaulingOrder"
+          },
+          "type": "array"
+        },
+        "hudTitle": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `titleHUD`.",
+          "x-gameText": true
+        },
+        "instances": {
+          "$ref": "#/$defs/InstanceLimits",
+          "description": "How many instances run and for how long."
+        },
+        "invitationMissionGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `invitationMission`, an entry of `missionBrokerEntries`."
+        },
+        "journalEntriesOnComplete": {
+          "description": "The `journalEntriesToAddOnComplete`, journal Records; no kind lists these.",
+          "items": {
+            "$ref": "#/$defs/Guid"
+          },
+          "type": "array"
+        },
+        "journalEntriesOnRemove": {
+          "description": "The `journalEntriesToRemoveOnComplete`, journal Records; no kind lists these.",
+          "items": {
+            "$ref": "#/$defs/Guid"
+          },
+          "type": "array"
+        },
+        "linkedMissionGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `linkedMission`, an entry of `missionBrokerEntries`."
+        },
+        "localityGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `localityAvailable`, an entry of `missionLocalities`."
+        },
+        "locationGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `locationMissionAvailable`, an entry of `starmapObjects`."
+        },
+        "locationQueries": {
+          "description": "The location queries the entry states, resolved like `shipSpawns`.",
+          "items": {
+            "$ref": "#/$defs/LocationQueryLink"
+          },
+          "type": "array"
+        },
+        "missionFlow": {
+          "description": "The `missionFlow` triggers in stored order.",
+          "items": {
+            "$ref": "#/$defs/FlowTrigger"
+          },
+          "type": "array"
+        },
+        "missionGiver": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `missionGiver`: the name the game shows as the giver.",
+          "x-gameText": true
+        },
+        "missionProperties": {
+          "description": "The mission properties of `properties` in stored order: the variables the objectives and\nmodifiers refer to.",
+          "items": {
+            "$ref": "#/$defs/TemplateProperty"
+          },
+          "type": "array"
+        },
+        "missionTags": {
+          "description": "The `missionTags`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "missionTypeGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `type`, an entry of `missionTypes`."
+        },
+        "modifiers": {
+          "description": "The `modifiers` in stored order.",
+          "items": {
+            "$ref": "#/$defs/TemplateModifier"
+          },
+          "type": "array"
+        },
+        "module": {
+          "description": "The `missionModule` file of the mission scripting, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "moduleHandlesOwnShutdown": {
+          "description": "The `moduleHandlesOwnShutdown` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "modulePerPlayer": {
+          "description": "The `missionModulePerPlayer` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "notForRelease": {
+          "description": "The `notForRelease` flag as stored, `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "objectives": {
+          "description": "The objective tokens in depth-first order, each phase after its parent.",
+          "items": {
+            "$ref": "#/$defs/TemplateObjective"
+          },
+          "type": "array"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemplateOwner"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `owner` of the Record, `null` when it names none."
+        },
+        "partialPayout": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartialPayout"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `partialRewardPayout`, `null` when the entry has none."
+        },
+        "preShowObjectives": {
+          "description": "The `preShowObjectives` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "recordPath": {
+          "description": "The record path, without `.xml`.",
+          "type": "string"
+        },
+        "refundBuyInOnWithdraw": {
+          "description": "The `refundBuyInOnWithdraw` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "reputationResults": {
+          "description": "The `missionResultReputationRewards`, one element per stored position.",
+          "items": {
+            "$ref": "#/$defs/ReputationResult"
+          },
+          "type": "array"
+        },
+        "requiredAreaTags": {
+          "description": "The `requiredAreaTags`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "requiredCompletedTags": {
+          "description": "The `requiredCompletedMissionTags`: the player has completed missions that carry the\npositive and none that carry the negative tags of each term.",
+          "items": {
+            "$ref": "#/$defs/TagTerm"
+          },
+          "type": "array"
+        },
+        "requiredMissionGuids": {
+          "description": "The `requiredMissions`, entries of `missionBrokerEntries`, in stored order.",
+          "items": {
+            "$ref": "#/$defs/Guid"
+          },
+          "type": "array"
+        },
+        "reward": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MissionReward"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `missionReward`, `null` when absent."
+        },
+        "schedule": {
+          "description": "The windows the entry is offered in, in stored order.",
+          "items": {
+            "$ref": "#/$defs/ScheduleWindow"
+          },
+          "type": "array"
+        },
+        "settings": {
+          "$ref": "#/$defs/ActiveSettings",
+          "description": "The active contract settings: `canBeShared`, `hasCompleteButton`, `handlesAbandonRequest`,\n`displayAlliedMarkers` and `onlyOwnerCanComplete`."
+        },
+        "shipSpawns": {
+          "description": "The ship spawn descriptions the entry states, one per variable, ordered by variable; `level`\nis always `broker`.",
+          "items": {
+            "$ref": "#/$defs/ShipSpawnLink"
+          },
+          "type": "array"
+        },
+        "showLifeTimeInMobiGlas": {
+          "description": "The `showLifeTimeInMobiGlas` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "standingRequirements": {
+          "description": "The `reputationRequirements` expression in stored order.",
+          "items": {
+            "$ref": "#/$defs/StandingTerm"
+          },
+          "type": "array"
+        },
+        "title": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `title`.",
+          "x-gameText": true
+        },
+        "unlessAvailableMissionGuids": {
+          "description": "The `onlyAvailableIfAllMissionsNotAvailable`, entries of `missionBrokerEntries`: the entry\nis offered only while none of them is.",
+          "items": {
+            "$ref": "#/$defs/Guid"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "associatedMissionGuids",
+        "availability",
+        "buyInAmount",
+        "className",
+        "commsChannelName",
+        "completionTags",
+        "cooldowns",
+        "debugName",
+        "description",
+        "difficulty",
+        "excludedAreaTags",
+        "finish",
+        "giverFragmentTags",
+        "giverGuid",
+        "guid",
+        "haulingOrders",
+        "hudTitle",
+        "instances",
+        "invitationMissionGuid",
+        "journalEntriesOnComplete",
+        "journalEntriesOnRemove",
+        "linkedMissionGuid",
+        "localityGuid",
+        "locationGuid",
+        "locationQueries",
+        "missionFlow",
+        "missionGiver",
+        "missionProperties",
+        "missionTags",
+        "missionTypeGuid",
+        "modifiers",
+        "module",
+        "moduleHandlesOwnShutdown",
+        "modulePerPlayer",
+        "notForRelease",
+        "objectives",
+        "owner",
+        "partialPayout",
+        "preShowObjectives",
+        "recordPath",
+        "refundBuyInOnWithdraw",
+        "reputationResults",
+        "requiredAreaTags",
+        "requiredCompletedTags",
+        "requiredMissionGuids",
+        "reward",
+        "schedule",
+        "settings",
+        "shipSpawns",
+        "showLifeTimeInMobiGlas",
+        "standingRequirements",
+        "title",
+        "unlessAvailableMissionGuids"
       ],
       "type": "object"
     },
@@ -974,6 +1532,28 @@
         }
       ]
     },
+    "Comparison": {
+      "description": "How a reputation requirement compares the standing of the player with the one it names.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "The standing equals it (`EqualTo`).",
+          "value": "equalTo"
+        },
+        {
+          "description": "The standing is higher (`GreaterThan`).",
+          "value": "greaterThan"
+        },
+        {
+          "description": "The standing is at least as high (`GreaterThanOrEqualTo`).",
+          "value": "greaterThanOrEqualTo"
+        },
+        {
+          "description": "The standing is at most as high (`LessThanOrEqualTo`).",
+          "value": "lessThanOrEqualTo"
+        }
+      ]
+    },
     "Completeness": {
       "description": "The completeness of every kind.",
       "properties": {
@@ -1093,6 +1673,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `miningGlobalParams`."
         },
+        "missionBrokerEntries": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `missionBrokerEntries`."
+        },
         "missionLocalities": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `missionLocalities`."
@@ -1188,6 +1772,7 @@
         "mineableElements",
         "mineableEntities",
         "miningGlobalParams",
+        "missionBrokerEntries",
         "missionLocalities",
         "missionLocationTemplates",
         "missionTypes",
@@ -1308,6 +1893,17 @@
             "$ref": "#/$defs/BlueprintReward"
           },
           "type": "array"
+        },
+        "brokerEntryGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The GUID of the `MissionBrokerEntry` Record the contract names in `missionBrokerEntry`, an\nentry of `missionBrokerEntries`; `null` when it names none."
         },
         "buyInAmount": {
           "description": "The `contractBuyInAmount` of the contract's `contractResults`, as stored; `null` when\nabsent. A sub contract shares the contract's value.",
@@ -1650,6 +2246,7 @@
         "abandonedCooldownTimeVariation",
         "availableInPrison",
         "blueprintRewards",
+        "brokerEntryGuid",
         "buyInAmount",
         "canBeShared",
         "canReacceptAfterAbandoning",
@@ -2028,6 +2625,76 @@
         "hasPersonalCooldown",
         "personalCooldownTime",
         "personalCooldownTimeVariation"
+      ],
+      "type": "object"
+    },
+    "Cooldowns": {
+      "description": "The cooldowns and the respawn time of an entry.",
+      "properties": {
+        "abandonedCooldownTime": {
+          "description": "The `abandonedCooldownTime`, the cooldown after the player abandons the mission.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "abandonedCooldownTimeVariation": {
+          "description": "The `abandonedCooldownTimeVariation`.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "hasPersonalCooldown": {
+          "description": "The `hasPersonalCooldown` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "personalCooldownTime": {
+          "description": "The `personalCooldownTime`.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "personalCooldownTimeVariation": {
+          "description": "The `personalCooldownTimeVariation`.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "respawnTime": {
+          "description": "The `respawnTime` of the offer.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "respawnTimeVariation": {
+          "description": "The `respawnTimeVariation`.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "abandonedCooldownTime",
+        "abandonedCooldownTimeVariation",
+        "hasPersonalCooldown",
+        "personalCooldownTime",
+        "personalCooldownTimeVariation",
+        "respawnTime",
+        "respawnTimeVariation"
       ],
       "type": "object"
     },
@@ -2843,6 +3510,82 @@
       ],
       "type": "object"
     },
+    "Finish": {
+      "description": "The failure conditions and the deadline of an entry.",
+      "properties": {
+        "autoEnd": {
+          "description": "The `missionAutoEnd` flag of the deadline.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "completionTime": {
+          "description": "The `missionCompletionTime` of the deadline.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "endReason": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `missionEndReason` of the deadline.",
+          "x-gameText": true
+        },
+        "failIfBecameCriminal": {
+          "description": "The `failIfBecameCriminal` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "failIfLeavePrison": {
+          "description": "The `failIfLeavePrison` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "failIfSentToPrison": {
+          "description": "The `failIfSentToPrison` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "remainingTimeToShowTimer": {
+          "description": "The `remainingTimeToShowTimer` of the deadline.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "resultAfterTimerEnd": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectiveState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `missionResultAfterTimerEnd` of the deadline: the state the mission ends in."
+        }
+      },
+      "required": [
+        "autoEnd",
+        "completionTime",
+        "endReason",
+        "failIfBecameCriminal",
+        "failIfLeavePrison",
+        "failIfSentToPrison",
+        "remainingTimeToShowTimer",
+        "resultAfterTimerEnd"
+      ],
+      "type": "object"
+    },
     "FireAction": {
       "description": "One fire mode of a weapon.",
       "properties": {
@@ -3147,35 +3890,6 @@
             "phases"
           ],
           "type": "object"
-        },
-        {
-          "description": "An action of another struct.",
-          "properties": {
-            "structName": {
-              "description": "The struct name.",
-              "type": "string"
-            },
-            "toState": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/ObjectiveState"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "The `toState`, as for the other actions."
-            },
-            "type": {
-              "const": "other",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "structName"
-          ],
-          "type": "object"
         }
       ]
     },
@@ -3233,6 +3947,43 @@
             },
             "type": {
               "const": "allTokensState",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionFlowCondition_AnyTokensState`: some objective is in a state.",
+          "properties": {
+            "tokenState": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ObjectiveState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `tokenState`."
+            },
+            "type": {
+              "const": "anyTokensState",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionFlowCondition_OnMissionStart`: the mission has just started.",
+          "properties": {
+            "type": {
+              "const": "onMissionStart",
               "type": "string"
             }
           },
@@ -3324,24 +4075,6 @@
           },
           "required": [
             "type"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "A condition of another struct.",
-          "properties": {
-            "structName": {
-              "description": "The struct name.",
-              "type": "string"
-            },
-            "type": {
-              "const": "other",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "structName"
           ],
           "type": "object"
         }
@@ -4283,6 +5016,67 @@
       ],
       "type": "object"
     },
+    "InstanceLimits": {
+      "description": "How many instances of an entry run and for how long.",
+      "properties": {
+        "hasLifeTime": {
+          "description": "The `instanceHasLifeTime` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "lifeTime": {
+          "description": "The `instanceLifeTime`.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lifeTimeVariation": {
+          "description": "The `instanceLifeTimeVariation`.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "maxInstances": {
+          "description": "The `maxInstances`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "maxInstancesPerPlayer": {
+          "description": "The `maxInstancesPerPlayer`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "maxPlayersPerInstance": {
+          "description": "The `maxPlayersPerInstance`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "hasLifeTime",
+        "lifeTime",
+        "lifeTimeVariation",
+        "maxInstances",
+        "maxInstancesPerPlayer",
+        "maxPlayersPerInstance"
+      ],
+      "type": "object"
+    },
     "Item": {
       "description": "An item: an `EntityClassDefinition` Record under `entities/scitem` or `entities/legacyitems`.",
       "properties": {
@@ -5138,6 +5932,24 @@
         "positiveTagGuids"
       ],
       "type": "object"
+    },
+    "LicenseType": {
+      "description": "The licence a `LawLicense` modifier asks for. A value the catalog does not know is `null`.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "`IllegalGoodsLicense_ClassA`.",
+          "value": "illegalGoodsLicenseClassA"
+        },
+        {
+          "description": "`IllegalGoodsLicense_ClassB`.",
+          "value": "illegalGoodsLicenseClassB"
+        },
+        {
+          "description": "`IllegalGoodsLicense_ClassC`.",
+          "value": "illegalGoodsLicenseClassC"
+        }
+      ]
     },
     "LinkedOutput": {
       "description": "The output property an input property takes the value of.",
@@ -7196,6 +8008,60 @@
       ],
       "type": "object"
     },
+    "MissionReward": {
+      "description": "The `missionReward` of an entry, as stored.",
+      "properties": {
+        "currency": {
+          "description": "The `currencyType` as stored, e.g. `UEC`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max": {
+          "description": "The `max`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "plusBonuses": {
+          "description": "The `plusBonuses` flag.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "reputationBonusGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `reputationBonus` Record."
+        },
+        "reward": {
+          "description": "The `reward`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "currency",
+        "max",
+        "plusBonuses",
+        "reputationBonusGuid",
+        "reward"
+      ],
+      "type": "object"
+    },
     "MissionType": {
       "description": "A mission type: a `MissionType` Record under `missiontype`.",
       "properties": {
@@ -7224,6 +8090,60 @@
         "typeName"
       ],
       "type": "object"
+    },
+    "Month": {
+      "description": "A calendar month of an availability schedule.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "January.",
+          "value": "january"
+        },
+        {
+          "description": "February.",
+          "value": "february"
+        },
+        {
+          "description": "March.",
+          "value": "march"
+        },
+        {
+          "description": "April.",
+          "value": "april"
+        },
+        {
+          "description": "May.",
+          "value": "may"
+        },
+        {
+          "description": "June.",
+          "value": "june"
+        },
+        {
+          "description": "July.",
+          "value": "july"
+        },
+        {
+          "description": "August.",
+          "value": "august"
+        },
+        {
+          "description": "September.",
+          "value": "september"
+        },
+        {
+          "description": "October.",
+          "value": "october"
+        },
+        {
+          "description": "November.",
+          "value": "november"
+        },
+        {
+          "description": "December.",
+          "value": "december"
+        }
+      ]
     },
     "NavPoint": {
       "description": "The `navPointSpawnInfo` of a handler: the entity the game spawns as the marker.",
@@ -8643,6 +9563,24 @@
       ],
       "type": "object"
     },
+    "Reaction": {
+      "description": "How a faction reacts to the other in a `FactionHostility` modifier. A value the catalog does\nnot know is `null`.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "Friendly.",
+          "value": "friendly"
+        },
+        {
+          "description": "Neutral.",
+          "value": "neutral"
+        },
+        {
+          "description": "Hostile.",
+          "value": "hostile"
+        }
+      ]
+    },
     "RecoveryOverride": {
       "description": "An `ItemRecoveryOverrideGroupDef`: the multipliers of a group of entity classes.",
       "properties": {
@@ -8817,6 +9755,69 @@
       ],
       "type": "object"
     },
+    "RepeatType": {
+      "description": "How an availability schedule repeats.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "The window repeats every year until the repeat end (`RepeatYearly`).",
+          "value": "repeatYearly"
+        }
+      ]
+    },
+    "ReputationAmount": {
+      "description": "A reputation amount an entry grants.",
+      "properties": {
+        "amount": {
+          "description": "The `reputationAmount` of the reward Record; `null` when it cannot be read.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "factionReputationGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `factionReputation`, an entry of `factionReputations`."
+        },
+        "rewardGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The reward Record the amount is read from."
+        },
+        "scopeGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `reputationScope`, an entry of `reputationScopes`."
+        }
+      },
+      "required": [
+        "amount",
+        "factionReputationGuid",
+        "rewardGuid",
+        "scopeGuid"
+      ],
+      "type": "object"
+    },
     "ReputationContext": {
       "description": "A reputation context: an `SReputationContextUI` Record under `reputation/contexts`, the scopes a\nfaction is shown with.",
       "properties": {
@@ -8914,6 +9915,29 @@
         "factionReputationName",
         "scopeGuid",
         "scopeName"
+      ],
+      "type": "object"
+    },
+    "ReputationResult": {
+      "description": "One element of `missionResultReputationRewards`: the amounts granted for one result of the\nmission.",
+      "properties": {
+        "amounts": {
+          "description": "The `reputationAmounts` in stored order.",
+          "items": {
+            "$ref": "#/$defs/ReputationAmount"
+          },
+          "type": "array"
+        },
+        "index": {
+          "description": "The position in the stored array; the Archive names no result.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "amounts",
+        "index"
       ],
       "type": "object"
     },
@@ -9497,6 +10521,106 @@
         "blueprintPoolGuids",
         "globalPointsMultiplier",
         "minPoints"
+      ],
+      "type": "object"
+    },
+    "ScheduleMoment": {
+      "description": "A date and time of day as stored; a part the Record does not state is `null`.",
+      "properties": {
+        "day": {
+          "description": "The day of the month.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "hour": {
+          "description": "The hour.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "minute": {
+          "description": "The minute.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "month": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Month"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The month."
+        },
+        "second": {
+          "description": "The second.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "year": {
+          "description": "The year.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "day",
+        "hour",
+        "minute",
+        "month",
+        "second",
+        "year"
+      ],
+      "type": "object"
+    },
+    "ScheduleWindow": {
+      "description": "A window an entry is offered in (`availableDateSchedule`).",
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/ScheduleMoment",
+          "description": "The `end` of the window."
+        },
+        "repeatEnd": {
+          "$ref": "#/$defs/ScheduleMoment",
+          "description": "The `repeatEnd`: the date after which the window no longer repeats; no time of day."
+        },
+        "repeatType": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RepeatType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `repeatType`."
+        },
+        "start": {
+          "$ref": "#/$defs/ScheduleMoment",
+          "description": "The `start` of the window."
+        }
+      },
+      "required": [
+        "end",
+        "repeatEnd",
+        "repeatType",
+        "start"
       ],
       "type": "object"
     },
@@ -10222,6 +11346,10 @@
         {
           "description": "The `contractProperties` of the `ContractTemplate`.",
           "value": "template"
+        },
+        {
+          "description": "The `properties` of the `MissionBrokerEntry`.",
+          "value": "broker"
         }
       ]
     },
@@ -10414,6 +11542,107 @@
         "scopeGuid"
       ],
       "type": "object"
+    },
+    "StandingTerm": {
+      "description": "One element of the reputation requirement expression of an entry, in stored order, tagged by\n`type`. The elements form an infix expression: requirements joined by `and`, grouped by\nparentheses.",
+      "oneOf": [
+        {
+          "description": "`SReputationMissionGiverRequirementParams`: the standing in a scope of a faction compared\nwith a named standing.",
+          "properties": {
+            "comparison": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Comparison"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `comparison`."
+            },
+            "factionReputationGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `factionReputation`, an entry of `factionReputations`."
+            },
+            "scopeGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `reputationScope`, an entry of `reputationScopes`."
+            },
+            "standingGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `standing`, an entry of `reputationStandings`."
+            },
+            "type": {
+              "const": "requirement",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`SReputationMissionRequirementExpression_And`.",
+          "properties": {
+            "type": {
+              "const": "and",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`SReputationMissionRequirementExpression_LeftParenthesis`.",
+          "properties": {
+            "type": {
+              "const": "leftParenthesis",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`SReputationMissionRequirementExpression_RightParenthesis`.",
+          "properties": {
+            "type": {
+              "const": "rightParenthesis",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "StarmapObject": {
       "description": "A starmap object: a `StarMapObject` Record under `starmap/pu`, a star system, planet, moon,\nstation, jump point or other place, with its world position when a system container places it.",
@@ -10864,7 +12093,7 @@
       "type": "object"
     },
     "TemplateModifier": {
-      "description": "A modifier of a template (`MissionModifier_*`), tagged by `modifier`.",
+      "description": "A modifier of a template or a broker entry (`MissionModifier_*`), tagged by `modifier`.",
       "oneOf": [
         {
           "description": "`MissionModifier_SecurityClearance`.",
@@ -11023,8 +12252,151 @@
           "type": "object"
         },
         {
-          "description": "A modifier of another struct.",
+          "description": "`MissionModifier_FactionHostility`.",
           "properties": {
+            "enabled": {
+              "description": "The `enabled` flag.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "factionGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `faction` Record, a `Faction`; no kind lists these."
+            },
+            "ignoreCriminalHostility": {
+              "description": "The `ignoreCriminalHostility` flag.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "locationProperty": {
+              "description": "The `missionVariableName` of the property the `locationProperty` points to.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "modifier": {
+              "const": "factionHostility",
+              "type": "string"
+            },
+            "modifierName": {
+              "description": "The `modifierName`, `null` when empty.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "myReaction": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Reaction"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `myReaction`: the reaction of the mission giver's faction to `faction`."
+            },
+            "theirReaction": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Reaction"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `theirReaction`: the reaction of `faction` to the mission giver's faction."
+            }
+          },
+          "required": [
+            "modifier",
+            "enabled",
+            "locationProperty",
+            "modifierName"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionModifier_HostileMission`.",
+          "properties": {
+            "brokerEntryGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `missionBrokerEntry` of the hostile mission, an entry of `missionBrokerEntries`."
+            },
+            "enabled": {
+              "description": "The `enabled` flag.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "legalToAttack": {
+              "description": "The `legalToAttack` flag.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "locationProperty": {
+              "description": "The `missionVariableName` of the property the `locationProperty` points to.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "modifier": {
+              "const": "hostileMission",
+              "type": "string"
+            },
+            "modifierName": {
+              "description": "The `modifierName`, `null` when empty.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "modifier",
+            "enabled",
+            "locationProperty",
+            "modifierName"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionModifier_IgnoreMissionPlayerCriminality`.",
+          "properties": {
+            "brokerEntryGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `missionBrokerEntry` whose players' criminality is ignored, an entry of\n`missionBrokerEntries`."
+            },
             "enabled": {
               "description": "The `enabled` flag.",
               "type": [
@@ -11040,7 +12412,7 @@
               ]
             },
             "modifier": {
-              "const": "other",
+              "const": "ignoreMissionPlayerCriminality",
               "type": "string"
             },
             "modifierName": {
@@ -11049,18 +12421,61 @@
                 "string",
                 "null"
               ]
-            },
-            "structName": {
-              "description": "The struct name.",
-              "type": "string"
             }
           },
           "required": [
             "modifier",
             "enabled",
             "locationProperty",
-            "modifierName",
-            "structName"
+            "modifierName"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionModifier_LawLicense`.",
+          "properties": {
+            "enabled": {
+              "description": "The `enabled` flag.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "licenseType": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LicenseType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `licenseType`."
+            },
+            "locationProperty": {
+              "description": "The `missionVariableName` of the property the `locationProperty` points to.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "modifier": {
+              "const": "lawLicense",
+              "type": "string"
+            },
+            "modifierName": {
+              "description": "The `modifierName`, `null` when empty.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "modifier",
+            "enabled",
+            "locationProperty",
+            "modifierName"
           ],
           "type": "object"
         }
@@ -11694,6 +13109,13 @@
       },
       "type": "array"
     },
+    "missionBrokerEntries": {
+      "description": "The mission broker entries, the targets of `contracts[].brokerEntryGuid`, ordered by GUID.",
+      "items": {
+        "$ref": "#/$defs/BrokerEntry"
+      },
+      "type": "array"
+    },
     "missionLocalities": {
       "description": "The mission localities, sets of starmap objects, ordered by GUID.",
       "items": {
@@ -11851,6 +13273,7 @@
     "mineableElements",
     "mineableEntities",
     "miningGlobalParams",
+    "missionBrokerEntries",
     "missionLocalities",
     "missionLocationTemplates",
     "missionTypes",

@@ -46,7 +46,7 @@ pub(super) fn payout() -> TestValue {
     ))
 }
 
-/// A security clearance, a ship rental, a kiosk filter and a modifier of an unknown struct.
+/// A security clearance, a ship rental, a kiosk filter and a law licence.
 pub(super) fn modifiers() -> TestValue {
     array(vec![
         object(
@@ -77,7 +77,11 @@ pub(super) fn modifiers() -> TestValue {
                     )),
                 ),
         ),
-        object(TestInstance::new("MissionModifier")),
+        object(
+            TestInstance::new("MissionModifier_LawLicense")
+                .value("enabled", TestValue::Bool(true))
+                .value("licenseType", text("IllegalGoodsLicense_ClassA")),
+        ),
     ])
 }
 
@@ -104,8 +108,9 @@ pub(super) fn token_state(state: &str, target: Option<&str>) -> TestInstance {
     }
 }
 
-/// Five triggers: a nested condition with a state change, a random phase pick, a condition of an
-/// unknown struct, and two that point to a property and to a token the Record lacks.
+/// Eight triggers: a nested condition with a state change, a random phase pick, a condition on all
+/// tokens, one on a token without an id, two that point to a property and to a token the Record
+/// lacks, and a condition on any token and one on the start of the mission.
 pub(super) fn flow() -> TestValue {
     let nested = TestInstance::new("MissionFlowCondition_AND").value(
         "conditions",
@@ -138,7 +143,8 @@ pub(super) fn flow() -> TestValue {
             trigger("Pick", token_state("Active", None), pick),
             trigger(
                 "Odd",
-                TestInstance::new("MissionFlowCondition_Unknown"),
+                TestInstance::new("MissionFlowCondition_AllTokensState")
+                    .value("tokenState", text("Completed")),
                 state_change("Sleeping"),
             ),
             trigger(
@@ -150,6 +156,17 @@ pub(super) fn flow() -> TestValue {
             trigger(
                 "Outside",
                 token_state("Active", Some("outside")),
+                state_change("Active"),
+            ),
+            trigger(
+                "Any",
+                TestInstance::new("MissionFlowCondition_AnyTokensState")
+                    .value("tokenState", text("Failed")),
+                state_change("Active"),
+            ),
+            trigger(
+                "Start",
+                TestInstance::new("MissionFlowCondition_OnMissionStart"),
                 state_change("Active"),
             ),
         ]),

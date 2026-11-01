@@ -176,12 +176,6 @@ pub(super) fn contract_templates() -> serde_json::Value {
             "enabled": true,
             "locationProperty": null,
             "terms": [{"positiveTags": ["Ship.Model.Mole"], "negativeTags": []}]
-        }, {
-            "modifier": "other",
-            "structName": "MissionModifier_Unknown",
-            "locationProperty": null,
-            "modifierName": null,
-            "enabled": null
         }],
         "owner": {"guid": "300dcbf0-d201-465b-a7be-af7e15a0a512", "className": "MDT"},
         "missionFlow": [{
@@ -189,8 +183,11 @@ pub(super) fn contract_templates() -> serde_json::Value {
             "condition": {"type": "and", "conditions": [
                 {"type": "tokenState", "objectiveId": "ce628b01-6ec2-4add-9f47-078493d1f48e", "tokenState": "completed"},
                 {"type": "not", "condition": {"type": "propertyIsSet", "propertyVariable": "Flag_BP"}},
-                {"type": "or", "conditions": [{"type": "allTokensState", "tokenState": "failed"}]},
-                {"type": "other", "structName": "MissionFlowCondition_Unknown"}
+                {"type": "or", "conditions": [
+                    {"type": "allTokensState", "tokenState": "failed"},
+                    {"type": "anyTokensState", "tokenState": "active"},
+                    {"type": "onMissionStart"}
+                ]}
             ]},
             "action": {"type": "stateChange", "toState": "completed"}
         }, {
@@ -203,17 +200,13 @@ pub(super) fn contract_templates() -> serde_json::Value {
             "action": {"type": "pickRandomMissionPhase", "toState": null, "phases": [
                 {"objectiveId": "ce628b01-6ec2-4add-9f47-078493d1f48e", "probability": 0.5}
             ]}
-        }, {
-            "note": null,
-            "condition": null,
-            "action": {"type": "other", "structName": "MissionFlowAction_Unknown"}
         }],
         "startComms": {"delay": 0, "communicationTag": "Comms.Tag"},
         "endComms": [{"reason": "complete", "delay": 0, "communicationTag": null}]
     }])
 }
 
-fn objective_display() -> serde_json::Value {
+pub(super) fn objective_display() -> serde_json::Value {
     json!({
         "category": "primary",
         "hideOnHud": false,
@@ -223,7 +216,7 @@ fn objective_display() -> serde_json::Value {
     })
 }
 
-fn objective_handler() -> serde_json::Value {
+pub(super) fn objective_handler() -> serde_json::Value {
     json!({
         "structName": "ObjectiveHandler_Hauling",
         "module": "Libs/Subsumption/Missions/GoTo.xml",

@@ -108,8 +108,9 @@ pub enum CraftingWarning {
     /// The radar parameters do not name the slot of the scan signature, so `scanSignature` of
     /// `mineableEntities` is `null` everywhere; the text says why. `signatures` is still exported.
     UnknownScanSignatureSlot(&'static str),
-    /// This many stored names in the contract templates (a state, a category, a comms timing or
-    /// reason, a kind of objective property) are not known to the catalog, so they are `null`.
+    /// This many stored names in the contract templates and mission broker entries (a state, a
+    /// category, a comms timing or reason, a kind of objective property, a comparison, a month, a
+    /// repeat type, a reaction, a licence type) are not known to the catalog, so they are `null`.
     /// `details` gives each kind and value with its number, ordered.
     UnknownTemplateValues {
         /// The number of names.
@@ -282,7 +283,7 @@ impl fmt::Display for CraftingWarning {
             ),
             Self::UnknownTemplateValues { count, details } => write!(
                 f,
-                "{count} stored names in the contract templates are not known; they are null{}",
+                "{count} stored names in the contract templates and mission broker entries are not known; they are null{}",
                 Listed(details)
             ),
             Self::UnknownScanSignatureSlot(reason) => write!(

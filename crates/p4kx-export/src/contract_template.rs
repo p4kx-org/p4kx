@@ -8,10 +8,9 @@ use crate::contract::{LocalisedText, every_field_required};
 use crate::contract_hauling::HaulingOrder;
 use crate::guid_text::CatalogGuid;
 use crate::spawn_model::{LocationQueryLink, ShipSpawnLink};
-use crate::template_extras::{
-    EndComms, PartialPayout, StartComms, TemplateModifier, TemplateOwner,
-};
+use crate::template_extras::{EndComms, PartialPayout, StartComms, TemplateOwner};
 use crate::template_flow::FlowTrigger;
+use crate::template_modifier::TemplateModifier;
 use crate::template_objective::{ObjectiveState, TemplateObjective};
 
 /// A contract template: a `ContractTemplate` Record under `contracts/contracttemplates`, the

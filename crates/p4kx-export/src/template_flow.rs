@@ -51,6 +51,14 @@ pub(crate) enum FlowCondition {
         /// The `tokenState`.
         token_state: Option<ObjectiveState>,
     },
+    /// `MissionFlowCondition_AnyTokensState`: some objective is in a state.
+    #[serde(rename_all = "camelCase")]
+    AnyTokensState {
+        /// The `tokenState`.
+        token_state: Option<ObjectiveState>,
+    },
+    /// `MissionFlowCondition_OnMissionStart`: the mission has just started.
+    OnMissionStart,
     /// `MissionFlowCondition_AND`: all of the conditions hold.
     And {
         /// The `conditions` in stored order.
@@ -71,12 +79,6 @@ pub(crate) enum FlowCondition {
     PropertyIsSet {
         /// The `missionVariableName` of the `property`.
         property_variable: Option<String>,
-    },
-    /// A condition of another struct.
-    #[serde(rename_all = "camelCase")]
-    Other {
-        /// The struct name.
-        struct_name: String,
     },
 }
 
@@ -106,14 +108,6 @@ pub(crate) enum FlowAction {
         /// The `toState`.
         to_state: Option<ObjectiveState>,
     },
-    /// An action of another struct.
-    #[serde(rename_all = "camelCase")]
-    Other {
-        /// The struct name.
-        struct_name: String,
-        /// The `toState`, as for the other actions.
-        to_state: Option<ObjectiveState>,
-    },
 }
 
 /// A `MissionRandomPhaseEntry`.
@@ -139,7 +133,9 @@ impl FlowReader<'_, '_, '_> {
     ///
     /// # Errors
     ///
-    /// Returns [`TemplateError::ConditionsTooDeep`] for conditions nested deeper than the limit.
+    /// Returns [`TemplateError::ConditionsTooDeep`] for conditions nested deeper than the limit
+    /// and [`TemplateError::UnknownStruct`] for a condition or action of a struct the catalog does
+    /// not know.
     pub(crate) fn triggers(
         &self,
         root: Option<&StructValue<'_>>,
@@ -152,7 +148,9 @@ impl FlowReader<'_, '_, '_> {
                     condition: one(trigger, "condition")
                         .map(|condition| self.condition(condition, 0))
                         .transpose()?,
-                    action: one(trigger, "action").map(|action| self.action(action)),
+                    action: one(trigger, "action")
+                        .map(|action| self.action(action))
+                        .transpose()?,
                 })
             })
             .collect()
@@ -186,6 +184,10 @@ impl FlowReader<'_, '_, '_> {
             "AllTokensState" => FlowCondition::AllTokensState {
                 token_state: self.state(parent, "tokenState"),
             },
+            "AnyTokensState" => FlowCondition::AnyTokensState {
+                token_state: self.state(parent, "tokenState"),
+            },
+            "OnMissionStart" => FlowCondition::OnMissionStart,
             "AND" => FlowCondition::And {
                 conditions: nested("conditions")?,
             },
@@ -200,17 +202,15 @@ impl FlowReader<'_, '_, '_> {
             "PropertyIsSet" => FlowCondition::PropertyIsSet {
                 property_variable: self.reader.property_variable(parent, "property"),
             },
-            _ => FlowCondition::Other {
-                struct_name: name.to_owned(),
-            },
+            _ => return Err(TemplateError::unknown("missionFlow condition", condition)),
         })
     }
 
-    fn action(&self, action: &StructValue<'_>) -> FlowAction {
+    fn action(&self, action: &StructValue<'_>) -> Result<FlowAction, TemplateError> {
         let parent = Some(action);
         let name = action.type_name();
         let to_state = self.state(parent, "toState");
-        match name.strip_prefix(ACTION_PREFIX).unwrap_or(name) {
+        Ok(match name.strip_prefix(ACTION_PREFIX).unwrap_or(name) {
             "StateChange" => FlowAction::StateChange { to_state },
             "TokenStateChange" => FlowAction::TokenStateChange {
                 objective_id: self.reader.objective_id(parent, "objectiveToken"),
@@ -225,10 +225,7 @@ impl FlowReader<'_, '_, '_> {
                     .collect(),
                 to_state,
             },
-            _ => FlowAction::Other {
-                struct_name: name.to_owned(),
-                to_state,
-            },
-        }
+            _ => return Err(TemplateError::unknown("missionFlow action", action)),
+        })
     }
 }

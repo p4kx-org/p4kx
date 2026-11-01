@@ -157,7 +157,7 @@ fn the_partial_payout_lists_its_ranges_with_the_scope_links() -> TestResult {
 }
 
 #[test]
-fn modifiers_are_a_closed_list_with_an_other_entry_for_an_unknown_struct() -> TestResult {
+fn modifiers_are_a_closed_list_tagged_by_their_struct() -> TestResult {
     let catalog = build()?;
     let modifiers = template(&catalog)?["modifiers"]
         .as_array()
@@ -197,11 +197,11 @@ fn modifiers_are_a_closed_list_with_an_other_entry_for_an_unknown_struct() -> Te
     assert_eq!(
         modifiers[3],
         json!({
-            "modifier": "other",
-            "structName": "MissionModifier",
+            "modifier": "lawLicense",
             "modifierName": null,
-            "enabled": null,
-            "locationProperty": null
+            "enabled": true,
+            "locationProperty": null,
+            "licenseType": "illegalGoodsLicenseClassA"
         })
     );
     Ok(())
@@ -218,12 +218,17 @@ fn the_owner_names_its_record() -> TestResult {
 }
 
 #[test]
-fn the_mission_flow_nests_its_conditions_and_names_unknown_structs() -> TestResult {
+fn the_mission_flow_nests_its_conditions_and_nulls_unknown_states() -> TestResult {
     let catalog = build()?;
     let flow = template(&catalog)?["missionFlow"]
         .as_array()
         .ok_or("flow")?;
-    assert_eq!(flow.len(), 6);
+    assert_eq!(flow.len(), 8);
+    assert_eq!(
+        flow[6]["condition"],
+        json!({"type": "anyTokensState", "tokenState": "failed"})
+    );
+    assert_eq!(flow[7]["condition"], json!({"type": "onMissionStart"}));
     assert_eq!(flow[0]["note"], "All done -> Completed");
     assert_eq!(
         flow[0]["condition"],
@@ -255,7 +260,7 @@ fn the_mission_flow_nests_its_conditions_and_names_unknown_structs() -> TestResu
     );
     assert_eq!(
         flow[2]["condition"],
-        json!({"type": "other", "structName": "MissionFlowCondition_Unknown"})
+        json!({"type": "allTokensState", "tokenState": "completed"})
     );
     assert_eq!(
         flow[2]["action"],

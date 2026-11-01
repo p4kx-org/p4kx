@@ -6,7 +6,7 @@
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 
 use super::template_parts::{display, object, token_state, trigger};
-use super::{DEEP_FLOW, DEEP_PHASES, array, text};
+use super::{DEEP_FLOW, DEEP_PHASES, UNKNOWN_FLOW, UNKNOWN_MODIFIER, array, text};
 
 /// The levels of phases the deep template nests, more than the catalog follows.
 const DEPTH_PAST_PHASES: usize = 35;
@@ -40,6 +40,39 @@ pub(super) fn deep_phases() -> TestRecord {
     .value(
         "objectiveTokens",
         array(vec![phase_chain(DEPTH_PAST_PHASES)]),
+    )
+}
+
+/// A template whose mission flow holds a condition of a struct the catalog does not know.
+pub(super) fn unknown_flow() -> TestRecord {
+    let trigger = trigger(
+        "Odd",
+        TestInstance::new("MissionFlowCondition_Unknown"),
+        TestInstance::new("MissionFlowAction_StateChange").value("toState", text("Failed")),
+    );
+    TestRecord::new(
+        UNKNOWN_FLOW,
+        "ContractTemplate",
+        "ContractTemplate.Unknown_Flow",
+        "libs/foundry/records/contracts/contracttemplates/unknown_flow.xml",
+    )
+    .value(
+        "missionFlow",
+        object(TestInstance::new("MissionFlow").value("triggers", array(vec![trigger]))),
+    )
+}
+
+/// A template with a modifier of a struct the catalog does not know.
+pub(super) fn unknown_modifier() -> TestRecord {
+    TestRecord::new(
+        UNKNOWN_MODIFIER,
+        "ContractTemplate",
+        "ContractTemplate.Unknown_Modifier",
+        "libs/foundry/records/contracts/contracttemplates/unknown_modifier.xml",
+    )
+    .value(
+        "modifiers",
+        array(vec![object(TestInstance::new("MissionModifier"))]),
     )
 }
 

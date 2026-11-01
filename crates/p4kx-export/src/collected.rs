@@ -8,11 +8,12 @@ use p4kx_extraction::Guid;
 use crate::blueprint_category::unlink_categories;
 use crate::catalog_crafting::CraftingKinds;
 use crate::contract::{
-    Blueprint, BlueprintCategory, BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal,
-    DismantleProcess, GameplayProperty, HarvestableLocation, HarvestableProviderPreset, Item,
-    Loadout, LootContainer, Manufacturer, MineableComposition, MineableElement, MineableEntity,
-    MiningGlobalParams, Paint, QualityDistribution, QualityQuantization, RefiningProcess,
-    ResourceGroup, Ship, Shop, StarmapObject, SubHarvestableMultiConfig,
+    Blueprint, BlueprintCategory, BlueprintPool, BrokerEntry, Commodity, ContractEntry, Crafter,
+    CraftingGlobal, DismantleProcess, GameplayProperty, HarvestableLocation,
+    HarvestableProviderPreset, Item, Loadout, LootContainer, Manufacturer, MineableComposition,
+    MineableElement, MineableEntity, MiningGlobalParams, Paint, QualityDistribution,
+    QualityQuantization, RefiningProcess, ResourceGroup, Ship, Shop, StarmapObject,
+    SubHarvestableMultiConfig,
 };
 use crate::contract_template::ContractTemplate;
 use crate::crafting_warning::CraftingWarning;
@@ -52,6 +53,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) contract_ship_spawns: Vec<ShipSpawnPool>,
     pub(crate) contract_location_queries: Vec<LocationQuery>,
     pub(crate) contract_templates: Vec<ContractTemplate<'f>>,
+    pub(crate) mission_broker_entries: Vec<BrokerEntry<'f>>,
     pub(crate) port_items: Vec<CatalogGuid>,
     pub(crate) starmap_objects: Vec<StarmapObject<'f>>,
     pub(crate) mineable_elements: Vec<MineableElement<'f>>,
@@ -102,6 +104,7 @@ impl<'f> Collected<'f> {
             contract_ship_spawns: Vec::new(),
             contract_location_queries: Vec::new(),
             contract_templates: Vec::new(),
+            mission_broker_entries: Vec::new(),
             port_items: Vec::new(),
             starmap_objects: Vec::new(),
             mineable_elements: Vec::new(),
@@ -246,6 +249,16 @@ impl<'f> Collected<'f> {
         }
     }
 
+    /// Stores the mission broker entries, counts the ones left out as `skipped` and adds the
+    /// failures.
+    pub(crate) fn add_broker_entries(&mut self, entries: KindRead<BrokerEntry<'f>>) {
+        self.mission_broker_entries = entries.items;
+        if let Some(slot) = self.skipped.get_mut(Kind::MissionBrokerEntries.index()) {
+            *slot = entries.skipped;
+        }
+        self.add_failures(entries.failures);
+    }
+
     /// Adds `failures` and orders all of them by the text of the GUID, one per Record.
     pub(crate) fn add_failures(&mut self, failures: Vec<CatalogFailure>) {
         self.failures.extend(failures);
@@ -310,6 +323,7 @@ impl<'f> Collected<'f> {
                     Kind::ContractShipSpawns => self.contract_ship_spawns.len(),
                     Kind::ContractLocationQueries => self.contract_location_queries.len(),
                     Kind::ContractTemplates => self.contract_templates.len(),
+                    Kind::MissionBrokerEntries => self.mission_broker_entries.len(),
                     Kind::MineableElements => self.mineable_elements.len(),
                     Kind::RefiningProcesses => self.refining_processes.len(),
                     Kind::MineableCompositions => self.mineable_compositions.len(),

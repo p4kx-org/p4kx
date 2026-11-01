@@ -4,6 +4,8 @@
 //! A synthetic Archive with one contract that states ship spawns and location queries at the
 //! template, handler, contract and sub contract level, and two location templates.
 
+mod broker;
+mod broker_structures;
 mod structures;
 mod template;
 mod template_deep;
@@ -27,6 +29,14 @@ pub(crate) const LEFTOVER_TEMPLATE: u128 = 0x4000_0000_0000_4000_8000_0000_0000_
 pub(crate) const ELSEWHERE_TEMPLATE: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0003;
 pub(crate) const DEEP_PHASES: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0004;
 pub(crate) const DEEP_FLOW: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0005;
+pub(crate) const UNKNOWN_FLOW: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0006;
+pub(crate) const UNKNOWN_MODIFIER: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0007;
+pub(crate) const BROKER: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0001;
+pub(crate) const BROKER_ELSEWHERE: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0002;
+pub(crate) const BROKER_LEFTOVER: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0003;
+pub(crate) const BROKER_BAD: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0004;
+pub(crate) const BROKER_OBJECTIVE: u128 = 0x7000_0000_0000_4000_8000_0000_0000_0010;
+pub(crate) const REPUTATION_REWARD: u128 = 0xb100_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const MISSION_TYPE: u128 = 0x5000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const RESOURCE: u128 = 0x6000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const OBJECTIVE_A: u128 = 0x7000_0000_0000_4000_8000_0000_0000_0001;
@@ -195,6 +205,7 @@ fn generator() -> TestRecord {
         .value("id", TestValue::Guid(CONTRACT))
         .value("debugName", text("Hunt_A"))
         .value("template", reference(TEMPLATE))
+        .value("missionBrokerEntry", reference(BROKER))
         .value(
             "paramOverrides",
             overrides(vec![
@@ -293,6 +304,13 @@ fn database() -> DataForgeBuilder {
         template::elsewhere(),
         template_deep::deep_phases(),
         template_deep::deep_flow(),
+        template_deep::unknown_flow(),
+        template_deep::unknown_modifier(),
+        broker::broker(),
+        broker::elsewhere(),
+        broker::leftover(),
+        broker::bad(),
+        broker::reward_record(),
         location_template(LOCATION_A, "a_hijacked", false),
         location_template(LOCATION_B, "b_hijacked", true),
         location_template(LOCATION_DEV, "dev_temp_hijacked", false),

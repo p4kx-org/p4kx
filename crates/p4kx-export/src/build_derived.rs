@@ -7,6 +7,7 @@ use std::sync::Arc;
 use p4kx_assembly::Entities;
 use p4kx_extraction::{Archive, CancelToken, DataForge, Guid};
 
+use crate::broker_entry_read::BrokerEntries;
 use crate::collected::Collected;
 use crate::contract_loadout::EntityKind;
 use crate::contract_template_read::ContractTemplates;
@@ -37,10 +38,16 @@ pub(crate) fn add_contracts<'f>(
         read,
         pools: template_pools,
         unknowns,
-    } = missions.contract_templates;
+    } = missions.siblings.contract_templates;
+    let BrokerEntries {
+        read: broker_read,
+        pools: broker_pools,
+    } = missions.siblings.broker_entries;
     let mut pools = missions.pools;
     pools.merge(template_pools);
-    collected.add_spawns(missions.templates, pools);
+    pools.merge(broker_pools);
+    collected.add_spawns(missions.siblings.location_templates, pools);
+    collected.add_broker_entries(broker_read);
     collected.add_contract_templates(read, unknowns);
     Ok(())
 }

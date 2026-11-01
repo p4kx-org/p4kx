@@ -131,6 +131,10 @@ impl Kind {
                 prefixes: &["libs/foundry/records/"],
                 type_name: "ContractTemplate",
             },
+            Self::MissionBrokerEntries => KindRule {
+                prefixes: &["libs/foundry/records/"],
+                type_name: "MissionBrokerEntry",
+            },
             Self::CargoManifests => KindRule {
                 prefixes: &["libs/foundry/records/cargomanifest/"],
                 type_name: "CargoManifest",

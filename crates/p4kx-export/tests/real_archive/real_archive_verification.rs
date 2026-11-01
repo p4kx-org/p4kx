@@ -20,6 +20,7 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_b_path, real_archive_path};
 use serde_json::Value;
 
+use crate::real_archive_broker_entries::check_broker_links;
 use crate::real_archive_contract_templates::check_template_links;
 use crate::real_archive_spawns::check_spawn_links;
 
@@ -27,7 +28,7 @@ use crate::real_archive_texts::check_texts;
 
 pub(crate) type TestResult = Result<(), Box<dyn Error>>;
 
-const MINIMUM: [(Kind, usize); 42] = [
+const MINIMUM: [(Kind, usize); 43] = [
     (Kind::Manufacturers, 500),
     (Kind::Items, 10_000),
     (Kind::Ships, 200),
@@ -70,6 +71,7 @@ const MINIMUM: [(Kind, usize); 42] = [
     (Kind::ContractShipSpawns, 400),
     (Kind::ContractLocationQueries, 1_500),
     (Kind::ContractTemplates, 400),
+    (Kind::MissionBrokerEntries, 2_000),
 ];
 
 fn built(archive: &Archive) -> Result<(CatalogSummary, Value), Box<dyn Error>> {
@@ -243,6 +245,7 @@ fn check_leftovers(catalog: &Value) -> TestResult {
 fn check_links(catalog: &Value) -> TestResult {
     check_spawn_links(catalog)?;
     check_template_links(catalog)?;
+    check_broker_links(catalog)?;
     let guids = |kind: Kind| -> Result<HashSet<&str>, String> {
         Ok(list(catalog, kind)?
             .iter()

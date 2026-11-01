@@ -38,7 +38,7 @@ const fn baseline_of(kind: Kind, english: f64, german: f64) -> Baseline {
     }
 }
 
-const BASELINES: [Baseline; 17] = [
+const BASELINES: [Baseline; 18] = [
     baseline_of(Kind::Manufacturers, 0.01, 0.06),
     baseline_of(Kind::Items, 0.01, 0.38),
     baseline_of(Kind::Ships, 0.01, 0.31),
@@ -56,7 +56,12 @@ const BASELINES: [Baseline; 17] = [
     baseline_of(Kind::MissionTypes, 0.0, 0.57),
     baseline_of(Kind::MissionLocationTemplates, 0.09, 0.99),
     baseline_of(Kind::ContractTemplates, 0.01, 0.99),
+    baseline_of(Kind::MissionBrokerEntries, 0.04, 1.0),
 ];
+
+/// The German texts a kind with a baseline of 1.0 must still resolve, as measured on LIVE and
+/// rounded down: a baseline of 1.0 alone would not notice keys that stop resolving.
+const GERMAN_FLOORS: [(Kind, usize); 1] = [(Kind::MissionBrokerEntries, 90)];
 
 /// The start of a mission token (`~mission(Contractor|Key)`) in a contract text; the exporter
 /// replaces it by a placeholder such as `[CONTRACTOR]`, so only the presence of such a text is
@@ -252,11 +257,25 @@ pub(crate) fn check_texts(archive: &Archive, catalog: &Value, baselined: bool) -
             baselined.then_some(baseline.german),
             &mut failures,
         );
+        if baselined {
+            floor_verdict(kind, &german, &mut failures);
+        }
     }
     if failures.is_empty() {
         Ok(())
     } else {
         Err(failures.join("\n").into())
+    }
+}
+
+fn floor_verdict(kind: Kind, german: &Coverage, failures: &mut Vec<String>) {
+    if let Some((_, floor)) = GERMAN_FLOORS.iter().find(|(known, _)| *known == kind)
+        && german.resolved < *floor
+    {
+        failures.push(format!(
+            "{kind}: only {} de texts resolve, below the floor {floor}",
+            german.resolved
+        ));
     }
 }
 
