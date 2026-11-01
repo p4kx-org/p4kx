@@ -22,8 +22,16 @@ Linux; the write guard of that ADR is unchanged.
 ## Unknown means running
 
 On Linux an unreadable `/proc` makes `game_is_running` return `true`, so the window shows its
-warning rather than staying silent. The warning never blocks anything (ADR-0036). Elsewhere without
-`/proc` (macOS) the answer stays `false`. The Windows check is unchanged.
+warning rather than staying silent. The Windows check returns `false` when it cannot tell (a
+failing `qprocess` or PowerShell); that is the existing behaviour and stays. The platforms differ
+on purpose for now: the result drives only the non-blocking warning, and the write guard does not
+depend on it (ADR-0036), so a wrong answer costs a missing or a needless notice, never a write
+into the game folder. The cost of the Linux choice: an unreadable `/proc` keeps the warning on and
+`game_watch` keeps polling every 20 seconds. Aligning the Windows failure handling is #1030.
+
+macOS and the BSDs stay `false` without `/proc`: Star Citizen does not run there, so there is no
+game to notice. Inside Flatpak or another PID namespace only the processes of that namespace are
+visible; a game outside it is not seen.
 
 ## Write guard on Linux
 

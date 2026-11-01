@@ -109,6 +109,29 @@ fn reads_only_a_bounded_prefix_of_the_command_line() -> TestResult {
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn does_not_follow_links_in_the_tree() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let elsewhere = tempfile::tempdir()?;
+    process(elsewhere.path(), "1", "StarCitizen.exe", b"")?;
+    std::os::unix::fs::symlink(elsewhere.path().join("1"), root.path().join("42"))?;
+    let folder = root.path().join("43");
+    fs::create_dir(&folder)?;
+    fs::write(elsewhere.path().join("comm"), "StarCitizen.exe\n")?;
+    std::os::unix::fs::symlink(elsewhere.path().join("comm"), folder.join("comm"))?;
+    assert!(!game_in_proc_tree(root.path())?);
+    Ok(())
+}
+
+#[test]
+fn a_folder_in_place_of_a_file_is_skipped() -> TestResult {
+    let root = tempfile::tempdir()?;
+    fs::create_dir_all(root.path().join("8").join("comm"))?;
+    assert!(!game_in_proc_tree(root.path())?);
+    Ok(())
+}
+
 #[test]
 fn an_empty_process_list_has_no_game() -> TestResult {
     let root = tempfile::tempdir()?;

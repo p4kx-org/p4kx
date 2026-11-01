@@ -50,7 +50,11 @@ pub fn process_count_lists_game(output: &str) -> bool {
 /// below `/proc` elsewhere, which finds the game under Wine and Proton (see
 /// [`game_in_proc_tree`](crate::game_in_proc_tree)). No process is opened, attached to or
 /// inspected, so the game's memory and handles are never touched. The check takes a few hundred
-/// milliseconds on Windows. On Linux an unreadable `/proc` counts as running.
+/// milliseconds on Windows.
+///
+/// When the process list cannot be read, Windows answers `false` and Linux answers `true`. The
+/// result only drives a non-blocking warning; the write guard does not depend on it. Other
+/// platforms without `/proc` answer `false`.
 #[must_use]
 pub fn game_is_running() -> bool {
     platform::game_is_running()
