@@ -45,10 +45,16 @@ pub fn process_count_lists_game(output: &str) -> bool {
 
 /// Returns whether `StarCitizen.exe` of any Channel is running.
 ///
-/// Only the list of process names is read: `qprocess` on Windows (a PowerShell count of the
-/// matching processes where `qprocess` is missing), the process names below `/proc` elsewhere. No
-/// process is opened, attached to or inspected, so the game's memory and handles are never
-/// touched. The check takes a few hundred milliseconds on Windows.
+/// Only process names are read: `qprocess` on Windows (a PowerShell count of the matching
+/// processes where `qprocess` is missing), `comm` and the first `cmdline` argument of each process
+/// below `/proc` elsewhere, which finds the game under Wine and Proton (see
+/// [`game_in_proc_tree`](crate::game_in_proc_tree)). No process is opened, attached to or
+/// inspected, so the game's memory and handles are never touched. The check takes a few hundred
+/// milliseconds on Windows.
+///
+/// When the process list cannot be read, Windows answers `false` and Linux answers `true`. The
+/// result only drives a non-blocking warning; the write guard does not depend on it. Other
+/// platforms without `/proc` answer `false`.
 #[must_use]
 pub fn game_is_running() -> bool {
     platform::game_is_running()
@@ -99,13 +105,11 @@ mod platform {
 
 #[cfg(not(windows))]
 mod platform {
+    use std::path::Path;
+
+    /// Scans `/proc`; where it cannot be listed the answer is unknown, which on Linux counts as
+    /// "the game may be running".
     pub(super) fn game_is_running() -> bool {
-        let Ok(processes) = std::fs::read_dir("/proc") else {
-            return false;
-        };
-        processes.filter_map(Result::ok).any(|process| {
-            std::fs::read_to_string(process.path().join("comm"))
-                .is_ok_and(|name| super::is_game_process(name.trim_end()))
-        })
+        crate::game_in_proc_tree(Path::new("/proc")).unwrap_or(cfg!(target_os = "linux"))
     }
 }
