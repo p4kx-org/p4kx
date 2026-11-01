@@ -72,7 +72,7 @@ peak_alloc = "0.3.0"
 proptest = "1.12.0"
 raw-window-handle = "0.6.2"
 rayon = "1.12.0"
-rfd = "0.17.2"
+rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal", "wayland"] }
 rmcp = { version = "3.5.1", default-features = false, features = ["macros", "server", "transport-io"] }
 rodio = { version = "0.23.0", default-features = false, features = ["playback"] }
 roxmltree = "0.21.2"
