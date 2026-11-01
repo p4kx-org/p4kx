@@ -17,6 +17,7 @@ use crate::limits::Limits;
 use crate::look::Look;
 use crate::paint::Area;
 use crate::rest::{AtRest, RestParams};
+use crate::style::preset::PresetStyles;
 use crate::style::{CanvasStyles, Modifiers, StyleCache, Subject, TagPaths, Uses};
 use crate::text::Shaped;
 use crate::transform::Placement;
@@ -59,6 +60,7 @@ pub(crate) struct Walk<'s, 'a, 'f, 't> {
     pub(crate) overrides: Vec<Override>,
     pub(crate) pixel: f32,
     pub(crate) turned: usize,
+    pub(crate) presets: Option<Rc<PresetStyles>>,
 }
 
 impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
@@ -105,6 +107,7 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
             overrides: Vec::new(),
             pixel: 1.0,
             turned: 0,
+            presets: None,
         }
     }
 

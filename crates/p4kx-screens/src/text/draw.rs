@@ -195,7 +195,14 @@ fn pick_font(
 fn font_size(look: &Look<'_>, spec: &TextSpec, area: Area, scale: f32, notes: &mut Notes) -> f32 {
     let size = look.style.text.font_size.or(spec.font_size).map_or_else(
         || {
-            notes.push("no font size: taken from the height of the widget".to_owned());
+            notes.push(spec.preset.as_deref().map_or_else(
+                || "no font size: taken from the height of the widget".to_owned(),
+                |preset| {
+                    format!(
+                        "text style {preset} has no font size in the Archive: taken from the height of the widget"
+                    )
+                },
+            ));
             area.height * FIELD_SIZE_OF_HEIGHT
         },
         |pixels| pixels * look.pixel,

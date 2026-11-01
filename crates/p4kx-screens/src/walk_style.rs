@@ -55,6 +55,7 @@ impl Walk<'_, '_, '_, '_> {
         if let Some(part) = self.inner_part(widget, &subject) {
             merge(&mut style, &part);
         }
+        self.apply_preset(canvas, widget, &mut style);
         self.under_bound_geometry(index, &mut style);
         self.apply_overrides(canvas, index, &mut style);
         let style = Rc::new(style);
