@@ -106,6 +106,11 @@ _Avoid_: viewer, inspector
 The game's typed object database, stored in the Entry `Data\Game.dcb` (or `Game2.dcb`).
 _Avoid_: DataCore, dcb, Game database
 
+**DataForge file**:
+A `Game2.dcb` kept on disk, read in place of an Archive by every `p4kx dcb` command, the MCP
+DataForge tools and the window; recognised by its content, never written (ADR-0249).
+_Avoid_: dcb copy, stand-in Archive
+
 **Record**:
 One typed object in DataForge, identified by its GUID and addressed by its record path.
 _Avoid_: dcb entry, item (an item is one kind of Record)
@@ -266,6 +271,17 @@ attach another Entity, with its own Loadout, to a Port, if it fits the Port's ty
 (ADR-0076).
 _Avoid_: override (that is the entry's Loadout), mod, swap
 
+**Loadout pick**:
+The alternative, counted from 0, that is taken in a group of a generated Loadout (a creature's or
+an NPC's) instead of the first one: `--loadout-pick Body=2` (ADR-0309).
+_Avoid_: random seed, variant (a ship has variants)
+
+**Hidden parts**:
+The Ports whose item another worn item hides by its Record (`HiddenParts`): a hat hides the hair,
+an undersuit the clothing under it. The hidden item is left out and reported as `part_hidden`
+(ADR-0279, ADR-0304).
+_Avoid_: occlusion, culling
+
 **XML Loadout**:
 A Loadout stored as an XML or CryXml Entry, e.g. `Scripts/Loadouts/…`, that a Record names by
 path instead of listing its entries; it may include further XML Loadouts.
@@ -294,6 +310,11 @@ An Entity placed in an Assembly: the root Entity or one attached to a port, name
 `<port>/<entity>`, with the model its Record names, a transform relative to its parent part and
 the material library its Entity chooses (ADR-0040).
 _Avoid_: component, child
+
+**Bone attachment**:
+A model that a character definition (`.cdf`) lets a Part carry at a bone of its skeleton, offset
+by a position and rotation; drawn as a node below the Part (ADR-0257).
+_Avoid_: socket, accessory
 
 **Blender package**:
 A folder that describes an Assembly without depending on Blender's file format: `scene.json` (format
@@ -396,6 +417,12 @@ _Avoid_: voice language, locale
 A human body with head (CHF/DNA), armour and clothing, assembled like an Entity.
 _Avoid_: avatar, player model
 
+**Creature**:
+An Entity whose root geometry is a character file with a skeleton and that is no human body. Its
+skins are bound to that skeleton, and its clips are those its animation database names; it is
+exported as one skinned rig mesh (ADR-0275, ADR-0307, ADR-0316).
+_Avoid_: animal, NPC (an NPC is a human Character)
+
 **Body variant**:
 The build a Character's body comes in, male or female: its skeleton, its default body skin and
 the tag (`Male`, `Female`) an Entity's Record gives the geometry worn on it.
@@ -456,6 +483,11 @@ _Avoid_: side, surface
 One element of a texture array, or one slice of a volume texture; exported as one PNG
 `<name>_layerN` or `<name>_sliceN`, and previewed tiled on one sheet.
 _Avoid_: frame, page
+
+**Stencil decal**:
+A `MeshDecal` material with `STENCIL_MAP` whose motif is cut out by its stencil map, in the colours
+of the livery (`StencilTintOverride`) instead of a solid quad (ADR-0298, ADR-0310).
+_Avoid_: logo quad, sticker
 
 **Chunk file**:
 A CryEngine file made of typed chunks in the `#ivo` or the older `CrCh` container, e.g. a model
@@ -637,8 +669,16 @@ _Avoid_: validation, integrity scan
 
 **Conversion**:
 Turning an Entry or Record from its game-internal format into a readable one, e.g. CryXml or a
-Record into XML.
+Record into XML. A folder of files extracted without it is converted later by `p4kx convert`
+(ADR-0272).
 _Avoid_: decoding, transformation
+
+**Portable file name**:
+A written file name that is valid on both Linux and Windows whatever the platform: forbidden
+characters, device names, trailing dots and spaces and over-long parts are reported or escaped,
+and a Record that needs it is a renamed Record, written under its GUID or an escaped record path
+(ADR-0248).
+_Avoid_: safe name, sanitised name
 
 **Comparison**:
 The set of Entries and Records that were added, removed or changed between two Archives.
@@ -663,6 +703,18 @@ _Avoid_: p4k-catalog, basetool export
 One group of entities in the Basetool catalog, e.g. manufacturers or items, selected by record-path
 prefix and type and complete or partial on its own.
 _Avoid_: category, entity type
+
+**Contract template**:
+A `ContractTemplate` Record that a contract names by `templateGuid`: its mission properties, ship
+spawn and location links, hauling orders, modifiers, mission flow and reward contributions, stated
+as the Archive has them (`contractTemplates`, ADR-0313).
+_Avoid_: contract type
+
+**Mission broker entry**:
+A `MissionBrokerEntry` Record, an offer of the mission board with its texts, availability,
+schedule, reward and requirements; a contract names it by `brokerEntryGuid`
+(`missionBrokerEntries`, ADR-0320).
+_Avoid_: mission offer, board entry
 
 **Export**:
 A structured file derived from DataForge for another tool, as opposed to an Extraction of Entries.

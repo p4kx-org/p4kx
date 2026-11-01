@@ -97,7 +97,7 @@ a new test file goes into `tests/it/` and `main.rs` gets its `mod` line.
 ## Plan and decisions
 
 - [docs/ROADMAP.md](docs/ROADMAP.md): product decisions, the milestones M1–M14 (all done) and the
-  releases after 0.4.0.
+  releases up to 0.4.2, with 0.5.0 next.
 - [README.md](README.md): what P4KX does and how to install it; [docs/commands.md](docs/commands.md):
   every command and the MCP tools; [docs/user-help.md](docs/user-help.md): the window. Keep them
   in step with `p4kx --help` when a command or option changes.
@@ -118,6 +118,9 @@ a new test file goes into `tests/it/` and `main.rs` gets its `mod` line.
   that (ADR-0006).
 - The look follows the P4KX theme strictly: dark only, Lato only (ADR-0006). See "GUI design
   (hard rule)" below.
+- The window opens Direct3D 12 first on Windows and falls back to the default wgpu backends;
+  `WGPU_BACKEND` overrides it, and the GUI's headless tests open only the software backend
+  (ADR-0317).
 - Source files stay below about 400 lines; split by responsibility before that.
 - One canonical Record tree serialised to XML and JSON; References are links, never embedded
   (ADR-0004).

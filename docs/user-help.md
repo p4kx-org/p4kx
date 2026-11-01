@@ -87,6 +87,29 @@ when the open containers need their memory; hovering the row gives the reason. C
 container while it opens cancels the opening. When the Archive changes on disk, its containers
 are closed until you reload it.
 
+## Extracting
+
+**Extract selected…**, **Extract shown…** and **Extract all…** open the dialog **Extract
+Entries** with the scope, the target (a new folder `SC-EXPORT-<Channel>-<Build>-<time>` inside the chosen
+folder, or an existing folder) and what to do with files that already exist. The target cannot be
+inside a Star Citizen installation. The field **Leave out** takes one Filter per line, with the
+rules of the search, and skips the Entries they match: `*_lod?.cgam` leaves out the level-of-detail
+companions of models. A texture whose header is matched is left out with its parts; with the
+Conversion on, an excluded part of a texture that stays is still read to build the texture, and the
+summary says so. The dialog refuses Filters longer than 1024 bytes or with more than 32 wildcards,
+blank lines and a selection that leaves nothing. The same field is in the dialog of a Comparison
+side.
+
+Only file names valid on both Linux and Windows are written. The summary of an Extraction with
+Conversion and of a Record export lists the Records whose file does not follow their name or record
+path, with GUID, record path and reason (*Renamed Records*); they are written and do not count as
+failed.
+
+**Archive › Convert folder…** converts a folder of files that were extracted earlier without
+conversion (CryXml, split textures, sounds, soundbanks and a DataForge file) into a new folder, as
+the Conversion of an Extraction does. It runs in the background with progress and **Cancel**, and
+ends with a summary. `p4kx convert` does the same on the command line.
+
 ## Comparing two Archives
 
 The **Comparison** tab next to **Browse** compares two Archives, for example an older against a newer Build.
@@ -313,7 +336,10 @@ it again.
 with the level of detail, the materials and the texture size of your choice. The Export menu
 offers **Export Interior…** for a socpak container on its own. The dialog follows the same rules
 as the model export: the target cannot be inside a Star Citizen installation, the file is written
-only when complete, and the summary lists what could not be resolved. `p4kx entity glb`,
+only when complete, and the summary lists what could not be resolved, including the layer files
+of the materials that are missing. For a creature or an NPC whose Loadout the game generates at
+random, **Loadout alternatives** takes another alternative of a group (`Body=1, Eggs=2`; counting
+from 0, a bare index applies to every group that has it). `p4kx entity glb`,
 `entity package` and `interior glb|package` do the same on the command line.
 
 ## Characters
@@ -347,7 +373,11 @@ writes the sounds of the selected trigger or of all triggers as Ogg, WAV or unch
 The **UI** tab draws pictures. **Files** lists the GFx and SWF movies of the Archive and draws the
 first frame of the selected one, **Ships** lists the ships and vehicles and the screens (MFDs,
 radar, HUD) of the selected one, and draws a screen from its Records. Choose the **Size**, the
-**Background** and the **Format** (PNG or SVG) and press **Export…**. The tabs **Contents** and
+**Background**, the **State** (*At rest* or *Powered on*, which sets `powerstate=1`), more game
+variables as `NAME=VALUE` in **Variables** (`mfdviewname=…`, `landscapecanvasguid=…` to draw one
+page of a powered MFD) and the **Format** (PNG or SVG) and press **Export…**. The state and the
+variables are kept across sessions, and the report lists the variables no canvas of the screen
+reads and the textures the Archive lacks. The tabs **Contents** and
 **Left out** list what the movie holds and what the renderer left out (fonts it lacks, unsupported
 widget types, limits). `p4kx ui` draws the same pictures on the command line, and `p4kx ui
 hologram` draws the hologram of a vehicle, which the window does not offer.
@@ -357,8 +387,9 @@ hologram` draws the hologram of a vehicle, which the window does not offer.
 - The tab bar has **Browse**, **Comparison**, **Query**, **Localisation**, **Tags**, **Search**,
   **Entities**, **Sounds**, **Characters** and **UI**. The sidebar lists the detected Channels
   (Archive menu: **Open Archive…**, **Open DataForge file…** for a `Game2.dcb` kept on its own,
-  **Add folder…**, **Add Archive…**, **Recent Archives**), or you
-  drop a `Data.p4k` on the window.
+  **Add folder…**, **Add Archive…**, **Convert folder…**, **Recent Archives**), or you
+  drop a `Data.p4k` on the window. A DataForge file opens as its DataForge only: no Entry table,
+  folder tree or Entry counts, and no Search tab.
 - The **Export** menu holds **Record export…**, **Export as GLB…** for a model, **Export
   Interior…** and the **Basetool catalog…**.
 - The smallest window is 640 by 400 points. Below 872 points of width the sidebar folds into a
@@ -366,6 +397,12 @@ hologram` draws the hologram of a vehicle, which the window does not offer.
   puts its actions in a line of its own, and what still does not fit scrolls.
 - The look is P4KX's own dark theme in the Lato typeface. **Language** in the menu switches
   between German and British English; the first start follows the system language.
+- **Graphics.** On Windows the 3D view opens a Direct3D 12 instance first, so the Vulkan
+  drivers and the overlays injected into them are not loaded. A machine where Direct3D 12 yields no adapter or
+  device within a few seconds falls back to the default backends. The environment variable
+  `WGPU_BACKEND` (for example `vulkan`) overrides the choice. If the graphics driver does not
+  release the device in time at exit, the window ends the process with status 4 ten seconds after
+  it has saved its settings and leaves a note in the settings folder.
 
 ## The Archive key
 

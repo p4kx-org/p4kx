@@ -57,7 +57,7 @@ body:
     attributes:
       label: P4KX Version
       description: The version from the About view, or a commit SHA for a build from source.
-      placeholder: "e.g. 0.4.1"
+      placeholder: "e.g. 0.4.2"
     validations:
       required: true
 

@@ -9,7 +9,8 @@ turns their internal formats into readable or importable data: XML, JSON, PNG, O
 glTF and Blender packages. It comes as a Windows window (`p4kx-gui`), a command line (`p4kx`), a
 read-only [MCP server](#mcp-server) (`p4kx-mcp`) and a [Blender add-on](#blender-add-on).
 
-The current version is **[0.4.0](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.0)**. P4KX is written in Rust and licensed under either of the
+The current version is **[0.4.2](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.2)**. P4KX is
+written in Rust and licensed under either of the
 [Apache License, Version 2.0](LICENSE-APACHE) or the [MIT licence](LICENSE-MIT) at your option.
 The source lives at [github.com/p4kx-org/p4kx](https://github.com/p4kx-org/p4kx).
 
@@ -31,46 +32,55 @@ Copyright (c) 2026 the P4KX contributors
   installed Channels (`LIVE`, `PTU`, `EPTU`, `HOTFIX`, `TECH-PREVIEW`) and their Build. An Archive
   is only ever read, and an updated Archive is noticed while it is open. `--recover` rebuilds one
   whose directory is damaged.
-- **Search and verification.** Filters Entries by path with globs, finds a text in the Records, the
-  localisation and the text Entries (`grep`), and checks every Entry against the CRC-32C of the
-  Archive directory (`verify`).
+- **Search and verification.** Filters Entries by path with globs and leaves out others with a
+  repeatable `--exclude`, finds a text in the Records, the localisation and the text Entries
+  (`grep`), and checks every Entry against the CRC-32C of the Archive directory (`verify`).
 - **Extraction.** Writes Entries in parallel into a new `SC-EXPORT-<Channel>-<Build>-<time>`
-  folder, with conflict policies, cancellation and path-traversal protection. `--convert` turns
-  CryXml into XML, the DataForge into one XML file per Record, textures into PNG, DDS or OpenEXR
-  and sounds into Ogg or WAV on the way.
-- **DataForge and Records.** Reads DataForge versions 6 and 8 as a canonical Record tree, exports
-  it as Record XML, Record JSON, NDJSON or flat CSV, and answers Queries, References, tag trees
-  and field statistics over it.
+  folder, with conflict policies, cancellation and path-traversal protection, and only with file
+  names valid on both Linux and Windows. `--convert` turns CryXml into XML, the DataForge into one
+  XML file per Record, textures into PNG, DDS or OpenEXR and sounds into Ogg or WAV on the way;
+  `p4kx convert` does the same for a folder extracted earlier.
+- **DataForge and Records.** Reads DataForge versions 6 and 8, from an Archive or from a
+  `Game2.dcb` file on disk, as a canonical Record tree, exports it as Record XML, Record JSON,
+  NDJSON or flat CSV, and answers Queries, References, tag trees and field statistics over it.
 - **Comparison.** Compares two Archives, for example an older and a newer Build: Entries by size
   and checksum, Records field by field, the DataForge schema, and the line diff of one Entry.
 - **Textures and localisation.** Merges split DDS textures, decodes BC1 to BC7 and the
   uncompressed formats to PNG (high-range textures to OpenEXR), and reads the `global.ini` of every language.
 - **Audio.** Converts Wwise WEM sounds and soundbanks to Ogg or WAV without re-encoding where the
-  codec allows, and resolves an audio trigger through its events and containers to the sounds.
+  codec allows, resolves an audio trigger through its events and containers to the sounds, prints
+  the object hierarchy of a soundbank and writes vgmstream `.txtp` files for resolved events.
 - **Models, Assemblies and Interiors.** Reads CryEngine chunk files and models with materials,
   textures, skeletons and animations, and exports them as glTF (GLB). An Assembly places a ship, a
-  vehicle or a weapon with its whole Loadout, palettes and landing gear; the Loadout can be
-  changed port by port. The Interior of a ship comes from its socpak containers, with props and
-  lights.
+  vehicle, a weapon or a creature with its whole Loadout, palettes, landing gear, bone attachments
+  and skin ports; the Loadout can be changed port by port, and another alternative of a generated
+  Loadout can be picked (`--loadout-pick`). The Interior of a ship comes from its socpak
+  containers, with props and lights.
 - **Characters and armour.** Builds a Character from a CHF head or a story character's Loadout,
-  the default body, armour and clothing, with face expressions as morph targets and animations.
-  Converts CHF files to JSON and back byte for byte.
-- **3D viewer.** The window draws models, Assemblies and Characters with wgpu: orbit, level of
-  detail, material switch, skeleton and animation playback.
+  the default body, armour and clothing, with hair, brows and beard bound to the face, face
+  expressions as morph targets at every level of detail and animations; worn clothing hides what
+  its Record hides. Converts CHF files to JSON and back byte for byte.
+- **3D viewer.** The window draws models, Assemblies and Characters with wgpu (Direct3D 12 first on
+  Windows): orbit, level of detail, material switch, skeleton and animation playback.
 - **UI movies, ship screens and holograms.** Lists and draws GFx and SWF movies, renders the MFD
-  screens of a ship from their Records as PNG or SVG, and draws the hologram of a vehicle.
-- **Blender package.** Writes an Entity, an Interior or a Character as a folder (`scene.json`,
-  GLB parts, textures) that the Blender add-on imports with node-tree materials.
+  screens of a ship from their Records as PNG or SVG, also powered on and page by page
+  (`--var`), and draws the hologram of a vehicle.
+- **Blender package.** Writes an Entity (a creature as one skinned rig), an Interior or a Character
+  as a folder (`scene.json`, GLB parts, textures) that the Blender add-on imports with node-tree
+  materials for layered surfaces, glass, stencil decals and liveries.
 - **Basetool catalog and ship base data.** Writes the versioned JSON catalog of manufacturers,
-  items, ships, commodities, blueprints, loadouts, paints, shops, the starmap, contracts,
-  reputation, mining, refining and loot that the Basetool imports, and the base data of every ship.
+  items, ships, commodities, blueprints, loadouts, paints, shops, the starmap, contracts with their
+  templates, broker entries, spawns and hauling orders, reputation, mining, refining and loot that
+  the Basetool imports, and the base data of every ship.
 
 ## The window
 
 `p4kx-gui` has the tabs **Browse**, **Comparison**, **Query**, **Localisation**, **Tags**,
 **Search**, **Entities**, **Sounds**, **Characters** and **UI**, a sidebar with the detected
 Channels and an Export menu. It previews text, hex, textures, models, sounds and Records, runs
-Queries, exports Records and the Basetool catalog, and fits down to a window of 640 by 400 points.
+Queries, exports Records and the Basetool catalog, converts a folder of extracted files, opens a
+`Game2.dcb` on its own, and fits down to a window of 640 by 400 points. On Windows its 3D view
+opens Direct3D 12 first and falls back to the default backends; `WGPU_BACKEND` overrides that.
 The look is P4KX's own dark theme, and the language is German or British English. See
 [docs/user-help.md](docs/user-help.md).
 
@@ -82,7 +92,7 @@ codes are in `p4kx --help`. Every command takes the path of a `Data.p4k` as `<ar
 
 | Area | Commands |
 |---|---|
-| Archive | `list`, `search`, `grep`, `info`, `verify`, `extract`, `channels`, `socpak`, `key` |
+| Archive | `list`, `search`, `grep`, `info`, `verify`, `extract`, `convert`, `channels`, `socpak`, `key` |
 | DataForge | `dcb info`, `dcb export`, `dcb query`, `dcb refs`, `dcb tags`, `dcb fields`, `prefab` |
 | Exports | `catalog`, `ships`, `actionmap export`, `loc`, `coverage` |
 | Comparison | `compare` (`--entries`, `--records`, `--schema`, `--diff`) |
@@ -93,16 +103,16 @@ codes are in `p4kx --help`. Every command takes the path of a `Data.p4k` as `<ar
 ## MCP server
 
 `p4kx-mcp` is a read-only [Model Context Protocol](https://modelcontextprotocol.io) server over
-stdio with 23 tools, so an AI client can look into the Archives: entries, Records, Queries, chunk
-files, models, textures, sounds and Loadouts. It writes no file. See
+stdio with 24 tools, so an AI client can look into the Archives: entries, Records, Queries, chunk
+files, models, textures, sounds, soundbank objects and Loadouts. It writes no file. See
 [docs/commands.md](docs/commands.md#mcp-server) for the tools and how to add it to Claude Code or
 Claude Desktop.
 
 ## Blender add-on
 
 The add-on `p4kx_importer` imports the packages written by `entity package`,
-`interior package` and `character package` into Blender 5.2 LTS (File > Import > P4KX Package
-(scene.json)). See [blender_addon/README.md](blender_addon/README.md) and
+`interior package` and `character package` (package format 1.8) into Blender 5.2 LTS (File >
+Import > P4KX Package (scene.json)). See [blender_addon/README.md](blender_addon/README.md) and
 [docs/blender-package.md](docs/blender-package.md).
 
 ## Install
@@ -116,6 +126,8 @@ offers:
   any folder.
 - `p4kx_importer-<version>.zip`: the Blender add-on (Edit > Preferences > Get Extensions >
   Install from Disk).
+- `SHA256SUMS.txt` and `SHA3-512SUMS.txt`: the checksums of the other files, to check a download
+  (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 Settings live in `%APPDATA%\P4KX`. The window can check GitHub once at start for a newer Release
 if you switch that on in the Help menu; it is off by default, and nothing else touches the network.
