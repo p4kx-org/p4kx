@@ -186,7 +186,7 @@ fn records_that_nest_phases_or_conditions_too_deep_fail_instead_of_being_cut() -
         .map(|failure| (failure.record_path.as_str(), failure.reason.as_str()))
         .collect();
     failed.sort_unstable();
-    assert_eq!(failed.len(), 10, "{failed:?}");
+    assert_eq!(failed.len(), 11, "{failed:?}");
     assert!(failed[0].0.ends_with("deep_flow"), "{failed:?}");
     assert!(failed[0].1.contains("conditions nest deeper than 16"));
     assert!(failed[1].0.ends_with("deep_phases"), "{failed:?}");
@@ -201,6 +201,10 @@ fn records_that_nest_phases_or_conditions_too_deep_fail_instead_of_being_cut() -
 }
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one row per struct the catalog fails the Record on"
+)]
 fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_other() -> TestResult
 {
     let dir = tempfile::tempdir()?;
@@ -248,6 +252,10 @@ fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_
         (
             "/unknown_item_condition",
             "item condition holds the unknown struct DataSetMatchCondition_Mystery",
+        ),
+        (
+            "/unknown_location_condition",
+            "location condition holds the unknown struct DataSetMatchCondition_Mystery",
         ),
         (
             "/missionbroker/bad",

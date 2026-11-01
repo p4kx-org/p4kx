@@ -196,12 +196,6 @@ pub(crate) enum LocationCondition {
         /// The `MissionItem` Records.
         item_guids: Vec<CatalogGuid>,
     },
-    /// A condition of another struct, which the catalog does not read.
-    #[serde(rename_all = "camelCase")]
-    Other {
-        /// The struct name.
-        struct_name: String,
-    },
 }
 
 /// Whether a location property holds one location or several.

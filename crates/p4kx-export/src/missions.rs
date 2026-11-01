@@ -26,6 +26,7 @@ use crate::record_fields::{boolean, identity, reference, text};
 use crate::selection::{Kind, is_leftover};
 use crate::spawn_layers::{HandlerSpawns, RecordSpawns};
 use crate::spawn_pools::SpawnPools;
+use crate::spawn_read::SpawnError;
 use crate::texts::Texts;
 use crate::{CatalogError, CatalogFailure};
 
@@ -46,7 +47,7 @@ pub(crate) struct Missions<'f> {
     pub(crate) siblings: Siblings<'f>,
 }
 
-/// A Record that cannot be read: the error of the DataForge or of an identifier of a description.
+/// A Record that cannot be read: the error of the DataForge or a [`SpawnError`].
 type PieceError = Box<dyn std::error::Error + Send + Sync>;
 
 enum Piece<'f> {
@@ -241,7 +242,7 @@ impl<'f> Parent<'_, 'f> {
         &self,
         context: &Context<'_, 'f>,
         out: &mut Vec<ContractEntry<'f>>,
-    ) -> Result<usize, serde_json::Error> {
+    ) -> Result<usize, SpawnError> {
         let index = context.index;
         let contract_where = Where::read(Some(self.contract), "additionalPrerequisites");
         let template = reference(Some(self.contract), "template").map(|guid| guid.0);
@@ -254,7 +255,7 @@ impl<'f> Parent<'_, 'f> {
             self.contract,
             template_data.and_then(|data| data.spawns.as_ref()),
         )?;
-        let make = |sub: Option<&StructValue<'f>>| -> Result<ContractEntry<'f>, serde_json::Error> {
+        let make = |sub: Option<&StructValue<'f>>| -> Result<ContractEntry<'f>, SpawnError> {
             let spawns = spawn_levels.resolve(sub)?;
             let sub_layer =
                 sub.map(|sub| Layer::read(one(Some(sub), "paramOverrides").or(Some(sub))));

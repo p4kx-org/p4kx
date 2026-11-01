@@ -6788,24 +6788,6 @@
             "itemGuids"
           ],
           "type": "object"
-        },
-        {
-          "description": "A condition of another struct, which the catalog does not read.",
-          "properties": {
-            "condition": {
-              "const": "other",
-              "type": "string"
-            },
-            "structName": {
-              "description": "The struct name.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "condition",
-            "structName"
-          ],
-          "type": "object"
         }
       ]
     },

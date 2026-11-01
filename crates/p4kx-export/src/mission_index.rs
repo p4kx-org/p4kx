@@ -17,7 +17,7 @@ use crate::record_fields::{boolean, integer, reference};
 use crate::spawn_layers::Level;
 use crate::spawn_model::SpawnLevel;
 use crate::spawn_pools::SpawnPools;
-use crate::spawn_read::Reader;
+use crate::spawn_read::{Reader, SpawnError};
 use crate::{CatalogError, CatalogFailure};
 
 const TEMPLATES: &str = "libs/foundry/records/contracts/contracttemplates/";
@@ -284,7 +284,7 @@ fn template_of<'f>(
     tree: &RecordTree<'f>,
     tags: &TagTree,
     pools: &mut SpawnPools<'f>,
-) -> Result<Template<'f>, serde_json::Error> {
+) -> Result<Template<'f>, SpawnError> {
     let root = Some(tree.root());
     let display = one(root, "contractDisplayInfo");
     let reader = Reader::new(tags, tree.root());

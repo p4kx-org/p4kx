@@ -106,6 +106,20 @@ pub(super) fn properties() -> Vec<TestValue> {
     ]
 }
 
+/// A location property whose only condition is of a struct the catalog does not know.
+pub(super) fn mystery_location(variable: &str) -> TestValue {
+    property(
+        variable,
+        "",
+        TestInstance::new("MissionPropertyValue_Location").value(
+            "matchConditions",
+            array(vec![object(TestInstance::new(
+                "DataSetMatchCondition_Mystery",
+            ))]),
+        ),
+    )
+}
+
 /// A mission item property whose only condition is of a struct the catalog does not know.
 pub(super) fn mystery_item(variable: &str) -> TestValue {
     property(

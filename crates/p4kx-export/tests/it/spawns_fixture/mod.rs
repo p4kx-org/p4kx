@@ -39,6 +39,7 @@ pub(crate) const UNKNOWN_VALUE: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0008
 pub(crate) const UNKNOWN_CONDITION: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0009;
 pub(crate) const UNKNOWN_CONTRACT_PROPERTY: u128 = 0x4000_0000_0000_4000_8000_0000_0000_000a;
 pub(crate) const UNKNOWN_ITEM_CONDITION: u128 = 0x4000_0000_0000_4000_8000_0000_0000_000b;
+pub(crate) const UNKNOWN_LOCATION_CONDITION: u128 = 0x4000_0000_0000_4000_8000_0000_0000_000c;
 pub(crate) const BROKER_BAD_PROPERTY: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0005;
 pub(crate) const BROKER: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const BROKER_ELSEWHERE: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0002;
@@ -323,6 +324,7 @@ fn database() -> DataForgeBuilder {
         template_deep::unknown_condition(),
         template_deep::unknown_contract_property(),
         template_deep::unknown_item_condition(),
+        template_deep::unknown_location_condition(),
         broker::broker(),
         broker::elsewhere(),
         broker::leftover(),
