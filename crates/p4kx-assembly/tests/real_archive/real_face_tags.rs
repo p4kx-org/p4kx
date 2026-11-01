@@ -13,6 +13,8 @@ use p4kx_assembly::{
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
+use crate::real_paths::unified;
+
 type TestResult = Result<(), Box<dyn Error>>;
 /// A port name with the file of the entity path and the file of the armour path.
 type PortFiles = (String, Option<String>, Option<String>);
@@ -22,10 +24,6 @@ const PACHECO: &str = "NPC_Archetypes-Female-Human-MissionGivers-TeciaPacheco";
 const LASHES: &str = "Eyelashes_ItemPort";
 const BROW: &str = "Eyebrow_ItemPort";
 const PORTS: [&str; 2] = [LASHES, BROW];
-
-fn unified(path: &str) -> String {
-    path.replace('\\', "/").to_ascii_lowercase()
-}
 
 /// Returns the entity-path file of the port `name` among `files`.
 fn file_of<'f>(files: &'f [PortFiles], name: &str) -> Result<&'f str, Box<dyn Error>> {
