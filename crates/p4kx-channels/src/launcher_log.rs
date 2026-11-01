@@ -125,7 +125,7 @@ pub(crate) fn scan(log_folder: &Path, wanted: Wanted) -> LauncherLog {
 
 fn library_folder(line: &str) -> Option<PathBuf> {
     if let Some(channel_folder) = launched_channel_folder(line) {
-        return channel_folder.parent().map(Path::to_path_buf);
+        return parent_folder(&channel_folder);
     }
     INSTALLERS.iter().find_map(|marker| {
         let rest = after(line, marker)?;
@@ -133,6 +133,18 @@ fn library_folder(line: &str) -> Option<PathBuf> {
         let end = rest.find(INSTALL_END)?;
         unescape(rest.get(..end)?).map(PathBuf::from)
     })
+}
+
+/// Returns the parent of `folder`, also for a Windows path that a non-Windows host sees as a
+/// single file name (a launcher log inside a Wine prefix).
+fn parent_folder(folder: &Path) -> Option<PathBuf> {
+    if let Some(parent) = folder.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        return Some(parent.to_path_buf());
+    }
+    let (parent, _) = folder.to_str()?.rsplit_once(['\\', '/'])?;
+    (!parent.is_empty()).then(|| PathBuf::from(parent))
 }
 
 fn launched_channel_folder(line: &str) -> Option<PathBuf> {
@@ -150,4 +162,22 @@ fn after<'a>(text: &'a str, marker: &str) -> Option<&'a str> {
 fn unescape(json_fragment: &str) -> Option<String> {
     let path: String = serde_json::from_str(&format!("\"{json_fragment}\"")).ok()?;
     (!path.is_empty()).then_some(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_parent_of_a_windows_path_is_found_on_every_host() {
+        assert_eq!(
+            parent_folder(Path::new(r"C:\Games\SC\LIVE")),
+            Some(PathBuf::from(r"C:\Games\SC"))
+        );
+    }
+
+    #[test]
+    fn a_name_without_a_separator_has_no_parent() {
+        assert_eq!(parent_folder(Path::new("LIVE")), None);
+    }
 }
