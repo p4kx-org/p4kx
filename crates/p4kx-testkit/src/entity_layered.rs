@@ -15,6 +15,8 @@ pub const LAYERED_TINTS: [[u8; 3]; 3] = [[255, 0, 0], [0, 255, 0], [0, 0, 255]];
 pub const LAYERED_MISSING_TEXTURE: &str = "Objects/Test/layers/textures/wear_spec.tif";
 
 const SIDE: u32 = 8;
+const CUBE_VERTICES: usize = 24;
+const CUBE_COLOUR: [u8; 4] = [10, 20, 30, 255];
 const LAYER_TEXTURES: [&str; 8] = [
     "base_diff",
     "base_ddna",
@@ -131,12 +133,14 @@ fn model() -> TestModel {
         first_vertex,
         vertex_count,
     };
-    TestModel::cube().with_submeshes(vec![
-        part(CUBE_CAPS_MATERIAL, 0, 12, 0, 8),
-        part(CUBE_SIDES_MATERIAL, 12, 12, 8, 8),
-        part(3, 24, 6, 16, 4),
-        part(4, 30, 6, 20, 4),
-    ])
+    TestModel::cube()
+        .with_colours(vec![CUBE_COLOUR; CUBE_VERTICES])
+        .with_submeshes(vec![
+            part(CUBE_CAPS_MATERIAL, 0, 12, 0, 8),
+            part(CUBE_SIDES_MATERIAL, 12, 12, 8, 8),
+            part(3, 24, 6, 16, 4),
+            part(4, 30, 6, 20, 4),
+        ])
 }
 
 /// Returns the Entries of a synthetic Archive with a ship Entity `TEST_Layered` whose library

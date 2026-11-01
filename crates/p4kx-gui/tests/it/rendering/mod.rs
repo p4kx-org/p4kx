@@ -16,18 +16,19 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::{RenderState, RendererOptions};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state, default_wgpu_setup};
+use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::{GpuReport, Language, Model, ViewerSupport, install_viewer};
 use viewing::{Site, TestResult, entries, opened_at};
 
 pub(crate) const BACKGROUND: [u8; 3] = [0x0F, 0x0F, 0x0F];
 
 pub(crate) fn render_state() -> Option<RenderState> {
-    render_state_with(default_wgpu_setup())
+    render_state_with(software_wgpu_setup())
 }
 
 #[expect(
@@ -48,7 +49,7 @@ fn render_state_with(setup: eframe::egui_wgpu::WgpuSetup) -> Option<RenderState>
 /// A render state whose device reads no storage buffer in a vertex stage, so it refuses the
 /// pipelines that skin a model and draw its skeleton.
 pub(crate) fn render_state_without_skinning() -> Option<RenderState> {
-    let eframe::egui_wgpu::WgpuSetup::CreateNew(mut setup) = default_wgpu_setup() else {
+    let eframe::egui_wgpu::WgpuSetup::CreateNew(mut setup) = software_wgpu_setup() else {
         return None;
     };
     setup.device_descriptor = Arc::new(|adapter| eframe::egui_wgpu::wgpu::DeviceDescriptor {

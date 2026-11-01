@@ -15,11 +15,12 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::RendererOptions;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state, default_wgpu_setup};
+use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::{
     ComparisonList, ComparisonSide, ComparisonStatus, ComparisonView, Language, Model, WorkTab, ui,
 };
@@ -158,7 +159,7 @@ fn the_schema_tab_is_translated() -> TestResult {
 )]
 fn renderer() -> Option<WgpuTestRenderer> {
     let state =
-        catch_unwind(|| create_render_state(default_wgpu_setup(), RendererOptions::PREDICTABLE))
+        catch_unwind(|| create_render_state(software_wgpu_setup(), RendererOptions::PREDICTABLE))
             .ok();
     if state.is_none() {
         eprintln!("no graphics adapter: the test checks nothing");

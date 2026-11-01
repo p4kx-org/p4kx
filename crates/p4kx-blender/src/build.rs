@@ -47,7 +47,7 @@ pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
         options: Options {
             lod: inputs.options.lod,
             texture_mip: inputs.options.texture_mip,
-            vertex_colours: inputs.options.vertex_colours,
+            vertex_colours: inputs.options.writes_vertex_colours(),
             exclude: inputs.info.exclude.clone(),
             replace: inputs.info.replace.clone(),
         },

@@ -8,10 +8,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crate::software_wgpu::software_wgpu_setup;
 use eframe::egui_wgpu::RendererOptions;
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
-use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state, default_wgpu_setup};
+use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::{
     Browser, Language, MAX_SCENE_TRIANGLES, MAX_SCENE_VERTICES, Model, ModelPreview, ModelStatus,
     Preview, PreviewTab, ViewerSupport, install_viewer, is_model_path, ui,
@@ -215,7 +216,7 @@ fn save_png(image: &[u8], (width, height): (u32, u32)) -> TestResult {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn a_real_model_is_drawn_in_the_window() -> TestResult {
     let Ok(state) = std::panic::catch_unwind(|| {
-        create_render_state(default_wgpu_setup(), RendererOptions::PREDICTABLE)
+        create_render_state(software_wgpu_setup(), RendererOptions::PREDICTABLE)
     }) else {
         no_adapter();
         return Ok(());
@@ -313,7 +314,7 @@ fn animated_parts(browser: &mut Browser) -> Result<Vec<(u32, String)>, Box<dyn E
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn real_doors_and_gear_are_drawn_at_rest_and_in_motion() -> TestResult {
     let Ok(state) = std::panic::catch_unwind(|| {
-        create_render_state(default_wgpu_setup(), RendererOptions::PREDICTABLE)
+        create_render_state(software_wgpu_setup(), RendererOptions::PREDICTABLE)
     }) else {
         no_adapter();
         return Ok(());

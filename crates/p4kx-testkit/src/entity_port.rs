@@ -3,8 +3,6 @@
 
 use crate::{TestInstance, TestValue};
 
-const DEFAULT_ATTACHMENT: &str = "Bone";
-
 /// An item port definition of a synthetic Entity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TestPort {
@@ -13,7 +11,7 @@ pub struct TestPort {
     types: Vec<(String, Vec<String>)>,
     helper: Option<(String, [f32; 3], [f32; 3])>,
     item_helper: String,
-    attachment: &'static str,
+    skin: bool,
     default_item: Option<u128>,
     flags: String,
     tags: (String, String),
@@ -29,7 +27,7 @@ impl TestPort {
             types: Vec::new(),
             helper: None,
             item_helper: String::new(),
-            attachment: DEFAULT_ATTACHMENT,
+            skin: false,
             default_item: None,
             flags: String::new(),
             tags: (String::new(), String::new()),
@@ -92,7 +90,7 @@ impl TestPort {
     /// Makes the attachment of the port a skin, with or without a helper.
     #[must_use]
     pub const fn skin(mut self) -> Self {
-        self.attachment = "Skin";
+        self.skin = true;
         self
     }
 
@@ -145,10 +143,11 @@ impl TestPort {
                 ),
             );
         }
-        if self.helper.is_some() || self.attachment != DEFAULT_ATTACHMENT {
+        if self.helper.is_some() || self.skin {
+            let kind = if self.skin { "Skin" } else { "Bone" };
             instance = instance.value(
                 "AttachmentImplementation",
-                attachment(self.attachment, self.helper.as_ref(), &self.item_helper),
+                attachment(kind, self.helper.as_ref(), &self.item_helper),
             );
         }
         TestValue::Struct(instance)

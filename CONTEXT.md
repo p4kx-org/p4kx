@@ -234,6 +234,8 @@ _Avoid_: item name, entity name
 A named place on an Entity where another Entity attaches, e.g. `hardpoint_weapon_nose`. Its
 **port definition** in the Entity's Record gives the sizes and types it takes and a default
 item; its **port transform** is the helper in the Entity's geometry it sits at, with an offset.
+The definition also gives the attachment type (`Bone`, `Entity`, `Skin` or `StatObj`). A part on a
+`Skin` port is drawn in the parent's bind pose, whatever the helper and the offset say (ADR-0224).
 _Avoid_: hardpoint (fine as part of a name), slot, socket
 
 **Loadout entry**:
@@ -413,8 +415,7 @@ _Avoid_: item (an Entity), attachment
 The material choices a CHF makes for one Piece of its head: a base material, and colours and numbers
 that replace parameters of its shaders (skin tone, iris colour, hair melanin and dye). The export
 draws them as one colour per material.
-_Avoid_: skin (a skin is a model; "skin" also names the game's port attachment type, whose parts are
-drawn in the bind pose, ADR-0224), theme
+_Avoid_: skin (a skin is a model), theme
 
 **CHF**:
 A 4096-byte character file holding a Character's body type, face DNA, worn item ports and
