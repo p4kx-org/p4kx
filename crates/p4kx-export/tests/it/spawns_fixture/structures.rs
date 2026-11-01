@@ -21,6 +21,7 @@ pub(super) fn structures(builder: DataForgeBuilder) -> DataForgeBuilder {
         contracts(),
         templates(),
         super::template_structures::structs(),
+        super::template_values::structs(),
         super::broker_structures::structs(),
         super::npc::structs(),
         properties(),

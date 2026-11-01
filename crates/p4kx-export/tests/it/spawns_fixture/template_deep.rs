@@ -104,7 +104,7 @@ pub(super) fn unknown_value() -> TestRecord {
     )
     .value(
         "objectiveTokens",
-        array(vec![token_with(npc::mission_item("Item_BP"))]),
+        array(vec![token_with(npc::mystery_value("Item_BP"))]),
     )
 }
 

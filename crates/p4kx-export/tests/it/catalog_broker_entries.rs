@@ -190,15 +190,40 @@ fn the_reputation_requirements_are_an_expression_and_the_results_name_their_amou
 fn properties_spawns_and_orders_are_read_like_those_of_a_template() -> TestResult {
     let catalog = build()?;
     let broker = entry(&catalog)?;
+    let properties: Vec<(&Value, &Value, &Value)> = broker["missionProperties"]
+        .as_array()
+        .ok_or("properties")?
+        .iter()
+        .map(|property| {
+            (
+                &property["variable"],
+                &property["valueType"],
+                &property["value"]["type"],
+            )
+        })
+        .collect();
     assert_eq!(
-        broker["missionProperties"],
-        json!([
-            {"variable": "Wave_BP", "token": null, "valueType": "ShipSpawnDescriptions"},
-            {"variable": "Place_BP", "token": "Place", "valueType": "Location"},
-            {"variable": "Crew_BP", "token": null, "valueType": "NPCSpawnDescriptions"},
-            {"variable": "Loot_BP", "token": null, "valueType": "EntitySpawnDescriptions"}
-        ])
+        properties,
+        [
+            (
+                &json!("Wave_BP"),
+                &json!("ShipSpawnDescriptions"),
+                &json!("shipSpawnDescriptions")
+            ),
+            (&json!("Place_BP"), &json!("Location"), &json!("location")),
+            (
+                &json!("Crew_BP"),
+                &json!("NPCSpawnDescriptions"),
+                &json!("npcSpawnDescriptions")
+            ),
+            (
+                &json!("Loot_BP"),
+                &json!("EntitySpawnDescriptions"),
+                &json!("entitySpawnDescriptions")
+            ),
+        ]
     );
+    assert_eq!(broker["missionProperties"][1]["token"], "Place");
     let level = |field: &str| broker[field][0]["level"].clone();
     assert_eq!(level("shipSpawns"), "broker");
     assert_eq!(level("locationQueries"), "broker");

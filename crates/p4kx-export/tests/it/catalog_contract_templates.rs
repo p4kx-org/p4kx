@@ -121,6 +121,12 @@ fn properties_list_the_variables_with_the_kind_of_their_value() -> TestResult {
             ("Guard_BP", "", "NPCSpawnDescriptions"),
             ("Spare_BP", "", "NPCSpawnDescriptions"),
             ("Loot_BP", "", "EntitySpawnDescriptions"),
+            ("Item_BP", "", "MissionItem"),
+            ("Name_BP", "", "AIName"),
+            ("Combined_BP", "", "CombinedDataSetEntries"),
+            ("Pay_BP", "", "Reward"),
+            ("Race_BP", "", "TimeTrialRace"),
+            ("Map_BP", "", "StarMapLocation"),
         ]
     );
     Ok(())

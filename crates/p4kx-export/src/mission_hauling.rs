@@ -28,11 +28,16 @@ pub(crate) fn property_orders<'f>(
             let value = structure(Some(property), "value")?;
             (value.type_name() == ORDERS_PROPERTY).then(|| HaulingProperty {
                 name: text(Some(property), "missionVariableName"),
-                requirements: structs(Some(value), "haulingOrderContent")
-                    .filter_map(|content| requirement(content, false))
-                    .collect(),
+                requirements: value_requirements(value),
             })
         })
+        .collect()
+}
+
+/// Reads the requirements a `MissionPropertyValue_HaulingOrders` value states.
+pub(crate) fn value_requirements(value: &StructValue<'_>) -> Vec<HaulingRequirement> {
+    structs(Some(value), "haulingOrderContent")
+        .filter_map(|content| requirement(content, false))
         .collect()
 }
 

@@ -240,9 +240,9 @@ fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_
     );
     assert!(failed[5].0.ends_with("unknown_value"), "{failed:?}");
     assert!(
-        failed[5].1.contains(
-            "objective property value holds the unknown struct MissionPropertyValue_MissionItem"
-        ),
+        failed[5]
+            .1
+            .contains("property value holds the unknown struct MissionPropertyValue_Mystery"),
         "{failed:?}"
     );
     assert!(failed[6].0.ends_with("missionbroker/bad"), "{failed:?}");

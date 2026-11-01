@@ -13,6 +13,7 @@ mod template_deep;
 mod template_parts;
 mod template_properties;
 mod template_structures;
+mod template_values;
 
 use std::error::Error;
 use std::path::{Path, PathBuf};

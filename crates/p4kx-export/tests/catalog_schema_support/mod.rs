@@ -6,6 +6,7 @@
 use serde_json::json;
 
 mod brokers;
+mod contract_properties;
 mod contracts;
 mod crafters;
 mod harvest;

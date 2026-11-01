@@ -9818,6 +9818,160 @@
             "conditions"
           ],
           "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_MissionItem`: the mission items a mission may pick from.",
+          "properties": {
+            "conditions": {
+              "description": "The `matchConditions`, as for a location query.",
+              "items": {
+                "$ref": "#/$defs/LocationCondition"
+              },
+              "type": "array"
+            },
+            "forcedItemGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `debugForceChosenItem` Record (`MissionItem`), `null` when absent."
+            },
+            "maxItemsToFind": {
+              "description": "The `maxItemsToFind`.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "minItemsToFind": {
+              "description": "The `minItemsToFind`.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "missionItem",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "conditions"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/AiName",
+          "description": "`MissionPropertyValue_AIName`: the name an NPC gets.",
+          "properties": {
+            "type": {
+              "const": "aiName",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_CombinedDataSetEntries`: the properties whose data set entries the\nmission combines.",
+          "properties": {
+            "entryProperties": {
+              "description": "The `missionVariableName` of the properties of `dataSetEntryProperties`, in stored\norder.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "combinedDataSetEntries",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "entryProperties"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_HaulingOrders`: what the mission hauls, as in `haulingOrders`.",
+          "properties": {
+            "requirements": {
+              "description": "The requirements of the `haulingOrderContent`.",
+              "items": {
+                "$ref": "#/$defs/HaulingRequirement"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "haulingOrders",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "requirements"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Reward`.",
+          "properties": {
+            "reward": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/MissionReward"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `rewardDef`, `null` when absent."
+            },
+            "type": {
+              "const": "reward",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_TimeTrialRace`: a race the mission scripting provides.",
+          "properties": {
+            "type": {
+              "const": "timeTrialRace",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_StarMapLocation`: a star map location the mission scripting provides.",
+          "properties": {
+            "type": {
+              "const": "starMapLocation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -13268,7 +13422,7 @@
       "type": "object"
     },
     "TemplateProperty": {
-      "description": "A mission property of a template: a variable and the kind of value it holds.",
+      "description": "A mission property of a template or broker entry: a variable and the value it holds.",
       "properties": {
         "token": {
           "description": "The `extendedTextToken`, `null` when empty.",
@@ -13276,6 +13430,17 @@
             "string",
             "null"
           ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyValue"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The value as for the properties of an objective, tagged by `type`; `null` when the\nproperty has none. Spawn descriptions and location queries are links into the kinds\n`contractShipSpawns`, `contractNpcSpawns`, `contractEntitySpawns` and\n`contractLocationQueries`."
         },
         "valueType": {
           "description": "The struct of the value without its `MissionPropertyValue_` start, e.g. `Location` or\n`ShipSpawnDescriptions`; `null` when the property has no value.",
@@ -13294,6 +13459,7 @@
       },
       "required": [
         "token",
+        "value",
         "valueType",
         "variable"
       ],

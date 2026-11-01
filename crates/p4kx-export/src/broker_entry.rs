@@ -79,7 +79,7 @@ pub(crate) struct BrokerEntry<'a> {
     pub(crate) reputation_results: Vec<ReputationResult>,
     /// The mission properties of `properties` in stored order: the variables the objectives and
     /// modifiers refer to.
-    pub(crate) mission_properties: Vec<TemplateProperty>,
+    pub(crate) mission_properties: Vec<TemplateProperty<'a>>,
     /// The ship spawn descriptions the entry states, one per variable, ordered by variable; `level`
     /// is always `broker`.
     pub(crate) ship_spawns: Vec<SpawnPoolLink>,

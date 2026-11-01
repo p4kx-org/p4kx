@@ -7,13 +7,13 @@ use p4kx_extraction::{CancelToken, DataForge, Filter, RecordTree, StructValue, T
 
 use crate::CatalogError;
 use crate::contract_hauling::{HaulingOrder, HaulingSource};
-use crate::contract_template::{ActiveSettings, AutoFinish, ContractTemplate, TemplateProperty};
+use crate::contract_template::{ActiveSettings, AutoFinish, ContractTemplate};
 use crate::guid_text::CatalogGuid;
 use crate::mission_hauling::{objective_orders, property_orders};
 use crate::mission_hauling_levels::HaulingLevels;
 use crate::mission_index::title_key;
 use crate::mission_layers::one;
-use crate::record_fields::{boolean, class_name, integer, linked, structs, text};
+use crate::record_fields::{boolean, class_name, integer, linked, text};
 use crate::record_read::{KindRead, ReadError, read_kind};
 use crate::selection::Kind;
 use crate::spawn_layers::Level;
@@ -26,9 +26,8 @@ use crate::template_issues::Unknowns;
 use crate::template_modifier::modifiers;
 use crate::template_objective::ObjectiveState;
 use crate::template_objective_read::ObjectiveReader;
+use crate::template_property_read::PropertyReader;
 use crate::texts::Texts;
-
-const PROPERTY_VALUE_PREFIX: &str = "MissionPropertyValue_";
 
 /// The contract templates of a DataForge, what was left out, the spawn descriptions and location
 /// queries their properties state and the stored names the catalog does not know.
@@ -117,6 +116,7 @@ fn template<'f>(
     )?
     .resolved();
     let objectives = ObjectiveReader::new(&reader, texts, unknowns, &pools).objectives(root)?;
+    let properties = PropertyReader::new(&reader, texts, unknowns, &pools);
     let flow = FlowReader {
         reader: &reader,
         unknowns,
@@ -135,7 +135,7 @@ fn template<'f>(
         class_type: class.map(|class| class.type_name().to_owned()),
         settings: one(class, "additionalParams").map(settings),
         auto_finish: one(class, "autoFinishSettings").map(|finish| auto_finish(finish, unknowns)),
-        contract_properties: properties(root, "contractProperties"),
+        contract_properties: properties.mission_properties(root, "contractProperties")?,
         ship_spawns: spawns.ship_spawns,
         npc_spawns: spawns.npc_spawns,
         entity_spawns: spawns.entity_spawns,
@@ -193,26 +193,4 @@ fn auto_finish(settings: &StructValue<'_>, unknowns: &Unknowns) -> AutoFinish {
         ),
         remaining_time_to_show_timer: integer(deadline, "remainingTimeToShowTimer"),
     }
-}
-
-/// Reads the mission properties the array field `field` of `root` holds: the variable, the token
-/// and the kind of value of each.
-pub(crate) fn properties(root: Option<&StructValue<'_>>, field: &str) -> Vec<TemplateProperty> {
-    let owned = |property: &StructValue<'_>, name: &str| {
-        text(Some(property), name)
-            .filter(|value| !value.is_empty())
-            .map(str::to_owned)
-    };
-    structs(root, field)
-        .map(|property| TemplateProperty {
-            variable: owned(property, "missionVariableName"),
-            token: owned(property, "extendedTextToken"),
-            value_type: one(Some(property), "value").map(|value| {
-                let name = value.type_name();
-                name.strip_prefix(PROPERTY_VALUE_PREFIX)
-                    .unwrap_or(name)
-                    .to_owned()
-            }),
-        })
-        .collect()
 }

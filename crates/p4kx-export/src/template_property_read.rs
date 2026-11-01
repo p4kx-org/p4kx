@@ -6,9 +6,13 @@ use std::cell::RefCell;
 use p4kx_extraction::StructValue;
 
 use crate::blueprint::as_struct;
+use crate::broker_terms::mission_reward;
 use crate::contract::LocalisedText;
+use crate::contract_template::TemplateProperty;
+use crate::mission_hauling::value_requirements;
 use crate::mission_layers::{items, key, one};
-use crate::record_fields::{boolean, integer, number, reference, text};
+use crate::npc_spawn_read::ai_name;
+use crate::record_fields::{boolean, integer, number, reference, structs, text};
 use crate::record_read::ReadError;
 use crate::spawn_model::LocationCondition;
 use crate::spawn_pools::{Registered, SpawnPools, Target};
@@ -31,7 +35,57 @@ pub(crate) struct PropertyReader<'r, 'x, 'f> {
     pub(crate) pools: &'r RefCell<SpawnPools<'f>>,
 }
 
+impl<'r, 'x, 'f> PropertyReader<'r, 'x, 'f> {
+    /// Creates the reader of the Record `reader` belongs to.
+    pub(crate) const fn new(
+        reader: &'r Reader<'x, 'f>,
+        texts: &'r Texts<'f>,
+        unknowns: &'r Unknowns,
+        pools: &'r RefCell<SpawnPools<'f>>,
+    ) -> Self {
+        Self {
+            reader,
+            texts,
+            unknowns,
+            pools,
+        }
+    }
+}
+
 impl<'f> PropertyReader<'_, '_, 'f> {
+    /// Reads the mission properties the array field `field` of `root` holds (the
+    /// `contractProperties` of a template, the `properties` of a broker entry): the variable, the
+    /// token and the value of each.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::properties`].
+    pub(crate) fn mission_properties(
+        &self,
+        root: Option<&StructValue<'f>>,
+        field: &str,
+    ) -> Result<Vec<TemplateProperty<'f>>, ReadError> {
+        let owned = |property: &StructValue<'f>, name: &str| {
+            text(Some(property), name)
+                .filter(|value| !value.is_empty())
+                .map(str::to_owned)
+        };
+        structs(root, field)
+            .map(|property| {
+                let value = one(Some(property), "value");
+                Ok(TemplateProperty {
+                    variable: owned(property, "missionVariableName"),
+                    token: owned(property, "extendedTextToken"),
+                    value_type: value.map(|value| {
+                        let name = value.type_name();
+                        name.strip_prefix(VALUE_PREFIX).unwrap_or(name).to_owned()
+                    }),
+                    value: value.map(|value| self.value(value)).transpose()?,
+                })
+            })
+            .collect()
+    }
+
     /// Reads the `properties` of an objective token.
     ///
     /// # Errors
@@ -105,33 +159,61 @@ impl<'f> PropertyReader<'_, '_, 'f> {
                 tags: self.reader.tag_list(parent, "tags"),
                 negative_tags: self.reader.tag_list(parent, "negativeTags"),
             },
-            "Organization" => return self.organization(value),
+            "Organization" => PropertyValue::Organization {
+                conditions: self.conditions(value, "organization condition")?,
+                forced_organization_guid: reference(parent, "debugForceChosenOrganization"),
+            },
+            "MissionItem" => PropertyValue::MissionItem {
+                conditions: self.conditions(value, "item condition")?,
+                forced_item_guid: reference(parent, "debugForceChosenItem"),
+                min_items_to_find: integer(parent, "minItemsToFind"),
+                max_items_to_find: integer(parent, "maxItemsToFind"),
+            },
+            "AIName" => {
+                let mut name = ai_name(value);
+                name.resolve(self.texts);
+                PropertyValue::AiName(name)
+            }
+            "CombinedDataSetEntries" => PropertyValue::CombinedDataSetEntries {
+                entry_properties: self
+                    .reader
+                    .property_variables(parent, "dataSetEntryProperties"),
+            },
+            "HaulingOrders" => PropertyValue::HaulingOrders {
+                requirements: value_requirements(value),
+            },
+            "Reward" => PropertyValue::Reward {
+                reward: one(parent, "rewardDef").map(mission_reward),
+            },
+            "TimeTrialRace" => PropertyValue::TimeTrialRace,
+            "StarMapLocation" => PropertyValue::StarMapLocation,
             _ => return self.spawn(value),
         })
     }
 
-    /// Reads an organisation value.
+    /// Reads the `matchConditions` of `value`; `what` names them in the error.
     ///
     /// # Errors
     ///
     /// Returns [`TemplateError::UnknownStruct`] for a condition of a struct the catalog does not
     /// know.
-    fn organization(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, ReadError> {
+    fn conditions(
+        &self,
+        value: &StructValue<'f>,
+        what: &'static str,
+    ) -> Result<Vec<LocationCondition>, ReadError> {
         let conditions = self.reader.conditions(Some(value));
         if let Some(LocationCondition::Other { struct_name }) = conditions
             .iter()
             .find(|condition| matches!(condition, LocationCondition::Other { .. }))
         {
             return Err(TemplateError::UnknownStruct {
-                field: "organization condition",
+                field: what,
                 name: struct_name.clone(),
             }
             .into());
         }
-        Ok(PropertyValue::Organization {
-            conditions,
-            forced_organization_guid: reference(Some(value), "debugForceChosenOrganization"),
-        })
+        Ok(conditions)
     }
 
     /// Reads a spawn description or a location query and registers it.
@@ -141,7 +223,7 @@ impl<'f> PropertyReader<'_, '_, 'f> {
     /// Returns [`TemplateError::UnknownStruct`] for a value of any other struct.
     fn spawn(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, ReadError> {
         let Some(spawn) = self.reader.spawn(value)? else {
-            return Err(TemplateError::unknown("objective property value", value).into());
+            return Err(TemplateError::unknown("property value", value).into());
         };
         let Registered { target, empty } = self.pools.borrow_mut().register(spawn);
         let pool_guid = |guid| (!empty).then_some(guid);

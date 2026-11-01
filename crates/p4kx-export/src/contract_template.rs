@@ -12,6 +12,7 @@ use crate::template_extras::{EndComms, PartialPayout, StartComms, TemplateOwner}
 use crate::template_flow::FlowTrigger;
 use crate::template_modifier::TemplateModifier;
 use crate::template_objective::{ObjectiveState, TemplateObjective};
+use crate::template_property::PropertyValue;
 
 /// A contract template: a `ContractTemplate` Record under `contracts/contracttemplates`, the
 /// structure a contract names in `templateGuid` and lays its own overrides over.
@@ -49,7 +50,7 @@ pub(crate) struct ContractTemplate<'a> {
     pub(crate) auto_finish: Option<AutoFinish>,
     /// The mission properties of `contractProperties` in stored order: the variables the
     /// contracts, handlers and sub contracts override.
-    pub(crate) contract_properties: Vec<TemplateProperty>,
+    pub(crate) contract_properties: Vec<TemplateProperty<'a>>,
     /// The ship spawn descriptions the template states, one per variable, ordered by variable;
     /// `level` is always `template`.
     pub(crate) ship_spawns: Vec<SpawnPoolLink>,
@@ -117,11 +118,11 @@ pub(crate) struct AutoFinish {
     pub(crate) remaining_time_to_show_timer: Option<i64>,
 }
 
-/// A mission property of a template: a variable and the kind of value it holds.
+/// A mission property of a template or broker entry: a variable and the value it holds.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TemplateProperty {
+pub(crate) struct TemplateProperty<'a> {
     /// The `missionVariableName`, `null` when empty.
     pub(crate) variable: Option<String>,
     /// The `extendedTextToken`, `null` when empty.
@@ -129,4 +130,9 @@ pub(crate) struct TemplateProperty {
     /// The struct of the value without its `MissionPropertyValue_` start, e.g. `Location` or
     /// `ShipSpawnDescriptions`; `null` when the property has no value.
     pub(crate) value_type: Option<String>,
+    /// The value as for the properties of an objective, tagged by `type`; `null` when the
+    /// property has none. Spawn descriptions and location queries are links into the kinds
+    /// `contractShipSpawns`, `contractNpcSpawns`, `contractEntitySpawns` and
+    /// `contractLocationQueries`.
+    pub(crate) value: Option<PropertyValue<'a>>,
 }

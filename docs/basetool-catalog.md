@@ -1512,7 +1512,7 @@ additive rule of ADR-0054 is not touched.
 | `illegal`, `showLifeTimeInMobiGlas`, `preShowObjectives` | The flags of the display info |
 | `classType`, `settings` | The struct of the contract class (`ContractClass_Contract`, one template is a `ContractClass_PVPBounty`) and its `ActiveContractSettings`: `canBeShared`, `hasCompleteButton`, `handlesAbandonRequest`, `displayAlliedMarkers`, `onlyOwnerCanComplete`; `null` when absent |
 | `autoFinish` | The `ContractAutoFinishSettings`: `failIfSentToPrison`, `failIfBecameCriminal`, `failIfLeavePrison` and the deadline as stored: `completionTime`, `autoEnd`, `resultAfterTimerEnd` (an objective state), `remainingTimeToShowTimer`; the Archive does not state the unit of the times; `null` without the block |
-| `contractProperties` | The mission properties in stored order: `variable`, `token` (`null` when empty) and `valueType`, the struct of the value without `MissionPropertyValue_` (`StringHash`, `Location`, `ShipSpawnDescriptions`, `HaulingOrders`, ...) |
+| `contractProperties` | The mission properties in stored order: `variable`, `token` (`null` when empty), `valueType`, the struct of the value without `MissionPropertyValue_` (`StringHash`, `Location`, `ShipSpawnDescriptions`, `HaulingOrders`, ...), and `value`, the union of the objective properties (see "Objective properties"); `null` when the property has no value |
 | `shipSpawns`, `npcSpawns`, `entitySpawns`, `locationQueries` | The links of ADR-0266 and ADR-0324, one per variable the template states, with `level` always `template`, into `contractShipSpawns`, `contractNpcSpawns`, `contractEntitySpawns` and `contractLocationQueries` |
 | `haulingOrders` | The hauling orders of the template as in "Hauling orders": the properties (`source` `template`) and the orders of its hauling objectives (`templateObjective`) |
 | `objectives` | The objective tokens depth first, each phase after its parent (see "Objectives") |
@@ -1561,11 +1561,22 @@ without a group), `location` (`queryGuid`, an entry of `contractLocationQueries`
 `npcSpawnDescriptions` and `entitySpawnDescriptions` (`poolGuid`, an entry of `contractNpcSpawns` or
 `contractEntitySpawns`, `null` for a description without a group) and `organization` (`conditions`,
 the `matchConditions` as for a location query, and `forcedOrganizationGuid`, the
-`debugForceChosenOrganization`, a `MissionOrganization` Record no kind lists). The spawn
-descriptions and location queries are read as for the contracts and added to their kinds. A value of
-any other struct fails the Record (on LIVE the values of objective properties are all of the types
-above); so does an organisation whose condition is of a struct the catalog does not know. Further
-value types are stated where the values of the contract-level properties are (#1003).
+`debugForceChosenOrganization`, a `MissionOrganization` Record no kind lists). The contract-level
+properties add `missionItem` (`conditions`, the `matchConditions` as for a location query,
+`forcedItemGuid`, the `debugForceChosenItem`, a `MissionItem` Record no kind lists, `minItemsToFind`
+and `maxItemsToFind`), `aiName` (the fields of an embedded NPC name, see "NPC and entity spawns":
+`randomName`, `randomLastName`, `randomNickName`, `givenName`, `givenLastName`, `givenNickName`,
+`chanceOfNickName` and `nameDataGuid`), `combinedDataSetEntries` (`entryProperties`, the variables
+of the `dataSetEntryProperties`), `haulingOrders` (`requirements` as in "Hauling orders"), `reward`
+(`reward`, the `rewardDef` as the `reward` of a broker entry, `null` without one), and `timeTrialRace`
+and `starMapLocation` (no fields). The spawn descriptions and location queries are read as for the
+contracts and added to their kinds. A value of any other struct fails the Record (on LIVE the
+values of all properties are of the types above); so does an organisation or a mission item whose
+condition is of a struct the catalog does not know.
+
+**Contract-level properties.** The `value` of an entry of `contractProperties` of a template and of
+`missionProperties` of a broker entry is read by the reader of the objective values and states the
+same union; `valueType` stays. On LIVE every property that has a value struct states one.
 
 **Mission flow.** A trigger has `note` (the developer's `description`), a `condition` and an
 `action`, either `null` when absent. A condition is tagged by `type`: `tokenState` (`objectiveId`,
@@ -1622,7 +1633,7 @@ contract templates (see there).
 | `finish` | `failIfSentToPrison`, `failIfBecameCriminal`, `failIfLeavePrison` and the deadline: `autoEnd`, `completionTime`, `endReason` (game text), `resultAfterTimerEnd` (an objective state) and `remainingTimeToShowTimer` |
 | `standingRequirements` | The reputation requirement expression in stored order, tagged by `type`: `requirement` (`comparison`, `factionReputationGuid`, `scopeGuid`, `standingGuid`), `and`, `leftParenthesis` and `rightParenthesis`; the elements form an infix expression and the catalog does not evaluate it |
 | `reputationResults` | The `missionResultReputationRewards`: one element per stored position (`index`, the Archive names no result) with its `amounts` (`factionReputationGuid`, `scopeGuid`, `rewardGuid` and the `amount` of that reward Record) |
-| `missionProperties` | The mission properties in stored order: `variable`, `token` and `valueType`, as for the contract templates |
+| `missionProperties` | The mission properties in stored order: `variable`, `token`, `valueType` and `value`, as for the contract templates |
 | `shipSpawns`, `npcSpawns`, `entitySpawns`, `locationQueries` | The links of ADR-0266 and ADR-0324 with `level` `broker`, into `contractShipSpawns`, `contractNpcSpawns`, `contractEntitySpawns` and `contractLocationQueries`, which hold the descriptions of the entries too |
 | `haulingOrders` | The orders of the hauling objectives (`source` `brokerObjective`) as in "Hauling orders" |
 | `objectives`, `partialPayout`, `modifiers`, `missionFlow` | As for the contract templates; `comms` of an objective is empty, an entry has no start or end comms |
@@ -1630,8 +1641,8 @@ contract templates (see there).
 A comparison is `equalTo`, `greaterThan`, `greaterThanOrEqualTo` or `lessThanOrEqualTo`. A stored
 name the catalog does not know (a comparison, a month, a repeat type, a reaction, a licence type)
 is `null` and counted in the warning `unknown_template_values`, like those of the templates. The
-tokens of the objective values are the same as there. The values of the `properties` other than the
-spawn descriptions and location queries, which the links state, follow with #1003.
+tokens of the objective values are the same as there. The values of the `properties` are read like
+those of the contract-level properties of a template.
 
 On LIVE (2026-10-31) the kind holds 2,428 entries with 703 objective tokens, 26,741 properties,
 949 modifiers, 2,097 flow triggers and 1,666 requirement terms, 16.9 MB of JSON. The catalog grows

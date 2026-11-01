@@ -151,7 +151,8 @@ fn inventory_item(item: &StructValue<'_>) -> SpawnInventoryItem {
     }
 }
 
-fn ai_name<'f>(name: &StructValue<'f>) -> AiName<'f> {
+/// Reads a `MissionPropertyValue_AIName`; the texts hold their keys only, see [`AiName::resolve`].
+pub(crate) fn ai_name<'f>(name: &StructValue<'f>) -> AiName<'f> {
     let parent = Some(name);
     let keyed = |field: &str| LocalisedText {
         key: key(parent, field),
