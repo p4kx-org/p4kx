@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::locations::create_private_folder;
 use crate::profile::profile_folder;
 use crate::{
     AssemblyExportSettings, ModelExportSettings, RecentArchives, SavedQueries, UiRenderSettings,
@@ -157,7 +158,9 @@ pub enum SettingsError {
 }
 
 /// Returns `settings.toml` in the `P4KX` folder of the platform config directory,
-/// `%APPDATA%\P4KX` on Windows. The first call migrates the old `P4K-Extractor` folder (see
+/// `%APPDATA%\P4KX` on Windows and `$XDG_CONFIG_HOME/P4KX` on Linux.
+///
+/// The first call migrates the old `P4K-Extractor` folder (see
 /// [`migrate_profile`](crate::migrate_profile)).
 #[must_use]
 pub fn default_settings_file() -> Option<PathBuf> {
@@ -209,7 +212,7 @@ impl Settings {
             });
         }
         if let Some(folder) = file.parent() {
-            std::fs::create_dir_all(folder).map_err(|source| io_error(file, source))?;
+            create_private_folder(folder).map_err(|source| io_error(file, source))?;
         }
         let mut temporary = file.as_os_str().to_owned();
         temporary.push(format!(".{}.tmp", std::process::id()));
