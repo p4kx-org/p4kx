@@ -89,8 +89,8 @@ are closed until you reload it.
 
 ## Extracting
 
-**Extract selected…**, **Extract shown…** and **Extract all…** open the dialog **Extract Entries**
-with the scope, the target (a new folder `SC-EXPORT-<Channel>-<Build>-<time>` inside the chosen
+**Extract selected…**, **Extract shown…** and **Extract all…** open the dialog **Extract
+Entries** with the scope, the target (a new folder `SC-EXPORT-<Channel>-<Build>-<time>` inside the chosen
 folder, or an existing folder) and what to do with files that already exist. The target cannot be
 inside a Star Citizen installation. The field **Leave out** takes one Filter per line, with the
 rules of the search, and skips the Entries they match: `*_lod?.cgam` leaves out the level-of-detail
@@ -397,8 +397,8 @@ hologram` draws the hologram of a vehicle, which the window does not offer.
   puts its actions in a line of its own, and what still does not fit scrolls.
 - The look is P4KX's own dark theme in the Lato typeface. **Language** in the menu switches
   between German and British English; the first start follows the system language.
-- **Graphics.** On Windows the 3D view opens Direct3D 12 only, so the Vulkan drivers and the
-  overlays injected into them are not loaded. A machine where Direct3D 12 yields no adapter or
+- **Graphics.** On Windows the 3D view opens a Direct3D 12 instance first, so the Vulkan
+  drivers and the overlays injected into them are not loaded. A machine where Direct3D 12 yields no adapter or
   device within a few seconds falls back to the default backends. The environment variable
   `WGPU_BACKEND` (for example `vulkan`) overrides the choice. If the graphics driver does not
   release the device in time at exit, the window ends the process with status 4 ten seconds after

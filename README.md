@@ -9,7 +9,8 @@ turns their internal formats into readable or importable data: XML, JSON, PNG, O
 glTF and Blender packages. It comes as a Windows window (`p4kx-gui`), a command line (`p4kx`), a
 read-only [MCP server](#mcp-server) (`p4kx-mcp`) and a [Blender add-on](#blender-add-on).
 
-The current version is **[0.4.2](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.2)**. P4KX is written in Rust and licensed under either of the
+The current version is **[0.4.2](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.2)**. P4KX is
+written in Rust and licensed under either of the
 [Apache License, Version 2.0](LICENSE-APACHE) or the [MIT licence](LICENSE-MIT) at your option.
 The source lives at [github.com/p4kx-org/p4kx](https://github.com/p4kx-org/p4kx).
 

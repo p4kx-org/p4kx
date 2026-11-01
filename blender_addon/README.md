@@ -16,9 +16,9 @@ importer that ships with Blender must be enabled.
   layers blended by their masks (by position and `WearBlendBase` when the material has no blend
   map, mask map or vertex colours), palette tints, wear, glass that stays see-through in EEVEE and
   tints what lies behind it, decals (stencil decals cut out by their stencil map, in the livery's
-  decal colours), holograms and alpha modes, with the node groups `P4KX Layer Blend v1` and `P4KX Wear v1` shared by all materials. The glTF
-  materials are matched by their `p4kx_index` custom property. Unknown shaders and 1.0 packages
-  get a basic setup (diffuse, normal map, specular, alpha); unknown shaders also a warning.
+  primary decal colour), holograms and alpha modes, with the node groups `P4KX Layer Blend v1`
+  and `P4KX Wear v1` shared by all materials. The glTF materials are matched by their `p4kx_index` custom
+  property. Unknown shaders and 1.0 packages get a basic setup (diffuse, normal map, specular, alpha); unknown shaders also a warning.
 - Builds the Interior of a package written with `--interior`, or of one written by
   `p4kx interior package` on its own: containers and models as empties
   and instances, lights as Blender point, spot and sun lights (mapping in

@@ -67,9 +67,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   written, whatever the platform (ADR-0248): an Entry with a forbidden character, a Windows device
   name, a trailing dot or space, a part over 255 bytes or a path over 260 characters is reported
   with the rule it breaks and the run goes on, and Entries that differ only in case collide. A
-  corrupt Entry fails alone and is named with the reason. While stderr is a terminal a progress line shows the Entries done; Ctrl+C cancels the
-  run promptly, leaves no partial file and reports the Entries not written as cancelled; a second
-  Ctrl+C quits at once. The
+  corrupt Entry fails alone and is named with the reason. While stderr is a terminal a progress
+  line shows the Entries done; Ctrl+C cancels the run promptly, leaves no partial file and
+  reports the Entries not written as cancelled; a second Ctrl+C quits at once. The
   run ends with a summary of extracted, skipped, failed and cancelled Entries.
   `--convert` writes CryXml Entries (`CryXmlB`, `CryXml`, `CRY3SDK`, either byte order) as
   UTF-8 XML under their own path; text XML and every other Entry stay byte-identical. A CryXml
@@ -176,8 +176,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   Record is still written; the summary counts these error values. A Record whose name is no valid
   file name on Linux and Windows is written under its GUID and a record path with such a part is
   escaped (`a|b` becomes `a%7Cb`, ADR-0248); the summary lists each of them as renamed. The same
-  Record always gives the same bytes. `--combined` writes every selected Record into one file in record-path order,
-  named after the DataForge Entry (`Game2.xml`), under one `p4kx:records` root element.
+  Record always gives the same bytes. `--combined` writes every selected Record into one file in
+  record-path order, named after the DataForge Entry (`Game2.xml`), under one `p4kx:records`
+  root element.
   `--flat --format csv|ndjson` writes one row per leaf value instead
   ([docs/record-flat.md](record-flat.md)): `values.csv` (UTF-8 with byte order mark, formulas
   neutralised; `--csv-raw` for the exact values) or `values.ndjson`.
@@ -536,8 +537,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   card or with `--software` on the software adapter (WARP, lavapipe; on Windows a Direct3D 12
   instance only), which gives a picture that does not depend on the graphics card. Releasing the
   device waits for the queue to go idle for a limited time; a driver that does not finish in it
-  leaves a warning that names the stage it stopped in. The background is `transparent` or `#RRGGBB[AA]`; the PNG
-  has straight alpha. Textures and interiors are not drawn.
+  leaves a warning that names the stage it stopped in. The background is `transparent` or
+  `#RRGGBB[AA]`; the PNG has straight alpha. Textures and interiors are not drawn.
 - `p4kx ui screens <archive> <entity>` lists the `BuildingBlocks` screens of an Entity and of
   everything in its default Loadout, e.g. the MFDs, the radar and the HUD of a ship: per screen the
   port, the Entity, the canvas Record and its size, the canvases, textures, vector graphics, movies
