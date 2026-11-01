@@ -10,9 +10,9 @@ use super::npc::{self, NpcKind};
 use super::template::{objective, resource_order};
 use super::template_parts as parts;
 use super::{
-    BROKER, BROKER_BAD, BROKER_ELSEWHERE, BROKER_LEFTOVER, BROKER_OBJECTIVE, MISSION_TYPE, OWNER,
-    REPUTATION_REWARD, RESOURCE, SCOPE, TAG_HIJACKED, TAG_KILL, array, location, reference, ships,
-    tag_list, term, text,
+    BROKER, BROKER_BAD, BROKER_BAD_PROPERTY, BROKER_ELSEWHERE, BROKER_LEFTOVER, BROKER_OBJECTIVE,
+    MISSION_TYPE, OWNER, REPUTATION_REWARD, RESOURCE, SCOPE, TAG_HIJACKED, TAG_KILL, array,
+    location, reference, ships, tag_list, term, text,
 };
 
 const BROKER_FOLDER: &str = "libs/foundry/records/missionbroker/";
@@ -305,6 +305,16 @@ pub(super) fn bad() -> TestRecord {
         "reputationRequirements",
         TestValue::Struct(TestInstance::new("SReputationMissionRequirementsUnknown")),
     )
+}
+
+/// An entry with a property of a struct the catalog does not know.
+pub(super) fn bad_property() -> TestRecord {
+    entry(
+        BROKER_BAD_PROPERTY,
+        "Bad_Property",
+        &format!("{BROKER_FOLDER}bad_property.xml"),
+    )
+    .value("properties", array(vec![npc::mystery_value("Mystery_BP")]))
 }
 
 /// The reward Record the first reputation result names.

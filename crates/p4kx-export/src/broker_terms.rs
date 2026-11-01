@@ -183,15 +183,20 @@ pub(crate) fn instances(root: Option<&StructValue<'_>>) -> InstanceLimits {
 
 /// Reads the `missionReward` of `root`, `None` when it has none.
 pub(crate) fn reward(root: Option<&StructValue<'_>>) -> Option<MissionReward> {
-    let reward = one(root, "missionReward")?;
+    one(root, "missionReward").map(mission_reward)
+}
+
+/// Reads a reward definition struct (the `missionReward` of an entry, the `rewardDef` of a
+/// property value).
+pub(crate) fn mission_reward(reward: &StructValue<'_>) -> MissionReward {
     let reward = Some(reward);
-    Some(MissionReward {
+    MissionReward {
         currency: text(reward, "currencyType").map(str::to_owned),
         reward: integer(reward, "reward"),
         max: integer(reward, "max"),
         plus_bonuses: boolean(reward, "plusBonuses"),
         reputation_bonus_guid: linked(reward, "reputationBonus"),
-    })
+    }
 }
 
 /// Reads the failure conditions and the deadline of `root`.

@@ -9,6 +9,7 @@ use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 use super::npc::{self, NpcKind};
 use super::template_parts as parts;
 use super::template_properties as properties;
+use super::template_values as values;
 use super::{
     ELSEWHERE_TEMPLATE, LEFTOVER_TEMPLATE, MISSION_TYPE, OBJECTIVE_A, OBJECTIVE_B, OBJECTIVE_C,
     OWNER, RESOURCE, TAG_KILL, TEMPLATE, array, location, property, reference, ships, text,
@@ -27,32 +28,38 @@ pub(super) fn template() -> TestRecord {
     .value("contractClass", contract_class())
     .value(
         "contractProperties",
-        array(vec![
-            ships("Wave_BP", "", Some(9)),
-            parts::named(location("Place_BP", "Place", None), "prop_place"),
-            parts::named(location("Home_BP", "", None), "prop_home"),
-            property(
-                "Flag_BP",
-                "",
-                TestInstance::new("MissionPropertyValue_Boolean")
-                    .value("value", TestValue::Bool(true)),
-            ),
-            property(
-                "Cargo_BP",
-                "Cargo",
-                TestInstance::new("MissionPropertyValue_HaulingOrders").value(
-                    "haulingOrderContent",
-                    array(vec![resource_order(RESOURCE, 4)]),
-                ),
-            ),
-            npc::npcs(
-                "Guard_BP",
-                "",
-                Some(("Guards", NpcKind::Named("prop_place"))),
-            ),
-            npc::npcs("Spare_BP", "", Some(("Spares", NpcKind::Full))),
-            npc::entities("Loot_BP", "", Some("Template crate")),
-        ]),
+        array(
+            [
+                vec![
+                    ships("Wave_BP", "", Some(9)),
+                    parts::named(location("Place_BP", "Place", None), "prop_place"),
+                    parts::named(location("Home_BP", "", None), "prop_home"),
+                    property(
+                        "Flag_BP",
+                        "",
+                        TestInstance::new("MissionPropertyValue_Boolean")
+                            .value("value", TestValue::Bool(true)),
+                    ),
+                    property(
+                        "Cargo_BP",
+                        "Cargo",
+                        TestInstance::new("MissionPropertyValue_HaulingOrders").value(
+                            "haulingOrderContent",
+                            array(vec![resource_order(RESOURCE, 4)]),
+                        ),
+                    ),
+                    npc::npcs(
+                        "Guard_BP",
+                        "",
+                        Some(("Guards", NpcKind::Named("prop_place"))),
+                    ),
+                    npc::npcs("Spare_BP", "", Some(("Spares", NpcKind::Full))),
+                    npc::entities("Loot_BP", "", Some("Template crate")),
+                ],
+                values::properties(),
+            ]
+            .concat(),
+        ),
     )
     .value("objectiveTokens", objective_tokens())
     .value("owner", reference(OWNER))

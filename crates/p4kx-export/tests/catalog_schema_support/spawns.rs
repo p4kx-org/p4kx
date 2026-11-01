@@ -109,11 +109,7 @@ pub(super) fn contract_templates() -> serde_json::Value {
             "resultAfterTimerEnd": "failed",
             "remainingTimeToShowTimer": 15
         },
-        "contractProperties": [{
-            "variable": "AcePilot_BP",
-            "token": null,
-            "valueType": "ShipSpawnDescriptions"
-        }],
+        "contractProperties": super::contract_properties::template_properties(),
         "shipSpawns": [{
             "variable": "AcePilot_BP",
             "token": null,

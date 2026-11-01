@@ -50,6 +50,11 @@ the catalog does not know fails the Record instead of hiding behind an escape ha
   what its `aiName` variant reuses. As in ADR-0320, the kind `contractTemplates` was merged
   with #990 on 2026-10-31 and no release contains it (v0.4.2 is unreleased), so no consumer has
   seen the `other` variant: ADR-0054's additive rule is not touched.
+  Note: #1003 added those variants (`missionItem`, `aiName`, `combinedDataSetEntries`,
+  `haulingOrders`, `reward`, `timeTrialRace`, and `starMapLocation`) and reads the values of the
+  contract-level properties with the same reader; the field of the error is now `property value`
+  and covers both levels, and a mission item's condition of an unknown struct fails with
+  `item condition`.
 - **Location queries keep `other` for now.** `LocationCondition::Other` of `contractLocationQueries`
   (ADR-0266) still lets a condition of an unknown struct pass; none occurs on LIVE. Only the
   organisation value fails the Record on one.

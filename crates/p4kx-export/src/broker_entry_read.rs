@@ -13,7 +13,7 @@ use crate::broker_requirements::{requirements, results};
 use crate::broker_schedule::schedule;
 use crate::broker_terms::{availability, cooldowns, finish, instances, reward};
 use crate::contract_hauling::HaulingOrder;
-use crate::contract_template_read::{properties, settings};
+use crate::contract_template_read::settings;
 use crate::guid_text::CatalogGuid;
 use crate::mission_hauling::objective_orders;
 use crate::mission_hauling_levels::HaulingLevels;
@@ -30,6 +30,7 @@ use crate::template_flow::FlowReader;
 use crate::template_issues::Unknowns;
 use crate::template_modifier::modifiers;
 use crate::template_objective_read::ObjectiveReader;
+use crate::template_property_read::PropertyReader;
 use crate::texts::Texts;
 
 /// The mission broker entries of a DataForge, what was left out and the spawn descriptions and
@@ -113,6 +114,7 @@ fn entry<'f>(
         &mut pools.borrow_mut(),
     )?
     .resolved();
+    let properties = PropertyReader::new(&reader, texts, unknowns, &pools);
     let flow = FlowReader {
         reader: &reader,
         unknowns,
@@ -141,7 +143,7 @@ fn entry<'f>(
         finish: finish(texts, unknowns, root),
         standing_requirements: requirements(unknowns, root)?,
         reputation_results: results(index, root),
-        mission_properties: properties(root, "properties"),
+        mission_properties: properties.mission_properties(root, "properties")?,
         ship_spawns: spawns.ship_spawns,
         npc_spawns: spawns.npc_spawns,
         entity_spawns: spawns.entity_spawns,

@@ -76,7 +76,7 @@ pub(super) fn structs() -> Vec<TestStruct> {
             .parent("DataSetMatchCondition")
             .array("organizations", TestType::Reference),
         TestStruct::new("DataSetMatchCondition_Mystery").parent("DataSetMatchCondition"),
-        value("MissionPropertyValue_MissionItem"),
+        value("MissionPropertyValue_Mystery"),
     ];
     structs.push(auto_spawn_struct());
     structs
@@ -175,18 +175,20 @@ fn auto_spawn() -> TestValue {
     object(settings)
 }
 
+fn ai_name_instance() -> TestInstance {
+    TestInstance::new("MissionPropertyValue_AIName")
+        .value("randomName", TestValue::Bool(true))
+        .value("randomLastName", TestValue::Bool(false))
+        .value("randomNickName", TestValue::Bool(true))
+        .value("characterGivenName", text("@place_name"))
+        .value("characterGivenLastName", text("@LOC_UNINITIALIZED"))
+        .value("characterGivenNickName", text("@LOC_EMPTY"))
+        .value("chanceOfNickName", TestValue::Single(0.25))
+        .value("characterNameData", reference(OWNER))
+}
+
 fn ai_name() -> TestValue {
-    object(
-        TestInstance::new("MissionPropertyValue_AIName")
-            .value("randomName", TestValue::Bool(true))
-            .value("randomLastName", TestValue::Bool(false))
-            .value("randomNickName", TestValue::Bool(true))
-            .value("characterGivenName", text("@place_name"))
-            .value("characterGivenLastName", text("@LOC_UNINITIALIZED"))
-            .value("characterGivenNickName", text("@LOC_EMPTY"))
-            .value("chanceOfNickName", TestValue::Single(0.25))
-            .value("characterNameData", reference(OWNER)),
-    )
+    object(ai_name_instance())
 }
 
 /// What an NPC option of the fixture carries besides its settings.
@@ -277,10 +279,15 @@ pub(crate) fn organization(variable: &str, known: bool) -> TestValue {
 }
 
 /// A property whose value is a struct the catalog does not know.
-pub(crate) fn mission_item(variable: &str) -> TestValue {
+pub(crate) fn mystery_value(variable: &str) -> TestValue {
     property(
         variable,
         "",
-        TestInstance::new("MissionPropertyValue_MissionItem"),
+        TestInstance::new("MissionPropertyValue_Mystery"),
     )
+}
+
+/// A property whose value is the name of an NPC.
+pub(crate) fn name(variable: &str) -> TestValue {
+    property(variable, "", ai_name_instance())
 }

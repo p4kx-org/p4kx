@@ -4,8 +4,11 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::broker_terms::MissionReward;
 use crate::contract::{LocalisedText, every_field_required};
+use crate::contract_hauling::HaulingRequirement;
 use crate::guid_text::CatalogGuid;
+use crate::npc_spawn_model::AiName;
 use crate::spawn_model::{LocationCondition, TagPaths};
 
 /// How an objective holds a mission property (`ObjectiveProperty_*`). A struct the catalog does
@@ -174,4 +177,41 @@ pub(crate) enum PropertyValue<'a> {
         /// The `debugForceChosenOrganization` Record (`MissionOrganization`), `null` when absent.
         forced_organization_guid: Option<CatalogGuid>,
     },
+    /// `MissionPropertyValue_MissionItem`: the mission items a mission may pick from.
+    #[serde(rename_all = "camelCase")]
+    MissionItem {
+        /// The `matchConditions`, as for a location query.
+        conditions: Vec<LocationCondition>,
+        /// The `debugForceChosenItem` Record (`MissionItem`), `null` when absent.
+        forced_item_guid: Option<CatalogGuid>,
+        /// The `minItemsToFind`.
+        min_items_to_find: Option<i64>,
+        /// The `maxItemsToFind`.
+        max_items_to_find: Option<i64>,
+    },
+    /// `MissionPropertyValue_AIName`: the name an NPC gets.
+    #[serde(rename = "aiName")]
+    AiName(AiName<'a>),
+    /// `MissionPropertyValue_CombinedDataSetEntries`: the properties whose data set entries the
+    /// mission combines.
+    #[serde(rename_all = "camelCase")]
+    CombinedDataSetEntries {
+        /// The `missionVariableName` of the properties of `dataSetEntryProperties`, in stored
+        /// order.
+        entry_properties: Vec<String>,
+    },
+    /// `MissionPropertyValue_HaulingOrders`: what the mission hauls, as in `haulingOrders`.
+    HaulingOrders {
+        /// The requirements of the `haulingOrderContent`.
+        requirements: Vec<HaulingRequirement>,
+    },
+    /// `MissionPropertyValue_Reward`.
+    Reward {
+        /// The `rewardDef`, `null` when absent.
+        reward: Option<MissionReward>,
+    },
+    /// `MissionPropertyValue_TimeTrialRace`: a race the mission scripting provides.
+    TimeTrialRace,
+    /// `MissionPropertyValue_StarMapLocation`: a star map location the mission scripting provides.
+    StarMapLocation,
 }

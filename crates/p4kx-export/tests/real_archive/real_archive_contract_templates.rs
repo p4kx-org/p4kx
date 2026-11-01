@@ -3,7 +3,7 @@
 
 //! The contract templates in the Basetool catalog of a real Archive.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::time::SystemTime;
 
 use p4kx_export::{CatalogOptions, build_catalog};
@@ -86,6 +86,77 @@ fn check_property(
     if let Some(guid) = value["queryGuid"].as_str() {
         assert!(queries.contains(guid), "{name}: location query {guid}");
     }
+}
+
+/// Asserts that every contract-level property of a template and of a broker entry with a value
+/// struct states a value whose links name an entry of the shared kinds, and returns how many
+/// properties state each type of value.
+fn check_contract_properties(catalog: &Value) -> Result<BTreeMap<String, usize>, String> {
+    let mut pools = HashSet::new();
+    for kind in [
+        "contractShipSpawns",
+        "contractNpcSpawns",
+        "contractEntitySpawns",
+    ] {
+        pools.extend(guids(catalog, kind)?);
+    }
+    let queries = guids(catalog, "contractLocationQueries")?;
+    let mut types = BTreeMap::new();
+    for (kind, field) in [
+        ("contractTemplates", "contractProperties"),
+        ("missionBrokerEntries", "missionProperties"),
+    ] {
+        for entry in catalog[kind].as_array().ok_or(kind)? {
+            for property in entry[field].as_array().ok_or(field)? {
+                let value = &property["value"];
+                if property["valueType"].is_null() {
+                    assert!(value.is_null(), "a value without a value type");
+                    continue;
+                }
+                let name = value["type"].as_str().ok_or("a value without a type")?;
+                if let Some(guid) = value["poolGuid"].as_str() {
+                    assert!(pools.contains(guid), "{kind}: spawn pool {guid}");
+                }
+                if let Some(guid) = value["queryGuid"].as_str() {
+                    assert!(queries.contains(guid), "{kind}: location query {guid}");
+                }
+                *types.entry(name.to_owned()).or_default() += 1;
+            }
+        }
+    }
+    Ok(types)
+}
+
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn the_contract_properties_of_a_real_archive_state_their_values() -> TestResult {
+    let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
+    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let failed: Vec<&str> = built
+        .summary()
+        .failures()
+        .iter()
+        .filter(|failure| failure.reason.contains("MissionPropertyValue_"))
+        .map(|failure| failure.record_path.as_str())
+        .collect();
+    assert!(failed.is_empty(), "{failed:?}");
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    let types = check_contract_properties(&catalog)?;
+    print_line(&format!("contract property values by type: {types:?}"));
+    for name in [
+        "missionItem",
+        "aiName",
+        "combinedDataSetEntries",
+        "haulingOrders",
+        "reward",
+        "timeTrialRace",
+        "starMapLocation",
+        "location",
+        "shipSpawnDescriptions",
+    ] {
+        assert!(types.contains_key(name), "no property of the type {name}");
+    }
+    Ok(())
 }
 
 #[test]

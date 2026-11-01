@@ -189,7 +189,8 @@ pub(super) fn broker_entries() -> serde_json::Value {
         "missionProperties": [{
             "variable": "Place_BP",
             "token": "Place",
-            "valueType": "Location"
+            "valueType": "Location",
+            "value": {"type": "location", "queryGuid": "e2000000-0000-4000-8000-000000000001"}
         }],
         "shipSpawns": [{
             "variable": "Wave_BP",

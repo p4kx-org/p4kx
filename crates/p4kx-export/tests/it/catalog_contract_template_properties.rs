@@ -186,7 +186,7 @@ fn records_that_nest_phases_or_conditions_too_deep_fail_instead_of_being_cut() -
         .map(|failure| (failure.record_path.as_str(), failure.reason.as_str()))
         .collect();
     failed.sort_unstable();
-    assert_eq!(failed.len(), 7, "{failed:?}");
+    assert_eq!(failed.len(), 10, "{failed:?}");
     assert!(failed[0].0.ends_with("deep_flow"), "{failed:?}");
     assert!(failed[0].1.contains("conditions nest deeper than 16"));
     assert!(failed[1].0.ends_with("deep_phases"), "{failed:?}");
@@ -217,41 +217,50 @@ fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_
         .map(|failure| (failure.record_path.as_str(), failure.reason.as_str()))
         .collect();
     failed.sort_unstable();
-    assert!(failed[2].0.ends_with("unknown_condition"), "{failed:?}");
-    assert!(
-        failed[2].1.contains(
-            "organization condition holds the unknown struct DataSetMatchCondition_Mystery"
+    let reason = |suffix: &str| {
+        failed
+            .iter()
+            .find(|(path, _)| path.ends_with(suffix))
+            .map(|(_, reason)| *reason)
+            .unwrap_or_default()
+    };
+    let expected = [
+        (
+            "/unknown_condition",
+            "organization condition holds the unknown struct DataSetMatchCondition_Mystery",
         ),
-        "{failed:?}"
-    );
-    assert!(failed[3].0.ends_with("unknown_flow"), "{failed:?}");
-    assert!(
-        failed[3]
-            .1
-            .contains("holds the unknown struct MissionFlowCondition_Unknown"),
-        "{failed:?}"
-    );
-    assert!(failed[4].0.ends_with("unknown_modifier"), "{failed:?}");
-    assert!(
-        failed[4]
-            .1
-            .contains("modifiers holds the unknown struct MissionModifier"),
-        "{failed:?}"
-    );
-    assert!(failed[5].0.ends_with("unknown_value"), "{failed:?}");
-    assert!(
-        failed[5].1.contains(
-            "objective property value holds the unknown struct MissionPropertyValue_MissionItem"
+        (
+            "/unknown_flow",
+            "holds the unknown struct MissionFlowCondition_Unknown",
         ),
-        "{failed:?}"
-    );
-    assert!(failed[6].0.ends_with("missionbroker/bad"), "{failed:?}");
-    assert!(
-        failed[6]
-            .1
-            .contains("holds the unknown struct SReputationMissionRequirementsUnknown"),
-        "{failed:?}"
-    );
+        (
+            "/unknown_modifier",
+            "modifiers holds the unknown struct MissionModifier",
+        ),
+        (
+            "/unknown_value",
+            "property value holds the unknown struct MissionPropertyValue_Mystery",
+        ),
+        (
+            "/unknown_contract_property",
+            "property value holds the unknown struct MissionPropertyValue_Mystery",
+        ),
+        (
+            "/unknown_item_condition",
+            "item condition holds the unknown struct DataSetMatchCondition_Mystery",
+        ),
+        (
+            "/missionbroker/bad",
+            "holds the unknown struct SReputationMissionRequirementsUnknown",
+        ),
+        (
+            "/missionbroker/bad_property",
+            "property value holds the unknown struct MissionPropertyValue_Mystery",
+        ),
+    ];
+    for (suffix, text) in expected {
+        assert!(reason(suffix).contains(text), "{suffix}: {failed:?}");
+    }
     Ok(())
 }
 

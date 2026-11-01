@@ -48,12 +48,7 @@ impl<'r, 'x, 'f> ObjectiveReader<'r, 'x, 'f> {
             reader,
             texts,
             unknowns,
-            properties: PropertyReader {
-                reader,
-                texts,
-                unknowns,
-                pools,
-            },
+            properties: PropertyReader::new(reader, texts, unknowns, pools),
         }
     }
 

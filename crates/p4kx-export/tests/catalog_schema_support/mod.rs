@@ -5,10 +5,13 @@
 
 use serde_json::json;
 
+mod blueprints;
 mod brokers;
+mod contract_properties;
 mod contracts;
 mod crafters;
 mod harvest;
+mod loadouts;
 mod loot;
 mod npc_spawns;
 mod recovery;
@@ -175,7 +178,7 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
                     "slotKey": "@crafting_ui_slotname_core"
                 }
             ],
-            "tiers": tiers(),
+            "tiers": blueprints::tiers(),
             "defaultAvailable": false,
             "dismantle": {
                 "processGuid": "f1000000-0000-4000-8000-000000000001",
@@ -224,7 +227,7 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             ],
             "resourceTypeGuids": ["b1000000-0000-4000-8000-000000000001"]
         }],
-        "blueprintPools": pools(),
+        "blueprintPools": blueprints::pools(),
         "dismantleProcesses": [{
             "guid": "f1000000-0000-4000-8000-000000000001",
             "className": "GlobalGenericDismantle",
@@ -240,7 +243,7 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "itemGuid": "30000000-0000-4000-8000-000000000001",
             "shipGuids": ["90000000-0000-4000-8000-000000000001"]
         }],
-        "loadouts": loadouts(),
+        "loadouts": loadouts::loadouts(),
         "starmapObjects": [{
             "guid": "a2000000-0000-4000-8000-000000000001",
             "className": "Stanton1_Hurston",
@@ -313,80 +316,4 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
         "shipStoreSlugs": slugs::ship_store_slugs(),
         "itemRecovery": item_recovery()
     })
-}
-
-fn loadouts() -> serde_json::Value {
-    let gun = json!({
-        "name": "hardpoint_gun_left", "source": "loadout",
-        "minSize": 1, "maxSize": 3,
-        "types": [{"type": "WeaponGun", "subTypes": ["Gun"]}],
-        "flags": ["uneditable"], "portTags": ["Gun"],
-        "requiredTags": ["Mount"],
-        "displayNameKey": null, "visibility": "visible",
-        "itemGuid": "30000000-0000-4000-8000-000000000001",
-        "itemClassName": "POWR_ACAS_S01", "dockedVehicle": false, "unresolved": null,
-        "ports": []
-    });
-    json!([{
-        "entityGuid": "90000000-0000-4000-8000-000000000001",
-        "entityKind": "ship",
-        "issues": ["vehicle_implementation"],
-        "ports": [{
-            "name": "hardpoint_turret", "source": "vehicle",
-            "minSize": null, "maxSize": null,
-            "types": [], "flags": [], "portTags": [],
-            "requiredTags": [],
-            "displayNameKey": null, "visibility": "unspecified",
-            "itemGuid": null, "itemClassName": null, "dockedVehicle": false,
-            "unresolved": null,
-            "ports": [gun]
-        }]
-    }])
-}
-
-fn pools() -> serde_json::Value {
-    json!([{
-        "guid": "e4000000-0000-4000-8000-000000000001",
-        "className": "BP_REWARDS_Haul",
-        "recordPath": "libs/foundry/records/crafting/blueprintrewards/bp_rewards_haul",
-        "totalWeight": 4.0,
-        "entries": [{
-            "blueprintGuid": "11000000-0000-4000-8000-000000000001",
-            "weight": 1.0
-        }],
-        "rewardSources": [{
-            "recordGuid": "e5000000-0000-4000-8000-000000000001",
-            "recordPath": "libs/foundry/records/contracts/contractgenerator/haul",
-            "contractId": null, "contractName": "Haul_Intro", "chance": 0.5
-        }]
-    }])
-}
-
-fn tiers() -> serde_json::Value {
-    let line = json!({
-        "kind": "resource", "count": null, "slot": null, "slotKey": null,
-        "options": [],
-        "resourceGuid": "b1000000-0000-4000-8000-000000000001",
-        "itemGuid": null, "quantityScu": 0.5, "quantityUnits": null,
-        "minQuality": 0, "quantityMultiplier": 1.15,
-        "compositionInclusion": "Include",
-        "modifiers": [{
-            "propertyGuid": "e1000000-0000-4000-8000-000000000001",
-            "ranges": [{
-                "kind": "multiplier", "startQuality": 0, "endQuality": 1000,
-                "atStart": 0.85, "atEnd": 1.15
-            }]
-        }]
-    });
-    json!([{
-        "craftTimeSeconds": 93784,
-        "mandatory": {
-            "kind": "select", "count": 1, "slot": "CORE", "slotKey": null,
-            "options": [line],
-            "resourceGuid": null, "itemGuid": null, "quantityScu": null,
-            "quantityUnits": null, "minQuality": null, "quantityMultiplier": null,
-            "compositionInclusion": null, "modifiers": []
-        },
-        "optional": []
-    }])
 }

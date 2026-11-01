@@ -7,6 +7,7 @@
 
 mod catalog_broker_entries;
 mod catalog_compression;
+mod catalog_contract_property_values;
 mod catalog_contract_template_parts;
 mod catalog_contract_template_properties;
 mod catalog_contract_templates;
