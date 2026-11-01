@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The material descriptions of a package written from the synthetic ship `TEST_Layered`:
-//! shaders, layers and their materials, palettes, textures by use, placeholders and raw
-//! parameters.
+//! Material descriptions of a package written from the synthetic ship `TEST_Layered`: shaders,
+//! layers, palettes, textures by use, placeholders and raw parameters.
 
 use p4kx_blender::{
     AlphaMeaning, AlphaMode, ColourSpace, FORMAT_VERSION, IssueOrigin, Manifest,
     MaterialDescription, PackageInfo, PaletteEntry, TextureUse, manifest_schema, write_package,
 };
 use p4kx_extraction::Archive;
+use p4kx_gltf::GlbOptions;
 use p4kx_model::srgb8_to_linear;
 use p4kx_testkit::{LAYERED_MISSING_TEXTURE, LAYERED_TINTS, layered_entries};
 
@@ -40,6 +40,10 @@ impl Written {
 }
 
 pub(crate) fn write() -> Result<Written, Box<dyn std::error::Error>> {
+    write_with(&glb_options(0))
+}
+
+pub(crate) fn write_with(options: &GlbOptions) -> Result<Written, Box<dyn std::error::Error>> {
     let fixture = fixture(layered_entries())?;
     let archive = Archive::open(&fixture.path)?;
     let assembly = assemble(&archive, "TEST_Layered")?;
@@ -50,7 +54,7 @@ pub(crate) fn write() -> Result<Written, Box<dyn std::error::Error>> {
         &assembly,
         &models,
         &models.textures(),
-        &glb_options(0),
+        options,
         &PackageInfo::default(),
         &out,
         &never,

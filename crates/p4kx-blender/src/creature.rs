@@ -42,8 +42,9 @@ pub(crate) fn write_creature_package(
     write_rig_package(
         out,
         name,
+        &options,
         cancelled,
-        |writer| assembly.write_glb_with(&options, textures, writer),
+        |options, writer| assembly.write_glb_with(options, textures, writer),
         |written| manifest(assembly, interior_left_out, info, &options, written),
     )
 }

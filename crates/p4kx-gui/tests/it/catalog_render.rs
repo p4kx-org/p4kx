@@ -16,12 +16,13 @@ use std::io::BufWriter;
 use std::panic::catch_unwind;
 use std::path::PathBuf;
 
+use crate::software_wgpu::software_wgpu_setup;
 use cataloging::{TestResult, makers, opened};
 use eframe::egui_wgpu::{RenderState, RendererOptions};
 use egui::Rect;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state, default_wgpu_setup};
+use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::{CatalogExportStage, CatalogExportStatus, Language, Model, ui};
 
 const SIZES: [[f32; 2]; 2] = [[1280.0, 800.0], [640.0, 400.0]];
@@ -50,7 +51,7 @@ fn save(name: &str, width: u32, height: u32, image: &[u8]) -> TestResult {
 )]
 fn adapter() -> Option<RenderState> {
     let state =
-        catch_unwind(|| create_render_state(default_wgpu_setup(), RendererOptions::PREDICTABLE))
+        catch_unwind(|| create_render_state(software_wgpu_setup(), RendererOptions::PREDICTABLE))
             .ok();
     if state.is_none() {
         assert!(

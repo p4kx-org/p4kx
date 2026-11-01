@@ -9,6 +9,7 @@
 mod app;
 mod assembly_export;
 mod audio;
+mod backends;
 mod browser;
 mod catalog_export;
 mod channel_list;

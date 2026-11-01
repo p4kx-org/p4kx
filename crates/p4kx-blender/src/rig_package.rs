@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
+use crate::mesh_options::package_mesh_options;
 use p4kx_gltf::{GlbOptions, GlbSummary, GltfError};
 
 use crate::build::{coordinates, generator};
@@ -59,7 +60,7 @@ pub(crate) fn rig_manifest(
         options: Options {
             lod: options.lod,
             texture_mip: options.texture_mip,
-            vertex_colours: options.vertex_colours,
+            vertex_colours: options.writes_vertex_colours(),
             exclude: info.exclude.clone(),
             replace: info.replace.clone(),
         },
@@ -107,15 +108,17 @@ impl<W: Write> Write for Stoppable<'_, W> {
 pub(crate) type RigWriter<'a> = Stoppable<'a, BufWriter<File>>;
 
 /// Writes a package into the folder `out` whose only mesh, `meshes/m0001.glb`, `write_glb` writes
-/// to the writer it is given, and whose manifest `manifest_of` makes from what was written.
+/// to the writer it is given with the GLB options of a package mesh (`options` with the vertex
+/// colours of layered surfaces, which the add-on reads as layer shares), and whose manifest `manifest_of` makes from what was written.
 ///
 /// `out` is checked before anything is done and replaced only once the package is complete;
 /// `cancelled` is polled while the file is written. `name` names the mesh in an error.
 pub(crate) fn write_rig_package(
     out: &Path,
     name: &str,
+    options: &GlbOptions,
     cancelled: &(dyn Fn() -> bool + Sync),
-    write_glb: impl FnOnce(&mut RigWriter<'_>) -> Result<GlbSummary, GltfError>,
+    write_glb: impl FnOnce(&GlbOptions, &mut RigWriter<'_>) -> Result<GlbSummary, GltfError>,
     manifest_of: impl FnOnce(&GlbSummary) -> Manifest,
 ) -> PackageResult<PackageSummary> {
     let cancelled = Cancelled::new(cancelled);
@@ -128,8 +131,8 @@ pub(crate) fn write_rig_package(
         inner: BufWriter::new(file),
         cancelled: &cancelled,
     };
-    let written =
-        write_glb(&mut writer).map_err(|error| glb_error(error, &path, (&id, name), &cancelled))?;
+    let written = write_glb(&package_mesh_options(options), &mut writer)
+        .map_err(|error| glb_error(error, &path, (&id, name), &cancelled))?;
     writer
         .flush()
         .map_err(|source| flush_error(source, &path, &cancelled))?;
