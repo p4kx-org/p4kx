@@ -7,6 +7,12 @@ ADR-0266 (ship spawns and location queries) and ADR-0270 (texts per key). The ow
 same day, that it carries everything the Record states: the payouts, contributions, modifiers,
 owner, mission flow, comms, the handler and display texts and the properties of the objectives.
 
+Amended by ADR-0320: a modifier, flow condition or flow action of a struct the catalog does not
+know fails the Record instead of being `other`, the flow conditions `anyTokensState` and
+`onMissionStart` and the modifiers `factionHostility`, `hostileMission`,
+`ignoreMissionPlayerCriminality` and `lawLicense` are variants, and "none occurs on LIVE" below
+held only because those two conditions were `other`.
+
 ## Decision
 
 - The kind `contractTemplates` is added additively (ADR-0054, schema version 2 keeps its number).

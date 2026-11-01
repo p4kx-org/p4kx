@@ -37,6 +37,9 @@ struct the catalog does not know fails the Record instead of hiding behind an es
   now (`anyTokensState`, `onMissionStart`) and no Record of LIVE fails. The value of an objective
   property keeps `other` with its `structName` for the NPC and entity spawn descriptions that
   follow with #815; no objective of a broker entry holds one.
+- **Side effect on the templates, kept on purpose.** The readers are shared, so the rule and the
+  new variants apply to `contractTemplates` as well; this follows the owner's rule from #812 and
+  amends ADR-0313.
 - **Union shapes.** A reputation requirement element is tagged by `type`: `requirement`, `and`,
   `leftParenthesis`, `rightParenthesis`; the expression is infix and the catalog does not evaluate
   it. The modifiers gain `factionHostility`, `hostileMission`, `ignoreMissionPlayerCriminality` and
