@@ -63,8 +63,11 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   CRC-32C differs from the Entry; kept files are reported as skipped. Entries are written in
   parallel, each to a temporary file that replaces the destination once complete. Entry paths
   that are absolute, carry a drive prefix, contain `..` or name a Windows device are rejected,
-  and nothing is written outside the target. A corrupt Entry fails alone and is named with the
-  reason. While stderr is a terminal a progress line shows the Entries done; Ctrl+C cancels the
+  and nothing is written outside the target. Only file names valid on both Linux and Windows are
+  written, whatever the platform (ADR-0248): an Entry with a forbidden character, a Windows device
+  name, a trailing dot or space, a part over 255 bytes or a path over 260 characters is reported
+  with the rule it breaks and the run goes on, and Entries that differ only in case collide. A
+  corrupt Entry fails alone and is named with the reason. While stderr is a terminal a progress line shows the Entries done; Ctrl+C cancels the
   run promptly, leaves no partial file and reports the Entries not written as cancelled; a second
   Ctrl+C quits at once. The
   run ends with a summary of extracted, skipped, failed and cancelled Entries.
@@ -136,7 +139,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   are not UTF-8 or hold a separator. An output folder that is the input folder, lies inside it or
   contains it, or lies inside a Star Citizen installation is invalid input (exit 2) and nothing is
   written; an input that is no folder is too. Progress, Ctrl+C, `--json` and the exit codes are
-  those of `extract`; the JSON report of [`p4kx extract`](cli-json.md#p4kx-extract--json) adds
+  those of `extract`; the JSON report of [`p4kx extract`](cli-json.md#p4kx-extract----json) adds
   `not_converted`, the number of files left out, when it is not 0. The window offers **Convert
   folder…** in the Archive menu with progress and cancel.
 - `p4kx info <archive>` prints the Channel, the Build (branch, version, change number, BuildId)
@@ -170,8 +173,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `--format ndjson` writes one `records.ndjson` with one Record per line in record-path order.
   `--filter` selects Records by record path with the rules of `search`; `--out` and `--conflict`
   work as for `extract`. A value that cannot be read is written as an error at its field and the
-  Record is still written; the summary counts these error values. The same Record always gives
-  the same bytes. `--combined` writes every selected Record into one file in record-path order,
+  Record is still written; the summary counts these error values. A Record whose name is no valid
+  file name on Linux and Windows is written under its GUID and a record path with such a part is
+  escaped (`a|b` becomes `a%7Cb`, ADR-0248); the summary lists each of them as renamed. The same
+  Record always gives the same bytes. `--combined` writes every selected Record into one file in record-path order,
   named after the DataForge Entry (`Game2.xml`), under one `p4kx:records` root element.
   `--flat --format csv|ndjson` writes one row per leaf value instead
   ([docs/record-flat.md](record-flat.md)): `values.csv` (UTF-8 with byte order mark, formulas
@@ -211,7 +216,12 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   it, its size and helper, and recursively the ports of each attached Entity. Ports that cannot be
   resolved, such as a dangling Reference, are listed with the reason. A Loadout generated at
   random from loadout assortments, as a creature or an NPC has it, resolves to the first
-  alternative of each group (ADR-0289). For a ship it also reads the
+  alternative of each group (ADR-0289); `--loadout-pick <group>=<index>` takes another one
+  (`Body=2`, a bare `<index>` for every group that has it, counting from 0, repeatable or
+  separated by commas), also on `entity glb`, `entity package` and `ui hologram`: an index beyond
+  a named group is reported as a Loadout issue and the group keeps its first alternative. A group
+  whose Requirement names tags of the spawn still applies and is listed in `notes` as
+  `assortment_requirement`. For a ship it also reads the
   vehicle implementation XML with the Modification its Record selects: ports the implementation
   hides are marked `(invisible)`, and the treads, wheels and landing gear are listed. With
   `--json` the tree has the shape described in [docs/cli-json.md](cli-json.md). A docked
@@ -236,9 +246,14 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `--json` the report has the shape described in [docs/cli-json.md](cli-json.md). A docked
   vehicle such as a Merlin or an Archimedes is
   placed as one part, without the parts of its own Loadout, unless `--expand-docked-vehicles`
-  places those parts too. With `--animations` a creature whose skins are bound to its skeleton also
+  places those parts too. A creature, an Entity whose root geometry is a character file with a
+  skeleton, is written with its skins bound to that skeleton (bones as nodes, one glTF skin,
+  joints and weights); bones the skeleton lacks are listed as `bones_not_in_skeleton`, and a
+  creature whose skeleton is missing or unreadable stays static. With `--animations` it also
   gets the clips its animation database names, as glTF animations of the bones; without it the
-  GLB is static.
+  GLB is static. The bone attachments of a character definition are drawn at their bone, rigid
+  props on a skin port at the body bone the port names, and a worn Entity whose port another worn
+  Entity hides by its `HiddenParts` is left out and reported as `part_hidden`.
   `--interior` adds the ship's rooms:
   the socpak containers the Records of the ship and of its attached Entities name, each at its
   bone of the Entity that names it, below an `Interior` node of that Entity; a docked vehicle
@@ -361,7 +376,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   schema version (2), Channel and Build, completeness per kind and the kinds of the catalog:
   manufacturers, items (with their item class), ships and ground vehicles, commodities, crafting
   blueprints, loadouts, paints, shops, the starmap, contracts (with their ship, NPC and entity
-  spawns and location queries), factions and reputation, mining,
+  spawns, location queries and hauling orders), contract templates, mission broker entries and
+  cargo manifests, factions and reputation, mining,
   refining and loot, each ordered by GUID, with test, template, dummy,
   debug, deprecated and dev Records left out and counted as skipped, and names and descriptions
   resolved in English and German. `--filter` marks the catalog partial. It prints the counts per
@@ -517,8 +533,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   through the narrow lens of the game's `UIHoloVehicle_Config` Record (field of view, view angle
   and distance factor, 10, 60 and 1.5 in the current game, each overridable). The picture is
   drawn offscreen without a window, by the same wgpu renderer as the 3D viewer, on the graphics
-  card or with `--software` on the software adapter (WARP, lavapipe), which gives a picture that
-  does not depend on the graphics card. The background is `transparent` or `#RRGGBB[AA]`; the PNG
+  card or with `--software` on the software adapter (WARP, lavapipe; on Windows a Direct3D 12
+  instance only), which gives a picture that does not depend on the graphics card. Releasing the
+  device waits for the queue to go idle for a limited time; a driver that does not finish in it
+  leaves a warning that names the stage it stopped in. The background is `transparent` or `#RRGGBB[AA]`; the PNG
   has straight alpha. Textures and interiors are not drawn.
 - `p4kx ui screens <archive> <entity>` lists the `BuildingBlocks` screens of an Entity and of
   everything in its default Loadout, e.g. the MFDs, the radar and the HUD of a ship: per screen the

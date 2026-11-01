@@ -38,7 +38,8 @@ The rule is ADR-0054 (amending ADR-0002):
   Version 2 also fixes a port whose name several parts of the vehicle file share (#677): the first
   such part gives the port its sizes, types and flags, as in the tree, so the `Radar_Helper` port
   of eight Ursa ships on LIVE 4.10 no longer lists `start_hidden` in its `flags`.
-  Version 2 was released with 0.4.0 and has the kind `qualityQuantizations` (#692, ADR-0177), the
+  Version 2 was released with 0.4.0 and has gained the kinds and fields below since, the last ones
+  with 0.4.2. It has the kind `qualityQuantizations` (#692, ADR-0177), the
   ship field `insurance` (#323, ADR-0218), the kinds `mineableCompositions`, `miningGlobalParams`,
   `harvestableProviderPresets`, `subHarvestableMultiConfigs` and `harvestableLocations` (#320,
   ADR-0236), the kinds `factionReputations`, `reputationScopes`, `reputationStandings`,
@@ -61,7 +62,8 @@ The rule is ADR-0054 (amending ADR-0002):
   (#915, ADR-0273), and so are the kind `contractTemplates` (#812, ADR-0313) and the kind
   `missionBrokerEntries` with the contract field `brokerEntryGuid` (#813, ADR-0320), and the kinds
   `contractNpcSpawns` and `contractEntitySpawns` with the fields `npcSpawns` and `entitySpawns` of
-  a contract, a template and a broker entry (#815, ADR-0324).
+  a contract, a template and a broker entry (#815, ADR-0324), and the field `value` of the
+  `contractProperties` of a template and the `missionProperties` of a broker entry (#1003).
 - **A production import takes catalogs of the Channel `LIVE` only.** `PTU`, `EPTU`, `TECH-PREVIEW`
   and `HOTFIX` are confidential test Channels (ADR-0038).
 
@@ -1500,7 +1502,7 @@ discriminator: `type` for the value of a property, a flow condition and a flow a
 for a modifier and `structName` for a handler; the other fields depend on it. A condition, an action
 or a modifier of a struct the catalog does not know fails the Record (ADR-0320), and so does the
 value of an objective property (ADR-0324). The unions lost their `other` variants before the kind
-`contractTemplates` was first released (v0.4.2 is unreleased), so no consumer has seen them and the
+`contractTemplates` was first released (in 0.4.2), so no consumer has seen them and the
 additive rule of ADR-0054 is not touched.
 
 | Field | Meaning |
