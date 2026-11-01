@@ -48,6 +48,7 @@ pub struct TestCanvas {
     operations: Vec<(String, TestOp)>,
     shared: Option<u128>,
     brand: Option<(u128, Vec<TestStyleEntry>)>,
+    defaults: Vec<TestStyleEntry>,
     embedded: Vec<TestStyleEntry>,
 }
 
@@ -67,6 +68,7 @@ impl TestCanvas {
             operations: Vec::new(),
             shared: None,
             brand: None,
+            defaults: Vec::new(),
             embedded: Vec::new(),
         }
     }
@@ -136,6 +138,13 @@ impl TestCanvas {
         self
     }
 
+    /// Adds an entry to the default styles of the canvas.
+    #[must_use]
+    pub fn default_style(mut self, entry: TestStyleEntry) -> Self {
+        self.defaults.push(entry);
+        self
+    }
+
     /// Adds an embedded style entry.
     #[must_use]
     pub fn embedded(mut self, entry: TestStyleEntry) -> Self {
@@ -157,7 +166,7 @@ impl TestCanvas {
                 "sharedStyles",
                 self.shared.map_or(TestValue::Null, TestValue::Reference),
             )
-            .value("entries", TestValue::Array(Vec::new()));
+            .value("entries", entries(&self.defaults));
         let brands = self.brand.iter().map(|(guid, brand_entries)| {
             TestValue::Struct(
                 TestInstance::new("BuildingBlocks_BrandStyles")

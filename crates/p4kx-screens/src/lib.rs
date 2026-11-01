@@ -88,6 +88,7 @@ mod walk_instance;
 mod walk_measure;
 mod walk_notes;
 mod walk_part;
+mod walk_preset;
 mod walk_rest;
 mod walk_style;
 mod walk_text;

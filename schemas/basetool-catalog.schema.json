@@ -6790,7 +6790,8 @@
           "type": "object"
         },
         {
-          "description": "A condition of another struct, which the catalog does not read.",
+          "deprecated": true,
+          "description": "Never written; a condition of an unknown struct fails the Record.",
           "properties": {
             "condition": {
               "const": "other",

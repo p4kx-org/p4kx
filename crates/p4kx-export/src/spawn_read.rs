@@ -9,10 +9,12 @@ use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{items, one};
 use crate::npc_spawn_model::NpcSpawnPool;
 use crate::record_fields::{boolean, guid_value, integer, nonnil_guid, number, reference, text};
+use crate::spawn_error::SpawnError;
 use crate::spawn_model::{
     LocationCondition, LocationCount, LocationQuery, ShipSpawnGroup, ShipSpawnOption,
     ShipSpawnPool, ShipSpawnSlot, TagPaths, TagTerm, content_guid,
 };
+use crate::template_issues::TemplateError;
 
 const LOCATION: &str = "MissionPropertyValue_Location";
 const LOCATIONS: &str = "MissionPropertyValue_Locations";
@@ -52,11 +54,9 @@ impl<'x, 'f> Reader<'x, 'f> {
     ///
     /// # Errors
     ///
-    /// Returns the error of the serialisation that makes the identifier of the content.
-    pub(crate) fn spawn(
-        &self,
-        value: &StructValue<'f>,
-    ) -> Result<Option<Spawn<'f>>, serde_json::Error> {
+    /// Returns [`SpawnError::Identifier`] when the identifier of the content cannot be made and
+    /// [`SpawnError::Template`] for a location condition of a struct the catalog does not know.
+    pub(crate) fn spawn(&self, value: &StructValue<'f>) -> Result<Option<Spawn<'f>>, SpawnError> {
         Ok(Some(match value.type_name() {
             SHIPS => Spawn::Ships(self.ships(value)?),
             NPCS => Spawn::Npcs(self.npcs(value)?),
@@ -112,7 +112,7 @@ impl<'x, 'f> Reader<'x, 'f> {
         &self,
         value: &StructValue<'f>,
         count: LocationCount,
-    ) -> Result<LocationQuery, serde_json::Error> {
+    ) -> Result<LocationQuery, SpawnError> {
         let many = matches!(count, LocationCount::Many);
         let log = boolean(Some(value), "logErrorOnSearchFail");
         let min = many
@@ -125,7 +125,7 @@ impl<'x, 'f> Reader<'x, 'f> {
             .then(|| boolean(Some(value), "failIfMinAmountNotFound"))
             .flatten();
         let resource_tags = self.tag_array(Some(value), "resourceTags");
-        let conditions = self.conditions(Some(value));
+        let conditions = self.conditions(Some(value), "location condition")?;
         let content = (count, min, max, fail, log, &resource_tags, &conditions);
         Ok(LocationQuery {
             guid: content_guid(&content)?,
@@ -139,20 +139,34 @@ impl<'x, 'f> Reader<'x, 'f> {
         })
     }
 
-    /// Reads the `matchConditions` of `parent`, a location query or an organisation value.
-    pub(crate) fn conditions(&self, parent: Option<&StructValue<'f>>) -> Vec<LocationCondition> {
+    /// Reads the `matchConditions` of `parent`, a location query or the value of an organisation
+    /// or mission item property; `what` names them in the error.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TemplateError::UnknownStruct`] for a condition of a struct the catalog does not
+    /// know.
+    pub(crate) fn conditions(
+        &self,
+        parent: Option<&StructValue<'f>>,
+        what: &'static str,
+    ) -> Result<Vec<LocationCondition>, TemplateError> {
         items(parent, "matchConditions")
             .iter()
             .filter_map(as_struct)
-            .map(|condition| self.condition(condition))
+            .map(|condition| self.condition(condition, what))
             .collect()
     }
 
-    fn condition(&self, condition: &StructValue<'f>) -> LocationCondition {
+    fn condition(
+        &self,
+        condition: &StructValue<'f>,
+        what: &'static str,
+    ) -> Result<LocationCondition, TemplateError> {
         let parent = Some(condition);
         let name = condition.type_name();
         let owned = |field: &str| text(parent, field).map(str::to_owned);
-        match name.strip_prefix(CONDITION_PREFIX).unwrap_or(name) {
+        Ok(match name.strip_prefix(CONDITION_PREFIX).unwrap_or(name) {
             "TagSearch" => LocationCondition::TagSearch {
                 tag_type: owned("tagType"),
                 terms: items(parent, "tagSearch")
@@ -188,10 +202,8 @@ impl<'x, 'f> Reader<'x, 'f> {
             "SpecificItemsDef" => LocationCondition::SpecificItems {
                 item_guids: crate::record_fields::references(parent, "items"),
             },
-            _ => LocationCondition::Other {
-                struct_name: name.to_owned(),
-            },
-        }
+            _ => return Err(TemplateError::unknown(what, condition)),
+        })
     }
 
     /// Returns the tag paths of the `TagList` struct in the field `name`.
