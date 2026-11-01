@@ -28,6 +28,8 @@ const WIDTH: u32 = 800;
 const SHIELDS_LABEL: (u32, u32) = (70, 55);
 /// The most alpha the faint panel of the generic shields canvas has.
 const FAINT: u8 = 64;
+/// The least alpha of the solid chip of the RSI shields canvas.
+const SOLID: u8 = 250;
 
 /// Inside the left backdrop of the turret layout, where a solid block was drawn.
 const BACKDROP: (u32, u32) = (60, 420);
@@ -126,10 +128,10 @@ fn assert_page(
 }
 
 /// Composes the powered MFD of a brand with the given game variables.
-type Compose<'a> = dyn Fn(&str, &[&str]) -> Result<Composed, Box<dyn Error>> + 'a;
+type ComposeMfd<'a> = dyn Fn(&str, &[&str]) -> Result<Composed, Box<dyn Error>> + 'a;
 
 /// Opens the real Archive and calls `run` with a function that composes the MFD.
-fn with_mfd(run: impl FnOnce(&Compose<'_>) -> TestResult) -> TestResult {
+fn with_mfd(run: impl FnOnce(&ComposeMfd<'_>) -> TestResult) -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
@@ -201,11 +203,13 @@ fn the_aegis_shields_page_takes_the_default_canvas_and_draws_no_label_chip() -> 
     let named = format!("landscapecanvasguid={SHIELDS_PAGE}");
     let settings = ["powerstate=1", &named, "mfdviewname=SHIELDS"];
     with_mfd(|compose| {
-        let composed = compose("aegs", &settings)?;
+        let rsi = alpha_at(&raster(&compose("rsi", &settings)?)?, SHIELDS_LABEL);
         assert!(
-            alpha_at(&raster(&composed)?, SHIELDS_LABEL) < FAINT,
-            "the shields label of the RSI canvas sits on a solid chip"
+            rsi >= SOLID,
+            "control: the RSI canvas draws the chip: {rsi}"
         );
+        let aegs = alpha_at(&raster(&compose("aegs", &settings)?)?, SHIELDS_LABEL);
+        assert!(aegs < FAINT, "the Aegis page draws no solid chip: {aegs}");
         Ok(())
     })
 }

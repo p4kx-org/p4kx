@@ -74,7 +74,7 @@ impl Canvas {
     }
 
     /// Returns the brand style of the manufacturer `code`; without a code the first brand style.
-    /// A code the canvas has no style for gets none, as in the game: the default entries apply.
+    /// A code the canvas has no style for gets none, as the master's default entry does: the default entries apply.
     pub(crate) fn pick_brand(&self, code: Option<&str>) -> Option<&BrandStyle> {
         code.map_or_else(|| self.brands.first(), |code| self.brand_of(code))
     }
