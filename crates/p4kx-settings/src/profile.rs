@@ -7,8 +7,8 @@ use std::sync::OnceLock;
 
 use crate::MAX_SETTINGS_SIZE;
 use crate::key_store::create_private;
+use crate::locations::{APP_FOLDER as FOLDER, FolderKind, base_folder};
 
-const FOLDER: &str = "P4KX";
 const PREVIOUS_FOLDER: &str = "P4K-Extractor";
 const STAGING_PREFIX: &str = "P4KX.migrating-";
 const KNOWN_FILES: [&str; 2] = ["settings.toml", "archive.key"];
@@ -34,12 +34,13 @@ pub enum ProfileMigration {
 
 /// Returns the profile folder of the platform config directory, `None` without one.
 ///
-/// It is `P4KX` (`%APPDATA%\P4KX` on Windows), or the old `P4K-Extractor` folder for this process
-/// when its migration failed. The first call of a process runs [`migrate_profile`]; its outcome never stops the start.
+/// It is `P4KX` (`%APPDATA%\P4KX` on Windows, `$XDG_CONFIG_HOME/P4KX` on Linux), or the old
+/// `P4K-Extractor` folder for this process when its migration failed. The first call of a
+/// process runs [`migrate_profile`]; its outcome never stops the start.
 #[must_use]
 pub fn profile_folder() -> Option<PathBuf> {
     FOLDER_IN_USE
-        .get_or_init(|| dirs::config_dir().map(|config| profile_folder_in(&config)))
+        .get_or_init(|| base_folder(FolderKind::Config).map(|config| profile_folder_in(&config)))
         .clone()
 }
 

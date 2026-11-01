@@ -12,6 +12,8 @@ use p4kx_assembly::character::{Chf, ItemPort, lowered_hash, name_hash, skin_atta
 use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
+use crate::real_paths::unified;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const PORTS: [&str; 18] = [
@@ -66,7 +68,7 @@ fn the_attachment_hashes_of_the_shipped_characters_resolve_to_item_port_names() 
     let mut unmatched_ports = HashSet::new();
     let mut default_materials = 0_usize;
     for entry in archive.entries() {
-        let path = entry.path().to_ascii_lowercase().replace('\\', "/");
+        let path = unified(entry.path());
         if !path.ends_with(".chf") {
             continue;
         }
