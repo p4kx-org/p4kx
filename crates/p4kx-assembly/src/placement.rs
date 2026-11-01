@@ -118,6 +118,34 @@ mod tests {
         close(transform.rows[2], [0.0, 0.0, 1.0, 3.0]);
     }
 
+    /// The local axes of a part placed with `rotation`, as the columns of its rotation matrix.
+    fn axes(rotation: [f32; 3]) -> [[f32; 3]; 3] {
+        let rows = offset([0.0; 3], rotation).rows;
+        [0, 1, 2].map(|column| rows.map(|row| row[column]))
+    }
+
+    fn assert_axis(actual: [f32; 3], expected: [f32; 3]) {
+        for (a, e) in actual.iter().zip(expected) {
+            assert!((a - e).abs() < 1e-5, "{actual:?} against {expected:?}");
+        }
+    }
+
+    #[test]
+    fn a_multi_axis_rack_points_its_z_axis_forward_and_mirrors_its_twin() {
+        let left = axes([90.0, 90.0, 180.0]);
+        let right = axes([90.0, -90.0, 180.0]);
+        assert_axis(left[2], [0.0, 1.0, 0.0]);
+        assert_axis(right[2], [0.0, 1.0, 0.0]);
+        assert_axis(left[1], [-1.0, 0.0, 0.0]);
+        assert_axis(right[1], [1.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn a_pitch_and_a_yaw_leave_the_right_axis_level() {
+        let tilted = axes([30.0, 0.0, 90.0]);
+        assert!(tilted[0][2].abs() < 1e-5, "{tilted:?}");
+    }
+
     #[test]
     fn rotations_apply_x_before_y_before_z() {
         let transform = offset([0.0; 3], [90.0, 0.0, 90.0]);

@@ -3,7 +3,7 @@
 
 use p4kx_dataforge::StructValue;
 
-use crate::read::{struct_field, struct_items, text, texts, unsigned, xyz};
+use crate::read::{flag, struct_field, struct_items, text, texts, unsigned, xyz};
 
 const ATTACHMENT_PREFIX: &str = "SItemPortDefAttachmentImplementation";
 const SKIN_ATTACHMENT: &str = "Skin";
@@ -21,9 +21,25 @@ pub struct PortDefinition {
     pub(crate) required_tags: String,
     pub(crate) transform: Option<PortTransform>,
     pub(crate) skin: bool,
+    pub(crate) no_rotation: bool,
+    pub(crate) detach_direction: [f32; 3],
 }
 
 impl PortDefinition {
+    /// Returns whether the item keeps its own orientation and takes only the translation of the
+    /// port (`constraintParams.noRotation` of an entity attachment), as gimbals and turrets do.
+    #[must_use]
+    pub const fn no_rotation(&self) -> bool {
+        self.no_rotation
+    }
+
+    /// Returns the direction in which the item leaves the port when detached, `[x, y, z]` as
+    /// stored.
+    #[must_use]
+    pub const fn detach_direction(&self) -> [f32; 3] {
+        self.detach_direction
+    }
+
     /// Returns the tags the port offers, as stored: words separated by white space.
     #[must_use]
     pub fn port_tags(&self) -> &str {
@@ -162,6 +178,10 @@ pub(crate) fn read_definition(port: &StructValue<'_>) -> PortDefinition {
         required_tags: text(port, "RequiredPortTags").to_owned(),
         transform: attachment.and_then(read_transform),
         skin: attachment.is_some_and(|attachment| attachment_kind(attachment) == SKIN_ATTACHMENT),
+        no_rotation: attachment
+            .and_then(|attachment| struct_field(attachment, "constraintParams"))
+            .is_some_and(|constraints| flag(constraints, "noRotation")),
+        detach_direction: xyz(struct_field(port, "detachDirection")),
     }
 }
 

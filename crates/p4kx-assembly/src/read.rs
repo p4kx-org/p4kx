@@ -62,6 +62,11 @@ pub(crate) fn texts(structure: &StructValue<'_>, name: &str) -> Vec<String> {
     }
 }
 
+/// Returns whether the boolean field `name` is set; a missing or non-boolean field is not.
+pub(crate) fn flag(structure: &StructValue<'_>, name: &str) -> bool {
+    matches!(structure.field(name), Some(Value::Bool(true)))
+}
+
 /// Returns an integer field as `u32`, or `None` when it holds no integer in range.
 pub(crate) fn unsigned(structure: &StructValue<'_>, name: &str) -> Option<u32> {
     unsigned_value(structure.field(name)?)

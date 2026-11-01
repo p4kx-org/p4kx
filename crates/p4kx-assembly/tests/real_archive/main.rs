@@ -55,6 +55,7 @@ mod real_interior_hardpoints;
 mod real_interior_verification;
 mod real_layer_textures;
 mod real_layered_materials;
+mod real_loadout_semantics;
 mod real_npc;
 mod real_npc_face;
 mod real_npc_hidden_parts;
