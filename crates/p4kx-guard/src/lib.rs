@@ -5,12 +5,14 @@
 //! refused, and a running game is noticed from the process list alone.
 
 mod installation;
+mod proc_tree;
 mod process;
 mod registry;
 
 use std::path::PathBuf;
 
 pub use installation::{Installation, without_verbatim_prefix};
+pub use proc_tree::game_in_proc_tree;
 pub use process::{
     any_game_process, game_is_running, is_game_process, process_count_lists_game,
     qprocess_lists_game,
