@@ -127,6 +127,7 @@ pub(super) fn mining_global_params() -> serde_json::Value {
         "childRockInvulnerabilityTime": 10.0,
         "childRockLifeTimer": 600.0,
         "childRockZeroGDamping": 0.154_321,
+        "compositionMassMultiplier": 1.5,
         "controlledBreakingDecayRate": 0.5,
         "controlledBreakingFillRate": 2.0,
         "controlledBreakingFillRateDanger": 0.7,

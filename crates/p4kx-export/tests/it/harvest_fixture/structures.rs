@@ -39,6 +39,7 @@ pub(super) fn structures(builder: DataForgeBuilder) -> DataForgeBuilder {
         TestStruct::new("HitConsistencyParams").field("timeExponent", TestType::Single),
         TestStruct::new("MiningGlobalParams")
             .field("cSCUPerVolume", TestType::Single)
+            .field("compositionMassMultiplier", TestType::Single)
             .field("defaultMass", TestType::Single)
             .field("hitConsistencyParams", class("HitConsistencyParams"))
             .field("wasteResourceType", TestType::Reference),

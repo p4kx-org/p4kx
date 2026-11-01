@@ -102,6 +102,7 @@ fn the_mining_parameters_carry_their_numbers_and_nested_blocks() -> TestResult {
     assert_eq!(params["className"], "MiningGlobalParamsShip");
     assert_eq!(params["cScuPerVolume"], 0.7);
     assert_eq!(params["defaultMass"], 100.0);
+    assert_eq!(params["compositionMassMultiplier"], 1.5);
     assert_eq!(params["gadgetDestroyThreshold"], Value::Null);
     assert_eq!(params["hitConsistency"]["timeExponent"], 2.0);
     assert_eq!(params["hitConsistency"]["minDeviation"], Value::Null);

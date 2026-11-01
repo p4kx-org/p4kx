@@ -90,6 +90,7 @@ fn params(guid: u128, name: &str, mass: f32) -> TestRecord {
         &format!("{MINING}{}", name.to_lowercase()),
     )
     .value("cSCUPerVolume", TestValue::Single(0.7))
+    .value("compositionMassMultiplier", TestValue::Single(1.5))
     .value("defaultMass", TestValue::Single(mass))
     .value(
         "hitConsistencyParams",
