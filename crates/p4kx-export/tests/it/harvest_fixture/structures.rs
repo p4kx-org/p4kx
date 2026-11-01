@@ -23,7 +23,14 @@ fn element_struct() -> TestStruct {
 }
 
 #[expect(clippy::too_many_lines, reason = "one entry per struct of the fixture")]
-pub(super) fn structures(builder: DataForgeBuilder) -> DataForgeBuilder {
+pub(super) fn structures(builder: DataForgeBuilder, mass_multiplier: bool) -> DataForgeBuilder {
+    let mining_params =
+        TestStruct::new("MiningGlobalParams").field("cSCUPerVolume", TestType::Single);
+    let mining_params = if mass_multiplier {
+        mining_params.field("compositionMassMultiplier", TestType::Single)
+    } else {
+        mining_params
+    };
     [
         TestStruct::new("ResourceType"),
         TestStruct::new("MineableElement").field("resourceType", TestType::Reference),
@@ -37,8 +44,7 @@ pub(super) fn structures(builder: DataForgeBuilder) -> DataForgeBuilder {
             .field("minimumDistinctElements", TestType::Int32)
             .array("compositionArray", class("MineableCompositionPart")),
         TestStruct::new("HitConsistencyParams").field("timeExponent", TestType::Single),
-        TestStruct::new("MiningGlobalParams")
-            .field("cSCUPerVolume", TestType::Single)
+        mining_params
             .field("defaultMass", TestType::Single)
             .field("hitConsistencyParams", class("HitConsistencyParams"))
             .field("wasteResourceType", TestType::Reference),

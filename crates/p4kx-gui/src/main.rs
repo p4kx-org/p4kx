@@ -9,7 +9,8 @@ use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
 use p4kx_channels::SearchPaths;
-use p4kx_gui::{App, ChannelList, Language, Model, RecordTextChoice, Text, theme, window};
+use p4kx_gui::smoke::Frames;
+use p4kx_gui::{App, ChannelList, Language, Model, RecordTextChoice, Text, frame, theme, window};
 use p4kx_settings::{
     KEY_VARIABLE, KeyChoiceError, KeyStore, Settings, choose_key, default_settings_file,
 };
@@ -69,21 +70,27 @@ fn main() -> Result<()> {
     let title = model.texts().get(Text::AppTitle);
     let options = window::native_options(window::viewport(settings.window, &title));
     let archive = std::env::args_os().nth(1).map(PathBuf::from);
+    let smoke = Frames::from_environment();
     eframe::run_native(
         &title,
         options,
         Box::new(move |creation| {
             theme::apply(&creation.egui_ctx);
-            #[cfg(windows)]
-            p4kx_gui::dwm::tint(creation);
+            frame::tint(creation);
             let mut model = model;
-            let ctx = creation.egui_ctx.clone();
-            model.check_for_update(move || ctx.request_repaint());
+            if smoke.is_none() {
+                let ctx = creation.egui_ctx.clone();
+                model.check_for_update(move || ctx.request_repaint());
+            }
             if let Some(path) = archive {
                 let ctx = creation.egui_ctx.clone();
                 model.open(path, move || ctx.request_repaint());
             }
-            Ok(Box::new(App::new(model, settings_file, settings.window)))
+            let app = App::new(model, settings_file, settings.window);
+            Ok(Box::new(match smoke {
+                Some(frames) => app.with_smoke(frames),
+                None => app,
+            }))
         }),
     )
     .map_err(|error| anyhow!("cannot show the window: {error}"))

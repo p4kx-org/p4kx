@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=P4KX
+GenericName=Star Citizen Archive browser
+GenericName[de]=Star-Citizen-Archivbrowser
+Comment=Browse and extract the Data.p4k Archive of Star Citizen
+Comment[de]=Das Data.p4k-Archiv von Star Citizen durchsuchen und extrahieren
+Exec=p4kx-gui %f
+Icon=p4kx
+Terminal=false
+Categories=Utility;Archiving;
+Keywords=Star Citizen;p4k;Archive;DataForge;Extract;
+StartupWMClass=p4kx
+StartupNotify=true

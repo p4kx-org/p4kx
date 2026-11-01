@@ -32,6 +32,8 @@ pub(crate) struct MiningGlobalParams<'a> {
     pub(crate) child_rock_life_timer: Option<f32>,
     /// `childRockZeroGDamping`.
     pub(crate) child_rock_zero_g_damping: Option<f32>,
+    /// `compositionMassMultiplier`; `null` for a Record without it.
+    pub(crate) composition_mass_multiplier: Option<f32>,
     /// `controlledBreakingDecayRate`.
     pub(crate) controlled_breaking_decay_rate: Option<f32>,
     /// `controlledBreakingFillRate`.

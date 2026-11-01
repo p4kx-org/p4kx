@@ -27,6 +27,7 @@ mod exit_guard;
 mod extraction;
 mod forge_cache;
 mod format;
+pub mod frame;
 #[cfg(feature = "test-hooks")]
 mod hold;
 mod installation;
@@ -48,6 +49,7 @@ mod record_search;
 mod record_tree;
 mod search;
 mod shown_line;
+pub mod smoke;
 mod sort;
 mod sounds;
 mod tags;

@@ -6,7 +6,9 @@ use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::Duration;
 
-use rodio::{ChannelCount, DeviceSinkBuilder, SampleRate, Source};
+use rodio::{
+    ChannelCount, DeviceSinkBuilder, DeviceSinkError, MixerDeviceSink, SampleRate, Source,
+};
 
 use super::{AudioOutput, FailureReporter, SoundSource, StreamGuard};
 use crate::model::describe;
@@ -18,12 +20,25 @@ pub struct DeviceOutput;
 
 impl AudioOutput for DeviceOutput {
     fn start(&self, source: SoundSource) -> StreamGuard {
+        Opened(open_default).start(source)
+    }
+}
+
+/// Opens an output device; stream errors after the opening go to the reporter.
+type Opener = fn(&FailureReporter) -> Result<MixerDeviceSink, DeviceSinkError>;
+
+/// An output that opens its device with the wrapped function.
+struct Opened(Opener);
+
+impl AudioOutput for Opened {
+    fn start(&self, source: SoundSource) -> StreamGuard {
         let (guard, closed) = mpsc::channel::<()>();
         let reporter = source.reporter();
         let thread_reporter = reporter.clone();
+        let open = self.0;
         let spawned = thread::Builder::new()
             .name("audio-output".to_owned())
-            .spawn(move || play(source, &thread_reporter, &closed));
+            .spawn(move || play(open, source, &thread_reporter, &closed));
         if let Err(error) = spawned {
             reporter.report(describe(&error));
         }
@@ -31,14 +46,18 @@ impl AudioOutput for DeviceOutput {
     }
 }
 
-fn play(source: SoundSource, reporter: &FailureReporter, closed: &Receiver<()>) {
+/// Opens the default output device; a host without one reports an error, typically `NoDevice`.
+fn open_default(reporter: &FailureReporter) -> Result<MixerDeviceSink, DeviceSinkError> {
     let runtime = reporter.clone();
-    let opened = DeviceSinkBuilder::from_default_device().and_then(|builder| {
+    DeviceSinkBuilder::from_default_device().and_then(|builder| {
         builder
             .with_error_callback(move |error| runtime.report(describe(&error)))
             .open_sink_or_fallback()
-    });
-    let mut sink = match opened {
+    })
+}
+
+fn play(open: Opener, source: SoundSource, reporter: &FailureReporter, closed: &Receiver<()>) {
+    let mut sink = match open(reporter) {
         Ok(sink) => sink,
         Err(error) => {
             reporter.report(describe(&error));
@@ -78,3 +97,6 @@ impl Source for Feed {
         None
     }
 }
+
+#[cfg(test)]
+mod tests;

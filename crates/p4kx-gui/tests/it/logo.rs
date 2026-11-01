@@ -124,7 +124,7 @@ fn the_svg_files_carry_the_geometry_and_only_theme_colours() -> TestResult {
     Ok(())
 }
 
-fn encode(size: u32, rgba: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+pub(crate) fn encode(size: u32, rgba: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut bytes = Vec::new();
     let mut encoder = png::Encoder::new(&mut bytes, size, size);
     encoder.set_color(png::ColorType::Rgba);
@@ -158,7 +158,7 @@ fn icon_file() -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(file)
 }
 
-fn decode(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), Box<dyn Error>> {
+pub(crate) fn decode(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), Box<dyn Error>> {
     let mut reader = png::Decoder::new(std::io::Cursor::new(bytes)).read_info()?;
     let mut pixels = vec![0; reader.output_buffer_size().ok_or("size")?];
     let info = reader.next_frame(&mut pixels)?;

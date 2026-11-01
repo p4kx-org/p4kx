@@ -80,6 +80,12 @@ jobs:
           PARTITION_COUNT: ${{ inputs.count }}
         shell: bash
         run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --partition "count:${PARTITION}/${PARTITION_COUNT}"
+      - name: Install the X server and the libraries the window loads at run time
+        if: runner.os == 'Linux' && matrix.partition == 1
+        run: sudo apt-get install -y --no-install-recommends xvfb libx11-6 libxcursor1 libxi6 libxrandr2 libxkbcommon-x11-0 libegl1
+      - name: Smoke run of the window under Xvfb, drawing on lavapipe
+        if: runner.os == 'Linux' && matrix.partition == 1
+        run: xvfb-run --auto-servernum cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --run-ignored only -E 'test(the_window_starts_draws_frames_and_exits)'
       - name: Name the software adapter the render tests drew on
         env:
           P4KX_REQUIRE_SOFTWARE_ADAPTER: '1'

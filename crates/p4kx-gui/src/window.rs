@@ -15,11 +15,16 @@ use crate::theme::window_metrics::{WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH};
 const DEFAULT_SIZE: [f32; 2] = [1280.0, 800.0];
 const MIN_SIZE: [f32; 2] = [WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT];
 
+/// The application id of the window: the Wayland `app_id` and the X11 `WM_CLASS`, which a desktop
+/// environment matches to `p4kx.desktop` for the icon and the name in its task switcher.
+pub const APP_ID: &str = "p4kx";
+
 /// Returns the main window for `title`, placed at `geometry` or at the default size.
 #[must_use]
 pub fn viewport(geometry: Option<WindowGeometry>, title: &str) -> ViewportBuilder {
     let builder = ViewportBuilder::default()
         .with_title(title)
+        .with_app_id(APP_ID)
         .with_icon(window_icon())
         .with_min_inner_size(MIN_SIZE)
         .with_drag_and_drop(true);
@@ -127,7 +132,7 @@ mod tests {
     use eframe::egui_wgpu::WgpuSetup;
     use eframe::egui_wgpu::wgpu::Backends;
 
-    use super::{geometry, native_options_with, viewport};
+    use super::{APP_ID, geometry, native_options_with, viewport};
 
     fn instance_backends(options: &eframe::NativeOptions) -> Option<Backends> {
         match &options.wgpu_options.wgpu_setup {
@@ -162,6 +167,16 @@ mod tests {
 
         assert_eq!(instance_backends(&options), default);
         assert_ne!(default, Some(Backends::DX12), "not Direct3D 12 alone");
+    }
+
+    #[test]
+    fn the_default_backends_hold_vulkan_with_a_gl_fallback() {
+        let options = native_options_with(viewport(None, "title"), None, |_| false);
+
+        let backends = instance_backends(&options).unwrap_or(Backends::empty());
+
+        assert!(backends.contains(Backends::VULKAN), "Vulkan: {backends:?}");
+        assert!(backends.contains(Backends::GL), "GL: {backends:?}");
     }
 
     #[test]
@@ -277,5 +292,12 @@ mod tests {
         assert_eq!(builder.inner_size, Some(vec2(1000.0, 700.0)), "size");
         assert_eq!(builder.maximized, Some(false), "not maximised");
         assert_eq!(builder.title.as_deref(), Some("P4KX"), "title");
+    }
+
+    #[test]
+    fn the_window_carries_the_application_id_of_the_desktop_file() {
+        let builder = viewport(None, "P4KX");
+
+        assert_eq!(builder.app_id.as_deref(), Some(APP_ID), "app id");
     }
 }
