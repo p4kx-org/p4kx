@@ -3,34 +3,28 @@
 
 use std::time::{Duration, Instant};
 
-use rodio::DeviceSinkBuilder;
+use rodio::DeviceSinkError;
 
-use super::DeviceOutput;
+use super::Opened;
 use crate::audio::{Pcm, Player};
 
-/// How long the output thread may take to report that it found no device.
+/// How long the output thread may take to report its failure.
 const REPORT_DEADLINE: Duration = Duration::from_secs(10);
 
-/// Returns whether the host has an output device; a host with one plays instead of failing.
-fn has_device() -> bool {
-    DeviceSinkBuilder::from_default_device()
-        .and_then(|builder| builder.open_sink_or_fallback())
-        .is_ok()
+fn player() -> Player {
+    Player::new(Pcm::new(vec![0; 4_800], 1, 48_000), 1.0)
 }
 
 #[test]
-fn a_host_without_an_output_device_reports_the_failure_and_does_not_panic() {
-    if has_device() {
-        return;
-    }
-    let mut player = Player::new(Pcm::new(vec![0; 4_800], 1, 48_000), 1.0);
-    player.play(&DeviceOutput);
+fn a_missing_device_is_reported_to_the_player_and_does_not_panic() {
+    let mut player = player();
+    player.play(&Opened(|_| Err(DeviceSinkError::NoDevice)));
 
     let started = Instant::now();
     while !player.poll() {
         assert!(
             started.elapsed() < REPORT_DEADLINE,
-            "the missing device was not reported"
+            "the failure was not reported"
         );
         std::thread::sleep(Duration::from_millis(10));
     }
@@ -40,4 +34,13 @@ fn a_host_without_an_output_device_reports_the_failure_and_does_not_panic() {
         "the failure carries a reason"
     );
     assert!(!player.is_playing(), "a failed output does not play");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn the_default_output_survives_a_host_with_or_without_a_device() {
+    let mut player = player();
+    player.play(&super::DeviceOutput);
+    std::thread::sleep(Duration::from_millis(200));
+    player.poll();
 }

@@ -12,10 +12,11 @@ the audio preview).
 - Building needs the ALSA headers (`libasound2-dev`). `.github/actions/setup-rust` installs them for
   every Linux job and CONTRIBUTING names them.
 - A host without an output device (a CI runner, a container) is a normal case: `DeviceOutput` opens
-  the device on its own thread, reports `DeviceSinkError::NoDevice` through the `FailureReporter`,
-  and the Audio tab shows the reason. Nothing panics and the window never waits. A unit test of
-  `DeviceOutput` runs this on every host without a device, which includes the `ubuntu-24.04` job; on
-  a host with a device it returns early instead of playing.
+  the device on its own thread and reports the opening error, typically
+  `DeviceSinkError::NoDevice`, through the `FailureReporter`; the Audio tab shows the reason.
+  Nothing panics and the window never waits. The opener is injectable, so a unit test fails it with
+  `NoDevice` on every host. A Linux-only smoke test plays through the real default output, which
+  typically has no device on the `ubuntu-24.04` job, and only checks that nothing panics.
 - Decoding and conversion (`Pcm`, `decode`, the transport) never touch a device; their tests drive a
   fake `AudioOutput`.
 - Windows is unchanged: the same code opens WASAPI.
