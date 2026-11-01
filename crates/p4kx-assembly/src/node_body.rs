@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::character_path::is_world_prop_path;
+use crate::geometry_choice::GeometryChoice;
 use crate::placement::is_character_item;
 use crate::resolver::LoadoutResolver;
-use crate::tree::GeometryChoice;
 use crate::{Attachment, BodyVariant, EntityNode, MaterialVariant, PortNode};
 
 /// The item type of the head of a character.
@@ -113,12 +113,14 @@ impl LoadoutResolver<'_> {
     /// (armour, clothing, head parts), whose Record names geometry per body (`Male`, `Female`)
     /// and that no port flag gave a sub-geometry takes the one tagged for the body; one without a
     /// sub-geometry for the body has no geometry, and neither has one whose only geometry is a
-    /// world prop. A tree without a body is left as it is.
+    /// world prop. The head of a story character then takes its own skins, see
+    /// `EntityNode::wear_own_head_skins`. A tree without a body is left as it is.
     pub(crate) fn dress_body(&mut self, root: &mut EntityNode) {
         let Some(body) = root.body_variant() else {
             return;
         };
         self.dress_ports(&mut root.ports, body);
+        root.wear_own_head_skins();
     }
 
     fn dress_ports(&mut self, ports: &mut [PortNode], body: BodyVariant) {

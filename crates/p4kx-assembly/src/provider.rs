@@ -167,7 +167,8 @@ pub trait ModelProvider: Sync {
     }
 
     /// Reads the bytes of the file at `path`, a path below `Data`, such as the DNA rig a piece is
-    /// shaped by. The default has no such files.
+    /// shaped by. The default has no such files. A provider that does not implement it holds no
+    /// own skin of a story character's head, as the Armour looks for those through this method.
     ///
     /// # Errors
     ///

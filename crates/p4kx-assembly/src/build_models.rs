@@ -9,7 +9,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::build::{file_key, issue};
 use crate::flatten::Draft;
-use crate::tree::GeometryChoice;
+use crate::geometry_choice::GeometryChoice;
 use crate::{
     AssemblyError, AssemblyOptions, Issue, IssueKind, ModelFailure, ModelProvider,
     ProvidedAttachment, SkeletonProblem,
@@ -73,36 +73,72 @@ pub(crate) fn read_models(
     Ok(models)
 }
 
-/// Gives a part whose chosen sub-geometry is not in the Archive the main geometry of its Entity
-/// and notes the missing file; the main models are read once each, after the others.
-pub(crate) fn fall_back<'t>(
-    drafts: &mut [Draft<'t>],
+/// Gives a part whose own skin of a story character's head is not in the Archive the geometry its
+/// Entity had without it, silently, and then a part whose chosen sub-geometry is not in the
+/// Archive the main geometry of its Entity, noting the missing file; the models they fall back to
+/// are read once each, after the others.
+pub(crate) fn fall_back(
+    drafts: &mut [Draft<'_>],
     models: &mut Models,
     provider: &dyn ModelProvider,
     options: &AssemblyOptions,
     issues: &mut Vec<Issue>,
 ) -> Result<(), AssemblyError> {
+    retreat(drafts, models, provider, options, issues, Retreat::OwnSkin)?;
+    retreat(
+        drafts,
+        models,
+        provider,
+        options,
+        issues,
+        Retreat::SubGeometry,
+    )
+}
+
+/// The geometry a part falls back to.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Retreat {
+    /// From the own skin of a head to the geometry the port flags or the body chose.
+    OwnSkin,
+    /// From a sub-geometry to the main geometry.
+    SubGeometry,
+}
+
+fn retreat<'t>(
+    drafts: &mut [Draft<'t>],
+    models: &mut Models,
+    provider: &dyn ModelProvider,
+    options: &AssemblyOptions,
+    issues: &mut Vec<Issue>,
+    step: Retreat,
+) -> Result<(), AssemblyError> {
     let mut seen = HashSet::new();
     let mut files: Vec<(String, &'t str)> = Vec::new();
     for draft in drafts.iter_mut() {
-        let (Some(chosen), Some(main)) = (draft.geometry, draft.node.fallback.as_ref()) else {
+        let node = draft.node;
+        let back = match step {
+            Retreat::OwnSkin => draft.own_skin().and(node.geometry.as_ref()),
+            Retreat::SubGeometry => node.fallback.as_ref(),
+        };
+        let (Some(chosen), Some(back)) = (draft.geometry, back) else {
             continue;
         };
-        if draft.hidden {
-            continue;
-        }
-        if !matches!(
-            models.get(&file_key(chosen.path())),
-            Some(Outcome::Failed { missing: true, .. })
-        ) {
+        if draft.hidden
+            || !matches!(
+                models.get(&file_key(chosen.path())),
+                Some(Outcome::Failed { missing: true, .. })
+            )
+        {
             continue;
         }
         let path = chosen.path().to_owned();
-        draft.geometry = Some(main);
-        issues.push(issue(draft, IssueKind::SubGeometryMissing { path }));
-        let key = file_key(main.path());
+        draft.geometry = Some(back);
+        if step == Retreat::SubGeometry {
+            issues.push(issue(draft, IssueKind::SubGeometryMissing { path }));
+        }
+        let key = file_key(back.path());
         if !models.contains_key(&key) && seen.insert(key.clone()) {
-            files.push((key, main.path()));
+            files.push((key, back.path()));
         }
     }
     let read = models

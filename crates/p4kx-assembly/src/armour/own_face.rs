@@ -18,7 +18,7 @@ use crate::{IssueKind, ModelFailure, ModelProvider};
 
 /// The folder below `Data` that holds the `.RigLogic` file of every head rig.
 const LOGIC_FOLDER: &str = "Objects/Characters/RigLogic";
-const HEAD_SUFFIX: &str = "_head.skin";
+const SKIN_SUFFIX: &str = "_head.skin";
 /// The largest geometry file read for the blendshapes of a head's own rig, 64 MiB.
 const MAX_OWN_RIG_GEOMETRY_LEN: u64 = 64 << 20;
 /// The largest `.RigLogic` file that is read, 4 MiB; the largest in LIVE has 0.5 MB.
@@ -30,9 +30,9 @@ const FACIAL_PREFIX: &str = "facial_";
 /// like the skin without `_head.skin` in [`LOGIC_FOLDER`]; `None` for any other skin.
 pub(super) fn logic_path(skin: &str) -> Option<String> {
     let name = skin.rsplit(['/', '\\']).next()?;
-    let cut = name.len().checked_sub(HEAD_SUFFIX.len())?;
+    let cut = name.len().checked_sub(SKIN_SUFFIX.len())?;
     let (stem, tail) = (name.get(..cut)?, name.get(cut..)?);
-    (!stem.is_empty() && tail.eq_ignore_ascii_case(HEAD_SUFFIX))
+    (!stem.is_empty() && tail.eq_ignore_ascii_case(SKIN_SUFFIX))
         .then(|| format!("{LOGIC_FOLDER}/{stem}.RigLogic"))
 }
 

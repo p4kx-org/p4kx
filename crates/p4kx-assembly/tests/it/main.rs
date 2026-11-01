@@ -46,6 +46,8 @@ mod creature_animation;
 mod creature_skeleton;
 mod docked_vehicles;
 mod entity_catalogue;
+mod entity_head_skin_fallbacks;
+mod entity_head_skins;
 mod entity_interior;
 mod entity_interior_cache;
 mod entity_interior_modules;

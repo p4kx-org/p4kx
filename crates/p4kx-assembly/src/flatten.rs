@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::bespoke::OwnSkin;
 use crate::{
     Attachment, EntityNode, Geometry, Issue, IssueKind, LandingGear, MAX_ASSEMBLY_DEPTH, PortNode,
     PortVisibility, Target,
@@ -16,10 +17,12 @@ pub(crate) struct Draft<'t> {
     pub(crate) node: &'t EntityNode,
     pub(crate) parent: Option<usize>,
     pub(crate) geometry: Option<&'t Geometry>,
+    /// The material library the part draws with instead of the one of its geometry.
+    pub(crate) library: Option<&'t str>,
     pub(crate) hidden: bool,
 }
 
-impl Draft<'_> {
+impl<'t> Draft<'t> {
     /// Returns the class name of the Entity part, or the bone of a landing gear.
     pub(crate) fn class_name(&self) -> &str {
         self.gear
@@ -44,6 +47,16 @@ impl Draft<'_> {
         } else {
             key
         })
+    }
+
+    /// Returns the own skin of a story character's head the part draws, `None` once the part
+    /// fell back to its geometry. The part draws the skin while its geometry is the very
+    /// geometry of the skin, hence the pointer comparison.
+    pub(crate) fn own_skin(&self) -> Option<&'t OwnSkin> {
+        let own = self.node.own_skin.as_ref()?;
+        self.geometry
+            .is_some_and(|worn| std::ptr::eq(worn, &raw const own.geometry))
+            .then_some(own)
     }
 
     /// Returns the path of the model file the part draws.
@@ -85,6 +98,7 @@ pub(crate) fn flatten(root: &EntityNode, max_parts: usize) -> Flat<'_> {
                 node: root,
                 parent: None,
                 geometry: root.geometry(),
+                library: None,
                 hidden: false,
             }],
             issues: Vec::new(),
@@ -183,7 +197,12 @@ impl<'t> Walker<'t> {
             gear: None,
             node: child,
             parent: Some(owner),
-            geometry: child.geometry(),
+            geometry: child
+                .own_skin
+                .as_ref()
+                .map(|own| &own.geometry)
+                .or_else(|| child.geometry()),
+            library: None,
             hidden,
         });
         self.gears(child, index, path);
@@ -224,6 +243,7 @@ impl<'t> Walker<'t> {
                 node,
                 parent: Some(index),
                 geometry: None,
+                library: None,
                 hidden,
             });
         }
