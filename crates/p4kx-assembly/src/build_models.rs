@@ -9,7 +9,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::build::{file_key, issue};
 use crate::flatten::Draft;
-use crate::tree::GeometryChoice;
+use crate::geometry_choice::GeometryChoice;
 use crate::{
     AssemblyError, AssemblyOptions, Issue, IssueKind, ModelFailure, ModelProvider,
     ProvidedAttachment, SkeletonProblem,
@@ -74,7 +74,8 @@ pub(crate) fn read_models(
 }
 
 /// Gives a part whose chosen sub-geometry is not in the Archive the main geometry of its Entity
-/// and notes the missing file; the main models are read once each, after the others.
+/// and notes the missing file, except for the own skin of a head, which the Archive need not
+/// have; the main models are read once each, after the others.
 pub(crate) fn fall_back<'t>(
     drafts: &mut [Draft<'t>],
     models: &mut Models,
@@ -99,7 +100,9 @@ pub(crate) fn fall_back<'t>(
         }
         let path = chosen.path().to_owned();
         draft.geometry = Some(main);
-        issues.push(issue(draft, IssueKind::SubGeometryMissing { path }));
+        if draft.node.choice != GeometryChoice::Bespoke {
+            issues.push(issue(draft, IssueKind::SubGeometryMissing { path }));
+        }
         let key = file_key(main.path());
         if !models.contains_key(&key) && seen.insert(key.clone()) {
             files.push((key, main.path()));

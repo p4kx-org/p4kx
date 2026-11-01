@@ -3,9 +3,9 @@
 
 use p4kx_dataforge::Guid;
 
+use crate::geometry_choice::GeometryChoice;
 use crate::port::PortDefinition;
 use crate::resolver::LoadoutResolver;
-use crate::tree::GeometryChoice;
 use crate::{Attachment, Geometry, GeometryVariant, PortNode, VehicleImplementation};
 
 impl LoadoutResolver<'_> {

@@ -35,6 +35,7 @@ mod real_creature_skeletons;
 mod real_default_fit;
 mod real_docked_vehicles;
 mod real_dressed_head;
+mod real_entity_head_skins;
 mod real_entity_interior;
 mod real_face_tags;
 mod real_followups;

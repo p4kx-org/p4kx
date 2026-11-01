@@ -5,6 +5,7 @@ use p4kx_character::Dna;
 
 use super::{Expressions, Look, Wearable};
 use crate::PortTransform;
+use crate::bespoke::Bespoke;
 
 /// The port an unskinned piece hangs on: the helper of the holder it is placed at, the offset from
 /// it and the helper of the piece that goes there. The offset is kept as the bits of its numbers
@@ -93,14 +94,6 @@ pub struct Piece {
     pub(crate) bespoke: Option<Bespoke>,
     pub(crate) mount: Option<Mount>,
     pub(crate) port: Option<String>,
-}
-
-/// Where the skins of a story character's own head are, see [`Piece::bespoke`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Bespoke {
-    pub(crate) folder: String,
-    pub(crate) prefix: String,
-    pub(crate) library: Option<String>,
 }
 
 impl Piece {

@@ -16,6 +16,8 @@ pub(crate) struct Draft<'t> {
     pub(crate) node: &'t EntityNode,
     pub(crate) parent: Option<usize>,
     pub(crate) geometry: Option<&'t Geometry>,
+    /// The material library the part draws with instead of the one of its geometry.
+    pub(crate) library: Option<&'t str>,
     pub(crate) hidden: bool,
 }
 
@@ -85,6 +87,7 @@ pub(crate) fn flatten(root: &EntityNode, max_parts: usize) -> Flat<'_> {
                 node: root,
                 parent: None,
                 geometry: root.geometry(),
+                library: None,
                 hidden: false,
             }],
             issues: Vec::new(),
@@ -184,6 +187,7 @@ impl<'t> Walker<'t> {
             node: child,
             parent: Some(owner),
             geometry: child.geometry(),
+            library: None,
             hidden,
         });
         self.gears(child, index, path);
@@ -224,6 +228,7 @@ impl<'t> Walker<'t> {
                 node,
                 parent: Some(index),
                 geometry: None,
+                library: None,
                 hidden,
             });
         }

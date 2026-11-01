@@ -254,8 +254,8 @@ pub(crate) fn file_key(path: &str) -> String {
 /// its model names.
 fn library_name<'a>(draft: &'a Draft<'_>, loaded: &'a Loaded) -> Option<&'a str> {
     draft
-        .geometry
-        .and_then(|geometry| geometry.material())
+        .library
+        .or_else(|| draft.geometry.and_then(|geometry| geometry.material()))
         .or(loaded.model.material_library.as_deref())
 }
 

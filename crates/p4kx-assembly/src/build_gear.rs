@@ -8,6 +8,7 @@ use p4kx_model::Model;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::build::issue;
+use crate::build_head_library::use_head_libraries;
 use crate::build_models::{Models, Outcome, fall_back, read_models};
 use crate::flatten::Draft;
 use crate::{AssemblyError, AssemblyOptions, Issue, IssueKind, ModelFailure, ModelProvider};
@@ -22,6 +23,7 @@ pub(crate) fn load_models(
 ) -> Result<Models, AssemblyError> {
     let mut models = read_models(drafts, provider, options)?;
     fall_back(drafts, &mut models, provider, options, issues)?;
+    use_head_libraries(drafts, provider, issues);
     pose_gears(drafts, &mut models, provider, issues)?;
     Ok(models)
 }

@@ -33,7 +33,7 @@ const RIGS: [(BodyVariant, u32, Guid, &str); 2] = [
 
 /// Returns what the file name `stem` adds to the name of a stock head rig, e.g. `eyes` for
 /// `protos_human_male_face_t1_pu_eyes`, ignoring ASCII case; `None` for any other name.
-pub(super) fn rig_part(stem: &str) -> Option<&str> {
+pub(crate) fn rig_part(stem: &str) -> Option<&str> {
     RIGS.iter().find_map(|(_, _, _, rig)| {
         let rest = stem.get(rig.len()..)?;
         let head = stem.get(..rig.len())?;

@@ -5,13 +5,13 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::entities::describe;
+use crate::geometry_choice::GeometryChoice;
 use crate::merge::{merge_by_port, port_key};
 use crate::node_body::is_head_type;
 use crate::node_notes;
 use crate::port::PortDefinition;
 use crate::resolver::LoadoutResolver;
 use crate::spec::{EntitySpec, EntrySpec, LoadoutOrigin, LoadoutSpec, TargetSpec};
-use crate::tree::GeometryChoice;
 use crate::vehicle::flags_contain;
 use crate::walk::Walk;
 use crate::{
@@ -319,6 +319,7 @@ fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode 
         geometry: spec.geometry.clone(),
         fallback: None,
         choice: GeometryChoice::Main,
+        head_library: None,
         vehicle: None,
         landing_gear: Arc::from([]),
         docked_vehicle,

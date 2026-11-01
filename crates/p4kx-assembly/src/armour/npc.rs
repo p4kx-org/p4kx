@@ -2,11 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::{BodyVariant, Expressions, Piece, Wearable};
+use crate::bespoke::Bespoke;
 use crate::node_geometry::port_words;
 use crate::resolver::LoadoutResolver;
 use crate::{Attachment, EntityNode, PortNode};
-
-const HEAD_SUFFIX: &str = "_head";
 
 /// The head of a character as its Loadout gives it: the head Entity, when it names a model, and
 /// what sits on its ports, as pieces to wear on the body.
@@ -75,15 +74,6 @@ fn has_geometry(wearable: &Wearable) -> bool {
     wearable.geometry().is_some() || !wearable.variants().is_empty()
 }
 
-/// Returns the folder part of `path`, with `/` as separator.
-fn folder_of(path: &str) -> Option<String> {
-    let unified = path.replace('\\', "/");
-    unified
-        .rsplit_once('/')
-        .map(|(folder, _)| folder.to_owned())
-        .filter(|folder| !folder.is_empty())
-}
-
 /// Returns the flags of `port` followed by the `shared` flags of its container.
 fn flags_of(port: &PortNode, shared: &[String]) -> Vec<String> {
     let own = port.definition().map(crate::PortDefinition::flags);
@@ -110,23 +100,8 @@ impl LoadoutResolver<'_> {
             .geometry()
             .and_then(|geometry| geometry.material())
             .map(str::to_owned);
-        let folder = library.as_deref().and_then(folder_of);
-        let prefix = {
-            let class = wearable.class_name();
-            let cut = class.len().checked_sub(HEAD_SUFFIX.len());
-            match cut.and_then(|cut| class.get(cut..).map(|tail| (cut, tail))) {
-                Some((cut, tail)) if tail.eq_ignore_ascii_case(HEAD_SUFFIX) => {
-                    class.get(..cut).unwrap_or(class).to_owned()
-                }
-                _ => class.to_owned(),
-            }
-        };
         let class_name = wearable.class_name().to_owned();
-        let own = folder.clone().map(|folder| Own {
-            folder,
-            prefix,
-            library,
-        });
+        let own = Bespoke::of_head(&class_name, library.as_deref());
         let mut pieces = Vec::new();
         if has_geometry(&wearable) {
             pieces.push(bespoke(
@@ -142,7 +117,7 @@ impl LoadoutResolver<'_> {
         Some(NpcHead {
             class_name,
             variant,
-            folder,
+            folder: own.map(|own| own.folder),
             pieces,
         })
     }
@@ -191,13 +166,7 @@ impl LoadoutResolver<'_> {
     }
 }
 
-struct Own {
-    folder: String,
-    prefix: String,
-    library: Option<String>,
-}
-
-fn bespoke(piece: Piece, own: Option<&Own>) -> Piece {
+fn bespoke(piece: Piece, own: Option<&Bespoke>) -> Piece {
     let Some(own) = own else {
         return piece;
     };

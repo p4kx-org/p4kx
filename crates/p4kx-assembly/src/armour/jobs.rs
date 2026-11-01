@@ -5,12 +5,12 @@ use std::sync::Arc;
 
 use p4kx_character::Dna;
 
-use super::head::rig_part;
 use super::hidden;
-use super::piece::{Bespoke, Mount, Note, Source};
+use super::piece::{Mount, Note, Source};
 use super::wearable::{Unfit, Worn};
 use super::{BodyVariant, Expressions, Look, PartOrigin, Piece, ZoneChunk};
-use crate::{Issue, IssueKind, MaterialVariant, ModelFailure, ModelProvider, PaletteRef};
+use crate::bespoke::{Bespoke, exists, replaced_library_note};
+use crate::{Issue, IssueKind, MaterialVariant, ModelProvider, PaletteRef};
 
 /// One skin to read and wear.
 pub(super) struct Job {
@@ -87,14 +87,9 @@ fn note_kind(note: &Note) -> IssueKind {
 /// Returns the skin of the story character's own head that stands for the generic skin at
 /// `path`, if the Archive has one: the file `<prefix>_<part>.skin` in the folder of `bespoke`.
 fn bespoke_path(path: &str, bespoke: &Bespoke, models: &dyn ModelProvider) -> Option<String> {
-    let name = path.rsplit(['/', '\\']).next()?;
-    let (stem, extension) = name.rsplit_once('.')?;
-    if !extension.eq_ignore_ascii_case("skin") {
-        return None;
-    }
-    let part = rig_part(stem)?;
-    let candidate = format!("{}/{}_{part}.skin", bespoke.folder, bespoke.prefix);
-    exists(&candidate, models).then_some(candidate)
+    bespoke
+        .skin_for(path)
+        .filter(|candidate| exists(candidate, models))
 }
 
 /// Returns the skin of the story character's own head that stands for the generic skin at `path`
@@ -108,12 +103,6 @@ fn is_skinned_file(path: &str) -> bool {
     path.rsplit_once('.').is_some_and(|(_, extension)| {
         extension.eq_ignore_ascii_case("skin") || extension.eq_ignore_ascii_case("chr")
     })
-}
-
-/// Returns whether the Archive holds the file at `path`, a path below `Data`; a file that cannot
-/// be read still exists.
-fn exists(path: &str, models: &dyn ModelProvider) -> bool {
-    !matches!(models.file(path, 0), Err(ModelFailure::Missing))
 }
 
 /// Adds the skin `piece` contributes for `variant` to `jobs`, or the reason it contributes none
@@ -205,11 +194,7 @@ fn existing_library(
     let fallback = head.library.clone().filter(|_| bespoke);
     let reason = fallback.as_ref().map_or_else(
         || format!("the material library {library} does not exist"),
-        |head_library| {
-            format!(
-                "the material library {library} does not exist; the library of the head, {head_library}, is used"
-            )
-        },
+        |head_library| replaced_library_note(library, head_library),
     );
     issues.push(piece_issue(piece, IssueKind::MaterialLibrary { reason }));
     fallback
