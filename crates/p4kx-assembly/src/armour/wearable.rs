@@ -4,6 +4,7 @@
 use p4kx_dataforge::Guid;
 
 use super::{BodyVariant, ZoneChunk, ZoneList};
+use crate::node_geometry::select_variant;
 use crate::spec::EntitySpec;
 use crate::{Geometry, GeometryVariant, MaterialVariant};
 
@@ -81,19 +82,16 @@ impl Wearable {
         &self.material_variants
     }
 
-    /// Returns the geometry worn on `body` like [`Self::geometry_for`], but the sub-geometry
-    /// tagged with one of `selecting` comes first: a port's flags select the sub-geometry of the
-    /// item attached to it.
+    /// Returns the geometry worn on `body` like [`Self::geometry_for`], but a sub-geometry whose
+    /// tags all are among `selecting` comes first: a port's flags select the sub-geometry of the
+    /// item attached to it, as in the Entity tree. A flag that covers only some tags of a
+    /// sub-geometry, e.g. the head's flag next to `Male` / `Female`, leaves the body to decide.
     pub(crate) fn geometry_selected(
         &self,
         body: BodyVariant,
         selecting: &[String],
     ) -> Result<Worn<'_>, Unfit> {
-        let chosen = self
-            .variants
-            .iter()
-            .find(|found| selecting.iter().any(|tag| found.has_tag(tag)));
-        chosen.map_or_else(
+        select_variant(&self.variants, selecting).map_or_else(
             || self.geometry_for(body),
             |found| {
                 Ok(Worn {
@@ -164,5 +162,77 @@ impl Wearable {
                 main: true,
             })
             .ok_or(Unfit::NoGeometry)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use p4kx_dataforge::Guid;
+
+    use super::{BodyVariant, Wearable};
+    use crate::{Geometry, GeometryVariant};
+
+    const MALE_TEETH: &str = "heads/male/teeth.skin";
+    const FEMALE_TEETH: &str = "heads/female/teeth.skin";
+
+    fn variant(tags: &[&str], path: &str) -> GeometryVariant {
+        GeometryVariant {
+            tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
+            geometry: Geometry {
+                path: path.to_owned(),
+                material: None,
+                palette: None,
+            },
+        }
+    }
+
+    fn teeth() -> Wearable {
+        Wearable {
+            guid: Guid::from_stored([0; 16]),
+            record_path: String::new(),
+            class_name: "Head_Teeth".to_owned(),
+            item_type: "Char_Head_Teeth".to_owned(),
+            geometry: None,
+            variants: vec![
+                variant(&["Protos_Head", "Female"], FEMALE_TEETH),
+                variant(&["Protos_Head", "Male"], MALE_TEETH),
+                variant(&["other_head"], "heads/other/teeth.skin"),
+            ],
+            tags: Vec::new(),
+            material_variants: Vec::new(),
+            zones: super::ZoneList::default(),
+        }
+    }
+
+    fn selected(body: BodyVariant, flags: &[&str]) -> Option<String> {
+        let flags: Vec<String> = flags.iter().map(|flag| (*flag).to_owned()).collect();
+        teeth()
+            .geometry_selected(body, &flags)
+            .ok()
+            .map(|worn| worn.geometry.path.clone())
+    }
+
+    #[test]
+    fn a_flag_that_covers_only_part_of_the_tags_leaves_the_choice_to_the_body() {
+        assert_eq!(
+            selected(BodyVariant::Male, &["Protos_Head"]).as_deref(),
+            Some(MALE_TEETH)
+        );
+        assert_eq!(
+            selected(BodyVariant::Female, &["Protos_Head"]).as_deref(),
+            Some(FEMALE_TEETH)
+        );
+    }
+
+    #[test]
+    fn flags_that_cover_every_tag_of_a_sub_geometry_choose_it() {
+        assert_eq!(
+            selected(BodyVariant::Male, &["Protos_Head", "Female"]).as_deref(),
+            Some(FEMALE_TEETH)
+        );
+        assert_eq!(
+            selected(BodyVariant::Male, &["other_head"]).as_deref(),
+            Some("heads/other/teeth.skin")
+        );
     }
 }

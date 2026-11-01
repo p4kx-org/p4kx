@@ -27,7 +27,8 @@ impl Walk<'_, '_, '_, '_> {
     }
 
     /// Resolves the style of widget `index`: the entries, then the inner part of a text field or
-    /// an icon, then the bound layout numbers under them, then the overrides of the instance.
+    /// an icon, then the bound layout numbers under them, then the overrides of the instance, then
+    /// the preset of a text field where nothing set its size.
     pub(crate) fn style_of(
         &mut self,
         canvas: &Canvas,
@@ -57,6 +58,7 @@ impl Walk<'_, '_, '_, '_> {
         }
         self.under_bound_geometry(index, &mut style);
         self.apply_overrides(canvas, index, &mut style);
+        self.apply_preset(widget, &mut style);
         let style = Rc::new(style);
         self.resolved.insert(key, Rc::clone(&style));
         style

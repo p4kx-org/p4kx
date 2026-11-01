@@ -41,6 +41,7 @@ mod real_face_tags;
 mod real_followups;
 mod real_generic_lashes;
 mod real_generic_npc_clothing;
+mod real_generic_teeth_eyes;
 mod real_hair_expressions;
 mod real_hair_joints;
 mod real_head;
