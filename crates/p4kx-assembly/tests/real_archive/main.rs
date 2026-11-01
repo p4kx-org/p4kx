@@ -63,6 +63,7 @@ mod real_npc_face;
 mod real_npc_hidden_parts;
 mod real_npc_outfits;
 mod real_palette_decals;
+mod real_paths;
 mod real_port_flag_geometry;
 mod real_prefabs;
 mod real_resolve;
