@@ -42,9 +42,8 @@ impl LoadoutResolver<'_> {
         child.fallback = child.geometry.replace(tagged);
     }
 
-    /// Returns the sub-geometry of the Entity `guid` whose tags are all among `words`, the flags
-    /// of the port it is attached to, such as `left` or `right` for a door; of several, the one
-    /// with the most distinct tags, the first on a tie.
+    /// Returns the geometry of the [`select_variant`] of the Entity `guid` for the flag `words`
+    /// of its port.
     fn tagged_geometry(&mut self, guid: Guid, words: &[&str]) -> Option<Geometry> {
         if words.is_empty() {
             return None;
@@ -166,9 +165,8 @@ mod tests {
 
     #[test]
     fn case_and_repeated_tags_do_not_count() {
-        let variants = [variant("Left left", "doubled"), variant("RIGHT", "single")];
-        assert_eq!(chosen(&variants, &["LEFT", "right"]), Some("doubled"));
-        assert_eq!(chosen(&variants[1..], &["right"]), Some("single"));
+        let variants = [variant("RIGHT", "single"), variant("Left left", "doubled")];
+        assert_eq!(chosen(&variants, &["LEFT", "right"]), Some("single"));
     }
 
     #[test]

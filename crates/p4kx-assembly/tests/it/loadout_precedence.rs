@@ -23,8 +23,8 @@ fn ship(entry: TestLoadoutEntry) -> TestEntity {
         .loadout(TestLoadout::Manual(vec![entry]))
 }
 
-/// Returns the class name of the Entity on the first port of the ship.
-fn attached_class(ship: &TestEntity) -> Result<String, Box<dyn Error>> {
+/// Returns what the first port of the ship holds.
+fn first_attachment(ship: &TestEntity) -> Result<Attachment, Box<dyn Error>> {
     let bytes = [
         ship,
         &TestEntity::new(GIMBAL, "TEST_Gimbal", "entities/test_gimbal.xml"),
@@ -40,10 +40,33 @@ fn attached_class(ship: &TestEntity) -> Result<String, Box<dyn Error>> {
     let entity = resolver.entities().find("TEST_Ship")?;
     let tree = resolver.resolve(&entity)?;
     let port = tree.ports().first().ok_or("no port")?;
-    match port.attachment() {
+    Ok(port.attachment().clone())
+}
+
+/// Returns the class name of the Entity on the first port of the ship.
+fn attached_class(ship: &TestEntity) -> Result<String, Box<dyn Error>> {
+    match first_attachment(ship)? {
         Attachment::Entity(child) => Ok(child.class_name().to_owned()),
         other => Err(format!("{other:?}").into()),
     }
+}
+
+#[test]
+fn an_entry_that_names_no_entity_keeps_its_port_empty() -> TestResult {
+    let ship =
+        ship(TestLoadoutEntry::empty("mount")).port(TestPort::new("mount").default_item(WEAPON));
+    assert_eq!(first_attachment(&ship)?, Attachment::Empty);
+    Ok(())
+}
+
+#[test]
+fn a_reference_to_a_missing_record_still_beats_the_class_name() -> TestResult {
+    let entry = TestLoadoutEntry::reference("mount", 0x9999).named("TEST_Weapon");
+    assert!(matches!(
+        first_attachment(&ship(entry))?,
+        Attachment::Unresolved(_)
+    ));
+    Ok(())
 }
 
 #[test]

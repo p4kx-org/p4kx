@@ -10,7 +10,7 @@ Record). When the Entity names none, or the Record cannot be used, the part take
 `DefaultPalette` its material library names. There is no fallback by name or family. A
 `ChildPath` below the root palette is not supported yet: such a palette is reported and the part
 falls back as for a missing one. Paint items attached to a Paint port, which choose a
-sub-geometry and its palette, are the variant selection of #277.
+sub-geometry and its palette, are chosen by the flags of their port (ADR-0208).
 
 **Which materials take it.** A material takes the palette entry of its first `MatLayers` layer
 with a `PaletteTint` of 1, 2 or 3 (primary, secondary, tertiary), and a `GlassPBR` material whose

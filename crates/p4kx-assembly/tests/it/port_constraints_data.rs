@@ -37,11 +37,13 @@ fn definition<'n>(node: &'n EntityNode, port: &str) -> Result<&'n PortDefinition
 #[test]
 fn a_gimbal_port_keeps_its_orientation_and_a_plain_port_does_not() -> TestResult {
     let ship = resolve(vec![
-        TestPort::new("gimbal").no_rotation(),
+        TestPort::new("gimbal").entity_attachment(true),
+        TestPort::new("fixed").entity_attachment(false),
         TestPort::new("plain"),
         TestPort::new("bone").helper("hardpoint_bone", [0.0; 3], [0.0; 3]),
     ])?;
     assert!(definition(&ship, "gimbal")?.no_rotation(), "gimbal");
+    assert!(!definition(&ship, "fixed")?.no_rotation(), "entity, unset");
     assert!(!definition(&ship, "plain")?.no_rotation(), "plain");
     assert!(!definition(&ship, "bone")?.no_rotation(), "bone");
     Ok(())

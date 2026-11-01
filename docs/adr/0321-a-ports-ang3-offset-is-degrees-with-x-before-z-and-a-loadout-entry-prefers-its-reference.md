@@ -1,4 +1,4 @@
-# A port's Ang3 offset is degrees applied X, then Y, then Z, and a Loadout entry prefers its Reference to its class name
+# A port's Ang3 offset is degrees with X before Z, and a Loadout entry prefers its Reference to its class name
 
 Decided for issue #277. Amends ADR-0040, which left the Ang3 convention unvalidated. Evidence: the
 LIVE Archive, `crates/p4kx-assembly/tests/real_archive/real_loadout_semantics.rs` and the unit
@@ -12,7 +12,8 @@ counter-clockwise (right-handed), the offset's position added after the rotation
 for the `Ang3` offset of an object container. `placement::offset` is the only place that applies
 it.
 
-The data decides it. Over the 395 spaceship and ground-vehicle Entities of LIVE, 49,035 attached
+The data decides degrees and X before Z, not the place of Y. The evidence was measured during the
+review of PR #371, not reproducible from the repository. Over the 395 spaceship and ground-vehicle Entities of LIVE, 49,035 attached
 ports, 2,096 with a rotation and 352 rotated about more than one axis, each placement was
 recomputed under 24 conventions (six axis orders, degrees or radians, both signs):
 
@@ -56,7 +57,7 @@ the Entity of the **Reference**; the class name is used only when there is no Re
 default (`defaultItem`) fills a port only when no entry names it, and an entry that names no Entity
 keeps the port empty.
 
-In LIVE, 538 entries of Entity Records carry both and 432 of them disagree (one more has a
+In LIVE, 539 entries of Entity Records carry both and 432 of them disagree (one of the 539 has a
 Reference to a Record that is not there). The Reference is therefore the deciding field: the class
 name of a disagreeing entry often names the inner part (a weapon) while the Reference points to
 the part that holds it (a gimbal). Of 155,900 ports of the 1,144 ships and vehicles that hold an

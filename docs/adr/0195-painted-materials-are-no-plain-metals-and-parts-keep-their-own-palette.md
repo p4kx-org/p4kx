@@ -19,7 +19,7 @@ else the default palette of its material library (ADR-0080). The palette of the 
 passed down to the parts attached to it, and a part without a palette of its own stays unpainted.
 This is the rule as built and tested (`hardpoint_plain` in the synthetic ship `TEST_Livery`), and
 the owner confirmed it: attached parts do not inherit the ship's livery or a Loadout paint. Paint
-items of the Paint ports (#277, variant selection) choose the sub-geometry and palette of the item
+items of the Paint ports (ADR-0208, variant selection) choose the sub-geometry and palette of the item
 they are fitted to and do not change this rule.
 
 **Determinism.** Two runs of `entity glb --materials textures` write identical bytes; a test pins it.
