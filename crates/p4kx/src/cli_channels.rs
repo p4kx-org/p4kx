@@ -21,8 +21,8 @@ pub(crate) struct ChannelsArgs {
     #[arg(long, global = true, env = "P4KX_LAUNCHER_DIR", value_name = "FOLDER")]
     pub(crate) launcher_dir: Option<PathBuf>,
     /// The default library folder; defaults to C:\Program Files\Roberts Space Industries\StarCitizen
-    /// on Windows. On Linux the libraries in the Wine prefix named by WINEPREFIX and in
-    /// ~/Games/star-citizen are searched without it.
+    /// on Windows. On Unix the Wine prefixes named by WINEPREFIX and ~/Games/star-citizen are
+    /// searched as well, whether or not this is set; elsewhere there is no default.
     #[arg(
         long,
         global = true,

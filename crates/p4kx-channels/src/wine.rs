@@ -124,12 +124,10 @@ pub(crate) fn scan_prefix(prefix: &Path, wanted: Wanted) -> LauncherLog {
 /// Translates a Windows path of the prefix to the path on this machine: `C:` is `drive_c`, any
 /// other drive letter is the link `dosdevices/<letter>:`.
 ///
-/// A path without a drive letter is returned unchanged; one with a `..` part gives `None`.
+/// A path without a drive letter (a UNC or `\\?\` path, a relative or a host path) and one with a
+/// `..` part give `None`.
 fn host_path(prefix: &Path, path: &Path) -> Option<PathBuf> {
-    let text = path.to_str()?;
-    let Some((drive, rest)) = split_drive(text) else {
-        return Some(path.to_path_buf());
-    };
+    let (drive, rest) = split_drive(path.to_str()?)?;
     let mut host = if drive == 'c' {
         prefix.join(DRIVE_C)
     } else {
@@ -198,10 +196,15 @@ mod tests {
     }
 
     #[test]
-    fn a_path_without_a_drive_stays() {
-        assert_eq!(
-            host_path(&prefix(), Path::new("/data/games")),
-            Some(PathBuf::from("/data/games"))
-        );
+    fn paths_without_a_drive_letter_are_refused() {
+        for path in [
+            "/data/games",
+            "games/SC",
+            r"\\server\share\SC",
+            r"\\?\C:\Games\SC",
+            r"\\?\UNC\server\share",
+        ] {
+            assert_eq!(host_path(&prefix(), Path::new(path)), None, "{path}");
+        }
     }
 }

@@ -53,7 +53,7 @@ pub(crate) struct LauncherLog {
 
 impl LauncherLog {
     /// Adds the library folders of `newer` that are not known yet and lets its patches win over
-    /// the known ones.
+    /// the known ones by order of absorption, not by the age of their log lines.
     pub(crate) fn absorb(&mut self, newer: Self) {
         for library in newer.libraries {
             if !self.libraries.contains(&library) {

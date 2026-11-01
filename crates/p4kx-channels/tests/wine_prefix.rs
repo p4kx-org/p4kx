@@ -243,3 +243,21 @@ fn a_manual_folder_and_archive_are_found_again() -> TestResult {
     );
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn a_windows_path_in_the_native_launcher_log_is_not_listed() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let logs = root.path().join("rsilauncher").join("logs");
+    std::fs::create_dir_all(&logs)?;
+    std::fs::write(
+        logs.join("log.log"),
+        "{ \"msg\": \"Launching Star Citizen LIVE from (C:\\Games\\SC\\LIVE)\" }\n",
+    )?;
+    let paths = SearchPaths {
+        launcher: Some(root.path().join("rsilauncher")),
+        ..SearchPaths::default()
+    };
+    assert_eq!(known_library_folders(&paths).len(), 0);
+    Ok(())
+}

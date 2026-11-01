@@ -119,6 +119,8 @@ fn scan_launchers(paths: &SearchPaths, wanted: Wanted) -> LauncherLog {
         .map_or_else(LauncherLog::default, |launcher| {
             launcher_log::scan(&launcher_logs_folder(launcher), wanted)
         });
+    // A Windows path such as `C:\Games` is not absolute on a Unix host and names nothing there.
+    log.libraries.retain(|library| library.is_absolute());
     for prefix in &paths.wine_prefixes {
         log.absorb(wine::scan_prefix(prefix, wanted));
     }
