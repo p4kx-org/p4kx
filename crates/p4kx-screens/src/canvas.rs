@@ -61,19 +61,20 @@ impl Canvas {
             .map_or(self.record_path.as_str(), |(_, name)| name)
     }
 
+    /// Returns the brand style whose Record path holds `s_<code>_`, ignoring case.
+    pub(crate) fn brand_of(&self, code: &str) -> Option<&BrandStyle> {
+        let wanted = format!("s_{}_", code.to_ascii_lowercase());
+        self.brands.iter().find(|brand| {
+            brand
+                .style
+                .record_path
+                .to_ascii_lowercase()
+                .contains(&wanted)
+        })
+    }
+
     pub(crate) fn pick_brand(&self, code: Option<&str>) -> Option<&BrandStyle> {
-        let wanted = code.map(|code| format!("s_{}_", code.to_ascii_lowercase()));
-        wanted
-            .as_deref()
-            .and_then(|wanted| {
-                self.brands.iter().find(|brand| {
-                    brand
-                        .style
-                        .record_path
-                        .to_ascii_lowercase()
-                        .contains(wanted)
-                })
-            })
+        code.and_then(|code| self.brand_of(code))
             .or_else(|| self.brands.first())
     }
 

@@ -8,6 +8,7 @@ mod flex;
 mod geometry;
 mod matching;
 mod picture;
+pub(crate) mod preset;
 #[cfg(test)]
 mod select_tests;
 mod sheet;
