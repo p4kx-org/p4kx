@@ -7773,6 +7773,14 @@
           "description": "The Record name without its type, e.g. `miningglobalparamsship`.",
           "type": "string"
         },
+        "compositionMassMultiplier": {
+          "description": "`compositionMassMultiplier`; `null` for a Record without it.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "controlledBreakingDecayRate": {
           "description": "`controlledBreakingDecayRate`.",
           "format": "float",
@@ -7965,6 +7973,7 @@
         "childRockLifeTimer",
         "childRockZeroGDamping",
         "className",
+        "compositionMassMultiplier",
         "controlledBreakingDecayRate",
         "controlledBreakingFillRate",
         "controlledBreakingFillRateDanger",

@@ -1872,9 +1872,10 @@ of `compositionArray` are as stored: `mineableElementGuid` (the element of `mine
 
 **Parameters (`miningGlobalParams`).** The `MiningGlobalParams` Records under `mining` (7 on LIVE,
 6 entries). Every number of the Record is a field of the same name in camel case (`cScuPerVolume`
-for `cSCUPerVolume`); `hitConsistencyParams`, `mineableInstabilityParams` and the numbers
-`dangerPoolFactor` and `defaultVolume` of `mineableExplosionParams` are the objects `hitConsistency`,
-`instability` and `explosion`. Particle effects, audio triggers and the default explosion are not
+for `cSCUPerVolume`; `compositionMassMultiplier` is `null` on a Record without it, as on LIVE
+4.10); `hitConsistencyParams`, `mineableInstabilityParams` and the numbers `dangerPoolFactor` and
+`defaultVolume` of `mineableExplosionParams` are the objects `hitConsistency`, `instability` and
+`explosion`. Particle effects, audio triggers and the default explosion are not
 exported. `wasteResourceTypeGuid` is the `ResourceType` of the waste.
 
 **Entities (`mineableEntities`).** The `EntityClassDefinition` Records under `entities/mineable`

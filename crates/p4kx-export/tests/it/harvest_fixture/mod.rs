@@ -82,22 +82,39 @@ fn composition(guid: u128, name: &str) -> TestRecord {
     )
 }
 
-fn params(guid: u128, name: &str, mass: f32) -> TestRecord {
-    record(
+fn params(guid: u128, name: &str, mass: f32, multiplier: Option<f32>) -> TestRecord {
+    let record = record(
         guid,
         "MiningGlobalParams",
         name,
         &format!("{MINING}{}", name.to_lowercase()),
+    );
+    let record = match multiplier {
+        Some(multiplier) => {
+            record.value("compositionMassMultiplier", TestValue::Single(multiplier))
+        }
+        None => record,
+    };
+    record
+        .value("cSCUPerVolume", TestValue::Single(0.7))
+        .value("defaultMass", TestValue::Single(mass))
+        .value(
+            "hitConsistencyParams",
+            TestValue::Struct(
+                TestInstance::new("HitConsistencyParams")
+                    .value("timeExponent", TestValue::Single(2.0)),
+            ),
+        )
+        .value("wasteResourceType", TestValue::Reference(RESOURCE))
+}
+
+fn ship_params(mass_multiplier: bool) -> TestRecord {
+    params(
+        PARAMS,
+        "MiningGlobalParamsShip",
+        100.0,
+        mass_multiplier.then_some(1.5),
     )
-    .value("cSCUPerVolume", TestValue::Single(0.7))
-    .value("defaultMass", TestValue::Single(mass))
-    .value(
-        "hitConsistencyParams",
-        TestValue::Struct(
-            TestInstance::new("HitConsistencyParams").value("timeExponent", TestValue::Single(2.0)),
-        ),
-    )
-    .value("wasteResourceType", TestValue::Reference(RESOURCE))
 }
 
 fn harvestable_entry(harvestable: Option<u128>, entity: Option<u128>) -> TestValue {
@@ -225,60 +242,63 @@ fn multi_config() -> TestRecord {
     )
 }
 
-fn database(radar: Radar) -> DataForgeBuilder {
-    mineables::add(structures(DataForgeBuilder::new().version(8)), radar)
-        .record(record(
-            RESOURCE,
-            "ResourceType",
-            "iron",
-            "libs/foundry/records/resourcetypedatabase/iron",
-        ))
-        .record(
-            record(
-                ELEMENT,
-                "MineableElement",
-                "iron_ore",
-                &format!("{MINING}mineableelements/iron_ore"),
-            )
-            .value("resourceType", TestValue::Reference(RESOURCE)),
+fn database(radar: Radar, mass_multiplier: bool) -> DataForgeBuilder {
+    mineables::add(
+        structures(DataForgeBuilder::new().version(8), mass_multiplier),
+        radar,
+    )
+    .record(record(
+        RESOURCE,
+        "ResourceType",
+        "iron",
+        "libs/foundry/records/resourcetypedatabase/iron",
+    ))
+    .record(
+        record(
+            ELEMENT,
+            "MineableElement",
+            "iron_ore",
+            &format!("{MINING}mineableelements/iron_ore"),
         )
-        .record(composition(COMPOSITION, "Asteroid_CType_Iron"))
-        .record(composition(COMPOSITION_TEST, "Composition_Test"))
-        .record(params(PARAMS, "MiningGlobalParamsShip", 100.0))
-        .record(params(PARAMS_TEST, "MiningGlobalParams_Test", 1.0))
-        .record(
-            record(
-                HARVESTABLE,
-                "HarvestablePreset",
-                "Mining_Iron",
-                "libs/foundry/records/harvestable/harvestablepresets/mining_iron",
-            )
-            .value("entityClass", TestValue::Reference(ENTITY)),
+        .value("resourceType", TestValue::Reference(RESOURCE)),
+    )
+    .record(composition(COMPOSITION, "Asteroid_CType_Iron"))
+    .record(composition(COMPOSITION_TEST, "Composition_Test"))
+    .record(ship_params(mass_multiplier))
+    .record(params(PARAMS_TEST, "MiningGlobalParams_Test", 1.0, None))
+    .record(
+        record(
+            HARVESTABLE,
+            "HarvestablePreset",
+            "Mining_Iron",
+            "libs/foundry/records/harvestable/harvestablepresets/mining_iron",
         )
-        .record(provider(PRESET_PLACED, "HPP_Placed", true))
-        .record(provider(PRESET_PRIVATE, "HPP_Private", false))
-        .record(provider(PRESET_UNREACHED, "HPP_Unreached", false))
-        .record(provider(PRESET_NOWHERE, "HPP_Nowhere", false))
-        .record(multi_config())
-        .record(
-            record(
-                PLANET,
-                "StarMapObject",
-                "Stanton1",
-                "libs/foundry/records/starmap/pu/system/stanton/stanton1",
-            )
-            .value("name", TestValue::text("@starmap_Stanton1")),
+        .value("entityClass", TestValue::Reference(ENTITY)),
+    )
+    .record(provider(PRESET_PLACED, "HPP_Placed", true))
+    .record(provider(PRESET_PRIVATE, "HPP_Private", false))
+    .record(provider(PRESET_UNREACHED, "HPP_Unreached", false))
+    .record(provider(PRESET_NOWHERE, "HPP_Nowhere", false))
+    .record(multi_config())
+    .record(
+        record(
+            PLANET,
+            "StarMapObject",
+            "Stanton1",
+            "libs/foundry/records/starmap/pu/system/stanton/stanton1",
         )
-        .record(
-            record(
-                PRIVATE_POINT,
-                "StarMapObject",
-                "Claim_01",
-                "libs/foundry/records/starmap/pu/system/stanton/claim_01",
-            )
-            .value("name", TestValue::text("@starmap_Claim"))
-            .value("description", TestValue::text("@MiningClaims_Desc_001")),
+        .value("name", TestValue::text("@starmap_Stanton1")),
+    )
+    .record(
+        record(
+            PRIVATE_POINT,
+            "StarMapObject",
+            "Claim_01",
+            "libs/foundry/records/starmap/pu/system/stanton/claim_01",
         )
+        .value("name", TestValue::text("@starmap_Claim"))
+        .value("description", TestValue::text("@MiningClaims_Desc_001")),
+    )
 }
 
 fn external(name: &str, record: u128, inner: Vec<TestElement>) -> TestElement {
@@ -326,9 +346,26 @@ pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
 
 /// Writes the fixture Archive whose radar parameters are `radar` into `dir`.
 pub(crate) fn write_archive_with(dir: &Path, radar: Radar) -> Result<PathBuf, Box<dyn Error>> {
+    write_archive_layout(dir, radar, true)
+}
+
+/// Writes the fixture Archive whose `MiningGlobalParams` struct lacks the mass multiplier, as in
+/// an older game version, into `dir`.
+pub(crate) fn write_archive_without_mass_multiplier(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    write_archive_layout(dir, Radar::Named, false)
+}
+
+fn write_archive_layout(
+    dir: &Path,
+    radar: Radar,
+    mass_multiplier: bool,
+) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database(radar).build()).encrypted())
+        .entry(
+            TestEntry::zstd("Data\\Game2.dcb", database(radar, mass_multiplier).build())
+                .encrypted(),
+        )
         .entry(TestEntry::zstd(
             "Data\\Localization\\english\\global.ini",
             GlobalIniBuilder::new()

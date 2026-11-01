@@ -25,6 +25,7 @@ pub(crate) fn mining_global_params<'f>(tree: &RecordTree<'f>) -> MiningGlobalPar
         child_rock_invulnerability_time: number(root, "childRockInvulnerabilityTime"),
         child_rock_life_timer: number(root, "childRockLifeTimer"),
         child_rock_zero_g_damping: number(root, "childRockZeroGDamping"),
+        composition_mass_multiplier: number(root, "compositionMassMultiplier"),
         controlled_breaking_decay_rate: number(root, "controlledBreakingDecayRate"),
         controlled_breaking_fill_rate: number(root, "controlledBreakingFillRate"),
         controlled_breaking_fill_rate_danger: number(root, "controlledBreakingFillRateDanger"),
