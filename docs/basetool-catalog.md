@@ -1576,7 +1576,9 @@ condition is of a struct the catalog does not know.
 
 **Contract-level properties.** The `value` of an entry of `contractProperties` of a template and of
 `missionProperties` of a broker entry is read by the reader of the objective values and states the
-same union; `valueType` stays. On LIVE every property that has a value struct states one.
+same union; `valueType` stays. On LIVE every property that has a value struct states one, and the
+values grow the catalog from 208.5 MB to 214.1 MB decompressed and from 3.82 MB to 3.89 MB as
+`.json.zst`.
 
 **Mission flow.** A trigger has `note` (the developer's `description`), a `condition` and an
 `action`, either `null` when absent. A condition is tagged by `type`: `tokenState` (`objectiveId`,
