@@ -14,8 +14,9 @@ use crate::contract_hauling::HaulingRequirement;
 use crate::mission_hauling::{HaulingProperty, objective_orders, property_orders};
 use crate::mission_layers::{Property, items, key, one, properties};
 use crate::record_fields::{boolean, integer, reference};
-use crate::spawn_layers::{Level, SpawnPools};
+use crate::spawn_layers::Level;
 use crate::spawn_model::SpawnLevel;
+use crate::spawn_pools::SpawnPools;
 use crate::spawn_read::Reader;
 use crate::{CatalogError, CatalogFailure};
 
@@ -64,7 +65,7 @@ pub(crate) struct MissionTypeName<'f> {
 pub(crate) type Variants<'f> = Vec<(Guid, &'f str)>;
 
 enum Piece<'f> {
-    Template(Guid, Template<'f>, SpawnPools),
+    Template(Guid, Template<'f>, SpawnPools<'f>),
     Failed(CatalogFailure),
     Type(Guid, MissionTypeName<'f>),
     Organization(Guid, Variants<'f>),
@@ -86,7 +87,7 @@ pub(crate) struct MissionIndex<'f> {
     brokers: HashMap<Guid, Broker<'f>>,
     factions: HashMap<Guid, Option<&'f str>>,
     tags: TagTree,
-    pools: SpawnPools,
+    pools: SpawnPools<'f>,
     failures: Vec<CatalogFailure>,
 }
 
@@ -155,9 +156,9 @@ impl<'f> MissionIndex<'f> {
         Ok(index)
     }
 
-    /// Takes the ship spawns and location queries of the templates and the templates that could
-    /// not be read.
-    pub(crate) fn take_template_results(&mut self) -> (SpawnPools, Vec<CatalogFailure>) {
+    /// Takes the spawn descriptions and location queries of the templates and the templates that
+    /// could not be read.
+    pub(crate) fn take_template_results(&mut self) -> (SpawnPools<'f>, Vec<CatalogFailure>) {
         (
             std::mem::take(&mut self.pools),
             std::mem::take(&mut self.failures),
@@ -282,7 +283,7 @@ fn piece<'f>(
 fn template_of<'f>(
     tree: &RecordTree<'f>,
     tags: &TagTree,
-    pools: &mut SpawnPools,
+    pools: &mut SpawnPools<'f>,
 ) -> Result<Template<'f>, serde_json::Error> {
     let root = Some(tree.root());
     let display = one(root, "contractDisplayInfo");

@@ -17,17 +17,20 @@ use crate::contract::{
 };
 use crate::contract_template::ContractTemplate;
 use crate::crafting_warning::CraftingWarning;
+use crate::entity_spawn_model::EntitySpawnPool;
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::location_template::{LocationTemplates, MissionLocationTemplate};
 use crate::loot_kinds::LootKinds;
 use crate::mission_kinds::MissionKinds;
+use crate::npc_spawn_model::NpcSpawnPool;
 use crate::paint_port::VehicleFacts;
 use crate::picked::Picked;
 use crate::playability::PlayabilitySummary;
 use crate::record_read::KindRead;
-use crate::spawn_layers::SpawnPools;
 use crate::spawn_model::{LocationQuery, ShipSpawnPool};
+use crate::spawn_pools::SpawnPools;
 use crate::template_issues::Unknowns;
+use crate::texts::Texts;
 use crate::{CatalogFailure, ItemClassSummary, Kind, KindSummary, QuantizationSummary};
 
 /// The entities of every kind, ordered by GUID, with the counts of the summary.
@@ -54,6 +57,8 @@ pub(crate) struct Collected<'f> {
     pub(crate) contract_location_queries: Vec<LocationQuery>,
     pub(crate) contract_templates: Vec<ContractTemplate<'f>>,
     pub(crate) mission_broker_entries: Vec<BrokerEntry<'f>>,
+    pub(crate) contract_npc_spawns: Vec<NpcSpawnPool<'f>>,
+    pub(crate) contract_entity_spawns: Vec<EntitySpawnPool>,
     pub(crate) port_items: Vec<CatalogGuid>,
     pub(crate) starmap_objects: Vec<StarmapObject<'f>>,
     pub(crate) mineable_elements: Vec<MineableElement<'f>>,
@@ -105,6 +110,8 @@ impl<'f> Collected<'f> {
             contract_location_queries: Vec::new(),
             contract_templates: Vec::new(),
             mission_broker_entries: Vec::new(),
+            contract_npc_spawns: Vec::new(),
+            contract_entity_spawns: Vec::new(),
             port_items: Vec::new(),
             starmap_objects: Vec::new(),
             mineable_elements: Vec::new(),
@@ -218,14 +225,23 @@ impl<'f> Collected<'f> {
         self.add_failures(failures);
     }
 
-    /// Stores the location templates and the distinct ship spawn descriptions and location queries
-    /// of the contracts, counts the templates left out as `skipped` and adds the failures.
-    pub(crate) fn add_spawns(&mut self, templates: LocationTemplates<'f>, pools: SpawnPools) {
+    /// Stores the location templates and the distinct spawn descriptions and location queries of
+    /// the contracts, resolving the texts of the descriptions with `texts`, counts the templates
+    /// left out as `skipped` and adds the failures.
+    pub(crate) fn add_spawns(
+        &mut self,
+        templates: LocationTemplates<'f>,
+        mut pools: SpawnPools<'f>,
+        texts: &Texts<'f>,
+    ) {
         self.mission_location_templates = templates.items;
         if let Some(slot) = self.skipped.get_mut(Kind::MissionLocationTemplates.index()) {
             *slot = templates.skipped;
         }
+        pools.resolve_texts(texts);
         self.contract_ship_spawns = pools.ships.into_values().collect();
+        self.contract_npc_spawns = pools.npcs.into_values().collect();
+        self.contract_entity_spawns = pools.entities.into_values().collect();
         self.contract_location_queries = pools.locations.into_values().collect();
         self.add_failures(templates.failures);
     }
@@ -324,6 +340,8 @@ impl<'f> Collected<'f> {
                     Kind::ContractLocationQueries => self.contract_location_queries.len(),
                     Kind::ContractTemplates => self.contract_templates.len(),
                     Kind::MissionBrokerEntries => self.mission_broker_entries.len(),
+                    Kind::ContractNpcSpawns => self.contract_npc_spawns.len(),
+                    Kind::ContractEntitySpawns => self.contract_entity_spawns.len(),
                     Kind::MineableElements => self.mineable_elements.len(),
                     Kind::RefiningProcesses => self.refining_processes.len(),
                     Kind::MineableCompositions => self.mineable_compositions.len(),

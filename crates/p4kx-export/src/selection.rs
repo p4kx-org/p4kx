@@ -150,11 +150,15 @@ pub enum Kind {
     /// Mission broker entries: every `MissionBrokerEntry` Record, whatever its folder, the offers
     /// of the mission board.
     MissionBrokerEntries,
+    /// Contract NPC spawns: the distinct NPC spawn descriptions. Derived, so no record-path rule.
+    ContractNpcSpawns,
+    /// Contract entity spawns: the distinct entity spawn descriptions. Derived, so no rule either.
+    ContractEntitySpawns,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 45] = [
+    pub const ALL: [Self; 47] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -200,6 +204,8 @@ impl Kind {
         Self::ContractLocationQueries,
         Self::ContractTemplates,
         Self::MissionBrokerEntries,
+        Self::ContractNpcSpawns,
+        Self::ContractEntitySpawns,
     ];
 
     /// Returns the name of the kind's array in the catalog, e.g. `manufacturers`.
@@ -251,6 +257,8 @@ impl Kind {
             Self::ContractLocationQueries => "contractLocationQueries",
             Self::ContractTemplates => "contractTemplates",
             Self::MissionBrokerEntries => "missionBrokerEntries",
+            Self::ContractNpcSpawns => "contractNpcSpawns",
+            Self::ContractEntitySpawns => "contractEntitySpawns",
         }
     }
 
@@ -317,6 +325,8 @@ impl Kind {
                 | Self::LootContainers
                 | Self::ContractShipSpawns
                 | Self::ContractLocationQueries
+                | Self::ContractNpcSpawns
+                | Self::ContractEntitySpawns
         )
     }
 }

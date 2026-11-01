@@ -41,6 +41,7 @@ mod catalog_loot;
 mod catalog_loot_followups;
 mod catalog_mining;
 mod catalog_mining_stats;
+mod catalog_npc_spawns;
 mod catalog_paints;
 mod catalog_playability;
 mod catalog_quantization;

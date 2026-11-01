@@ -11,7 +11,7 @@ use crate::contract_offer::{BlueprintReward, GiverFaction, OfferedAt};
 use crate::contract_reward::FixedReward;
 use crate::guid_text::CatalogGuid;
 use crate::mission_cooldown::ContractCooldown;
-use crate::spawn_model::{LocationPrerequisite, LocationQueryLink, ShipSpawnLink};
+use crate::spawn_model::{LocationPrerequisite, LocationQueryLink, SpawnPoolLink};
 
 /// A contract or one of its sub contracts, with the overrides of sub contract, contract and
 /// handler laid over the template.
@@ -120,7 +120,13 @@ pub(crate) struct ContractEntry<'a> {
     /// The ship spawn descriptions the contract states, one per `missionVariableName`, ordered by
     /// variable: the first of sub contract, contract, handler and template that states the
     /// variable wins; a description without a group is left out.
-    pub(crate) ship_spawns: Vec<ShipSpawnLink>,
+    pub(crate) ship_spawns: Vec<SpawnPoolLink>,
+    /// The NPC spawn descriptions the contract states, resolved like `shipSpawns`: `poolGuid` is an
+    /// entry of `contractNpcSpawns`.
+    pub(crate) npc_spawns: Vec<SpawnPoolLink>,
+    /// The entity spawn descriptions the contract states, resolved like `shipSpawns`: `poolGuid` is
+    /// an entry of `contractEntitySpawns`.
+    pub(crate) entity_spawns: Vec<SpawnPoolLink>,
     /// The location queries the contract states, resolved like `shipSpawns`. The game runs a
     /// query when the mission starts; the catalog does not.
     pub(crate) location_queries: Vec<LocationQueryLink>,

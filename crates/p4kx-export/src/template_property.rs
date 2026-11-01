@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::contract::{LocalisedText, every_field_required};
 use crate::guid_text::CatalogGuid;
-use crate::spawn_model::TagPaths;
+use crate::spawn_model::{LocationCondition, TagPaths};
 
 /// How an objective holds a mission property (`ObjectiveProperty_*`). A struct the catalog does
 /// not know is `null`.
@@ -152,11 +152,26 @@ pub(crate) enum PropertyValue<'a> {
         /// The `guid` of the entry of `contractLocationQueries`.
         query_guid: CatalogGuid,
     },
-    /// A value of another struct, which the catalog does not read, e.g. the NPC and entity spawn
-    /// descriptions.
+    /// `MissionPropertyValue_NPCSpawnDescriptions`.
     #[serde(rename_all = "camelCase")]
-    Other {
-        /// The struct name.
-        struct_name: String,
+    NpcSpawnDescriptions {
+        /// The `guid` of the entry of `contractNpcSpawns`; `null` for a description without a
+        /// group.
+        pool_guid: Option<CatalogGuid>,
+    },
+    /// `MissionPropertyValue_EntitySpawnDescriptions`.
+    #[serde(rename_all = "camelCase")]
+    EntitySpawnDescriptions {
+        /// The `guid` of the entry of `contractEntitySpawns`; `null` for a description without a
+        /// group.
+        pool_guid: Option<CatalogGuid>,
+    },
+    /// `MissionPropertyValue_Organization`: the organisations a mission may pick from.
+    #[serde(rename_all = "camelCase")]
+    Organization {
+        /// The `matchConditions`, as for a location query.
+        conditions: Vec<LocationCondition>,
+        /// The `debugForceChosenOrganization` Record (`MissionOrganization`), `null` when absent.
+        forced_organization_guid: Option<CatalogGuid>,
     },
 }

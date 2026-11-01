@@ -173,6 +173,8 @@ impl Kind {
             | Self::Shops
             | Self::ContractShipSpawns
             | Self::ContractLocationQueries
+            | Self::ContractNpcSpawns
+            | Self::ContractEntitySpawns
             | Self::LootContainers => KindRule {
                 prefixes: &[],
                 type_name: "",

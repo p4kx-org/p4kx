@@ -6,7 +6,10 @@
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 
 use super::template_parts::{display, object, token_state, trigger};
-use super::{DEEP_FLOW, DEEP_PHASES, UNKNOWN_FLOW, UNKNOWN_MODIFIER, array, text};
+use super::{
+    DEEP_FLOW, DEEP_PHASES, OBJECTIVE_A, UNKNOWN_CONDITION, UNKNOWN_FLOW, UNKNOWN_MODIFIER,
+    UNKNOWN_VALUE, array, npc, text,
+};
 
 /// The levels of phases the deep template nests, more than the catalog follows.
 const DEPTH_PAST_PHASES: usize = 35;
@@ -73,6 +76,49 @@ pub(super) fn unknown_modifier() -> TestRecord {
     .value(
         "modifiers",
         array(vec![object(TestInstance::new("MissionModifier"))]),
+    )
+}
+
+/// An objective token with the embedded property `value`.
+fn token_with(value: TestValue) -> TestValue {
+    object(
+        TestInstance::new("ObjectiveToken")
+            .value("id", TestValue::Guid(OBJECTIVE_A))
+            .value("displayInfo", display("@LOC_UNINITIALIZED"))
+            .value(
+                "properties",
+                array(vec![object(
+                    TestInstance::new("ObjectiveProperty_Embedded").value("property", value),
+                )]),
+            ),
+    )
+}
+
+/// A template whose objective holds a property value of a struct the catalog does not know.
+pub(super) fn unknown_value() -> TestRecord {
+    TestRecord::new(
+        UNKNOWN_VALUE,
+        "ContractTemplate",
+        "ContractTemplate.Unknown_Value",
+        "libs/foundry/records/contracts/contracttemplates/unknown_value.xml",
+    )
+    .value(
+        "objectiveTokens",
+        array(vec![token_with(npc::mission_item("Item_BP"))]),
+    )
+}
+
+/// A template whose objective holds an organisation with a condition of an unknown struct.
+pub(super) fn unknown_condition() -> TestRecord {
+    TestRecord::new(
+        UNKNOWN_CONDITION,
+        "ContractTemplate",
+        "ContractTemplate.Unknown_Condition",
+        "libs/foundry/records/contracts/contracttemplates/unknown_condition.xml",
+    )
+    .value(
+        "objectiveTokens",
+        array(vec![token_with(npc::organization("Giver_BP", false))]),
     )
 }
 

@@ -8,10 +8,12 @@ use p4kx_extraction::StructValue;
 use crate::blueprint::as_struct;
 use crate::contract::LocalisedText;
 use crate::mission_layers::{items, key, one};
-use crate::record_fields::{boolean, integer, number, text};
-use crate::spawn_layers::SpawnPools;
-use crate::spawn_read::{Reader, Spawn};
-use crate::template_issues::Unknowns;
+use crate::record_fields::{boolean, integer, number, reference, text};
+use crate::record_read::ReadError;
+use crate::spawn_model::LocationCondition;
+use crate::spawn_pools::{Registered, SpawnPools, Target};
+use crate::spawn_read::Reader;
+use crate::template_issues::{TemplateError, Unknowns};
 use crate::template_property::{
     LinkedOutput, NumberOption, ObjectiveProperty, PropertyKind, PropertyValue, StringOption,
 };
@@ -20,13 +22,13 @@ use crate::texts::Texts;
 const VALUE_PREFIX: &str = "MissionPropertyValue_";
 
 /// What the properties of the objectives of one Record are read with: its tags and weak pointers,
-/// the texts, the count of unknown names and the pools the ship spawns and location queries they
-/// state are registered in.
+/// the texts, the count of unknown names and the pools the spawn descriptions and location queries
+/// they state are registered in.
 pub(crate) struct PropertyReader<'r, 'x, 'f> {
     pub(crate) reader: &'r Reader<'x, 'f>,
     pub(crate) texts: &'r Texts<'f>,
     pub(crate) unknowns: &'r Unknowns,
-    pub(crate) pools: &'r RefCell<SpawnPools>,
+    pub(crate) pools: &'r RefCell<SpawnPools<'f>>,
 }
 
 impl<'f> PropertyReader<'_, '_, 'f> {
@@ -34,11 +36,12 @@ impl<'f> PropertyReader<'_, '_, 'f> {
     ///
     /// # Errors
     ///
-    /// Returns the error of the serialisation that makes the identifier of a description.
+    /// Returns [`TemplateError::UnknownStruct`] for a value of a struct the catalog does not know
+    /// and the error of the serialisation that makes the identifier of a description.
     pub(crate) fn properties(
         &self,
         token: &StructValue<'f>,
-    ) -> Result<Vec<ObjectiveProperty<'f>>, serde_json::Error> {
+    ) -> Result<Vec<ObjectiveProperty<'f>>, ReadError> {
         items(Some(token), "properties")
             .iter()
             .filter_map(as_struct)
@@ -46,10 +49,7 @@ impl<'f> PropertyReader<'_, '_, 'f> {
             .collect()
     }
 
-    fn property(
-        &self,
-        property: &StructValue<'f>,
-    ) -> Result<ObjectiveProperty<'f>, serde_json::Error> {
+    fn property(&self, property: &StructValue<'f>) -> Result<ObjectiveProperty<'f>, ReadError> {
         let parent = Some(property);
         let embedded = one(parent, "property");
         let named = embedded.or(parent);
@@ -76,7 +76,7 @@ impl<'f> PropertyReader<'_, '_, 'f> {
         })
     }
 
-    fn value(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, serde_json::Error> {
+    fn value(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, ReadError> {
         let parent = Some(value);
         let name = value.type_name();
         Ok(match name.strip_prefix(VALUE_PREFIX).unwrap_or(name) {
@@ -105,40 +105,57 @@ impl<'f> PropertyReader<'_, '_, 'f> {
                 tags: self.reader.tag_list(parent, "tags"),
                 negative_tags: self.reader.tag_list(parent, "negativeTags"),
             },
+            "Organization" => return self.organization(value),
             _ => return self.spawn(value),
         })
     }
 
-    /// Reads a ship spawn description or a location query, registering it; any other struct is
-    /// stated by its name.
-    fn spawn(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, serde_json::Error> {
-        Ok(match self.reader.spawn(value)? {
-            Some(Spawn::Ships(pool)) => {
-                let guid = pool.guid;
-                let described = !pool.groups.is_empty();
-                if described {
-                    self.pools
-                        .borrow_mut()
-                        .ships
-                        .entry(guid.text())
-                        .or_insert(pool);
-                }
-                PropertyValue::ShipSpawnDescriptions {
-                    pool_guid: described.then_some(guid),
-                }
+    /// Reads an organisation value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TemplateError::UnknownStruct`] for a condition of a struct the catalog does not
+    /// know.
+    fn organization(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, ReadError> {
+        let conditions = self.reader.conditions(Some(value));
+        if let Some(LocationCondition::Other { struct_name }) = conditions
+            .iter()
+            .find(|condition| matches!(condition, LocationCondition::Other { .. }))
+        {
+            return Err(TemplateError::UnknownStruct {
+                field: "organization condition",
+                name: struct_name.clone(),
             }
-            Some(Spawn::Location(query)) => {
-                let guid = query.guid;
-                self.pools
-                    .borrow_mut()
-                    .locations
-                    .entry(guid.text())
-                    .or_insert(query);
-                PropertyValue::Location { query_guid: guid }
-            }
-            None => PropertyValue::Other {
-                struct_name: value.type_name().to_owned(),
+            .into());
+        }
+        Ok(PropertyValue::Organization {
+            conditions,
+            forced_organization_guid: reference(Some(value), "debugForceChosenOrganization"),
+        })
+    }
+
+    /// Reads a spawn description or a location query and registers it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TemplateError::UnknownStruct`] for a value of any other struct.
+    fn spawn(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, ReadError> {
+        let Some(spawn) = self.reader.spawn(value)? else {
+            return Err(TemplateError::unknown("objective property value", value).into());
+        };
+        let Registered { target, empty } = self.pools.borrow_mut().register(spawn);
+        let pool_guid = |guid| (!empty).then_some(guid);
+        Ok(match target {
+            Target::Ships(guid) => PropertyValue::ShipSpawnDescriptions {
+                pool_guid: pool_guid(guid),
             },
+            Target::Npcs(guid) => PropertyValue::NpcSpawnDescriptions {
+                pool_guid: pool_guid(guid),
+            },
+            Target::Entities(guid) => PropertyValue::EntitySpawnDescriptions {
+                pool_guid: pool_guid(guid),
+            },
+            Target::Location(guid) => PropertyValue::Location { query_guid: guid },
         })
     }
 

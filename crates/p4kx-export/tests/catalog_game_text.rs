@@ -5,7 +5,7 @@
 
 use serde_json::json;
 
-const GAME_TEXT: [&str; 20] = [
+const GAME_TEXT: [&str; 23] = [
     "description",
     "displayName",
     "displayType",
@@ -26,6 +26,9 @@ const GAME_TEXT: [&str; 20] = [
     "missionGiver",
     "commsChannelName",
     "endReason",
+    "givenName",
+    "givenLastName",
+    "givenNickName",
 ];
 
 fn collect_properties<'s>(
@@ -70,8 +73,8 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 35,
-        "the title, HUD title, description, giver, comms channel and end reason of a mission broker entry, four descriptions, two display types, the contract title and description, mission type, contractor, faction name, pickup place, the process name, the deposit name, the names of a faction, a scope, a standing and a mission type, the variant of a location template, the title of a contract template, the three texts of an objective display, the two overrides of the mission details, the HUD text of an instance handler, the name of a marker and the texts of the options of a string and a number property"
+        marked, 38,
+        "the given name, last name and nick name of an NPC, the title, HUD title, description, giver, comms channel and end reason of a mission broker entry, four descriptions, two display types, the contract title and description, mission type, contractor, faction name, pickup place, the process name, the deposit name, the names of a faction, a scope, a standing and a mission type, the variant of a location template, the title of a contract template, the three texts of an objective display, the two overrides of the mission details, the HUD text of an instance handler, the name of a marker and the texts of the options of a string and a number property"
     );
     let mut starmap_properties = Vec::new();
     collect_properties(&starmap, &mut starmap_properties);

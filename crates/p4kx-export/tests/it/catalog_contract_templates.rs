@@ -118,6 +118,9 @@ fn properties_list_the_variables_with_the_kind_of_their_value() -> TestResult {
             ("Home_BP", "", "Location"),
             ("Flag_BP", "", "Boolean"),
             ("Cargo_BP", "Cargo", "HaulingOrders"),
+            ("Guard_BP", "", "NPCSpawnDescriptions"),
+            ("Spare_BP", "", "NPCSpawnDescriptions"),
+            ("Loot_BP", "", "EntitySpawnDescriptions"),
         ]
     );
     Ok(())

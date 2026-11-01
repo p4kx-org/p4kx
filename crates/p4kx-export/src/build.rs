@@ -282,6 +282,8 @@ fn assemble<R>(
         contract_location_queries: collected.contract_location_queries,
         contract_templates: collected.contract_templates,
         mission_broker_entries: collected.mission_broker_entries,
+        contract_npc_spawns: collected.contract_npc_spawns,
+        contract_entity_spawns: collected.contract_entity_spawns,
         ship_store_slugs: resolved.exported,
         item_recovery: rules,
     };

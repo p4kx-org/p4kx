@@ -46,7 +46,7 @@ pub(crate) fn add_contracts<'f>(
     let mut pools = missions.pools;
     pools.merge(template_pools);
     pools.merge(broker_pools);
-    collected.add_spawns(missions.siblings.location_templates, pools);
+    collected.add_spawns(missions.siblings.location_templates, pools, texts);
     collected.add_broker_entries(broker_read);
     collected.add_contract_templates(read, unknowns);
     Ok(())

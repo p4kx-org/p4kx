@@ -360,8 +360,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   Basetool catalog for the basetool's P4K import ([docs/basetool-catalog.md](basetool-catalog.md)):
   schema version (2), Channel and Build, completeness per kind and the kinds of the catalog:
   manufacturers, items (with their item class), ships and ground vehicles, commodities, crafting
-  blueprints, loadouts, paints, shops, the starmap, contracts (with their ship spawns and location
-  queries), factions and reputation, mining,
+  blueprints, loadouts, paints, shops, the starmap, contracts (with their ship, NPC and entity
+  spawns and location queries), factions and reputation, mining,
   refining and loot, each ordered by GUID, with test, template, dummy,
   debug, deprecated and dev Records left out and counted as skipped, and names and descriptions
   resolved in English and German. `--filter` marks the catalog partial. It prints the counts per

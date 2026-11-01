@@ -6,6 +6,7 @@
 
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 
+use super::npc::{self, NpcKind};
 use super::template_parts as parts;
 use super::template_properties as properties;
 use super::{
@@ -44,6 +45,13 @@ pub(super) fn template() -> TestRecord {
                     array(vec![resource_order(RESOURCE, 4)]),
                 ),
             ),
+            npc::npcs(
+                "Guard_BP",
+                "",
+                Some(("Guards", NpcKind::Named("prop_place"))),
+            ),
+            npc::npcs("Spare_BP", "", Some(("Spares", NpcKind::Full))),
+            npc::entities("Loot_BP", "", Some("Template crate")),
         ]),
     )
     .value("objectiveTokens", objective_tokens())

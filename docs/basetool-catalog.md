@@ -59,7 +59,9 @@ The rule is ADR-0054 (amending ADR-0002):
   additive. The contract field `fixedRewards` (#888, ADR-0268) is one, and so is `cooldownLayers`
   (#909, ADR-0271), and the contract fields `offeredAt`, `giverFaction` and `blueprintRewards`
   (#915, ADR-0273), and so are the kind `contractTemplates` (#812, ADR-0313) and the kind
-  `missionBrokerEntries` with the contract field `brokerEntryGuid` (#813, ADR-0320).
+  `missionBrokerEntries` with the contract field `brokerEntryGuid` (#813, ADR-0320), and the kinds
+  `contractNpcSpawns` and `contractEntitySpawns` with the fields `npcSpawns` and `entitySpawns` of
+  a contract, a template and a broker entry (#815, ADR-0324).
 - **A production import takes catalogs of the Channel `LIVE` only.** `PTU`, `EPTU`, `TECH-PREVIEW`
   and `HOTFIX` are confidential test Channels (ADR-0038).
 
@@ -179,6 +181,8 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `contractLocationQueries` | The distinct location queries of the contracts, ordered by identifier |
 | `contractTemplates` | The contract templates (`ContractTemplate`), the targets of `contracts[].templateGuid`, ordered by GUID |
 | `missionBrokerEntries` | The mission broker entries (`MissionBrokerEntry`), the targets of `contracts[].brokerEntryGuid`, ordered by GUID |
+| `contractNpcSpawns` | The distinct NPC spawn descriptions of the contracts, templates and broker entries, ordered by identifier |
+| `contractEntitySpawns` | The distinct entity spawn descriptions of the contracts, templates and broker entries, ordered by identifier |
 | `lootTables` | The loot tables (`LootTableV3Record`) with the weighted archetypes of each, ordered by GUID |
 | `lootArchetypes` | The loot archetypes (`LootArchetypeV3Record`) with the weighted selectors of each, ordered by GUID |
 | `lootPoolFilters` | The pool filters of the loot generation, ordered by GUID |
@@ -1402,10 +1406,10 @@ the struct, `periodScenarioGuid`), each with `tiers`: `minPoints`, `badgeToAward
 `blueprintPoolGuids`, entries of `blueprintPools`. The progression texts and the multiplier rewards
 (empty on LIVE) are not exported.
 
-Not exported, for want of a consumer: NPC spawns and the sandbox triggers and perks of the
-reputation Records. Contract templates are described in "Contract templates", mission broker
-entries in "Mission broker entries", ship spawns and the locations of contracts in "Ship spawns and
-location queries".
+Not exported, for want of a consumer: the sandbox triggers and perks of the reputation Records.
+Contract templates are described in "Contract templates", mission broker entries in "Mission broker
+entries", ship spawns and the locations of contracts in "Ship spawns and location queries" and NPC
+and entity spawns in "NPC and entity spawns".
 
 ### Ship spawns and location queries
 
@@ -1431,6 +1435,7 @@ at a lower level and is itself left out.
 | Field of `contracts` | Meaning |
 |----------------------|---------|
 | `shipSpawns` | `variable`, `token` (`extendedTextToken`, `null` when empty), `level` and `poolGuid`, an entry of `contractShipSpawns`; ordered by variable |
+| `npcSpawns`, `entitySpawns` | The same links for the NPC and entity spawn descriptions (see "NPC and entity spawns"): `poolGuid` is an entry of `contractNpcSpawns` or `contractEntitySpawns` |
 | `locationQueries` | `variable`, `token`, `level` and `queryGuid`, an entry of `contractLocationQueries`; ordered by variable |
 | `locationPrerequisites` | The `ContractPrerequisite_LocationProperty` prerequisites of the handler, the contract and the sub contract, in that order, as stored: `level` (`handler`, `contract`, `subContract`), `variable` (the `propertyVariableName`, a `variable` of `locationQueries`; on LIVE 4 of the 479 name a variable no query states), `token` and `locationLevelType` |
 
@@ -1476,9 +1481,7 @@ text; the German file lacks 3,246 of the 3,297 variants on LIVE, so `de` is `nul
 falls back to `en`) and `entityClusterMemberGuid`. Not exported: the NPC auto spawn settings,
 mission modules and limits and the security network manifest.
 
-Not exported: NPC spawn descriptions (`MissionPropertyValue_NPCSpawnDescriptions`), the
-content of the `ObjectiveToken` structures of the templates (see "Contract templates" for what is
-listed), and SCMDB's own pools, waves and region lists, which are derived and not stated by the
+Not exported: SCMDB's own pools, waves and region lists, which are derived and not stated by the
 Archive.
 
 ### Contract templates
@@ -1494,11 +1497,10 @@ identifiers, flags and numbers, links, and the texts the Archive keeps with them
 (`x-gameText`). Where a field holds one of several structs, the entry names the struct in a
 discriminator: `type` for the value of a property, a flow condition and a flow action, `modifier`
 for a modifier and `structName` for a handler; the other fields depend on it. A condition, an action
-or a modifier of a struct the catalog does not know fails the Record (ADR-0320); only the value of a
-property has an `other` variant (the `type` tag, with the field `structName`) for the structs that
-follow with #815. The unions lost their `other` variants before the kind `contractTemplates` was
-first released (v0.4.2 is unreleased), so no consumer has seen them and the additive rule of
-ADR-0054 is not touched.
+or a modifier of a struct the catalog does not know fails the Record (ADR-0320), and so does the
+value of an objective property (ADR-0324). The unions lost their `other` variants before the kind
+`contractTemplates` was first released (v0.4.2 is unreleased), so no consumer has seen them and the
+additive rule of ADR-0054 is not touched.
 
 | Field | Meaning |
 |-------|---------|
@@ -1510,7 +1512,7 @@ ADR-0054 is not touched.
 | `classType`, `settings` | The struct of the contract class (`ContractClass_Contract`, one template is a `ContractClass_PVPBounty`) and its `ActiveContractSettings`: `canBeShared`, `hasCompleteButton`, `handlesAbandonRequest`, `displayAlliedMarkers`, `onlyOwnerCanComplete`; `null` when absent |
 | `autoFinish` | The `ContractAutoFinishSettings`: `failIfSentToPrison`, `failIfBecameCriminal`, `failIfLeavePrison` and the deadline as stored: `completionTime`, `autoEnd`, `resultAfterTimerEnd` (an objective state), `remainingTimeToShowTimer`; the Archive does not state the unit of the times; `null` without the block |
 | `contractProperties` | The mission properties in stored order: `variable`, `token` (`null` when empty) and `valueType`, the struct of the value without `MissionPropertyValue_` (`StringHash`, `Location`, `ShipSpawnDescriptions`, `HaulingOrders`, ...) |
-| `shipSpawns`, `locationQueries` | The links of ADR-0266, one per variable the template states, with `level` always `template`, into `contractShipSpawns` and `contractLocationQueries` |
+| `shipSpawns`, `npcSpawns`, `entitySpawns`, `locationQueries` | The links of ADR-0266 and ADR-0324, one per variable the template states, with `level` always `template`, into `contractShipSpawns`, `contractNpcSpawns`, `contractEntitySpawns` and `contractLocationQueries` |
 | `haulingOrders` | The hauling orders of the template as in "Hauling orders": the properties (`source` `template`) and the orders of its hauling objectives (`templateObjective`) |
 | `objectives` | The objective tokens depth first, each phase after its parent (see "Objectives") |
 | `partialPayout` | The `PartialContractRewards`: `thresholds`, each `minPercentage`, `maxPercentage`, `currencyRewardMultiplier` and `reputationMultipliers` (`scopeGuid`, an entry of `reputationScopes`, and `reputationRewardMultiplier`); `null` without one |
@@ -1554,9 +1556,15 @@ referenced property the `missionVariableName` of the property of the template it
 properties the option makes dependent), `integer` and `float` (`options`, each `displayName`,
 `value`, `variation`, `weighting` and `dependentProperties`), `tags` (`tags` and `negativeTags`),
 `shipSpawnDescriptions` (`poolGuid`, an entry of `contractShipSpawns`, `null` for a description
-without a group), `location` (`queryGuid`, an entry of `contractLocationQueries`) and `other`
-(`structName`; the NPC and entity spawn descriptions are among them). The ship spawns and location
-queries are read as for the contracts and added to their kinds.
+without a group), `location` (`queryGuid`, an entry of `contractLocationQueries`),
+`npcSpawnDescriptions` and `entitySpawnDescriptions` (`poolGuid`, an entry of `contractNpcSpawns` or
+`contractEntitySpawns`, `null` for a description without a group) and `organization` (`conditions`,
+the `matchConditions` as for a location query, and `forcedOrganizationGuid`, the
+`debugForceChosenOrganization`, a `MissionOrganization` Record no kind lists). The spawn
+descriptions and location queries are read as for the contracts and added to their kinds. A value of
+any other struct fails the Record (on LIVE the values of objective properties are all of the types
+above); so does an organisation whose condition is of a struct the catalog does not know. Further
+value types are stated where the values of the contract-level properties are (#1003).
 
 **Mission flow.** A trigger has `note` (the developer's `description`), a `condition` and an
 `action`, either `null` when absent. A condition is tagged by `type`: `tokenState` (`objectiveId`,
@@ -1614,20 +1622,74 @@ contract templates (see there).
 | `standingRequirements` | The reputation requirement expression in stored order, tagged by `type`: `requirement` (`comparison`, `factionReputationGuid`, `scopeGuid`, `standingGuid`), `and`, `leftParenthesis` and `rightParenthesis`; the elements form an infix expression and the catalog does not evaluate it |
 | `reputationResults` | The `missionResultReputationRewards`: one element per stored position (`index`, the Archive names no result) with its `amounts` (`factionReputationGuid`, `scopeGuid`, `rewardGuid` and the `amount` of that reward Record) |
 | `missionProperties` | The mission properties in stored order: `variable`, `token` and `valueType`, as for the contract templates |
-| `shipSpawns`, `locationQueries` | The links of ADR-0266 with `level` `broker`, into `contractShipSpawns` and `contractLocationQueries`, which hold the descriptions of the entries too |
+| `shipSpawns`, `npcSpawns`, `entitySpawns`, `locationQueries` | The links of ADR-0266 and ADR-0324 with `level` `broker`, into `contractShipSpawns`, `contractNpcSpawns`, `contractEntitySpawns` and `contractLocationQueries`, which hold the descriptions of the entries too |
 | `haulingOrders` | The orders of the hauling objectives (`source` `brokerObjective`) as in "Hauling orders" |
 | `objectives`, `partialPayout`, `modifiers`, `missionFlow` | As for the contract templates; `comms` of an objective is empty, an entry has no start or end comms |
 
 A comparison is `equalTo`, `greaterThan`, `greaterThanOrEqualTo` or `lessThanOrEqualTo`. A stored
 name the catalog does not know (a comparison, a month, a repeat type, a reaction, a licence type)
 is `null` and counted in the warning `unknown_template_values`, like those of the templates. The
-tokens of the objective values are the same as there; the NPC and entity spawn descriptions of the
-`properties` (`valueType` only) follow with #815.
+tokens of the objective values are the same as there. The values of the `properties` other than the
+spawn descriptions and location queries, which the links state, follow with #1003.
 
 On LIVE (2026-10-31) the kind holds 2,428 entries with 703 objective tokens, 26,741 properties,
 949 modifiers, 2,097 flow triggers and 1,666 requirement terms, 16.9 MB of JSON. The catalog grows
 from 187.2 MB to 205.9 MB decompressed and from 3.44 MB to 3.78 MB as `.json.zst`; the upload
 limit is 64,000,000 bytes.
+
+### NPC and entity spawns
+
+Two kinds and the fields `npcSpawns` and `entitySpawns` of a contract, a contract template and a
+mission broker entry (#815, ADR-0324, additive, schema version 2, no bump) state the people and the
+objects a contract spawns, as the Archive stores them. The catalog never resolves which NPC or
+entity the game picks. The Archive has no Record for these descriptions: a
+`MissionPropertyValue_NPCSpawnDescriptions` or `_EntitySpawnDescriptions` sits in the properties of
+a contract, a template or a broker entry. The kinds follow the design of `contractShipSpawns`
+(ADR-0266): equal content shares one entry, its `guid` is the content hash of the entry written as a
+UUID (the first 16 bytes of the SHA-256 of the canonical JSON of the groups; not a GUID of the
+Archive, valid as long as the content, not to be stored across a change of it), and the kinds are
+ordered by it. The hash is made over the localisation keys of the names and not their texts, so it
+does not depend on a language. The links are the `SpawnPoolLink` of "Ship spawns and location
+queries": `variable`, `token`, `level` and `poolGuid`, resolved by the same rules (the nearest level
+wins, a description without a group is left out and still hides the same variable at a lower level).
+Every link resolves.
+
+On LIVE (2026-10-31) the kinds hold 411 NPC spawn descriptions (2,074 options) and 43 entity spawn
+descriptions (556 options). They add 2.1 MB of JSON; the links on 5,175 contracts (544 NPC and 182
+entity links), 496 templates (7 and 10) and 2,428 broker entries (793 and 146), every entry with the
+two fields, add 0.5 MB. The catalog grows from 205.9 MB to 208.5 MB decompressed (limit
+1,000,000,000 bytes) and from 3.78 MB to 3.82 MB as `.json.zst` (upload limit 64,000,000 bytes).
+
+**NPC spawn descriptions (`contractNpcSpawns`).** An entry has `guid` and `groups`
+(`SpawnDescription_NPC_Group`: `name`, `null` when empty, and `options`). An option
+(`SpawnDescription_NPCOption`) is one alternative of the group and has `priority` (`-1` as stored
+means none), `includeLocationAISpawnTags`, `weight`, `autoSpawnSettings` (see below),
+`identifierTags` (tag paths), `namePropertyVariable` (the `missionVariableName` of the property the
+weak pointer `nameProperty` points to, `null` when it points to none) and `embeddedName`.
+
+The `autoSpawnSettings` (`AutoSpawnSettings`) have `name` (a developer's label such as
+`SC_CE -> DA_I (Grenadier x1)`, `null` when empty), `initialActivity` (as stored: `Sentry`,
+`Guard`, `GuardPatrolling`, ...; `null` when empty), `excludeShipCrew`, `excludeSpawnGender` (the
+enum `EExcludeSpawnGender` as stored: `Male`, `Female` or `None`, listed in `x-values`),
+`minGroupSize`, `maxGroupSize`, `maxConcurrentSpawns`, `maxSpawns`, `minSpawnDelay` and
+`maxSpawnDelay` (the numbers as stored, `-1` for none; the Archive states no unit of the delays),
+`missionAlliedMarker`, `isCritical`, the tag pairs `characterTags`, `closetTags`, `roomTags`,
+`defendAreaTags` and `scheduleAreaTags` (each `positiveTags` and `negativeTags`, from the fields
+`positiveCharacterTags` and `negativeCharacterTags`, `closetPositiveTags` and so on), `entityTags`,
+`inventoryItems` (`entityClassGuid`, `quantity`, `amountInventoriesToFill` and `markAsMissionItem`)
+and `factionOverrideGuid` (a `Faction` Record no kind lists). Tags are full tag paths; what a tag
+means is not stated by the Archive and the catalog does not interpret it.
+
+The `embeddedName` (`MissionPropertyValue_AIName`, `null` when absent; 22 options on LIVE, all of
+them with placeholder texts) has `randomName`, `randomLastName`, `randomNickName`, `givenName`,
+`givenLastName` and `givenNickName` (game texts, the keys with their English and German texts; a
+placeholder key such as `@LOC_UNINITIALIZED` has a `null` key and no texts), `chanceOfNickName` and
+`nameDataGuid` (the `CharacterRandomNameParams` Record, no kind lists these).
+
+**Entity spawn descriptions (`contractEntitySpawns`).** An entry has `guid` and `groups`
+(`SpawnDescription_EntityGroup`: `name` and `slots`; a slot is a `SpawnDescription_EntityOptions`,
+the alternatives for one entity, each an `options` entry with `amount`, `weight` and the tag sets
+`tags`, `negativeTags`, `markupTags` and `entityTags`).
 
 ### Cargo manifests
 
@@ -2401,6 +2463,8 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `missionLocationTemplates` | `libs/foundry/records/missiondata/pu_locations/` | `MissionLocationTemplate` |
 | `contractShipSpawns` | None: derived from the properties of the contracts and their templates, no Records | |
 | `contractLocationQueries` | None: derived from the properties of the contracts and their templates, no Records | |
+| `contractNpcSpawns` | None: derived from the properties of the contracts, templates and broker entries, no Records | |
+| `contractEntitySpawns` | None: derived from the properties of the contracts, templates and broker entries, no Records | |
 | `contractTemplates` | `libs/foundry/records/` (every folder; see "Contract templates") | `ContractTemplate` |
 | `missionBrokerEntries` | `libs/foundry/records/` (every folder; see "Mission broker entries") | `MissionBrokerEntry` |
 | `lootTables` | `libs/foundry/records/lootgeneration/loottables/` | `LootTableV3Record` |

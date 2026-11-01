@@ -10,6 +10,7 @@ mod contracts;
 mod crafters;
 mod harvest;
 mod loot;
+mod npc_spawns;
 mod recovery;
 mod reputation;
 mod slugs;
@@ -65,6 +66,8 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "contractLocationQueries": {"status": "complete"},
             "contractTemplates": {"status": "complete"},
             "missionBrokerEntries": {"status": "complete"},
+            "contractNpcSpawns": {"status": "complete"},
+            "contractEntitySpawns": {"status": "complete"},
             "lootTables": {"status": "complete"},
             "lootArchetypes": {"status": "complete"},
             "lootPoolFilters": {"status": "complete"},
@@ -296,6 +299,8 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
         "contractLocationQueries": spawns::location_queries(),
         "contractTemplates": spawns::contract_templates(),
         "missionBrokerEntries": brokers::broker_entries(),
+        "contractNpcSpawns": npc_spawns::npc_spawns(),
+        "contractEntitySpawns": npc_spawns::entity_spawns(),
         "lootTables": loot::tables(),
         "lootArchetypes": loot::archetypes(),
         "lootPoolFilters": loot::filters(),

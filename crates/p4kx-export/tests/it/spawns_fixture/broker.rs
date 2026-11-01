@@ -6,6 +6,7 @@
 
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 
+use super::npc::{self, NpcKind};
 use super::template::{objective, resource_order};
 use super::template_parts as parts;
 use super::{
@@ -120,6 +121,8 @@ fn with_parts(record: TestRecord) -> TestRecord {
             array(vec![
                 ships("Wave_BP", "", Some(9)),
                 parts::named(location("Place_BP", "Place", None), "bprop_place"),
+                npc::npcs("Crew_BP", "", Some(("Squad", NpcKind::Full))),
+                npc::entities("Loot_BP", "", Some("Crate")),
             ]),
         )
         .value("objectiveTokens", objectives())

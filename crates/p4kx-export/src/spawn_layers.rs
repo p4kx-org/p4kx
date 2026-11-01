@@ -7,51 +7,19 @@ use std::collections::BTreeMap;
 use p4kx_extraction::{StructValue, TagTree};
 
 use crate::blueprint::as_struct;
-use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{items, one};
 use crate::record_fields::text;
-use crate::spawn_model::{
-    LocationPrerequisite, LocationQuery, LocationQueryLink, ShipSpawnLink, ShipSpawnPool,
-    SpawnLevel,
-};
-use crate::spawn_read::{Reader, Spawn};
+use crate::spawn_model::{LocationPrerequisite, LocationQueryLink, SpawnLevel, SpawnPoolLink};
+use crate::spawn_pools::{Registered, SpawnPools, Target};
+use crate::spawn_read::Reader;
 
 const LOCATION_PROPERTY: &str = "ContractPrerequisite_LocationProperty";
-
-/// The distinct ship spawn descriptions and location queries, by identifier.
-#[derive(Debug, Default)]
-pub(crate) struct SpawnPools {
-    pub(crate) ships: BTreeMap<[u8; 36], ShipSpawnPool>,
-    pub(crate) locations: BTreeMap<[u8; 36], LocationQuery>,
-}
-
-impl SpawnPools {
-    /// Adds what `other` holds that `self` does not.
-    pub(crate) fn merge(&mut self, other: Self) {
-        for (key, pool) in other.ships {
-            self.ships.entry(key).or_insert(pool);
-        }
-        for (key, query) in other.locations {
-            self.locations.entry(key).or_insert(query);
-        }
-    }
-}
-
-/// What a property states, by identifier of the entry it names.
-#[derive(Debug, Clone, Copy)]
-enum Target {
-    Ships(CatalogGuid),
-    Location(CatalogGuid),
-}
 
 #[derive(Debug)]
 struct Stated {
     variable: String,
     token: Option<String>,
-    target: Target,
-    /// A ship spawn description without a group: it states nothing but still takes the place of
-    /// the same variable at a lower level.
-    empty: bool,
+    registered: Registered,
 }
 
 /// The properties and location prerequisites one level of a contract states.
@@ -74,12 +42,12 @@ impl Level {
     /// # Errors
     ///
     /// Returns the error of the serialisation that makes the identifier of a description.
-    pub(crate) fn read(
+    pub(crate) fn read<'f>(
         level: SpawnLevel,
-        reader: &Reader<'_, '_>,
-        (params, properties): (Option<&StructValue<'_>>, &str),
+        reader: &Reader<'_, 'f>,
+        (params, properties): (Option<&StructValue<'f>>, &str),
         (owner, prerequisites): (Option<&StructValue<'_>>, &str),
-        pools: &mut SpawnPools,
+        pools: &mut SpawnPools<'f>,
     ) -> Result<Self, serde_json::Error> {
         let mut found = Vec::new();
         for property in items(params, properties).iter().filter_map(as_struct) {
@@ -93,10 +61,10 @@ impl Level {
     }
 }
 
-fn stated(
-    reader: &Reader<'_, '_>,
-    property: &StructValue<'_>,
-    pools: &mut SpawnPools,
+fn stated<'f>(
+    reader: &Reader<'_, 'f>,
+    property: &StructValue<'f>,
+    pools: &mut SpawnPools<'f>,
 ) -> Result<Option<Stated>, serde_json::Error> {
     let Some(variable) = text(Some(property), "missionVariableName") else {
         return Ok(None);
@@ -105,29 +73,10 @@ fn stated(
     let Some(value) = one(Some(property), "value") else {
         return Ok(None);
     };
-    let (target, empty) = match reader.spawn(value)? {
-        None => return Ok(None),
-        Some(spawn) => match spawn {
-            Spawn::Ships(pool) => {
-                let empty = pool.groups.is_empty();
-                let guid = pool.guid;
-                if !empty {
-                    pools.ships.entry(guid.text()).or_insert(pool);
-                }
-                (Target::Ships(guid), empty)
-            }
-            Spawn::Location(query) => {
-                let guid = query.guid;
-                pools.locations.entry(guid.text()).or_insert(query);
-                (Target::Location(guid), false)
-            }
-        },
-    };
-    Ok(Some(Stated {
+    Ok(reader.spawn(value)?.map(|spawn| Stated {
         variable: variable.to_owned(),
         token,
-        target,
-        empty,
+        registered: pools.register(spawn),
     }))
 }
 
@@ -152,11 +101,11 @@ fn location_prerequisites(
         .collect()
 }
 
-/// The ship spawns and location queries of the levels of one Record, read through its tags and
-/// weak pointers; what they state is collected in [`pools`](Self::into_pools).
+/// The spawn descriptions and location queries of the levels of one Record, read through its tags
+/// and weak pointers; what they state is collected in [`pools`](Self::into_pools).
 pub(crate) struct RecordSpawns<'x, 'f> {
     reader: Reader<'x, 'f>,
-    pools: RefCell<SpawnPools>,
+    pools: RefCell<SpawnPools<'f>>,
 }
 
 impl<'x, 'f> RecordSpawns<'x, 'f> {
@@ -169,7 +118,7 @@ impl<'x, 'f> RecordSpawns<'x, 'f> {
     }
 
     /// Returns the distinct descriptions and queries the levels stated.
-    pub(crate) fn into_pools(self) -> SpawnPools {
+    pub(crate) fn into_pools(self) -> SpawnPools<'f> {
         self.pools.into_inner()
     }
 
@@ -277,10 +226,12 @@ impl<'f> ContractSpawns<'_, '_, '_, 'f> {
     }
 }
 
-/// What an entry states about ships and locations.
+/// What an entry states about spawns and locations.
 #[derive(Debug, Default)]
 pub(crate) struct Resolved {
-    pub(crate) ship_spawns: Vec<ShipSpawnLink>,
+    pub(crate) ship_spawns: Vec<SpawnPoolLink>,
+    pub(crate) npc_spawns: Vec<SpawnPoolLink>,
+    pub(crate) entity_spawns: Vec<SpawnPoolLink>,
     pub(crate) location_queries: Vec<LocationQueryLink>,
     pub(crate) location_prerequisites: Vec<LocationPrerequisite>,
 }
@@ -299,22 +250,32 @@ fn resolve(levels: &[&Level]) -> Resolved {
     let mut resolved = Resolved::default();
     for (variable, (level, stated)) in won {
         let (variable, token, at) = (variable.to_owned(), stated.token.clone(), level.at);
-        match stated.target {
-            Target::Ships(pool_guid) if !stated.empty => {
-                resolved.ship_spawns.push(ShipSpawnLink {
-                    variable,
-                    token,
-                    level: at,
-                    pool_guid,
-                });
-            }
-            Target::Ships(_) => {}
-            Target::Location(query_guid) => resolved.location_queries.push(LocationQueryLink {
-                variable,
-                token,
-                level: at,
-                query_guid,
-            }),
+        let link = move |pool_guid| SpawnPoolLink {
+            variable,
+            token,
+            level: at,
+            pool_guid,
+        };
+        match stated.registered {
+            Registered { empty: true, .. } => {}
+            Registered {
+                target: Target::Ships(guid),
+                ..
+            } => resolved.ship_spawns.push(link(guid)),
+            Registered {
+                target: Target::Npcs(guid),
+                ..
+            } => resolved.npc_spawns.push(link(guid)),
+            Registered {
+                target: Target::Entities(guid),
+                ..
+            } => resolved.entity_spawns.push(link(guid)),
+            Registered {
+                target: Target::Location(query_guid),
+                ..
+            } => resolved
+                .location_queries
+                .push(LocationQueryLink::from(link(query_guid))),
         }
     }
     resolved.location_prerequisites = levels

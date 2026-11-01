@@ -48,6 +48,77 @@
       ],
       "type": "object"
     },
+    "AiName": {
+      "description": "The name an NPC gets (`MissionPropertyValue_AIName`): drawn at random or given.",
+      "properties": {
+        "chanceOfNickName": {
+          "description": "The `chanceOfNickName`, 0 to 1; `null` when absent.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "givenLastName": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `characterGivenLastName`.",
+          "x-gameText": true
+        },
+        "givenName": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `characterGivenName`.",
+          "x-gameText": true
+        },
+        "givenNickName": {
+          "$ref": "#/$defs/LocalisedText",
+          "description": "The `characterGivenNickName`.",
+          "x-gameText": true
+        },
+        "nameDataGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `characterNameData` Record (`CharacterRandomNameParams`), `null` when absent."
+        },
+        "randomLastName": {
+          "description": "The `randomLastName` flag; `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "randomName": {
+          "description": "The `randomName` flag; `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "randomNickName": {
+          "description": "The `randomNickName` flag; `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "chanceOfNickName",
+        "givenLastName",
+        "givenName",
+        "givenNickName",
+        "nameDataGuid",
+        "randomLastName",
+        "randomName",
+        "randomNickName"
+      ],
+      "type": "object"
+    },
     "AmmoStats": {
       "description": "The ammunition of a weapon.",
       "properties": {
@@ -257,6 +328,180 @@
         "failIfSentToPrison",
         "remainingTimeToShowTimer",
         "resultAfterTimerEnd"
+      ],
+      "type": "object"
+    },
+    "AutoSpawnSettings": {
+      "description": "The `AutoSpawnSettings` of an NPC option: how many NPCs spawn, where and with what.",
+      "properties": {
+        "characterTags": {
+          "$ref": "#/$defs/TagTerm",
+          "description": "The `positiveCharacterTags` and `negativeCharacterTags` the character is searched by."
+        },
+        "closetTags": {
+          "$ref": "#/$defs/TagTerm",
+          "description": "The `closetPositiveTags` and `closetNegativeTags`."
+        },
+        "defendAreaTags": {
+          "$ref": "#/$defs/TagTerm",
+          "description": "The `defendAreaPositiveTags` and `defendAreaNegativeTags`."
+        },
+        "entityTags": {
+          "description": "The `entityTags`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "excludeShipCrew": {
+          "description": "The `excludeShipCrew` flag; `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "excludeSpawnGender": {
+          "description": "The `excludeSpawnGender` as the enum `EExcludeSpawnGender` stores it.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-values": [
+            {
+              "value": "Male"
+            },
+            {
+              "value": "Female"
+            },
+            {
+              "value": "None"
+            }
+          ]
+        },
+        "factionOverrideGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `factionOverride` `Faction` Record, `null` when absent; no kind lists these Records."
+        },
+        "initialActivity": {
+          "description": "The `initialActivity` as stored (`Sentry`, `Guard`, `GuardPatrolling`, ...); `null` when\nempty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inventoryItems": {
+          "description": "The `inventoryItems` in stored order.",
+          "items": {
+            "$ref": "#/$defs/SpawnInventoryItem"
+          },
+          "type": "array"
+        },
+        "isCritical": {
+          "description": "The `isCritical` flag; `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "maxConcurrentSpawns": {
+          "description": "The `maxConcurrentSpawns`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "maxGroupSize": {
+          "description": "The `maxGroupSize`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "maxSpawnDelay": {
+          "description": "The `maxSpawnDelay`; the Archive states no unit.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "maxSpawns": {
+          "description": "The `maxSpawns`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "minGroupSize": {
+          "description": "The `minGroupSize`; `-1` as stored means no minimum.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "minSpawnDelay": {
+          "description": "The `minSpawnDelay`; the Archive states no unit.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "missionAlliedMarker": {
+          "description": "The `missionAlliedMarker` flag; `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "The `name`, a developer's label such as `SC_CE -> DA_I (Grenadier x1)`; `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "roomTags": {
+          "$ref": "#/$defs/TagTerm",
+          "description": "The `roomPositiveTags` and `roomNegativeTags`."
+        },
+        "scheduleAreaTags": {
+          "$ref": "#/$defs/TagTerm",
+          "description": "The `scheduleAreaPositiveTags` and `scheduleAreaNegativeTags`."
+        }
+      },
+      "required": [
+        "characterTags",
+        "closetTags",
+        "defendAreaTags",
+        "entityTags",
+        "excludeShipCrew",
+        "excludeSpawnGender",
+        "factionOverrideGuid",
+        "initialActivity",
+        "inventoryItems",
+        "isCritical",
+        "maxConcurrentSpawns",
+        "maxGroupSize",
+        "maxSpawnDelay",
+        "maxSpawns",
+        "minGroupSize",
+        "minSpawnDelay",
+        "missionAlliedMarker",
+        "name",
+        "roomTags",
+        "scheduleAreaTags"
       ],
       "type": "object"
     },
@@ -717,6 +962,13 @@
             "null"
           ]
         },
+        "entitySpawns": {
+          "description": "The entity spawn descriptions the entry states, resolved like `shipSpawns`.",
+          "items": {
+            "$ref": "#/$defs/SpawnPoolLink"
+          },
+          "type": "array"
+        },
         "excludedAreaTags": {
           "description": "The `excludedAreaTags`.",
           "items": {
@@ -903,6 +1155,13 @@
             "null"
           ]
         },
+        "npcSpawns": {
+          "description": "The NPC spawn descriptions the entry states, resolved like `shipSpawns`.",
+          "items": {
+            "$ref": "#/$defs/SpawnPoolLink"
+          },
+          "type": "array"
+        },
         "objectives": {
           "description": "The objective tokens in depth-first order, each phase after its parent.",
           "items": {
@@ -1003,7 +1262,7 @@
         "shipSpawns": {
           "description": "The ship spawn descriptions the entry states, one per variable, ordered by variable; `level`\nis always `broker`.",
           "items": {
-            "$ref": "#/$defs/ShipSpawnLink"
+            "$ref": "#/$defs/SpawnPoolLink"
           },
           "type": "array"
         },
@@ -1045,6 +1304,7 @@
         "debugName",
         "description",
         "difficulty",
+        "entitySpawns",
         "excludedAreaTags",
         "finish",
         "giverFragmentTags",
@@ -1070,6 +1330,7 @@
         "moduleHandlesOwnShutdown",
         "modulePerPlayer",
         "notForRelease",
+        "npcSpawns",
         "objectives",
         "owner",
         "partialPayout",
@@ -1577,9 +1838,17 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `commodities`."
         },
+        "contractEntitySpawns": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `contractEntitySpawns`."
+        },
         "contractLocationQueries": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `contractLocationQueries`."
+        },
+        "contractNpcSpawns": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `contractNpcSpawns`."
         },
         "contractScenarios": {
           "$ref": "#/$defs/KindCompleteness",
@@ -1748,7 +2017,9 @@
         "blueprints",
         "cargoManifests",
         "commodities",
+        "contractEntitySpawns",
         "contractLocationQueries",
+        "contractNpcSpawns",
         "contractScenarios",
         "contractShipSpawns",
         "contractTemplates",
@@ -1978,6 +2249,13 @@
           "description": "The description, resolved like the title: the `Description` of the sub contract, else of\nthe contract, else of the handler, else the `description` of the contract's\n`MissionBrokerEntry`. A game text that must not be passed on to third parties. The\ntemplate states none.",
           "x-gameText": true
         },
+        "entitySpawns": {
+          "description": "The entity spawn descriptions the contract states, resolved like `shipSpawns`: `poolGuid` is\nan entry of `contractEntitySpawns`.",
+          "items": {
+            "$ref": "#/$defs/SpawnPoolLink"
+          },
+          "type": "array"
+        },
         "faction": {
           "anyOf": [
             {
@@ -2124,6 +2402,13 @@
             "null"
           ]
         },
+        "npcSpawns": {
+          "description": "The NPC spawn descriptions the contract states, resolved like `shipSpawns`: `poolGuid` is an\nentry of `contractNpcSpawns`.",
+          "items": {
+            "$ref": "#/$defs/SpawnPoolLink"
+          },
+          "type": "array"
+        },
         "offeredAt": {
           "$ref": "#/$defs/OfferedAt",
           "description": "Every place the contract is offered at, without the cap of `pickupPlaces`: the localities\nand location objects of the same prerequisites, as stated."
@@ -2187,7 +2472,7 @@
         "shipSpawns": {
           "description": "The ship spawn descriptions the contract states, one per `missionVariableName`, ordered by\nvariable: the first of sub contract, contract, handler and template that states the\nvariable wins; a description without a group is left out.",
           "items": {
-            "$ref": "#/$defs/ShipSpawnLink"
+            "$ref": "#/$defs/SpawnPoolLink"
           },
           "type": "array"
         },
@@ -2256,6 +2541,7 @@
         "cooldownLayers",
         "debugName",
         "description",
+        "entitySpawns",
         "faction",
         "fixedRewards",
         "giverFaction",
@@ -2273,6 +2559,7 @@
         "missionType",
         "missionTypeGuid",
         "notForRelease",
+        "npcSpawns",
         "offeredAt",
         "onceOnly",
         "personalCooldownTime",
@@ -2386,6 +2673,13 @@
           },
           "type": "array"
         },
+        "entitySpawns": {
+          "description": "The entity spawn descriptions the template states, resolved like `shipSpawns`.",
+          "items": {
+            "$ref": "#/$defs/SpawnPoolLink"
+          },
+          "type": "array"
+        },
         "guid": {
           "$ref": "#/$defs/Guid",
           "description": "The GUID of the Record; the `templateGuid` of the contracts that name it."
@@ -2443,6 +2737,13 @@
             "null"
           ]
         },
+        "npcSpawns": {
+          "description": "The NPC spawn descriptions the template states, resolved like `shipSpawns`.",
+          "items": {
+            "$ref": "#/$defs/SpawnPoolLink"
+          },
+          "type": "array"
+        },
         "objectives": {
           "description": "The objective tokens in depth-first order, each phase after its parent.",
           "items": {
@@ -2497,7 +2798,7 @@
         "shipSpawns": {
           "description": "The ship spawn descriptions the template states, one per variable, ordered by variable;\n`level` is always `template`.",
           "items": {
-            "$ref": "#/$defs/ShipSpawnLink"
+            "$ref": "#/$defs/SpawnPoolLink"
           },
           "type": "array"
         },
@@ -2538,6 +2839,7 @@
         "classType",
         "contractProperties",
         "endComms",
+        "entitySpawns",
         "guid",
         "haulingOrders",
         "illegal",
@@ -2546,6 +2848,7 @@
         "missionTypeGuid",
         "modifiers",
         "notForRelease",
+        "npcSpawns",
         "objectives",
         "owner",
         "partialPayout",
@@ -3294,6 +3597,125 @@
           "value": "abandon"
         }
       ]
+    },
+    "EntitySpawnGroup": {
+      "description": "A group of entities that spawn together (`SpawnDescription_EntityGroup`).",
+      "properties": {
+        "name": {
+          "description": "The `Name` of the group, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "slots": {
+          "description": "The entities of the group, one slot each.",
+          "items": {
+            "$ref": "#/$defs/EntitySpawnSlot"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "slots"
+      ],
+      "type": "object"
+    },
+    "EntitySpawnOption": {
+      "description": "One alternative of an entity slot (`SpawnDescription_Entity`): an entity the game picks by\ntags.",
+      "properties": {
+        "amount": {
+          "description": "The `amount` of entities that spawn; `null` when absent.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "entityTags": {
+          "description": "The `entityTags`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "markupTags": {
+          "description": "The `markupTags`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "negativeTags": {
+          "description": "The `negativeTags` a match must not carry.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "description": "The `tags` the game searches entities by.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "weight": {
+          "description": "The `weight` of the alternative among its slot; `null` when absent.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "amount",
+        "entityTags",
+        "markupTags",
+        "negativeTags",
+        "tags",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "EntitySpawnPool": {
+      "description": "An entity spawn description of a contract: what a\n`MissionPropertyValue_EntitySpawnDescriptions` property states, shared by every contract that\nstates the same.",
+      "properties": {
+        "groups": {
+          "description": "The groups in stored order.",
+          "items": {
+            "$ref": "#/$defs/EntitySpawnGroup"
+          },
+          "type": "array"
+        },
+        "guid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The identifier of the content (see the catalog documentation); not a GUID of the Archive."
+        }
+      },
+      "required": [
+        "groups",
+        "guid"
+      ],
+      "type": "object"
+    },
+    "EntitySpawnSlot": {
+      "description": "The alternatives for one entity (`SpawnDescription_EntityOptions`): the game spawns one of them.",
+      "properties": {
+        "options": {
+          "description": "The alternatives in stored order.",
+          "items": {
+            "$ref": "#/$defs/EntitySpawnOption"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "options"
+      ],
+      "type": "object"
     },
     "EscalatingClaims": {
       "description": "The `escalatingClaimsParams` of the item recovery rules.",
@@ -8179,6 +8601,125 @@
       ],
       "type": "object"
     },
+    "NpcSpawnGroup": {
+      "description": "A group of NPCs that spawn together (`SpawnDescription_NPC_Group`).",
+      "properties": {
+        "name": {
+          "description": "The `Name` of the group, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "options": {
+          "description": "The alternatives in stored order.",
+          "items": {
+            "$ref": "#/$defs/NpcSpawnOption"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "options"
+      ],
+      "type": "object"
+    },
+    "NpcSpawnOption": {
+      "description": "One alternative of an NPC group (`SpawnDescription_NPCOption`): the game spawns one of them.",
+      "properties": {
+        "autoSpawnSettings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AutoSpawnSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `autoSpawnSettings`, `null` when absent."
+        },
+        "embeddedName": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AiName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `embeddedName`, `null` when absent."
+        },
+        "identifierTags": {
+          "description": "The `identifierTags`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "includeLocationAISpawnTags": {
+          "description": "The `includeLocationAISpawnTags` flag; `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "namePropertyVariable": {
+          "description": "The `missionVariableName` of the property the `nameProperty` points to, `null` when absent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priority": {
+          "description": "The `priority`; `-1` as stored means none.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "weight": {
+          "description": "The `weight` of the alternative among its group; `null` when absent.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "autoSpawnSettings",
+        "embeddedName",
+        "identifierTags",
+        "includeLocationAISpawnTags",
+        "namePropertyVariable",
+        "priority",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "NpcSpawnPool": {
+      "description": "An NPC spawn description of a contract: what a `MissionPropertyValue_NPCSpawnDescriptions`\nproperty states, shared by every contract that states the same.",
+      "properties": {
+        "groups": {
+          "description": "The groups in stored order.",
+          "items": {
+            "$ref": "#/$defs/NpcSpawnGroup"
+          },
+          "type": "array"
+        },
+        "guid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The identifier of the content (see the catalog documentation); not a GUID of the Archive."
+        }
+      },
+      "required": [
+        "groups",
+        "guid"
+      ],
+      "type": "object"
+    },
     "NumberOption": {
       "description": "An option of an integer or float property.",
       "properties": {
@@ -9199,20 +9740,82 @@
           "type": "object"
         },
         {
-          "description": "A value of another struct, which the catalog does not read, e.g. the NPC and entity spawn\ndescriptions.",
+          "description": "`MissionPropertyValue_NPCSpawnDescriptions`.",
           "properties": {
-            "structName": {
-              "description": "The struct name.",
-              "type": "string"
+            "poolGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `guid` of the entry of `contractNpcSpawns`; `null` for a description without a\ngroup."
             },
             "type": {
-              "const": "other",
+              "const": "npcSpawnDescriptions",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_EntitySpawnDescriptions`.",
+          "properties": {
+            "poolGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `guid` of the entry of `contractEntitySpawns`; `null` for a description without a\ngroup."
+            },
+            "type": {
+              "const": "entitySpawnDescriptions",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`MissionPropertyValue_Organization`: the organisations a mission may pick from.",
+          "properties": {
+            "conditions": {
+              "description": "The `matchConditions`, as for a location query.",
+              "items": {
+                "$ref": "#/$defs/LocationCondition"
+              },
+              "type": "array"
+            },
+            "forcedOrganizationGuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Guid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `debugForceChosenOrganization` Record (`MissionOrganization`), `null` when absent."
+            },
+            "type": {
+              "const": "organization",
               "type": "string"
             }
           },
           "required": [
             "type",
-            "structName"
+            "conditions"
           ],
           "type": "object"
         }
@@ -10916,37 +11519,6 @@
       ],
       "type": "object"
     },
-    "ShipSpawnLink": {
-      "description": "The ship spawn description a contract states for a variable.",
-      "properties": {
-        "level": {
-          "$ref": "#/$defs/SpawnLevel",
-          "description": "The level that states the property: the first of sub contract, contract, handler and\ntemplate."
-        },
-        "poolGuid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The `guid` of the entry of `contractShipSpawns`."
-        },
-        "token": {
-          "description": "The `extendedTextToken` of the property, `null` when empty.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "variable": {
-          "description": "The `missionVariableName` of the property.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "level",
-        "poolGuid",
-        "token",
-        "variable"
-      ],
-      "type": "object"
-    },
     "ShipSpawnOption": {
       "description": "One alternative of a ship slot: a ship the game picks by tags.",
       "properties": {
@@ -11327,6 +11899,52 @@
       ],
       "type": "object"
     },
+    "SpawnInventoryItem": {
+      "description": "An item an NPC carries (`SpawnSettingsInventoryItem`).",
+      "properties": {
+        "amountInventoriesToFill": {
+          "description": "The `amountInventoriesToFill`; `null` when absent.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "entityClassGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `entityClass` Record, `null` when absent."
+        },
+        "markAsMissionItem": {
+          "description": "The `markAsMissionItem` flag; `null` when absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "quantity": {
+          "description": "The `quantity`; `null` when absent.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "amountInventoriesToFill",
+        "entityClassGuid",
+        "markAsMissionItem",
+        "quantity"
+      ],
+      "type": "object"
+    },
     "SpawnLevel": {
       "description": "The level of a contract that states a property or a prerequisite.",
       "type": "string",
@@ -11352,6 +11970,37 @@
           "value": "broker"
         }
       ]
+    },
+    "SpawnPoolLink": {
+      "description": "The ship, NPC or entity spawn description a contract states for a variable.",
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/SpawnLevel",
+          "description": "The level that states the property: the first of sub contract, contract, handler and\ntemplate."
+        },
+        "poolGuid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The `guid` of the entry of `contractShipSpawns`, `contractNpcSpawns` or\n`contractEntitySpawns`, by the field the link is in."
+        },
+        "token": {
+          "description": "The `extendedTextToken` of the property, `null` when empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variable": {
+          "description": "The `missionVariableName` of the property.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "poolGuid",
+        "token",
+        "variable"
+      ],
+      "type": "object"
     },
     "SpawnWith": {
       "description": "Items an entry spawns along with its own (`ArchetypeOptionalDataV3_SpawnWith`).",
@@ -12926,10 +13575,24 @@
       "$ref": "#/$defs/Completeness",
       "description": "Whether each kind is a complete snapshot of the Build."
     },
+    "contractEntitySpawns": {
+      "description": "The distinct entity spawn descriptions of the contracts, templates and broker entries,\nordered by identifier.",
+      "items": {
+        "$ref": "#/$defs/EntitySpawnPool"
+      },
+      "type": "array"
+    },
     "contractLocationQueries": {
       "description": "The distinct location queries of the contracts, ordered by identifier.",
       "items": {
         "$ref": "#/$defs/LocationQuery"
+      },
+      "type": "array"
+    },
+    "contractNpcSpawns": {
+      "description": "The distinct NPC spawn descriptions of the contracts, templates and broker entries, ordered\nby identifier.",
+      "items": {
+        "$ref": "#/$defs/NpcSpawnPool"
       },
       "type": "array"
     },
@@ -13247,7 +13910,9 @@
     "cargoManifests",
     "commodities",
     "completeness",
+    "contractEntitySpawns",
     "contractLocationQueries",
+    "contractNpcSpawns",
     "contractScenarios",
     "contractShipSpawns",
     "contractTemplates",

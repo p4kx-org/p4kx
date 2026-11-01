@@ -120,6 +120,18 @@ fn spawn_links() -> serde_json::Value {
             "level": "contract",
             "poolGuid": "e1000000-0000-4000-8000-000000000001"
         }],
+        "npcSpawns": [{
+            "variable": "Crew_BP",
+            "token": null,
+            "level": "contract",
+            "poolGuid": "e5000000-0000-4000-8000-000000000001"
+        }],
+        "entitySpawns": [{
+            "variable": "Loot_BP",
+            "token": null,
+            "level": "handler",
+            "poolGuid": "e6000000-0000-4000-8000-000000000001"
+        }],
         "locationQueries": [{
             "variable": "Location_BP",
             "token": "Location",

@@ -223,11 +223,11 @@ pub(crate) struct LocationQuery {
     pub(crate) conditions: Vec<LocationCondition>,
 }
 
-/// The ship spawn description a contract states for a variable.
+/// The ship, NPC or entity spawn description a contract states for a variable.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShipSpawnLink {
+pub(crate) struct SpawnPoolLink {
     /// The `missionVariableName` of the property.
     pub(crate) variable: String,
     /// The `extendedTextToken` of the property, `null` when empty.
@@ -235,7 +235,8 @@ pub(crate) struct ShipSpawnLink {
     /// The level that states the property: the first of sub contract, contract, handler and
     /// template.
     pub(crate) level: SpawnLevel,
-    /// The `guid` of the entry of `contractShipSpawns`.
+    /// The `guid` of the entry of `contractShipSpawns`, `contractNpcSpawns` or
+    /// `contractEntitySpawns`, by the field the link is in.
     pub(crate) pool_guid: CatalogGuid,
 }
 
@@ -253,6 +254,18 @@ pub(crate) struct LocationQueryLink {
     pub(crate) level: SpawnLevel,
     /// The `guid` of the entry of `contractLocationQueries`.
     pub(crate) query_guid: CatalogGuid,
+}
+
+impl From<SpawnPoolLink> for LocationQueryLink {
+    /// Takes the identifier of the link as the one of a location query.
+    fn from(link: SpawnPoolLink) -> Self {
+        Self {
+            variable: link.variable,
+            token: link.token,
+            level: link.level,
+            query_guid: link.pool_guid,
+        }
+    }
 }
 
 /// A `ContractPrerequisite_LocationProperty`: the contract is offered at the location another

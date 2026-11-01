@@ -24,7 +24,8 @@ use crate::mission_siblings::{self, Siblings};
 use crate::mission_titles::titles;
 use crate::record_fields::{boolean, guid_value, nonnil_guid, reference, text};
 use crate::selection::{Kind, is_leftover};
-use crate::spawn_layers::{HandlerSpawns, RecordSpawns, SpawnPools};
+use crate::spawn_layers::{HandlerSpawns, RecordSpawns};
+use crate::spawn_pools::SpawnPools;
 use crate::texts::Texts;
 use crate::{CatalogError, CatalogFailure};
 
@@ -41,7 +42,7 @@ pub(crate) struct Missions<'f> {
     pub(crate) contracts: Vec<ContractEntry<'f>>,
     pub(crate) skipped: usize,
     pub(crate) failures: Vec<CatalogFailure>,
-    pub(crate) pools: SpawnPools,
+    pub(crate) pools: SpawnPools<'f>,
     pub(crate) siblings: Siblings<'f>,
 }
 
@@ -49,7 +50,7 @@ pub(crate) struct Missions<'f> {
 type PieceError = Box<dyn std::error::Error + Send + Sync>;
 
 enum Piece<'f> {
-    Contracts(Vec<ContractEntry<'f>>, usize, Grants, SpawnPools),
+    Contracts(Vec<ContractEntry<'f>>, usize, Grants, SpawnPools<'f>),
     Failed(CatalogFailure),
 }
 
@@ -376,6 +377,8 @@ impl<'f> Parent<'_, 'f> {
             cooldown: ContractCooldown::resolve(&shared.cooldown, levels),
             facts,
             ship_spawns: spawns.ship_spawns,
+            npc_spawns: spawns.npc_spawns,
+            entity_spawns: spawns.entity_spawns,
             location_queries: spawns.location_queries,
             location_prerequisites: spawns.location_prerequisites,
             hauling_orders: HaulingLevels::of(levels, template_data, broker).orders(),

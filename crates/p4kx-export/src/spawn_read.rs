@@ -4,8 +4,10 @@
 use p4kx_extraction::{StructValue, TagTree, Value};
 
 use crate::blueprint::as_struct;
+use crate::entity_spawn_model::EntitySpawnPool;
 use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{items, one};
+use crate::npc_spawn_model::NpcSpawnPool;
 use crate::record_fields::{boolean, guid_value, integer, nonnil_guid, number, reference, text};
 use crate::spawn_model::{
     LocationCondition, LocationCount, LocationQuery, ShipSpawnGroup, ShipSpawnOption,
@@ -15,13 +17,19 @@ use crate::spawn_model::{
 const LOCATION: &str = "MissionPropertyValue_Location";
 const LOCATIONS: &str = "MissionPropertyValue_Locations";
 const SHIPS: &str = "MissionPropertyValue_ShipSpawnDescriptions";
+const NPCS: &str = "MissionPropertyValue_NPCSpawnDescriptions";
+const ENTITIES: &str = "MissionPropertyValue_EntitySpawnDescriptions";
 const CONDITION_PREFIX: &str = "DataSetMatchCondition_";
 
 /// What a mission property states.
 #[derive(Debug)]
-pub(crate) enum Spawn {
+pub(crate) enum Spawn<'f> {
     /// A ship spawn description.
     Ships(ShipSpawnPool),
+    /// An NPC spawn description.
+    Npcs(NpcSpawnPool<'f>),
+    /// An entity spawn description.
+    Entities(EntitySpawnPool),
     /// A location query.
     Location(LocationQuery),
 }
@@ -39,8 +47,8 @@ impl<'x, 'f> Reader<'x, 'f> {
         Self { tags, root }
     }
 
-    /// Reads the value of a property, `None` for a value that is neither a ship spawn description
-    /// nor a location.
+    /// Reads the value of a property, `None` for a value that is no spawn description and no
+    /// location.
     ///
     /// # Errors
     ///
@@ -48,9 +56,11 @@ impl<'x, 'f> Reader<'x, 'f> {
     pub(crate) fn spawn(
         &self,
         value: &StructValue<'f>,
-    ) -> Result<Option<Spawn>, serde_json::Error> {
+    ) -> Result<Option<Spawn<'f>>, serde_json::Error> {
         Ok(Some(match value.type_name() {
             SHIPS => Spawn::Ships(self.ships(value)?),
+            NPCS => Spawn::Npcs(self.npcs(value)?),
+            ENTITIES => Spawn::Entities(self.entities(value)?),
             LOCATION => Spawn::Location(self.location(value, LocationCount::One)?),
             LOCATIONS => Spawn::Location(self.location(value, LocationCount::Many)?),
             _ => return Ok(None),
@@ -115,11 +125,7 @@ impl<'x, 'f> Reader<'x, 'f> {
             .then(|| boolean(Some(value), "failIfMinAmountNotFound"))
             .flatten();
         let resource_tags = self.tag_array(Some(value), "resourceTags");
-        let conditions: Vec<LocationCondition> = items(Some(value), "matchConditions")
-            .iter()
-            .filter_map(as_struct)
-            .map(|condition| self.condition(condition))
-            .collect();
+        let conditions = self.conditions(Some(value));
         let content = (count, min, max, fail, log, &resource_tags, &conditions);
         Ok(LocationQuery {
             guid: content_guid(&content)?,
@@ -131,6 +137,15 @@ impl<'x, 'f> Reader<'x, 'f> {
             resource_tags,
             conditions,
         })
+    }
+
+    /// Reads the `matchConditions` of `parent`, a location query or an organisation value.
+    pub(crate) fn conditions(&self, parent: Option<&StructValue<'f>>) -> Vec<LocationCondition> {
+        items(parent, "matchConditions")
+            .iter()
+            .filter_map(as_struct)
+            .map(|condition| self.condition(condition))
+            .collect()
     }
 
     fn condition(&self, condition: &StructValue<'f>) -> LocationCondition {

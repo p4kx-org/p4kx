@@ -197,6 +197,18 @@ pub(super) fn broker_entries() -> serde_json::Value {
             "level": "broker",
             "poolGuid": "e1000000-0000-4000-8000-000000000001"
         }],
+        "npcSpawns": [{
+            "variable": "Crew_BP",
+            "token": null,
+            "level": "broker",
+            "poolGuid": "e5000000-0000-4000-8000-000000000001"
+        }],
+        "entitySpawns": [{
+            "variable": "Loot_BP",
+            "token": null,
+            "level": "broker",
+            "poolGuid": "e6000000-0000-4000-8000-000000000001"
+        }],
         "locationQueries": [],
         "haulingOrders": [],
         "objectives": [{

@@ -52,6 +52,8 @@ impl Kind {
             Self::ContractLocationQueries => 42,
             Self::ContractTemplates => 43,
             Self::MissionBrokerEntries => 44,
+            Self::ContractNpcSpawns => 45,
+            Self::ContractEntitySpawns => 46,
         }
     }
 }

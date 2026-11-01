@@ -11,7 +11,8 @@ use crate::mission_layers::{items, key, one};
 use crate::record_fields::{
     boolean, guid_value, integer, linked, nonnil_guid, number, structs, text,
 };
-use crate::spawn_layers::SpawnPools;
+use crate::record_read::ReadError;
+use crate::spawn_pools::SpawnPools;
 use crate::spawn_read::Reader;
 use crate::template_issues::{TemplateError, Unknowns};
 use crate::template_objective::{
@@ -41,7 +42,7 @@ impl<'r, 'x, 'f> ObjectiveReader<'r, 'x, 'f> {
         reader: &'r Reader<'x, 'f>,
         texts: &'r Texts<'f>,
         unknowns: &'r Unknowns,
-        pools: &'r RefCell<SpawnPools>,
+        pools: &'r RefCell<SpawnPools<'f>>,
     ) -> Self {
         Self {
             reader,
@@ -62,12 +63,13 @@ impl<'r, 'x, 'f> ObjectiveReader<'r, 'x, 'f> {
     /// # Errors
     ///
     /// Returns [`TemplateError::PhasesTooDeep`] for phases nested deeper than
-    /// [`MAX_PHASE_DEPTH`] and the error of the serialisation that makes the identifier of a
+    /// [`MAX_PHASE_DEPTH`], [`TemplateError::UnknownStruct`] for a property value of a struct the
+    /// catalog does not know and the error of the serialisation that makes the identifier of a
     /// description.
     pub(crate) fn objectives(
         &self,
         root: Option<&StructValue<'f>>,
-    ) -> Result<Vec<TemplateObjective<'f>>, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<Vec<TemplateObjective<'f>>, ReadError> {
         let mut found = Vec::new();
         let mut pending: Vec<(&StructValue<'f>, Option<CatalogGuid>, usize)> =
             structs(root, "objectiveTokens")
@@ -99,7 +101,7 @@ impl<'r, 'x, 'f> ObjectiveReader<'r, 'x, 'f> {
         token: &StructValue<'f>,
         id: CatalogGuid,
         parent_id: Option<CatalogGuid>,
-    ) -> Result<TemplateObjective<'f>, serde_json::Error> {
+    ) -> Result<TemplateObjective<'f>, ReadError> {
         let fields = token;
         let token = Some(token);
         let override_display = one(token, "overrideMissionDetailsDisplayInfo");
