@@ -157,7 +157,9 @@ pub enum SettingsError {
 }
 
 /// Returns `settings.toml` in the `P4KX` folder of the platform config directory,
-/// `%APPDATA%\P4KX` on Windows. The first call migrates the old `P4K-Extractor` folder (see
+/// `%APPDATA%\P4KX` on Windows and `$XDG_CONFIG_HOME/P4KX` on Linux.
+///
+/// The first call migrates the old `P4K-Extractor` folder (see
 /// [`migrate_profile`](crate::migrate_profile)).
 #[must_use]
 pub fn default_settings_file() -> Option<PathBuf> {

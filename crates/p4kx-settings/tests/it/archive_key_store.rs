@@ -75,6 +75,23 @@ fn the_key_file_is_readable_by_the_user_alone() -> TestResult {
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn replacing_a_key_file_with_wider_permissions_leaves_mode_0600() -> TestResult {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir()?;
+    let store = store(&dir);
+    store.save(&key(FIRST)?)?;
+    std::fs::set_permissions(store.file(), std::fs::Permissions::from_mode(0o644))?;
+
+    store.save(&key(SECOND)?)?;
+
+    let mode = std::fs::metadata(store.file())?.permissions().mode();
+    assert_eq!(mode & 0o777, 0o600, "mode");
+    Ok(())
+}
+
 #[test]
 fn a_file_that_is_no_key_is_malformed_and_its_error_hides_the_content() -> TestResult {
     let dir = tempfile::tempdir()?;
