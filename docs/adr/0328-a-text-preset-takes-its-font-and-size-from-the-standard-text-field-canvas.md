@@ -23,27 +23,32 @@ the cascade set no size, 60 % of the box (`text style Heading1 names no font sty
 - The other places that select a preset tag are the styles of single screens and the modular-kit
   styles; they are ordinary entries of the cascade.
 - A `BuildingBlocks_FontStyle` Record has a `scaleModifier` (Titillium Web 0.87, Outfit 0.89): the
-  size a text is drawn at is its `FontSize` times that factor, so the font decides the size too.
+  size a text is drawn at is its `FontSize` times that factor, so a preset's size is drawn with its
+  font.
 
 ## Decision
 
-- A text field whose cascade sets no font style or no font size takes them from the entry of its
-  preset in the canvas of the standard text field: the entry of the brand style that the canvas of
-  the field picks (`Canvas::pick_brand`), over the default entry, field by field. Entries of the
-  cascade, the inline styles and the overrides of an instance win over it.
+- A text field whose style (cascade, inline style, override of an instance) sets no font size
+  takes the size of its preset from the canvas of the standard text field. Its font style comes
+  from the preset too, unless the style sets one. A field whose size is set keeps its font as it
+  was: the preset's font goes with the preset's size, not alone.
+- The entry is the one of the brand style `s_<code>_` of the standard text field itself, over the
+  default entry, field by field. The brand is that of the screen and is looked up in the standard
+  canvas, not in the canvas that holds the field, so a nested canvas without brand styles gets the
+  brand's entry too; a brand the standard canvas lacks gets the default.
 - Only entries that select exactly one preset tag count. Other modifiers of those entries (colour,
   alignment, spacing) are not applied here.
-- A preset that the canvas sets no size for is listed as `text style <preset> has no font size in
-  the Archive: taken from the height of the widget`; one without a font style stays listed as
-  before.
+- A preset with no entry or no size is listed as `text style <preset> has no font size in the
+  Archive: taken from the height of the widget`; a missing standard canvas is listed once as
+  `standard text field not found in the Archive`.
 
 ## Compared with the game
 
 Renders of `m_mfd_screen` with `--var powerstate=1` and the power page, brand `aegs`: every text
-field of the page already has a size from entries of its canvas (32 to 70), so the sizes do not
-change; the font becomes Titillium Web at 0.87, narrower than the default, so the labels are
-smaller on screen. Not compared: the owner's in-game screenshots are not part of the repository,
-so the render was not set beside them in this change.
+field of the page already has a size from entries of its canvas (32 to 70), so by the rule above
+the page does not change; the tab bar keeps its look. The preset applies to fields without such a
+size on other screens. Not compared: the owner's in-game screenshots are not part of the
+repository, so no render was set beside them.
 
 ## Not done
 

@@ -2,6 +2,7 @@
 
 Decided for issue #969. Amends ADR-0296 ("Comparison with the game"), ADR-0106 ("Compared with the
 game") and ADR-0277 (the canvas a binding picks).
+Amended by ADR-0328 for the text sizes left open below.
 
 ## Context
 

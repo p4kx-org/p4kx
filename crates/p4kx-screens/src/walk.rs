@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -60,7 +61,7 @@ pub(crate) struct Walk<'s, 'a, 'f, 't> {
     pub(crate) overrides: Vec<Override>,
     pub(crate) pixel: f32,
     pub(crate) turned: usize,
-    pub(crate) presets: Option<Rc<PresetStyles>>,
+    pub(crate) presets: OnceCell<PresetStyles>,
 }
 
 impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
@@ -107,7 +108,7 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
             overrides: Vec::new(),
             pixel: 1.0,
             turned: 0,
-            presets: None,
+            presets: OnceCell::new(),
         }
     }
 

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The text presets of the text fields of the powered MFD take the size and the font the standard
-//! text field sets, and the page name in the tab bar is drawn at that size.
+//! The text presets of the powered MFD all have a size, and the page name in the tab bar keeps the
+//! size its style entries give it.
 
 use std::error::Error;
 use std::ops::Range;
@@ -24,9 +24,9 @@ const WIDTH: u32 = 800;
 /// The columns and rows the page name of the tab bar stands in, at 800 pixels wide.
 const NAME_COLUMNS: Range<u32> = 250..550;
 const NAME_ROWS: Range<u32> = 548..600;
-/// The height in pixels of the capitals of the page name on LIVE (Titillium Web at the size the
-/// preset `Heading1` sets for the Aegis style), with room for a changed Archive.
-const NAME_HEIGHT: Range<u32> = 14..24;
+/// The height in pixels of the capitals of the page name on LIVE, measured at 20: its size is set
+/// by the style entries of the screen, so the presets must leave it as it is.
+const NAME_HEIGHT: Range<u32> = 18..23;
 
 fn is_ink(image: &RgbaImage, column: u32, row: u32) -> bool {
     let at = (row as usize * image.width() as usize + column as usize) * 4;
@@ -47,7 +47,7 @@ fn ink_height(image: &RgbaImage, columns: Range<u32>, rows: Range<u32>) -> u32 {
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn the_presets_of_the_powered_mfd_have_a_size_and_the_page_name_is_drawn_at_it() -> TestResult {
+fn the_presets_of_the_powered_mfd_have_a_size_and_the_page_name_keeps_its_size() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
@@ -80,12 +80,12 @@ fn the_presets_of_the_powered_mfd_have_a_size_and_the_page_name_is_drawn_at_it()
         .report()
         .unsupported
         .iter()
-        .filter(|entry| entry.reason.starts_with("text style"))
+        .filter(|entry| entry.reason.contains("has no font size"))
         .map(|entry| entry.reason.as_str())
         .collect();
     assert!(
         unresolved.is_empty(),
-        "presets without a style: {unresolved:?}"
+        "presets without a size: {unresolved:?}"
     );
     let image = composed
         .rasterize(&RasterOptions {

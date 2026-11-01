@@ -1,6 +1,7 @@
 # Screen texts are glyph outlines of the font movie, placed by the style cascade
 
 Decided for issue #536, on top of ADR-0089 (screens) and ADR-0045 (texts of movies).
+Amended by ADR-0328: the presets of text fields take a font and a size from the standard text field.
 
 ## Decisions
 

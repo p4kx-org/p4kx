@@ -177,9 +177,10 @@ fn pick_font(
             "font style {} has no font in the font movie: default font used",
             info.name
         ),
-        (None, Some(preset)) => {
-            format!("text style {preset} names no font style in the Archive: default font used")
-        }
+        (None, Some(preset)) => style_note(
+            preset,
+            "has no font style from the cascade: default font used",
+        ),
         (None, None) => "no font style: default font used".to_owned(),
     });
     let default = book.default_font();
@@ -192,14 +193,20 @@ fn pick_font(
     default.map(|at| (at, scale))
 }
 
+/// Returns the note about the text style `preset`: `what` follows its name.
+fn style_note(preset: &str, what: &str) -> String {
+    format!("text style {preset} {what}")
+}
+
 fn font_size(look: &Look<'_>, spec: &TextSpec, area: Area, scale: f32, notes: &mut Notes) -> f32 {
     let size = look.style.text.font_size.or(spec.font_size).map_or_else(
         || {
             notes.push(spec.preset.as_deref().map_or_else(
                 || "no font size: taken from the height of the widget".to_owned(),
                 |preset| {
-                    format!(
-                        "text style {preset} has no font size in the Archive: taken from the height of the widget"
+                    style_note(
+                        preset,
+                        "has no font size in the Archive: taken from the height of the widget",
                     )
                 },
             ));

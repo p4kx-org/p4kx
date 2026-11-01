@@ -284,8 +284,8 @@ pub use screens_rest::{TestOp, TestParam};
 pub use screens_sample::{SCREEN_MFD, SCREEN_PANEL, SCREEN_SHIP, SCREEN_STYLE, screens_sample};
 pub use screens_style::{TestCondition, TestModifier, TestStyle, TestStyleEntry};
 pub use screens_text::{
-    SCREEN_TEXT_CANVAS, SCREEN_TEXT_STYLE, screens_font_movie, screens_text_sample,
-    text_localisation,
+    SCREEN_DEFAULT_STYLE, SCREEN_TEXT_CANVAS, SCREEN_TEXT_STYLE, screens_font_movie,
+    screens_text_sample, text_localisation,
 };
 pub use screens_widget::{TestColour, TestDim, TestWidget};
 pub use skin_blendshapes::{BSHAPES_GPU_CHUNK, TestSkinBlendshapes, TestSkinEntry};

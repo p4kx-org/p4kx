@@ -15,6 +15,10 @@ pub const SCREEN_TEXT_CANVAS: u128 = 0x4e71_a0c5_83d2_4f19_9b36_d7e8_12a4_c05b;
 /// [`screens_font_movie`].
 pub const SCREEN_TEXT_STYLE: u128 = 0x93b0_2d6e_f1a7_48c4_a5e9_0c37_b8d1_6f42;
 
+/// The GUID of the font style Record `blenderpromedium`, whose font `Blender Pro Medium` is the
+/// default font of [`screens_font_movie`].
+pub const SCREEN_DEFAULT_STYLE: u128 = 0x6c1e_95a3_0d47_4b82_91fa_e3b8_5720_c4d6;
+
 const SCREEN_TEXT_TAG: u128 = 0xd2f4_7a18_6b93_4e0d_8c51_a9e3_f720_14b6;
 const FONT_STYLES: &str = "libs/foundry/records/ui/buildingblocks/fontstyles/";
 const RED: TestColour = TestColour::Solid([255, 0, 0, 255]);
@@ -100,6 +104,22 @@ fn font_style() -> TestRecord {
     .value("scaleModifier", TestValue::Single(1.0))
 }
 
+fn default_font_style() -> TestRecord {
+    TestRecord::new(
+        SCREEN_DEFAULT_STYLE,
+        "BuildingBlocks_FontStyle",
+        "BuildingBlocks_FontStyle.blenderpromedium",
+        format!("{FONT_STYLES}blenderpromedium.xml"),
+    )
+    .value("font", TestValue::text("$Text1Med"))
+    .value(
+        "paintFile",
+        TestValue::text("UI/fonts/Install/BlenderPro-Medium.slug"),
+    )
+    .value("isBold", TestValue::Bool(false))
+    .value("scaleModifier", TestValue::Single(1.0))
+}
+
 fn text(name: &'static str, source: &'static str, at: (f32, f32), size: (f32, f32)) -> TestWidget {
     TestWidget::new("BuildingBlocks_WidgetText", name)
         .parent("root")
@@ -174,6 +194,7 @@ fn canvas() -> TestCanvas {
 pub fn screens_text_sample() -> DataForgeBuilder {
     screens_schema(entity_schema(DataForgeBuilder::new()))
         .record(font_style())
+        .record(default_font_style())
         .record(tag_record(SCREEN_TEXT_TAG, "Styled"))
         .record(canvas().record())
 }
