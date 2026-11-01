@@ -69,9 +69,6 @@ pub(super) fn location_queries() -> serde_json::Value {
             "condition": "excludeNearbyLocations",
             "rangeKm": 100,
             "locationProperty": "Pickup_BP"
-        }, {
-            "condition": "other",
-            "structName": "DataSetMatchCondition_Unknown"
         }]
     }])
 }

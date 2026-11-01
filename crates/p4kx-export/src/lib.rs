@@ -89,6 +89,7 @@ mod collected;
 #[cfg(test)]
 mod collected_tests;
 mod commodity;
+mod condition_schema;
 mod container_read;
 mod contract;
 mod contract_cargo;
@@ -227,6 +228,7 @@ mod shop_soc;
 mod shop_summary;
 mod shops;
 mod soc_preset;
+mod spawn_error;
 mod spawn_layers;
 mod spawn_model;
 mod spawn_pools;

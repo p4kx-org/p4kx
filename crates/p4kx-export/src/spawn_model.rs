@@ -139,6 +139,7 @@ pub(crate) struct TagTerm {
 /// One match condition of a location query (`DataSetMatchCondition_*`), as stored.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(tag = "condition", rename_all = "camelCase")]
+#[schemars(transform = crate::condition_schema::with_deprecated_other)]
 pub(crate) enum LocationCondition {
     /// `DataSetMatchCondition_TagSearch`: the location must satisfy one of the terms.
     #[serde(rename_all = "camelCase")]
@@ -195,12 +196,6 @@ pub(crate) enum LocationCondition {
     SpecificItems {
         /// The `MissionItem` Records.
         item_guids: Vec<CatalogGuid>,
-    },
-    /// A condition of another struct, which the catalog does not read.
-    #[serde(rename_all = "camelCase")]
-    Other {
-        /// The struct name.
-        struct_name: String,
     },
 }
 
