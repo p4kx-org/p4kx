@@ -4,8 +4,10 @@
 //! The own skins of a story character's head: the naming rule of ADR-0109 that the armour and the
 //! entity path share.
 
-use crate::armour::rig_part;
-use crate::{ModelFailure, ModelProvider};
+use std::sync::Arc;
+
+use crate::head_rig::rig_part;
+use crate::{Geometry, ModelFailure, ModelProvider};
 
 const HEAD_SUFFIX: &str = "_head";
 
@@ -15,7 +17,7 @@ const HEAD_SUFFIX: &str = "_head";
 pub(crate) struct Bespoke {
     pub(crate) folder: String,
     pub(crate) prefix: String,
-    pub(crate) library: Option<String>,
+    pub(crate) library: String,
 }
 
 impl Bespoke {
@@ -23,8 +25,7 @@ impl Bespoke {
     /// `library`; `None` when the library names no folder, so the head has none of its own.
     ///
     /// The prefix is the class name without `_head`, e.g. `eckhart_t2`.
-    pub(crate) fn of_head(class_name: &str, library: Option<&str>) -> Option<Self> {
-        let library = library?;
+    pub(crate) fn of_head(class_name: &str, library: &str) -> Option<Self> {
         let folder = folder_of(library)?;
         let prefix = class_name
             .len()
@@ -36,7 +37,7 @@ impl Bespoke {
         Some(Self {
             folder,
             prefix: prefix.to_owned(),
-            library: Some(library.to_owned()),
+            library: library.to_owned(),
         })
     }
 
@@ -55,18 +56,50 @@ impl Bespoke {
     }
 }
 
+/// The own skin of a part of a story character's head, in the Loadout tree: the geometry that
+/// names the skin, drawn when the Archive holds it, and the material library of the head.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OwnSkin {
+    pub(crate) geometry: Geometry,
+    pub(crate) head_library: Arc<str>,
+}
+
 /// Returns whether the Archive holds the file at `path`, a path below `Data`; a file that cannot
-/// be read still exists.
+/// be read still exists. A provider without file access, see [`ModelProvider::file`], holds none.
 pub(crate) fn exists(path: &str, models: &dyn ModelProvider) -> bool {
     !matches!(models.file(path, 0), Err(ModelFailure::Missing))
 }
 
-/// Returns the note for a material `library` the Archive lacks and the library of the head,
-/// `head_library`, that stands for it.
-pub(crate) fn replaced_library_note(library: &str, head_library: &str) -> String {
-    format!(
-        "the material library {library} does not exist; the library of the head, {head_library}, is used"
-    )
+/// A material library the Archive lacks, and what stands for it.
+pub(crate) struct MissingLibrary {
+    /// The library of the head, for a part that has an own skin.
+    pub(crate) replacement: Option<String>,
+    pub(crate) reason: String,
+}
+
+/// Returns what stands for the material library `library` of a part when `is_missing` says the
+/// Archive lacks it, `None` when it is there. A bare name is looked for beside the model, so only
+/// a name with a folder is checked. A part with an own skin takes `head_library`.
+pub(crate) fn missing_library(
+    library: &str,
+    head_library: Option<&str>,
+    is_missing: impl FnOnce(&str) -> bool,
+) -> Option<MissingLibrary> {
+    if !library.contains(['/', '\\']) || !is_missing(library) {
+        return None;
+    }
+    let reason = head_library.map_or_else(
+        || format!("the material library {library} does not exist"),
+        |head| {
+            format!(
+                "the material library {library} does not exist; the library of the head, {head}, is used"
+            )
+        },
+    );
+    Some(MissingLibrary {
+        replacement: head_library.map(str::to_owned),
+        reason,
+    })
 }
 
 /// Returns the folder part of `path`, with `/` as separator.
@@ -80,14 +113,14 @@ fn folder_of(path: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::Bespoke;
+    use super::{Bespoke, missing_library};
 
     const LIBRARY: &str =
         "Objects/Characters/Human/heads/male/pu/eckhart/eckhart_t2_head_material.mtl";
 
     #[test]
     fn the_prefix_is_the_class_name_without_head() {
-        let own = Bespoke::of_head("eckhart_t2_head", Some(LIBRARY));
+        let own = Bespoke::of_head("eckhart_t2_head", LIBRARY);
         assert_eq!(
             own.as_ref().map(|own| own.prefix.as_str()),
             Some("eckhart_t2")
@@ -100,13 +133,12 @@ mod tests {
 
     #[test]
     fn a_library_without_a_folder_gives_no_own_skins() {
-        assert_eq!(Bespoke::of_head("x_head", Some("head_material")), None);
-        assert_eq!(Bespoke::of_head("x_head", None), None);
+        assert_eq!(Bespoke::of_head("x_head", "head_material"), None);
     }
 
     #[test]
     fn a_generic_skin_maps_to_the_own_skin_of_its_part() {
-        let own = Bespoke::of_head("eckhart_t2_head", Some(LIBRARY));
+        let own = Bespoke::of_head("eckhart_t2_head", LIBRARY);
         let teeth =
             "Objects/Characters/Human/heads/male/pu/protos_human_male_face_t1_pu_teeth.skin";
         assert_eq!(
@@ -117,5 +149,18 @@ mod tests {
             own.and_then(|own| own.skin_for("Objects/x/eckhart_t2_eyebrow.skin")),
             None
         );
+    }
+
+    #[test]
+    fn only_a_library_with_a_folder_that_is_missing_has_a_replacement() {
+        assert!(missing_library("bare_name", Some("head"), |_| true).is_none());
+        assert!(missing_library("a/b.mtl", Some("head"), |_| false).is_none());
+        let missing = missing_library("a/b.mtl", Some("head"), |_| true);
+        assert_eq!(
+            missing.and_then(|missing| missing.replacement).as_deref(),
+            Some("head")
+        );
+        let plain = missing_library("a/b.mtl", None, |_| true);
+        assert!(plain.is_some_and(|plain| plain.replacement.is_none()));
     }
 }

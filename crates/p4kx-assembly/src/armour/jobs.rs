@@ -9,7 +9,7 @@ use super::hidden;
 use super::piece::{Mount, Note, Source};
 use super::wearable::{Unfit, Worn};
 use super::{BodyVariant, Expressions, Look, PartOrigin, Piece, ZoneChunk};
-use crate::bespoke::{Bespoke, exists, replaced_library_note};
+use crate::bespoke::{Bespoke, exists, missing_library};
 use crate::{Issue, IssueKind, MaterialVariant, ModelProvider, PaletteRef};
 
 /// One skin to read and wear.
@@ -188,16 +188,13 @@ fn existing_library(
     let (Some(head), Some(library)) = (&piece.bespoke, &material) else {
         return material;
     };
-    if !library.contains(['/', '\\']) || exists(library, models) {
+    let head_library = bespoke.then_some(head.library.as_str());
+    let Some(missing) = missing_library(library, head_library, |name| !exists(name, models)) else {
         return material;
-    }
-    let fallback = head.library.clone().filter(|_| bespoke);
-    let reason = fallback.as_ref().map_or_else(
-        || format!("the material library {library} does not exist"),
-        |head_library| replaced_library_note(library, head_library),
-    );
+    };
+    let reason = missing.reason;
     issues.push(piece_issue(piece, IssueKind::MaterialLibrary { reason }));
-    fallback
+    missing.replacement
 }
 
 /// Returns the material library of a worn Entity: the one its material tree has for the tags of

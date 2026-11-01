@@ -8,8 +8,8 @@ ADR-0228. Evidence: `entity glb` and `armour glb` of
 
 ## The gap
 
-The Armour of a Loadout (`LoadoutResolver::npc_head`) put the head and the Entities on the head's
-ports through `Piece::bespoke_in`; the Entity Assembly did not. For Eckhart the Armour drew
+The Armour of a Loadout (`LoadoutResolver::npc_head`) gave the head and the Entities on the head's
+ports their own skins; the Entity Assembly did not. For Eckhart the Armour drew
 `eckhart_t2_head.skin`, `eckhart_t2_teeth.skin` and `eckhart_t2_eyes.skin`, the Entity Assembly the
 generic Protos skins (`protos_human_male_face_t1_pu_*`) that the Records name.
 
@@ -20,22 +20,29 @@ prefix from the head Entity's class name and the material library of its geometr
 `Bespoke::skin_for` names the own skin for a generic one.
 
 - **Where.** After the body is known, the resolver (`EntityNode::wear_own_head_skins`) walks the
-  character's `Char_Head` Entity and the Entities on the head's own ports. A part whose chosen
-  geometry is a generic head skin takes the own skin; the generic geometry stays in `fallback`.
-  What the port flags or the body chose before (ADR-0109, sub-geometry by flag) is the generic
-  skin the rule starts from, so the shared `PortFlags` of the head keep choosing among the
-  sub-geometries as before.
-- **Archive check.** The resolver does not read the Archive. The Assembly build reads the own
-  skin; one the Archive lacks gives way to the generic skin without an issue, as in the Armour.
-  Any other missing sub-geometry is still listed as `sub_geometry_missing`.
-- **Material library.** A part with an own skin whose Entity names a material library that the
-  Archive lacks takes the library of the head and lists a `material_library` issue that does not
-  skip the part, as in the Armour. A part that fell back to the generic skin keeps its library.
+  character's `Char_Head` Entity and the Entities on the head's own ports. A part whose geometry
+  is a generic head skin gets an `OwnSkin` on its node: the geometry naming the own skin and the
+  material library of the head. The node's `geometry` and `fallback`, and so what the port flags
+  or the body chose, stay as they were.
+- **Archive check.** The resolver does not read the Archive, so it names a skin that may not
+  exist: a generic head such as `PU_Protos_Head` gets a name no file has. The Assembly build reads
+  the own skin and falls back to the geometry the node had when the Archive lacks the file, and
+  from there to the main geometry as before. The absence of an own skin is never reported; every
+  other report (`sub_geometry_missing`, `body_geometry_missing`) is unchanged, so a head without
+  own skins behaves as before.
+- **Material library.** A part that draws an own skin whose geometry names a material library with
+  a folder that the Archive lacks takes the library of the head and lists a `material_library`
+  issue that does not skip the part, as the Armour does for a part with an own skin. The Armour
+  also lists a missing library of a head piece without an own skin and leaves it without one; the
+  Entity Assembly lists that library as it does for every part. The library is asked of the
+  provider (`ModelProvider::library`); the Armour asks the files of the provider for it
+  (`ModelProvider::file`).
 
 ## Consequences
 
 - `entity glb` and `armour glb` draw the same head skins for a story character.
-- A head whose library names no folder, a tree without a head or without a named body, and parts
-  whose skin is no generic head skin (hair, brows, lashes) are unchanged.
-- A male generic NPC taking teeth and eyes from the female head folder (#1000) is not touched: the
-  rule only replaces a generic head skin of a head that has a folder of its own.
+- A head whose library names no folder, a tree without a head or without a named body, a hidden
+  part, and parts whose skin is no generic head skin (hair, brows, lashes) are unchanged.
+- A male generic NPC taking teeth and eyes from the female head folder (#1000) is not touched.
+- `Piece::bespoke_in` is gone from the public API; the head pieces of `npc_head` carry the own
+  skins as before.

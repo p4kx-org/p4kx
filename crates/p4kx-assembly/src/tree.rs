@@ -6,6 +6,7 @@ use std::sync::Arc;
 use p4kx_dataforge::Guid;
 
 use crate::LoadoutEntry;
+use crate::bespoke::OwnSkin;
 use crate::entities::class_name_of;
 use crate::geometry_choice::GeometryChoice;
 use crate::spec::LoadoutOrigin;
@@ -26,8 +27,9 @@ pub struct EntityNode {
     pub(crate) geometry: Option<Geometry>,
     pub(crate) fallback: Option<Geometry>,
     pub(crate) choice: GeometryChoice,
-    /// The material library of the head, for the choice [`GeometryChoice::Bespoke`].
-    pub(crate) head_library: Option<Arc<str>>,
+    /// The own skin of a story character's head for this part, see
+    /// `EntityNode::wear_own_head_skins`; drawn when the Archive holds it, else `geometry`.
+    pub(crate) own_skin: Option<OwnSkin>,
     pub(crate) vehicle: Option<Arc<VehicleImplementation>>,
     pub(crate) landing_gear: Arc<[LandingGear]>,
     pub(crate) docked_vehicle: bool,

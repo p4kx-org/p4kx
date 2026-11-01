@@ -1,41 +1,39 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::bespoke::{exists, replaced_library_note};
+use p4kx_model::MaterialStatus;
+
+use crate::bespoke::missing_library;
 use crate::build::issue;
 use crate::flatten::Draft;
-use crate::geometry_choice::GeometryChoice;
 use crate::{Issue, IssueKind, ModelProvider};
 
-/// Gives a part that wears the own skin of a story character's head, see
+/// Gives a part that draws the own skin of a story character's head, see
 /// `EntityNode::wear_own_head_skins`, the material library of the head when the library its
-/// Entity names is not in the Archive, and notes the replacement. A part that fell back to the
-/// generic skin keeps its library.
+/// geometry names is not in the Archive, and notes the replacement. A part that fell back to its
+/// geometry keeps its library.
+///
+/// The library is asked of the provider, not of its files, so that a provider without file access
+/// does not report a library that exists.
 pub(crate) fn use_head_libraries(
     drafts: &mut [Draft<'_>],
     provider: &dyn ModelProvider,
     issues: &mut Vec<Issue>,
 ) {
-    for draft in drafts.iter_mut() {
-        let node = draft.node;
-        if node.choice != GeometryChoice::Bespoke || draft.hidden {
-            continue;
-        }
-        let (Some(worn), Some(own), Some(head_library)) = (
-            draft.geometry,
-            node.geometry.as_ref(),
-            node.head_library.as_deref(),
-        ) else {
+    for draft in drafts.iter_mut().filter(|draft| !draft.hidden) {
+        let Some(own) = draft.own_skin() else {
             continue;
         };
-        let Some(library) = worn.material() else {
+        let Some(library) = own.geometry.material() else {
             continue;
         };
-        if !std::ptr::eq(worn, own) || !library.contains(['/', '\\']) || exists(library, provider) {
+        let lacks =
+            |name: &str| matches!(provider.library("", name), MaterialStatus::Missing { .. });
+        let Some(missing) = missing_library(library, Some(&own.head_library), lacks) else {
             continue;
-        }
-        let reason = replaced_library_note(library, head_library);
-        draft.library = Some(head_library);
+        };
+        draft.library = Some(&own.head_library);
+        let reason = missing.reason;
         issues.push(issue(draft, IssueKind::MaterialLibrary { reason }));
     }
 }

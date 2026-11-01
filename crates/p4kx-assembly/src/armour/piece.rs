@@ -161,22 +161,12 @@ impl Piece {
     }
 
     /// Wears the skin a story character's own head has for this piece instead of the generic
-    /// Protos skin its Record names: the file `<prefix>_<part>.skin` in `folder`, where `<part>`
-    /// is what the generic file's name adds to its rig's name, e.g. `head` or `eyes`. A skin the
-    /// Archive lacks leaves the Record's. A material library of the Record that the Archive lacks
-    /// is replaced by `library`, the head's own, for such a skin.
+    /// Protos skin its Record names, see [`Bespoke::skin_for`]. A skin the Archive lacks leaves
+    /// the Record's. A material library of the Record that the Archive lacks is replaced by the
+    /// head's own for such a skin.
     #[must_use]
-    pub fn bespoke_in(
-        mut self,
-        folder: impl Into<String>,
-        prefix: impl Into<String>,
-        library: Option<String>,
-    ) -> Self {
-        self.bespoke = Some(Bespoke {
-            folder: folder.into(),
-            prefix: prefix.into(),
-            library,
-        });
+    pub(crate) fn with_bespoke(mut self, own: Bespoke) -> Self {
+        self.bespoke = Some(own);
         self
     }
 

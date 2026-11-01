@@ -319,7 +319,7 @@ fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode 
         geometry: spec.geometry.clone(),
         fallback: None,
         choice: GeometryChoice::Main,
-        head_library: None,
+        own_skin: None,
         vehicle: None,
         landing_gear: Arc::from([]),
         docked_vehicle,

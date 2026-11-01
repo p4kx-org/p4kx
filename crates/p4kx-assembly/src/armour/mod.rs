@@ -57,7 +57,6 @@ pub use body::BodyVariant;
 pub use dress::HeadItems;
 pub use expressions::Expressions;
 pub use forge_items::ForgeItems;
-pub(crate) use head::rig_part;
 pub use head::{Head, HeadError};
 pub use loadout::{Replaced, is_worn_type};
 pub use look::Look;

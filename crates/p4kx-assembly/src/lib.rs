@@ -100,6 +100,7 @@ mod gear_clip;
 mod gear_pose;
 mod geometry;
 mod geometry_choice;
+mod head_rig;
 mod hide_rule;
 mod hologram;
 mod interior;

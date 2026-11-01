@@ -12,8 +12,8 @@ use crate::{Attachment, EntityNode, PortNode};
 ///
 /// A story character's head and the generic head of other NPCs both qualify.
 ///
-/// A head whose material library lives in a folder of its own has a bespoke skin there, see
-/// [`Piece::bespoke_in`]; [`NpcHead::folder`] names that folder.
+/// A head whose material library lives in a folder of its own has own skins there (ADR-0109);
+/// [`NpcHead::folder`] names that folder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NpcHead {
     class_name: String,
@@ -101,7 +101,9 @@ impl LoadoutResolver<'_> {
             .and_then(|geometry| geometry.material())
             .map(str::to_owned);
         let class_name = wearable.class_name().to_owned();
-        let own = Bespoke::of_head(&class_name, library.as_deref());
+        let own = library
+            .as_deref()
+            .and_then(|library| Bespoke::of_head(&class_name, library));
         let mut pieces = Vec::new();
         if has_geometry(&wearable) {
             pieces.push(bespoke(
@@ -167,8 +169,8 @@ impl LoadoutResolver<'_> {
 }
 
 fn bespoke(piece: Piece, own: Option<&Bespoke>) -> Piece {
-    let Some(own) = own else {
-        return piece;
-    };
-    piece.bespoke_in(own.folder.clone(), own.prefix.clone(), own.library.clone())
+    match own {
+        Some(own) => piece.with_bespoke(own.clone()),
+        None => piece,
+    }
 }
