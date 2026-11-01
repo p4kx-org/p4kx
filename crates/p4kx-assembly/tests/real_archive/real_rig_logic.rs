@@ -12,6 +12,8 @@ use p4kx_chunks::{ChunkFile, ivo};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
+use crate::real_paths::unified;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 #[test]
@@ -21,7 +23,7 @@ fn the_stored_control_hashes_of_every_rig_logic_chunk_are_the_crcs_of_the_names(
     let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
     let (mut checked, mut unparsed) = (0_usize, 0_usize);
     for entry in archive.entries() {
-        let path = entry.path().to_ascii_lowercase().replace('\\', "/");
+        let path = unified(entry.path());
         let is_skin = std::path::Path::new(&path)
             .extension()
             .is_some_and(|extension| extension == "skin");
