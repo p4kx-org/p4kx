@@ -1478,7 +1478,8 @@ not part of the kind): `guid`, `className`, `recordPath`, `disabled`, `isSecurit
 `tags` (`generalTags`) a query matches, `producesTags`, `consumesTags` (`positiveTags` and
 `negativeTags`), `aiSpawnTags`, `names` (the `stringVariants`: `tag` and `displayName`, a game
 text; the German file lacks 3,246 of the 3,297 variants on LIVE, so `de` is `null` and the Basetool
-falls back to `en`) and `entityClusterMemberGuid`. Not exported: the NPC auto spawn settings,
+falls back to `en`) and `entityClusterMemberGuid`. Not exported of a location template: the NPC auto spawn settings of its
+`locationData` (not the NPC spawn descriptions of contracts, see "NPC and entity spawns"), the
 mission modules and limits and the security network manifest.
 
 Not exported: SCMDB's own pools, waves and region lists, which are derived and not stated by the

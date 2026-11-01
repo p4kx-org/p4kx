@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::io;
+
 use p4kx_extraction::Guid;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -30,6 +32,20 @@ pub(crate) enum SpawnLevel {
 /// stored order.
 pub(crate) type TagPaths = Vec<String>;
 
+/// An [`io::Write`] that feeds what it is given to a SHA-256 hasher.
+struct HashWriter(Sha256);
+
+impl io::Write for HashWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.0.update(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
 /// Returns the identifier of a pool: the first 16 bytes of the SHA-256 of its canonical JSON.
 ///
 /// The Archive gives these inline structures no GUID, so equal content shares one entry and one
@@ -39,9 +55,10 @@ pub(crate) type TagPaths = Vec<String>;
 ///
 /// Returns the error of the JSON serialisation of `content`.
 pub(crate) fn content_guid(content: &impl Serialize) -> Result<CatalogGuid, serde_json::Error> {
-    let digest = Sha256::digest(serde_json::to_vec(content)?);
+    let mut hasher = HashWriter(Sha256::new());
+    serde_json::to_writer(&mut hasher, content)?;
     let mut bytes = [0_u8; 16];
-    for (target, source) in bytes.iter_mut().zip(digest) {
+    for (target, source) in bytes.iter_mut().zip(hasher.0.finalize()) {
         *target = source;
     }
     Ok(CatalogGuid(Guid::from_stored(bytes)))
@@ -256,18 +273,6 @@ pub(crate) struct LocationQueryLink {
     pub(crate) query_guid: CatalogGuid,
 }
 
-impl From<SpawnPoolLink> for LocationQueryLink {
-    /// Takes the identifier of the link as the one of a location query.
-    fn from(link: SpawnPoolLink) -> Self {
-        Self {
-            variable: link.variable,
-            token: link.token,
-            level: link.level,
-            query_guid: link.pool_guid,
-        }
-    }
-}
-
 /// A `ContractPrerequisite_LocationProperty`: the contract is offered at the location another
 /// property resolves to.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -282,4 +287,20 @@ pub(crate) struct LocationPrerequisite {
     pub(crate) token: Option<String>,
     /// The `locationLevelType` as stored (an enum name), `null` when absent.
     pub(crate) location_level_type: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_identifier_is_the_start_of_the_sha256_of_the_canonical_json()
+    -> Result<(), serde_json::Error> {
+        let expected = Guid::from_stored([
+            0x13, 0x5f, 0x17, 0xa4, 0x75, 0xa6, 0x1a, 0xfd, 0xee, 0xaf, 0x37, 0x59, 0xad, 0x2e,
+            0x45, 0xad,
+        ]);
+        assert_eq!(content_guid(&("a", 1))?.0, expected, "SHA-256 of [\"a\",1]");
+        Ok(())
+    }
 }

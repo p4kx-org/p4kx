@@ -249,34 +249,31 @@ fn resolve(levels: &[&Level]) -> Resolved {
     }
     let mut resolved = Resolved::default();
     for (variable, (level, stated)) in won {
+        let Registered { target, empty } = stated.registered;
+        if empty {
+            continue;
+        }
         let (variable, token, at) = (variable.to_owned(), stated.token.clone(), level.at);
-        let link = move |pool_guid| SpawnPoolLink {
+        let (links, pool_guid) = match target {
+            Target::Ships(guid) => (&mut resolved.ship_spawns, guid),
+            Target::Npcs(guid) => (&mut resolved.npc_spawns, guid),
+            Target::Entities(guid) => (&mut resolved.entity_spawns, guid),
+            Target::Location(query_guid) => {
+                resolved.location_queries.push(LocationQueryLink {
+                    variable,
+                    token,
+                    level: at,
+                    query_guid,
+                });
+                continue;
+            }
+        };
+        links.push(SpawnPoolLink {
             variable,
             token,
             level: at,
             pool_guid,
-        };
-        match stated.registered {
-            Registered { empty: true, .. } => {}
-            Registered {
-                target: Target::Ships(guid),
-                ..
-            } => resolved.ship_spawns.push(link(guid)),
-            Registered {
-                target: Target::Npcs(guid),
-                ..
-            } => resolved.npc_spawns.push(link(guid)),
-            Registered {
-                target: Target::Entities(guid),
-                ..
-            } => resolved.entity_spawns.push(link(guid)),
-            Registered {
-                target: Target::Location(query_guid),
-                ..
-            } => resolved
-                .location_queries
-                .push(LocationQueryLink::from(link(query_guid))),
-        }
+        });
     }
     resolved.location_prerequisites = levels
         .iter()

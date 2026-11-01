@@ -47,9 +47,12 @@ the catalog does not know fails the Record instead of hiding behind an escape ha
   The types that only the contract-level properties hold on LIVE (`MissionItem`, `AIName`,
   `CombinedDataSetEntries`, `HaulingOrders`, `Reward`, `TimeTrialRace`) are left to #1003: its
   variants join the same union in `PropertyReader::value`, and the `AiName` struct of this ADR is
-  what its `aiName` variant reuses. As in ADR-0320, the kind `contractTemplates` was first
-  released with #990 on 2026-10-31 and no release contains it (v0.4.2 is unreleased), so no consumer
-  has seen the `other` variant: ADR-0054's additive rule is not touched.
+  what its `aiName` variant reuses. As in ADR-0320, the kind `contractTemplates` was merged
+  with #990 on 2026-10-31 and no release contains it (v0.4.2 is unreleased), so no consumer has
+  seen the `other` variant: ADR-0054's additive rule is not touched.
+- **Location queries keep `other` for now.** `LocationCondition::Other` of `contractLocationQueries`
+  (ADR-0266) still lets a condition of an unknown struct pass; none occurs on LIVE. Only the
+  organisation value fails the Record on one.
 - **Texts.** The names are game texts and go through the per-kind verification of ADR-0270. On LIVE
   all 22 embedded names hold placeholder keys, so the kind has no keyed text and needs no baseline;
   a future key would be held to a baseline of zero and name itself.

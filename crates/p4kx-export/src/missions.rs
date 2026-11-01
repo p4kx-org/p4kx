@@ -22,7 +22,7 @@ use crate::mission_results::{granted_tags, link};
 use crate::mission_shared::{Found, Rewards, Shared};
 use crate::mission_siblings::{self, Siblings};
 use crate::mission_titles::titles;
-use crate::record_fields::{boolean, guid_value, nonnil_guid, reference, text};
+use crate::record_fields::{boolean, identity, reference, text};
 use crate::selection::{Kind, is_leftover};
 use crate::spawn_layers::{HandlerSpawns, RecordSpawns};
 use crate::spawn_pools::SpawnPools;
@@ -394,8 +394,4 @@ impl<'f> Parent<'_, 'f> {
             display_name: context.texts.localised(context.index.faction_name(guid.0)),
         })
     }
-}
-
-fn identity(structure: &StructValue<'_>) -> Option<p4kx_extraction::Guid> {
-    guid_value(Some(structure), "id").and_then(nonnil_guid)
 }

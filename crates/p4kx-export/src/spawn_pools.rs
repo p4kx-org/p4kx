@@ -37,6 +37,23 @@ pub(crate) struct Registered {
     pub(crate) empty: bool,
 }
 
+/// Keeps `pool` under its identifier unless it is `empty`; `(guid, empty)` is its identifier and
+/// whether it has no group.
+fn store<P>(
+    pools: &mut BTreeMap<[u8; 36], P>,
+    pool: P,
+    (guid, empty): (CatalogGuid, bool),
+    target: fn(CatalogGuid) -> Target,
+) -> Registered {
+    if !empty {
+        pools.entry(guid.text()).or_insert(pool);
+    }
+    Registered {
+        target: target(guid),
+        empty,
+    }
+}
+
 impl<'f> SpawnPools<'f> {
     /// Adds what `other` holds that `self` does not.
     pub(crate) fn merge(&mut self, other: Self) {
@@ -58,42 +75,20 @@ impl<'f> SpawnPools<'f> {
     pub(crate) fn register(&mut self, spawn: Spawn<'f>) -> Registered {
         match spawn {
             Spawn::Ships(pool) => {
-                let (guid, empty) = (pool.guid, pool.groups.is_empty());
-                if !empty {
-                    self.ships.entry(guid.text()).or_insert(pool);
-                }
-                Registered {
-                    target: Target::Ships(guid),
-                    empty,
-                }
+                let id = (pool.guid, pool.groups.is_empty());
+                store(&mut self.ships, pool, id, Target::Ships)
             }
             Spawn::Npcs(pool) => {
-                let (guid, empty) = (pool.guid, pool.groups.is_empty());
-                if !empty {
-                    self.npcs.entry(guid.text()).or_insert(pool);
-                }
-                Registered {
-                    target: Target::Npcs(guid),
-                    empty,
-                }
+                let id = (pool.guid, pool.groups.is_empty());
+                store(&mut self.npcs, pool, id, Target::Npcs)
             }
             Spawn::Entities(pool) => {
-                let (guid, empty) = (pool.guid, pool.groups.is_empty());
-                if !empty {
-                    self.entities.entry(guid.text()).or_insert(pool);
-                }
-                Registered {
-                    target: Target::Entities(guid),
-                    empty,
-                }
+                let id = (pool.guid, pool.groups.is_empty());
+                store(&mut self.entities, pool, id, Target::Entities)
             }
             Spawn::Location(query) => {
-                let guid = query.guid;
-                self.locations.entry(guid.text()).or_insert(query);
-                Registered {
-                    target: Target::Location(guid),
-                    empty: false,
-                }
+                let id = (query.guid, false);
+                store(&mut self.locations, query, id, Target::Location)
             }
         }
     }
