@@ -228,12 +228,7 @@ fn read(
                 LicenseType::parse,
             ),
         },
-        _ => {
-            return Err(TemplateError::UnknownStruct {
-                field: "modifiers",
-                name: name.to_owned(),
-            });
-        }
+        _ => return Err(TemplateError::unknown("modifiers", modifier)),
     })
 }
 

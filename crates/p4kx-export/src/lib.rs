@@ -71,6 +71,7 @@ mod broker_entry_read;
 mod broker_identity;
 mod broker_links;
 mod broker_requirements;
+mod broker_schedule;
 mod broker_terms;
 mod broker_values;
 mod build;

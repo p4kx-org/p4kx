@@ -1495,7 +1495,10 @@ identifiers, flags and numbers, links, and the texts the Archive keeps with them
 discriminator: `type` for the value of a property, a flow condition and a flow action, `modifier`
 for a modifier and `structName` for a handler; the other fields depend on it. A condition, an action
 or a modifier of a struct the catalog does not know fails the Record (ADR-0320); only the value of a
-property has an `other` for the structs that follow with #815.
+property has an `other` variant (the `type` tag, with the field `structName`) for the structs that
+follow with #815. The unions lost their `other` variants before the kind `contractTemplates` was
+first released (v0.4.2 is unreleased), so no consumer has seen them and the additive rule of
+ADR-0054 is not touched.
 
 | Field | Meaning |
 |-------|---------|
@@ -1570,7 +1573,11 @@ Record has a `null` link.
 A token without an `id` (or a nil one) and the phases below it are left out. A Record whose phases
 nest deeper than 32 levels or whose conditions nest deeper than 16 cannot be read, and so is one
 with a condition, an action or a modifier of a struct the catalog does not know: it is a failure of
-the build and not an entry (none on LIVE).
+the build and not an entry (none on LIVE). A future Build that meets such a struct therefore
+lacks the whole Record: it is not in the kind, the summary counts it in the `failed` list of the
+build (`p4kx catalog` prints it, with the record path and the struct name as reason, and exits with
+code 1), and the contracts that name it keep a GUID that resolves to no entry, so a consumer must
+check the failure list before it relies on the links being complete.
 
 ### Mission broker entries
 

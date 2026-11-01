@@ -39,7 +39,9 @@ struct the catalog does not know fails the Record instead of hiding behind an es
   follow with #815; no objective of a broker entry holds one.
 - **Side effect on the templates, kept on purpose.** The readers are shared, so the rule and the
   new variants apply to `contractTemplates` as well; this follows the owner's rule from #812 and
-  amends ADR-0313.
+  amends ADR-0313. The kind came with #990 on 2026-10-31 and no release contains it (v0.4.2 is
+  unreleased), so no consumer has seen the `other` variants: the unions changed before the kind was
+  first released, ADR-0054's additive rule is not touched and no exception to it is needed.
 - **Union shapes.** A reputation requirement element is tagged by `type`: `requirement`, `and`,
   `leftParenthesis`, `rightParenthesis`; the expression is infix and the catalog does not evaluate
   it. The modifiers gain `factionHostility`, `hostileMission`, `ignoreMissionPlayerCriminality` and
@@ -58,12 +60,24 @@ struct the catalog does not know fails the Record instead of hiding behind an es
 - A consumer joins `contracts[].brokerEntryGuid` to `missionBrokerEntries[].guid`. A link to another
   entry (`invitationMissionGuid`, `associatedMissionGuids`, `requiredMissionGuids`, a modifier's
   `brokerEntryGuid`) resolves on LIVE in every case; a GUID the Archive lacks would be kept.
+- **A struct the catalog does not know in a future Build removes the whole Record**, a template as
+  well as a broker entry, not just the part. The Record is then missing from its kind and is listed
+  in the failures of the build (`failures` of the summary; `p4kx catalog` prints the record path and
+  the struct name and exits with code 1). The kind itself stays marked complete: completeness
+  speaks of a Filter, not of failures. A contract that names the missing entry keeps its
+  `brokerEntryGuid` or `templateGuid`, which then resolves to nothing; a consumer checks the failure
+  list before it relies on complete links. The real-Archive tests require no failure on LIVE.
 - A consumer must not read a time of an entry (cooldown, life time, deadline) as a duration without
   knowing its unit; the Archive does not state one.
 - On LIVE the kind holds 2,428 entries with 703 objective tokens, 26,741 properties, 949 modifiers,
   2,097 flow triggers and 1,666 requirement terms and none is left out for a failure.
 - The kind adds 17,733 keyed texts to the verification of ADR-0270; the baselines are 0.04 for
-  English and 1.0 for German, the share measured on LIVE rounded up to the hundredth.
+  English and 1.0 for German, the share measured on LIVE rounded up to the hundredth. A German
+  baseline of 1.0 would pass whatever resolves, so the test also holds the kind to a floor of 90
+  resolved German texts (97 on LIVE). The kinds that are 1.0 for German as well (`blueprints`,
+  `refiningProcesses`) resolve none and need no floor.
 - The kind itself is 16.9 MB of JSON. The catalog is 205,869,419 bytes decompressed and 3,779,868
   bytes as `.json.zst` on LIVE (2026-10-31), 18.7 MB and 0.34 MB more than the 187,179,857 and
-  3,436,476 bytes of ADR-0313; the upload limit is 64,000,000 bytes.
+  3,436,476 bytes of ADR-0313. Against the limits that is 5.9 % of the upload limit of
+  64,000,000 bytes (headroom 60.2 MB) and 20.6 % of the decompressed limit of 1,000,000,000 bytes
+  (headroom 794 MB).

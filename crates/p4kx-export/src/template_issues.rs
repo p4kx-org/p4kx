@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
+use p4kx_extraction::StructValue;
 use thiserror::Error;
 
 /// A contract template whose structure the catalog does not follow to its end.
@@ -23,6 +24,16 @@ pub(crate) enum TemplateError {
         /// The struct name.
         name: String,
     },
+}
+
+impl TemplateError {
+    /// Returns the error for the struct `value` in the field `field`.
+    pub(crate) fn unknown(field: &'static str, value: &StructValue<'_>) -> Self {
+        Self::UnknownStruct {
+            field,
+            name: value.type_name().to_owned(),
+        }
+    }
 }
 
 /// The stored enum names of the contract templates that the catalog does not know, counted per

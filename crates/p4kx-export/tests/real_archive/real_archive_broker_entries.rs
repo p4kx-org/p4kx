@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, CatalogSummary, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
@@ -25,7 +25,7 @@ const LINKS: [(&str, &str); 5] = [
 /// Asserts that every `brokerEntryGuid` of a contract names an entry, that the links of an entry
 /// resolve to the entry of their kind when they name one the catalog lists, and that every
 /// objective names a parent among those of its entry. Returns the links that name a Record the
-/// catalog does not list, per field.
+/// catalog does not list, per field, ordered by field name.
 pub(crate) fn check_broker_links(catalog: &Value) -> Result<BTreeMap<&'static str, usize>, String> {
     let entries = guids(catalog, "missionBrokerEntries")?;
     for contract in catalog["contracts"].as_array().ok_or("contracts")? {
@@ -120,6 +120,11 @@ fn the_mission_broker_entries_of_a_real_archive_resolve() -> TestResult {
     let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let unlisted = check_broker_links(&catalog)?;
+    assert!(
+        unlisted.is_empty(),
+        "links to Records the catalog does not list, per field: {unlisted:?}"
+    );
+    assert_nothing_unknown(built.summary());
     let entries = catalog["missionBrokerEntries"]
         .as_array()
         .ok_or("entries")?;
@@ -161,8 +166,13 @@ fn the_mission_broker_entries_of_a_real_archive_resolve() -> TestResult {
     assert!(entries.len() > 2_000, "entries");
     assert!(!named.is_empty(), "a contract names an entry");
     assert!(count("objectives") > 500, "objectives");
-    let failed: Vec<String> = built
-        .summary()
+    Ok(())
+}
+
+/// Asserts that no Record failed and that no stored name of a template or a broker entry is
+/// unknown to the catalog (the warning `unknown_template_values`).
+fn assert_nothing_unknown(summary: &CatalogSummary) {
+    let failed: Vec<String> = summary
         .failures()
         .iter()
         .map(|failure| format!("{}: {}", failure.record_path, failure.reason))
@@ -171,5 +181,12 @@ fn the_mission_broker_entries_of_a_real_archive_resolve() -> TestResult {
         failed.is_empty(),
         "records that cannot be read: {failed:#?}"
     );
-    Ok(())
+    assert!(
+        summary
+            .warnings()
+            .iter()
+            .all(|warning| warning.kind() != "unknown_template_values"),
+        "a stored name of a template or broker entry is unknown: {:?}",
+        summary.warnings()
+    );
 }

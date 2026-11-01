@@ -18,8 +18,9 @@ pub(crate) struct Siblings<'f> {
     pub(crate) broker_entries: BrokerEntries<'f>,
 }
 
-/// Reads the sibling kinds `filter` matches; the contract templates and the broker entries count
-/// the stored names they do not know in one place.
+/// Reads the sibling kinds `filter` matches. The contract templates are read first: their
+/// `Unknowns` is the one the broker entries are read with, so both count the stored names they do
+/// not know in one place, and the caller takes it from `contract_templates` afterwards.
 ///
 /// # Errors
 ///

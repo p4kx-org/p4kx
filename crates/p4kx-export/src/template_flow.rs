@@ -202,12 +202,7 @@ impl FlowReader<'_, '_, '_> {
             "PropertyIsSet" => FlowCondition::PropertyIsSet {
                 property_variable: self.reader.property_variable(parent, "property"),
             },
-            _ => {
-                return Err(TemplateError::UnknownStruct {
-                    field: "missionFlow condition",
-                    name: name.to_owned(),
-                });
-            }
+            _ => return Err(TemplateError::unknown("missionFlow condition", condition)),
         })
     }
 
@@ -230,12 +225,7 @@ impl FlowReader<'_, '_, '_> {
                     .collect(),
                 to_state,
             },
-            _ => {
-                return Err(TemplateError::UnknownStruct {
-                    field: "missionFlow action",
-                    name: name.to_owned(),
-                });
-            }
+            _ => return Err(TemplateError::unknown("missionFlow action", action)),
         })
     }
 }

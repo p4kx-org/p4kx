@@ -6,7 +6,8 @@ use serde::Serialize;
 
 use crate::broker_identity::{Names, Scripting};
 use crate::broker_links::{Links, Tags};
-use crate::broker_requirements::{ReputationResult, ScheduleWindow, StandingTerm};
+use crate::broker_requirements::{ReputationResult, StandingTerm};
+use crate::broker_schedule::ScheduleWindow;
 use crate::broker_terms::{Availability, Cooldowns, Finish, InstanceLimits, MissionReward};
 use crate::contract::every_field_required;
 use crate::contract_hauling::HaulingOrder;
