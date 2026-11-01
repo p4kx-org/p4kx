@@ -8,8 +8,7 @@ use serde::Serialize;
 use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
 use crate::mission_layers::one;
-use crate::record_fields::{boolean, integer, linked, number, structs, text};
-use crate::spawn_model::TagTerm;
+use crate::record_fields::{integer, linked, number, structs, text};
 use crate::spawn_read::Reader;
 use crate::template_issues::Unknowns;
 
@@ -58,65 +57,6 @@ pub(crate) struct PayoutReputation {
     pub(crate) scope_guid: Option<CatalogGuid>,
     /// The `reputationRewardMultiplier` applied to the gain in that scope, as stored.
     pub(crate) reputation_reward_multiplier: Option<f32>,
-}
-
-/// The fields every modifier shares.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct ModifierHeader {
-    /// The `modifierName`, `null` when empty.
-    pub(crate) modifier_name: Option<String>,
-    /// The `enabled` flag.
-    pub(crate) enabled: Option<bool>,
-    /// The `missionVariableName` of the property the `locationProperty` points to.
-    pub(crate) location_property: Option<String>,
-}
-
-/// A modifier of a template (`MissionModifier_*`), tagged by `modifier`.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(tag = "modifier", rename_all = "camelCase")]
-pub(crate) enum TemplateModifier {
-    /// `MissionModifier_SecurityClearance`.
-    #[serde(rename_all = "camelCase")]
-    SecurityClearance {
-        /// The fields every modifier has.
-        #[serde(flatten)]
-        header: ModifierHeader,
-        /// The `clearanceToken` Record.
-        clearance_token_guid: Option<CatalogGuid>,
-    },
-    /// `MissionModifier_RequestRentShip`.
-    #[serde(rename_all = "camelCase")]
-    RequestRentShip {
-        /// The fields every modifier has.
-        #[serde(flatten)]
-        header: ModifierHeader,
-        /// The `itemRecordGUID`, the ship item that is rented; an entry of `items` or `ships`.
-        item_guid: Option<CatalogGuid>,
-        /// The `durationSeconds` of the rental.
-        duration_seconds: Option<i64>,
-        /// The `clearRentalOnFail` flag.
-        clear_rental_on_fail: Option<bool>,
-    },
-    /// `MissionModifier_ShipKioskFilter`.
-    #[serde(rename_all = "camelCase")]
-    ShipKioskFilter {
-        /// The fields every modifier has.
-        #[serde(flatten)]
-        header: ModifierHeader,
-        /// The `terms` of the `kioskFilterType`: a ship matches one of them.
-        terms: Vec<TagTerm>,
-    },
-    /// A modifier of another struct.
-    #[serde(rename_all = "camelCase")]
-    Other {
-        /// The fields every modifier has.
-        #[serde(flatten)]
-        header: ModifierHeader,
-        /// The struct name.
-        struct_name: String,
-    },
 }
 
 /// The `contractStartCommsNotification`: the message sent when the contract starts.
@@ -208,49 +148,6 @@ pub(crate) fn partial_payout(root: Option<&StructValue<'_>>) -> Option<PartialPa
             })
             .collect(),
     })
-}
-
-/// Reads the `modifiers` of `root`.
-pub(crate) fn modifiers(
-    reader: &Reader<'_, '_>,
-    root: Option<&StructValue<'_>>,
-) -> Vec<TemplateModifier> {
-    structs(root, "modifiers")
-        .map(|modifier| {
-            let parent = Some(modifier);
-            let header = ModifierHeader {
-                modifier_name: text(parent, "modifierName").map(str::to_owned),
-                enabled: boolean(parent, "enabled"),
-                location_property: reader.property_variable(parent, "locationProperty"),
-            };
-            let name = modifier.type_name();
-            match name.strip_prefix("MissionModifier_").unwrap_or(name) {
-                "SecurityClearance" => TemplateModifier::SecurityClearance {
-                    header,
-                    clearance_token_guid: linked(parent, "clearanceToken"),
-                },
-                "RequestRentShip" => TemplateModifier::RequestRentShip {
-                    header,
-                    item_guid: linked(parent, "itemRecordGUID"),
-                    duration_seconds: integer(parent, "durationSeconds"),
-                    clear_rental_on_fail: boolean(parent, "clearRentalOnFail"),
-                },
-                "ShipKioskFilter" => TemplateModifier::ShipKioskFilter {
-                    header,
-                    terms: structs(one(parent, "kioskFilterType"), "terms")
-                        .map(|term| TagTerm {
-                            positive_tags: reader.tag_array(Some(term), "positiveTags"),
-                            negative_tags: reader.tag_array(Some(term), "negativeTags"),
-                        })
-                        .collect(),
-                },
-                _ => TemplateModifier::Other {
-                    header,
-                    struct_name: name.to_owned(),
-                },
-            }
-        })
-        .collect()
 }
 
 /// Reads the `contractStartCommsNotification` of `root`.

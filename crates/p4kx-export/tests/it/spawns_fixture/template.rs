@@ -115,7 +115,7 @@ fn contract_class() -> TestValue {
     )
 }
 
-fn resource_order(resource: u128, max_scu: i32) -> TestValue {
+pub(super) fn resource_order(resource: u128, max_scu: i32) -> TestValue {
     TestValue::Struct(
         TestInstance::new("HaulingOrder_Resource")
             .value("resource", reference(resource))
@@ -126,7 +126,7 @@ fn resource_order(resource: u128, max_scu: i32) -> TestValue {
 
 /// An objective token named `instance` for the weak pointers, with the handler `handler`, the
 /// properties and the phases; a phase with the id `OBJECTIVE_B` is tagged `Kill`.
-fn objective(
+pub(super) fn objective(
     (id, instance): (u128, &str),
     (name, starts_active): (&str, bool),
     handler: TestInstance,

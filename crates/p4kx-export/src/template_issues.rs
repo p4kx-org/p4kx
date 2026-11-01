@@ -15,6 +15,14 @@ pub(crate) enum TemplateError {
     /// Mission flow conditions nest deeper than the limit.
     #[error("mission flow conditions nest deeper than {0} levels")]
     ConditionsTooDeep(usize),
+    /// A field that holds one of several structs holds one the catalog does not know.
+    #[error("{field} holds the unknown struct {name}")]
+    UnknownStruct {
+        /// The field, e.g. `modifiers`.
+        field: &'static str,
+        /// The struct name.
+        name: String,
+    },
 }
 
 /// The stored enum names of the contract templates that the catalog does not know, counted per

@@ -38,7 +38,7 @@ const fn baseline_of(kind: Kind, english: f64, german: f64) -> Baseline {
     }
 }
 
-const BASELINES: [Baseline; 17] = [
+const BASELINES: [Baseline; 18] = [
     baseline_of(Kind::Manufacturers, 0.01, 0.06),
     baseline_of(Kind::Items, 0.01, 0.38),
     baseline_of(Kind::Ships, 0.01, 0.31),
@@ -56,6 +56,7 @@ const BASELINES: [Baseline; 17] = [
     baseline_of(Kind::MissionTypes, 0.0, 0.57),
     baseline_of(Kind::MissionLocationTemplates, 0.09, 0.99),
     baseline_of(Kind::ContractTemplates, 0.01, 0.99),
+    baseline_of(Kind::MissionBrokerEntries, 0.04, 1.0),
 ];
 
 /// The start of a mission token (`~mission(Contractor|Key)`) in a contract text; the exporter

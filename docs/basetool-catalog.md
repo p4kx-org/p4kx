@@ -58,7 +58,8 @@ The rule is ADR-0054 (amending ADR-0002):
   `locationPrerequisites` (#902, ADR-0266). Later additions keep version 2 as long as they are
   additive. The contract field `fixedRewards` (#888, ADR-0268) is one, and so is `cooldownLayers`
   (#909, ADR-0271), and the contract fields `offeredAt`, `giverFaction` and `blueprintRewards`
-  (#915, ADR-0273), and so is the kind `contractTemplates` (#812, ADR-0313).
+  (#915, ADR-0273), and so are the kind `contractTemplates` (#812, ADR-0313) and the kind
+  `missionBrokerEntries` with the contract field `brokerEntryGuid` (#813, ADR-0320).
 - **A production import takes catalogs of the Channel `LIVE` only.** `PTU`, `EPTU`, `TECH-PREVIEW`
   and `HOTFIX` are confidential test Channels (ADR-0038).
 
@@ -177,6 +178,7 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `contractShipSpawns` | The distinct ship spawn descriptions of the contracts, ordered by identifier |
 | `contractLocationQueries` | The distinct location queries of the contracts, ordered by identifier |
 | `contractTemplates` | The contract templates (`ContractTemplate`), the targets of `contracts[].templateGuid`, ordered by GUID |
+| `missionBrokerEntries` | The mission broker entries (`MissionBrokerEntry`), the targets of `contracts[].brokerEntryGuid`, ordered by GUID |
 | `lootTables` | The loot tables (`LootTableV3Record`) with the weighted archetypes of each, ordered by GUID |
 | `lootArchetypes` | The loot archetypes (`LootArchetypeV3Record`) with the weighted selectors of each, ordered by GUID |
 | `lootPoolFilters` | The pool filters of the loot generation, ordered by GUID |
@@ -1096,6 +1098,7 @@ that the rule on equal `guid` and `subContractGuid` above drops.
 | `recordGuid`, `recordPath` | The `ContractGenerator` Record |
 | `debugName`, `handler` | The `debugName` of the contract and of its handler |
 | `templateGuid` | The `ContractTemplate` Record the contract names, an entry of `contractTemplates` |
+| `brokerEntryGuid` | The `MissionBrokerEntry` Record the contract names in `missionBrokerEntry`, an entry of `missionBrokerEntries`; `null` when it names none (on LIVE the 419 contracts that name one all resolve) |
 | `notForRelease`, `workInProgress` | The flags as stored, `null` when absent; the catalog does not filter on them |
 | `title` | The resolved title (game text) |
 | `description` | The resolved description (game text; must not be passed on to third parties) |
@@ -1399,9 +1402,10 @@ the struct, `periodScenarioGuid`), each with `tiers`: `minPoints`, `badgeToAward
 `blueprintPoolGuids`, entries of `blueprintPools`. The progression texts and the multiplier rewards
 (empty on LIVE) are not exported.
 
-Not exported, for want of a consumer: mission broker entries, NPC spawns and the sandbox triggers
-and perks of the reputation Records. Contract templates are described in "Contract templates",
-ship spawns and the locations of contracts in "Ship spawns and location queries".
+Not exported, for want of a consumer: NPC spawns and the sandbox triggers and perks of the
+reputation Records. Contract templates are described in "Contract templates", mission broker
+entries in "Mission broker entries", ship spawns and the locations of contracts in "Ship spawns and
+location queries".
 
 ### Ship spawns and location queries
 
@@ -1419,7 +1423,8 @@ location prerequisites).
 `MissionPropertyValue_ShipSpawnDescriptions` states ships, a `MissionPropertyValue_Location` or
 `_Locations` a location. They are found at four levels, resolved like the other fields of a
 contract: the first of sub contract, contract, handler and template that states a variable wins
-(`level` names it: `subContract`, `contract`, `handler`, `template`). A property without a variable
+(`level` names it: `subContract`, `contract`, `handler`, `template`, and `broker` for the
+properties of a mission broker entry). A property without a variable
 name is skipped. A ship spawn description without a group still takes the place of the same variable
 at a lower level and is itself left out.
 
@@ -1488,8 +1493,9 @@ templates such as `handyman_template` carry. An entry states the fields of the R
 identifiers, flags and numbers, links, and the texts the Archive keeps with them as game texts
 (`x-gameText`). Where a field holds one of several structs, the entry names the struct in a
 discriminator: `type` for the value of a property, a flow condition and a flow action, `modifier`
-for a modifier and `structName` for a handler; the other fields depend on it, and `other` stands for
-a struct the catalog does not read.
+for a modifier and `structName` for a handler; the other fields depend on it. A condition, an action
+or a modifier of a struct the catalog does not know fails the Record (ADR-0320); only the value of a
+property has an `other` for the structs that follow with #815.
 
 | Field | Meaning |
 |-------|---------|
@@ -1505,7 +1511,7 @@ a struct the catalog does not read.
 | `haulingOrders` | The hauling orders of the template as in "Hauling orders": the properties (`source` `template`) and the orders of its hauling objectives (`templateObjective`) |
 | `objectives` | The objective tokens depth first, each phase after its parent (see "Objectives") |
 | `partialPayout` | The `PartialContractRewards`: `thresholds`, each `minPercentage`, `maxPercentage`, `currencyRewardMultiplier` and `reputationMultipliers` (`scopeGuid`, an entry of `reputationScopes`, and `reputationRewardMultiplier`); `null` without one |
-| `modifiers` | The modifiers in stored order, tagged by `modifier`: `securityClearance` (`clearanceTokenGuid`), `requestRentShip` (`itemGuid`, `durationSeconds`, `clearRentalOnFail`), `shipKioskFilter` (`terms`, each `positiveTags` and `negativeTags`) and `other` (`structName`); each with the shared `modifierName`, `enabled` and `locationProperty`, the variable of the property the weak pointer names |
+| `modifiers` | The modifiers in stored order, tagged by `modifier`: `securityClearance` (`clearanceTokenGuid`), `requestRentShip` (`itemGuid`, `durationSeconds`, `clearRentalOnFail`), `shipKioskFilter` (`terms`, each `positiveTags` and `negativeTags`), `factionHostility` (`factionGuid`, a `Faction` Record no kind lists, `myReaction` and `theirReaction` as `friendly`, `neutral` or `hostile`, `ignoreCriminalHostility`), `hostileMission` and `ignoreMissionPlayerCriminality` (`brokerEntryGuid`, an entry of `missionBrokerEntries`; `legalToAttack` for the first) and `lawLicense` (`licenseType`: `illegalGoodsLicenseClassA`, `B` or `C`); each with the shared `modifierName`, `enabled` and `locationProperty`, the variable of the property the weak pointer names |
 | `owner` | The `DevOwner` Record: `guid` and `className` (e.g. `MDT`); `null` without one |
 | `missionFlow` | The triggers in stored order (see "Mission flow") |
 | `startComms`, `endComms` | The `contractStartCommsNotification` (`delay`, `communicationTag` as a tag path; `null` without one) and the `contractEndCommsNotifications` (`reason` `complete`, `fail` or `abandon`, `delay`, `communicationTag`) |
@@ -1551,19 +1557,70 @@ queries are read as for the contracts and added to their kinds.
 
 **Mission flow.** A trigger has `note` (the developer's `description`), a `condition` and an
 `action`, either `null` when absent. A condition is tagged by `type`: `tokenState` (`objectiveId`,
-the `id` of an entry of `objectives`, and `tokenState`), `allTokensState`, `and` and `or`
-(`conditions`), `not` (`condition`), `propertyIsSet` (`propertyVariable`) and `other`
-(`structName`). An action is tagged by `type`: `stateChange` (`toState`), `tokenStateChange`
-(`objectiveId`, `toState`), `pickRandomMissionPhase` (`phases`, each `objectiveId` and
-`probability`, and `toState`) and `other` (`structName` and `toState`). A state is `active`,
+the `id` of an entry of `objectives`, and `tokenState`), `allTokensState` and `anyTokensState`
+(`tokenState`), `onMissionStart` (no fields), `and` and `or` (`conditions`), `not` (`condition`) and
+`propertyIsSet` (`propertyVariable`). An action is tagged by `type`: `stateChange` (`toState`),
+`tokenStateChange` (`objectiveId`, `toState`) and `pickRandomMissionPhase` (`phases`, each
+`objectiveId` and `probability`, and `toState`). A state is `active`,
 `completed`, `failed` or `abandoned`. A stored enum name the catalog does not know is `null`, like
 the values of every closed set, and is counted in the warning `unknown_template_values` of the
 build. A weak pointer that points to nothing, to a token without an `id` or to a struct outside the
 Record has a `null` link.
 
 A token without an `id` (or a nil one) and the phases below it are left out. A Record whose phases
-nest deeper than 32 levels or whose conditions nest deeper than 16 cannot be read: it is a failure
-of the build and not an entry (none on LIVE).
+nest deeper than 32 levels or whose conditions nest deeper than 16 cannot be read, and so is one
+with a condition, an action or a modifier of a struct the catalog does not know: it is a failure of
+the build and not an entry (none on LIVE).
+
+### Mission broker entries
+
+`missionBrokerEntries` lists the `MissionBrokerEntry` Records (#813, ADR-0320, additive, schema
+version 2, no bump), ordered by GUID: the offers of the mission board. `contracts[].brokerEntryGuid`
+is the `guid` of an entry. The Records are selected by the struct, in any folder (on LIVE
+2026-10-31 all 2,584 lie under `missionbroker`); the 156 whose path or name holds a word of the
+usual leftover rule are left out, so 2,428 entries remain, 419 of them named by a contract, every
+link resolves. An entry states every field of the Record as stored, and the texts as game texts
+(`x-gameText`); a Record of a struct the catalog does not know in a modifier, a flow condition or
+action, or the reputation requirements fails (none on LIVE). The objectives, handlers, hauling
+orders, partial payout, modifiers, mission flow, owner and the `settings` have the shapes of the
+contract templates (see there).
+
+| Field | Meaning |
+|-------|---------|
+| `guid`, `className`, `recordPath`, `notForRelease` | The Record and its flag as stored |
+| `debugName`, `title`, `hudTitle`, `description`, `missionGiver`, `commsChannelName`, `giverFragmentTags` | The `playerFacingDebugName`, the five game texts and the `missionGiverFragmentTags` |
+| `missionTypeGuid`, `locationGuid`, `localityGuid` | Links to `missionTypes`, `starmapObjects` (the `locationMissionAvailable`) and `missionLocalities` |
+| `giverGuid` | The `missionGiverRecord`; no kind lists these Records |
+| `invitationMissionGuid`, `linkedMissionGuid`, `associatedMissionGuids`, `requiredMissionGuids`, `unlessAvailableMissionGuids` | Links to entries of this kind (`invitationMission`, `linkedMission`, `associatedMissions`, `requiredMissions`, `onlyAvailableIfAllMissionsNotAvailable`); a GUID the Archive lacks is kept |
+| `journalEntriesOnComplete`, `journalEntriesOnRemove` | GUIDs of journal Records; no kind lists these |
+| `module`, `modulePerPlayer`, `moduleHandlesOwnShutdown` | The mission scripting file and its two flags |
+| `completionTags`, `missionTags`, `requiredAreaTags`, `excludedAreaTags`, `requiredCompletedTags` | Tag paths; the last is a list of terms with `positiveTags` and `negativeTags` |
+| `owner` | The `DevOwner` Record: `guid` and `className`; `null` without one |
+| `difficulty`, `preShowObjectives`, `showLifeTimeInMobiGlas`, `buyInAmount`, `refundBuyInOnWithdraw` | The values as stored |
+| `settings` | The `canBeShared`, `hasCompleteButton`, `handlesAbandonRequest`, `displayAlliedMarkers` and `onlyOwnerCanComplete` flags |
+| `availability` | The flags `initiallyActive`, `showAsOffer`, `requestOnly`, `onceOnly`, `notifyOnAvailable`, `availableInPrison`, `lawfulMission`, `tutorial`, `canReacceptAfterAbandoning`, `canReacceptAfterFailing`, `applyCompletionTagsOnAbandoned` and `applyCompletionTagsOnFailed`, and the `wantedLevelMin` and `wantedLevelMax` the player may have |
+| `schedule` | The `availableDateSchedule` windows: `start` and `end` (`year`, `month`, `day`, `hour`, `minute`, `second`), `repeatEnd` (the same without a time of day) and `repeatType` (`repeatYearly`); a month is `january` to `december` |
+| `cooldowns` | `hasPersonalCooldown`, the personal and abandoned cooldown times with their variations and the respawn time with its variation; the Archive does not state the unit |
+| `instances` | `maxInstances`, `maxInstancesPerPlayer`, `maxPlayersPerInstance`, `hasLifeTime`, `lifeTime` and `lifeTimeVariation` |
+| `reward` | The `missionReward`: `currency` as stored (`UEC`, `MER` or `INVALID`), `reward`, `max`, `plusBonuses` and `reputationBonusGuid`; `null` without one |
+| `finish` | `failIfSentToPrison`, `failIfBecameCriminal`, `failIfLeavePrison` and the deadline: `autoEnd`, `completionTime`, `endReason` (game text), `resultAfterTimerEnd` (an objective state) and `remainingTimeToShowTimer` |
+| `standingRequirements` | The reputation requirement expression in stored order, tagged by `type`: `requirement` (`comparison`, `factionReputationGuid`, `scopeGuid`, `standingGuid`), `and`, `leftParenthesis` and `rightParenthesis`; the elements form an infix expression and the catalog does not evaluate it |
+| `reputationResults` | The `missionResultReputationRewards`: one element per stored position (`index`, the Archive names no result) with its `amounts` (`factionReputationGuid`, `scopeGuid`, `rewardGuid` and the `amount` of that reward Record) |
+| `missionProperties` | The mission properties in stored order: `variable`, `token` and `valueType`, as for the contract templates |
+| `shipSpawns`, `locationQueries` | The links of ADR-0266 with `level` `broker`, into `contractShipSpawns` and `contractLocationQueries`, which hold the descriptions of the entries too |
+| `haulingOrders` | The orders of the hauling objectives (`source` `brokerObjective`) as in "Hauling orders" |
+| `objectives`, `partialPayout`, `modifiers`, `missionFlow` | As for the contract templates; `comms` of an objective is empty, an entry has no start or end comms |
+
+A comparison is `equalTo`, `greaterThan`, `greaterThanOrEqualTo` or `lessThanOrEqualTo`. A stored
+name the catalog does not know (a comparison, a month, a repeat type, a reaction, a licence type)
+is `null` and counted in the warning `unknown_template_values`, like those of the templates. The
+tokens of the objective values are the same as there; the NPC and entity spawn descriptions of the
+`properties` (`valueType` only) follow with #815.
+
+On LIVE (2026-10-31) the kind holds 2,428 entries with 703 objective tokens, 26,741 properties,
+949 modifiers, 2,097 flow triggers and 1,666 requirement terms, 16.9 MB of JSON. The catalog grows
+from 187.2 MB to 205.9 MB decompressed and from 3.44 MB to 3.78 MB as `.json.zst`; the upload
+limit is 64,000,000 bytes.
 
 ### Cargo manifests
 
@@ -2338,6 +2395,7 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `contractShipSpawns` | None: derived from the properties of the contracts and their templates, no Records | |
 | `contractLocationQueries` | None: derived from the properties of the contracts and their templates, no Records | |
 | `contractTemplates` | `libs/foundry/records/` (every folder; see "Contract templates") | `ContractTemplate` |
+| `missionBrokerEntries` | `libs/foundry/records/` (every folder; see "Mission broker entries") | `MissionBrokerEntry` |
 | `lootTables` | `libs/foundry/records/lootgeneration/loottables/` | `LootTableV3Record` |
 | `lootArchetypes` | `libs/foundry/records/lootgeneration/lootarchetypes/` | `LootArchetypeV3Record` |
 | `lootPoolFilters` | `libs/foundry/records/lootgeneration/filters/` | `PoolFilterRecord` |
@@ -2501,6 +2559,7 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   | missionTypes | 41 | 0 | 23 |
   | missionLocationTemplates | 3,211 | 274 | 3,160 |
   | contractTemplates | 6,765 | 12 | 6,651 |
+  | missionBrokerEntries | 17,733 | 566 | 17,636 |
 
   A contract text that holds a `~mission(…)` token is rewritten by the exporter, so the
   verification only checks that such a text is present. The location templates have 3,297 name
@@ -2511,6 +2570,11 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   option texts, the marker names; most are the placeholder `@LOC_UNINITIALIZED` and carry no key):
   the English file lacks 12 of them (`@MissionPhaseDebug_*` among them) and the German file 6,651,
   so the baselines of the kind are 0.01 and 0.99.
+
+  The mission broker entries have 17,733 keyed texts (the titles, descriptions, givers, comms
+  channels and end reasons, the objective texts): the English file lacks 566 of them
+  (`@procedural_text_null` and the texts of the `cfp_*` delivery entries among them) and the German
+  file 17,636, so the baselines of the kind are 0.04 and 1.0.
 
   The `p4kx catalog` summary counts them over all texts of the catalog: English 79,504 resolved,
   597 unresolved, German 31,495 resolved, 48,606 unresolved, 23,717 placeholders in each.

@@ -10,9 +10,7 @@ use crate::blueprint::as_struct;
 use crate::contract_missions::{ContractEntry, ContractFaction, PickupPlace};
 use crate::contract_offer::OfferedAt;
 use crate::contract_starmap::StarmapObject;
-use crate::contract_template_read::{self, ContractTemplates};
 use crate::guid_text::CatalogGuid;
-use crate::location_template::{self, LocationTemplates};
 use crate::mission_cooldown::ContractCooldown;
 use crate::mission_facts::Levels;
 use crate::mission_hauling_levels::HaulingLevels;
@@ -22,6 +20,7 @@ use crate::mission_layers::{Layer, items, one};
 use crate::mission_places::{Places, Prerequisites, Where};
 use crate::mission_results::{granted_tags, link};
 use crate::mission_shared::{Found, Rewards, Shared};
+use crate::mission_siblings::{self, Siblings};
 use crate::mission_titles::titles;
 use crate::record_fields::{boolean, guid_value, nonnil_guid, reference, text};
 use crate::selection::{Kind, is_leftover};
@@ -43,8 +42,7 @@ pub(crate) struct Missions<'f> {
     pub(crate) skipped: usize,
     pub(crate) failures: Vec<CatalogFailure>,
     pub(crate) pools: SpawnPools,
-    pub(crate) templates: LocationTemplates<'f>,
-    pub(crate) contract_templates: ContractTemplates<'f>,
+    pub(crate) siblings: Siblings<'f>,
 }
 
 /// A Record that cannot be read: the error of the DataForge or of an identifier of a description.
@@ -60,6 +58,26 @@ struct Context<'x, 'f> {
     index: &'x MissionIndex<'f>,
     texts: &'x Texts<'f>,
     places: &'x Places<'x, 'f>,
+}
+
+/// Reads each of `records` in parallel; a Record that cannot be read is a failure.
+fn read_pieces<'f>(
+    records: &[Record<'f>],
+    context: &Context<'_, 'f>,
+    cancel: Option<&CancelToken>,
+) -> Result<Vec<Piece<'f>>, CatalogError> {
+    records
+        .par_iter()
+        .map_init(TreeBuilder::new, |trees, record| {
+            if cancel.is_some_and(CancelToken::is_cancelled) {
+                return Err(CatalogError::Cancelled);
+            }
+            Ok(piece(trees, record, context).unwrap_or_else(|source| {
+                Some(Piece::Failed(CatalogFailure::of(record, source.as_ref())))
+            }))
+        })
+        .filter_map(Result::transpose)
+        .collect()
 }
 
 /// Reads the contracts of the `ContractGenerator` Records `filter` matches: for each contract an
@@ -90,14 +108,12 @@ pub(crate) fn read<'f>(
         .collect();
     let mut index = MissionIndex::read(forge, cancel)?;
     let (pools, failures) = index.take_template_results();
-    let tags = index.tags();
     let mut missions = Missions {
         contracts: Vec::new(),
         skipped: 0,
         failures,
         pools,
-        templates: location_template::read(forge, texts, tags, filter, cancel)?,
-        contract_templates: contract_template_read::read(forge, texts, tags, filter, cancel)?,
+        siblings: mission_siblings::read(forge, (texts, &index), filter, cancel)?,
     };
     if records.is_empty() {
         return Ok(missions);
@@ -108,20 +124,8 @@ pub(crate) fn read<'f>(
         texts,
         places: &places,
     };
-    let pieces: Vec<Piece<'f>> = records
-        .par_iter()
-        .map_init(TreeBuilder::new, |trees, record| {
-            if cancel.is_some_and(CancelToken::is_cancelled) {
-                return Err(CatalogError::Cancelled);
-            }
-            Ok(piece(trees, record, &context).unwrap_or_else(|source| {
-                Some(Piece::Failed(CatalogFailure::of(record, source.as_ref())))
-            }))
-        })
-        .filter_map(Result::transpose)
-        .collect::<Result<_, _>>()?;
     let mut grants = Grants::new();
-    for piece in pieces {
+    for piece in read_pieces(&records, &context, cancel)? {
         match piece {
             Piece::Contracts(contracts, skipped, granted, found) => {
                 missions.pools.merge(found);
@@ -348,6 +352,7 @@ impl<'f> Parent<'_, 'f> {
             debug_name: self.name,
             handler: text(Some(self.handler), "debugName"),
             template_guid: template.map(CatalogGuid),
+            broker_entry_guid: reference(Some(self.contract), "missionBrokerEntry"),
             not_for_release: boolean(Some(self.contract), "notForRelease"),
             work_in_progress: boolean(Some(self.contract), "workInProgress"),
             title,

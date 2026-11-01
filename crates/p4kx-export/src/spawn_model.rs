@@ -22,6 +22,8 @@ pub(crate) enum SpawnLevel {
     Handler,
     /// The `contractProperties` of the `ContractTemplate`.
     Template,
+    /// The `properties` of the `MissionBrokerEntry`.
+    Broker,
 }
 
 /// A set of tags written as their full tag paths, e.g. `AI.Ship.SpawnFlags.PoweredOff`, in

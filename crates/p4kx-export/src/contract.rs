@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use crate::guid_text::CatalogGuid;
 
+pub(crate) use crate::broker_entry::BrokerEntry;
 pub(crate) use crate::contract_cargo::CargoManifest;
 pub(crate) use crate::contract_crafter::Crafter;
 pub(crate) use crate::contract_crafting::{
@@ -156,6 +157,8 @@ pub(crate) struct Catalog<'a> {
     pub(crate) contract_location_queries: Vec<LocationQuery>,
     /// The contract templates, the targets of `contracts[].templateGuid`, ordered by GUID.
     pub(crate) contract_templates: Vec<ContractTemplate<'a>>,
+    /// The mission broker entries, the targets of `contracts[].brokerEntryGuid`, ordered by GUID.
+    pub(crate) mission_broker_entries: Vec<BrokerEntry<'a>>,
     /// The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered
     /// by `slug`. A curated list, not read from the Archive.
     pub(crate) ship_store_slugs: Vec<ShipStoreSlug<'a>>,
@@ -257,6 +260,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) contract_location_queries: KindCompleteness<'a>,
     /// The completeness of `contractTemplates`.
     pub(crate) contract_templates: KindCompleteness<'a>,
+    /// The completeness of `missionBrokerEntries`.
+    pub(crate) mission_broker_entries: KindCompleteness<'a>,
     /// The completeness of `shipStoreSlugs`.
     pub(crate) ship_store_slugs: KindCompleteness<'a>,
 }
@@ -309,6 +314,7 @@ impl<'a> Completeness<'a> {
             contract_ship_spawns: completeness,
             contract_location_queries: completeness,
             contract_templates: completeness,
+            mission_broker_entries: completeness,
             ship_store_slugs: completeness,
         }
     }

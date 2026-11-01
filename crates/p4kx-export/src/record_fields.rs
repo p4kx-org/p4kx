@@ -165,7 +165,17 @@ pub(crate) fn reference(parent: Option<&StructValue<'_>>, name: &str) -> Option<
 /// Returns the GUID of the Record the field `name` of `parent` links to, including a Reference to
 /// a Record the DataForge does not have.
 pub(crate) fn linked(parent: Option<&StructValue<'_>>, name: &str) -> Option<CatalogGuid> {
-    let value = parent?.field(name)?;
+    link_of(parent?.field(name)?)
+}
+
+/// Returns the GUIDs of the Records the References among the elements of the array the field
+/// `name` of `parent` holds link to, including References to Records the DataForge does not
+/// have, in stored order.
+pub(crate) fn linked_list(parent: Option<&StructValue<'_>>, name: &str) -> Vec<CatalogGuid> {
+    elements(parent, name).iter().filter_map(link_of).collect()
+}
+
+fn link_of(value: &Value<'_>) -> Option<CatalogGuid> {
     record_reference(value).or_else(|| match value {
         Value::Error(error) => error.dangling_guid().map(CatalogGuid),
         _ => None,

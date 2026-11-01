@@ -159,7 +159,7 @@ fn records_that_nest_phases_or_conditions_too_deep_fail_instead_of_being_cut() -
         .map(|failure| (failure.record_path.as_str(), failure.reason.as_str()))
         .collect();
     failed.sort_unstable();
-    assert_eq!(failed.len(), 2, "{failed:?}");
+    assert_eq!(failed.len(), 5, "{failed:?}");
     assert!(failed[0].0.ends_with("deep_flow"), "{failed:?}");
     assert!(failed[0].1.contains("conditions nest deeper than 16"));
     assert!(failed[1].0.ends_with("deep_phases"), "{failed:?}");
@@ -168,7 +168,48 @@ fn records_that_nest_phases_or_conditions_too_deep_fail_instead_of_being_cut() -
     assert_eq!(
         catalog["contractTemplates"].as_array().map(Vec::len),
         Some(2),
-        "neither deep template is listed"
+        "no failed template is listed"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_other() -> TestResult
+{
+    let dir = tempfile::tempdir()?;
+    let archive = Archive::open_with_key(
+        spawns_fixture::write_archive(dir.path())?,
+        Some(p4kx_testkit::test_key()),
+    )?;
+    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let built = build_catalog(&archive, &options)?;
+    let mut failed: Vec<(&str, &str)> = built
+        .summary()
+        .failures()
+        .iter()
+        .map(|failure| (failure.record_path.as_str(), failure.reason.as_str()))
+        .collect();
+    failed.sort_unstable();
+    assert!(failed[2].0.ends_with("unknown_flow"), "{failed:?}");
+    assert!(
+        failed[2]
+            .1
+            .contains("holds the unknown struct MissionFlowCondition_Unknown"),
+        "{failed:?}"
+    );
+    assert!(failed[3].0.ends_with("unknown_modifier"), "{failed:?}");
+    assert!(
+        failed[3]
+            .1
+            .contains("modifiers holds the unknown struct MissionModifier"),
+        "{failed:?}"
+    );
+    assert!(failed[4].0.ends_with("missionbroker/bad"), "{failed:?}");
+    assert!(
+        failed[4]
+            .1
+            .contains("holds the unknown struct SReputationMissionRequirementsUnknown"),
+        "{failed:?}"
     );
     Ok(())
 }
@@ -188,10 +229,16 @@ fn stored_names_the_catalog_does_not_know_are_counted_in_a_warning() -> TestResu
         .iter()
         .find(|warning| warning.kind() == "unknown_template_values")
         .ok_or("the warning")?;
-    assert_eq!(warning.count(), Some(2), "{:?}", warning.details());
+    assert_eq!(warning.count(), Some(5), "{:?}", warning.details());
     assert_eq!(
         warning.details(),
-        ["end comms reason Vanish (1)", "flow state Sleeping (1)"]
+        [
+            "comparison Sideways (1)",
+            "end comms reason Vanish (1)",
+            "flow state Sleeping (1)",
+            "month Smarch (1)",
+            "reaction Gloating (1)"
+        ]
     );
     assert!(matches!(
         warning,

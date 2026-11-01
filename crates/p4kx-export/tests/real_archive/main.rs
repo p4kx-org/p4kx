@@ -5,6 +5,7 @@
 //! when `P4KX_DATA_P4K` names one.
 
 mod real_archive;
+mod real_archive_broker_entries;
 mod real_archive_catalog_ships;
 mod real_archive_commodity_refining;
 mod real_archive_compression;
