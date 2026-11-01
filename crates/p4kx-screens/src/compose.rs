@@ -196,7 +196,8 @@ impl<'a, 'f> ScreenComposer<'a, 'f> {
     /// The colour slots (`Base`, `Accent1` and so on) of the widgets take their colours from the
     /// default style, overlaid by the HUD style of the manufacturer `brand` (a code such as
     /// `aegs`), overlaid by the styles each canvas names for itself and its nested canvases; a
-    /// canvas with several brand styles uses the one of `brand`, else its first. The style
+    /// canvas uses its brand style of `brand`, or none when it has no style of that code, and
+    /// without a `brand` its first brand style. The style
     /// entries of those canvases and styles, whose selectors the composer evaluates, set the
     /// colours, borders, alpha, visibility and geometry of the widgets at rest. The bindings of
     /// each canvas, calculated with every game variable at zero, decide which widgets are

@@ -74,7 +74,8 @@ pub(crate) enum UiAction {
         #[arg(long, value_name = "CANVAS", conflicts_with = "entry")]
         screen: Option<String>,
         /// The manufacturer code, e.g. `aegs`, whose colour style the canvas is drawn with;
-        /// without a match the first brand style of the canvas is used.
+        /// a canvas without a brand style of that code uses its default entries only; without
+        /// the option the first brand style of each canvas is used.
         #[arg(long, value_name = "BRAND", requires = "screen")]
         brand: Option<String>,
         /// Set a game variable before the bindings of the screens are evaluated, as `NAME=VALUE`,
