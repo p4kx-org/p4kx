@@ -105,6 +105,11 @@ P4KX reads your own Star Citizen installation and ships no game data.
 You need the stable Rust toolchain (see the [README](README.md#build)) on Windows or Linux, and
 for the Blender add-on Python and Blender 5.2 LTS.
 
+On Linux the audio preview builds against the ALSA headers: `sudo apt-get install
+libasound2-dev` (Debian and Ubuntu; CI installs the same package). PipeWire and PulseAudio need
+nothing extra at build time; at run time they serve the ALSA `default` device through
+`pipewire-alsa` or `pulseaudio-alsa`, which desktop distributions install.
+
 ```powershell
 cargo build --release
 cargo fmt --all

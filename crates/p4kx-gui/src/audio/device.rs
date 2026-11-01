@@ -6,7 +6,9 @@ use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::Duration;
 
-use rodio::{ChannelCount, DeviceSinkBuilder, SampleRate, Source};
+use rodio::{
+    ChannelCount, DeviceSinkBuilder, DeviceSinkError, MixerDeviceSink, SampleRate, Source,
+};
 
 use super::{AudioOutput, FailureReporter, SoundSource, StreamGuard};
 use crate::model::describe;
@@ -31,14 +33,20 @@ impl AudioOutput for DeviceOutput {
     }
 }
 
-fn play(source: SoundSource, reporter: &FailureReporter, closed: &Receiver<()>) {
+/// Opens the default output device; stream errors after the opening go to `reporter`. Fails
+/// with [`DeviceSinkError::NoDevice`] when the system has none, as on a host without a sound
+/// card.
+fn open_default(reporter: &FailureReporter) -> Result<MixerDeviceSink, DeviceSinkError> {
     let runtime = reporter.clone();
-    let opened = DeviceSinkBuilder::from_default_device().and_then(|builder| {
+    DeviceSinkBuilder::from_default_device().and_then(|builder| {
         builder
             .with_error_callback(move |error| runtime.report(describe(&error)))
             .open_sink_or_fallback()
-    });
-    let mut sink = match opened {
+    })
+}
+
+fn play(source: SoundSource, reporter: &FailureReporter, closed: &Receiver<()>) {
+    let mut sink = match open_default(reporter) {
         Ok(sink) => sink,
         Err(error) => {
             reporter.report(describe(&error));
@@ -49,6 +57,9 @@ fn play(source: SoundSource, reporter: &FailureReporter, closed: &Receiver<()>) 
     sink.mixer().add(Feed(source));
     let _closed = closed.recv();
 }
+
+#[cfg(test)]
+mod tests;
 
 /// A [`SoundSource`] as a rodio source.
 struct Feed(SoundSource);
