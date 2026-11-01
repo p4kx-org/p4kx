@@ -74,6 +74,9 @@ fn refuses_after_swap(parent: bool) -> TestResult {
     fs::create_dir_all(&watched)?;
     let probe = dir.path().join("probe");
     if !link(&outside, &probe) {
+        if cfg!(unix) {
+            return Err("a symbolic link can be created on Unix".into());
+        }
         return Ok(());
     }
     fs::remove_dir(&probe).or_else(|_| fs::remove_file(&probe))?;

@@ -7,6 +7,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::SystemTime;
 
+#[cfg(test)]
+mod tests;
+
 #[cfg(windows)]
 const FILE_SHARE_READ: u32 = 0x0000_0001;
 #[cfg(windows)]

@@ -9,6 +9,7 @@ use p4kx_model::{CompanionError, CompanionPath, CompanionResolver};
 use thiserror::Error;
 
 use crate::chunk_source::MAX_CHUNK_FILE_LEN;
+use crate::disk_case;
 use crate::entry_path::relative_path;
 use crate::path_index::PathIndex;
 use crate::sound::read_capped;
@@ -90,11 +91,19 @@ impl CompanionResolver for DiskCompanions<'_> {
         if self.absent.as_ref() == Some(&file_path) {
             return Ok(None);
         }
-        let file = match File::open(&file_path) {
-            Ok(file) => file,
+        let (file, file_path) = match File::open(&file_path) {
+            Ok(file) => (file, file_path),
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                self.absent = Some(file_path);
-                return Ok(None);
+                let other_case = if cfg!(windows) {
+                    None
+                } else {
+                    disk_case::open_variant(&file_path)?
+                };
+                let Some(found) = other_case else {
+                    self.absent = Some(file_path);
+                    return Ok(None);
+                };
+                found
             }
             Err(error) => return Err(error.into()),
         };
@@ -121,4 +130,38 @@ fn too_large(name: &str, limit: u64) -> CompanionError {
         limit,
     }
     .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use p4kx_model::{CompanionPath, CompanionResolver};
+
+    use super::DiskCompanions;
+
+    #[test]
+    fn a_companion_named_with_other_case_is_read_from_the_file_it_names() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        fs::write(dir.path().join("Ship.CHUNK"), b"chunk")?;
+        let mut companions = DiskCompanions {
+            folder: dir.path(),
+            read: Vec::new(),
+            absent: None,
+        };
+
+        let bytes = companions.resolve(CompanionPath::Sibling("ship.chunk"));
+
+        assert!(
+            matches!(bytes, Ok(Some(ref bytes)) if bytes == b"chunk"),
+            "{bytes:?}"
+        );
+        assert_eq!(companions.read.len(), 1);
+        if cfg!(unix) {
+            assert_eq!(companions.read, [dir.path().join("Ship.CHUNK")]);
+        }
+        let missing = companions.resolve(CompanionPath::Sibling("other.chunk"));
+        assert!(matches!(missing, Ok(None)), "{missing:?}");
+        Ok(())
+    }
 }

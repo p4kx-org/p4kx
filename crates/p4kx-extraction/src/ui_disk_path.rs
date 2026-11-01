@@ -4,6 +4,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::disk_case;
+
 const DDS: &str = "dds";
 const DATA: &str = "Data";
 
@@ -69,7 +71,14 @@ pub(crate) fn resolve_on_disk(movie: &Path, relative: &str) -> Result<Option<Pat
         return Err(root);
     }
     if !path.is_file() {
-        return Ok(None);
+        if cfg!(windows) {
+            return Ok(None);
+        }
+        match disk_case::variant(&path) {
+            Ok(Some(found)) if found.is_file() => path = found,
+            Ok(_) => return Ok(None),
+            Err(_) => return Err(root),
+        }
     }
     let canonical = fs::canonicalize(&path).map_err(|_| root.clone())?;
     let canonical_root = fs::canonicalize(&root).map_err(|_| root.clone())?;
@@ -154,6 +163,23 @@ mod tests {
             "below"
         );
         assert!(resolve_on_disk(&movie, "../y.dds").is_err(), "above");
+        Ok(())
+    }
+
+    #[test]
+    fn a_link_with_other_case_finds_the_file_it_names() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let data = dir.path().join("Data");
+        let movie = data.join("UI").join("m.gfx");
+        touch(&movie)?;
+        touch(&data.join("Textures").join("Button.dds"))?;
+
+        let found = resolve_on_disk(&movie, "../textures/BUTTON.DDS");
+
+        assert!(
+            matches!(&found, Ok(Some(path)) if path.ends_with("Textures/Button.dds")),
+            "{found:?}"
+        );
         Ok(())
     }
 }
