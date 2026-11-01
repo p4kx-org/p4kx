@@ -29,10 +29,16 @@ const VALUE_PREFIX: &str = "MissionPropertyValue_";
 /// the texts, the count of unknown names and the pools the spawn descriptions and location queries
 /// they state are registered in.
 pub(crate) struct PropertyReader<'r, 'x, 'f> {
-    pub(crate) reader: &'r Reader<'x, 'f>,
-    pub(crate) texts: &'r Texts<'f>,
-    pub(crate) unknowns: &'r Unknowns,
-    pub(crate) pools: &'r RefCell<SpawnPools<'f>>,
+    reader: &'r Reader<'x, 'f>,
+    texts: &'r Texts<'f>,
+    unknowns: &'r Unknowns,
+    pools: &'r RefCell<SpawnPools<'f>>,
+}
+
+/// Returns the struct name of a property value without its `MissionPropertyValue_` start.
+fn value_type<'v>(value: &'v StructValue<'_>) -> &'v str {
+    let name = value.type_name();
+    name.strip_prefix(VALUE_PREFIX).unwrap_or(name)
 }
 
 impl<'r, 'x, 'f> PropertyReader<'r, 'x, 'f> {
@@ -76,10 +82,7 @@ impl<'f> PropertyReader<'_, '_, 'f> {
                 Ok(TemplateProperty {
                     variable: owned(property, "missionVariableName"),
                     token: owned(property, "extendedTextToken"),
-                    value_type: value.map(|value| {
-                        let name = value.type_name();
-                        name.strip_prefix(VALUE_PREFIX).unwrap_or(name).to_owned()
-                    }),
+                    value_type: value.map(|value| value_type(value).to_owned()),
                     value: value.map(|value| self.value(value)).transpose()?,
                 })
             })
@@ -132,8 +135,7 @@ impl<'f> PropertyReader<'_, '_, 'f> {
 
     fn value(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, ReadError> {
         let parent = Some(value);
-        let name = value.type_name();
-        Ok(match name.strip_prefix(VALUE_PREFIX).unwrap_or(name) {
+        Ok(match value_type(value) {
             "Object" => PropertyValue::Object,
             "DeliveryOrder" => PropertyValue::DeliveryOrder,
             "Boolean" => PropertyValue::Boolean {

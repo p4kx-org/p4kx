@@ -6,9 +6,10 @@
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 
 use super::template_parts::{display, object, token_state, trigger};
+use super::template_values as values;
 use super::{
-    DEEP_FLOW, DEEP_PHASES, OBJECTIVE_A, UNKNOWN_CONDITION, UNKNOWN_FLOW, UNKNOWN_MODIFIER,
-    UNKNOWN_VALUE, array, npc, text,
+    DEEP_FLOW, DEEP_PHASES, OBJECTIVE_A, UNKNOWN_CONDITION, UNKNOWN_CONTRACT_PROPERTY,
+    UNKNOWN_FLOW, UNKNOWN_ITEM_CONDITION, UNKNOWN_MODIFIER, UNKNOWN_VALUE, array, npc, text,
 };
 
 /// The levels of phases the deep template nests, more than the catalog follows.
@@ -105,6 +106,34 @@ pub(super) fn unknown_value() -> TestRecord {
     .value(
         "objectiveTokens",
         array(vec![token_with(npc::mystery_value("Item_BP"))]),
+    )
+}
+
+/// A template with a contract property of a struct the catalog does not know.
+pub(super) fn unknown_contract_property() -> TestRecord {
+    TestRecord::new(
+        UNKNOWN_CONTRACT_PROPERTY,
+        "ContractTemplate",
+        "ContractTemplate.Unknown_Contract_Property",
+        "libs/foundry/records/contracts/contracttemplates/unknown_contract_property.xml",
+    )
+    .value(
+        "contractProperties",
+        array(vec![npc::mystery_value("Mystery_BP")]),
+    )
+}
+
+/// A template with a contract property of a mission item whose condition is of an unknown struct.
+pub(super) fn unknown_item_condition() -> TestRecord {
+    TestRecord::new(
+        UNKNOWN_ITEM_CONDITION,
+        "ContractTemplate",
+        "ContractTemplate.Unknown_Item_Condition",
+        "libs/foundry/records/contracts/contracttemplates/unknown_item_condition.xml",
+    )
+    .value(
+        "contractProperties",
+        array(vec![values::mystery_item("Item_BP")]),
     )
 }
 

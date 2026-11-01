@@ -37,6 +37,9 @@ pub(crate) const UNKNOWN_FLOW: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0006;
 pub(crate) const UNKNOWN_MODIFIER: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0007;
 pub(crate) const UNKNOWN_VALUE: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0008;
 pub(crate) const UNKNOWN_CONDITION: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0009;
+pub(crate) const UNKNOWN_CONTRACT_PROPERTY: u128 = 0x4000_0000_0000_4000_8000_0000_0000_000a;
+pub(crate) const UNKNOWN_ITEM_CONDITION: u128 = 0x4000_0000_0000_4000_8000_0000_0000_000b;
+pub(crate) const BROKER_BAD_PROPERTY: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0005;
 pub(crate) const BROKER: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const BROKER_ELSEWHERE: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0002;
 pub(crate) const BROKER_LEFTOVER: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0003;
@@ -318,10 +321,13 @@ fn database() -> DataForgeBuilder {
         template_deep::unknown_modifier(),
         template_deep::unknown_value(),
         template_deep::unknown_condition(),
+        template_deep::unknown_contract_property(),
+        template_deep::unknown_item_condition(),
         broker::broker(),
         broker::elsewhere(),
         broker::leftover(),
         broker::bad(),
+        broker::bad_property(),
         broker::reward_record(),
         location_template(LOCATION_A, "a_hijacked", false),
         location_template(LOCATION_B, "b_hijacked", true),
