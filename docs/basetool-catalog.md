@@ -1465,14 +1465,15 @@ are not exported.
 (`matchConditions`, all of which a location satisfies), a closed list tagged by `condition`:
 `tagSearch` (`tagType` and `terms` with `positiveTags` and `negativeTags`), `excludeNearbyLocations`
 and `excludeDistantLocations` (`rangeKm` and `locationProperty`, a variable name),
-`excludeProperty`, `propertyTags`, `specificOrganizations`, `specificItems` and `other`
-(`structName` of a condition the catalog does not read; none on LIVE). A condition's weak pointer
-is the `missionVariableName` of the property it points to; on LIVE 83 of 431 distance conditions
-point to a property that has no variable name and have `null`. The game runs the query against the
-location templates when the mission starts, depending on the other properties of the mission
-(distance, organisation, items); the catalog exports the query as stored and never a list of
-resulting places or starmap objects. The Archive links a query to a starmap object only through the
-pickup `MissionLocality` Records (see "Contracts").
+`excludeProperty`, `propertyTags`, `specificOrganizations` and `specificItems`. A condition of a
+struct the catalog does not know fails the Record that holds the query (ADR-0326). The schema
+still lists the deprecated condition `other` (`structName`); the catalog never writes it. A
+condition's weak pointer is the `missionVariableName` of the property it points to; on LIVE 83 of
+431 distance conditions point to a property that has no variable name and have `null`. The game
+runs the query against the location templates when the mission starts, depending on the other
+properties of the mission (distance, organisation, items); the catalog exports the query as stored
+and never a list of resulting places or starmap objects. The Archive links a query to a starmap
+object only through the pickup `MissionLocality` Records (see "Contracts").
 
 **Location templates (`missionLocationTemplates`).** A `MissionLocationTemplate` Record under
 `missiondata/pu_locations` (one more of the type lies outside that folder, a test platform, and is

@@ -14,7 +14,6 @@ use crate::mission_layers::{items, key, one};
 use crate::npc_spawn_read::ai_name;
 use crate::record_fields::{boolean, integer, number, reference, structs, text};
 use crate::record_read::ReadError;
-use crate::spawn_model::LocationCondition;
 use crate::spawn_pools::{Registered, SpawnPools, Target};
 use crate::spawn_read::Reader;
 use crate::template_issues::{TemplateError, Unknowns};
@@ -162,11 +161,11 @@ impl<'f> PropertyReader<'_, '_, 'f> {
                 negative_tags: self.reader.tag_list(parent, "negativeTags"),
             },
             "Organization" => PropertyValue::Organization {
-                conditions: self.conditions(value, "organization condition")?,
+                conditions: self.reader.conditions(parent, "organization condition")?,
                 forced_organization_guid: reference(parent, "debugForceChosenOrganization"),
             },
             "MissionItem" => PropertyValue::MissionItem {
-                conditions: self.conditions(value, "item condition")?,
+                conditions: self.reader.conditions(parent, "item condition")?,
                 forced_item_guid: reference(parent, "debugForceChosenItem"),
                 min_items_to_find: integer(parent, "minItemsToFind"),
                 max_items_to_find: integer(parent, "maxItemsToFind"),
@@ -191,31 +190,6 @@ impl<'f> PropertyReader<'_, '_, 'f> {
             "StarMapLocation" => PropertyValue::StarMapLocation,
             _ => return self.spawn(value),
         })
-    }
-
-    /// Reads the `matchConditions` of `value`; `what` names them in the error.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TemplateError::UnknownStruct`] for a condition of a struct the catalog does not
-    /// know.
-    fn conditions(
-        &self,
-        value: &StructValue<'f>,
-        what: &'static str,
-    ) -> Result<Vec<LocationCondition>, ReadError> {
-        let conditions = self.reader.conditions(Some(value));
-        if let Some(LocationCondition::Other { struct_name }) = conditions
-            .iter()
-            .find(|condition| matches!(condition, LocationCondition::Other { .. }))
-        {
-            return Err(TemplateError::UnknownStruct {
-                field: what,
-                name: struct_name.clone(),
-            }
-            .into());
-        }
-        Ok(conditions)
     }
 
     /// Reads a spawn description or a location query and registers it.

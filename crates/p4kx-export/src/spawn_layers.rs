@@ -9,6 +9,7 @@ use p4kx_extraction::{StructValue, TagTree};
 use crate::blueprint::as_struct;
 use crate::mission_layers::{items, one};
 use crate::record_fields::text;
+use crate::spawn_error::SpawnError;
 use crate::spawn_model::{LocationPrerequisite, LocationQueryLink, SpawnLevel, SpawnPoolLink};
 use crate::spawn_pools::{Registered, SpawnPools, Target};
 use crate::spawn_read::Reader;
@@ -41,14 +42,15 @@ impl Level {
     ///
     /// # Errors
     ///
-    /// Returns the error of the serialisation that makes the identifier of a description.
+    /// Returns [`SpawnError::Identifier`] when the identifier of a description cannot be made and
+    /// [`SpawnError::Template`] for a location condition of a struct the catalog does not know.
     pub(crate) fn read<'f>(
         level: SpawnLevel,
         reader: &Reader<'_, 'f>,
         (params, properties): (Option<&StructValue<'f>>, &str),
         (owner, prerequisites): (Option<&StructValue<'_>>, &str),
         pools: &mut SpawnPools<'f>,
-    ) -> Result<Self, serde_json::Error> {
+    ) -> Result<Self, SpawnError> {
         let mut found = Vec::new();
         for property in items(params, properties).iter().filter_map(as_struct) {
             found.extend(stated(reader, property, pools)?);
@@ -65,7 +67,7 @@ fn stated<'f>(
     reader: &Reader<'_, 'f>,
     property: &StructValue<'f>,
     pools: &mut SpawnPools<'f>,
-) -> Result<Option<Stated>, serde_json::Error> {
+) -> Result<Option<Stated>, SpawnError> {
     let Some(variable) = text(Some(property), "missionVariableName") else {
         return Ok(None);
     };
@@ -127,7 +129,7 @@ impl<'x, 'f> RecordSpawns<'x, 'f> {
         level: SpawnLevel,
         params: (Option<&StructValue<'f>>, &str),
         owner: (Option<&StructValue<'f>>, &str),
-    ) -> Result<Level, serde_json::Error> {
+    ) -> Result<Level, SpawnError> {
         Level::read(
             level,
             &self.reader,
@@ -141,11 +143,11 @@ impl<'x, 'f> RecordSpawns<'x, 'f> {
     ///
     /// # Errors
     ///
-    /// Returns the error of the serialisation that makes the identifier of a description.
+    /// See [`Level::read`].
     pub(crate) fn handler(
         &self,
         handler: &StructValue<'f>,
-    ) -> Result<HandlerSpawns<'_, 'x, 'f>, serde_json::Error> {
+    ) -> Result<HandlerSpawns<'_, 'x, 'f>, SpawnError> {
         let level = self.level(
             SpawnLevel::Handler,
             (one(Some(handler), "contractParams"), "propertyOverrides"),
@@ -169,12 +171,12 @@ impl<'r, 'x, 'f> HandlerSpawns<'r, 'x, 'f> {
     ///
     /// # Errors
     ///
-    /// Returns the error of the serialisation that makes the identifier of a description.
+    /// See [`Level::read`].
     pub(crate) fn contract<'h>(
         &'h self,
         contract: &StructValue<'f>,
         template: Option<&'h Level>,
-    ) -> Result<ContractSpawns<'h, 'r, 'x, 'f>, serde_json::Error> {
+    ) -> Result<ContractSpawns<'h, 'r, 'x, 'f>, SpawnError> {
         let level = self.record.level(
             SpawnLevel::Contract,
             (one(Some(contract), "paramOverrides"), "propertyOverrides"),
@@ -200,11 +202,8 @@ impl<'f> ContractSpawns<'_, '_, '_, 'f> {
     ///
     /// # Errors
     ///
-    /// Returns the error of the serialisation that makes the identifier of a description.
-    pub(crate) fn resolve(
-        &self,
-        sub: Option<&StructValue<'f>>,
-    ) -> Result<Resolved, serde_json::Error> {
+    /// See [`Level::read`].
+    pub(crate) fn resolve(&self, sub: Option<&StructValue<'f>>) -> Result<Resolved, SpawnError> {
         let sub_level = sub
             .map(|sub| {
                 self.handler.record.level(

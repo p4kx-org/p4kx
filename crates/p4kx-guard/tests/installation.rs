@@ -255,7 +255,7 @@ fn notices_a_running_game_from_the_process_list() -> TestResult {
     } else {
         (
             std::path::PathBuf::from("/bin/sleep"),
-            "StarCitizen",
+            "StarCitizen.exe",
             &["30"],
         )
     };
