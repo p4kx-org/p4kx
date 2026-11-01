@@ -13,6 +13,8 @@ use p4kx_assembly::{
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
+use crate::real_paths::unified;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const MALE: &str = "NPC_Archetypes-Male-Human-Civilians-Orison-Hauler_Orison_02";
@@ -32,11 +34,6 @@ const WORLD_PROP_ONLY_ITEMS: [&str; 2] = [
     "Clothing_Torso2_Unified [Char_Clothing_Torso_2] Objects/buildingsets/human/universal/prop/storage/box_cardboard/box_clothing_1_jacket_a.cgf",
     "bnu_shirt_01_01_01 [Char_Clothing_Torso_0] Objects/buildingsets/human/universal/prop/storage/box_cardboard/box_clothing_1_shirt_a.cgf",
 ];
-
-/// Returns `path` in lower case with `/`.
-fn unified(path: &str) -> String {
-    path.to_ascii_lowercase().replace('\\', "/")
-}
 
 /// Returns whether the model `path` is a prop of the world: neither in the characters folder nor
 /// a character file.

@@ -18,6 +18,8 @@ use p4kx_extraction::{AnimationChoice, Archive, DataForgeEntry};
 use p4kx_gltf::GlbOptions;
 use p4kx_testkit::{check_glb, real_archive_key, real_archive_path};
 
+use crate::real_paths::unified;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const NPC: &str = "NPC_Archetypes-Male-Human-MissionGivers-MilesEckhart";
@@ -207,7 +209,7 @@ fn every_rig_logic_file_of_the_archive_reads_and_moves_its_joints() -> TestResul
     let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
     let (mut read, mut masks) = (0_usize, 0_usize);
     for entry in archive.entries() {
-        let path = entry.path().to_ascii_lowercase().replace('\\', "/");
+        let path = unified(entry.path());
         if !path.contains(RIG_LOGIC_FOLDER) || !path.ends_with(".riglogic") {
             continue;
         }
