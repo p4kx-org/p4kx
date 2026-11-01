@@ -9,9 +9,10 @@ use p4kx_extraction::{StructValue, TagTree};
 use crate::blueprint::as_struct;
 use crate::mission_layers::{items, one};
 use crate::record_fields::text;
+use crate::spawn_error::SpawnError;
 use crate::spawn_model::{LocationPrerequisite, LocationQueryLink, SpawnLevel, SpawnPoolLink};
 use crate::spawn_pools::{Registered, SpawnPools, Target};
-use crate::spawn_read::{Reader, SpawnError};
+use crate::spawn_read::Reader;
 
 const LOCATION_PROPERTY: &str = "ContractPrerequisite_LocationProperty";
 
@@ -41,8 +42,8 @@ impl Level {
     ///
     /// # Errors
     ///
-    /// Returns a [`SpawnError`] for a description whose identifier cannot be made or a location
-    /// condition of an unknown struct.
+    /// Returns [`SpawnError::Identifier`] when the identifier of a description cannot be made and
+    /// [`SpawnError::Template`] for a location condition of a struct the catalog does not know.
     pub(crate) fn read<'f>(
         level: SpawnLevel,
         reader: &Reader<'_, 'f>,
@@ -142,8 +143,7 @@ impl<'x, 'f> RecordSpawns<'x, 'f> {
     ///
     /// # Errors
     ///
-    /// Returns a [`SpawnError`] for a description whose identifier cannot be made or a location
-    /// condition of an unknown struct.
+    /// See [`Level::read`].
     pub(crate) fn handler(
         &self,
         handler: &StructValue<'f>,
@@ -171,8 +171,7 @@ impl<'r, 'x, 'f> HandlerSpawns<'r, 'x, 'f> {
     ///
     /// # Errors
     ///
-    /// Returns a [`SpawnError`] for a description whose identifier cannot be made or a location
-    /// condition of an unknown struct.
+    /// See [`Level::read`].
     pub(crate) fn contract<'h>(
         &'h self,
         contract: &StructValue<'f>,
@@ -203,8 +202,7 @@ impl<'f> ContractSpawns<'_, '_, '_, 'f> {
     ///
     /// # Errors
     ///
-    /// Returns a [`SpawnError`] for a description whose identifier cannot be made or a location
-    /// condition of an unknown struct.
+    /// See [`Level::read`].
     pub(crate) fn resolve(&self, sub: Option<&StructValue<'f>>) -> Result<Resolved, SpawnError> {
         let sub_level = sub
             .map(|sub| {

@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{StructValue, TagTree, Value};
-use thiserror::Error;
 
 use crate::blueprint::as_struct;
 use crate::entity_spawn_model::EntitySpawnPool;
@@ -10,6 +9,7 @@ use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{items, one};
 use crate::npc_spawn_model::NpcSpawnPool;
 use crate::record_fields::{boolean, guid_value, integer, nonnil_guid, number, reference, text};
+use crate::spawn_error::SpawnError;
 use crate::spawn_model::{
     LocationCondition, LocationCount, LocationQuery, ShipSpawnGroup, ShipSpawnOption,
     ShipSpawnPool, ShipSpawnSlot, TagPaths, TagTerm, content_guid,
@@ -22,17 +22,6 @@ const SHIPS: &str = "MissionPropertyValue_ShipSpawnDescriptions";
 const NPCS: &str = "MissionPropertyValue_NPCSpawnDescriptions";
 const ENTITIES: &str = "MissionPropertyValue_EntitySpawnDescriptions";
 const CONDITION_PREFIX: &str = "DataSetMatchCondition_";
-
-/// A mission property cannot be read.
-#[derive(Debug, Error)]
-pub(crate) enum SpawnError {
-    /// The content of a description cannot be serialised to make its identifier.
-    #[error(transparent)]
-    Identifier(#[from] serde_json::Error),
-    /// A location condition is of a struct the catalog does not know.
-    #[error(transparent)]
-    Template(#[from] TemplateError),
-}
 
 /// What a mission property states.
 #[derive(Debug)]

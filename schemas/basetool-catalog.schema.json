@@ -6788,6 +6788,25 @@
             "itemGuids"
           ],
           "type": "object"
+        },
+        {
+          "deprecated": true,
+          "description": "Never written; a condition of an unknown struct fails the Record.",
+          "properties": {
+            "condition": {
+              "const": "other",
+              "type": "string"
+            },
+            "structName": {
+              "description": "The struct name.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition",
+            "structName"
+          ],
+          "type": "object"
         }
       ]
     },

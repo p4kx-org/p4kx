@@ -9,8 +9,7 @@ use super::template_parts::{display, object, token_state, trigger};
 use super::template_values as values;
 use super::{
     DEEP_FLOW, DEEP_PHASES, OBJECTIVE_A, UNKNOWN_CONDITION, UNKNOWN_CONTRACT_PROPERTY,
-    UNKNOWN_FLOW, UNKNOWN_ITEM_CONDITION, UNKNOWN_LOCATION_CONDITION, UNKNOWN_MODIFIER,
-    UNKNOWN_VALUE, array, npc, text,
+    UNKNOWN_FLOW, UNKNOWN_ITEM_CONDITION, UNKNOWN_MODIFIER, UNKNOWN_VALUE, array, npc, text,
 };
 
 /// The levels of phases the deep template nests, more than the catalog follows.
@@ -135,21 +134,6 @@ pub(super) fn unknown_item_condition() -> TestRecord {
     .value(
         "contractProperties",
         array(vec![values::mystery_item("Item_BP")]),
-    )
-}
-
-/// A template with a contract property of a location query whose condition is of an unknown
-/// struct.
-pub(super) fn unknown_location_condition() -> TestRecord {
-    TestRecord::new(
-        UNKNOWN_LOCATION_CONDITION,
-        "ContractTemplate",
-        "ContractTemplate.Unknown_Location_Condition",
-        "libs/foundry/records/contracts/contracttemplates/unknown_location_condition.xml",
-    )
-    .value(
-        "contractProperties",
-        array(vec![values::mystery_location("Place_BP")]),
     )
 }
 

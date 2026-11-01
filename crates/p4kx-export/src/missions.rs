@@ -24,9 +24,9 @@ use crate::mission_siblings::{self, Siblings};
 use crate::mission_titles::titles;
 use crate::record_fields::{boolean, identity, reference, text};
 use crate::selection::{Kind, is_leftover};
+use crate::spawn_error::SpawnError;
 use crate::spawn_layers::{HandlerSpawns, RecordSpawns};
 use crate::spawn_pools::SpawnPools;
-use crate::spawn_read::SpawnError;
 use crate::texts::Texts;
 use crate::{CatalogError, CatalogFailure};
 

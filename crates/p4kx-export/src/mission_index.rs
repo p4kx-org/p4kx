@@ -14,10 +14,11 @@ use crate::contract_hauling::HaulingRequirement;
 use crate::mission_hauling::{HaulingProperty, objective_orders, property_orders};
 use crate::mission_layers::{Property, items, key, one, properties};
 use crate::record_fields::{boolean, integer, reference};
+use crate::spawn_error::SpawnError;
 use crate::spawn_layers::Level;
 use crate::spawn_model::SpawnLevel;
 use crate::spawn_pools::SpawnPools;
-use crate::spawn_read::{Reader, SpawnError};
+use crate::spawn_read::Reader;
 use crate::{CatalogError, CatalogFailure};
 
 const TEMPLATES: &str = "libs/foundry/records/contracts/contracttemplates/";

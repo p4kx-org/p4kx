@@ -7,7 +7,7 @@
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{CatalogOptions, CraftingWarning, build_catalog};
+use p4kx_export::{BuiltCatalog, CatalogOptions, CraftingWarning, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
@@ -179,18 +179,15 @@ fn records_that_nest_phases_or_conditions_too_deep_fail_instead_of_being_cut() -
     )?;
     let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
     let built = build_catalog(&archive, &options)?;
-    let mut failed: Vec<(&str, &str)> = built
-        .summary()
-        .failures()
-        .iter()
-        .map(|failure| (failure.record_path.as_str(), failure.reason.as_str()))
-        .collect();
-    failed.sort_unstable();
-    assert_eq!(failed.len(), 11, "{failed:?}");
-    assert!(failed[0].0.ends_with("deep_flow"), "{failed:?}");
-    assert!(failed[0].1.contains("conditions nest deeper than 16"));
-    assert!(failed[1].0.ends_with("deep_phases"), "{failed:?}");
-    assert!(failed[1].1.contains("phases nest deeper than 32"));
+    let failed = failures(&built);
+    assert_eq!(failed.len(), UNKNOWN_STRUCTS.len() + TOO_DEEP, "{failed:?}");
+    assert_failures(
+        &failed,
+        &[
+            ("/deep_flow", "conditions nest deeper than 16"),
+            ("/deep_phases", "phases nest deeper than 32"),
+        ],
+    );
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(
         catalog["contractTemplates"].as_array().map(Vec::len),
@@ -200,11 +197,42 @@ fn records_that_nest_phases_or_conditions_too_deep_fail_instead_of_being_cut() -
     Ok(())
 }
 
+const ORGANIZATION: &str =
+    "organization condition holds the unknown struct DataSetMatchCondition_Mystery";
+const ITEM: &str = "item condition holds the unknown struct DataSetMatchCondition_Mystery";
+const LOCATION: &str = "location condition holds the unknown struct DataSetMatchCondition_Mystery";
+const VALUE: &str = "property value holds the unknown struct MissionPropertyValue_Mystery";
+
+/// The Records of the fixture that fail on an unknown struct: a record path suffix and what the
+/// reason states.
+const UNKNOWN_STRUCTS: [(&str, &str); 12] = [
+    ("/unknown_condition", ORGANIZATION),
+    (
+        "/unknown_flow",
+        "holds the unknown struct MissionFlowCondition_Unknown",
+    ),
+    (
+        "/unknown_modifier",
+        "modifiers holds the unknown struct MissionModifier",
+    ),
+    ("/unknown_value", VALUE),
+    ("/unknown_contract_property", VALUE),
+    ("/unknown_item_condition", ITEM),
+    ("/unknown_location_condition", LOCATION),
+    ("/unknown_location_after_known", LOCATION),
+    ("/contractgenerator/unknown_location", LOCATION),
+    (
+        "/missionbroker/bad",
+        "holds the unknown struct SReputationMissionRequirementsUnknown",
+    ),
+    ("/missionbroker/bad_property", VALUE),
+    ("/missionbroker/bad_location", LOCATION),
+];
+
+/// The Records that fail because they nest too deep.
+const TOO_DEEP: usize = 2;
+
 #[test]
-#[expect(
-    clippy::too_many_lines,
-    reason = "one row per struct the catalog fails the Record on"
-)]
 fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_other() -> TestResult
 {
     let dir = tempfile::tempdir()?;
@@ -214,6 +242,12 @@ fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_
     )?;
     let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
     let built = build_catalog(&archive, &options)?;
+    assert_failures(&failures(&built), &UNKNOWN_STRUCTS);
+    Ok(())
+}
+
+/// The record path and reason of every failed Record.
+fn failures(built: &BuiltCatalog) -> Vec<(&str, &str)> {
     let mut failed: Vec<(&str, &str)> = built
         .summary()
         .failures()
@@ -221,55 +255,17 @@ fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_
         .map(|failure| (failure.record_path.as_str(), failure.reason.as_str()))
         .collect();
     failed.sort_unstable();
-    let reason = |suffix: &str| {
-        failed
-            .iter()
-            .find(|(path, _)| path.ends_with(suffix))
-            .map(|(_, reason)| *reason)
-            .unwrap_or_default()
-    };
-    let expected = [
-        (
-            "/unknown_condition",
-            "organization condition holds the unknown struct DataSetMatchCondition_Mystery",
-        ),
-        (
-            "/unknown_flow",
-            "holds the unknown struct MissionFlowCondition_Unknown",
-        ),
-        (
-            "/unknown_modifier",
-            "modifiers holds the unknown struct MissionModifier",
-        ),
-        (
-            "/unknown_value",
-            "property value holds the unknown struct MissionPropertyValue_Mystery",
-        ),
-        (
-            "/unknown_contract_property",
-            "property value holds the unknown struct MissionPropertyValue_Mystery",
-        ),
-        (
-            "/unknown_item_condition",
-            "item condition holds the unknown struct DataSetMatchCondition_Mystery",
-        ),
-        (
-            "/unknown_location_condition",
-            "location condition holds the unknown struct DataSetMatchCondition_Mystery",
-        ),
-        (
-            "/missionbroker/bad",
-            "holds the unknown struct SReputationMissionRequirementsUnknown",
-        ),
-        (
-            "/missionbroker/bad_property",
-            "property value holds the unknown struct MissionPropertyValue_Mystery",
-        ),
-    ];
+    failed
+}
+
+/// Asserts that a failed Record ends with each suffix and states each text in its reason.
+fn assert_failures(failed: &[(&str, &str)], expected: &[(&str, &str)]) {
     for (suffix, text) in expected {
-        assert!(reason(suffix).contains(text), "{suffix}: {failed:?}");
+        let found = failed
+            .iter()
+            .any(|(path, reason)| path.ends_with(suffix) && reason.contains(text));
+        assert!(found, "{suffix} {text}: {failed:?}");
     }
-    Ok(())
 }
 
 #[test]

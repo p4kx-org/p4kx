@@ -106,17 +106,23 @@ pub(super) fn properties() -> Vec<TestValue> {
     ]
 }
 
-/// A location property whose only condition is of a struct the catalog does not know.
-pub(super) fn mystery_location(variable: &str) -> TestValue {
+/// A location property with a condition of a struct the catalog does not know, after a known
+/// condition when `known_first` is set.
+pub(super) fn mystery_location(variable: &str, known_first: bool) -> TestValue {
+    let known = TestInstance::new("DataSetMatchCondition_SpecificOrganizationsDef")
+        .value("organizations", array(vec![reference(OWNER)]));
+    let unknown = TestInstance::new("DataSetMatchCondition_Mystery");
+    let conditions = known_first
+        .then_some(known)
+        .into_iter()
+        .chain([unknown])
+        .map(object)
+        .collect();
     property(
         variable,
         "",
-        TestInstance::new("MissionPropertyValue_Location").value(
-            "matchConditions",
-            array(vec![object(TestInstance::new(
-                "DataSetMatchCondition_Mystery",
-            ))]),
-        ),
+        TestInstance::new("MissionPropertyValue_Location")
+            .value("matchConditions", array(conditions)),
     )
 }
 
