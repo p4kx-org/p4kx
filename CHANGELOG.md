@@ -10,6 +10,369 @@ the entries under `## [Unreleased]`.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-01
+
+A 3D, character, audio and catalog update.
+- **Exports:** ships, creatures and characters export more completely:
+  - creatures are skinned, with opt-in animations (`--animations`);
+  - story characters get their own heads, and hair follows the head's joints and expressions;
+  - stencil decals take the livery's primary decal colour, and glass is see-through;
+  - worn parts hide what they cover;
+  - `--loadout-pick` chooses a loadout alternative.
+- **Blender package:** format 1.8. It states the layer shares and the creature rigs.
+- **Audio:** vgmstream `.txtp` files and the object hierarchy of a soundbank.
+- **Extraction:**
+  - `p4kx convert` converts a folder extracted earlier;
+  - `--exclude` Filters;
+  - file names that are valid on Linux and Windows;
+  - DataForge files open without an Archive.
+- **Basetool catalog:** the new kinds `contractTemplates`, `missionBrokerEntries`,
+  `cargoManifests`, `contractNpcSpawns` and `contractEntitySpawns`, and the values of the contract
+  properties. All are additive, so the catalog stays `schemaVersion` 2.
+- **Graphics:** on Windows the window opens Direct3D 12 first and falls back to the other backends.
+
+### Added
+
+- Audio: `p4kx wwise extract --txtp` also writes one vgmstream `.txtp` text file per Wwise event of
+  the trigger next to the sounds. It layers an Event's actions and blend containers, chains
+  sequence containers, selects the first child of a random or switch container and carries the
+  loop of each sound; an event with broken links is marked incomplete, and an event with a sound
+  that has no whole file is listed instead. P4KX writes the text only; it does not run vgmstream.
+- UI screens: `p4kx ui render --screen` takes `--var NAME=VALUE` (repeatable) to set game
+  variables before the bindings are evaluated, e.g. `--var powerstate=1` for a ship that is
+  powered on. The report lists the variables in force and the names no canvas of the screen
+  reads. The UI tab offers the state "At rest" or "Powered on" and a field for more variables.
+- Story characters: the head of a character with a `.RigLogic` file of its own, such as Miles
+  Eckhart, now has expressions and a face animation. `p4kx armour glb --loadout` and
+  `p4kx character package` write the blendshapes of the head's geometry as morph targets
+  (`--expression NAME`, `--no-expressions`), place the facial joints by the head's own skeleton
+  file and animate them from the face clips of the character's folder.
+- `p4kx-character`: `RigLogic` reads the joint delta records of a rig (`joint_records`,
+  `joint_step`, `FaceRig::from_logic`) and `SkinBlendshapes` reads the `BShapesGpu` chunk of a
+  head. `RigLogic` no longer implements `Eq`, as it holds the scales of the records as `f64`.
+- Assembly: the bone attachments of a character definition, such as the housing of a thruster, are
+  drawn at their bone of the skeleton, offset by their position and rotation, as nodes below the
+  part in the GLB, the Blender package and the viewer. Their vertices count against the budget.
+  An attachment whose file is missing or whose bone is unknown is reported.
+- Basetool catalog: the new kind `contractTemplates` lists the `ContractTemplate` Records that
+  `contracts[].templateGuid` names: display flags, class settings, deadline, mission properties,
+  ship spawn and location links, hauling orders, partial reward payouts, modifiers, owner, mission
+  flow, comms and the objective tokens with their handlers, reward contributions, properties and
+  texts (game texts, flagged `x-gameText`). A stored name the catalog does not know is `null` and
+  counted in the new warning `unknown_template_values`; a template that nests its phases or
+  conditions too deep is a failure of the build.
+- Basetool catalog: the new kind `missionBrokerEntries` lists the `MissionBrokerEntry` Records, the
+  offers of the mission board, with their texts (game texts, flagged `x-gameText`), links,
+  availability, schedule, cooldowns, instance limits, reward, deadline, reputation requirements and
+  results, mission properties, ship spawn and location links, hauling orders, objectives, partial
+  payout, modifiers and mission flow. Contracts name their entry in the new field
+  `brokerEntryGuid`. The modifiers `factionHostility`, `hostileMission`,
+  `ignoreMissionPlayerCriminality` and `lawLicense` and the flow conditions `anyTokensState` and
+  `onMissionStart` are variants of the contract templates too (`anyTokensState` occurs three times
+  and `onMissionStart` once on LIVE). A modifier, mission flow condition or action of a struct the
+  catalog does not know fails the Record, in a template as in a broker entry, and is listed in the
+  failures of the build; the unions of `contractTemplates` changed before the kind was first
+  released.
+- Basetool catalog: the new kind `cargoManifests` lists the cargo manifests of the Archive (how the
+  game fills the cargo grid of a ship it spawns), and every contract entry gains `haulingOrders`,
+  what the contract has to haul: commodities in SCU, entities and mission items, with the
+  alternatives of an `or`. Schema version 2 keeps its number (ADR-0265).
+- Basetool catalog: the new kinds `contractNpcSpawns` and `contractEntitySpawns` list the distinct
+  NPC and entity spawn descriptions of the contracts, templates and broker entries with every field
+  the Archive states (groups, options, spawn settings, tags, inventory items, the embedded NPC names
+  as game texts flagged `x-gameText`). Contracts, contract templates and mission broker entries link
+  to them in the new fields `npcSpawns` and `entitySpawns`. The value of an objective property is
+  now `npcSpawnDescriptions`, `entitySpawnDescriptions` or `organization` where it was `other`; a
+  value of any other struct fails the Record and is listed in the failures of the build. The
+  `other` variant of `contractTemplates` and `missionBrokerEntries` was not part of a release.
+- Extraction: `p4kx extract --filter` and `p4kx search` take a repeatable `--exclude <FILTER>` that
+  leaves out the Entries it matches, with the rules of the Filter, e.g. `--filter 'Data\Objects\*'
+  --exclude '*_lod?.cgam'` for all models without their level-of-detail companions. A texture whose
+  header is excluded is left out with its parts; with `--convert`, an excluded part of a texture
+  that stays is still read to build the texture, and a note says so. A pair that selects nothing is
+  invalid input and names the side that removed everything. The Extraction dialog has a **Leave
+  out** field with one Filter per line. Filter text is limited to 1024 bytes and 32 wildcards.
+- Entity export: the skeleton file a character definition (`.cdf`) names is checked. A missing or
+  unreadable skeleton is listed as the notes `skeleton_missing` and `skeleton_unreadable` in
+  `entity glb` and `entity package`; the skin is still written. A real-Archive census lists which
+  Entities with a `.cdf`, `.chr` or `.skin` outside the human rigs draw.
+- Soundbanks: `p4kx bnk objects` prints the object hierarchy of a bank in bank order (type, ID,
+  parent, children and, for music objects, segment durations and markers, track clips and playlist
+  items with their loop counts), filtered by `--type` or `--id` and paged with `--limit` and
+  `--offset`; objects the reader cannot decode are listed and counted. `--json` gives the same
+  data.
+- DataForge: every `p4kx dcb` command, the DataForge tools of the MCP server and the window
+  (Archive menu, **Open DataForge file…**) read a `Game2.dcb` file on disk in place of an Archive.
+  The file is recognised by its content; `dcb export --lang` takes the texts from `--archive`.
+- `p4kx convert <folder> --out <folder>` converts a folder of files that were extracted earlier
+  without conversion: CryXml, split textures, sounds, soundbanks and a DataForge file are written
+  as `extract --convert` writes them. The window offers **Convert folder…** with progress and
+  cancel.
+- MCP: `list_soundbank_objects` lists the `HIRC` objects of a soundbank in bank order, paged with a
+  cursor and narrowed by `type` and `id`, in the shape of `p4kx bnk objects --json`. Objects the
+  reader does not decode are listed and counted, not skipped.
+- GUI: the Extraction summary (with Conversion on) and the Record export summary list the Records
+  whose file does not follow their name or record path, with GUID, record path and reason. A
+  renamed Record does not count as failed.
+- Exclusion Filters: `p4kx grep`, `p4kx verify`, `p4kx convert`, `p4kx socpak verify` and `p4kx
+  socpak extract` take a repeatable `--exclude` with the rules of `p4kx search`, and the
+  Extraction dialog of the window offers the *Leave out* field for the changes of a Comparison
+  side too, with the same texture rule as for the Archive.
+- Filter text from outside is bounded everywhere: more than 1024 bytes or 32 wildcards is invalid
+  input in every command that takes a Filter, an error of the MCP tools, and a red field in the
+  window.
+- Library: `convert_folder` of `p4kx-extraction` takes the `FolderSelection` of
+  `FolderSource::select` instead of a Filter, and `FolderSource::count_matching` is removed.
+- Basetool catalog: a contract lists the payout it states itself in `fixedRewards` (currency,
+  amount, maximum and bonus flag as stored). The UEC reward of most contracts is calculated by the
+  game and is not part of the Archive, so it stays out of the catalog.
+- Basetool catalog: the item `stats` gain the blocks `miningLaser` (throttle, modifiers and filter
+  of a mining laser, ship and FPS) and `miningModifier` (activation, charges, lifetime, laser, rock
+  and filter modifiers and damage multipliers of a mining module or gadget), and every fire mode
+  gains `hitType`, `fullDamageRange` and `zeroDamageRange`. `schemaVersion` stays 2.
+- Basetool catalog: `contracts` lists the time to complete, the buy-in, whether a contract can be
+  shared or is illegal, once-only, the players per instance, availability in prison, the
+  re-accept rules, hidden in mobiGlas and the intro contracts a contract requires. Each value
+  that several levels can state names the level (sub contract, contract, handler or template) it
+  comes from. Schema version 2 keeps its number.
+- Basetool catalog: contracts list the ship spawn descriptions and location queries they state
+  (`shipSpawns`, `locationQueries`, `locationPrerequisites`), with the new kinds
+  `contractShipSpawns`, `contractLocationQueries` and `missionLocationTemplates`. The queries are
+  exported as stored, never resolved to places.
+- Basetool catalog: every `contracts` entry has a `description` game text (`x-gameText`, not to be
+  passed on to third parties), resolved like the title.
+- UI screens: the canvas a canvas widget holds is now the one a style entry or a boolean binding
+  picks, so a powered MFD enters the canvases it swaps in (the Avenger Titan MFD with
+  `--var powerstate=1`: 206 widgets in 18 canvases instead of 48 in 6). A setting can name the
+  canvas it is meant for, `--var mapdisplaymaster::isradar=1`. The UI tab keeps the game state
+  and the typed variables across sessions.
+- Basetool catalog: every contract entry lists all places it is offered at (`offeredAt`: the
+  localities and location objects its prerequisites name, without the five-place cap of
+  `pickupPlaces`), the faction it is stated for with the place that names it (`giverFaction`: the
+  handler, a positive reputation result or a reputation prerequisite; a rival with a negative amount
+  does not count) and the blueprint pools it hands out on success (`blueprintRewards`, per entry,
+  so a consumer can tell which sub contract gives a blueprint). The fields are additive in schema
+  version 2.
+- Entity export: `entity glb --animations` writes the clips of a creature as animations of its
+  skeleton. They are the clips the creature's animation database names, found in the animation
+  folders of its skeleton's parameter file; additive clips and clips that move no bone are left
+  out and listed. Without the option the GLB stays static (ADR-0307).
+- UI screens: state tags that a canvas binds to its widgets, the text a text field holds
+  (`Type Text` selectors) and animations that hold their last frame are evaluated, so the
+  Avenger Titan MFD with `--var powerstate=1` draws its bars, frames and some texts (52 shapes
+  and 4 texts instead of none). The report lists every texture the Archive lacks per screen
+  (`missing_textures`, and `texture not in the Archive: <path>` on stderr), and the asset
+  listing of a screen follows the canvases its styles swap in.
+- Entity export: `--loadout-pick <group>=<index>` on `p4kx entity loadout`, `entity glb` and
+  `entity package`, the `loadout_pick` parameter of the MCP tool `entity_loadout` and a field in
+  the GUI's Entity export choose another alternative than the first of a group of a generated
+  Loadout (a creature's or an NPC's). A bare index applies to every group that has it; an index
+  beyond a named group is reported as a Loadout issue and the group keeps its first alternative.
+  Without a pick nothing changes.
+- Entity, armour and Interior exports: the JSON report of `p4kx entity glb`, `armour glb` and
+  `interior glb` carries `unresolved_layers`, the number of layer files of the material libraries
+  that are missing, unreadable or over the load budget, and `first_unresolved_layer`. The Export
+  of an Entity as GLB shows them in its summary, in German and English.
+- UI screens: `--var landscapecanvasguid=<record path or GUID>` puts a page in the powered MFD
+  (`portraitcanvasguid` for the portrait view), and `--var mfdviewname=<name>` names it in the
+  tab bar, which now draws its chevrons and its name on every page. The pages of the Avenger Titan
+  MFD (power, weapons, scanning, diagnostics, shields, configuration, communications and self
+  status) can be rendered one by one and compared with the game.
+- MCP: the `entity_loadout` tool states the `notes` of an Entity next to its `issues`, in the
+  shape of the CLI JSON: what the Archive cannot decide, such as an `assortment_requirement`.
+- Basetool catalog: the `contractProperties` of `contractTemplates` and the `missionProperties` of
+  `missionBrokerEntries` state their value in the new field `value`, the same union as the
+  properties of an objective, with the types `missionItem`, `aiName`, `combinedDataSetEntries`,
+  `haulingOrders`, `reward`, `timeTrialRace` and `starMapLocation` added to it. `valueType` stays.
+  A value of any other struct fails the Record.
+
+### Changed
+
+- Armour and Character export: a head at `--lod 1` and up now has its expressions as morph targets,
+  carried from level 0 over its surface, so the face animation drives them at every level. By
+  default all expressions are written at every level; `--expression` and `--no-expressions`
+  apply at every level. The expressions make the file of a distant level about four times
+  larger, so `--no-expressions` shrinks the files of distant levels.
+- Layered materials: the layer files of one ship are fetched and parsed once for all its material
+  libraries, and one load reads at most 64 MiB of them. `p4kx model info` and the MCP model tools no
+  longer read layer files. The Export as GLB summary lists how many layer files are missing, as
+  `p4kx model glb` does.
+- Armour: a worn piece whose Record hides a port (`HiddenParts`) leaves out the piece at that port:
+  a hat hides the hair, an undersuit the clothing under it, a jacket the shirt. The piece is
+  reported as `part_hidden`, and the body shows where it covered it. A clothing chunk whose
+  condition names no port and no tag now covers its zone; a chunk conditional on ports or tags
+  still covers nothing and is reported as `clothing_conditions_undecided` when it names a zone of
+  the body. A garment partly covered by another is still drawn whole (ADR-0279).
+- Characters: the hair, brows, lashes and beard of a head are bound to the head's facial joints
+  through the skin weights of the head vertices around them, so a facial animation moves the beard
+  with the jaw and the lashes with the eyelids (ADR-0299).
+- Releases: the checksum files are now `SHA256SUMS.txt` and `SHA3-512SUMS.txt`, so they open in
+  any text editor with a double click. The release notes and the verification guide use the new
+  names.
+- Entity export: `entity glb` and `entity package` fail when the main geometry of the Entity
+  itself is not in the Archive (exit code 2) or cannot be read (exit code 3), naming the file, and
+  write nothing; before they wrote a GLB or package without meshes. A part below the Entity that
+  cannot be drawn is still listed and skipped.
+- Extraction and Record export write only file names that are valid on both Linux and Windows,
+  whatever the platform. An Entry with a forbidden character, a Windows device name, a trailing dot
+  or space, a part over 255 bytes or a full path over 260 characters is reported with the rule it
+  breaks and the run goes on. Entries that differ only in case count as a collision. A Record with
+  such a name is written under its GUID, a record path with such a part is escaped (`a|b` becomes
+  `a%7Cb`), and the report lists each of them.
+- Window: a DataForge file opens as its DataForge only, with no Entry table, no folder tree and no
+  Entry counts in the status bar, and the Search tab is hidden for it. `p4kx dcb`, the MCP server
+  and the window read a DataForge file through one shared source type.
+- Audio: the sound files of `p4kx wwise extract` and `p4kx entity audio --extract` and the `.txtp`
+  files take their names from the portable file-name rule of the extraction. A forbidden
+  character becomes `%` and two hex digits instead of `_`, letters beyond ASCII and spaces are
+  kept, and names that differ only in case stay distinct. A sound whose path is too long is
+  reported as failed instead of aborting in the file system.
+- Entity export: `entity glb` writes a creature, an Entity whose root geometry is a character
+  file with a skeleton, with its skins bound to that skeleton: the bones as nodes, one glTF skin and
+  joints and weights on the skinned meshes, so it can be posed in Blender or a viewer. Bones the
+  skeleton lacks follow their nearest parent and are listed as `bones_not_in_skeleton`; a creature
+  whose skeleton is missing or unreadable stays static. The JSON report counts `bones` and
+  `skinned_meshes`.
+- Record JSON, Record XML and Query JSON: a Reference to a Record that does not exist keeps its
+  error value and also carries the GUID of the missing Record, as `"guid"` next to `"error"` in
+  JSON and as the `guid` attribute of `p4kx:error` in XML. The Record JSON schema accepts it, and
+  exports without it still validate.
+- Game texts: leading and trailing blanks and line breaks are removed from the texts of the Basetool
+  catalog and from the text the Localisation tab copies, e.g. `Antium Arms Moss Camo ` is now
+  `Antium Arms Moss Camo`. Record XML and JSON, `p4kx loc` and `dcb export --lang` keep the text
+  as the `global.ini` stores it.
+- Entity export: the `--help` text of `entity glb` and `entity package` and the exit-code section
+  say that a missing (exit code 2) or unreadable (exit code 3) geometry of the Entity itself
+  fails the run and writes nothing.
+- Basetool catalog: the `names` of a `missionLocationTemplates` entry carry the `displayName` game
+  text (`x-gameText`) again, with its English and German text, instead of only the `nameKey`.
+  Where the German file lacks a key, `de` is `null` and the Basetool falls back to `en`.
+- Blender package: `entity package` of a creature whose skeleton the Archive holds writes one
+  skinned GLB with the skeleton, the skins and the parts on its bones, and its `scene.json` says
+  so in the mesh's `rig`. The Blender add-on imports it as an armature with skinned meshes. A
+  creature without its skeleton stays a set of static meshes. Package format 1.8: `rig.body` is
+  optional and the part origin `skin` is new (ADR-0316).
+- Entity assembly: a worn Entity whose port another worn Entity hides by its `HiddenParts` (a
+  hat hides the hair, an undersuit the clothing under it, a jacket the shirt) is left out, as in
+  the Armour, and reported as `part_hidden`. It covers no zone of the body, so the body shows
+  where the hidden garment covered it (ADR-0304).
+- Screens: bound sizes, anchors, pivots, scales, positions, paddings and margins are evaluated at
+  rest, and the text of a text field takes the colour of an entry that selects it by its parent.
+  The powered MFD of the Avenger Titan now draws its header and counters.
+- Entity export: the Requirement of a loadout assortment and of its groups is now read. A group
+  that names no tag always applies. A group that depends on tags of the spawn still applies and is
+  noted as `assortment_requirement` in the new `notes` of `entity loadout`; it is not an issue and
+  does not appear in the catalog's loadout `issues`.
+- Window: on Windows the graphics instance opens Direct3D 12 only, so the Vulkan loader, the
+  Vulkan drivers and the overlay layers injected into them are no longer loaded. A machine where
+  Direct3D 12 yields no adapter or device within a few seconds falls back to the default backends,
+  and `WGPU_BACKEND` still overrides the choice.
+
+### Fixed
+
+- Blender add-on: a layered material without a blend map, mask map or vertex colours shows its
+  layers by position and `WearBlendBase` as the GLB does, instead of only the first layer; a layer
+  that is the only one with weight is shown. The package (format 1.5) states the shares per layer
+  (`layer_shares`). A texture that cannot be loaded falls back to the material's colours instead
+  of a black image, and decals with a stencil map take their `StencilDiffuseColor` and
+  `StencilOpacity`.
+- Screens: a canvas with the coordinate method `aspectOverridesWidth` or `aspectOverridesHeight`
+  is laid out in the whole box of its canvas widget instead of a box of the aspect of its own
+  size. The footer and header of every MFD page now span the screen. ADR-0106 records which layout
+  guesses the cockpit screenshots of the Gladius and the Constellation confirm, refute or leave open.
+- Characters: the body of a CHF character takes the base material and skin tone the character
+  chose for it, so body and head match at the collar instead of a pink body under a dark head.
+  The strands of a short beard that hang below the chin are the beard's own data and stay.
+- Assembly: the face parts of a head (eyelashes, teeth, eyes, brows) take the sub-geometry tagged
+  with the head's flags before the one tagged for the body, in `entity glb` and `entity package`
+  as in `armour glb`. Miles Eckhart's eyelashes are his own again instead of the generic male ones.
+- Armour: the natural colour of a hair material clamps its tint and dye to 0..1 and ignores a
+  tint or dye with fewer than three components, so a bad value no longer reaches the exported
+  base colour.
+- Blender add-on: an `Illum` material with a specular map now multiplies that map by its `Specular`
+  colour, as the GLB writer does. The Cutlass Black's landing gear, engine pipes and nozzles come
+  out dark metal instead of light, almost white, metal. A specular map on a material without a
+  `Specular` colour (default 0.04), including materials of 1.0 packages, no longer gives metal,
+  matching the GLB writer.
+- Assembly: the body of an NPC is found by its `Char_Body` attach type and the folder of the
+  variant's body skin instead of an exact skin file name, so a body that names another skin file of
+  the same variant is cut too. A cut that finds no body part, several, or one of another variant
+  is not made and is reported as `body_zones_unknown`.
+- Blender add-on: glass with the generation mask `PER_VERTEX_TINT`, such as the lamp lenses of the
+  Cutlass Black, takes its colour from the vertex colours instead of being plain white glass.
+- Blender add-on: glass is see-through in EEVEE and the viewport's Material Preview. Its alpha
+  follows the glass colour (clear glass 0.15, darker tints more opaque) and the palette colour
+  follows `GlassTintStrength`. In Cycles the same alpha makes glass lighter and less tinted.
+- Materials: stencil decals (`MeshDecal` with `STENCIL_MAP`, such as the branding of the ANVL
+  Paladin) are cut out by their stencil map in the GLB export and in the Blender add-on instead of
+  being drawn as solid quads. The motif takes `StencilDiffuseColor` and `StencilOpacity`, a
+  `StencilTintOverride` takes the primary palette colour, and a decal whose motif the game fills in
+  at run time (`$TintPaletteDecal`) is left out. Blender packages are format 1.6: the stencil map
+  has the texture usage `stencil` and each stencil decal states `stencil`.
+- Entity export: the head, teeth and eyes of a story character such as Miles Eckhart are his own
+  skins, as in the armour export, instead of the generic head skins.
+- GLB export: `COLOR_0` is written only on the primitives whose material reads the vertex colours
+  (glass with `PER_VERTEX_TINT`, layered surfaces without a blend map). Glass such as the hull
+  windows of the Cutlass Black is no longer tinted and faded by mask data in glTF viewers. Blender
+  packages are format 1.4: each material description states `reads_vertex_colours`, and the add-on
+  builds its vertex-colour nodes from it.
+- Assembly: an item port of a creature's skin, such as the collar of a Kopion, is placed at the
+  bone of the creature's skeleton its helper names instead of at the origin with the note
+  `helper_not_found`. A helper no skeleton holds stays a listed note.
+- Entity export: creatures whose Loadout is generated at random from loadout assortments, the
+  Quasigrazers, now draw their body skin and eggs; P4KX takes the first alternative of each group.
+  A creature whose Loadout file the Archive lacks, such as the Aloprat, lists
+  `loadout_unreadable` with the reason instead of exporting an empty scene silently.
+- Entity Assembly: the mobiGlas of a human NPC and the items its body holds, such as the tumbler
+  of Miles Eckhart or the weapons in the right hand, hang on the body bone their port names
+  instead of sitting at the origin between the feet. A rigid prop on a skin port is placed like a
+  bone attachment; skins, clothing and other character items keep their bind pose. A helper that
+  the skeleton of a human root holds is no longer listed as `helper_not_found`.
+- Blender add-on: dark tinted glass is no longer nearly opaque in EEVEE. Glass tints the scene
+  behind it by its colour, as the game's glass does, and EEVEE and Cycles now agree.
+- Catalog: the cooldown of a contract or sub contract that overrides it through a parameter
+  override (`PersonalCooldownTime` and similar) is exported with the override's value and level;
+  `cooldownLayer` is now `handler`, `contract` or `subContract`, and the new `cooldownLayers` names
+  the level of each cooldown field.
+- Basetool catalog schema: the closed value sets `FactLayer`, `StandingLevel`, `SpawnLevel`,
+  `HaulingSource`, `HaulingItemKind`, `LocationCount`, `CargoFillType` and `CargoSpawnKind` are
+  strings with their known values in `x-values`, so a catalog with a new value still validates.
+  The catalog data does not change.
+- Hologram render on the software adapter: on Windows the software adapter now opens a Direct3D 12
+  instance only, so the Vulkan drivers and the capture overlays injected into them are no longer
+  loaded. That removes the multi-second start-up stalls and the rare crash (exit code 2173) seen
+  under load.
+- Viewer: releasing the graphics device no longer blocks `p4kx ui hologram` or the window for
+  longer than a time limit. The command waits for the queue to go idle and drops the device on a
+  worker thread, and prints a warning that names the stage the driver stopped in when it did not
+  finish in time; the window ends the process with status 4 ten seconds after it has saved its
+  settings and leaves a note in the settings folder.
+- Characters: at `--lod 1` and up the hair, brows, lashes and beard follow the expressions of
+  the head like at LOD 0 (ADR-0305). The GLB of a dressed character grows by about three and a half
+  times with expressions at every level; `--no-expressions` writes the small file.
+- Entity Assembly: the clothing and armour of a generic NPC no longer appears as a cardboard box or
+  armour crate at the origin of the character. When the head names no body, the body Entity
+  decides, the clothing takes the `Male` or `Female` models of the body, and the body skin is cut
+  under it. A worn item whose only geometry is a world prop is left out and listed as
+  `world_prop_not_worn`.
+- UI screens: the constant of an integer comparison in a screen (`seatdashboard/currentmode`
+  equal to 4, say) was read as zero, so the powered MFD drew every mode of its self-status page at
+  once, with two large light-blue blocks at the lower corners. A runtime image such as the ship
+  diagram no longer fills its box with a colour, a notification of the power page is no longer
+  drawn at rest, and the arrows of the tab bar take their colour.
+- Materials: a stencil decal with a `StencilTintOverride` of 2, such as the logos of the RSI Ursa
+  Medivac, paints the red, green and blue masks of its stencil map with the livery's decal colours
+  in the GLB export and in the Blender add-on, instead of one grey from the primary palette
+  colour. Blender packages are format 1.7: a palette states its `decal` colours and such a decal
+  has the `palette` value `decal`.
+- Characters: an NPC with the generic head (most NPC archetypes) now takes its body from its
+  `Char_Body` Entity in `p4kx armour glb --loadout`, the character window and `p4kx entity glb`,
+  so a female NPC is no longer built on the male body. `body` of the `p4kx entity glb` report gains
+  `named_by` and `named_by_head`.
+- Ursa Medivac and every other layered hull: a GLB no longer multiplies the layer shares stored in
+  the vertex colours into the hull colour, so the Respite livery is dark grey and black instead
+  of purple. The Blender package is unchanged.
+
 ## [0.4.1] - 2026-10-28
 
 A catalog and release-process update. The Basetool catalog gains these kinds and fields; all are
