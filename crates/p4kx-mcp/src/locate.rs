@@ -39,6 +39,7 @@ impl Accepts {
 pub(crate) struct Locations {
     default_library: Option<PathBuf>,
     launcher: Option<PathBuf>,
+    wine_prefixes: Vec<PathBuf>,
     settings_file: Option<PathBuf>,
     patches: Arc<Mutex<Option<CachedPatches>>>,
 }
@@ -57,6 +58,7 @@ impl Locations {
         Self {
             default_library: default_library.or(standard.default_library),
             launcher: launcher.or(standard.launcher),
+            wine_prefixes: standard.wine_prefixes,
             settings_file,
             patches: Arc::default(),
         }
@@ -72,6 +74,7 @@ impl Locations {
         Ok(detect(&SearchPaths {
             default_library: self.default_library.clone(),
             launcher: self.launcher.clone(),
+            wine_prefixes: self.wine_prefixes.clone(),
             manual_folders: settings.channels.folders,
             manual_archives: settings.channels.archives,
         }))

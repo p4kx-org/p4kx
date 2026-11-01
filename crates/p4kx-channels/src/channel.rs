@@ -13,7 +13,7 @@ const UNKNOWN: &str = "unknown";
 /// Where a Channel was found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ChannelSource {
-    /// Below the default Library folder.
+    /// Below the default Library folder, also the one inside a Wine prefix.
     DefaultPath,
     /// Below a Library folder named in the RSI Launcher log.
     Launcher,

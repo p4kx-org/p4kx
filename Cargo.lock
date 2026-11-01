@@ -3592,6 +3592,7 @@ version = "0.4.2"
 dependencies = [
  "dirs",
  "p4kx-archive",
+ "p4kx-settings",
  "p4kx-testkit",
  "serde_json",
  "tempfile",
