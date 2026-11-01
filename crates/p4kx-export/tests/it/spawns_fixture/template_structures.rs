@@ -224,7 +224,6 @@ fn properties() -> Vec<TestStruct> {
             .field("linkedOutput", weak("ObjectiveProperty")),
         value("MissionPropertyValue_Object"),
         value("MissionPropertyValue_DeliveryOrder"),
-        value("MissionPropertyValue_NPCSpawnDescriptions"),
         value("MissionPropertyValue_StringHash")
             .array("options", class("MissionPropertyValueOption_StringHash")),
         TestStruct::new("MissionPropertyValueOption_StringHash")

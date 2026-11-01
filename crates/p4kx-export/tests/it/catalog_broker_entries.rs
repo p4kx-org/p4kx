@@ -194,7 +194,9 @@ fn properties_spawns_and_orders_are_read_like_those_of_a_template() -> TestResul
         broker["missionProperties"],
         json!([
             {"variable": "Wave_BP", "token": null, "valueType": "ShipSpawnDescriptions"},
-            {"variable": "Place_BP", "token": "Place", "valueType": "Location"}
+            {"variable": "Place_BP", "token": "Place", "valueType": "Location"},
+            {"variable": "Crew_BP", "token": null, "valueType": "NPCSpawnDescriptions"},
+            {"variable": "Loot_BP", "token": null, "valueType": "EntitySpawnDescriptions"}
         ])
     );
     let level = |field: &str| broker[field][0]["level"].clone();

@@ -16,8 +16,9 @@ use crate::mission_layers::one;
 use crate::record_fields::{boolean, class_name, integer, linked, structs, text};
 use crate::record_read::{KindRead, ReadError, read_kind};
 use crate::selection::Kind;
-use crate::spawn_layers::{Level, SpawnPools};
+use crate::spawn_layers::Level;
 use crate::spawn_model::SpawnLevel;
+use crate::spawn_pools::SpawnPools;
 use crate::spawn_read::Reader;
 use crate::template_extras::{end_comms, owner, partial_payout, start_comms};
 use crate::template_flow::FlowReader;
@@ -29,11 +30,11 @@ use crate::texts::Texts;
 
 const PROPERTY_VALUE_PREFIX: &str = "MissionPropertyValue_";
 
-/// The contract templates of a DataForge, what was left out, the ship spawns and location queries
-/// their objectives state and the stored names the catalog does not know.
+/// The contract templates of a DataForge, what was left out, the spawn descriptions and location
+/// queries their properties state and the stored names the catalog does not know.
 pub(crate) struct ContractTemplates<'f> {
     pub(crate) read: KindRead<ContractTemplate<'f>>,
-    pub(crate) pools: SpawnPools,
+    pub(crate) pools: SpawnPools<'f>,
     pub(crate) unknowns: Unknowns,
 }
 
@@ -95,7 +96,7 @@ pub(crate) fn read<'f>(
 fn template<'f>(
     sources: &Sources<'_, 'f>,
     tree: &RecordTree<'f>,
-) -> Result<(ContractTemplate<'f>, SpawnPools), ReadError> {
+) -> Result<(ContractTemplate<'f>, SpawnPools<'f>), ReadError> {
     let Sources {
         forge,
         texts,
@@ -136,6 +137,8 @@ fn template<'f>(
         auto_finish: one(class, "autoFinishSettings").map(|finish| auto_finish(finish, unknowns)),
         contract_properties: properties(root, "contractProperties"),
         ship_spawns: spawns.ship_spawns,
+        npc_spawns: spawns.npc_spawns,
+        entity_spawns: spawns.entity_spawns,
         location_queries: spawns.location_queries,
         hauling_orders: hauling_orders(root),
         objectives,

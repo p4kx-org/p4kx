@@ -174,6 +174,7 @@ fn a_filter_marks_both_kinds_partial_and_selects_by_record_path() -> TestResult 
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "the list of every kind in order")]
 fn the_kinds_follow_the_existing_ones_in_the_catalog_order() {
     assert_eq!(
         Kind::ALL.map(Kind::name),
@@ -223,6 +224,8 @@ fn the_kinds_follow_the_existing_ones_in_the_catalog_order() {
             "contractLocationQueries",
             "contractTemplates",
             "missionBrokerEntries",
+            "contractNpcSpawns",
+            "contractEntitySpawns",
         ],
         "order of the catalog"
     );

@@ -197,3 +197,8 @@ pub(crate) fn record_reference(value: &Value<'_>) -> Option<CatalogGuid> {
 pub(crate) fn nonnil_guid(guid: Guid) -> Option<Guid> {
     (guid != Guid::default()).then_some(guid)
 }
+
+/// Returns the non-nil `id` of the struct `structure`, the identity of a contract or sub contract.
+pub(crate) fn identity(structure: &StructValue<'_>) -> Option<Guid> {
+    guid_value(Some(structure), "id").and_then(nonnil_guid)
+}

@@ -13,7 +13,7 @@ use crate::contract::every_field_required;
 use crate::contract_hauling::HaulingOrder;
 use crate::contract_template::{ActiveSettings, TemplateProperty};
 use crate::guid_text::CatalogGuid;
-use crate::spawn_model::{LocationQueryLink, ShipSpawnLink};
+use crate::spawn_model::{LocationQueryLink, SpawnPoolLink};
 use crate::template_extras::{PartialPayout, TemplateOwner};
 use crate::template_flow::FlowTrigger;
 use crate::template_modifier::TemplateModifier;
@@ -82,7 +82,11 @@ pub(crate) struct BrokerEntry<'a> {
     pub(crate) mission_properties: Vec<TemplateProperty>,
     /// The ship spawn descriptions the entry states, one per variable, ordered by variable; `level`
     /// is always `broker`.
-    pub(crate) ship_spawns: Vec<ShipSpawnLink>,
+    pub(crate) ship_spawns: Vec<SpawnPoolLink>,
+    /// The NPC spawn descriptions the entry states, resolved like `shipSpawns`.
+    pub(crate) npc_spawns: Vec<SpawnPoolLink>,
+    /// The entity spawn descriptions the entry states, resolved like `shipSpawns`.
+    pub(crate) entity_spawns: Vec<SpawnPoolLink>,
     /// The location queries the entry states, resolved like `shipSpawns`.
     pub(crate) location_queries: Vec<LocationQueryLink>,
     /// The orders of the hauling objectives of the entry (`source` `brokerObjective`).

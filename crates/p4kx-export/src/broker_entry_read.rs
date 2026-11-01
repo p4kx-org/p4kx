@@ -21,8 +21,9 @@ use crate::mission_index::MissionIndex;
 use crate::record_fields::{boolean, class_name, integer};
 use crate::record_read::{KindRead, ReadError, read_kind};
 use crate::selection::Kind;
-use crate::spawn_layers::{Level, SpawnPools};
+use crate::spawn_layers::Level;
 use crate::spawn_model::SpawnLevel;
+use crate::spawn_pools::SpawnPools;
 use crate::spawn_read::Reader;
 use crate::template_extras::{owner, partial_payout};
 use crate::template_flow::FlowReader;
@@ -31,11 +32,11 @@ use crate::template_modifier::modifiers;
 use crate::template_objective_read::ObjectiveReader;
 use crate::texts::Texts;
 
-/// The mission broker entries of a DataForge, what was left out and the ship spawns and location
-/// queries their properties state.
+/// The mission broker entries of a DataForge, what was left out and the spawn descriptions and
+/// location queries their properties state.
 pub(crate) struct BrokerEntries<'f> {
     pub(crate) read: KindRead<BrokerEntry<'f>>,
-    pub(crate) pools: SpawnPools,
+    pub(crate) pools: SpawnPools<'f>,
 }
 
 /// What an entry is read with.
@@ -94,7 +95,7 @@ pub(crate) fn read<'f>(
 fn entry<'f>(
     sources: &Sources<'_, 'f>,
     tree: &RecordTree<'f>,
-) -> Result<(BrokerEntry<'f>, SpawnPools), ReadError> {
+) -> Result<(BrokerEntry<'f>, SpawnPools<'f>), ReadError> {
     let Sources {
         forge,
         texts,
@@ -142,6 +143,8 @@ fn entry<'f>(
         reputation_results: results(index, root),
         mission_properties: properties(root, "properties"),
         ship_spawns: spawns.ship_spawns,
+        npc_spawns: spawns.npc_spawns,
+        entity_spawns: spawns.entity_spawns,
         location_queries: spawns.location_queries,
         hauling_orders: hauling_orders(root),
         objectives: ObjectiveReader::new(&reader, texts, unknowns, &pools).objectives(root)?,

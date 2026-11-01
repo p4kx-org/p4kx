@@ -7,7 +7,7 @@ use serde::Serialize;
 use crate::contract::{LocalisedText, every_field_required};
 use crate::contract_hauling::HaulingOrder;
 use crate::guid_text::CatalogGuid;
-use crate::spawn_model::{LocationQueryLink, ShipSpawnLink};
+use crate::spawn_model::{LocationQueryLink, SpawnPoolLink};
 use crate::template_extras::{EndComms, PartialPayout, StartComms, TemplateOwner};
 use crate::template_flow::FlowTrigger;
 use crate::template_modifier::TemplateModifier;
@@ -52,7 +52,11 @@ pub(crate) struct ContractTemplate<'a> {
     pub(crate) contract_properties: Vec<TemplateProperty>,
     /// The ship spawn descriptions the template states, one per variable, ordered by variable;
     /// `level` is always `template`.
-    pub(crate) ship_spawns: Vec<ShipSpawnLink>,
+    pub(crate) ship_spawns: Vec<SpawnPoolLink>,
+    /// The NPC spawn descriptions the template states, resolved like `shipSpawns`.
+    pub(crate) npc_spawns: Vec<SpawnPoolLink>,
+    /// The entity spawn descriptions the template states, resolved like `shipSpawns`.
+    pub(crate) entity_spawns: Vec<SpawnPoolLink>,
     /// The location queries the template states, resolved like `shipSpawns`.
     pub(crate) location_queries: Vec<LocationQueryLink>,
     /// The hauling orders of the template: the hauling properties (`template`) and the orders of

@@ -55,7 +55,7 @@ fn a_referenced_property_names_the_property_of_the_template_it_points_to() -> Te
 fn output_and_embedded_properties_state_their_values_by_type() -> TestResult {
     let catalog = build()?;
     let properties = properties(&catalog, 0)?;
-    assert_eq!(properties.len(), 9);
+    assert_eq!(properties.len(), 11);
     assert_eq!(properties[1]["kind"], "output");
     assert_eq!(properties[1]["variable"], "Out_BP");
     assert_eq!(properties[1]["value"], json!({"type": "object"}));
@@ -86,9 +86,36 @@ fn output_and_embedded_properties_state_their_values_by_type() -> TestResult {
         properties[5]["value"],
         json!({"type": "tags", "tags": ["Kill"], "negativeTags": []})
     );
+    Ok(())
+}
+
+#[test]
+fn npc_entity_and_organization_values_link_or_state_their_fields() -> TestResult {
+    let catalog = build()?;
+    let properties = properties(&catalog, 0)?;
+    assert_eq!(field(&properties[6], "/value/type"), "npcSpawnDescriptions");
+    let npc = field(&properties[6], "/value/poolGuid")
+        .as_str()
+        .ok_or("npc pool guid")?;
+    assert!(kind_guids(&catalog, "contractNpcSpawns").contains(&npc));
     assert_eq!(
-        properties[6]["value"],
-        json!({"type": "other", "structName": "MissionPropertyValue_NPCSpawnDescriptions"})
+        field(&properties[9], "/value/type"),
+        "entitySpawnDescriptions"
+    );
+    let entity = field(&properties[9], "/value/poolGuid")
+        .as_str()
+        .ok_or("entity pool guid")?;
+    assert!(kind_guids(&catalog, "contractEntitySpawns").contains(&entity));
+    assert_eq!(
+        properties[10]["value"],
+        json!({
+            "type": "organization",
+            "conditions": [{
+                "condition": "specificOrganizations",
+                "organizationGuids": ["80000000-0000-4000-8000-000000000001"]
+            }],
+            "forcedOrganizationGuid": "80000000-0000-4000-8000-000000000001"
+        })
     );
     Ok(())
 }
@@ -159,7 +186,7 @@ fn records_that_nest_phases_or_conditions_too_deep_fail_instead_of_being_cut() -
         .map(|failure| (failure.record_path.as_str(), failure.reason.as_str()))
         .collect();
     failed.sort_unstable();
-    assert_eq!(failed.len(), 5, "{failed:?}");
+    assert_eq!(failed.len(), 7, "{failed:?}");
     assert!(failed[0].0.ends_with("deep_flow"), "{failed:?}");
     assert!(failed[0].1.contains("conditions nest deeper than 16"));
     assert!(failed[1].0.ends_with("deep_phases"), "{failed:?}");
@@ -190,23 +217,37 @@ fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_
         .map(|failure| (failure.record_path.as_str(), failure.reason.as_str()))
         .collect();
     failed.sort_unstable();
-    assert!(failed[2].0.ends_with("unknown_flow"), "{failed:?}");
+    assert!(failed[2].0.ends_with("unknown_condition"), "{failed:?}");
     assert!(
-        failed[2]
+        failed[2].1.contains(
+            "organization condition holds the unknown struct DataSetMatchCondition_Mystery"
+        ),
+        "{failed:?}"
+    );
+    assert!(failed[3].0.ends_with("unknown_flow"), "{failed:?}");
+    assert!(
+        failed[3]
             .1
             .contains("holds the unknown struct MissionFlowCondition_Unknown"),
         "{failed:?}"
     );
-    assert!(failed[3].0.ends_with("unknown_modifier"), "{failed:?}");
+    assert!(failed[4].0.ends_with("unknown_modifier"), "{failed:?}");
     assert!(
-        failed[3]
+        failed[4]
             .1
             .contains("modifiers holds the unknown struct MissionModifier"),
         "{failed:?}"
     );
-    assert!(failed[4].0.ends_with("missionbroker/bad"), "{failed:?}");
+    assert!(failed[5].0.ends_with("unknown_value"), "{failed:?}");
     assert!(
-        failed[4]
+        failed[5].1.contains(
+            "objective property value holds the unknown struct MissionPropertyValue_MissionItem"
+        ),
+        "{failed:?}"
+    );
+    assert!(failed[6].0.ends_with("missionbroker/bad"), "{failed:?}");
+    assert!(
+        failed[6]
             .1
             .contains("holds the unknown struct SReputationMissionRequirementsUnknown"),
         "{failed:?}"

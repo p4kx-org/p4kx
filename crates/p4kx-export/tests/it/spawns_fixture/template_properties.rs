@@ -5,6 +5,7 @@
 
 use p4kx_testkit::{TestInstance, TestValue};
 
+use super::npc::{self, NpcKind};
 use super::template_parts::{locale, object};
 use super::{TAG_KILL, array, location, property, reference, ships, text};
 
@@ -81,13 +82,11 @@ pub(super) fn properties() -> Vec<TestValue> {
         embedded(property("Mood_BP", "", string_hash())),
         embedded(property("Count_BP", "", integer())),
         embedded(property("Tags_BP", "", tags())),
-        embedded(property(
-            "Crew_BP",
-            "",
-            TestInstance::new("MissionPropertyValue_NPCSpawnDescriptions"),
-        )),
+        embedded(npc::npcs("Crew_BP", "", Some(("Squad", NpcKind::Full)))),
         embedded(ships("Embedded_Ships", "", Some(7))),
         embedded(location("Embedded_Loc", "", None)),
+        embedded(npc::entities("Loot_BP", "", Some("Crate"))),
+        embedded(npc::organization("Giver_BP", true)),
     ]
 }
 

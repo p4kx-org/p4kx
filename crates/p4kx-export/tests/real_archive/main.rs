@@ -32,6 +32,7 @@ mod real_archive_loadouts;
 mod real_archive_loot;
 mod real_archive_mining;
 mod real_archive_mining_stats;
+mod real_archive_npc_spawns;
 mod real_archive_paints;
 mod real_archive_playability;
 mod real_archive_quantization;

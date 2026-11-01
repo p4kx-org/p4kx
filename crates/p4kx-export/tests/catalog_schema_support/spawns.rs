@@ -5,6 +5,8 @@
 
 use serde_json::json;
 
+use super::npc_spawns;
+
 pub(super) fn location_templates() -> serde_json::Value {
     json!([{
         "guid": "e3000000-0000-4000-8000-000000000001",
@@ -117,6 +119,18 @@ pub(super) fn contract_templates() -> serde_json::Value {
             "token": null,
             "level": "template",
             "poolGuid": "e1000000-0000-4000-8000-000000000001"
+        }],
+        "npcSpawns": [{
+            "variable": "Crew_BP",
+            "token": null,
+            "level": "template",
+            "poolGuid": "e5000000-0000-4000-8000-000000000001"
+        }],
+        "entitySpawns": [{
+            "variable": "Loot_BP",
+            "token": null,
+            "level": "template",
+            "poolGuid": "e6000000-0000-4000-8000-000000000001"
         }],
         "locationQueries": [],
         "haulingOrders": [],
@@ -336,14 +350,23 @@ fn objective_properties() -> serde_json::Value {
         "contractProperty": null,
         "value": {"type": "location", "queryGuid": "e2000000-0000-4000-8000-000000000001"},
         "linkedOutput": null
-    }, {
-        "kind": "embedded",
-        "variable": "Crew_BP",
-        "token": null,
-        "contractProperty": null,
-        "value": {"type": "other", "structName": "MissionPropertyValue_NPCSpawnDescriptions"},
-        "linkedOutput": null
-    }, {
+    },
+    npc_spawns::embedded_property("Crew_BP", &json!({
+        "type": "npcSpawnDescriptions",
+        "poolGuid": "e5000000-0000-4000-8000-000000000001"
+    })),
+    npc_spawns::embedded_property("Loot_BP", &json!({
+        "type": "entitySpawnDescriptions",
+        "poolGuid": "e6000000-0000-4000-8000-000000000001"
+    })),
+    npc_spawns::embedded_property("Giver_BP", &json!({
+        "type": "organization",
+        "conditions": [{
+            "condition": "specificOrganizations",
+            "organizationGuids": ["e7000000-0000-4000-8000-000000000001"]
+        }],
+        "forcedOrganizationGuid": null
+    })), {
         "kind": "output",
         "variable": "Out_BP",
         "token": null,

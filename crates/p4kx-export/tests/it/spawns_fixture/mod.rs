@@ -6,6 +6,7 @@
 
 mod broker;
 mod broker_structures;
+mod npc;
 mod structures;
 mod template;
 mod template_deep;
@@ -21,6 +22,8 @@ use p4kx_testkit::{
     TestValue,
 };
 
+use self::npc::NpcKind;
+
 pub(crate) const GENERATOR: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const CONTRACT: u128 = 0x2000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const SUB: u128 = 0x3000_0000_0000_4000_8000_0000_0000_0001;
@@ -31,6 +34,8 @@ pub(crate) const DEEP_PHASES: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0004;
 pub(crate) const DEEP_FLOW: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0005;
 pub(crate) const UNKNOWN_FLOW: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0006;
 pub(crate) const UNKNOWN_MODIFIER: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0007;
+pub(crate) const UNKNOWN_VALUE: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0008;
+pub(crate) const UNKNOWN_CONDITION: u128 = 0x4000_0000_0000_4000_8000_0000_0000_0009;
 pub(crate) const BROKER: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const BROKER_ELSEWHERE: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0002;
 pub(crate) const BROKER_LEFTOVER: u128 = 0xb000_0000_0000_4000_8000_0000_0000_0003;
@@ -212,6 +217,8 @@ fn generator() -> TestRecord {
                 ships("Wave_BP", "", Some(2)),
                 ships("Empty_BP", "", None),
                 location("Place_BP", "Place", Some((1, 3))),
+                npc::npcs("Crew_BP", "", Some(("Squad", NpcKind::Full))),
+                npc::npcs("Spare_BP", "", None),
             ]),
         )
         .value("subContracts", array(vec![sub]));
@@ -229,6 +236,8 @@ fn generator() -> TestRecord {
             overrides(vec![
                 ships("Wave_BP", "", Some(1)),
                 ships("Empty_BP", "", Some(1)),
+                npc::npcs("Crew_BP", "", Some(("Reserve", NpcKind::Full))),
+                npc::entities("Loot_BP", "", Some("Crate")),
             ]),
         )
         .value("contracts", array(vec![TestValue::Struct(contract)]));
@@ -306,6 +315,8 @@ fn database() -> DataForgeBuilder {
         template_deep::deep_flow(),
         template_deep::unknown_flow(),
         template_deep::unknown_modifier(),
+        template_deep::unknown_value(),
+        template_deep::unknown_condition(),
         broker::broker(),
         broker::elsewhere(),
         broker::leftover(),
