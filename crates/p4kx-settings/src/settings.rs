@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::locations::create_private_folder;
 use crate::profile::profile_folder;
 use crate::{
     AssemblyExportSettings, ModelExportSettings, RecentArchives, SavedQueries, UiRenderSettings,
@@ -211,7 +212,7 @@ impl Settings {
             });
         }
         if let Some(folder) = file.parent() {
-            std::fs::create_dir_all(folder).map_err(|source| io_error(file, source))?;
+            create_private_folder(folder).map_err(|source| io_error(file, source))?;
         }
         let mut temporary = file.as_os_str().to_owned();
         temporary.push(format!(".{}.tmp", std::process::id()));

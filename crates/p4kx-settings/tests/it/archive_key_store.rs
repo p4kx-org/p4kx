@@ -176,3 +176,18 @@ fn a_leftover_temporary_file_is_neither_followed_nor_overwritten() -> TestResult
     assert_eq!(std::fs::read_to_string(&stale)?, "left behind", "untouched");
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn a_missing_key_folder_is_created_readable_by_the_user_alone() -> TestResult {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir()?;
+    let store = store(&dir);
+    store.save(&key(FIRST)?)?;
+
+    let folder = dir.path().join("config");
+    let mode = std::fs::metadata(&folder)?.permissions().mode();
+    assert_eq!(mode & 0o777, 0o700, "mode");
+    Ok(())
+}

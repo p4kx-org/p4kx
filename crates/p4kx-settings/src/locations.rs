@@ -7,11 +7,13 @@
 //! Directory specification. Callers never branch on the platform for a path.
 
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
 
 /// The application folder inside every base folder.
 pub(crate) const APP_FOLDER: &str = "P4KX";
 
+/// Whether this platform has known folders; otherwise the XDG rule applies.
 const USE_KNOWN_FOLDERS: bool = cfg!(any(windows, target_os = "macos"));
 
 /// The kind of a base folder.
@@ -70,9 +72,9 @@ impl XdgEnvironment {
     #[must_use]
     pub fn base(&self, kind: FolderKind) -> Option<PathBuf> {
         let (variable, fallback) = match kind {
-            FolderKind::Config => (&self.config_home, [".config"].as_slice()),
-            FolderKind::Cache => (&self.cache_home, [".cache"].as_slice()),
-            FolderKind::Data => (&self.data_home, [".local", "share"].as_slice()),
+            FolderKind::Config => (&self.config_home, ".config"),
+            FolderKind::Cache => (&self.cache_home, ".cache"),
+            FolderKind::Data => (&self.data_home, ".local/share"),
         };
         let from_variable = variable
             .as_ref()
@@ -80,11 +82,7 @@ impl XdgEnvironment {
             .filter(|path| path.is_absolute());
         from_variable.or_else(|| {
             let home = self.home.as_ref().filter(|home| home.is_absolute())?;
-            Some(
-                fallback
-                    .iter()
-                    .fold(home.clone(), |path, part| path.join(part)),
-            )
+            Some(home.join(fallback))
         })
     }
 }
@@ -113,4 +111,27 @@ pub fn cache_folder() -> Option<PathBuf> {
 #[must_use]
 pub fn data_folder() -> Option<PathBuf> {
     base_folder(FolderKind::Data).map(|base| base.join(APP_FOLDER))
+}
+
+/// Creates `folder` and its missing parents, readable by the user alone (mode 0700) on Unix.
+///
+/// An existing folder keeps its permissions.
+///
+/// # Errors
+///
+/// Returns the I/O error when a folder cannot be created.
+pub(crate) fn create_private_folder(folder: &Path) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(folder)
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::create_dir_all(folder)
+    }
 }

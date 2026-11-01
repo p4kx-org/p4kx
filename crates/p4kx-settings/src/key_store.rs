@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use p4kx_foundation::{ArchiveKey, ArchiveKeyError};
 use thiserror::Error;
 
+use crate::locations::create_private_folder;
 use crate::profile::profile_folder;
 
 const FILE_NAME: &str = "archive.key";
@@ -55,7 +56,9 @@ impl KeyStore {
 
     /// Returns the store in the `P4KX` folder of the platform config directory,
     /// `%APPDATA%\P4KX\archive.key` on Windows and `$XDG_CONFIG_HOME/P4KX/archive.key` on Linux,
-    /// or `None` when the platform has no config directory. The first call migrates the old `P4K-Extractor` folder (see
+    /// or `None` when the platform has no config directory.
+    ///
+    /// The first call migrates the old `P4K-Extractor` folder (see
     /// [`migrate_profile`](crate::migrate_profile)).
     #[must_use]
     pub fn in_profile() -> Option<Self> {
@@ -103,7 +106,7 @@ impl KeyStore {
     /// Returns a [`KeyStoreError`] when the folder or the file cannot be written.
     pub fn save(&self, key: &ArchiveKey) -> Result<(), KeyStoreError> {
         if let Some(folder) = self.file.parent() {
-            std::fs::create_dir_all(folder).map_err(|source| self.io_error(source))?;
+            create_private_folder(folder).map_err(|source| self.io_error(source))?;
         }
         let mut text = key.to_hex();
         text.push('\n');

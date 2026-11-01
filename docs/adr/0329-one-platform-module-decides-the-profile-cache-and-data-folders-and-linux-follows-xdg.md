@@ -23,6 +23,9 @@ Decided for issue #1015, part of #827 (full Linux compatibility). Builds on ADR-
 - The stored Archive key file is created with mode 0600 through a temporary file that is created with
   that mode and renamed over the key file, so it is never visible with wider permissions, also when it
   replaces a file that had them. On Windows the file keeps the permissions its folder gives it.
+- A missing profile, cache or data folder (and its missing parents) is created with mode 0700 on Unix,
+  by one helper used for the key file and the settings file; an existing folder keeps its
+  permissions. Windows creates folders as before.
 - Caches and data have no user yet; the two functions are the seam for the features that need them.
 
 ## Consequences
