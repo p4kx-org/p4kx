@@ -109,6 +109,13 @@ impl TestLoadoutEntry {
         }
     }
 
+    /// Sets the class name the entry carries next to its Reference, which may name another Entity.
+    #[must_use]
+    pub fn named(mut self, class_name: impl Into<String>) -> Self {
+        self.class_name = class_name.into();
+        self
+    }
+
     /// Sets the Loadout the entry gives the attached Entity.
     #[must_use]
     pub fn loadout(mut self, loadout: TestLoadout) -> Self {

@@ -15,6 +15,8 @@ pub struct TestPort {
     default_item: Option<u128>,
     flags: String,
     tags: (String, String),
+    detach_direction: Option<[f32; 3]>,
+    no_rotation: bool,
 }
 
 impl TestPort {
@@ -31,7 +33,24 @@ impl TestPort {
             default_item: None,
             flags: String::new(),
             tags: (String::new(), String::new()),
+            detach_direction: None,
+            no_rotation: false,
         }
+    }
+
+    /// Sets the direction in which the item leaves the port when detached.
+    #[must_use]
+    pub const fn detach_direction(mut self, direction: [f32; 3]) -> Self {
+        self.detach_direction = Some(direction);
+        self
+    }
+
+    /// Gives the port an entity attachment whose constraint keeps the item from rotating with its
+    /// parent; ignored when the port has a helper or is a skin.
+    #[must_use]
+    pub const fn no_rotation(mut self) -> Self {
+        self.no_rotation = true;
+        self
     }
 
     /// Sets the flags of the port, words separated by white space.
@@ -143,15 +162,41 @@ impl TestPort {
                 ),
             );
         }
+        if let Some(direction) = self.detach_direction {
+            instance = instance.value("detachDirection", vec3(direction));
+        }
         if self.helper.is_some() || self.skin {
             let kind = if self.skin { "Skin" } else { "Bone" };
             instance = instance.value(
                 "AttachmentImplementation",
                 attachment(kind, self.helper.as_ref(), &self.item_helper),
             );
+        } else if self.no_rotation {
+            instance = instance.value("AttachmentImplementation", entity_attachment());
         }
         TestValue::Struct(instance)
     }
+}
+
+fn vec3([x, y, z]: [f32; 3]) -> TestValue {
+    TestValue::Struct(
+        TestInstance::new("Vec3")
+            .value("x", TestValue::Single(x))
+            .value("y", TestValue::Single(y))
+            .value("z", TestValue::Single(z)),
+    )
+}
+
+fn entity_attachment() -> TestValue {
+    TestValue::Struct(
+        TestInstance::new("SItemPortDefAttachmentImplementationEntity").value(
+            "constraintParams",
+            TestValue::Struct(
+                TestInstance::new("SItemPortConstraintParams")
+                    .value("noRotation", TestValue::Bool(true)),
+            ),
+        ),
+    )
 }
 
 fn attachment(

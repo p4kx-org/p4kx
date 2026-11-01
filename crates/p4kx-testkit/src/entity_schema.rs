@@ -234,6 +234,7 @@ fn port_structs() -> Vec<TestStruct> {
             .field("MaxSize", TestType::UInt32)
             .field("PortTags", TestType::String)
             .field("RequiredPortTags", TestType::String)
+            .field("detachDirection", class("Vec3"))
             .field("defaultItem", class("SItemPortDefaultItemDef"))
             .array("Types", class("SItemPortDefTypes"))
             .field(
@@ -254,6 +255,10 @@ fn port_structs() -> Vec<TestStruct> {
         TestStruct::new("SItemPortDefAttachmentImplementationSkin")
             .parent("SItemPortDefAttachmentImplementationBase")
             .field("Helper", class("SItemPortDefHelperNode")),
+        TestStruct::new("SItemPortDefAttachmentImplementationEntity")
+            .parent("SItemPortDefAttachmentImplementationBase")
+            .field("constraintParams", class("SItemPortConstraintParams")),
+        TestStruct::new("SItemPortConstraintParams").field("noRotation", TestType::Bool),
         TestStruct::new("SItemPortDefHelperNode").field("Helper", class("SItemPortDefHelper")),
         TestStruct::new("SItemPortDefHelper")
             .field("Name", TestType::String)

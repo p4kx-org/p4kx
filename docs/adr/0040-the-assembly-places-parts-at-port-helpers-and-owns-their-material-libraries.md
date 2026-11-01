@@ -5,7 +5,7 @@ ANVL_Hornet_F7C, RSI_Constellation_Andromeda and TMBL_Cyclone of LIVE
 (`crates/p4kx-assembly/tests/real_archive/real_assembly.rs`), where 96% to 99% of the parts found their
 helper or a node named like their port and 0 to 5 parts were skipped.
 
-Amended by ADR-0150: it names ADR-0028 for the level-of-detail fallback, reads character
+Amended by ADR-0321 for the rotation convention and by ADR-0150: it names ADR-0028 for the level-of-detail fallback, reads character
 definitions, and corrects the sentences on equal materials, the Loadout's libraries, the waves and
 the `.cdf` limit below.
 
@@ -30,8 +30,8 @@ the port is used (the vehicle XML ports of #289 have no definition, and the name
 are the node names); failing that the part sits at the parent's origin, and a helper that was
 named but not found is an issue. An offset helper in the part's own model is undone.
 
-The Ang3 convention is not validated by any reference (#277). The tests pin the convention above
-for the unit cases; a real ship whose weapons sit wrongly is the signal to revisit it, in
+ADR-0321 validates the Ang3 convention above against the ports of the LIVE ships and pins it with
+multi-axis tests; a real ship whose weapons sit wrongly is the signal to revisit it, in
 `placement.rs` only.
 
 The glTF node of a part is a child of the node of its parent part, not of the helper node inside

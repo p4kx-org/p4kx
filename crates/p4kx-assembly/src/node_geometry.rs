@@ -51,23 +51,32 @@ impl LoadoutResolver<'_> {
         }
         let spec = self.spec(guid);
         let spec = spec.as_ref().as_ref().ok()?;
-        let mut best: Option<(&GeometryVariant, usize)> = None;
-        for variant in &spec.variants {
-            let tags = variant.tags();
-            let covered = !tags.is_empty()
-                && tags
-                    .iter()
-                    .all(|tag| words.iter().any(|word| word.eq_ignore_ascii_case(tag)));
-            if !covered {
-                continue;
-            }
-            let count = distinct(tags);
-            if best.is_none_or(|(_, kept)| count > kept) {
-                best = Some((variant, count));
-            }
-        }
-        best.map(|(variant, _)| variant.geometry().clone())
+        select_variant(&spec.variants, words).map(|variant| variant.geometry().clone())
     }
+}
+
+/// Returns the variant whose tags are all among `words`, ignoring ASCII case; of several, the one
+/// with the most distinct tags, the first on a tie. A variant without tags never matches.
+pub(crate) fn select_variant<'v>(
+    variants: &'v [GeometryVariant],
+    words: &[&str],
+) -> Option<&'v GeometryVariant> {
+    let mut best: Option<(&GeometryVariant, usize)> = None;
+    for variant in variants {
+        let tags = variant.tags();
+        let covered = !tags.is_empty()
+            && tags
+                .iter()
+                .all(|tag| words.iter().any(|word| word.eq_ignore_ascii_case(tag)));
+        if !covered {
+            continue;
+        }
+        let count = distinct(tags);
+        if best.is_none_or(|(_, kept)| count > kept) {
+            best = Some((variant, count));
+        }
+    }
+    best.map(|(variant, _)| variant)
 }
 
 /// Returns how many tags there are, ignoring ASCII case and repeats.
@@ -116,4 +125,65 @@ pub(crate) fn port_words<'a>(
     flags
         .split_whitespace()
         .chain(shared.iter().map(String::as_str))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::select_variant;
+    use crate::{Geometry, GeometryVariant};
+
+    fn variant(tags: &str, path: &str) -> GeometryVariant {
+        GeometryVariant {
+            tags: tags.split_whitespace().map(str::to_owned).collect(),
+            geometry: Geometry {
+                path: path.to_owned(),
+                material: None,
+                palette: None,
+            },
+        }
+    }
+
+    fn chosen<'v>(variants: &'v [GeometryVariant], words: &[&str]) -> Option<&'v str> {
+        select_variant(variants, words).map(|variant| variant.geometry().path())
+    }
+
+    #[test]
+    fn a_variant_needs_all_its_tags_among_the_words() {
+        let variants = [variant("front left", "a"), variant("left", "b")];
+        assert_eq!(chosen(&variants, &["left"]), Some("b"));
+        assert_eq!(chosen(&variants, &["front"]), None);
+    }
+
+    #[test]
+    fn the_variant_with_the_most_distinct_tags_wins_and_the_first_on_a_tie() {
+        let variants = [
+            variant("left", "one"),
+            variant("center left", "two"),
+            variant("right left", "three"),
+        ];
+        assert_eq!(chosen(&variants, &["left", "center", "right"]), Some("two"));
+    }
+
+    #[test]
+    fn case_and_repeated_tags_do_not_count() {
+        let variants = [variant("Left left", "doubled"), variant("RIGHT", "single")];
+        assert_eq!(chosen(&variants, &["LEFT", "right"]), Some("doubled"));
+        assert_eq!(chosen(&variants[1..], &["right"]), Some("single"));
+    }
+
+    #[test]
+    fn a_variant_without_tags_never_matches() {
+        let variants = [variant("", "untagged")];
+        assert_eq!(chosen(&variants, &["left"]), None);
+        assert_eq!(chosen(&variants, &[]), None);
+    }
+
+    #[test]
+    fn a_paint_tag_matches_like_any_other() {
+        let variants = [
+            variant("Paint_Base_Red", "red"),
+            variant("Paint_Base_Blue", "blue"),
+        ];
+        assert_eq!(chosen(&variants, &["Paint_Base_Blue"]), Some("blue"));
+    }
 }
