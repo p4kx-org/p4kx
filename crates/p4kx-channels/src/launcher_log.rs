@@ -3,6 +3,8 @@
 
 use std::path::{Path, PathBuf};
 
+use p4kx_settings::{FolderKind, base_folder};
+
 use crate::PublicPatches;
 use crate::log_lines::{PATCH_LINE_BYTES, Part, for_each_line};
 
@@ -49,6 +51,20 @@ pub(crate) struct LauncherLog {
     pub(crate) patches: PublicPatches,
 }
 
+impl LauncherLog {
+    /// Adds the library folders of `newer` that are not known yet and lets its patches win over
+    /// the known ones.
+    pub(crate) fn absorb(&mut self, newer: Self) {
+        for library in newer.libraries {
+            if !self.libraries.contains(&library) {
+                self.libraries.push(library);
+            }
+        }
+        self.patches.absorb_newer(newer.patches);
+        self.patches.trim();
+    }
+}
+
 /// Returns the folder of the launcher's logs inside the launcher's application-data folder.
 #[must_use]
 pub fn launcher_logs_folder(launcher: &Path) -> PathBuf {
@@ -58,7 +74,7 @@ pub fn launcher_logs_folder(launcher: &Path) -> PathBuf {
 /// Returns the application-data folder of the RSI Launcher on this machine.
 #[must_use]
 pub(crate) fn launcher_folder() -> Option<PathBuf> {
-    dirs::config_dir().map(|dir| dir.join(LAUNCHER_FOLDER))
+    base_folder(FolderKind::Config).map(|dir| dir.join(LAUNCHER_FOLDER))
 }
 
 /// Returns the folder of the launcher's logs: `P4KX_LAUNCHER_LOGS` when set, otherwise the
@@ -105,14 +121,6 @@ pub(crate) fn scan(log_folder: &Path, wanted: Wanted) -> LauncherLog {
     }
     log.patches.trim();
     log
-}
-
-/// Returns the library folders the RSI Launcher log in `log_folder` names, without duplicates.
-///
-/// Only the files in [`LAUNCHER_LOG_FILES`] are read; a missing or unreadable file is skipped.
-#[must_use]
-pub(crate) fn library_folders(log_folder: &Path) -> Vec<PathBuf> {
-    scan(log_folder, Wanted::LIBRARIES).libraries
 }
 
 fn library_folder(line: &str) -> Option<PathBuf> {

@@ -86,6 +86,7 @@ fn list(args: &ChannelsArgs, settings_file: &Path, as_json: bool) -> Result<()> 
     let paths = SearchPaths {
         default_library: args.default_library.clone().or(standard.default_library),
         launcher: args.launcher_dir.clone().or(standard.launcher),
+        wine_prefixes: standard.wine_prefixes,
         manual_folders: settings.channels.folders,
         manual_archives: settings.channels.archives,
     };

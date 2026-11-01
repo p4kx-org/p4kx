@@ -252,6 +252,7 @@ fn installed_archives() -> Vec<PathBuf> {
     let paths = SearchPaths {
         default_library: standard.default_library,
         launcher: standard.launcher,
+        wine_prefixes: standard.wine_prefixes,
         manual_folders: settings.channels.folders,
         manual_archives: settings.channels.archives,
     };

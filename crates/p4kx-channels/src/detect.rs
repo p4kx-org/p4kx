@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::launcher_log::{self, LauncherLog, Wanted, launcher_folder, launcher_logs_folder};
+use crate::wine::{self, WineEnvironment};
 use crate::{Channel, ChannelSource, PublicPatches};
 
 const ARCHIVE_NAME: &str = "Data.p4k";
@@ -21,6 +22,8 @@ pub struct SearchPaths {
     pub default_library: Option<PathBuf>,
     /// The RSI Launcher's application-data folder, whose `logs` folder names library folders.
     pub launcher: Option<PathBuf>,
+    /// Wine prefixes that may hold the game and the launcher; a missing one is skipped.
+    pub wine_prefixes: Vec<PathBuf>,
     /// Manually added folders, each a Channel folder or a library folder.
     pub manual_folders: Vec<PathBuf>,
     /// Manually added Archives.
@@ -28,21 +31,26 @@ pub struct SearchPaths {
 }
 
 impl SearchPaths {
-    /// Returns the default library folder and the launcher folder of this platform, without
-    /// manual entries.
+    /// Returns the default library folder, the launcher folder and, on Unix, the existing Wine
+    /// prefixes of this machine, without manual entries.
     #[must_use]
     pub fn standard() -> Self {
         Self {
             default_library: DEFAULT_LIBRARY.map(PathBuf::from),
             launcher: launcher_folder(),
+            wine_prefixes: if cfg!(unix) {
+                WineEnvironment::from_process().existing_prefixes()
+            } else {
+                Vec::new()
+            },
             manual_folders: Vec::new(),
             manual_archives: Vec::new(),
         }
     }
 }
 
-/// Returns the Channels found in `paths`, each Archive once, in the order default library,
-/// launcher library folders, manual folders, manual Archives.
+/// Returns the Channels found in `paths`, each Archive once, in the order default library, the
+/// libraries of the Wine prefixes, launcher library folders, manual folders, manual Archives.
 ///
 /// A Channel folder is a folder holding a `Data.p4k`; a library folder holds Channel folders.
 /// Only directory listings, `build_manifest.id` files and the launcher's log files are read; the
@@ -56,15 +64,13 @@ pub fn detect(paths: &SearchPaths) -> Vec<Channel> {
 /// the same pass, for whoever needs the public patch of a Build outside the Channels.
 #[must_use]
 pub fn detect_with_patches(paths: &SearchPaths) -> (Vec<Channel>, PublicPatches) {
-    let log = paths
-        .launcher
-        .as_ref()
-        .map_or_else(LauncherLog::default, |launcher| {
-            launcher_log::scan(&launcher_logs_folder(launcher), Wanted::BOTH)
-        });
+    let log = scan_launchers(paths, Wanted::BOTH);
     let mut found = Found::new(&log.patches);
     if let Some(library) = &paths.default_library {
         found.library(library, ChannelSource::DefaultPath);
+    }
+    for prefix in &paths.wine_prefixes {
+        found.library(&wine::game_library(prefix), ChannelSource::DefaultPath);
     }
     for library in &log.libraries {
         found.library(library, ChannelSource::Launcher);
@@ -85,21 +91,38 @@ pub fn detect_with_patches(paths: &SearchPaths) -> (Vec<Channel>, PublicPatches)
     (found.channels, log.patches)
 }
 
-/// Returns the Library folders known from `paths`: the default one and those the RSI Launcher
-/// log names, whether or not they exist.
+/// Returns the Library folders known from `paths`: the default one, those of the Wine prefixes
+/// and those the RSI Launcher logs name, whether or not they exist.
 ///
 /// Only the launcher's log files are read.
 #[must_use]
 pub fn known_library_folders(paths: &SearchPaths) -> Vec<PathBuf> {
     let mut folders: Vec<PathBuf> = paths.default_library.iter().cloned().collect();
-    if let Some(launcher) = &paths.launcher {
-        for library in launcher_log::library_folders(&launcher_logs_folder(launcher)) {
-            if !folders.contains(&library) {
-                folders.push(library);
-            }
+    let prefix_libraries = paths
+        .wine_prefixes
+        .iter()
+        .map(|prefix| wine::game_library(prefix));
+    let logged = scan_launchers(paths, Wanted::LIBRARIES).libraries;
+    for library in prefix_libraries.chain(logged) {
+        if !folders.contains(&library) {
+            folders.push(library);
         }
     }
     folders
+}
+
+/// Reads the logs of the launcher folder and of the launchers inside the Wine prefixes.
+fn scan_launchers(paths: &SearchPaths, wanted: Wanted) -> LauncherLog {
+    let mut log = paths
+        .launcher
+        .as_ref()
+        .map_or_else(LauncherLog::default, |launcher| {
+            launcher_log::scan(&launcher_logs_folder(launcher), wanted)
+        });
+    for prefix in &paths.wine_prefixes {
+        log.absorb(wine::scan_prefix(prefix, wanted));
+    }
+    log
 }
 
 struct Found<'a> {
