@@ -14,6 +14,7 @@ use crate::contract_hauling::HaulingRequirement;
 use crate::mission_hauling::{HaulingProperty, objective_orders, property_orders};
 use crate::mission_layers::{Property, items, key, one, properties};
 use crate::record_fields::{boolean, integer, reference};
+use crate::spawn_error::SpawnError;
 use crate::spawn_layers::Level;
 use crate::spawn_model::SpawnLevel;
 use crate::spawn_pools::SpawnPools;
@@ -284,7 +285,7 @@ fn template_of<'f>(
     tree: &RecordTree<'f>,
     tags: &TagTree,
     pools: &mut SpawnPools<'f>,
-) -> Result<Template<'f>, serde_json::Error> {
+) -> Result<Template<'f>, SpawnError> {
     let root = Some(tree.root());
     let display = one(root, "contractDisplayInfo");
     let reader = Reader::new(tags, tree.root());
