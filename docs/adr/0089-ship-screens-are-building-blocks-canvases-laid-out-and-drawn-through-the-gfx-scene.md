@@ -1,5 +1,8 @@
 # Ship screens are BuildingBlocks canvases, laid out and drawn through the GFx scene
 
+Amended by ADR-0337: a requested brand without a brand style in a canvas gets no brand style, not
+the first one.
+
 Decided for issue #170 and the spike #276. The roadmap described ship screens as GFx/SWF movies.
 They are not: a ship's MFDs, radar, annunciators and HUD are `BuildingBlocks_Canvas` Records of
 DataForge, trees of widgets with sizing, flex layout, tags, style entries and palette slots. The

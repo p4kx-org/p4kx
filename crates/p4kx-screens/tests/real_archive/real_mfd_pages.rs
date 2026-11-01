@@ -19,7 +19,17 @@ type TestResult = Result<(), Box<dyn Error>>;
 
 const MFD: &str = "libs/foundry/records/ui/buildingblocks/ships/displays/mfdscreens/mc_mfdcomponents/screens/general/m_mfd_screen";
 const POWER_PAGE: &str = "libs/foundry/records/ui/buildingblocks/ships/displays/mfdscreens/mc_mfdcomponents/screens/power/mc_s_power_master";
+const SHIELDS_PAGE: &str = "libs/foundry/records/ui/buildingblocks/ships/displays/mfdscreens/mc_mfdcomponents/screens/shields/mc_s_shields_master";
 const WIDTH: u32 = 800;
+
+/// Where the RSI shields canvas draws the solid chip behind its `SHIELDS` label, which the Aegis
+/// MFD must not show: its master styles no `aegs` brand, so the canvas without a brand style is
+/// the generic one.
+const SHIELDS_LABEL: (u32, u32) = (70, 55);
+/// The most alpha the faint panel of the generic shields canvas has.
+const FAINT: u8 = 64;
+/// The least alpha of the solid chip of the RSI shields canvas.
+const SOLID: u8 = 250;
 
 /// Inside the left backdrop of the turret layout, where a solid block was drawn.
 const BACKDROP: (u32, u32) = (60, 420);
@@ -117,9 +127,11 @@ fn assert_page(
     );
 }
 
-#[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn the_powered_mfd_draws_no_solid_block_and_a_tab_bar_on_every_page() -> TestResult {
+/// Composes the powered MFD of a brand with the given game variables.
+type ComposeMfd<'a> = dyn Fn(&str, &[&str]) -> Result<Composed, Box<dyn Error>> + 'a;
+
+/// Opens the real Archive and calls `run` with a function that composes the MFD.
+fn with_mfd(run: impl FnOnce(&ComposeMfd<'_>) -> TestResult) -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
@@ -143,6 +155,24 @@ fn the_powered_mfd_draws_no_solid_block_and_a_tab_bar_on_every_page() -> TestRes
             .vector(path, MAX_SVG_BYTES as u64)
             .map_err(|error| error.to_string())
     };
+    run(&|brand, settings| {
+        Ok(ScreenComposer::new(&forge)
+            .with_texts(TextSources {
+                fonts: &fonts,
+                localise: Some(&lookup as Localise<'_>),
+            })
+            .with_images(ImageSources {
+                texture: &texture,
+                vector: &vector,
+            })
+            .with_variables(&variables(settings)?)
+            .compose(MFD, Some(brand))?)
+    })
+}
+
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn the_powered_mfd_draws_no_solid_block_and_a_tab_bar_on_every_page() -> TestResult {
     let named = format!("landscapecanvasguid={POWER_PAGE}");
     let pages: [(&str, &[&str]); 2] = [
         ("the default page", &["powerstate=1"]),
@@ -151,26 +181,35 @@ fn the_powered_mfd_draws_no_solid_block_and_a_tab_bar_on_every_page() -> TestRes
             &["powerstate=1", &named, "mfdviewname=POWER MANAGEMENT"],
         ),
     ];
-    for brand in ["aegs", "rsi"] {
-        for (page, settings) in pages {
-            let composed = ScreenComposer::new(&forge)
-                .with_texts(TextSources {
-                    fonts: &fonts,
-                    localise: Some(&lookup as Localise<'_>),
-                })
-                .with_images(ImageSources {
-                    texture: &texture,
-                    vector: &vector,
-                })
-                .with_variables(&variables(settings)?)
-                .compose(MFD, Some(brand))?;
-            assert_page(
-                brand,
-                (page, settings.len() == 1),
-                &composed,
-                &raster(&composed)?,
-            );
+    with_mfd(|compose| {
+        for brand in ["aegs", "rsi"] {
+            for (page, settings) in pages {
+                let composed = compose(brand, settings)?;
+                assert_page(
+                    brand,
+                    (page, settings.len() == 1),
+                    &composed,
+                    &raster(&composed)?,
+                );
+            }
         }
-    }
-    Ok(())
+        Ok(())
+    })
+}
+
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn the_aegis_shields_page_takes_the_default_canvas_and_draws_no_label_chip() -> TestResult {
+    let named = format!("landscapecanvasguid={SHIELDS_PAGE}");
+    let settings = ["powerstate=1", &named, "mfdviewname=SHIELDS"];
+    with_mfd(|compose| {
+        let rsi = alpha_at(&raster(&compose("rsi", &settings)?)?, SHIELDS_LABEL);
+        assert!(
+            rsi >= SOLID,
+            "control: the RSI canvas draws the chip: {rsi}"
+        );
+        let aegs = alpha_at(&raster(&compose("aegs", &settings)?)?, SHIELDS_LABEL);
+        assert!(aegs < FAINT, "the Aegis page draws no solid chip: {aegs}");
+        Ok(())
+    })
 }

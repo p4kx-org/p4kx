@@ -2,7 +2,9 @@
 
 Decided for issue #969. Amends ADR-0296 ("Comparison with the game"), ADR-0106 ("Compared with the
 game") and ADR-0277 (the canvas a binding picks).
-Amended by ADR-0328 for the text sizes left open below.
+Amended by ADR-0328 for the text sizes left open below. Amended by ADR-0337 for the pale-blue
+labels: the Aegis SHIELDS chip came from the RSI canvas chosen by a wrong brand fallback, and the
+chip belongs to the parent widget of the label, not to the text.
 
 ## Context
 
