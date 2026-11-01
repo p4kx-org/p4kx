@@ -144,7 +144,7 @@ impl Piece {
         self
     }
 
-    /// Takes the sub-geometry of the Entity that is tagged with one of `flags`, the flags of the
+    /// Takes the sub-geometry of the Entity whose tags all are among `flags`, the flags of the
     /// port the Entity sits at, before the sub-geometry of the body.
     #[must_use]
     pub fn selected_by(mut self, flags: Vec<String>) -> Self {

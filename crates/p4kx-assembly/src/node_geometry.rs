@@ -56,17 +56,19 @@ impl LoadoutResolver<'_> {
 
 /// Returns the variant whose tags are all among `words`, ignoring ASCII case; of several, the one
 /// with the most distinct tags, the first on a tie. A variant without tags never matches.
-pub(crate) fn select_variant<'v>(
+pub(crate) fn select_variant<'v, W: AsRef<str>>(
     variants: &'v [GeometryVariant],
-    words: &[&str],
+    words: &[W],
 ) -> Option<&'v GeometryVariant> {
     let mut best: Option<(&GeometryVariant, usize)> = None;
     for variant in variants {
         let tags = variant.tags();
         let covered = !tags.is_empty()
-            && tags
-                .iter()
-                .all(|tag| words.iter().any(|word| word.eq_ignore_ascii_case(tag)));
+            && tags.iter().all(|tag| {
+                words
+                    .iter()
+                    .any(|word| word.as_ref().eq_ignore_ascii_case(tag))
+            });
         if !covered {
             continue;
         }
