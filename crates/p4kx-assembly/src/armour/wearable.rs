@@ -91,8 +91,7 @@ impl Wearable {
         body: BodyVariant,
         selecting: &[String],
     ) -> Result<Worn<'_>, Unfit> {
-        let chosen = select_variant(&self.variants, selecting);
-        chosen.map_or_else(
+        select_variant(&self.variants, selecting).map_or_else(
             || self.geometry_for(body),
             |found| {
                 Ok(Worn {
