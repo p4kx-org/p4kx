@@ -4,7 +4,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::disk_case;
+use crate::disk_case::CaseIndex;
 
 const DDS: &str = "dds";
 const DATA: &str = "Data";
@@ -74,10 +74,9 @@ pub(crate) fn resolve_on_disk(movie: &Path, relative: &str) -> Result<Option<Pat
         if cfg!(windows) {
             return Ok(None);
         }
-        match disk_case::variant(&path) {
-            Ok(Some(found)) if found.is_file() => path = found,
-            Ok(_) => return Ok(None),
-            Err(_) => return Err(root),
+        match CaseIndex::default().variant(&path) {
+            Some(found) if found.is_file() => path = found,
+            _ => return Ok(None),
         }
     }
     let canonical = fs::canonicalize(&path).map_err(|_| root.clone())?;

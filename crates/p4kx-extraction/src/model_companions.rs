@@ -9,7 +9,7 @@ use p4kx_model::{CompanionError, CompanionPath, CompanionResolver};
 use thiserror::Error;
 
 use crate::chunk_source::MAX_CHUNK_FILE_LEN;
-use crate::disk_case;
+use crate::disk_case::CaseIndex;
 use crate::entry_path::relative_path;
 use crate::path_index::PathIndex;
 use crate::sound::read_capped;
@@ -72,6 +72,7 @@ pub(crate) struct DiskCompanions<'p> {
     pub(crate) folder: &'p Path,
     pub(crate) read: Vec<PathBuf>,
     pub(crate) absent: Option<PathBuf>,
+    pub(crate) case: CaseIndex,
 }
 
 impl CompanionResolver for DiskCompanions<'_> {
@@ -97,7 +98,7 @@ impl CompanionResolver for DiskCompanions<'_> {
                 let other_case = if cfg!(windows) {
                     None
                 } else {
-                    disk_case::open_variant(&file_path)?
+                    self.case.open_variant(&file_path)?
                 };
                 let Some(found) = other_case else {
                     self.absent = Some(file_path);
@@ -139,6 +140,7 @@ mod tests {
     use p4kx_model::{CompanionPath, CompanionResolver};
 
     use super::DiskCompanions;
+    use crate::disk_case::CaseIndex;
 
     #[test]
     fn a_companion_named_with_other_case_is_read_from_the_file_it_names() -> std::io::Result<()> {
@@ -148,6 +150,7 @@ mod tests {
             folder: dir.path(),
             read: Vec::new(),
             absent: None,
+            case: CaseIndex::default(),
         };
 
         let bytes = companions.resolve(CompanionPath::Sibling("ship.chunk"));
@@ -157,11 +160,34 @@ mod tests {
             "{bytes:?}"
         );
         assert_eq!(companions.read.len(), 1);
-        if cfg!(unix) {
+        if cfg!(target_os = "linux") {
             assert_eq!(companions.read, [dir.path().join("Ship.CHUNK")]);
         }
         let missing = companions.resolve(CompanionPath::Sibling("other.chunk"));
         assert!(matches!(missing, Ok(None)), "{missing:?}");
+        Ok(())
+    }
+
+    #[test]
+    fn two_files_differing_only_in_case_leave_the_companion_absent() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        fs::write(dir.path().join("Ship.chunk"), b"1")?;
+        if fs::write(dir.path().join("SHIP.chunk"), b"2").is_err()
+            || fs::read_dir(dir.path())?.count() < 2
+        {
+            return Ok(());
+        }
+        let mut companions = DiskCompanions {
+            folder: dir.path(),
+            read: Vec::new(),
+            absent: None,
+            case: CaseIndex::default(),
+        };
+
+        let bytes = companions.resolve(CompanionPath::Sibling("ShIp.chunk"));
+
+        assert!(matches!(bytes, Ok(None)), "{bytes:?}");
+        assert_eq!(companions.read.len(), 0);
         Ok(())
     }
 }

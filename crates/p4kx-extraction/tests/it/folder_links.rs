@@ -75,7 +75,9 @@ fn refuses_after_swap(parent: bool) -> TestResult {
     let probe = dir.path().join("probe");
     if !link(&outside, &probe) {
         if cfg!(unix) {
-            return Err("a symbolic link can be created on Unix".into());
+            return Err(
+                "cannot create a symbolic link on Unix, so the test would check nothing".into(),
+            );
         }
         return Ok(());
     }

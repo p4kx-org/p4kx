@@ -67,7 +67,7 @@ fn another_handle_holding_the_file_open_does_not_block_reading() -> io::Result<(
 }
 
 #[test]
-fn concurrent_readers_each_get_a_handle_while_another_holds_the_file() -> io::Result<()> {
+fn concurrent_readers_read_correctly_while_another_handle_holds_the_file() -> io::Result<()> {
     let (_dir, path) = archive_file()?;
     let _writer = OpenOptions::new().write(true).open(&path)?;
     let source = FileSource::open(&path)?;
@@ -84,7 +84,8 @@ fn concurrent_readers_each_get_a_handle_while_another_holds_the_file() -> io::Re
             })
             .collect();
         for reader in readers {
-            assert!(reader.join().is_ok_and(|result| result.is_ok()));
+            let result = reader.join().expect("a reader thread panicked");
+            assert!(result.is_ok(), "{result:?}");
         }
     });
     Ok(())

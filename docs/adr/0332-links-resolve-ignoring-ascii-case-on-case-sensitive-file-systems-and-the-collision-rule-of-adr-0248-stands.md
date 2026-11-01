@@ -20,8 +20,14 @@ Decided for issue #1018 (part of #827, Linux). Extends ADR-0248.
   the Entry is read from disk and the file with exactly that name is missing, a non-Windows build
   lists the folder and uses the one file whose name equals the link's ignoring ASCII case, so a
   folder extracted on Linux converts to the same result as on Windows. Two or more candidates are
-  ambiguous and count as no file. Windows opens the name as written and never lists. The check
-  runs only after the exact name failed, so the common path allocates nothing new.
+  ambiguous and count as no file. Windows opens the name as written and never lists.
+- **The fallback runs only after the exact name failed.** An exact hit allocates nothing new. The
+  first miss in a folder lists it once into a `CaseIndex` (lower-case name to candidates) that the
+  resolver of one model keeps, so further misses in that folder cost a lookup. A folder that
+  cannot be listed counts as no file, at every call site.
+- **The fallback does not backtrack.** A part that exists as written is kept; if `Textures` and
+  `textures` both exist, a link into `textures` is not found once `Textures` exists and lacks the
+  file.
 - **`FileSource`** opens the Archive read-only with a Windows share mode of read and write and
   plain `open` elsewhere; `read_exact_at` returns `UnexpectedEof` for a short read or a read at
   or past the end on both platforms. Both are covered by tests that run on every platform.
@@ -35,6 +41,4 @@ Decided for issue #1018 (part of #827, Linux). Extends ADR-0248.
 - On Linux a model whose chunk or material link differs in case from the extracted file converts
   as it does on Windows.
 - Texture parts (`.dds.1`, `.dds.1a`) are still found on disk by the name derived from the header
-  file, as written. Parts are probed until one is missing, so a folder listing per texture would
-  cost more than the case difference between a header and its parts is likely to be worth; a
-  follow-up can measure it on a real Archive.
+  file, as written; issue #1035 adds the fallback on top of the shared `CaseIndex`.
