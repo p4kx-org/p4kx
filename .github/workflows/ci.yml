@@ -52,7 +52,7 @@ jobs:
         run: cargo xtask notices
       - name: The desktop file is valid
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y --no-install-recommends desktop-file-utils && desktop-file-validate packaging/linux/p4kx.desktop
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends desktop-file-utils && desktop-file-validate packaging/linux/p4kx.desktop
       - name: Disk space after the build
         if: runner.os == 'Linux'
         run: df -h /

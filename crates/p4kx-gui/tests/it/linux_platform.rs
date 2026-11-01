@@ -118,19 +118,6 @@ fn the_window_runs_on_x11_and_wayland_through_wgpu() -> TestResult {
 }
 
 #[test]
-fn the_file_dialogs_go_through_the_desktop_portal() -> TestResult {
-    let manifest = std::fs::read_to_string(repository().join("Cargo.toml"))?;
-    let rfd = declaration(&manifest, "rfd").ok_or("rfd is declared")?;
-
-    assert!(rfd.contains("\"xdg-portal\""), "rfd enables the portal");
-    assert!(
-        rfd.contains("\"wayland\""),
-        "rfd parents its dialogs on Wayland"
-    );
-    Ok(())
-}
-
-#[test]
 fn the_clipboard_reaches_other_programs_on_unix() -> TestResult {
     let manifest =
         std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"))?;

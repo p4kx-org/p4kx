@@ -7,7 +7,7 @@
 //! driver (lavapipe on a machine without a GPU), so it runs only when asked for with
 //! `--ignored`. The window gets an empty profile and no network access to the update check.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -32,7 +32,7 @@ fn window_binary() -> PathBuf {
 
 /// Runs the window with the profile folders below `profile` and returns how it ended, or `None`
 /// when it was still running after [`LIMIT`] and has been killed.
-fn run_window(profile: &std::path::Path) -> std::io::Result<Option<ExitStatus>> {
+fn run_window(profile: &Path) -> std::io::Result<Option<ExitStatus>> {
     let mut window = Command::new(window_binary())
         .env("P4KX_SMOKE_FRAMES", FRAMES)
         .env("HOME", profile)
@@ -43,6 +43,7 @@ fn run_window(profile: &std::path::Path) -> std::io::Result<Option<ExitStatus>> 
         .env("APPDATA", profile.join("config"))
         .env("LOCALAPPDATA", profile.join("cache"))
         .env_remove("P4KX_KEY_FILE")
+        .env_remove("P4KX_ARCHIVE_KEY")
         .spawn()?;
     let deadline = Instant::now() + LIMIT;
     while Instant::now() < deadline {

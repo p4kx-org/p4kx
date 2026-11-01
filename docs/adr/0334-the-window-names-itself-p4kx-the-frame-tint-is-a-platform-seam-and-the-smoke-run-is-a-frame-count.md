@@ -26,16 +26,25 @@ eframe's `wgpu` feature). A test pins Vulkan and GL in the default set.
 
 ## Dialogs and clipboard
 
-`rfd` is declared with `xdg-portal` and `wayland` and no other default, so the file dialogs are
-the portal's on Linux. `eframe/clipboard` is enabled for `cfg(unix)`: without it egui keeps copied
-text inside the process. Windows keeps its current dependency set.
+`rfd` keeps its defaults, which include `xdg-portal` and `wayland`, so the file dialogs are the
+portal's on Linux. `eframe/clipboard` is enabled for `cfg(unix)`, which covers macOS too: without
+it egui-winit has no system clipboard backend and keeps copied text inside the process. Windows
+keeps its current dependency set and therefore has that limitation today (#1040).
+
+## Third-party notices
+
+`about.toml` scopes `THIRD-PARTY-NOTICES.md` to `x86_64-pc-windows-msvc`, so the crates only the
+Linux build compiles (`smithay-clipboard`, both `smithay-client-toolkit` versions, `calloop` and
+the `wayland-protocols` crates, among others) are not listed. No Linux build is shipped before
+#1022, which must add the Linux target to the notices (noted there).
 
 ## Smoke run
 
 `P4KX_SMOKE_FRAMES=<n>` makes `p4kx-gui` draw `n` frames, skip the update check and close itself.
 It is a plain environment variable, not a test feature, so the packages of #1022 can run the
 installed binary with it. The test `the_window_starts_draws_frames_and_exits` runs it with an
-empty profile; it is `#[ignore]`d and runs in the ubuntu-24.04 job under `xvfb-run` on lavapipe.
+empty profile; a smoke run on an installed binary still saves the window settings to the profile
+on exit, which an empty `HOME` avoids. The test is `#[ignore]`d and runs in the ubuntu-24.04 job under `xvfb-run` on lavapipe.
 
 ## Not verified here
 
