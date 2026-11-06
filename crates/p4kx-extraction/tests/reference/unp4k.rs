@@ -8,17 +8,15 @@ use std::fs::File;
 use std::path::Path;
 use std::time::Instant;
 
-use p4kx_extraction::{Archive, Compression, Entry};
+use p4kx_extraction::{Archive, Compression, EffectiveEncoding, Entry};
 use p4kx_testkit::{real_archive_key, real_archive_path, reference_unp4k_path};
 use rayon::prelude::*;
 
 use super::TestResult;
 use super::bytes::{Verdict, compare_streams};
 use super::tally::Tally;
+use super::unp4k_allow::{self, Context, SourceIdentity, TRAILING_ZEROS};
 use super::walk::{files_under, index_entries, relative_key};
-
-pub(crate) const TRAILING_ZEROS: &str =
-    "encrypted Entry: unp4k trims trailing zero bytes after decryption";
 
 type Kind = (Compression, bool);
 
@@ -48,32 +46,42 @@ fn kind_name(kind: Kind) -> String {
     )
 }
 
-/// Classifies the verdict for `entry`, recording it in `tally`; returns whether it was equal.
-pub(crate) fn judge(tally: &mut Tally, path: &str, encrypted: bool, verdict: Verdict) -> bool {
+/// Records an exact comparison or an evidenced producer-specific difference.
+pub(crate) fn judge(
+    tally: &mut Tally,
+    source: SourceIdentity<'_>,
+    encoding: EffectiveEncoding,
+    context: Option<&Context<'_>>,
+    verdict: Verdict,
+) -> bool {
     match verdict {
         Verdict::Equal => {
             tally.equal();
             true
         }
-        Verdict::ReferenceShorter {
-            zeros_only: true, ..
-        } if encrypted => {
+        allowed if unp4k_allow::allows(context, source, encoding, allowed) => {
             tally.allow(TRAILING_ZEROS);
             false
         }
         other => {
-            tally.different(format!("{path}: {other:?}"));
+            tally.different(format!("{}: {other:?}", source.path));
             false
         }
     }
 }
 
-fn compare_file(archive: &Archive, entry: &Entry, file: &Path) -> Result<Verdict, String> {
+fn compare_file(
+    archive: &Archive,
+    entry: &Entry,
+    file: &Path,
+) -> Result<(Verdict, EffectiveEncoding), String> {
     let reference = File::open(file).map_err(|error| format!("{}: {error}", file.display()))?;
-    let ours = archive
+    let mut ours = archive
         .open_entry(entry)
         .map_err(|error| format!("{}: {error}", entry.path()))?;
-    compare_streams(ours, reference).map_err(|error| format!("{}: {error}", entry.path()))
+    let verdict = compare_streams(&mut ours, reference)
+        .map_err(|error| format!("{}: {error}", entry.path()))?;
+    Ok((verdict, ours.effective_encoding()))
 }
 
 fn run(archive: &Archive, root: &Path) -> Result<Outcome, std::io::Error> {
@@ -94,10 +102,11 @@ fn run(archive: &Archive, root: &Path) -> Result<Outcome, std::io::Error> {
             };
             let kind = kind_name((entry.compression(), entry.is_encrypted()));
             let equal = match compare_file(archive, entry, file) {
-                Ok(verdict) => judge(
+                Ok((verdict, encoding)) => judge(
                     &mut outcome.tally,
-                    entry.path(),
-                    entry.is_encrypted(),
+                    SourceIdentity::of(entry),
+                    encoding,
+                    None,
                     verdict,
                 ),
                 Err(message) => {

@@ -2,19 +2,19 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fmt;
-use std::io::{self, BufReader, Read};
+use std::io::{self, Read};
 
-use flate2::read::DeflateDecoder;
 use p4kx_foundation::{ARCHIVE_IV, ArchiveKey, ByteReader};
 
-use crate::decode::{CorruptAs, ExactSize, Overlong, ZstdOrPlain};
+use crate::decode::{ExactSize, Overlong};
 use crate::decrypt::{AES_BLOCK_LEN, Decrypting};
 use crate::entry::DataStart;
+use crate::entry_decoder::{DataReader, EntryDecoder};
 use crate::format_error::FormatError;
 use crate::source::Source;
 use crate::stored_hash::StoredCheck;
 use crate::verify::Verifier;
-use crate::{Compression, Entry};
+use crate::{Compression, EffectiveEncoding, Entry};
 
 const LOCAL_HEADER_SIGNATURE: u32 = 0x0403_4B50;
 const LOCAL_HEADER_CIG_SIGNATURE: u32 = 0x1403_4B50;
@@ -22,19 +22,24 @@ const LOCAL_HEADER_LEN: usize = 30;
 const LOCAL_HEADER_FIXED_FIELDS_LEN: usize = 22;
 const DECODER_BUFFER_LEN: usize = 256 * 1024;
 
-type DataReader<'a> = Box<dyn Read + Send + 'a>;
-
 /// Streams the decrypted and decompressed data of one Entry from its Archive.
 ///
 /// Decoding errors are reported as [`io::Error`]s of kind [`io::ErrorKind::InvalidData`] that
 /// carry a [`DataError`](crate::DataError).
 pub struct EntryReader<'a> {
-    inner: ExactSize<DataReader<'a>>,
+    inner: ExactSize<EntryDecoder<'a>>,
     encrypted: bool,
     verifier: Option<Verifier>,
 }
 
 impl EntryReader<'_> {
+    /// Returns the selected decoder without reading or consuming any bytes.
+    /// CIG method 100 stays undetermined until its decrypted prefix has been read.
+    #[must_use]
+    pub fn effective_encoding(&self) -> EffectiveEncoding {
+        self.inner.inner().effective_encoding()
+    }
+
     /// Checks the decoded data against the checksum of `entry` as it streams by, like
     /// `open_verified` but without the SHA-256 of the stored bytes. Only for a reader that starts
     /// at the beginning of the Entry's data.
@@ -48,7 +53,7 @@ impl EntryReader<'_> {
     /// [`DataError::TooLong`](crate::DataError::TooLong), instead of cutting it; the zero padding
     /// of an encrypted Entry below one AES block is still allowed.
     #[must_use]
-    pub fn reject_overlong(mut self) -> Self {
+    pub const fn reject_overlong(mut self) -> Self {
         self.inner.set_overlong(Overlong::Reject {
             padding: self.encrypted,
         });
@@ -209,7 +214,7 @@ fn open_with<'a>(
         Some(key) => Box::new(Decrypting::new(raw, buffer_len(stored_len), iv, key)),
         None => raw,
     };
-    let decoded = decoder(stored, entry)?;
+    let decoded = EntryDecoder::new(stored, entry, buffer_len(entry.compressed_size))?;
     let reader = EntryReader {
         inner: ExactSize::new(decoded, entry.uncompressed_size.saturating_sub(start)),
         encrypted: entry.encrypted,
@@ -227,30 +232,6 @@ fn stored_check(source: &Source, entry: &Entry, data_offset: u64) -> Option<Box<
         entry.compressed_size,
         digest,
     )))
-}
-
-/// Wraps `stored` in the decompressor of `entry`.
-fn decoder<'a>(stored: DataReader<'a>, entry: &Entry) -> Result<DataReader<'a>, FormatError> {
-    Ok(match entry.compression {
-        Compression::Store => stored,
-        Compression::Deflate => Box::new(CorruptAs::new(
-            DeflateDecoder::new_with_buf(stored, vec![0; buffer_len(entry.compressed_size)]),
-            entry.compression,
-        )),
-        Compression::Zstd => Box::new(CorruptAs::new(
-            ZstdOrPlain::new(
-                BufReader::with_capacity(buffer_len(entry.compressed_size), stored),
-                entry.uncompressed_size,
-            ),
-            entry.compression,
-        )),
-        Compression::Other(_) => {
-            return Err(FormatError::UnsupportedCompression {
-                entry: entry.path.clone(),
-                compression: entry.compression,
-            });
-        }
-    })
 }
 
 fn read_local_header(source: &Source, offset: u64) -> Result<u64, FormatError> {

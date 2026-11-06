@@ -12,8 +12,6 @@
 use std::io::Cursor;
 
 use super::bytes::{Verdict, compare_streams};
-use super::tally::Tally;
-use super::unp4k::{TRAILING_ZEROS, judge};
 
 const LENGTH: usize = (3 << 16) + 17;
 
@@ -71,14 +69,16 @@ fn a_missing_or_invented_byte_is_detected() {
         verdict(&bytes, &bytes[..LENGTH - 1]),
         Verdict::ReferenceShorter {
             zeros_only: false,
-            extra: 1
+            extra: 1,
+            reference_len: (LENGTH - 1) as u64,
+            last_reference_byte: bytes.get(LENGTH - 2).copied()
         },
         "last byte missing"
     );
 }
 
 #[test]
-fn trailing_zero_bytes_are_allowed_for_an_encrypted_entry_only() {
+fn a_missing_zero_suffix_preserves_the_reference_boundary() {
     let reference = sample(LENGTH);
     let mut ours = reference.clone();
     ours.extend([0; 3]);
@@ -87,17 +87,10 @@ fn trailing_zero_bytes_are_allowed_for_an_encrypted_entry_only() {
         found,
         Verdict::ReferenceShorter {
             zeros_only: true,
-            extra: 3
-        }
+            extra: 3,
+            reference_len: LENGTH as u64,
+            last_reference_byte: reference.last().copied()
+        },
+        "reference EOF length and terminal byte are retained"
     );
-    let mut tally = Tally::default();
-    judge(&mut tally, "encrypted", true, found);
-    judge(&mut tally, "plain", false, found);
-    assert_eq!(tally.allowed.get(TRAILING_ZEROS), Some(&1), "allowed once");
-    assert_eq!(tally.different, 1, "the plain Entry differs");
-
-    ours.push(1);
-    let mut other = Tally::default();
-    judge(&mut other, "encrypted", true, verdict(&ours, &reference));
-    assert_eq!(other.different, 1, "a non-zero tail is a difference");
 }

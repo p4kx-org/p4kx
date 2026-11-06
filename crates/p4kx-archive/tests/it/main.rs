@@ -8,6 +8,7 @@ mod build;
 mod container_limits;
 mod containers;
 mod decoding;
+mod effective_encoding;
 mod hash_block;
 mod layout_v2;
 mod listing;

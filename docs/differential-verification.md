@@ -51,7 +51,13 @@ The allow-list holds the known behaviour of the reference tools. Each entry name
 applies to it only; each allowed value is counted under its reason, so one Record can count
 several:
 
-- unp4k: trailing zero bytes of an encrypted Entry, which unp4k trims after decryption.
+- unp4k: a nonempty all-zero suffix of encrypted Stored or effective method-100 pass-through
+  data, only with validated source identity and the exact unmodified producer revision.
+  The retained reference prefix must have one byte (possibly zero), or at least three bytes
+  ending in nonzero. Empty/two-byte prefixes, inconsistent retained zeros, actual Deflate/Zstandard
+  logical-byte loss and unknown/patched/mismatched contexts fail. Allowed values are counted under
+  their specific producer reason, never exact equality
+  ([ADR-0341](adr/0341-reference-zero-trimming-requires-effective-decoder-and-producer-evidence.md)).
 - unforge: an attribute value or text `BUGGED` against a non-empty P4KX value, and text that is
   P4KX's non-ASCII UTF-8 read byte by byte.
 - StarBreaker:
@@ -77,9 +83,28 @@ GUID first. The number of embedded Records compared is reported; for a Record th
 is the number reached before its first difference, so a lower bound. `crates/p4kx-extraction/tests/reference/starbreaker_json.rs` is the one place that
 encodes the JSON shape of StarBreaker.
 
+## Effective decoder and producer evidence
+
+The declared compression method is not the effective encoding: CIG method 100 may contain a
+Zstandard frame or direct bytes. The additive public `EntryReader::effective_encoding` API reports
+`Stored`, `Deflate`, `Zstandard`, `PassThrough` or `Undetermined` from the same decoder that produces
+the comparison bytes. Calling it performs no I/O and consumes no prefix; method 100 remains
+undetermined until ordinary reading selects its decoder. An empty logical Entry can remain
+undetermined. The enum is also re-exported by `p4kx-extraction`; no CLI/output schema changes.
+
+The zero-trim classifier requires already-validated source and producer context. The inspected
+producer is unmodified unp4k revision
+`b492ab14d26280c6ec91c4365ff0faf5f3e24a6b`; its
+[trim loop](https://github.com/dolkensp/unp4k/blob/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b/src/ICSharpCode.SharpZipLib/Zip/ZipFile.cs#L3116-L3140)
+runs before decompression and retains at least one byte. The classifier does not parse manifests,
+prove producer success or excuse partial runs: those checks precede it in the reference harness.
+An unmanifested run supplies no allowance context, so exact bytes may compare equal but missing
+bytes remain differences. A local patch scope is not assumed equivalent to the inspected source.
+The current public API observation does not verify hashes or prove reference completeness.
+
 ## Mutation self-tests
 
-Without any variable, `mutation_bytes`, `mutation_xml`, `mutation_value` and
+Without any variable, `mutation_bytes`, `mutation_unp4k`, `mutation_xml`, `mutation_value` and
 `mutation_embedded` change a copy of
 synthetic reference data and require every change to be detected: a byte changed, deleted or
 appended at any block; a tag, attribute, text or child renamed, changed, swapped, deleted or
