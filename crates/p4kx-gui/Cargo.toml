@@ -46,7 +46,7 @@ thiserror.workspace = true
 tiny-skia.workspace = true
 unic-langid.workspace = true
 
-[target.'cfg(unix)'.dependencies]
+[target.'cfg(any(unix, windows))'.dependencies]
 eframe = { workspace = true, features = ["clipboard"] }
 
 [target.'cfg(windows)'.dependencies]

@@ -118,18 +118,18 @@ fn the_window_runs_on_x11_and_wayland_through_wgpu() -> TestResult {
 }
 
 #[test]
-fn the_clipboard_reaches_other_programs_on_unix() -> TestResult {
+fn the_system_clipboard_feature_is_enabled_for_windows_and_unix() -> TestResult {
     let manifest =
         std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"))?;
-    let unix = manifest
-        .split("[target.'cfg(unix)'.dependencies]")
+    let native = manifest
+        .split("[target.'cfg(any(unix, windows))'.dependencies]")
         .nth(1)
         .and_then(|rest| rest.split("\n[").next())
-        .ok_or("a unix dependency table")?;
+        .ok_or("the shared Windows and Unix dependency table")?;
 
     assert!(
-        declaration(unix, "eframe").is_some_and(|eframe| eframe.contains("\"clipboard\"")),
-        "eframe enables the clipboard"
+        declaration(native, "eframe").is_some_and(|eframe| eframe.contains("\"clipboard\"")),
+        "eframe enables the native clipboard feature"
     );
     Ok(())
 }
