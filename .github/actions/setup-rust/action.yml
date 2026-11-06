@@ -1,10 +1,13 @@
 name: Set up Rust
-description: Shared build setup of the CI jobs, run after checkout
+description: Shared native build setup, run after checkout
 
 inputs:
   cache-key:
     description: Distinct rust-cache key per job type
     required: true
+  target:
+    description: Native Rust target from the platform contract
+    default: ""
   components:
     description: Extra toolchain components
     default: ""
@@ -15,31 +18,38 @@ inputs:
 runs:
   using: composite
   steps:
+    - uses: ./.github/actions/install-rust
+      id: toolchain
+      with:
+        target: ${{ inputs.target }}
+        components: ${{ inputs.components }}
+        nextest: ${{ inputs.nextest }}
     - name: Link with rust-lld on Windows
       if: runner.os == 'Windows'
-      shell: bash
-      run: echo "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=rust-lld.exe" >> "$GITHUB_ENV"
-    - name: Link with mold on Linux
+      shell: pwsh
+      env:
+        NATIVE_TARGET: ${{ steps.toolchain.outputs.target }}
+      run: |
+        $name = 'CARGO_TARGET_' + $env:NATIVE_TARGET.Replace('-', '_').ToUpperInvariant() + '_LINKER'
+        "$name=rust-lld.exe" >> $env:GITHUB_ENV
+    - name: Link with native mold on Linux
       if: runner.os == 'Linux'
       uses: rui314/setup-mold@339e96b4ff1f3bd865856ba4cbbe8818a7acb038 # v1
     - name: Select mold as the Linux linker
       if: runner.os == 'Linux'
-      shell: bash
-      run: echo "RUSTFLAGS=-Clink-arg=-fuse-ld=mold" >> "$GITHUB_ENV"
+      shell: pwsh
+      run: |
+        "RUSTFLAGS=-Clink-arg=-fuse-ld=mold" >> $env:GITHUB_ENV
     - name: Mount a ReFS Dev Drive as the target directory
       if: runner.os == 'Windows'
       uses: samypr100/setup-dev-drive@562171fe8df7401fdf582d766cd3b6ab80d5b1a0 # v4.1.0
       with:
         drive-size: 60GB
         mount-path: target
-    - uses: ./.github/actions/install-rust
-      with:
-        components: ${{ inputs.components }}
-        nextest: ${{ inputs.nextest }}
     - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:
-        key: ${{ inputs.cache-key }}
-    - name: Install the ALSA headers the audio output builds against
+        key: ${{ inputs.cache-key }}-${{ steps.toolchain.outputs.target }}
+    - name: Install the native ALSA headers
       if: runner.os == 'Linux'
-      shell: bash
+      shell: pwsh
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev

@@ -15,7 +15,6 @@ accepted = [
     "OFL-1.1",
     "Ubuntu-font-1.0",
 ]
-targets = ["x86_64-pc-windows-msvc"]
 ignore-dev-dependencies = true
 ignore-build-dependencies = true
 private = { ignore = true }
@@ -128,6 +127,22 @@ checksum = "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
 license = "MIT"
 
 [[windows_x86_64_msvc.clarify.files]]
+path = "license-mit"
+license = "MIT"
+checksum = "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+
+[windows_aarch64_msvc.clarify]
+license = "MIT"
+
+[[windows_aarch64_msvc.clarify.files]]
+path = "license-mit"
+license = "MIT"
+checksum = "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+
+[windows_x86_64_gnu.clarify]
+license = "MIT"
+
+[[windows_x86_64_gnu.clarify.files]]
 path = "license-mit"
 license = "MIT"
 checksum = "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
@@ -303,6 +318,68 @@ override-git-commit = "ce8164ba92995cfa86005b6259115e08c8244253"
 path = "LICENSE-APACHE"
 license = "Apache-2.0"
 checksum = "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+
+[accesskit_atspi_common.clarify]
+license = "Apache-2.0"
+override-git-commit = "ce8164ba92995cfa86005b6259115e08c8244253"
+
+[[accesskit_atspi_common.clarify.git]]
+path = "LICENSE-APACHE"
+license = "Apache-2.0"
+checksum = "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+
+[accesskit_unix.clarify]
+license = "Apache-2.0"
+override-git-commit = "ce8164ba92995cfa86005b6259115e08c8244253"
+
+[[accesskit_unix.clarify.git]]
+path = "LICENSE-APACHE"
+license = "Apache-2.0"
+checksum = "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+
+[dasp_sample.clarify]
+license = "Apache-2.0"
+override-git-commit = "97c3bb9b2363c0b46ac1633858bf1054fd02a980"
+
+[[dasp_sample.clarify.git]]
+path = "LICENSE-APACHE"
+license = "Apache-2.0"
+checksum = "756c8d2ab2dc24f256e1455b5f03937f4933d83d7bc9f2d55009fc962377d512"
+
+[difflib.clarify]
+license = "MIT"
+override-git-commit = "f035fb8e656f27119e23eca9d5b996df14f3885e"
+
+[[difflib.clarify.git]]
+path = "LICENSE"
+license = "MIT"
+checksum = "6725d1437fc6c77301f2ff0e7d52914cf4f9509213e1078dc77d9356dbe6eac5"
+
+[enum-map.clarify]
+license = "Apache-2.0"
+override-git-commit = "a09d924a4afde4e2864a1df7b1438a5e6cdf3e7e"
+
+[[enum-map.clarify.git]]
+path = "LICENSES/Apache-2.0.txt"
+license = "Apache-2.0"
+checksum = "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+
+[enum-map-derive.clarify]
+license = "Apache-2.0"
+override-git-commit = "ccf562d340723530d54f7bdfeb1782b4ded803a7"
+
+[[enum-map-derive.clarify.git]]
+path = "LICENSES/Apache-2.0.txt"
+license = "Apache-2.0"
+checksum = "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+
+[wayland-protocols-plasma.clarify]
+license = "MIT"
+
+[[wayland-protocols-plasma.clarify.files]]
+path = "LICENSE.txt"
+license = "MIT"
+checksum = "1cb6f4dee8c649f175736380495f0af0c753c87f22d50931692968bb24bf2161"
 
 [intl_pluralrules.clarify]
 license = "Apache-2.0"

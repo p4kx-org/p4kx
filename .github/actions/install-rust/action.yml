@@ -2,6 +2,9 @@ name: Install pinned Rust tools
 description: Install and verify the repository compiler and optional test runner
 
 inputs:
+  target:
+    description: Native target from the platform contract
+    default: ""
   components:
     description: Extra toolchain components
     default: ""
@@ -10,6 +13,9 @@ inputs:
     default: "false"
 
 outputs:
+  target:
+    description: Native Rust target selected by the platform contract
+    value: ${{ steps.pins.outputs.target }}
   rust-version:
     description: Exact compiler release
     value: ${{ steps.pins.outputs.rust-version }}
@@ -23,11 +29,19 @@ runs:
     - name: Read repository tool pins
       id: pins
       shell: pwsh
-      run: .github/scripts/check-build-tools.ps1
+      env:
+        P4KX_TARGET: ${{ inputs.target }}
+      run: .github/scripts/check-build-tools.ps1 -Target $env:P4KX_TARGET
     - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
-        toolchain: ${{ steps.pins.outputs.rust-version }}
+        toolchain: ${{ steps.pins.outputs.rust-toolchain }}
         components: ${{ inputs.components }}
+    - name: Select the native pinned toolchain
+      shell: pwsh
+      env:
+        NATIVE_TOOLCHAIN: ${{ steps.pins.outputs.rust-toolchain }}
+      run: |
+        "RUSTUP_TOOLCHAIN=$env:NATIVE_TOOLCHAIN" >> $env:GITHUB_ENV
     - name: Install cargo-nextest
       if: inputs.nextest == 'true'
       uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
@@ -37,4 +51,5 @@ runs:
       shell: pwsh
       env:
         INSTALL_NEXTEST: ${{ inputs.nextest }}
-      run: .github/scripts/check-build-tools.ps1 -Verify -Nextest:($env:INSTALL_NEXTEST -eq 'true')
+        P4KX_TARGET: ${{ steps.pins.outputs.target }}
+      run: .github/scripts/check-build-tools.ps1 -Verify -Nextest:($env:INSTALL_NEXTEST -eq 'true') -Target $env:P4KX_TARGET

@@ -48,7 +48,7 @@ pub(super) fn show(ui: &mut Ui, model: &Model) {
                     Text::UpdateAvailable,
                     &[("version", release.version.clone().into())],
                 );
-                link(ui, &text, &release.page);
+                link(ui, &text, release.link());
             });
         }
     });

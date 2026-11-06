@@ -35,6 +35,7 @@ fn window_binary() -> PathBuf {
 fn run_window(profile: &Path) -> std::io::Result<Option<ExitStatus>> {
     let mut window = Command::new(window_binary())
         .env("P4KX_SMOKE_FRAMES", FRAMES)
+        .env(p4kx_settings::FOLDERS_ROOT_VARIABLE, profile)
         .env("HOME", profile)
         .env("USERPROFILE", profile)
         .env("XDG_CONFIG_HOME", profile.join("config"))

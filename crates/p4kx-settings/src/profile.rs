@@ -32,11 +32,12 @@ pub enum ProfileMigration {
     Failed(io::ErrorKind),
 }
 
-/// Returns the profile folder of the platform config directory, `None` without one.
+/// Returns the profile folder of the selected config base, `None` without one.
 ///
 /// It is `P4KX` (`%APPDATA%\P4KX` on Windows, `$XDG_CONFIG_HOME/P4KX` on Linux), or the old
 /// `P4K-Extractor` folder for this process when its migration failed. The first call of a
-/// process runs [`migrate_profile`]; its outcome never stops the start.
+/// process runs [`migrate_profile`]; its outcome never stops the start. An explicit
+/// [`FOLDERS_ROOT_VARIABLE`](crate::FOLDERS_ROOT_VARIABLE) selects the isolated config base.
 #[must_use]
 pub fn profile_folder() -> Option<PathBuf> {
     FOLDER_IN_USE

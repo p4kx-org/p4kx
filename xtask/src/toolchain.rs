@@ -20,7 +20,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<String>> {
     }
     let installer = fs::read_to_string(root.join(INSTALL_ACTION))?;
     for required in [
-        "toolchain: ${{ steps.pins.outputs.rust-version }}",
+        "toolchain: ${{ steps.pins.outputs.rust-toolchain }}",
         "tool: nextest@${{ steps.pins.outputs.nextest-version }}",
         "check-build-tools.ps1 -Verify",
     ] {
@@ -105,7 +105,7 @@ fn workflow_violations(path: &str, text: &str) -> Vec<String> {
         let installs_nextest = trimmed.starts_with("tool:") && trimmed.contains("nextest");
         let bypasses_pin = trimmed.starts_with("toolchain:")
             && (path != INSTALL_ACTION
-                || trimmed != "toolchain: ${{ steps.pins.outputs.rust-version }}");
+                || trimmed != "toolchain: ${{ steps.pins.outputs.rust-toolchain }}");
         let floats_compiler = [
             "cargo +stable",
             "cargo +beta",

@@ -33,3 +33,15 @@ Decided for issue #1015, part of #827 (full Linux compatibility). Builds on ADR-
 - A user who sets `XDG_CONFIG_HOME` moves the profile with it, as on any XDG application.
 - The folder resolution of the RSI Launcher (`launcher_log.rs`) and the testkit's key lookup still call
   `dirs` themselves; #1016 and #1023 move them onto this module.
+
+## Explicit process isolation
+
+For the native verification in #1113, `P4KX_FOLDERS_ROOT` overrides platform base folders with
+`config`, `cache` and `data` below an absolute root. The application folder remains `P4KX`.
+An explicitly empty or relative root yields no folders and cannot fall back to the user's profile.
+Without the variable the platform rules above apply unchanged.
+
+Windows known-folder APIs ignore the test's `APPDATA` and `USERPROFILE` substitutions. The native
+GUI smoke therefore sets this explicit root. Fresh-process tests verify real settings writes and
+invalid-root refusal on every native target. [The folder contract](../profile-folders.md) also
+documents key-file precedence and the limit to application-owned folders.

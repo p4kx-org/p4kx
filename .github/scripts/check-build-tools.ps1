@@ -1,6 +1,7 @@
 param(
     [switch]$Verify,
-    [switch]$Nextest
+    [switch]$Nextest,
+    [string]$Target
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,8 +18,13 @@ if ($nextestVersion -cnotmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
     throw '.config/nextest-version must select one exact MAJOR.MINOR.PATCH release.'
 }
 
+. (Join-Path $PSScriptRoot 'platform-contract.ps1')
+$platform = if ($Target) { Get-P4kxPlatform -Target $Target } else { Get-P4kxCurrentPlatform }
+Assert-P4kxNativeHost -Platform $platform
+$nativeToolchain = "$rustVersion-$($platform.target)"
+
 if (-not $Verify) {
-    $outputs = @("rust-version=$rustVersion", "nextest-version=$nextestVersion")
+    $outputs = @("rust-version=$rustVersion", "nextest-version=$nextestVersion", "rust-toolchain=$nativeToolchain", "target=$($platform.target)")
     if ($env:GITHUB_OUTPUT) {
         $outputs | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8NoBOM
     }
@@ -29,7 +35,7 @@ if (-not $Verify) {
 $compiler = & rustc --version --verbose
 if ($LASTEXITCODE -ne 0) { throw 'rustc version query failed.' }
 $compiler
-if ("release: $rustVersion" -cnotin $compiler) {
+if ("release: $rustVersion" -cnotin $compiler -or "host: $($platform.target)" -cnotin $compiler) {
     throw "The compiler does not match the repository pin $rustVersion."
 }
 & cargo --version
@@ -40,7 +46,7 @@ if ($Nextest) {
     if ($LASTEXITCODE -ne 0) { throw 'cargo-nextest version query failed.' }
     $runner
     $match = [regex]::Match(($runner -join [Environment]::NewLine), '(?m)^cargo-nextest (?<version>[^\s]+)')
-    if (-not $match.Success -or $match.Groups['version'].Value -cne $nextestVersion) {
+    if (-not $match.Success -or $match.Groups['version'].Value -cne $nextestVersion -or "host: $($platform.target)" -cnotin $runner) {
         throw "The test runner does not match the repository pin $nextestVersion."
     }
 }

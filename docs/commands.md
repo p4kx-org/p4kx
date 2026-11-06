@@ -662,6 +662,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   the last four digits hidden, `p4kx key remove` deletes the stored key. The key never appears in
   logs, error messages or JSON. `--key-file` (or `P4KX_KEY_FILE`) names another file for the stored
   key, for the command line, the window and the MCP server alike.
+- `P4KX_FOLDERS_ROOT` selects an absolute root for separate `config`, `cache` and `data`
+  application folders on every platform. An explicitly empty or relative root has no profile
+  fallback. [Profile folders](profile-folders.md) documents paths and key-file precedence.
 - `--recover` on any command rebuilds an Archive whose end of central directory is missing or
   whose central directory is damaged, by scanning its last 4 GiB for directory records. Entries
   whose records are lost are missing, and a warning says the Archive was recovered. Without the

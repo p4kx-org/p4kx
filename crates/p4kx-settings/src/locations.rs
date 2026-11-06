@@ -4,7 +4,7 @@
 //! The one place that decides where P4KX keeps its profile, caches and data.
 //!
 //! Windows and macOS use the known folders of the platform; every other Unix follows the XDG Base
-//! Directory specification. Callers never branch on the platform for a path.
+//! Directory specification. An explicit root isolates every application folder on any platform.
 
 use std::ffi::OsString;
 use std::io;
@@ -12,6 +12,9 @@ use std::path::{Path, PathBuf};
 
 /// The application folder inside every base folder.
 pub(crate) const APP_FOLDER: &str = "P4KX";
+
+/// The optional absolute root whose `config`, `cache` and `data` folders replace platform folders.
+pub const FOLDERS_ROOT_VARIABLE: &str = "P4KX_FOLDERS_ROOT";
 
 /// Whether this platform has known folders; otherwise the XDG rule applies.
 const USE_KNOWN_FOLDERS: bool = cfg!(any(windows, target_os = "macos"));
@@ -87,9 +90,22 @@ impl XdgEnvironment {
     }
 }
 
-/// Returns the base folder of `kind` on this platform, `None` when it has none.
+/// Returns the base folder of `kind`, honouring [`FOLDERS_ROOT_VARIABLE`] before platform defaults.
+/// An explicitly empty or relative root returns `None` without falling back to the user profile.
 #[must_use]
 pub fn base_folder(kind: FolderKind) -> Option<PathBuf> {
+    if let Some(root) = std::env::var_os(FOLDERS_ROOT_VARIABLE) {
+        let root = PathBuf::from(root);
+        if !root.is_absolute() {
+            return None;
+        }
+        let folder = match kind {
+            FolderKind::Config => "config",
+            FolderKind::Cache => "cache",
+            FolderKind::Data => "data",
+        };
+        return Some(root.join(folder));
+    }
     if USE_KNOWN_FOLDERS {
         match kind {
             FolderKind::Config => dirs::config_dir(),
