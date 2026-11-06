@@ -181,7 +181,8 @@ P4KX only reads the game folders and refuses to write into a Star Citizen instal
 
 ## Build
 
-Requires the stable Rust toolchain (1.99 or newer).
+The repository selects an exact stable compiler in [rust-toolchain.toml](rust-toolchain.toml);
+rustup uses it automatically. The workspace minimum remains Rust 1.99.
 
 ```powershell
 cargo build --release

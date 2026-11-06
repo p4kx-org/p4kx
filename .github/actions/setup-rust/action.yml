@@ -32,17 +32,13 @@ runs:
       with:
         drive-size: 60GB
         mount-path: target
-    - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+    - uses: ./.github/actions/install-rust
       with:
         components: ${{ inputs.components }}
+        nextest: ${{ inputs.nextest }}
     - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:
         key: ${{ inputs.cache-key }}
-    - name: Install cargo-nextest
-      if: inputs.nextest == 'true'
-      uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
-      with:
-        tool: nextest
     - name: Install the ALSA headers the audio output builds against
       if: runner.os == 'Linux'
       shell: bash

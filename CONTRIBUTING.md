@@ -102,8 +102,21 @@ P4KX reads your own Star Citizen installation and ships no game data.
 
 ## Local development setup
 
-You need the stable Rust toolchain (see the [README](README.md#build)) on Windows or Linux, and
-for the Blender add-on Python and Blender 5.2 LTS.
+Install rustup on Windows or Linux; the repository's
+[`rust-toolchain.toml`](rust-toolchain.toml) selects the exact compiler and components. For the
+Blender add-on you also need Python and Blender 5.2 LTS. Install the exact test runner selected by
+[`.config/nextest-version`](.config/nextest-version):
+
+```powershell
+cargo install cargo-nextest --version (Get-Content .config/nextest-version).Trim() --locked
+.github/scripts/check-build-tools.ps1 -Verify -Nextest
+```
+
+CI build jobs, test-archive consumers, packages and SBOM generation use the same verified pins.
+Update both files deliberately and run the configuration check, workspace tests, doctests,
+clippy and repository checks before accepting new versions; see
+[ADR-0340](docs/adr/0340-exact-build-tool-versions.md). Native target/runtime validation is separate
+from pin consistency.
 
 On Linux the audio preview builds against the ALSA headers: `sudo apt-get install
 libasound2-dev` (Debian and Ubuntu; CI installs the same package). PipeWire and PulseAudio need
@@ -121,7 +134,7 @@ cargo xtask
 
 `cargo test --workspace --locked` works as well when cargo-nextest is not installed. `cargo xtask`
 checks the layer direction of the crates, the 400-line limit, the SPDX headers, the changelog
-fragments, the lint set and the Archive key. After a dependency change, run
+fragments, the lint set, exact tool pins and the Archive key. After a dependency change, run
 `cargo xtask notices --write` (needs `cargo install cargo-about --version 0.9.2 --locked`).
 
 The tests against a real Archive are ignored by default; see

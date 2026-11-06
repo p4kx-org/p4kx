@@ -42,7 +42,10 @@ that group their tests (see "Test layout"), the real-Archive tests are the modul
 `cargo test --release -p <crate> --test real_archive -- <test_name> --ignored`. The CI suite
 runs faster with cargo-nextest: `cargo nextest run --workspace --locked`, then
 `cargo test --workspace --locked --doc` for the doctests nextest skips; `cargo test --workspace
---locked` stays valid. Prefer nextest for `p4kx-render` locally: its GPU tests run one process each
+--locked` stays valid. `rust-toolchain.toml` pins the compiler; `.config/nextest-version`
+pins cargo-nextest. `.github/scripts/check-build-tools.ps1 -Verify -Nextest` checks installed
+releases, and `cargo xtask toolchain` checks repository pin consistency.
+Prefer nextest for `p4kx-render` locally: its GPU tests run one process each
 with a time limit (`.config/nextest.toml`), while one shared process can hang in a graphics driver.
 In a plain `cargo test` run, `p4kx_testkit::watchdog` ends a hung process with exit code 3 and
 names the running tests and their phases; `P4KX_TEST_DEADLINE_SECS` overrides its 600 s limit. The two concurrency stress tests need optimised code and run with
