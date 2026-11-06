@@ -43,3 +43,12 @@ Decided for issue #916. Evidence: LIVE 4.10. Builds on ADR-0054 (additive catalo
   exporter; the only one in the catalog's texts is the `~mission(…)` rule.
 - A change of the game that moves a share past its baseline is a deliberate edit of the baseline,
   made after looking at the kind.
+
+## Independent oracle and primary-test alignment
+
+[ADR-0346](0346-localisation-verification-reads-source-lines-and-keeps-per-kind-baselines.md)
+records the LIVE reproduction for #1041 and aligns the older primary catalog test with this
+contract. The oracle now parses decoded source lines independently of the production INI index.
+For duplicate lines it uses the last plain and last suffixed declarations, preferring a non-empty
+plain value; this clarifies the abbreviated first-non-empty rule above. Per-kind baselines and
+German floors remain unchanged.

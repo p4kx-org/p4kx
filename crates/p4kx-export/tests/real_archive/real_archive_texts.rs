@@ -7,17 +7,18 @@
 //! translation completeness of the game is measured, never asserted as a global share.
 //!
 //! The expectation is built here from the file's lines with the game's rules (the key without its
-//! `@`, ASCII case ignored, a `key,P=` line standing for `key`, the first non-empty text, `\n`
-//! decoded and the text trimmed) and does not use the exporter's lookup.
-
-use std::borrow::Cow;
-use std::collections::HashMap;
+//! `@`, ASCII case ignored, the last plain and suffixed declarations with a non-empty plain
+//! value preferred, `\n` decoded and the text trimmed) and does not use the exporter's lookup.
 
 use p4kx_export::{Kind, Language, catalog_schema};
-use p4kx_extraction::{Archive, LocalizationSet, TextSet, display_text, is_placeholder_key};
+use p4kx_extraction::{Archive, LocalizationSet, is_placeholder_key};
 use serde_json::Value;
 
+use crate::real_archive_text_oracle::Oracle;
 use crate::real_archive_verification::{TestResult, list, print_line};
+
+#[path = "real_archive_texts_tests.rs"]
+mod tests;
 
 /// The baseline of a kind: the largest share of its keyed texts the English and the German
 /// `global.ini` may lack, as measured on LIVE and rounded up to the hundredth. A kind with keyed
@@ -71,30 +72,6 @@ const MISSION_TOKEN: &str = "~mission(";
 /// How many keys of a kind a failure message names.
 const SAMPLE: usize = 3;
 
-/// The texts one language's file holds, by lower-case key without `@`.
-struct Oracle<'a>(HashMap<String, Cow<'a, str>>);
-
-impl<'a> Oracle<'a> {
-    fn of(texts: &TextSet<'a>, language: Language) -> Result<Self, String> {
-        let ini = texts
-            .ini(language)
-            .ok_or_else(|| format!("the Archive holds {language}"))?;
-        let map = ini
-            .iter()
-            .filter_map(|(key, text)| {
-                let shown = display_text(text);
-                (!shown.is_empty()).then(|| (key.to_ascii_lowercase(), shown))
-            })
-            .collect();
-        Ok(Self(map))
-    }
-
-    fn text(&self, key: &str) -> Option<&str> {
-        let key = key.strip_prefix('@').unwrap_or(key).to_ascii_lowercase();
-        self.0.get(&key).map(AsRef::as_ref)
-    }
-}
-
 /// What the catalog holds for the keyed texts of one kind in one language.
 #[derive(Debug, Default)]
 struct Coverage {
@@ -110,14 +87,15 @@ struct Coverage {
 }
 
 impl Coverage {
-    fn count(&mut self, oracle: &Oracle<'_>, key: &str, shown: Option<&Value>) {
-        match (oracle.text(key), shown.and_then(Value::as_str)) {
-            (Some(expected), Some(shown))
-                if expected == shown || expected.contains(MISSION_TOKEN) =>
+    fn count(&mut self, oracle: &Oracle, key: &str, shown: Option<&Value>) {
+        match (oracle.text(key), shown) {
+            (Some(expected), Some(Value::String(shown)))
+                if expected == shown
+                    || (!shown.is_empty() && expected.contains(MISSION_TOKEN)) =>
             {
                 self.resolved += 1;
             }
-            (None, None) => {
+            (None, Some(Value::Null)) => {
                 self.fallback += 1;
                 if self.lacking.len() < SAMPLE {
                     self.lacking.push(key.to_owned());
@@ -209,10 +187,9 @@ fn baseline(kind: Kind) -> Baseline {
 /// holds for LIVE only.
 pub(crate) fn check_texts(archive: &Archive, catalog: &Value, baselined: bool) -> TestResult {
     let set = LocalizationSet::read(archive, &[Language::English, Language::German])?;
-    let texts = set.index()?;
     let (english_oracle, german_oracle) = (
-        Oracle::of(&texts, Language::English)?,
-        Oracle::of(&texts, Language::German)?,
+        Oracle::of(&set, Language::English)?,
+        Oracle::of(&set, Language::German)?,
     );
     let fields = text_fields();
     let mut failures: Vec<String> = Vec::new();
