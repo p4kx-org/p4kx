@@ -41,20 +41,34 @@ pub(crate) fn read_entries(
     )?;
     let mut entries = Vec::with_capacity(directory.len() / RECORD_LEN);
     let mut log = IssueLog::default();
-    let data_limit = trailer.directory_offset.min(trailer.names_offset);
+    let data_limit = trailer.payload_end;
+    let progress = trailer.progress(source)?;
+    let mut installed = ByteReader::with_base(&progress, trailer.payload_end);
     let mut record_offset = trailer.directory_offset;
     for record in directory.as_chunks::<RECORD_LEN>().0 {
-        let entry = parse_record(
+        let mut entry = parse_record(
             record,
             record_offset,
             &names,
             (entries.len(), data_limit),
             &mut log,
         )?;
+        let installed_bytes = installed.read_u64()?;
+        if installed_bytes > entry.compressed_size {
+            return Err(FormatError::corrupt(
+                record_offset,
+                "installed-byte counter exceeds stored size",
+            ));
+        }
+        entry.installed_bytes = Some(installed_bytes);
         entries.push(entry);
         record_offset += RECORD_LEN as u64;
     }
-    Ok(Directory { entries, log })
+    Ok(Directory {
+        entries,
+        log,
+        installation_flags: Some(trailer.flags),
+    })
 }
 
 fn read_range(
@@ -123,6 +137,7 @@ fn parse_record(
         index: u32::try_from(index).unwrap_or(u32::MAX),
         encrypted: encryption != 0,
         local_header: false,
+        installed_bytes: None,
     })
 }
 

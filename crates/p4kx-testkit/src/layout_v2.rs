@@ -23,6 +23,9 @@ pub(crate) fn build(entries: &[TestEntry]) -> Vec<u8> {
         })
         .collect();
     let end_of_payload = len_u64(&out);
+    for entry in entries {
+        put_u64(&mut out, len_u64(&entry.payload));
+    }
     let mut names = Vec::new();
     let directory_offset = len_u64(&out);
     for (entry, data_offset) in entries.iter().zip(data_offsets) {

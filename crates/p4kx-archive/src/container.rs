@@ -58,7 +58,11 @@ pub(crate) fn source_of(
 /// Checks the Entries of the container in `source` against the limits, leaves out folder
 /// Entries and writes their paths with backslashes.
 pub(crate) fn admit(directory: Directory, source: &Source) -> Result<Directory, FormatError> {
-    let Directory { entries, log } = directory;
+    let Directory {
+        entries,
+        log,
+        installation_flags,
+    } = directory;
     let mut admitted = Vec::with_capacity(entries.len());
     let mut kept = IssueLog::default();
     let mut dropped = 0;
@@ -94,6 +98,7 @@ pub(crate) fn admit(directory: Directory, source: &Source) -> Result<Directory, 
     Ok(Directory {
         entries: admitted,
         log: kept,
+        installation_flags,
     })
 }
 

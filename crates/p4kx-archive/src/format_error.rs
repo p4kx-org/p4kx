@@ -13,6 +13,9 @@ use crate::{ArchiveError, Compression};
 pub(crate) enum FormatError {
     Io(io::Error),
     NotAnArchive,
+    IncompleteInstallation {
+        flags: u8,
+    },
     UnsupportedLayout {
         version: u16,
     },
@@ -46,6 +49,9 @@ impl FormatError {
         match self {
             Self::Io(source) => ArchiveError::Io { path, source },
             Self::NotAnArchive => ArchiveError::NotAnArchive { path },
+            Self::IncompleteInstallation { flags } => {
+                ArchiveError::IncompleteInstallation { path, flags }
+            }
             Self::UnsupportedLayout { version } => {
                 ArchiveError::UnsupportedLayout { path, version }
             }

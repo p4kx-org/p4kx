@@ -14,6 +14,7 @@ type TestResult = Result<(), Box<dyn Error>>;
 const TRAILER_LEN: usize = 175;
 const RECORD_LEN: usize = 204;
 const PAYLOAD_LEN: usize = 6;
+const DIRECTORY_START: usize = PAYLOAD_LEN + 16;
 const NAMES: &[u8] = b"Data/a.bin\0Data/b.bin\0";
 
 fn put(bytes: &mut [u8], at: usize, value: u64) -> TestResult {
@@ -31,6 +32,8 @@ fn field(bytes: &mut [u8], offset: usize, value: u64) -> TestResult {
 
 fn fixture(base: u64, extension: u64) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut bytes = b"abcabc".to_vec();
+    bytes.extend_from_slice(&3_u64.to_le_bytes());
+    bytes.extend_from_slice(&3_u64.to_le_bytes());
     for index in 0..2 {
         let mut record = vec![0; RECORD_LEN];
         record
@@ -47,10 +50,11 @@ fn fixture(base: u64, extension: u64) -> Result<Vec<u8>, Box<dyn Error>> {
     bytes.extend_from_slice(&[0; TRAILER_LEN]);
     field(&mut bytes, 0, base)?;
     field(&mut bytes, 8, extension)?;
-    field(&mut bytes, 16, PAYLOAD_LEN as u64)?;
+    field(&mut bytes, 16, DIRECTORY_START as u64)?;
+    field(&mut bytes, 64, PAYLOAD_LEN as u64)?;
     field(&mut bytes, 24, base * RECORD_LEN as u64)?;
     field(&mut bytes, 32, extension * RECORD_LEN as u64)?;
-    field(&mut bytes, 40, (PAYLOAD_LEN + 2 * RECORD_LEN) as u64)?;
+    field(&mut bytes, 40, (DIRECTORY_START + 2 * RECORD_LEN) as u64)?;
     field(&mut bytes, 48, base * 11)?;
     field(&mut bytes, 56, extension * 11)?;
     let marker = bytes.len() - 6;
@@ -138,7 +142,7 @@ fn overflowing_counts_sizes_and_ranges_are_rejected() -> TestResult {
 fn overlapping_or_nonadjacent_directory_and_names_are_rejected() -> TestResult {
     for names_offset in [
         PAYLOAD_LEN as u64,
-        (PAYLOAD_LEN + 2 * RECORD_LEN - 1) as u64,
+        (DIRECTORY_START + 2 * RECORD_LEN - 1) as u64,
     ] {
         let mut bytes = fixture(1, 1)?;
         field(&mut bytes, 40, names_offset)?;
@@ -152,7 +156,7 @@ fn names_and_extension_data_must_be_within_their_declared_ranges() -> TestResult
     let mut outside = fixture(1, 1)?;
     put(
         &mut outside,
-        PAYLOAD_LEN + RECORD_LEN + 34,
+        DIRECTORY_START + RECORD_LEN + 34,
         NAMES.len() as u64,
     )?;
     corrupt(&outside)?;
@@ -167,7 +171,7 @@ fn names_and_extension_data_must_be_within_their_declared_ranges() -> TestResult
     corrupt(&unterminated)?;
 
     let mut truncated = fixture(1, 1)?;
-    truncated.remove(PAYLOAD_LEN + RECORD_LEN);
+    truncated.remove(DIRECTORY_START + RECORD_LEN);
     corrupt(&truncated)?;
     Ok(())
 }

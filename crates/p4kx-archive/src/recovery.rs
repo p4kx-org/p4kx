@@ -84,7 +84,11 @@ impl Scan {
             log.record_first(EntryIssue::RecoveryLimit);
         }
         log.record_first(EntryIssue::Recovered);
-        Some(Directory { entries, log })
+        Some(Directory {
+            entries,
+            log,
+            installation_flags: None,
+        })
     }
 }
 

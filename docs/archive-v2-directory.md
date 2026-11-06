@@ -17,3 +17,6 @@ Archive or writer implementation is required.
 Format field evidence:
 [the pinned independent trailer description](https://github.com/19h/svarog/blob/2e46eff4f7d475b8826ccfdc01c4a95db764db0d/crates/svarog-p4k/src/zip/eocd_v2.rs)
 and [its checked range interpretation](https://github.com/19h/svarog/blob/2e46eff4f7d475b8826ccfdc01c4a95db764db0d/crates/svarog-p4k/src/archive.rs).
+
+Installation flags and installed-byte declarations are defined in
+[the shared installation-status contract](archive-installation-status.md).

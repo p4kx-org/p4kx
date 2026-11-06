@@ -53,7 +53,11 @@ pub(crate) fn parse_entries(bytes: &[u8], base: u64, count: u64) -> Result<Direc
         let entry = parse_entry(&mut reader, entries.len(), &mut log)?;
         entries.push(entry);
     }
-    Ok(Directory { entries, log })
+    Ok(Directory {
+        entries,
+        log,
+        installation_flags: None,
+    })
 }
 
 /// One central-directory header read on its own.
@@ -117,6 +121,7 @@ fn parse_entry_parts<'a>(
         index: u32::try_from(index).unwrap_or(u32::MAX),
         encrypted: extra.encrypted,
         local_header: true,
+        installed_bytes: None,
     };
     Ok((entry, name, zip64_block))
 }

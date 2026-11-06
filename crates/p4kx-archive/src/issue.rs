@@ -149,4 +149,5 @@ fn lossy_path<'a>(bytes: &'a [u8], index: usize, log: &mut IssueLog) -> Cow<'a, 
 pub(crate) struct Directory {
     pub(crate) entries: Vec<Entry>,
     pub(crate) log: IssueLog,
+    pub(crate) installation_flags: Option<u8>,
 }

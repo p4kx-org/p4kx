@@ -26,9 +26,17 @@ pub struct Entry {
     pub(crate) index: u32,
     pub(crate) encrypted: bool,
     pub(crate) local_header: bool,
+    pub(crate) installed_bytes: Option<u64>,
 }
 
 impl Entry {
+    /// Returns the source installed-byte counter, or none when the layout provides none.
+    /// This counter does not verify payload integrity.
+    #[must_use]
+    pub const fn installed_bytes(&self) -> Option<u64> {
+        self.installed_bytes
+    }
+
     /// Returns where the stored data begins.
     pub(crate) const fn data(&self) -> DataStart {
         if self.local_header {

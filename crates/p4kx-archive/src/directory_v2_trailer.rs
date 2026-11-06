@@ -9,6 +9,10 @@ use crate::source::Source;
 
 pub(crate) const TRAILER_LEN: usize = 175;
 pub(crate) const RECORD_LEN: usize = 204;
+const PROGRESS_BYTES: u64 = 8;
+const FREELIST_BYTES: u64 = 16;
+const CACHE_AND_SECTOR_BYTES: usize = 24;
+const INCOMPLETE_FLAG: u8 = 1;
 
 /// The separate base and extension declarations of a v2 directory.
 pub(crate) struct Trailer {
@@ -20,6 +24,9 @@ pub(crate) struct Trailer {
     pub(crate) names_offset: u64,
     base_names_size: u64,
     extension_names_size: u64,
+    pub(crate) payload_end: u64,
+    freelist_count: u64,
+    pub(crate) flags: u8,
 }
 
 impl Trailer {
@@ -40,6 +47,14 @@ impl Trailer {
             names_offset: reader.read_u64()?,
             base_names_size: reader.read_u64()?,
             extension_names_size: reader.read_u64()?,
+            payload_end: reader.read_u64()?,
+            freelist_count: reader.read_u64()?,
+            flags: {
+                reader.skip(CACHE_AND_SECTOR_BYTES)?;
+                reader.read_bytes(1)?.first().copied().ok_or_else(|| {
+                    FormatError::corrupt(offset, "v2 installation status is cut off")
+                })?
+            },
         };
         trailer.validate(offset, max_entries)?;
         Ok(trailer)
@@ -62,6 +77,9 @@ impl Trailer {
     }
 
     fn validate(&self, trailer_offset: u64, max_entries: Option<u64>) -> Result<(), FormatError> {
+        if self.flags & INCOMPLETE_FLAG != 0 {
+            return Err(FormatError::IncompleteInstallation { flags: self.flags });
+        }
         let count = self.sum(self.base_count, self.extension_count, "Entry counts")?;
         layout::check_entry_count(count, max_entries)?;
         for (count, size, section) in [
@@ -79,6 +97,7 @@ impl Trailer {
                 ));
             }
         }
+        self.validate_installation(count, trailer_offset)?;
         let directory_end = self
             .directory_offset
             .checked_add(self.directory_size()?)
@@ -97,6 +116,44 @@ impl Trailer {
             return Err(FormatError::corrupt(
                 trailer_offset,
                 "directory or name table lies outside the file",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Reads the per-Entry installed-byte counters after their range has been validated.
+    pub(crate) fn progress(&self, source: &Source) -> Result<Vec<u8>, FormatError> {
+        let count = self.sum(self.base_count, self.extension_count, "Entry counts")?;
+        let size = count
+            .checked_mul(PROGRESS_BYTES)
+            .and_then(|size| usize::try_from(size).ok())
+            .ok_or_else(|| {
+                FormatError::corrupt(
+                    self.payload_end,
+                    "installed-byte counters do not fit into memory",
+                )
+            })?;
+        Ok(source.read_at(self.payload_end, size)?)
+    }
+    fn validate_installation(&self, count: u64, trailer_offset: u64) -> Result<(), FormatError> {
+        let install_size = count
+            .checked_mul(PROGRESS_BYTES)
+            .and_then(|progress| {
+                self.freelist_count
+                    .checked_mul(FREELIST_BYTES)?
+                    .checked_add(progress)
+            })
+            .ok_or_else(|| {
+                FormatError::corrupt(trailer_offset, "installation metadata size overflows")
+            })?;
+        if self
+            .payload_end
+            .checked_add(install_size)
+            .is_none_or(|end| end > self.directory_offset)
+        {
+            return Err(FormatError::corrupt(
+                trailer_offset,
+                "installation metadata is truncated or overlaps the directory",
             ));
         }
         Ok(())
