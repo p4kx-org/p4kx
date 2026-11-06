@@ -1,0 +1,83 @@
+# Windows packages
+
+The release target is `x86_64-pc-windows-msvc` for AMD64 and `aarch64-pc-windows-msvc` for
+ARM64. For version `<version>` each target produces `P4KX-<version>-<target>.msi` and
+`P4KX-<version>-<target>-portable.zip`. The full Rust target disambiguates both names. Older
+AMD64 releases use their historical `-x86_64` names, supported by the shared update selector.
+
+Choose ARM64 on a Windows ARM64 device and AMD64 on an AMD64 device. Both packages contain the
+GUI, CLI and MCP server, licence files, third-party notices, a distribution identity sidecar,
+`windows-runtime.json` and `MICROSOFT-REDISTRIBUTABLE-NOTICE.txt`. Any app-local Microsoft runtime
+DLL has its target PE machine, SHA-256 and Visual Studio redistributable source recorded.
+Windows system DLLs and Universal CRT are operating-system prerequisites, not copied files.
+
+## Installation and replacement
+
+The MSI installs for the current user without administrator rights in
+`%LOCALAPPDATA%\Programs\P4KX`, with one Start menu shortcut and one user PATH entry.
+There is one installed product across CPU choices. Newer versions upgrade it; lower versions
+are rejected. Choosing another CPU package explicitly at the same version replaces the current
+product on Windows ARM64, including when replacing an emulated AMD64 installation with ARM64.
+The same-version replacement is intentional; it does not create a second PATH installation.
+
+Settings and `%APPDATA%\P4KX\archive.key` are user data, never MSI-owned files. Installation,
+upgrade, rollback, CPU replacement and uninstall preserve them. Portable packages run from an
+extracted folder and use the same default profile. An isolated profile is available through
+`P4KX_FOLDERS_ROOT`, described in [profile folders](profile-folders.md).
+
+Update checks are opt-in and link-only. The common selector reads the target/package sidecar
+next to the running EXE and selects its CPU/package asset; unavailable or inconsistent identity
+falls back to the Release page. It never downloads, installs or switches CPU automatically.
+
+## Native verification and supported Windows evidence
+
+The native matrix selects `windows-2025` (Windows Server 2025, AMD64) and `windows-11-arm`
+(Windows 11, ARM64). Release runtime JSON records the actual OS version/build, source SHA and
+native tool identities. These are the intended CI verification systems; workflow definitions
+and synthetic MSI construction alone do not establish a successfully executed release.
+No untested Windows 10 minimum or ARM64 device result is claimed by this document.
+
+Each release run must execute the packaged release EXEs from both the portable ZIP and the MSI:
+
+- CLI lists the synthetic Archive, extracts Unicode text byte-for-byte and converts compressed CryXml.
+- MCP negotiates the protocol, lists tools and reads that synthetic text using a read-only tool.
+- GUI draws three frames and exits within 120 seconds with an isolated process profile.
+- The native renderer names a required software adapter. Device checks remain explicit.
+- MSI lifecycle verifies machine/template/component metadata, install, upgrade, blocked downgrade,
+  transactional rollback with restored product/file hashes/PATH, profile/key preservation and uninstall.
+- ARM64 verifies deliberate same-version CPU replacement in both directions. Its AMD64 compatibility
+  payload is not counted as native execution. AMD64 verifies rejection of the ARM64 MSI.
+- Historical upgrade uses only `P4K-Extractor-0.2.0-x86_64.msi` and checks its MSI identity; ARM64
+  does not use this AMD64-only predecessor.
+
+Installer lifecycle scripts refuse non-disposable local execution and pre-existing P4KX ownership.
+Tests seed synthetic `settings.toml`/`archive.key` markers only on a clean hosted runner. Runtime
+processes use `P4KX_FOLDERS_ROOT`, so no test GUI writes into that marker profile or the user's data.
+The local `test-windows-package-contract.ps1` builds synthetic, non-executable MSI payloads for
+both CPUs and checks database/rollback-probe authoring without installing either MSI.
+
+The target runtime artifact includes both package hashes and executed binary hashes. Final
+assembly rejects missing, skipped or mismatched package evidence and requires the complete
+[four-target release matrix](supported-platforms.md). Native hardware GPU, dialogs, clipboard and
+audio evidence remains part of the final integration verification; hosted frame success does not
+assert those capabilities. Native CI/device run URLs must be retained with the final release audit.
+
+## Release integration
+
+`release-windows.yml` consumes the Windows rows of `.config/platforms.json`. Each native producer
+builds three release applications and a next-version MSI, generates target-filtered CycloneDX
+SBOMs including any Microsoft runtime files, and uploads `windows-build-<target>`. A separate
+native consumer validates source/CPU/tool/digest metadata before executing portable/installed
+payloads and emits `release-<target>` only after successful lifecycle verification.
+
+Each release artifact contains two packages, three `P4KX-<version>-<target>-<binary>.cdx.json`
+SBOMs, `P4KX-<version>-<target>-runtime.json` and a host-tool-role inventory. Host CycloneDX is
+pinned 0.5.9 AMD64 and explicitly analyzes `--target <target>`, including on an ARM64 runner;
+its compatibility execution is dependency analysis, never native app evidence. WiX is pinned
+7.0.0. Native compiler and nextest pins come from the common setup.
+
+The shared workflow scans every architecture-specific package, attests each target's packages
+and metadata and assembles SHA-256/SHA3-512 sums. The Linux owner consumes `linux-matrix` from
+the same prepare job and emits the same `release-<target>` interface. Publishing requires all
+twelve packages, twelve SBOMs and four executed native proofs; a Windows-only run cannot publish
+a partial matrix. PR runs prepare artifacts without publication.

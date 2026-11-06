@@ -1,0 +1,105 @@
+$ErrorActionPreference = 'Stop'
+
+function Close-P4kxComObject {
+    param($Object)
+    if ($null -ne $Object) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($Object) }
+}
+
+function Get-P4kxComProperty {
+    param($Object, [string]$Name, [object[]]$Arguments)
+    return ,$Object.GetType().InvokeMember($Name, [Reflection.BindingFlags]::GetProperty, $null, $Object, $Arguments)
+}
+
+function Invoke-P4kxComMethod {
+    param($Object, [string]$Name, [object[]]$Arguments)
+    return ,$Object.GetType().InvokeMember($Name, [Reflection.BindingFlags]::InvokeMethod, $null, $Object, $Arguments)
+}
+
+function Read-P4kxMsiRows {
+    param($Database, [string]$Query, [int]$Columns)
+    $view = Invoke-P4kxComMethod $Database 'OpenView' @($Query)
+    try {
+        [void](Invoke-P4kxComMethod $view 'Execute' @())
+        while ($record = Invoke-P4kxComMethod $view 'Fetch' @()) {
+            try { $row = @(for ($index = 1; $index -le $Columns; $index++) { Get-P4kxComProperty $record 'StringData' @($index) }) }
+            finally { Close-P4kxComObject $record }
+            Write-Output -NoEnumerate $row
+        }
+    }
+    finally { [void](Invoke-P4kxComMethod $view 'Close' @()); Close-P4kxComObject $view }
+}
+
+function Get-P4kxMsiMetadata {
+    param([string]$Path)
+    $installer = New-Object -ComObject WindowsInstaller.Installer
+    $database = Invoke-P4kxComMethod $installer 'OpenDatabase' @((Resolve-Path -LiteralPath $Path).Path, 0)
+    $summary = $null
+    try {
+        $properties = @{}
+        foreach ($row in Read-P4kxMsiRows $database 'SELECT `Property`, `Value` FROM `Property`' 2) { $properties[$row[0]] = $row[1] }
+        $summary = Get-P4kxComProperty $database 'SummaryInformation' @(0)
+        return [pscustomobject]@{
+            product=$properties.ProductCode; upgrade=$properties.UpgradeCode; version=$properties.ProductVersion
+            template=(Get-P4kxComProperty $summary 'Property' @(7)); package=(Get-P4kxComProperty $summary 'Property' @(9))
+            components=@(Read-P4kxMsiRows $database 'SELECT `ComponentId`, `Attributes` FROM `Component`' 2)
+            files=@(Read-P4kxMsiRows $database 'SELECT `FileName` FROM `File`' 1 | ForEach-Object { $_[0] -replace '^.*\|', '' })
+            sequence=@(Read-P4kxMsiRows $database 'SELECT `Action`, `Sequence` FROM `InstallExecuteSequence`' 2)
+            directories=@(Read-P4kxMsiRows $database 'SELECT `Directory` FROM `Directory`' 1 | ForEach-Object { $_[0] })
+            registry=@(Read-P4kxMsiRows $database 'SELECT `Root`, `Key`, `Name` FROM `Registry`' 3)
+        }
+    }
+    finally { Close-P4kxComObject $summary; Close-P4kxComObject $database; Close-P4kxComObject $installer }
+}
+
+function Assert-P4kxMsiMetadata {
+    param($Metadata, $Platform, [string]$Version, [string]$UpgradeCode)
+    $cpu = if ($Platform.msi_arch -eq 'arm64') { 'Arm64' } else { $Platform.msi_arch }
+    if ($Metadata.template -cne "$cpu;1033" -or $Metadata.version -cne $Version -or
+        $Metadata.upgrade.Trim('{}') -ine $UpgradeCode.Trim('{}') -or
+        $Metadata.product -notmatch '^\{[0-9A-F-]{36}\}$') { throw 'MSI CPU/product/version/upgrade identity mismatch.' }
+    if (@($Metadata.components | Where-Object { ([int]$_[1] -band 256) -eq 0 }).Count -gt 0) { throw 'MSI contains a non-64-bit component.' }
+    foreach ($file in @('p4kx.exe', 'p4kx-gui.exe', 'p4kx-mcp.exe', 'p4kx-distribution.json',
+        'THIRD-PARTY-NOTICES.md', 'windows-runtime.json', 'MICROSOFT-REDISTRIBUTABLE-NOTICE.txt')) {
+        if (@($Metadata.files | Where-Object { $_ -ceq $file }).Count -ne 1) { throw "Missing or duplicate MSI file: $file" }
+    }
+    if (@($Metadata.files | Where-Object { $_ -match '^(settings\.toml|.*key.*)$' }).Count -ne 0 -or
+        'AppDataFolder' -in $Metadata.directories) { throw 'MSI must not own profile/key files.' }
+    $sequence = @{}
+    foreach ($action in $Metadata.sequence) { $sequence[$action[0]] = [int]$action[1] }
+    if ($sequence.RemoveExistingProducts -le $sequence.InstallInitialize -or
+        $sequence.RemoveExistingProducts -ge $sequence.ProcessComponents) { throw 'MSI upgrade removal is not early and transactional.' }
+}
+
+function New-P4kxRollbackMsi {
+    param([string]$Source, [string]$Destination)
+    Copy-Item -LiteralPath $Source -Destination $Destination
+    $installer = New-Object -ComObject WindowsInstaller.Installer
+    $database = Invoke-P4kxComMethod $installer 'OpenDatabase' @([IO.Path]::GetFullPath($Destination), 1)
+    $summary = $null
+    try {
+        $queries = @()
+        $actions = @(Read-P4kxMsiRows $database 'SELECT `Name` FROM `_Tables` WHERE `Name` = ''CustomAction''' 1)
+        if ($actions.Count -eq 0) {
+            $queries += 'CREATE TABLE `CustomAction` (`Action` CHAR(72) NOT NULL, `Type` SHORT NOT NULL, `Source` CHAR(72), `Target` CHAR(255) LOCALIZABLE, `ExtendedType` LONG PRIMARY KEY `Action`)'
+        }
+        $queries += @(
+            ('UPDATE `Property` SET `Value` = ''{0}'' WHERE `Property` = ''ProductCode''' -f "{$([guid]::NewGuid())}"),
+            'INSERT INTO `CustomAction` (`Action`, `Type`, `Target`) VALUES (''P4kxRollbackProbe'', 19, ''P4KX rollback verification failure'')',
+            'INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) VALUES (''P4kxRollbackProbe'', ''1'', 6550)'
+        )
+        $execute = @(Read-P4kxMsiRows $database 'SELECT `Action` FROM `InstallExecuteSequence` WHERE `Action` = ''InstallExecute''' 1)
+        if ($execute.Count -eq 0) {
+            $queries += 'INSERT INTO `InstallExecuteSequence` (`Action`, `Sequence`) VALUES (''InstallExecute'', 6500)'
+        }
+        foreach ($query in $queries) {
+            $view = Invoke-P4kxComMethod $database 'OpenView' @($query)
+            try { [void](Invoke-P4kxComMethod $view 'Execute' @()) }
+            finally { [void](Invoke-P4kxComMethod $view 'Close' @()); Close-P4kxComObject $view }
+        }
+        $summary = Get-P4kxComProperty $database 'SummaryInformation' @(1)
+        [void]$summary.GetType().InvokeMember('Property', [Reflection.BindingFlags]::SetProperty, $null, $summary, @(9, "{$([guid]::NewGuid())}"))
+        [void](Invoke-P4kxComMethod $summary 'Persist' @())
+        [void](Invoke-P4kxComMethod $database 'Commit' @())
+    }
+    finally { Close-P4kxComObject $summary; Close-P4kxComObject $database; Close-P4kxComObject $installer }
+}

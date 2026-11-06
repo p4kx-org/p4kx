@@ -60,6 +60,12 @@ and its animations play with **Play**. Above the view a facts bar gives the
   dragging the divider above it to see more of the model.
 - **Copy** puts the open tab on the clipboard: the text, or the hex rows as shown.
 
+On Windows, Linux and macOS, text copy and paste use the system clipboard. Text copied with
+**Copy** can be pasted into another application, and text copied there can be pasted into an
+editable P4KX field. Multiline fields retain line breaks; single-line fields keep their normal
+editing rules. An empty clipboard inserts no text. If another program temporarily holds the
+clipboard, release it and repeat the explicit copy or paste action.
+
 ### Size limits
 
 | Limit | Value | What happens |
@@ -439,14 +445,15 @@ The command line behaves the same way: `p4kx extract` stops and exits with code 
 
 ## Installing and updating
 
-Each Release on GitHub offers three downloads:
+Windows releases provide AMD64 (`x86_64-pc-windows-msvc`) and ARM64
+(`aarch64-pc-windows-msvc`) packages. Choose the target matching your device:
 
-- **`P4KX-<version>-x86_64.msi`** installs for the current user only, without
+- **`P4KX-<version>-<target>.msi`** installs for the current user only, without
   administrator rights, into `%LOCALAPPDATA%\Programs\P4KX`. It installs `p4kx-gui.exe`,
   `p4kx.exe` and `p4kx-mcp.exe`, adds P4KX to the Start menu and that folder to your `PATH`, so
   `p4kx` works in a new terminal. A newer MSI replaces the installed version in place; uninstall
   through **Settings › Apps**.
-- **`P4KX-<version>-x86_64-portable.zip`** holds `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe`
+- **`P4KX-<version>-<target>-portable.zip`** holds `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe`
   to run from any folder, without installing anything.
 - **`p4kx_importer-<version>.zip`** is the Blender add-on that imports a Blender package. In
   Blender 5.2 LTS use Edit › Preferences › Get Extensions › Install from Disk. It needs no
@@ -456,6 +463,12 @@ Both keep their settings in `%APPDATA%\P4KX\settings.toml`, so switching between
 uninstalling keeps them. Coming from P4K-Extractor, the first start copies its old settings
 folder `%APPDATA%\P4K-Extractor` (settings and stored Archive key) into `%APPDATA%\P4KX` when that
 does not exist yet; the old folder stays as a backup.
+Both CPU installers manage one per-user installation. Explicitly installing the other CPU
+package at the same version replaces that installation on Windows ARM64; updates select the
+running binary's CPU and never change it automatically. A lower version is rejected. An upgrade
+failure rolls back the installed version. Settings and the stored Archive key survive CPU
+replacement and uninstall. Older AMD64 releases use the historical `-x86_64` filenames.
+See [Windows packages](windows-packages.md) for exact native verification systems and evidence.
 
 ### About
 
@@ -481,7 +494,9 @@ covered by a non-disclosure agreement and must not be shared. The command line p
 **Help › Check for a new version at start** is off until you switch it on. While it is on, the
 window asks the GitHub API once at start for the latest Release of P4KX; switching it on
 also asks at once. When a newer Release exists, the status bar shows **Version … is available**,
-which opens its page in your browser.
+which opens the compatible package for your installed OS, binary CPU and package format when
+its identity and Release asset are available. Otherwise it opens the Release page in your browser.
+Following the link is your choice; the check does not download or install an update.
 
 The request is a plain anonymous GET of
 `https://api.github.com/repos/p4kx-org/p4kx/releases/latest`; it carries only the

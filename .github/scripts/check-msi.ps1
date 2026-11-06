@@ -1,106 +1,132 @@
-<#
-.SYNOPSIS
-Installs an MSI per user, upgrades it with a newer one and uninstalls it, failing on any deviation.
-
-.PARAMETER Msi
-The MSI of the Release.
-
-.PARAMETER NextMsi
-The same installer built with a higher version; the msiexec logs are written next to it.
-
-.PARAMETER NextVersion
-The version of NextMsi.
-
-.PARAMETER UpgradeCode
-The UpgradeCode both installers share.
-
-.PARAMETER PreviousMsi
-An MSI of an earlier Release; when given, it is installed first and upgraded with Msi, and the old install folder, PATH entry and registry key must be gone afterwards.
-#>
 param(
-    [Parameter(Mandatory)] [string] $Msi,
-    [Parameter(Mandatory)] [string] $NextMsi,
-    [Parameter(Mandatory)] [string] $NextVersion,
-    [Parameter(Mandatory)] [string] $UpgradeCode,
-    [string] $PreviousMsi
+    [Parameter(Mandatory)][string]$Target,
+    [Parameter(Mandatory)][string]$Msi,
+    [Parameter(Mandatory)][string]$NextMsi,
+    [Parameter(Mandatory)][string]$NextVersion,
+    [Parameter(Mandatory)][string]$UpgradeCode,
+    [Parameter(Mandatory)][string]$OtherArchitectureMsi,
+    [Parameter(Mandatory)][string]$FixtureDirectory,
+    [Parameter(Mandatory)][string]$OutputDirectory,
+    [string]$PreviousMsi
 )
 
 $ErrorActionPreference = 'Stop'
-trap {
-    $_.ScriptStackTrace | Out-Host
-    break
+. (Join-Path $PSScriptRoot 'platform-contract.ps1')
+. (Join-Path $PSScriptRoot 'msi-installation.ps1')
+. (Join-Path $PSScriptRoot 'binary-machine.ps1')
+$row = Get-P4kxPlatform -Target $Target
+Assert-P4kxNativeHost -Platform $row
+if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted') {
+    throw 'Installer verification requires a disposable GitHub-hosted native Windows runner.'
 }
-$folder = Join-Path $env:LOCALAPPDATA 'Programs\P4KX'
-$shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\P4KX.lnk'
-$logs = Split-Path -Parent (Resolve-Path $NextMsi)
-$installer = New-Object -ComObject WindowsInstaller.Installer
+$current = Get-P4kxMsiMetadata $Msi
+$next = Get-P4kxMsiMetadata $NextMsi
+$opposite = @((Get-P4kxPlatformContract).targets | Where-Object { $_.os -eq 'windows' -and $_.arch -ne $row.arch })[0]
+$other = Get-P4kxMsiMetadata $OtherArchitectureMsi
+Assert-P4kxMsiMetadata $current $row $current.version $UpgradeCode
+Assert-P4kxMsiMetadata $next $row $NextVersion $UpgradeCode
+Assert-P4kxMsiMetadata $other $opposite $current.version $UpgradeCode
+if (@(@($current.product, $next.product, $other.product) | Select-Object -Unique).Count -ne 3 -or
+    @(@($current.package, $next.package, $other.package) | Select-Object -Unique).Count -ne 3) { throw 'MSI package/product identities collide.' }
+foreach ($component in $current.components) {
+    if ($component[0] -in @($other.components | ForEach-Object { $_[0] })) { throw 'CPU packages share a component GUID.' }
+}
+$folder = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs/P4KX'
+$shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'P4KX.lnk'
+$profileFolder = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'P4KX'
+$logs = [IO.Path]::GetFullPath($OutputDirectory)
+New-Item -ItemType Directory -Force -Path $logs | Out-Null
+$originalPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+Assert-P4kxUninstalled $UpgradeCode $folder $shortcut $originalPath
+if (Test-Path -LiteralPath $profileFolder) { throw 'Installer verification requires an absent P4KX profile.' }
+New-Item -ItemType Directory -Path $profileFolder | Out-Null
+$markers = @('settings.toml', 'archive.key')
+$markerHashes = @{}
+foreach ($marker in $markers) {
+    'synthetic installer preservation marker' | Set-Content (Join-Path $profileFolder $marker) -Encoding utf8NoBOM
+    $markerHashes[$marker] = (Get-FileHash (Join-Path $profileFolder $marker)).Hash
+}
 
-function Invoke-Msiexec([string[]] $Arguments, [string] $Name) {
-    $log = Join-Path $logs $Name
-    $start = [System.Diagnostics.ProcessStartInfo]::new('msiexec.exe')
-    foreach ($argument in $Arguments + @('/qn', '/l*v', $log)) { $start.ArgumentList.Add($argument) }
-    $process = [System.Diagnostics.Process]::Start($start)
-    $process.WaitForExit()
-    if ($process.ExitCode -ne 0) {
-        if (Test-Path $log) { Get-Content $log -Tail 60 }
-        throw "msiexec $($Arguments -join ' ') failed with exit code $($process.ExitCode)"
+function Assert-ProfilePreserved {
+    foreach ($marker in $markers) {
+        if ((Get-FileHash (Join-Path $profileFolder $marker)).Hash -cne $markerHashes[$marker]) { throw "Installer changed the profile marker: $marker" }
     }
 }
 
-function Get-ComProperty($Target, [string] $Name, [object[]] $Arguments) {
-    , [System.__ComObject].InvokeMember($Name, [System.Reflection.BindingFlags]::GetProperty, $null, $Target, $Arguments)
+function Test-InstalledPayload([string]$Name) {
+    & (Join-Path $PSScriptRoot 'check-package-runtime.ps1') -Target $Target -BinaryDirectory $folder -FixtureDirectory $FixtureDirectory -OutputDirectory (Join-Path $logs $Name) -Package msi
+    Assert-ProfilePreserved
 }
 
-function Get-Installed {
-    $related = Get-ComProperty $installer 'RelatedProducts' @("{$UpgradeCode}")
-    $count = Get-ComProperty $related 'Count' $null
-    , @(for ($index = 0; $index -lt $count; $index++) { Get-ComProperty $related 'Item' @($index) })
-}
-
-function Get-RegistryKeys {
-    @(Get-ChildItem 'HKCU:\Software' -Recurse -ErrorAction SilentlyContinue |
-        ForEach-Object { $_.Name } |
-        Where-Object { $_ -notlike '*\Software\Microsoft' -and $_ -notlike '*\Software\Microsoft\*' -and $_ -notlike '*\Software\Classes' -and $_ -notlike '*\Software\Classes\*' })
-}
-
-if ($PreviousMsi) {
-    $oldFolder = Join-Path $env:LOCALAPPDATA 'Programs\P4K-Extractor'
-    $registryBefore = @(Get-RegistryKeys)
-    Invoke-Msiexec @('/i', $PreviousMsi) 'previous-install.log'
-    if (-not (Test-Path (Join-Path $oldFolder 'p4kx-gui.exe'))) { throw 'the previous release did not install into Programs\P4K-Extractor' }
-    $oldRegistry = @((Get-RegistryKeys) | Where-Object { $registryBefore -notcontains $_ })
-    if ($oldRegistry.Count -eq 0) { throw 'the previous release wrote no registry key' }
-    Invoke-Msiexec @('/i', $Msi) 'rename-upgrade.log'
-    if (Test-Path $oldFolder) { throw "left behind after the rename upgrade: $oldFolder" }
-    $registryAfter = @(Get-RegistryKeys)
-    foreach ($key in $oldRegistry) {
-        if ($registryAfter -contains $key) { throw "left behind after the rename upgrade: $key" }
+try {
+    if ($PreviousMsi) {
+        if ($row.arch -cne 'amd64') { throw 'Historical AMD64 MSI is not an ARM64 upgrade predecessor.' }
+        $previous = Get-P4kxMsiMetadata $PreviousMsi
+        if ($previous.template -cne 'x64;1033' -or $previous.version -cne '0.2.0' -or
+            $previous.upgrade -ine $current.upgrade) { throw 'Historical MSI CPU/version/upgrade identity differs.' }
+        $oldKeys = @($previous.registry | Where-Object { $_[0] -eq '1' -and $_[1] -match '^Software\\P4K-Extractor(?:\\|$)' } | ForEach-Object { $_[1] } | Select-Object -Unique)
+        if ($oldKeys.Count -eq 0) { throw 'Historical MSI has no expected per-user installer identity.' }
+        Invoke-P4kxMsiexec @('/i', $PreviousMsi) (Join-Path $logs 'previous-install.log')
+        Invoke-P4kxMsiexec @('/i', $Msi) (Join-Path $logs 'rename-upgrade.log')
+        $oldFolder = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs/P4K-Extractor'
+        if (Test-Path -LiteralPath $oldFolder) { throw 'Historical install directory survived migration.' }
+        if ([Environment]::GetEnvironmentVariable('Path', 'User') -match 'Programs\\P4K-Extractor') { throw 'Historical PATH entry survived migration.' }
+        foreach ($key in $oldKeys) { if (Test-Path -LiteralPath "HKCU:\$key") { throw 'Historical installer registry identity survived migration.' } }
+        Assert-P4kxInstalledProduct $current $folder $shortcut
+        Test-InstalledPayload 'historical-upgrade'
+        Invoke-P4kxMsiexec @('/x', $current.product) (Join-Path $logs 'historical-uninstall.log')
+        Assert-P4kxUninstalled $UpgradeCode $folder $shortcut $originalPath
     }
-    if (-not (Test-Path 'HKCU:\Software\P4KX')) { throw 'the upgrade did not write HKCU:\Software\P4KX' }
-    $entries = @([Environment]::GetEnvironmentVariable('Path', 'User') -split ';' | Where-Object { $_ })
-    if (@($entries | Where-Object { $_ -like '*Programs\P4K-Extractor*' }).Count -ne 0) { throw 'the user PATH still holds Programs\P4K-Extractor' }
-    if (@($entries | Where-Object { $_.TrimEnd('\') -eq $folder }).Count -ne 1) { throw 'the user PATH does not hold Programs\P4KX exactly once' }
-    $renamed = Get-Installed
-    if ($renamed.Count -ne 1) { throw "the rename upgrade left $($renamed.Count) installations" }
-    Invoke-Msiexec @('/x', $renamed[0]) 'rename-uninstall.log'
-    if ((Get-Installed).Count -ne 0) { throw 'still installed after the rename upgrade check' }
+    Invoke-P4kxMsiexec @('/i', $Msi) (Join-Path $logs 'install.log')
+    Assert-P4kxInstalledProduct $current $folder $shortcut
+    Test-InstalledPayload 'installed'
+    $before = @{}
+    foreach ($file in Get-ChildItem -LiteralPath $folder -File) { $before[$file.Name] = (Get-FileHash $file.FullName).Hash }
+    $rollbackMsi = Join-Path $logs 'rollback-probe.msi'
+    New-P4kxRollbackMsi $NextMsi $rollbackMsi
+    Invoke-P4kxMsiexec @('/i', $rollbackMsi) (Join-Path $logs 'rollback.log') 1603
+    $rollbackLog = Get-Content (Join-Path $logs 'rollback.log') -Raw
+    if ($rollbackLog -notmatch 'Action ended .*InstallExecute\. Return value 1\.' -or
+        $rollbackLog -notmatch 'Action ended .*P4kxRollbackProbe\. Return value 3\.' -or
+        $rollbackLog -notmatch 'Rollback') { throw 'MSI failure did not demonstrate post-execution rollback.' }
+    Assert-P4kxInstalledProduct $current $folder $shortcut
+    foreach ($name in $before.Keys) {
+        if ((Get-FileHash (Join-Path $folder $name)).Hash -cne $before[$name]) { throw "Rollback did not restore installed file: $name" }
+    }
+    Test-InstalledPayload 'rollback-restored'
+    Invoke-P4kxMsiexec @('/i', $NextMsi) (Join-Path $logs 'upgrade.log')
+    Assert-P4kxInstalledProduct $next $folder $shortcut
+    Test-InstalledPayload 'upgraded'
+    Invoke-P4kxMsiexec @('/i', $Msi) (Join-Path $logs 'downgrade-blocked.log') 1603
+    Assert-P4kxInstalledProduct $next $folder $shortcut
+    Assert-ProfilePreserved
+    Invoke-P4kxMsiexec @('/x', $next.product) (Join-Path $logs 'uninstall.log')
+    Assert-P4kxUninstalled $UpgradeCode $folder $shortcut $originalPath
+    Assert-ProfilePreserved
+    if ($row.arch -eq 'arm64') {
+        Invoke-P4kxMsiexec @('/i', $OtherArchitectureMsi) (Join-Path $logs 'amd64-compatibility-install.log')
+        Assert-P4kxInstalledProduct $other $folder $shortcut
+        Invoke-P4kxMsiexec @('/i', $Msi) (Join-Path $logs 'same-version-native-replacement.log')
+        Assert-P4kxInstalledProduct $current $folder $shortcut
+        Test-InstalledPayload 'native-replacement'
+        Invoke-P4kxMsiexec @('/i', $OtherArchitectureMsi) (Join-Path $logs 'same-version-amd64-replacement.log')
+        Assert-P4kxInstalledProduct $other $folder $shortcut
+        if ((Get-ImageMachine -Path (Join-Path $folder 'p4kx.exe') -Os windows) -ne $opposite.pe_machine) { throw 'Explicit AMD64 replacement payload differs.' }
+        Invoke-P4kxMsiexec @('/x', $other.product) (Join-Path $logs 'replacement-uninstall.log')
+    }
+    else { Invoke-P4kxMsiexec @('/i', $OtherArchitectureMsi) (Join-Path $logs 'wrong-cpu-rejected.log') 1633 }
+    Assert-P4kxUninstalled $UpgradeCode $folder $shortcut $originalPath
+    Assert-ProfilePreserved
+    [ordered]@{
+        target=$Target; lifecycle='success'; rollback='success'; profile_preserved=$true
+        cross_cpu=$(if ($row.arch -eq 'arm64') { 'explicit replacement both ways; AMD64 compatibility is not native evidence' } else { 'ARM64 package rejected' })
+    } | ConvertTo-Json | Set-Content (Join-Path $logs 'installer.json') -Encoding utf8NoBOM
 }
-
-Invoke-Msiexec @('/i', $Msi) 'install.log'
-foreach ($path in @((Join-Path $folder 'p4kx-gui.exe'), (Join-Path $folder 'p4kx.exe'), (Join-Path $folder 'p4kx-mcp.exe'), $shortcut)) {
-    if (-not (Test-Path $path)) { throw "missing after install: $path" }
+finally {
+    foreach ($product in Get-P4kxInstalledProducts $UpgradeCode) { Invoke-P4kxMsiexec @('/x', $product) (Join-Path $logs 'cleanup-uninstall.log') }
+    foreach ($marker in $markers) {
+        $path = Join-Path $profileFolder $marker
+        if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path }
+    }
+    if ((Get-ChildItem -LiteralPath $profileFolder -Force).Count -eq 0) { Remove-Item -LiteralPath $profileFolder }
 }
-if ((Get-Installed).Count -ne 1) { throw 'the install is not registered once' }
-
-Invoke-Msiexec @('/i', $NextMsi) 'upgrade.log'
-$installed = Get-Installed
-if ($installed.Count -ne 1) { throw "the upgrade left $($installed.Count) installations" }
-$version = Get-ComProperty $installer 'ProductInfo' @($installed[0], 'VersionString')
-if ($version -ne $NextVersion) { throw "the upgrade installed $version instead of $NextVersion" }
-
-Invoke-Msiexec @('/x', $installed[0]) 'uninstall.log'
-if ((Get-Installed).Count -ne 0) { throw 'still installed after uninstall' }
-foreach ($path in @($folder, $shortcut)) {
-    if (Test-Path $path) { throw "left behind after uninstall: $path" }
-}
-'install, upgrade and uninstall work'

@@ -117,12 +117,13 @@ Import > P4KX Package (scene.json)). See [blender_addon/README.md](blender_addon
 
 ## Install
 
-Windows on 64-bit x86 (x86_64). Each [GitHub Release](https://github.com/p4kx-org/p4kx/releases)
-offers:
+Windows packages target AMD64 (`x86_64-pc-windows-msvc`) and ARM64
+(`aarch64-pc-windows-msvc`). Choose your device's CPU in the
+[GitHub Release](https://github.com/p4kx-org/p4kx/releases):
 
-- `P4KX-<version>-x86_64.msi`: installs for the current user, without administrator rights, into
+- `P4KX-<version>-<target>.msi`: installs for the current user, without administrator rights, into
   `%LOCALAPPDATA%\Programs\P4KX`, adds the Start menu entry and puts the folder on your `PATH`.
-- `P4KX-<version>-x86_64-portable.zip`: `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe` to run from
+- `P4KX-<version>-<target>-portable.zip`: `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe` to run from
   any folder.
 - `p4kx_importer-<version>.zip`: the Blender add-on (Edit > Preferences > Get Extensions >
   Install from Disk).
@@ -131,6 +132,10 @@ offers:
 
 Settings live in `%APPDATA%\P4KX`. The window can check GitHub once at start for a newer Release
 if you switch that on in the Help menu; it is off by default, and nothing else touches the network.
+Both CPUs share one per-user MSI installation; an explicitly chosen same-version package
+replaces it. Settings and the stored Archive key survive uninstall. Older AMD64 releases keep
+their `-x86_64` names. [Windows packages](docs/windows-packages.md) defines supported-system
+evidence, runtime DLLs and installer verification.
 
 ## First run: the Archive key
 
@@ -183,6 +188,8 @@ P4KX only reads the game folders and refuses to write into a Star Citizen instal
 
 The repository selects an exact stable compiler in [rust-toolchain.toml](rust-toolchain.toml);
 rustup uses it automatically. The workspace minimum remains Rust 1.99.
+The native v0.5.0 target and verification contract covers Windows and Linux on AMD64 and ARM64;
+see [native platforms and release verification](docs/supported-platforms.md).
 
 ```powershell
 cargo build --release

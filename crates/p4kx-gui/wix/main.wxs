@@ -10,6 +10,7 @@
     <SummaryInformation Manufacturer="P4KX contributors" Description="P4KX $(var.Version)" />
     <MajorUpgrade
         AllowSameVersionUpgrades="yes"
+        Schedule="afterInstallInitialize"
         DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/p4kx-org/p4kx" />
@@ -20,10 +21,14 @@
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="UserPrograms" Name="Programs">
         <Directory Id="APPLICATIONFOLDER" Name="P4KX">
-          <Component Id="Application" Guid="5DA0A84A-B1EA-4B11-A4C1-7DB8F1449E7D">
+          <Component Id="Application" Guid="$(var.ApplicationGuid)" Bitness="always64">
             <File Id="GuiExe" Name="p4kx-gui.exe" Source="$(var.BinaryFolder)\p4kx-gui.exe" />
             <File Id="CliExe" Name="p4kx.exe" Source="$(var.BinaryFolder)\p4kx.exe" />
             <File Id="McpExe" Name="p4kx-mcp.exe" Source="$(var.BinaryFolder)\p4kx-mcp.exe" />
+            <File Id="DistributionIdentity" Name="p4kx-distribution.json" Source="$(var.BinaryFolder)\p4kx-distribution.json" />
+            <File Id="WindowsRuntimeInventory" Name="windows-runtime.json" Source="$(var.BinaryFolder)\windows-runtime.json" />
+            <File Id="MicrosoftRuntimeNotice" Name="MICROSOFT-REDISTRIBUTABLE-NOTICE.txt" Source="$(var.BinaryFolder)\MICROSOFT-REDISTRIBUTABLE-NOTICE.txt" />
+            <File Id="Changelog" Name="CHANGELOG.md" Source="$(var.BinaryFolder)\CHANGELOG.md" />
             <File Id="LicenceMit" Name="LICENSE-MIT" Source="$(var.RepositoryFolder)\LICENSE-MIT" />
             <File Id="LicenceApache" Name="LICENSE-APACHE" Source="$(var.RepositoryFolder)\LICENSE-APACHE" />
             <File Id="LicenceMitMarkdown" Name="LICENSE-MIT.md" Source="$(var.RepositoryFolder)\LICENSE-MIT.md" />
@@ -52,7 +57,7 @@
     </StandardDirectory>
 
     <StandardDirectory Id="ProgramMenuFolder">
-      <Component Id="StartMenuShortcut" Guid="5EB01C4B-DB2E-44BF-BFCA-71F808DB8600">
+      <Component Id="StartMenuShortcut" Guid="$(var.ShortcutGuid)" Bitness="always64">
         <Shortcut
             Id="GuiShortcut"
             Name="P4KX"
@@ -73,6 +78,7 @@
     <Feature Id="Complete" Title="P4KX" Level="1">
       <ComponentRef Id="Application" />
       <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="RuntimeLibraries" />
     </Feature>
   </Package>
 </Wix>
