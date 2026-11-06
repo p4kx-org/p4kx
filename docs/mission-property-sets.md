@@ -11,7 +11,10 @@ The source arrays are `contractParams.propertyOverrides` of a handler and
 `paramOverrides` block uses its directly authored `propertyOverrides`. Empty arrays remain
 explicit empty sets. Missing arrays create no link. Present malformed arrays or unreadable
 declarations fail their original Generator Record and emit neither its contract rows nor
-partial sets. Development leftovers follow the existing contract selection rules.
+partial sets. Every authored set in a selected Generator Record is retained independently of
+whether its scope produces a contract row. Missing IDs, debug rows and duplicate rows do not
+discard source arrays. Existing development-leftover and duplicate rules apply to derived
+contract rows and their links; the global Record Filter bounds the source kind.
 
 | Set field | Meaning |
 | --- | --- |

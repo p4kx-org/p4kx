@@ -21,5 +21,7 @@ and broker entries keep their existing fields and normalization semantics.
 
 Unknown or unreadable present values fail the original Generator instead of yielding null or
 partial sets. Weak links are resolved only in that original owner, before fanout into contract
-rows. The selected Generator Records and existing development-leftover rules determine which
-derived rows and their source sets are emitted. No runtime choice or final location is inferred.
+rows. Every authored set of a selected Generator Record is retained, including scopes without row
+IDs or derived contract rows and scopes whose rows are development leftovers or duplicates.
+Global Record selection bounds the source kind; row selection controls only derived contracts
+and their links. No runtime choice or final location is inferred.

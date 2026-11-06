@@ -82,6 +82,7 @@ mod mission_property_sets;
 mod mission_property_sets_failures;
 mod mission_property_sets_filters;
 mod mission_property_sets_fixture;
+mod mission_property_sets_unreferenced;
 mod ndjson_guard;
 mod ndjson_order;
 mod paints_fixture;

@@ -157,7 +157,7 @@ fn generator_weak_links_retain_foreign_identity_without_resolving_its_values() -
 fn direct_subcontract_fallback_keeps_its_own_authored_source_position() -> TestResult {
     let record = fixture::with_sub(
         [parameters(vec![]), parameters(vec![])],
-        &TestInstance::new("SubContract").value(
+        &TestInstance::new("DirectSubContract").value(
             "propertyOverrides",
             TestValue::Array(vec![property("Direct", scoped([]))]),
         ),

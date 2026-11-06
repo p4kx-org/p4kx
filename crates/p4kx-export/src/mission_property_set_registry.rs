@@ -36,7 +36,7 @@ impl<'r, 'f> MissionPropertySetRegistry<'r, 'f> {
         texts: &'r Texts<'f>,
         unknowns: &'r Unknowns,
     ) -> Result<Self, ReadError> {
-        Ok(Self {
+        let registry = Self {
             tree,
             index: MissionPropertySetIndex::new(tree.root())?,
             reader: Reader::for_record(tags, tree),
@@ -44,7 +44,11 @@ impl<'r, 'f> MissionPropertySetRegistry<'r, 'f> {
             unknowns,
             spawns: RefCell::new(SpawnPools::default()),
             sets: RefCell::new(MissionPropertySets::default()),
-        })
+        };
+        crate::mission_property_sources::visit(tree.root(), |level, params| {
+            registry.register(level, params).map(|_| ())
+        })?;
+        Ok(registry)
     }
 
     /// Returns authored handler, contract and sub-contract set links in that order.
@@ -81,6 +85,9 @@ impl<'r, 'f> MissionPropertySetRegistry<'r, 'f> {
         let Some(value) = params.field("propertyOverrides") else {
             return Ok(None);
         };
+        if matches!(value, Value::Null) {
+            return Ok(None);
+        }
         let location = self
             .index
             .location(params)

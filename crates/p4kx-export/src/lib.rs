@@ -188,6 +188,7 @@ mod mission_property_fields;
 mod mission_property_set;
 mod mission_property_set_index;
 mod mission_property_set_registry;
+mod mission_property_sources;
 mod mission_places;
 mod mission_results;
 mod mission_shared;

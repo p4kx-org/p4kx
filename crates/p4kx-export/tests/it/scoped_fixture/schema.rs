@@ -188,7 +188,7 @@ fn contracts() -> Vec<TestStruct> {
         TestStruct::new("ContractGeneratorHandler_Career")
             .parent("ContractGeneratorHandler")
             .field("debugName", TestType::String)
-            .field("contractParams", class("ContractParamOverrides"))
+            .field("contractParams", pointer("ContractParamOverrides"))
             .array("contracts", class("CareerContract")),
         TestStruct::new("ContractParamOverrides")
             .array("propertyOverrides", pointer("MissionProperty")),
@@ -197,12 +197,14 @@ fn contracts() -> Vec<TestStruct> {
             .field("debugName", TestType::String)
             .field("template", TestType::Reference)
             .field("missionBrokerEntry", TestType::Reference)
-            .field("paramOverrides", class("ContractParamOverrides"))
-            .array("subContracts", class("SubContract")),
+            .field("paramOverrides", pointer("ContractParamOverrides"))
+            .array("subContracts", pointer("SubContract")),
         TestStruct::new("SubContract")
             .field("id", TestType::Guid)
             .field("debugName", TestType::String)
-            .field("paramOverrides", pointer("ContractParamOverrides"))
+            .field("paramOverrides", pointer("ContractParamOverrides")),
+        TestStruct::new("DirectSubContract")
+            .parent("SubContract")
             .array("propertyOverrides", pointer("MissionProperty")),
     ]
 }
