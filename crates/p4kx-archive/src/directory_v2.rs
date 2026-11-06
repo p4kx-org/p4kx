@@ -3,26 +3,16 @@
 
 use p4kx_foundation::ByteReader;
 
+use crate::directory_v2_trailer::{RECORD_LEN, TRAILER_LEN, Trailer};
 use crate::entry::stated_sha256;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog, decode_path};
 use crate::source::Source;
-use crate::{Checksum, Compression, Entry, EntryIssue, layout};
+use crate::{Checksum, Compression, Entry, EntryIssue};
 
-const TRAILER_LEN: usize = 175;
-const RECORD_LEN: usize = 204;
-const TRAILER_EXTENSION_COUNT_LEN: usize = 8;
-const TRAILER_EXTENSION_SIZE_LEN: usize = 8;
 const RECORD_TIME_AND_DATE_LEN: usize = 4;
 const RECORD_SIGNATURE_LEN: usize = 128;
 const RECORD_SHA256_LEN: usize = 32;
-
-struct Trailer {
-    directory_offset: u64,
-    directory_size: u64,
-    names_offset: u64,
-    names_size: u64,
-}
 
 /// Reads the Entries of a v2 Archive from its trailer, directory records and name table, refusing
 /// more than `max_entries` before the directory is read.
@@ -34,18 +24,18 @@ pub(crate) fn read_entries(
         .len()
         .checked_sub(TRAILER_LEN as u64)
         .ok_or_else(|| FormatError::corrupt(0, "v2 trailer is cut off"))?;
-    let trailer = read_trailer(source, trailer_offset, max_entries)?;
+    let trailer = Trailer::read(source, trailer_offset, max_entries)?;
     let directory = read_range(
         source,
         trailer.directory_offset,
-        trailer.directory_size,
+        trailer.directory_size()?,
         trailer_offset,
         "central directory",
     )?;
     let names = read_range(
         source,
         trailer.names_offset,
-        trailer.names_size,
+        trailer.names_size()?,
         trailer_offset,
         "name table",
     )?;
@@ -65,35 +55,6 @@ pub(crate) fn read_entries(
         record_offset += RECORD_LEN as u64;
     }
     Ok(Directory { entries, log })
-}
-
-fn read_trailer(
-    source: &Source,
-    offset: u64,
-    max_entries: Option<u64>,
-) -> Result<Trailer, FormatError> {
-    let bytes = source.read_at(offset, TRAILER_LEN)?;
-    let mut reader = ByteReader::with_base(&bytes, offset);
-    let entry_count = reader.read_u64()?;
-    reader.skip(TRAILER_EXTENSION_COUNT_LEN)?;
-    let directory_offset = reader.read_u64()?;
-    let directory_size = reader.read_u64()?;
-    reader.skip(TRAILER_EXTENSION_SIZE_LEN)?;
-    let names_offset = reader.read_u64()?;
-    let names_size = reader.read_u64()?;
-    layout::check_entry_count(entry_count, max_entries)?;
-    if entry_count.checked_mul(RECORD_LEN as u64) != Some(directory_size) {
-        return Err(FormatError::corrupt(
-            offset,
-            format!("central directory size does not match its {entry_count} Entries"),
-        ));
-    }
-    Ok(Trailer {
-        directory_offset,
-        directory_size,
-        names_offset,
-        names_size,
-    })
 }
 
 fn read_range(

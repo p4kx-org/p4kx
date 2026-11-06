@@ -19,6 +19,7 @@ mod data_error;
 mod decode;
 mod decrypt;
 mod directory_v2;
+mod directory_v2_trailer;
 mod effective_encoding;
 mod end_records;
 mod entry;
