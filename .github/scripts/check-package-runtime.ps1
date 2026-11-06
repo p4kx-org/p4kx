@@ -3,13 +3,16 @@ param(
     [Parameter(Mandatory)][string]$BinaryDirectory,
     [Parameter(Mandatory)][string]$FixtureDirectory,
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [Parameter(Mandatory)][string]$Package
+    [Parameter(Mandatory)][string]$Package,
+    [hashtable]$Launchers,
+    [string]$ExpectedVersion
 )
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'binary-machine.ps1')
 . (Join-Path $PSScriptRoot 'package-mcp-smoke.ps1')
+. (Join-Path $PSScriptRoot 'package-launchers.ps1')
 $row = Get-P4kxPlatform -Target $Target
 Assert-P4kxNativeHost -Platform $row
 if ($row.os -eq 'windows') {
@@ -31,20 +34,26 @@ $binaries = @(foreach ($name in @('p4kx', 'p4kx-gui', 'p4kx-mcp')) {
     if ($machine -ne $required) { throw "Packaged $name is not native $Target." }
     [ordered]@{name=$name; machine=$machine; sha256=(Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()}
 })
-$suffix = if ($row.os -eq 'windows') { '.exe' } else { '' }
-$cli = Join-Path $BinaryDirectory "p4kx$suffix"
-$list = Invoke-P4kxPackageProcess $cli @('list', $archive) $directory (Join-Path $directory 'cli-list.log')
+$commands = Get-P4kxPackageLaunchers -BinaryDirectory $BinaryDirectory -Os $row.os -Overrides $Launchers
+$cli = $commands['p4kx']
+$version = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli @('--version')) $directory (Join-Path $directory 'cli-version.log')
+if ($ExpectedVersion -and ($version -split '\r?\n')[0] -cne "p4kx $ExpectedVersion") { throw 'Packaged CLI version differs from the release.' }
+$null = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli @('--help')) $directory (Join-Path $directory 'cli-help.log')
+$list = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli @('list', $archive)) $directory (Join-Path $directory 'cli-list.log')
 if ($list -cnotmatch 'Data/hello\.txt' -or $list -cnotmatch 'Data/smoke\.xml') { throw 'CLI omitted synthetic Entries.' }
 $extract = Join-Path $directory 'extract'
-$null = Invoke-P4kxPackageProcess $cli @('extract', $archive, '--out', $extract) $directory (Join-Path $directory 'cli-extract.log')
+$null = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli @('extract', $archive, '--out', $extract)) $directory (Join-Path $directory 'cli-extract.log')
 if ((Get-FileHash (Join-Path $extract 'Data/hello.txt')).Hash -cne
     (Get-FileHash (Join-Path $FixtureDirectory 'hello.txt')).Hash) { throw 'CLI extracted different bytes.' }
 $convert = Join-Path $directory 'convert'
-$null = Invoke-P4kxPackageProcess $cli @('extract', $archive, '--out', $convert, '--convert') $directory (Join-Path $directory 'cli-convert.log')
+$null = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli @('extract', $archive, '--out', $convert, '--convert')) $directory (Join-Path $directory 'cli-convert.log')
 $xml = [xml](Get-Content (Join-Path $convert 'Data/smoke.xml') -Raw)
 if ($xml.NativeSmoke.value -cne 'synthetic') { throw 'CLI CryXml conversion differs.' }
-Invoke-P4kxPackageMcpSmoke (Join-Path $BinaryDirectory "p4kx-mcp$suffix") $archive $directory $expected
-$gui = New-P4kxPackageProcess (Join-Path $BinaryDirectory "p4kx-gui$suffix") @() $directory
+$mcp = $commands['p4kx-mcp']
+$null = Invoke-P4kxPackageProcess $mcp.executable (Get-P4kxPackageArguments $mcp @('--help')) $directory (Join-Path $directory 'mcp-help.log')
+Invoke-P4kxPackageMcpSmoke $mcp.executable $archive $directory $expected $mcp.prefix
+$window = $commands['p4kx-gui']
+$gui = New-P4kxPackageProcess $window.executable $window.prefix $directory
 try {
     $gui.StartInfo.Environment['P4KX_SMOKE_FRAMES'] = '3'
     [void]$gui.Start()

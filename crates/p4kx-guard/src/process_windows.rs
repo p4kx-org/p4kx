@@ -33,14 +33,17 @@ pub(super) fn game_process_status() -> io::Result<bool> {
     use std::path::PathBuf;
     use std::process::Command;
 
-    let root = std::env::var_os("SystemRoot")
-        .map_or_else(|| PathBuf::from(r"C:\Windows"), PathBuf::from);
+    let root =
+        std::env::var_os("SystemRoot").map_or_else(|| PathBuf::from(r"C:\Windows"), PathBuf::from);
     let system = root.join("System32");
     let mut qprocess = Command::new(system.join("qprocess.exe"));
     qprocess.arg("StarCitizen.exe");
     check(run(&mut qprocess), || {
         let mut powershell = Command::new(
-            system.join("WindowsPowerShell").join("v1.0").join("powershell.exe"),
+            system
+                .join("WindowsPowerShell")
+                .join("v1.0")
+                .join("powershell.exe"),
         );
         powershell.args(["-NoProfile", "-NonInteractive", "-Command", COUNT_SCRIPT]);
         run(&mut powershell)
@@ -51,7 +54,10 @@ pub(super) fn game_process_status() -> io::Result<bool> {
 fn run(command: &mut std::process::Command) -> io::Result<ProbeOutput> {
     use std::os::windows::process::CommandExt;
 
-    command.creation_flags(CREATE_NO_WINDOW).output().map(ProbeOutput::from)
+    command
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map(ProbeOutput::from)
 }
 
 fn check(
@@ -60,7 +66,9 @@ fn check(
 ) -> io::Result<bool> {
     let first_error = match qprocess {
         Ok(output) if output.success => {
-            return Ok(qprocess_lists_game(&String::from_utf8_lossy(&output.stdout)));
+            return Ok(qprocess_lists_game(&String::from_utf8_lossy(
+                &output.stdout,
+            )));
         }
         Ok(output) => command_failure("qprocess", &output),
         Err(error) => error,

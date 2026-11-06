@@ -56,6 +56,9 @@ windows-sys.workspace = true
 [target.'cfg(windows)'.build-dependencies]
 winresource.workspace = true
 
+[build-dependencies]
+serde_json.workspace = true
+
 [dev-dependencies]
 p4kx-gui = { path = ".", features = ["test-hooks"] }
 p4kx-testkit.workspace = true

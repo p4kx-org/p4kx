@@ -9,7 +9,9 @@ const GAME_PROCESSES: [&str; 2] = ["StarCitizen.exe", "StarCitizen"];
 /// Returns whether name is the Star Citizen game process, ignoring case.
 #[must_use]
 pub fn is_game_process(name: &str) -> bool {
-    GAME_PROCESSES.iter().any(|game| name.eq_ignore_ascii_case(game))
+    GAME_PROCESSES
+        .iter()
+        .any(|game| name.eq_ignore_ascii_case(game))
 }
 
 /// Returns whether any of names is the game process.
@@ -54,7 +56,10 @@ pub fn game_process_status() -> io::Result<bool> {
     }
     #[cfg(target_os = "linux")]
     {
-        crate::game_in_proc_tree(std::path::Path::new("/proc"))
+        visible_process_status(
+            crate::game_in_proc_tree(std::path::Path::new("/proc")),
+            std::path::Path::new("/.flatpak-info").try_exists(),
+        )
     }
     #[cfg(not(any(windows, target_os = "linux")))]
     {
@@ -74,19 +79,90 @@ fn warning_for(status: io::Result<bool>) -> bool {
     status.unwrap_or(true)
 }
 
+#[cfg(any(test, target_os = "linux"))]
+fn visible_process_status(
+    status: io::Result<bool>,
+    flatpak_marker: io::Result<bool>,
+) -> io::Result<bool> {
+    match (status, flatpak_marker) {
+        (Ok(false), Ok(true)) => Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "Flatpak process isolation cannot establish host game absence",
+        )),
+        (Ok(false), Err(error)) => Err(error),
+        (status, _) => status,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io;
 
-    use super::warning_for;
+    use super::{visible_process_status, warning_for};
+
+    #[test]
+    fn a_flatpak_negative_scan_cannot_establish_host_absence() {
+        let result = visible_process_status(Ok(false), Ok(true));
+        assert!(
+            matches!(result, Err(ref error) if error.kind() == io::ErrorKind::Unsupported),
+            "a readable sandbox process tree does not include host processes"
+        );
+    }
+
+    #[test]
+    fn an_observed_process_is_conclusive_inside_a_sandbox() -> io::Result<()> {
+        assert!(
+            visible_process_status(Ok(true), Ok(true))?,
+            "observed presence remains conclusive in Flatpak"
+        );
+        assert!(
+            visible_process_status(
+                Ok(true),
+                Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "marker denied"
+                )),
+            )?,
+            "an observed process does not depend on marker readability"
+        );
+        assert!(
+            !visible_process_status(Ok(false), Ok(false))?,
+            "a complete host scan can establish absence"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn an_unreadable_sandbox_marker_leaves_absence_unknown() {
+        let result = visible_process_status(
+            Ok(false),
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "marker denied",
+            )),
+        );
+        assert!(
+            matches!(result, Err(ref error) if error.kind() == io::ErrorKind::PermissionDenied),
+            "marker failure cannot certify host process visibility"
+        );
+    }
 
     #[test]
     fn a_known_absence_is_the_only_result_without_a_warning() {
-        assert!(!warning_for(Ok(false)));
-        assert!(warning_for(Ok(true)));
-        assert!(warning_for(Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
-            "process list unavailable",
-        ))));
+        assert!(
+            !warning_for(Ok(false)),
+            "known absence suppresses the warning"
+        );
+        assert!(
+            warning_for(Ok(true)),
+            "observed presence warrants a warning"
+        );
+        assert!(
+            warning_for(Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "process list unavailable",
+            ))),
+            "unknown process status warrants a warning"
+        );
     }
 }

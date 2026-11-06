@@ -15,8 +15,15 @@ on:
       - "crates/p4kx-gui/build.rs"
       - "crates/p4kx/build.rs"
       - "crates/p4kx-testkit/examples/native_fixture.rs"
+      - "packaging/linux/**"
       - "blender_addon/**"
   workflow_dispatch:
+    inputs:
+      linux-only:
+        description: Validate native Linux packages without Windows, external scans or publication
+        type: boolean
+        default: false
+        required: false
 
 permissions: {}
 
@@ -92,6 +99,7 @@ jobs:
 
   windows:
     name: Native Windows packages
+    if: github.event_name != 'workflow_dispatch' || !inputs.linux-only
     needs: prepare
     permissions:
       contents: read
@@ -102,10 +110,20 @@ jobs:
       next-msi-version: ${{ needs.prepare.outputs.next-msi-version }}
       matrix: ${{ needs.prepare.outputs.windows-matrix }}
 
+  linux:
+    name: Linux native packages and execution
+    needs: prepare
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-linux.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      matrix: ${{ needs.prepare.outputs.linux-matrix }}
+
   scan:
     name: VirusTotal scan of package assets
-    needs: windows
-    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+    needs: [prepare, windows, linux]
+    if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && !inputs.linux-only)
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     permissions:
@@ -127,13 +145,14 @@ jobs:
         timeout-minutes: 140
         env:
           VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           . .github/scripts/platform-contract.ps1
           $contract = Get-P4kxPlatformContract
           $files = @(foreach ($row in $contract.targets) {
             foreach ($package in $row.packages) {
-              $suffix = $contract.packages.$package
-              Get-ChildItem -LiteralPath assets -File | Where-Object { $_.Name.Contains("-$($row.target)") -and $_.Name.EndsWith($suffix, [StringComparison]::Ordinal) } | ForEach-Object FullName
+              $name = Get-P4kxAssetName -Target $row.target -Version $env:VERSION -Package $package
+              (Get-Item -LiteralPath "assets/$name").FullName
             }
           })
           .github/scripts/virustotal-scan.ps1 -Path $files -NotePath virustotal.md
@@ -145,7 +164,7 @@ jobs:
 
   attest:
     name: Attest (${{ matrix.target }})
-    needs: [prepare, windows]
+    needs: [prepare, windows, linux]
     if: github.ref_type == 'tag'
     strategy:
       fail-fast: false
@@ -194,8 +213,8 @@ jobs:
 
   assemble:
     name: Complete matrix, hashes and release notes
-    needs: [prepare, windows, scan, attest, attest-addon]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.windows.result == 'success' && ((needs.attest.result == 'success' && needs.attest-addon.result == 'success') || github.ref_type != 'tag') }}
+    needs: [prepare, windows, linux, scan, attest, attest-addon]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && ((needs.attest.result == 'success' && needs.attest-addon.result == 'success') || github.ref_type != 'tag') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

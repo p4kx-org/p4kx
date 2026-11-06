@@ -37,6 +37,6 @@ foreach ($row in $contract.targets) {
     $runtime = Get-Content -LiteralPath (Join-Path $AssetDirectory $name) -Raw | ConvertFrom-Json
     Assert-P4kxArchiveEvidence -Metadata $runtime -Platform $row -Revision $Revision -Compiler $compiler -Nextest $nextest
     Assert-P4kxRuntimeEvidence -Metadata $runtime -Platform $row -Version $Version -Revision $Revision
-    if ($row.os -eq 'windows') { Assert-P4kxPackageRuntime $runtime $row $AssetDirectory $Version }
+    Assert-P4kxPackageRuntime $runtime $row $AssetDirectory $Version
 }
 Write-Output 'Complete release matrix verified: 12 packages, 12 target/binary SBOMs and four native runtime proofs.'

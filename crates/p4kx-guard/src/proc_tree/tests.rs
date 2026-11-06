@@ -10,14 +10,20 @@ use super::scan;
 fn a_partial_process_list_is_unknown_without_a_match() {
     let folders = [
         Ok(PathBuf::from("1")),
-        Err(io::Error::new(io::ErrorKind::PermissionDenied, "entry unavailable")),
+        Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "entry unavailable",
+        )),
     ];
     let result = scan(folders, |_, _, bytes| {
         bytes.clear();
         bytes.extend_from_slice(b"explorer");
         Ok(true)
     });
-    assert_eq!(result.expect_err("incomplete scan").kind(), io::ErrorKind::PermissionDenied);
+    assert!(
+        matches!(result, Err(ref error) if error.kind() == io::ErrorKind::PermissionDenied),
+        "a partial enumeration does not establish absence"
+    );
 }
 
 #[test]
@@ -25,13 +31,19 @@ fn an_unreadable_process_file_makes_absence_unknown() {
     let result = scan([Ok(PathBuf::from("1"))], |path, _, bytes| {
         bytes.clear();
         if path.ends_with("comm") {
-            Err(io::Error::new(io::ErrorKind::PermissionDenied, "comm denied"))
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "comm denied",
+            ))
         } else {
             bytes.extend_from_slice(b"other\0");
             Ok(true)
         }
     });
-    assert_eq!(result.expect_err("comm unreadable").kind(), io::ErrorKind::PermissionDenied);
+    assert!(
+        matches!(result, Err(ref error) if error.kind() == io::ErrorKind::PermissionDenied),
+        "one unreadable identity source leaves absence unknown"
+    );
 }
 
 #[test]
@@ -41,7 +53,10 @@ fn a_partial_file_read_is_not_used_as_a_match() {
         bytes.extend_from_slice(b"StarCitizen.exe");
         Err(io::Error::new(io::ErrorKind::UnexpectedEof, "partial read"))
     });
-    assert_eq!(result.expect_err("partial file").kind(), io::ErrorKind::UnexpectedEof);
+    assert!(
+        matches!(result, Err(ref error) if error.kind() == io::ErrorKind::UnexpectedEof),
+        "a failed read cannot produce a conclusive process name"
+    );
 }
 
 #[test]
@@ -49,14 +64,17 @@ fn a_disappearing_process_does_not_make_absence_unknown() -> io::Result<()> {
     let result = scan([Ok(PathBuf::from("1"))], |_, _, _| {
         Err(io::Error::new(io::ErrorKind::NotFound, "process ended"))
     })?;
-    assert!(!result);
+    assert!(!result, "processes ending during enumeration are skipped");
     Ok(())
 }
 
 #[test]
 fn a_positive_match_is_conclusive_despite_other_unreadable_entries() -> io::Result<()> {
     let folders = [
-        Err(io::Error::new(io::ErrorKind::PermissionDenied, "entry unavailable")),
+        Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "entry unavailable",
+        )),
         Ok(PathBuf::from("2")),
     ];
     let result = scan(folders, |_, _, bytes| {
@@ -64,7 +82,9 @@ fn a_positive_match_is_conclusive_despite_other_unreadable_entries() -> io::Resu
         bytes.extend_from_slice(b"StarCitizen.exe");
         Ok(true)
     })?;
-    assert!(result);
+    assert!(
+        result,
+        "an observed game establishes presence despite a partial list"
+    );
     Ok(())
 }
-

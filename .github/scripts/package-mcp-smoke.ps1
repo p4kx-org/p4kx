@@ -26,8 +26,8 @@ function Receive-P4kxMcpResponse {
 }
 
 function Invoke-P4kxPackageMcpSmoke {
-    param([string]$Executable, [string]$Archive, [string]$Directory, [string]$ExpectedText)
-    $process = New-P4kxPackageProcess -Executable $Executable -Arguments @('--archive', $Archive) -Directory $Directory
+    param([string]$Executable, [string]$Archive, [string]$Directory, [string]$ExpectedText, [string[]]$ArgumentPrefix = @())
+    $process = New-P4kxPackageProcess -Executable $Executable -Arguments ($ArgumentPrefix + @('--archive', $Archive)) -Directory $Directory
     try {
         [void]$process.Start()
         $stderr = $process.StandardError.ReadToEndAsync()

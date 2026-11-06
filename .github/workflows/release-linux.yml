@@ -1,0 +1,153 @@
+name: Linux release packages
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      matrix:
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build native Linux (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.matrix) }}
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+      VERSION: ${{ inputs.version }}
+      P4KX_REQUIRE_SOFTWARE_ADAPTER: "1"
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+        with:
+          target: ${{ matrix.target }}
+          cache-key: linux-release
+          nextest: "true"
+      - name: Install native baseline, desktop, source and package dependencies
+        run: .github/scripts/install-linux-package-dependencies.ps1 -Build
+      - name: Source-bound reproducible package timestamp
+        run: |
+          $epoch = git show -s --format=%ct $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0 -or $epoch -cnotmatch '^[0-9]+$') { throw 'Source timestamp query failed.' }
+          "SOURCE_DATE_EPOCH=$epoch" >> $env:GITHUB_ENV
+      - name: Verify Linux package and ABI contracts
+        run: |
+          .github/scripts/test-linux-package-contract.ps1 -Directory target/linux-contract-check
+          python3 -B packaging/linux/runtime/test_collect_sources.py --directory target/linux-source-contract-check
+          if ($LASTEXITCODE -ne 0) { throw 'Native runtime source inventory contract failed.' }
+      - name: Build all three shipped native release applications
+        run: |
+          cargo build --release --locked --target $env:P4KX_TARGET -p p4kx -p p4kx-gui -p p4kx-mcp
+          if ($LASTEXITCODE -ne 0) { throw 'Native Linux release build failed.' }
+          $fixture = [IO.Path]::GetFullPath('target/linux-release/fixture')
+          cargo run --release --locked --target $env:P4KX_TARGET -p p4kx-testkit --example native_fixture -- $fixture
+          if ($LASTEXITCODE -ne 0) { throw 'Native fixture generation failed.' }
+      - name: Execute the native Mesa software adapter
+        id: adapter
+        run: cargo nextest run --release --locked --target $env:P4KX_TARGET -p p4kx-render --lib --no-capture --no-tests fail -E 'test(the_software_adapter_is_named)'
+      - name: Install pinned native host packaging and SBOM tools
+        run: |
+          . .github/scripts/linux-package-tools.ps1
+          Install-P4kxLinuxPackageTools -Target $env:P4KX_TARGET -Directory (Join-Path $env:RUNNER_TEMP 'linux-package-tools')
+      - name: Build the native static AppImage runtime and corresponding source
+        run: .github/scripts/build-linux-runtime.ps1 -Target $env:P4KX_TARGET -StagingDirectory target/linux-runtime-build -OutputDirectory target/linux-runtime
+      - name: Build native tar.gz, AppImage, deb and Flatpak from the release executables
+        run: |
+          $binary = "target/$env:P4KX_TARGET/release"
+          $output = 'target/linux-release/package'
+          .github/scripts/build-linux-tar.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-tar
+          .github/scripts/build-linux-appimage.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-appimage -ToolsDirectory (Join-Path $env:RUNNER_TEMP 'linux-package-tools') -RuntimeDirectory target/linux-runtime
+          .github/scripts/build-linux-deb.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-deb
+          $env:FLATPAK_USER_DIR = [IO.Path]::GetFullPath('target/linux-flatpak-installation')
+          .github/scripts/build-linux-flatpak.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-flatpak
+      - name: Target-specific application and bundled runtime SBOMs
+        run: |
+          .github/scripts/build-target-sbom.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -OutputDirectory target/linux-release/package
+          .github/scripts/enrich-linux-sbom.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory target/linux-release/package -AppDir target/linux-appimage/AppDir -RuntimeDirectory target/linux-runtime
+      - name: Bind source, native CPU, exact compiler and actual software-adapter execution
+        env:
+          ADAPTER_OUTCOME: ${{ steps.adapter.outcome }}
+        run: |
+          . .github/scripts/platform-contract.ps1
+          if ($env:ADAPTER_OUTCOME -cne 'success') { throw 'Native software adapter did not execute successfully.' }
+          New-Item -ItemType Directory -Force target/linux-release/validation | Out-Null
+          $tar = Get-P4kxAssetName -Target $env:P4KX_TARGET -Version $env:VERSION -Package tar-gz
+          .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -ArchivePath "target/linux-release/package/$tar" -BinaryDirectory "target/$env:P4KX_TARGET/release" -MetadataPath target/linux-release/validation/build.json
+          @{target=$env:P4KX_TARGET; revision=$env:GITHUB_SHA; outcome=$env:ADAPTER_OUTCOME} | ConvertTo-Json | Set-Content target/linux-release/validation/adapter.json -Encoding utf8NoBOM
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'linux-package-tools/package-tools.json') target/linux-release/validation/package-tools.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-build-${{ matrix.target }}
+          path: |
+            target/linux-release/package/*
+            target/linux-release/fixture/*
+            target/linux-release/validation/*.json
+          if-no-files-found: error
+
+  verify:
+    name: Execute native Linux packages (${{ matrix.target }})
+    needs: build
+    if: ${{ !cancelled() && needs.build.result != 'skipped' }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.matrix) }}
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+      VERSION: ${{ inputs.version }}
+      LIBGL_ALWAYS_SOFTWARE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-rust
+        with:
+          target: ${{ matrix.target }}
+          nextest: "true"
+      - name: Install native desktop and runtime dependencies
+        run: .github/scripts/install-linux-package-dependencies.ps1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-build-${{ matrix.target }}
+          path: artifacts/linux-build-${{ matrix.target }}
+      - name: Execute each real package launcher, desktop frames and Documents portal grants
+        run: |
+          $base = "artifacts/linux-build-$env:P4KX_TARGET"
+          & dbus-run-session -- xvfb-run --auto-servernum pwsh -NoProfile -File .github/scripts/check-linux-packages.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory "$base/package" -FixtureDirectory "$base/fixture" -BuildMetadata "$base/validation/build.json" -AdapterEvidence "$base/validation/adapter.json" -OutputDirectory target/linux-package-check
+          if ($LASTEXITCODE -ne 0) { throw 'Native installed Linux package execution failed.' }
+          Copy-Item "$base/validation/package-tools.json" "$base/package/P4KX-$env:VERSION-$env:P4KX_TARGET-package-tools.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: linux-package-logs-${{ matrix.target }}
+          path: |
+            target/linux-package-check/**/*.log
+            target/linux-package-check/**/*.json
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ matrix.target }}
+          path: artifacts/linux-build-${{ matrix.target }}/package/*
+          if-no-files-found: error

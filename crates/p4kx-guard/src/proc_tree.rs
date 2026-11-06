@@ -22,8 +22,16 @@ struct ProcessFile {
 }
 
 const PROCESS_FILES: [ProcessFile; 2] = [
-    ProcessFile { name: "comm", limit: COMM_LIMIT, names_game: comm_names_game },
-    ProcessFile { name: "cmdline", limit: CMDLINE_LIMIT, names_game: cmdline_names_game },
+    ProcessFile {
+        name: "comm",
+        limit: COMM_LIMIT,
+        names_game: comm_names_game,
+    },
+    ProcessFile {
+        name: "cmdline",
+        limit: CMDLINE_LIMIT,
+        names_game: cmdline_names_game,
+    },
 ];
 
 /// Returns whether a process below a proc-style root identifies the game.

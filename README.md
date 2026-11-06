@@ -137,6 +137,11 @@ replaces it. Settings and the stored Archive key survive uninstall. Older AMD64 
 their `-x86_64` names. [Windows packages](docs/windows-packages.md) defines supported-system
 evidence, runtime DLLs and installer verification.
 
+Linux v0.5.0 packages cover AMD64 and ARM64 as tar.gz, AppImage, deb and Flatpak, each containing
+the GUI, CLI and MCP server. Native tar.gz/AppImage/deb require Ubuntu 24.04 / glibc 2.39;
+Flatpak uses Freedesktop Platform 25.08. See [Linux packages](docs/linux-packages.md) for
+installation, AppImage CLI/MCP dispatch, sandbox grants, source notices and native verification.
+
 ## First run: the Archive key
 
 Start `p4kx-gui` and pick a Channel in the sidebar, drop a `Data.p4k` on the window, or use
@@ -196,8 +201,8 @@ cargo build --release
 .\target\release\p4kx.exe list "C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Data.p4k"
 ```
 
-The release build produces `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe`. The code is platform
-neutral and CI also builds it on Linux, but only Windows is shipped.
+The release build produces `p4kx-gui`, `p4kx` and `p4kx-mcp`, with `.exe` on Windows.
+The v0.5.0 package contract requires native execution evidence for both CPUs on both systems.
 
 ## Contributing
 

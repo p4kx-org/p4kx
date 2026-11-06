@@ -121,6 +121,10 @@ The [native platform contract](docs/supported-platforms.md) drives all four targ
 test archives and release preflight. Run the PowerShell platform/evidence regression scripts when
 changing their contracts, and preserve the recorded distinction between native synthetic checks
 and physical device verification.
+Linux packaging additionally uses the declared Ubuntu 24.04 / glibc 2.39 baseline, native
+AppImage runtime source builds and fresh native package consumers. Run
+`test-linux-package-contract.ps1` and the source-collector tests when changing their boundaries;
+the [Linux package guide](docs/linux-packages.md) describes the complete evidence and source contract.
 
 On Linux the audio preview builds against the ALSA headers: `sudo apt-get install
 libasound2-dev` (Debian and Ubuntu; CI installs the same package). PipeWire and PulseAudio need

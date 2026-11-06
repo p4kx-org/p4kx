@@ -13,14 +13,22 @@ fn output(success: bool, stdout: &[u8]) -> ProbeOutput {
     }
 }
 
+fn failure(result: io::Result<bool>) -> io::Result<io::Error> {
+    result
+        .err()
+        .ok_or_else(|| io::Error::other("expected an unknown process status"))
+}
+
 #[test]
 fn qprocess_success_does_not_launch_the_fallback() -> io::Result<()> {
     for (text, expected) in [
         (b"user console 1 4242 StarCitizen.exe\r\n".as_slice(), true),
         (b"HEADER\r\n".as_slice(), false),
     ] {
-        let result = check(Ok(output(true, text)), || panic!("unexpected fallback"))?;
-        assert_eq!(result, expected);
+        let result = check(Ok(output(true, text)), || {
+            Err(io::Error::other("unexpected fallback"))
+        })?;
+        assert_eq!(result, expected, "a successful query is conclusive");
     }
     Ok(())
 }
@@ -33,7 +41,11 @@ fn missing_qprocess_uses_a_valid_count() -> io::Result<()> {
         (b"123".as_slice(), true),
     ] {
         let missing = io::Error::new(io::ErrorKind::NotFound, "qprocess absent");
-        assert_eq!(check(Err(missing), || Ok(output(true, text)))?, expected);
+        assert_eq!(
+            check(Err(missing), || Ok(output(true, text)))?,
+            expected,
+            "a valid fallback count establishes the process status"
+        );
     }
     Ok(())
 }
@@ -44,8 +56,14 @@ fn unsuccessful_qprocess_including_no_match_requires_the_fallback() -> io::Resul
         b"No Process exists for StarCitizen.exe".as_slice(),
         b"query failed".as_slice(),
     ] {
-        assert!(!check(Ok(output(false, text)), || Ok(output(true, b"0")))?);
-        assert!(check(Ok(output(false, text)), || Ok(output(true, b"1")))?);
+        assert!(
+            !check(Ok(output(false, text)), || Ok(output(true, b"0")))?,
+            "a successful zero fallback establishes absence"
+        );
+        assert!(
+            check(Ok(output(false, text)), || Ok(output(true, b"1")))?,
+            "a successful positive fallback establishes presence"
+        );
     }
     Ok(())
 }
@@ -53,40 +71,65 @@ fn unsuccessful_qprocess_including_no_match_requires_the_fallback() -> io::Resul
 #[test]
 fn qprocess_io_failure_can_be_resolved_by_the_fallback() -> io::Result<()> {
     let denied = io::Error::new(io::ErrorKind::PermissionDenied, "qprocess denied");
-    assert!(!check(Err(denied), || Ok(output(true, b"0")))?);
+    assert!(
+        !check(Err(denied), || Ok(output(true, b"0")))?,
+        "a failed first command does not override a conclusive fallback"
+    );
     Ok(())
 }
 
 #[test]
-fn both_missing_commands_preserve_the_unknown_reason() {
-    let result = check(
+fn both_missing_commands_preserve_the_unknown_reason() -> io::Result<()> {
+    let error = failure(check(
         Err(io::Error::new(io::ErrorKind::NotFound, "qprocess absent")),
         || Err(io::Error::new(io::ErrorKind::NotFound, "PowerShell absent")),
+    ))?;
+    assert_eq!(
+        error.kind(),
+        io::ErrorKind::NotFound,
+        "the final I/O reason is typed"
     );
-    let error = result.expect_err("both commands are unavailable");
-    assert_eq!(error.kind(), io::ErrorKind::NotFound);
-    assert!(error.to_string().contains("qprocess absent"));
-    assert!(error.to_string().contains("PowerShell absent"));
+    assert!(
+        error.to_string().contains("qprocess absent"),
+        "the first failure is retained"
+    );
+    assert!(
+        error.to_string().contains("PowerShell absent"),
+        "the second failure is retained"
+    );
+    Ok(())
 }
 
 #[test]
-fn an_unsuccessful_fallback_is_unknown_even_with_a_zero_count() {
-    let result = check(Ok(output(false, b"")), || Ok(output(false, b"0")));
-    let error = result.expect_err("failure is not a process count");
-    assert_eq!(error.kind(), io::ErrorKind::Other);
-    assert!(error.to_string().contains("command failed"));
+fn an_unsuccessful_fallback_is_unknown_even_with_a_zero_count() -> io::Result<()> {
+    let error = failure(check(Ok(output(false, b"")), || Ok(output(false, b"0"))))?;
+    assert_eq!(
+        error.kind(),
+        io::ErrorKind::Other,
+        "a failed command is not absence"
+    );
+    assert!(
+        error.to_string().contains("command failed"),
+        "the command error is retained"
+    );
+    Ok(())
 }
 
 #[test]
-fn a_fallback_io_error_is_unknown() {
-    let result = check(Ok(output(false, b"")), || {
+fn a_fallback_io_error_is_unknown() -> io::Result<()> {
+    let error = failure(check(Ok(output(false, b"")), || {
         Err(io::Error::new(io::ErrorKind::PermissionDenied, "denied"))
-    });
-    assert_eq!(result.expect_err("unreadable output").kind(), io::ErrorKind::PermissionDenied);
+    }))?;
+    assert_eq!(
+        error.kind(),
+        io::ErrorKind::PermissionDenied,
+        "the fallback cannot establish absence"
+    );
+    Ok(())
 }
 
 #[test]
-fn malformed_and_overflowing_counts_are_unknown() {
+fn malformed_and_overflowing_counts_are_unknown() -> io::Result<()> {
     for text in [
         b"".as_slice(),
         b"error".as_slice(),
@@ -95,7 +138,12 @@ fn malformed_and_overflowing_counts_are_unknown() {
         b"1\n0".as_slice(),
         &[0xff],
     ] {
-        let result = check(Ok(output(false, b"")), || Ok(output(true, text)));
-        assert_eq!(result.expect_err("invalid count").kind(), io::ErrorKind::InvalidData);
+        let error = failure(check(Ok(output(false, b"")), || Ok(output(true, text))))?;
+        assert_eq!(
+            error.kind(),
+            io::ErrorKind::InvalidData,
+            "malformed counts are not zero"
+        );
     }
+    Ok(())
 }

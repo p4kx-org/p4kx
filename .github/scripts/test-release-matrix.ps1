@@ -30,13 +30,33 @@ foreach ($row in $contract.targets) {
         $sbom | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Directory $name) -Encoding utf8NoBOM
     }
     $proof = New-P4kxTestEvidence -Platform $row -Version $version -Revision $revision -Compiler $compiler -Nextest $nextest
-    if ($row.os -eq 'windows') {
+    if ($row.os -in @('windows', 'linux')) {
         $smokes = @(foreach ($package in $row.packages) {
             $asset = Get-P4kxAssetName -Target $row.target -Version $version -Package $package
-            [ordered]@{
+            $smoke = [ordered]@{
                 target=$row.target; package=$package; binaries=$proof.binaries; runtime=$proof.runtime
                 archive_sha256=(Get-FileHash (Join-Path $Directory $asset) -Algorithm SHA256).Hash.ToLowerInvariant()
             }
+            if ($row.os -eq 'linux') {
+                $elf = @($proof.binaries | ConvertTo-Json -Depth 6 | ConvertFrom-Json)
+                foreach ($image in $elf) { $image | Add-Member -NotePropertyName text_sha256 -NotePropertyValue ('e' * 64) }
+                $smoke.producer = [ordered]@{
+                    schema=1; target=$row.target; package=$package; version=$version; revision=$revision
+                    compiler=$compiler; nextest=$nextest; binaries=$elf; source_binaries=$elf; transformations=@()
+                    minimum_distribution='Ubuntu 24.04'; archive_sha256=$smoke.archive_sha256
+                }
+                if ($package -eq 'app-image') {
+                    $sourceName = "P4KX-$version-$($row.target)-appimage-corresponding-source.tar.gz"
+                    Set-Content -LiteralPath (Join-Path $Directory $sourceName) -Value 'synthetic corresponding source' -Encoding utf8NoBOM
+                    $smoke.producer.corresponding_source = @{
+                        name=$sourceName; sha256=(Get-FileHash -LiteralPath (Join-Path $Directory $sourceName) -Algorithm SHA256).Hash.ToLowerInvariant()
+                    }
+                }
+                if ($package -eq 'flatpak') {
+                    $smoke.documents = @{target=$row.target; revision=$revision; read_only_archive='success'; writable_export='success'; game_alias_refusal='success'; source_unchanged='success'}
+                }
+            }
+            $smoke
         })
         $proof | Add-Member -NotePropertyName package_smokes -NotePropertyValue $smokes
     }
@@ -62,6 +82,31 @@ foreach ($mutation in @(
     if (-not $rejected) { throw 'Incomplete or mismatched executed package evidence was accepted.' }
 }
 $originalProof | Set-Content -LiteralPath $windowsProofPath -Encoding utf8NoBOM
+$linux = @($contract.targets | Where-Object os -EQ linux)[0]
+$linuxProofPath = Join-Path $Directory "P4KX-$version-$($linux.target)-runtime.json"
+$linuxOriginal = Get-Content -LiteralPath $linuxProofPath -Raw
+$transformed = $linuxOriginal | ConvertFrom-Json
+$appImage = @($transformed.package_smokes | Where-Object package -CEQ 'app-image')[0]
+$appImage.binaries[0].sha256 = 'f' * 64
+$appImage.producer.binaries[0].sha256 = 'f' * 64
+$transformed | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $linuxProofPath -Encoding utf8NoBOM
+& $validator -AssetDirectory $Directory -Version $version -Revision $revision | Out-Null
+foreach ($mutation in @(
+    { param($proof) $proof.package_smokes[0].producer.binaries[0].text_sha256 = 'f' * 64 },
+    { param($proof) $proof.package_smokes[0].producer.source_binaries[0].sha256 = 'f' * 64 },
+    { param($proof) $proof.package_smokes[0].producer.package = 'app-image' },
+    { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'app-image').producer.corresponding_source.sha256 = 'f' * 64 },
+    { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'flatpak').documents.game_alias_refusal = 'skipped' },
+    { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'flatpak').documents.revision = 'f' * 40 }
+)) {
+    $changed = $linuxOriginal | ConvertFrom-Json
+    & $mutation $changed
+    $changed | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $linuxProofPath -Encoding utf8NoBOM
+    $rejected = $false
+    try { & $validator -AssetDirectory $Directory -Version $version -Revision $revision | Out-Null } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Changed Linux code/source identity or missing portal execution evidence was accepted.' }
+}
+$linuxOriginal | Set-Content -LiteralPath $linuxProofPath -Encoding utf8NoBOM
 $row = $contract.targets[1]
 $packageName = Get-P4kxAssetName -Target $row.target -Version $version -Package $row.packages[0]
 $packagePath = Join-Path $Directory $packageName

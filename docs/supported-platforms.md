@@ -88,6 +88,10 @@ Windows runtime evidence additionally covers both the portable ZIP and installed
 with package hashes and the exact release EXE hashes. Missing, skipped or mismatched packaged
 runtime evidence fails preflight. [Windows packages](windows-packages.md) describes lifecycle,
 rollback and CPU replacement verification.
+Linux runtime evidence covers all four actual package launchers and retains post-transformation
+ELF hashes with unchanged source `.text` hashes, plus Flatpak runtime/app OSTree identity and
+Documents-portal grants. [Linux packages](linux-packages.md) defines the Ubuntu 24.04 / glibc 2.39
+host baseline, separate Freedesktop 25.08 runtime, source/relink artifacts and permission policy.
 Packaging checks, signatures, scans, provenance and the full export/device audit remain required
 parts of the final release gate.
 
