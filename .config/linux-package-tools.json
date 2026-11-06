@@ -45,6 +45,33 @@
         "url": "https://github.com/vasi/squashfuse/archive/0.5.2.tar.gz",
         "sha256": "db0238c5981dabbd80ee09ae15387f390091668ca060a7bc38047912491443d3"
       }
-    ]
+    ],
+    "recipe_archives": {
+      "0436c6d655a04cbfd7987202a970f5aa7870a901": {
+        "url": "https://gitlab.alpinelinux.org/api/v4/projects/alpine%2Faports/repository/archive.tar.gz?sha=0436c6d655a04cbfd7987202a970f5aa7870a901",
+        "sha256": "920cc2abb5787c04c5072c489771f2128c2957962ff7de2ffdb69c9c2ba26049",
+        "archive_root": "aports-0436c6d655a04cbfd7987202a970f5aa7870a901-0436c6d655a04cbfd7987202a970f5aa7870a901"
+      },
+      "254024f3b0572339fd24fae8865a4e313239ba71": {
+        "url": "https://github.com/alpinelinux/aports/archive/254024f3b0572339fd24fae8865a4e313239ba71.tar.gz",
+        "sha256": "a884a6785cbc0cbeffbf9fb4a970f8835efc27419a7d8dc15a72cadd3efb3ee8",
+        "archive_root": "aports-254024f3b0572339fd24fae8865a4e313239ba71"
+      },
+      "3c6e2ee2b16f403d53eab39c4426eb61f003c322": {
+        "url": "https://github.com/alpinelinux/aports/archive/3c6e2ee2b16f403d53eab39c4426eb61f003c322.tar.gz",
+        "sha256": "819f75ff266145a14d916546122a26907384cc610ff46caf1905a208dc700f16",
+        "archive_root": "aports-3c6e2ee2b16f403d53eab39c4426eb61f003c322"
+      },
+      "7fa6e7fd3465c5ff89cc33a56d20bf4d59105aaf": {
+        "url": "https://github.com/alpinelinux/aports/archive/7fa6e7fd3465c5ff89cc33a56d20bf4d59105aaf.tar.gz",
+        "sha256": "f7ecc4754608f4e1cc0beef2a96900910ff84af75421879f175c8adb353a541c",
+        "archive_root": "aports-7fa6e7fd3465c5ff89cc33a56d20bf4d59105aaf"
+      },
+      "fd05fc094264bce4fb76efc6c7f61ba4abfcb609": {
+        "url": "https://gitlab.alpinelinux.org/api/v4/projects/alpine%2Faports/repository/archive.tar.gz?sha=fd05fc094264bce4fb76efc6c7f61ba4abfcb609",
+        "sha256": "bb5fa80359d7cca5aa1d5911f53884e4a93d210e94907c58791b9a59e954b8c3",
+        "archive_root": "aports-fd05fc094264bce4fb76efc6c7f61ba4abfcb609-fd05fc094264bce4fb76efc6c7f61ba4abfcb609"
+      }
+    }
   }
 }

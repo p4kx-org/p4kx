@@ -24,6 +24,13 @@ function Get-P4kxLinuxTools {
                 $package.url -cnotmatch '^https://dl-cdn\.alpinelinux\.org/alpine/v3\.23/') {
                 throw 'Static runtime library input identity is invalid.'
             }
+            $recipe = $tools.runtime.recipe_archives.($package.recipe_commit)
+            $commit = $package.recipe_commit
+            $urls = @("https://github.com/alpinelinux/aports/archive/$commit.tar.gz", "https://gitlab.alpinelinux.org/api/v4/projects/alpine%2Faports/repository/archive.tar.gz?sha=$commit")
+            if (-not $recipe -or $recipe.url -cnotin $urls -or $recipe.sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+                $recipe.archive_root -cnotin @("aports-$commit", "aports-$commit-$commit")) {
+                throw 'Static runtime recipe source archive is not pinned to the exact official commit.'
+            }
         }
     }
     $tools.runtime | Add-Member -NotePropertyName libraries -NotePropertyValue $libraries

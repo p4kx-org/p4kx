@@ -4,7 +4,7 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import subprocess
@@ -74,7 +74,22 @@ def archive_source(dependency, sources, licences):
     return {**dependency, "source_sha256": source_digest, "licences": notices}
 
 
-def alpine_source(origin, packages, sources, licences):
+def recipe_source(commit, recipes):
+    """Requires an exact official archive URL, root and digest for a recipe commit."""
+    reference = recipes.get(commit)
+    urls = {
+        f"https://github.com/alpinelinux/aports/archive/{commit}.tar.gz",
+        f"https://gitlab.alpinelinux.org/api/v4/projects/alpine%2Faports/repository/archive.tar.gz?sha={commit}",
+    }
+    roots = {f"aports-{commit}", f"aports-{commit}-{commit}"}
+    if not reference or reference.get("url") not in urls or reference.get("archive_root") not in roots:
+        raise ValueError(f"unlocked Alpine recipe archive: {commit}")
+    if not re.fullmatch(r"[0-9a-f]{64}", reference.get("sha256", "")):
+        raise ValueError(f"invalid Alpine recipe digest: {commit}")
+    return reference
+
+
+def alpine_source(origin, packages, sources, licences, recipes):
     """Collects installed static library sources using their signed package recipe commits."""
     installed = [entry for entry in packages if entry.get("o") == origin]
     identities = {(entry.get("V"), entry.get("c")) for entry in installed}
@@ -86,18 +101,23 @@ def alpine_source(origin, packages, sources, licences):
     directory = sources / origin
     directory.mkdir()
     archive = directory / "aports.tar.gz"
-    recipe_url = f"https://gitlab.alpinelinux.org/alpine/aports/-/archive/{commit}/aports-{commit}.tar.gz"
-    recipe_archive_digest = download(recipe_url, archive)
+    reference = recipe_source(commit, recipes)
+    recipe_url = reference["url"]
+    recipe_archive_digest = download(recipe_url, archive, reference["sha256"])
     with tarfile.open(archive) as tar:
-        recipes = [member for member in tar.getmembers() if member.name.endswith(f"/{origin}/APKBUILD")]
-        if len(recipes) != 1:
+        members = tar.getmembers()
+        root = reference["archive_root"]
+        if any(member.name != root and not member.name.startswith(root + "/") for member in members):
+            raise ValueError(f"Alpine source archive root mismatch: {commit}")
+        matches = [member for member in members if member.name.endswith(f"/{origin}/APKBUILD")]
+        if len(matches) != 1:
             raise ValueError(f"ambiguous Alpine recipe: {origin}")
-        prefix = str(Path(recipes[0].name).parent) + "/"
-        selected = [member for member in tar.getmembers() if member.name.startswith(prefix)]
+        prefix = PurePosixPath(matches[0].name).parent.as_posix() + "/"
+        selected = [member for member in members if member.name.startswith(prefix)]
         unpacked = directory / "recipe"
         unpacked.mkdir()
         tar.extractall(unpacked, members=selected, filter="data")
-    recipe = unpacked / Path(recipes[0].name).parent
+    recipe = unpacked / Path(matches[0].name).parent
     environment = dict(os.environ, SRCDEST=str(directory / "distfiles"))
     subprocess.run(["abuild", "-F", "fetch", "verify", "unpack"], cwd=recipe, env=environment, check=True)
     notices = copy_licences(recipe / "src", licences / origin)
@@ -164,7 +184,7 @@ def main():
         if entry["V"] != reference["version"] or entry["c"] != reference["recipe_commit"]:
             raise ValueError(f"installed static dependency differs from its lock: {entry['P']}")
     origins = sorted({entry["origin"] for entry in locked})
-    dependencies += [alpine_source(name, selected, sources, licences) for name in origins]
+    dependencies += [alpine_source(name, selected, sources, licences, inputs["recipe_archives"]) for name in origins]
     archives = linked_archives(arguments.upstream, packages, expected)
     inventory = {
         "runtime_source_commit": inputs["source_commit"],

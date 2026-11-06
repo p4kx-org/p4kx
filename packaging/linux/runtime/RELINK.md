@@ -5,6 +5,8 @@ its static library source archives, original licence files, distribution build r
 and the exact signed APK inputs. `inputs.json` and `runtime-inventory.json` record source commits,
 versions and hashes. The APKs contain the original library archives and headers; their
 corresponding sources and Alpine recipes are alongside them.
+The recipe archives use Alpine's official GitHub mirror or public GitLab repository API, with
+the exact signed-package recipe commit, archive root and SHA-256 pinned in `inputs.json`.
 
 `type2-runtime/src/runtime/Makefile` contains the complete compiler and static linker command.
 The runtime source is MIT-licensed. Each library's original notices are under `licences/`;

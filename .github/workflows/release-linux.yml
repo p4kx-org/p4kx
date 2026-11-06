@@ -122,16 +122,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-build-${{ matrix.target }}
+          path: artifacts/linux-build-${{ matrix.target }}
       - uses: ./.github/actions/install-rust
         with:
           target: ${{ matrix.target }}
           nextest: "true"
       - name: Install native desktop and runtime dependencies
         run: .github/scripts/install-linux-package-dependencies.ps1
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: linux-build-${{ matrix.target }}
-          path: artifacts/linux-build-${{ matrix.target }}
       - name: Execute each real package launcher, desktop frames and Documents portal grants
         run: |
           $base = "artifacts/linux-build-$env:P4KX_TARGET"
