@@ -56,6 +56,10 @@ fn mission_properties() -> Vec<TestStruct> {
             .field("value", pointer("BaseMissionPropertyValue")),
         TestStruct::new("BaseMissionPropertyValue"),
         TestStruct::new("MissionPropertyValue_Object").parent("BaseMissionPropertyValue"),
+        TestStruct::new("MissionPropertyValue_Boolean")
+            .parent("BaseMissionPropertyValue")
+            .field("value", TestType::Bool),
+        TestStruct::new("MissionPropertyValue_Unknown").parent("BaseMissionPropertyValue"),
         TestStruct::new("MissionPropertyValue_ScopedLocation")
             .parent("BaseMissionPropertyValue")
             .field("factionFilter", pointer("LocationCondition_FactionBase"))
@@ -187,12 +191,18 @@ fn contracts() -> Vec<TestStruct> {
             .field("contractParams", class("ContractParamOverrides"))
             .array("contracts", class("CareerContract")),
         TestStruct::new("ContractParamOverrides")
-            .array("propertyOverrides", class("MissionProperty")),
+            .array("propertyOverrides", pointer("MissionProperty")),
         TestStruct::new("CareerContract")
             .field("id", TestType::Guid)
             .field("debugName", TestType::String)
             .field("template", TestType::Reference)
             .field("missionBrokerEntry", TestType::Reference)
-            .field("paramOverrides", class("ContractParamOverrides")),
+            .field("paramOverrides", class("ContractParamOverrides"))
+            .array("subContracts", class("SubContract")),
+        TestStruct::new("SubContract")
+            .field("id", TestType::Guid)
+            .field("debugName", TestType::String)
+            .field("paramOverrides", pointer("ContractParamOverrides"))
+            .array("propertyOverrides", pointer("MissionProperty")),
     ]
 }

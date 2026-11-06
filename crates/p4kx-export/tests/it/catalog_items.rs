@@ -345,6 +345,7 @@ fn every_kind_states_its_completeness() -> TestResult {
             "missionBrokerEntries": {"status": "complete"},
             "contractNpcSpawns": {"status": "complete"},
             "contractEntitySpawns": {"status": "complete"},
+            "missionPropertySets": {"status": "complete"},
             "lootTables": {"status": "complete"},
             "lootArchetypes": {"status": "complete"},
             "lootPoolFilters": {"status": "complete"},

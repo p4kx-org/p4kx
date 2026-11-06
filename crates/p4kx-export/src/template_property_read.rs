@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::StructValue;
+use p4kx_extraction::{StructValue, Value};
 
 use crate::blueprint::as_struct;
 use crate::broker_terms::mission_reward;
@@ -11,6 +11,8 @@ use crate::contract::LocalisedText;
 use crate::contract_template::TemplateProperty;
 use crate::mission_hauling::value_requirements;
 use crate::mission_layers::{items, key, one};
+use crate::mission_property_fields as source_fields;
+use crate::mission_property_set::MissionPropertyDeclaration;
 use crate::npc_spawn_read::ai_name;
 use crate::record_fields::{boolean, integer, number, reference, structs, text};
 use crate::record_read::ReadError;
@@ -58,6 +60,32 @@ impl<'r, 'x, 'f> PropertyReader<'r, 'x, 'f> {
 }
 
 impl<'f> PropertyReader<'_, '_, 'f> {
+    /// Reads ordered source declarations without normalising empty variable or token strings.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-field or strict value error instead of dropping a declaration.
+    pub(crate) fn source_properties(
+        &self,
+        values: &[Value<'f>],
+    ) -> Result<Vec<Option<MissionPropertyDeclaration<'f>>>, ReadError> {
+        values
+            .iter()
+            .map(|value| {
+                let Some(property) = source_fields::structure(value, "propertyOverrides[]")? else {
+                    return Ok(None);
+                };
+                let value = source_fields::parameter(property, "value")?;
+                Ok(Some(MissionPropertyDeclaration {
+                    variable: source_fields::text(property, "missionVariableName")?,
+                    token: source_fields::text(property, "extendedTextToken")?,
+                    value_type: value.map(|value| value_type(value).to_owned()),
+                    value: value.map(|value| self.value(value)).transpose()?,
+                }))
+            })
+            .collect()
+    }
+
     /// Reads the mission properties the array field `field` of `root` holds (the
     /// `contractProperties` of a template, the `properties` of a broker entry): the variable, the
     /// token and the value of each.

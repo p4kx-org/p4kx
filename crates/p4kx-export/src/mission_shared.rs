@@ -7,6 +7,7 @@ use crate::contract_facts::ContractFacts;
 use crate::contract_missions::{ContractFaction, PickupPlace, ReputationGain};
 use crate::contract_offer::{BlueprintReward, GiverFaction, OfferedAt};
 use crate::contract_reward::{FixedReward, fixed_rewards};
+use crate::guid_text::CatalogGuid;
 use crate::mission_blueprints::{Overrides, blueprint_rewards};
 use crate::mission_cooldown::CooldownDefaults;
 use crate::mission_facts::SharedFacts;
@@ -24,6 +25,7 @@ pub(crate) struct Found<'f> {
     pub(crate) offered_at: OfferedAt<'f>,
     pub(crate) facts: ContractFacts,
     pub(crate) spawns: Resolved,
+    pub(crate) property_set_guids: Vec<CatalogGuid>,
 }
 
 /// What the entries of one contract share: the standing it requires, the cooldown defaults of its

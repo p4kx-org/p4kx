@@ -105,6 +105,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) contract_npc_spawns: KindCompleteness<'a>,
     /// The completeness of `contractEntitySpawns`.
     pub(crate) contract_entity_spawns: KindCompleteness<'a>,
+    /// The completeness of `missionPropertySets`.
+    pub(crate) mission_property_sets: KindCompleteness<'a>,
     /// The completeness of `shipStoreSlugs`.
     pub(crate) ship_store_slugs: KindCompleteness<'a>,
 }
@@ -160,6 +162,7 @@ impl<'a> Completeness<'a> {
             mission_broker_entries: completeness,
             contract_npc_spawns: completeness,
             contract_entity_spawns: completeness,
+            mission_property_sets: completeness,
             ship_store_slugs: completeness,
         }
     }

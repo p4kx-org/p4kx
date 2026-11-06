@@ -716,6 +716,12 @@ schedule, reward and requirements; a contract names it by `brokerEntryGuid`
 (`missionBrokerEntries`, ADR-0320).
 _Avoid_: mission offer, board entry
 
+**Mission property set**:
+One authored collection of mission declarations at a handler, contract or sub-contract of a
+Generator, shared by the contract rows that refer to that source position. It preserves the
+declarations without choosing their runtime values (`missionPropertySets`, ADR-0345).
+_Avoid_: effective properties, resolved location
+
 **Export**:
 A structured file derived from DataForge for another tool, as opposed to an Extraction of Entries.
 _Avoid_: dump

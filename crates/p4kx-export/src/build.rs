@@ -284,6 +284,7 @@ fn assemble<R>(
         mission_broker_entries: collected.mission_broker_entries,
         contract_npc_spawns: collected.contract_npc_spawns,
         contract_entity_spawns: collected.contract_entity_spawns,
+        mission_property_sets: collected.mission_property_sets,
         ship_store_slugs: resolved.exported,
         item_recovery: rules,
     };

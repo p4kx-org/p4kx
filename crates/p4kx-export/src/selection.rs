@@ -152,11 +152,13 @@ pub enum Kind {
     ContractNpcSpawns,
     /// Contract entity spawns: the distinct entity spawn descriptions. Derived, so no rule either.
     ContractEntitySpawns,
+    /// Authored Generator property arrays, shared by all contract rows that reference them.
+    MissionPropertySets,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 47] = [
+    pub const ALL: [Self; 48] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -204,6 +206,7 @@ impl Kind {
         Self::MissionBrokerEntries,
         Self::ContractNpcSpawns,
         Self::ContractEntitySpawns,
+        Self::MissionPropertySets,
     ];
 
     /// Returns the name of the kind's array in the catalog, e.g. `manufacturers`.
@@ -257,6 +260,7 @@ impl Kind {
             Self::MissionBrokerEntries => "missionBrokerEntries",
             Self::ContractNpcSpawns => "contractNpcSpawns",
             Self::ContractEntitySpawns => "contractEntitySpawns",
+            Self::MissionPropertySets => "missionPropertySets",
         }
     }
 }

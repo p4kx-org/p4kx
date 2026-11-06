@@ -34,6 +34,7 @@ pub(crate) fn add_contracts<'f>(
         options.cancel,
     )?;
     collected.add_contracts(missions.contracts, missions.skipped, missions.failures);
+    collected.mission_property_sets = missions.property_sets.into_rows();
     let ContractTemplates {
         read,
         pools: template_pools,

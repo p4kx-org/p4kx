@@ -2061,6 +2061,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `missionLocationTemplates`."
         },
+        "missionPropertySets": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `missionPropertySets`."
+        },
         "missionTypes": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `missionTypes`."
@@ -2153,6 +2157,7 @@
         "missionBrokerEntries",
         "missionLocalities",
         "missionLocationTemplates",
+        "missionPropertySets",
         "missionTypes",
         "paints",
         "qualityDistributions",
@@ -2554,6 +2559,13 @@
           },
           "type": "array"
         },
+        "propertySetGuids": {
+          "description": "Authored handler, contract and sub-contract property sets in that source-level order.",
+          "items": {
+            "$ref": "#/$defs/Guid"
+          },
+          "type": "array"
+        },
         "recordGuid": {
           "$ref": "#/$defs/Guid",
           "description": "The GUID of the `ContractGenerator` Record that holds the contract."
@@ -2672,6 +2684,7 @@
         "personalCooldownTime",
         "personalCooldownTimeVariation",
         "pickupPlaces",
+        "propertySetGuids",
         "recordGuid",
         "recordPath",
         "reputationGains",
@@ -8771,6 +8784,121 @@
       ],
       "type": "object"
     },
+    "MissionPropertyDeclaration": {
+      "description": "A mission property's authored declaration within one canonical source set.",
+      "properties": {
+        "token": {
+          "description": "The exact source `extendedTextToken`, including an empty string.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyValue"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The complete typed value, null for an absent or null value pointer."
+        },
+        "valueType": {
+          "description": "The concrete source value type without its `MissionPropertyValue_` prefix.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variable": {
+          "description": "The exact source `missionVariableName`, including an empty string.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "token",
+        "value",
+        "valueType",
+        "variable"
+      ],
+      "type": "object"
+    },
+    "MissionPropertyLevel": {
+      "description": "The authored source level of a Generator property array.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "The handler's `contractParams`.",
+          "value": "handler"
+        },
+        {
+          "description": "The contract's `paramOverrides`.",
+          "value": "contract"
+        },
+        {
+          "description": "The sub-contract's `paramOverrides` or direct fallback declarations.",
+          "value": "subContract"
+        }
+      ]
+    },
+    "MissionPropertySet": {
+      "description": "One authored `propertyOverrides` array, identified independently of its mutable payload.",
+      "properties": {
+        "guid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The stable identifier derived from source Record GUID and authored location."
+        },
+        "level": {
+          "$ref": "#/$defs/MissionPropertyLevel",
+          "description": "The authoring level, without resolving which declaration wins at runtime."
+        },
+        "properties": {
+          "description": "Declarations in source order, retaining null pointer elements.",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/MissionPropertyDeclaration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "recordGuid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The original owning Record GUID."
+        },
+        "recordPath": {
+          "description": "The original owning Record path, without .xml.",
+          "type": "string"
+        },
+        "sourceLocation": {
+          "description": "The canonical location of the authored `propertyOverrides` array within its Record.",
+          "type": "string"
+        },
+        "sourceType": {
+          "description": "The original owning Record struct.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "guid",
+        "level",
+        "properties",
+        "recordGuid",
+        "recordPath",
+        "sourceLocation",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "MissionReward": {
       "description": "The `missionReward` of an entry, as stored.",
       "properties": {
@@ -14805,6 +14933,13 @@
       },
       "type": "array"
     },
+    "missionPropertySets": {
+      "description": "Canonical authored mission-property sets, ordered by stable source identifier.",
+      "items": {
+        "$ref": "#/$defs/MissionPropertySet"
+      },
+      "type": "array"
+    },
     "missionTypes": {
       "description": "The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID.",
       "items": {
@@ -14953,6 +15088,7 @@
     "missionBrokerEntries",
     "missionLocalities",
     "missionLocationTemplates",
+    "missionPropertySets",
     "missionTypes",
     "paints",
     "qualityDistributions",

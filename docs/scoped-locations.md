@@ -2,7 +2,9 @@
 
 Catalog schema version 3 exports `MissionPropertyValue_ScopedLocation` as a
 `PropertyValue` with `"type": "scopedLocation"`. It is available in template
-`contractProperties`, objective property values and broker `missionProperties`.
+`contractProperties`, objective property values, broker `missionProperties` and the authored
+Generator overrides in [`missionPropertySets`](mission-property-sets.md). Contract rows reference
+the Generator sets through ordered `propertySetGuids` without duplicating their payloads.
 Derived contract texts use the established LOCATION placeholder; the exporter does not choose
 a final location or evaluate the game rules.
 
@@ -97,8 +99,9 @@ location is invented for unresolved targets.
 The synthetic Archive tests cover all 19 concrete variants, the six independently nullable
 families, declared schema alternatives, raw future enum names, singular/plural links, empty and
 ordered/repeated/null list members, dangling definition GUIDs, owner-scoped weak links and
-unreadable source payloads. Template, broker, objective and derived-contract entrypoints are
-exercised with the same source mapper.
+unreadable source payloads. Template, broker, objective and Generator source-set entrypoints are
+exercised with the same source mapper. Generator tests assert actual filter values at handler,
+contract and sub-contract levels, the canonical joins and bounded fanout.
 
 `cargo test -p p4kx-export --test it --locked scoped_location` runs these cases. They compare
 the emitted JSON and runtime-generated catalog schema, rather than merely proving that generic

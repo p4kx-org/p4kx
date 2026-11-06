@@ -130,6 +130,8 @@ pub(crate) struct ContractEntry<'a> {
     /// The location queries the contract states, resolved like `shipSpawns`. The game runs a
     /// query when the mission starts; the catalog does not.
     pub(crate) location_queries: Vec<LocationQueryLink>,
+    /// Authored handler, contract and sub-contract property sets in that source-level order.
+    pub(crate) property_set_guids: Vec<CatalogGuid>,
     /// The `ContractPrerequisite_LocationProperty` prerequisites of handler, contract and sub
     /// contract, in that order and as stored: the contract is offered at the location the named
     /// variable of `locationQueries` resolves to. On LIVE four contracts (the North Rock PVP

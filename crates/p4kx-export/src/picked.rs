@@ -141,6 +141,7 @@ impl<'f> Picked<'f> {
             | Kind::ContractLocationQueries
             | Kind::ContractNpcSpawns
             | Kind::ContractEntitySpawns
+            | Kind::MissionPropertySets
             | Kind::ContractTemplates
             | Kind::MissionBrokerEntries
             | Kind::HarvestableProviderPresets

@@ -175,6 +175,7 @@ impl Kind {
             | Self::ContractLocationQueries
             | Self::ContractNpcSpawns
             | Self::ContractEntitySpawns
+            | Self::MissionPropertySets
             | Self::LootContainers => KindRule {
                 prefixes: &[],
                 type_name: "",

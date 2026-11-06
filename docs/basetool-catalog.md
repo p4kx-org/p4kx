@@ -192,6 +192,7 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `missionBrokerEntries` | The mission broker entries (`MissionBrokerEntry`), the targets of `contracts[].brokerEntryGuid`, ordered by GUID |
 | `contractNpcSpawns` | The distinct NPC spawn descriptions of the contracts, templates and broker entries, ordered by identifier |
 | `contractEntitySpawns` | The distinct entity spawn descriptions of the contracts, templates and broker entries, ordered by identifier |
+| `missionPropertySets` | The authored Generator property arrays, ordered by stable source identifier; contract rows join them through `propertySetGuids` |
 | `lootTables` | The loot tables (`LootTableV3Record`) with the weighted archetypes of each, ordered by GUID |
 | `lootArchetypes` | The loot archetypes (`LootArchetypeV3Record`) with the weighted selectors of each, ordered by GUID |
 | `lootPoolFilters` | The pool filters of the loot generation, ordered by GUID |
@@ -1446,6 +1447,7 @@ at a lower level and is itself left out.
 | `shipSpawns` | `variable`, `token` (`extendedTextToken`, `null` when empty), `level` and `poolGuid`, an entry of `contractShipSpawns`; ordered by variable |
 | `npcSpawns`, `entitySpawns` | The same links for the NPC and entity spawn descriptions (see "NPC and entity spawns"): `poolGuid` is an entry of `contractNpcSpawns` or `contractEntitySpawns` |
 | `locationQueries` | `variable`, `token`, `level` and `queryGuid`, an entry of `contractLocationQueries`; ordered by variable |
+| `propertySetGuids` | Links to `missionPropertySets` in handler, contract and sub-contract order, preserving source declarations without computing runtime precedence |
 | `locationPrerequisites` | The `ContractPrerequisite_LocationProperty` prerequisites of the handler, the contract and the sub contract, in that order, as stored: `level` (`handler`, `contract`, `subContract`), `variable` (the `propertyVariableName`, a `variable` of `locationQueries`; on LIVE 4 of the 479 name a variable no query states), `token` and `locationLevelType` |
 
 **Identifiers.** The Archive gives these inline structures no GUID, so equal content shares one
@@ -1494,6 +1496,17 @@ mission modules and limits and the security network manifest.
 
 Not exported: SCMDB's own pools, waves and region lists, which are derived and not stated by the
 Archive.
+
+### Authored mission property sets
+
+`missionPropertySets` preserves the complete typed `propertyOverrides` declarations of Generator
+handlers, contracts and sub-contracts. Each source array is emitted once and contract rows refer
+to it through ordered `propertySetGuids`. The owner GUID, Record path and struct, exact authored
+location and level remain available, along with ordered nullable declarations containing exact
+variable/token strings and the shared `PropertyValue` union. Empty strings stay empty in this
+source kind. Stable identifiers depend on the owner GUID and authored array position, so a value
+edit does not change identity. See [the full field and identity contract](mission-property-sets.md)
+and ADR-0345. Template and broker property fields keep their existing meanings.
 
 ### Contract templates
 
@@ -1590,7 +1603,7 @@ filters: `factionFilter`, `locationClassFilter`, `locationSizeFilter`, `location
 variants, raw enum names, ordered definition References and owner-scoped weak links are described
 in [Scoped mission-location values](scoped-locations.md), including null/empty states, source
 identity and unresolved/error statuses. No runtime-selected location is calculated. These values
-use the same reader in objective, template and broker mission properties.
+use the same reader in objective, template, broker and Generator source-set mission properties.
 
 **Contract-level properties.** The `value` of an entry of `contractProperties` of a template and of
 `missionProperties` of a broker entry is read by the reader of the objective values and states the
@@ -2498,6 +2511,7 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `contractLocationQueries` | None: derived from the properties of the contracts and their templates, no Records | |
 | `contractNpcSpawns` | None: derived from the properties of the contracts, templates and broker entries, no Records | |
 | `contractEntitySpawns` | None: derived from the properties of the contracts, templates and broker entries, no Records | |
+| `missionPropertySets` | None: derived from the authored property overrides of selected Generator Records | |
 | `contractTemplates` | `libs/foundry/records/` (every folder; see "Contract templates") | `ContractTemplate` |
 | `missionBrokerEntries` | `libs/foundry/records/` (every folder; see "Mission broker entries") | `MissionBrokerEntry` |
 | `lootTables` | `libs/foundry/records/lootgeneration/loottables/` | `LootTableV3Record` |

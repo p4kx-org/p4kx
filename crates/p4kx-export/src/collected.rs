@@ -22,6 +22,7 @@ use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::location_template::{LocationTemplates, MissionLocationTemplate};
 use crate::loot_kinds::LootKinds;
 use crate::mission_kinds::MissionKinds;
+use crate::mission_property_set::MissionPropertySet;
 use crate::npc_spawn_model::NpcSpawnPool;
 use crate::paint_port::VehicleFacts;
 use crate::picked::Picked;
@@ -59,6 +60,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) mission_broker_entries: Vec<BrokerEntry<'f>>,
     pub(crate) contract_npc_spawns: Vec<NpcSpawnPool<'f>>,
     pub(crate) contract_entity_spawns: Vec<EntitySpawnPool>,
+    pub(crate) mission_property_sets: Vec<MissionPropertySet<'f>>,
     pub(crate) port_items: Vec<CatalogGuid>,
     pub(crate) starmap_objects: Vec<StarmapObject<'f>>,
     pub(crate) mineable_elements: Vec<MineableElement<'f>>,
@@ -112,6 +114,7 @@ impl<'f> Collected<'f> {
             mission_broker_entries: Vec::new(),
             contract_npc_spawns: Vec::new(),
             contract_entity_spawns: Vec::new(),
+            mission_property_sets: Vec::new(),
             port_items: Vec::new(),
             starmap_objects: Vec::new(),
             mineable_elements: Vec::new(),
@@ -342,6 +345,7 @@ impl<'f> Collected<'f> {
                     Kind::MissionBrokerEntries => self.mission_broker_entries.len(),
                     Kind::ContractNpcSpawns => self.contract_npc_spawns.len(),
                     Kind::ContractEntitySpawns => self.contract_entity_spawns.len(),
+                    Kind::MissionPropertySets => self.mission_property_sets.len(),
                     Kind::MineableElements => self.mineable_elements.len(),
                     Kind::RefiningProcesses => self.refining_processes.len(),
                     Kind::MineableCompositions => self.mineable_compositions.len(),

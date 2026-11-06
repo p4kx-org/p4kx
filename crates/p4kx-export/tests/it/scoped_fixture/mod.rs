@@ -15,6 +15,10 @@ use serde_json::Value;
 
 pub(crate) type TestResult = Result<(), Box<dyn Error>>;
 
+pub(crate) fn schema(builder: DataForgeBuilder) -> DataForgeBuilder {
+    schema::add(builder)
+}
+
 pub(crate) const TEMPLATE: u128 = 0x1100_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const BROKER: u128 = 0x2200_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const FOREIGN: u128 = 0x3300_0000_0000_4000_8000_0000_0000_0001;

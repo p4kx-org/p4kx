@@ -43,6 +43,7 @@ pub(crate) use crate::contract_template::ContractTemplate;
 pub(crate) use crate::entity_spawn_model::EntitySpawnPool;
 pub(crate) use crate::location_template::MissionLocationTemplate;
 pub(crate) use crate::npc_spawn_model::NpcSpawnPool;
+pub(crate) use crate::mission_property_set::MissionPropertySet;
 pub(crate) use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 
 /// The version of the catalog shape and its closed payload unions.
@@ -164,6 +165,8 @@ pub(crate) struct Catalog<'a> {
     /// The distinct entity spawn descriptions of the contracts, templates and broker entries,
     /// ordered by identifier.
     pub(crate) contract_entity_spawns: Vec<EntitySpawnPool>,
+    /// Canonical authored mission-property sets, ordered by stable source identifier.
+    pub(crate) mission_property_sets: Vec<MissionPropertySet<'a>>,
     /// The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered
     /// by `slug`. A curated list, not read from the Archive.
     pub(crate) ship_store_slugs: Vec<ShipStoreSlug<'a>>,
