@@ -9,6 +9,7 @@ use crate::contract::{LocalisedText, every_field_required};
 use crate::contract_hauling::HaulingRequirement;
 use crate::guid_text::CatalogGuid;
 use crate::npc_spawn_model::AiName;
+use crate::scoped_location::ScopedLocation;
 use crate::spawn_model::{LocationCondition, TagPaths};
 
 /// How an objective holds a mission property (`ObjectiveProperty_*`). A struct the catalog does
@@ -110,6 +111,8 @@ pub(crate) struct NumberOption<'a> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum PropertyValue<'a> {
+    /// `MissionPropertyValue_ScopedLocation` with all declared source filters.
+    ScopedLocation(Box<ScopedLocation>),
     /// `MissionPropertyValue_Object`: an object the mission scripting provides.
     Object,
     /// `MissionPropertyValue_DeliveryOrder`: a delivery order the mission scripting provides.

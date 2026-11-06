@@ -104,7 +104,7 @@ fn entry<'f>(
         unknowns,
     } = *sources;
     let root = Some(tree.root());
-    let reader = Reader::new(index.tags(), tree.root());
+    let reader = Reader::for_record(index.tags(), tree);
     let pools = RefCell::new(SpawnPools::default());
     let spawns = Level::read(
         SpawnLevel::Broker,

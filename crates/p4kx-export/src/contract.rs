@@ -45,12 +45,8 @@ pub(crate) use crate::location_template::MissionLocationTemplate;
 pub(crate) use crate::npc_spawn_model::NpcSpawnPool;
 pub(crate) use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 
-/// The version of the catalog shape.
-///
-/// Added kinds and fields keep it; renaming, removing or retyping a field, or restructuring a kind,
-/// raises it (ADR-0054). Version 2 changes which ships a paint fits (ADR-0161) and has the
-/// `qualityQuantizations` kind (ADR-0177).
-pub const SCHEMA_VERSION: u32 = 2;
+/// The version of the catalog shape and its closed payload unions.
+pub const SCHEMA_VERSION: u32 = 3;
 
 /// The Basetool catalog: the game data the basetool's P4K import reads.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -59,7 +55,7 @@ pub const SCHEMA_VERSION: u32 = 2;
 #[schemars(title = "P4KX Basetool catalog")]
 pub(crate) struct Catalog<'a> {
     /// The version of the catalog shape; an import rejects a version it does not know.
-    #[schemars(extend("const" = 2))]
+    #[schemars(extend("const" = SCHEMA_VERSION))]
     pub(crate) schema_version: u32,
     /// The Archive and Build the catalog was made from.
     pub(crate) source: Source<'a>,
@@ -234,5 +230,9 @@ pub(crate) fn every_field_required(schema: &mut Schema) {
 /// Returns the JSON Schema (draft 2020-12) of the Basetool catalog.
 #[must_use]
 pub fn catalog_schema() -> serde_json::Value {
-    schemars::schema_for!(Catalog<'static>).to_value()
+    schemars::generate::SchemaSettings::draft2020_12()
+        .for_serialize()
+        .into_generator()
+        .into_root_schema_for::<Catalog<'static>>()
+        .to_value()
 }

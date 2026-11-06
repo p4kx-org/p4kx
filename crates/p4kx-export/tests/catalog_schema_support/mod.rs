@@ -23,7 +23,7 @@ use recovery::item_recovery;
 
 pub(crate) fn minimal_catalog() -> serde_json::Value {
     json!({
-        "schemaVersion": 2,
+        "schemaVersion": p4kx_export::SCHEMA_VERSION,
         "source": {
             "channel": null,
             "build": null,

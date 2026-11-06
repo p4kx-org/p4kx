@@ -269,7 +269,7 @@ fn a_filter_restricts_the_selection_and_marks_the_kind_partial() -> TestResult {
 #[test]
 fn the_source_names_channel_build_archive_tool_and_export_time() -> TestResult {
     let (built, catalog) = catalog_with(&options())?;
-    assert_eq!(catalog["schemaVersion"], 2, "schema version");
+    assert_eq!(catalog["schemaVersion"], p4kx_export::SCHEMA_VERSION, "schema version");
     let source = &catalog["source"];
     assert_eq!(source["channel"], "PTU", "channel");
     assert_eq!(

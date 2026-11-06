@@ -175,9 +175,9 @@ fn value<'f>(value: &StructValue<'f>) -> Prop<'f> {
                 _ => None,
             })
             .unwrap_or(Prop::Unknown),
-        "MissionPropertyValue_Location" | "MissionPropertyValue_Locations" => {
-            Prop::Placeholder("LOCATION")
-        }
+        "MissionPropertyValue_Location"
+        | "MissionPropertyValue_Locations"
+        | "MissionPropertyValue_ScopedLocation" => Prop::Placeholder("LOCATION"),
         "MissionPropertyValue_AIName" | "MissionPropertyValue_NPCSpawnDescriptions" => {
             Prop::Placeholder("TARGET")
         }

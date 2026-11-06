@@ -1637,6 +1637,113 @@
       ],
       "type": "object"
     },
+    "ClassFilter": {
+      "description": "A source `locationClass` condition.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ClassTarget",
+          "description": "`LocationCondition_RequiredLocationClass`.",
+          "properties": {
+            "type": {
+              "const": "requiredLocationClass",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ClassTargets",
+          "description": "`LocationCondition_RequiredLocationClasses`.",
+          "properties": {
+            "type": {
+              "const": "requiredLocationClasses",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ClassTarget",
+          "description": "`LocationCondition_ExcludedLocationClass`.",
+          "properties": {
+            "type": {
+              "const": "excludedLocationClass",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ClassTargets",
+          "description": "`LocationCondition_ExcludedLocationClasses`.",
+          "properties": {
+            "type": {
+              "const": "excludedLocationClasses",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ClassTarget": {
+      "description": "One source `locationClass` Reference.",
+      "properties": {
+        "locationClass": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DefinitionReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `locationClass` target, including a dangling GUID."
+        }
+      },
+      "required": [
+        "locationClass"
+      ],
+      "type": "object"
+    },
+    "ClassTargets": {
+      "description": "An ordered source `locationClasses` Reference array.",
+      "properties": {
+        "locationClasses": {
+          "description": "The `locationClasses` targets, retaining null elements and repetitions.",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DefinitionReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "locationClasses"
+      ],
+      "type": "object"
+    },
     "ClothingStats": {
       "description": "The worn properties of an item, raw facts of `SCItemClothingParams`.",
       "properties": {
@@ -3502,6 +3609,54 @@
       ],
       "type": "object"
     },
+    "DefinitionReference": {
+      "description": "The source identity and availability of a location-vocabulary Record.",
+      "properties": {
+        "guid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The target GUID, retained when its Record is missing."
+        },
+        "recordPath": {
+          "description": "The target Record path when its source identity is available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/DefinitionStatus",
+          "description": "Whether the target Record is present in the source `DataForge`."
+        },
+        "targetType": {
+          "description": "The source target struct name when available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "guid",
+        "recordPath",
+        "status",
+        "targetType"
+      ],
+      "type": "object"
+    },
+    "DefinitionStatus": {
+      "description": "Source availability of a definition Reference.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "The `DataForge` identifies the target Record.",
+          "value": "present"
+        },
+        {
+          "description": "The declared target GUID has no Record.",
+          "value": "dangling"
+        }
+      ]
+    },
     "DismantleProcess": {
       "description": "A generic dismantle process: a `CraftingBlueprintRecord` under `crafting/blueprints/dismantle`\nwhose process is a `GenericCraftingProcess_Dismantle`.",
       "properties": {
@@ -3806,6 +3961,39 @@
         {
           "description": "The `ContractTemplate` Record.",
           "value": "template"
+        }
+      ]
+    },
+    "FactionFilter": {
+      "description": "A source faction-hostility condition.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Hostility",
+          "description": "`LocationCondition_RequiredFactionHostility`.",
+          "properties": {
+            "type": {
+              "const": "requiredFactionHostility",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/Hostility",
+          "description": "`LocationCondition_ExcludedFactionHostility`.",
+          "properties": {
+            "type": {
+              "const": "excludedFactionHostility",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -4242,7 +4430,8 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "toState"
           ],
           "type": "object"
         },
@@ -4277,7 +4466,9 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "objectiveId",
+            "toState"
           ],
           "type": "object"
         },
@@ -4309,7 +4500,8 @@
           },
           "required": [
             "type",
-            "phases"
+            "phases",
+            "toState"
           ],
           "type": "object"
         }
@@ -4349,7 +4541,9 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "objectiveId",
+            "tokenState"
           ],
           "type": "object"
         },
@@ -4373,7 +4567,8 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "tokenState"
           ],
           "type": "object"
         },
@@ -4397,7 +4592,8 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "tokenState"
           ],
           "type": "object"
         },
@@ -4476,7 +4672,8 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "condition"
           ],
           "type": "object"
         },
@@ -4496,7 +4693,8 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "propertyVariable"
           ],
           "type": "object"
         }
@@ -4539,6 +4737,113 @@
         "action",
         "condition",
         "note"
+      ],
+      "type": "object"
+    },
+    "FunctionFilter": {
+      "description": "A source `locationFunction` condition.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/FunctionTarget",
+          "description": "`LocationCondition_RequiredLocationFunction`.",
+          "properties": {
+            "type": {
+              "const": "requiredLocationFunction",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/FunctionTargets",
+          "description": "`LocationCondition_RequiredLocationFunctions`.",
+          "properties": {
+            "type": {
+              "const": "requiredLocationFunctions",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/FunctionTarget",
+          "description": "`LocationCondition_ExcludedLocationFunction`.",
+          "properties": {
+            "type": {
+              "const": "excludedLocationFunction",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/FunctionTargets",
+          "description": "`LocationCondition_ExcludedLocationFunctions`.",
+          "properties": {
+            "type": {
+              "const": "excludedLocationFunctions",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "FunctionTarget": {
+      "description": "One source `locationFunction` Reference.",
+      "properties": {
+        "locationFunction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DefinitionReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `locationFunction` target, including a dangling GUID."
+        }
+      },
+      "required": [
+        "locationFunction"
+      ],
+      "type": "object"
+    },
+    "FunctionTargets": {
+      "description": "An ordered source `locationFunctions` Reference array.",
+      "properties": {
+        "locationFunctions": {
+          "description": "The `locationFunctions` targets, retaining null elements and repetitions.",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DefinitionReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "locationFunctions"
       ],
       "type": "object"
     },
@@ -5270,6 +5575,22 @@
         "minDeviation",
         "standardDeviationMultiplier",
         "timeExponent"
+      ],
+      "type": "object"
+    },
+    "Hostility": {
+      "description": "A raw `ReactionType` name.",
+      "properties": {
+        "hostility": {
+          "description": "The hostility enum option without interpretation.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "hostility"
       ],
       "type": "object"
     },
@@ -6618,6 +6939,7 @@
           },
           "required": [
             "condition",
+            "tagType",
             "terms"
           ],
           "type": "object"
@@ -6646,7 +6968,9 @@
             }
           },
           "required": [
-            "condition"
+            "condition",
+            "rangeKm",
+            "locationProperty"
           ],
           "type": "object"
         },
@@ -6674,7 +6998,9 @@
             }
           },
           "required": [
-            "condition"
+            "condition",
+            "rangeKm",
+            "locationProperty"
           ],
           "type": "object"
         },
@@ -6694,7 +7020,8 @@
             }
           },
           "required": [
-            "condition"
+            "condition",
+            "excludedProperty"
           ],
           "type": "object"
         },
@@ -6743,6 +7070,10 @@
           },
           "required": [
             "condition",
+            "propertyTagType",
+            "targetTagType",
+            "searchForAnyTag",
+            "searchProperty",
             "tagFilters"
           ],
           "type": "object"
@@ -9200,6 +9531,53 @@
       ],
       "type": "object"
     },
+    "OtherLocationFilter": {
+      "description": "A source relation to another location property.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PropertyTarget",
+          "description": "`LocationCondition_NotLocation`.",
+          "properties": {
+            "type": {
+              "const": "notLocation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/PropertyTarget",
+          "description": "`LocationCondition_SameLocation`.",
+          "properties": {
+            "type": {
+              "const": "sameLocation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/PropertyTargets",
+          "description": "`LocationCondition_NotLocations`.",
+          "properties": {
+            "type": {
+              "const": "notLocations",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "OverrideDisplay": {
       "description": "The title and description an objective overrides in the mission details.",
       "properties": {
@@ -9566,9 +9944,172 @@
       ],
       "type": "object"
     },
+    "PropertyReference": {
+      "description": "A source weak pointer and its resolution within its original owning Record.",
+      "properties": {
+        "location": {
+          "description": "The canonical source location within the target Record.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recordGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The target Record GUID when known."
+        },
+        "recordPath": {
+          "description": "The target Record path when known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceError": {
+          "description": "The source read error when available, without a fabricated target value.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourcePointer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePointer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Raw instance coordinates retained for an unresolved source pointer."
+        },
+        "status": {
+          "$ref": "#/$defs/PropertyReferenceStatus",
+          "description": "The owner-scoped resolution outcome."
+        },
+        "targetType": {
+          "description": "The source target struct name when known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variable": {
+          "description": "The resolved `missionVariableName`, retaining an empty source string.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "location",
+        "recordGuid",
+        "recordPath",
+        "sourceError",
+        "sourcePointer",
+        "status",
+        "targetType",
+        "variable"
+      ],
+      "type": "object"
+    },
+    "PropertyReferenceStatus": {
+      "description": "The result of resolving a weak link within its original owner.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "The original owner contains the linked mission property.",
+          "value": "resolved"
+        },
+        {
+          "description": "The declared target cannot be located.",
+          "value": "missingTarget"
+        },
+        {
+          "description": "The target belongs outside the original owner.",
+          "value": "outsideOwner"
+        },
+        {
+          "description": "The linked instance has an unsupported target struct.",
+          "value": "unsupportedTargetType"
+        },
+        {
+          "description": "The target property's variable cannot be read.",
+          "value": "unreadableTarget"
+        }
+      ]
+    },
+    "PropertyTarget": {
+      "description": "One declared weak link to a mission property.",
+      "properties": {
+        "location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The location link and its owner-scoped resolution."
+        }
+      },
+      "required": [
+        "location"
+      ],
+      "type": "object"
+    },
+    "PropertyTargets": {
+      "description": "An ordered array of declared weak links to mission properties.",
+      "properties": {
+        "locations": {
+          "description": "The locations links, retaining null elements and repetitions.",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PropertyReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "locations"
+      ],
+      "type": "object"
+    },
     "PropertyValue": {
       "description": "The value of a mission property (`MissionPropertyValue_*`), tagged by `type`.",
       "oneOf": [
+        {
+          "$ref": "#/$defs/ScopedLocation",
+          "description": "`MissionPropertyValue_ScopedLocation` with all declared source filters.",
+          "properties": {
+            "type": {
+              "const": "scopedLocation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
         {
           "description": "`MissionPropertyValue_Object`: an object the mission scripting provides.",
           "properties": {
@@ -9611,7 +10152,8 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "value"
           ],
           "type": "object"
         },
@@ -9727,7 +10269,8 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "poolGuid"
           ],
           "type": "object"
         },
@@ -9769,7 +10312,8 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "poolGuid"
           ],
           "type": "object"
         },
@@ -9793,7 +10337,8 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "poolGuid"
           ],
           "type": "object"
         },
@@ -9825,7 +10370,8 @@
           },
           "required": [
             "type",
-            "conditions"
+            "conditions",
+            "forcedOrganizationGuid"
           ],
           "type": "object"
         },
@@ -9873,7 +10419,10 @@
           },
           "required": [
             "type",
-            "conditions"
+            "conditions",
+            "forcedItemGuid",
+            "minItemsToFind",
+            "maxItemsToFind"
           ],
           "type": "object"
         },
@@ -9953,7 +10502,8 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "reward"
           ],
           "type": "object"
         },
@@ -10519,6 +11069,67 @@
       "required": [
         "scopeGuid",
         "standingGuid"
+      ],
+      "type": "object"
+    },
+    "RelativeLocationFilter": {
+      "description": "A source scope relation to another location property.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/RelativeTarget",
+          "description": "`LocationCondition_SameScope`.",
+          "properties": {
+            "type": {
+              "const": "sameScope",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/RelativeTarget",
+          "description": "`LocationCondition_DifferentScope`.",
+          "properties": {
+            "type": {
+              "const": "differentScope",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RelativeTarget": {
+      "description": "A raw `ContractScope` name and its declared location property.",
+      "properties": {
+        "location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The location link and its owner-scoped resolution."
+        },
+        "scope": {
+          "description": "The scope enum option without interpretation.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "location",
+        "scope"
       ],
       "type": "object"
     },
@@ -11391,6 +12002,86 @@
       ],
       "type": "object"
     },
+    "ScopedLocation": {
+      "description": "The six independently optional source filters of a scoped mission location.",
+      "properties": {
+        "factionFilter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FactionFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `factionFilter` declaration."
+        },
+        "locationClassFilter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClassFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `locationClassFilter` declaration."
+        },
+        "locationFunctionFilter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FunctionFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `locationFunctionFilter` declaration."
+        },
+        "locationSizeFilter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SizeFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `locationSizeFilter` declaration."
+        },
+        "otherLocationFilter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OtherLocationFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `otherLocationFilter` declaration."
+        },
+        "relativeLocationFilter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RelativeLocationFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `relativeLocationFilter` declaration."
+        }
+      },
+      "required": [
+        "factionFilter",
+        "locationClassFilter",
+        "locationFunctionFilter",
+        "locationSizeFilter",
+        "otherLocationFilter",
+        "relativeLocationFilter"
+      ],
+      "type": "object"
+    },
     "ShieldStats": {
       "description": "A shield generator.",
       "properties": {
@@ -12010,6 +12701,113 @@
       ],
       "type": "object"
     },
+    "SizeFilter": {
+      "description": "A source `locationSize` condition.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/SizeTarget",
+          "description": "`LocationCondition_RequiredLocationSize`.",
+          "properties": {
+            "type": {
+              "const": "requiredLocationSize",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/SizeTargets",
+          "description": "`LocationCondition_RequiredLocationSizes`.",
+          "properties": {
+            "type": {
+              "const": "requiredLocationSizes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/SizeTarget",
+          "description": "`LocationCondition_ExcludedLocationSize`.",
+          "properties": {
+            "type": {
+              "const": "excludedLocationSize",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/SizeTargets",
+          "description": "`LocationCondition_ExcludedLocationSizes`.",
+          "properties": {
+            "type": {
+              "const": "excludedLocationSizes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "SizeTarget": {
+      "description": "One source `locationSize` Reference.",
+      "properties": {
+        "locationSize": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DefinitionReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `locationSize` target, including a dangling GUID."
+        }
+      },
+      "required": [
+        "locationSize"
+      ],
+      "type": "object"
+    },
+    "SizeTargets": {
+      "description": "An ordered source `locationSizes` Reference array.",
+      "properties": {
+        "locationSizes": {
+          "description": "The `locationSizes` targets, retaining null elements and repetitions.",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DefinitionReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "locationSizes"
+      ],
+      "type": "object"
+    },
     "Source": {
       "description": "Where a catalog came from.",
       "properties": {
@@ -12060,6 +12858,28 @@
         "channel",
         "exportedAt",
         "toolVersion"
+      ],
+      "type": "object"
+    },
+    "SourcePointer": {
+      "description": "An unresolved weak pointer's stored struct and instance coordinates.",
+      "properties": {
+        "instanceIndex": {
+          "description": "The stored instance index.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "structIndex": {
+          "description": "The stored struct index.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "instanceIndex",
+        "structIndex"
       ],
       "type": "object"
     },
@@ -12412,7 +13232,11 @@
             }
           },
           "required": [
-            "type"
+            "type",
+            "comparison",
+            "factionReputationGuid",
+            "scopeGuid",
+            "standingGuid"
           ],
           "type": "object"
         },
@@ -12952,7 +13776,8 @@
             "modifier",
             "enabled",
             "locationProperty",
-            "modifierName"
+            "modifierName",
+            "clearanceTokenGuid"
           ],
           "type": "object"
         },
@@ -13015,7 +13840,10 @@
             "modifier",
             "enabled",
             "locationProperty",
-            "modifierName"
+            "modifierName",
+            "itemGuid",
+            "durationSeconds",
+            "clearRentalOnFail"
           ],
           "type": "object"
         },
@@ -13137,7 +13965,11 @@
             "modifier",
             "enabled",
             "locationProperty",
-            "modifierName"
+            "modifierName",
+            "factionGuid",
+            "myReaction",
+            "theirReaction",
+            "ignoreCriminalHostility"
           ],
           "type": "object"
         },
@@ -13192,7 +14024,9 @@
             "modifier",
             "enabled",
             "locationProperty",
-            "modifierName"
+            "modifierName",
+            "brokerEntryGuid",
+            "legalToAttack"
           ],
           "type": "object"
         },
@@ -13240,7 +14074,8 @@
             "modifier",
             "enabled",
             "locationProperty",
-            "modifierName"
+            "modifierName",
+            "brokerEntryGuid"
           ],
           "type": "object"
         },
@@ -13288,7 +14123,8 @@
             "modifier",
             "enabled",
             "locationProperty",
-            "modifierName"
+            "modifierName",
+            "licenseType"
           ],
           "type": "object"
         }
@@ -14033,7 +14869,7 @@
       "type": "array"
     },
     "schemaVersion": {
-      "const": 2,
+      "const": 3,
       "description": "The version of the catalog shape; an import rejects a version it does not know.",
       "format": "uint32",
       "minimum": 0,

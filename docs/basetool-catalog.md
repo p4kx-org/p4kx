@@ -9,6 +9,13 @@ it.
 
 ## Versioning and consumers
 
+Version 3 is the catalog contract for 0.5.0 (ADR-0339). Consumers must accept version 3 before
+importing it. Tagged payload unions are closed: a new variant requires a version decision, unlike
+an unknown additive field or kind. The schema describes serialization, so emitted nullable payload
+fields are required even when their value is null. The previous released schema is retained as a
+compatibility-test fixture; ResourceType alone remains an additive extension.
+
+
 The rule is ADR-0054 (amending ADR-0002):
 
 - **Additive changes keep `schemaVersion`:** a new kind, a new field on an entity, on `source` or
@@ -137,7 +144,7 @@ same in every kind. Every field is always present; one that has no value is `nul
 
 | Field | Meaning |
 |-------|---------|
-| `schemaVersion` | The version of the shape, now `2`; an import rejects a version it does not know |
+| `schemaVersion` | The version of the shape, now `3`; an import rejects a version it does not know |
 | `source.channel` | The Channel: the folder holding the Archive, e.g. `LIVE` |
 | `source.build` | `branch`, `version`, `changeNumber` and `buildId` from the build manifest, or `null` |
 | `source.build.publicPatch` | The public patch version, e.g. `4.7.2`, from the RSI Launcher log line `SC <CHANNEL> <version>-<tag>.<change>` (`<version>`: two or three dot-separated numbers, kept as logged) whose change equals `changeNumber`; `null` when the log has no such line (never guessed from a neighbouring one) |
@@ -1576,6 +1583,14 @@ and `starMapLocation` (no fields). The spawn descriptions and location queries a
 contracts and added to their kinds. A value of any other struct fails the Record (on LIVE the
 values of all properties are of the types above); so does an organisation or a mission item whose
 condition is of a struct the catalog does not know.
+
+**Scoped location properties (schema 3).** `scopedLocation` retains all six optional source
+filters: `factionFilter`, `locationClassFilter`, `locationSizeFilter`, `locationFunctionFilter`,
+`otherLocationFilter` and `relativeLocationFilter`. Their concrete required/excluded/same/different
+variants, raw enum names, ordered definition References and owner-scoped weak links are described
+in [Scoped mission-location values](scoped-locations.md), including null/empty states, source
+identity and unresolved/error statuses. No runtime-selected location is calculated. These values
+use the same reader in objective, template and broker mission properties.
 
 **Contract-level properties.** The `value` of an entry of `contractProperties` of a template and of
 `missionProperties` of a broker entry is read by the reader of the objective values and states the

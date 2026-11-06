@@ -105,7 +105,7 @@ fn template<'f>(
     let root = Some(tree.root());
     let display = one(root, "contractDisplayInfo");
     let class = one(root, "contractClass");
-    let reader = Reader::new(tags, tree.root());
+    let reader = Reader::for_record(tags, tree);
     let pools = RefCell::new(SpawnPools::default());
     let spawns = Level::read(
         SpawnLevel::Template,

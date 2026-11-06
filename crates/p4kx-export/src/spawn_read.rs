@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{StructValue, TagTree, Value};
+use p4kx_extraction::{Guid, RecordTree, Reference, StructValue, TagTree, Value};
 
 use crate::blueprint::as_struct;
 use crate::entity_spawn_model::EntitySpawnPool;
@@ -41,12 +41,39 @@ pub(crate) enum Spawn<'f> {
 pub(crate) struct Reader<'x, 'f> {
     tags: &'x TagTree,
     root: &'x StructValue<'f>,
+    owner: Option<Guid>,
 }
 
 impl<'x, 'f> Reader<'x, 'f> {
     /// Creates the reader of the Record whose root struct is `root`.
     pub(crate) const fn new(tags: &'x TagTree, root: &'x StructValue<'f>) -> Self {
-        Self { tags, root }
+        Self {
+            tags,
+            root,
+            owner: None,
+        }
+    }
+
+    /// Creates an owner-aware reader for a canonical Record tree.
+    pub(crate) const fn for_record(tags: &'x TagTree, tree: &'x RecordTree<'f>) -> Self {
+        Self {
+            tags,
+            root: tree.root(),
+            owner: Some(tree.guid()),
+        }
+    }
+
+    /// Returns whether a weak reference names the original owning Record.
+    pub(crate) fn owns(&self, target: &Reference<'_>) -> bool {
+        self.owner.is_some_and(|owner| owner == target.guid())
+    }
+
+    /// Returns a weak target only within the original owning Record.
+    pub(crate) fn owned_target(&self, target: &Reference<'_>) -> Option<&'x StructValue<'f>> {
+        if !self.owns(target) {
+            return None;
+        }
+        self.target(target.location()?.as_str())
     }
 
     /// Reads the value of a property, `None` for a value that is no spawn description and no

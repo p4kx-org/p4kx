@@ -68,7 +68,7 @@ fn a_committed_file_replaces_the_old_one_and_leaves_no_temporary_file() -> TestR
     let mut decoded = Vec::new();
     zstd::Decoder::new(fs::File::open(&out)?)?.read_to_end(&mut decoded)?;
     assert!(
-        decoded.starts_with(b"{\"schemaVersion\":2"),
+        decoded.starts_with(b"{\"schemaVersion\":3"),
         "the new catalog"
     );
     assert_eq!(

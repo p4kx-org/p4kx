@@ -344,6 +344,6 @@ fn a_file_is_written_to_a_path() -> TestResult {
 
     let mut decoded = Vec::new();
     zstd::Decoder::new(fs::File::open(&out)?)?.read_to_end(&mut decoded)?;
-    assert!(decoded.starts_with(b"{\"schemaVersion\":2"), "JSON");
+    assert!(decoded.starts_with(b"{\"schemaVersion\":3"), "JSON");
     Ok(())
 }

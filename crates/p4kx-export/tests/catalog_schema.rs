@@ -8,6 +8,8 @@
 #![recursion_limit = "256"]
 
 mod catalog_schema_support;
+#[path = "catalog_schema/revision.rs"]
+mod revision;
 
 use std::error::Error;
 use std::path::PathBuf;

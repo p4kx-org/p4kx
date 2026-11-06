@@ -135,6 +135,9 @@ impl<'f> PropertyReader<'_, '_, 'f> {
     fn value(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, ReadError> {
         let parent = Some(value);
         Ok(match value_type(value) {
+            "ScopedLocation" => PropertyValue::ScopedLocation(Box::new(
+                crate::scoped_location_read::read(self.reader, value)?,
+            )),
             "Object" => PropertyValue::Object,
             "DeliveryOrder" => PropertyValue::DeliveryOrder,
             "Boolean" => PropertyValue::Boolean {
