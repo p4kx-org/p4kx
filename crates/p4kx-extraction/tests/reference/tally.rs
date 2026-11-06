@@ -110,7 +110,10 @@ impl Tally {
 
     #[must_use]
     pub(crate) const fn passes(&self) -> bool {
-        self.different == 0 && self.missing_in_archive == 0
+        self.compared > 0
+            && self.different == 0
+            && self.missing_in_archive == 0
+            && self.missing_in_reference == 0
     }
 
     #[must_use]
@@ -161,6 +164,13 @@ mod tests {
     use super::{Compared, MAX_EXAMPLES, Tally};
 
     #[test]
+    fn zero_comparisons_never_establish_independent_verification() {
+        assert!(
+            !Tally::default().passes(),
+            "an empty comparison is not evidence"
+        );
+    }
+    #[test]
     fn at_most_the_example_limit_is_kept_and_a_difference_fails() {
         let mut tally = Tally::default();
         for index in 0..MAX_EXAMPLES * 2 {
@@ -171,12 +181,16 @@ mod tests {
     }
 
     #[test]
-    fn an_allowed_difference_and_a_missing_reference_file_do_not_fail() {
+    fn an_allowed_difference_does_not_excuse_a_missing_selected_reference() {
         let mut tally = Tally::default();
         tally.equal();
         tally.allow("a documented reason");
         tally.missing_in_reference();
-        assert!(tally.passes(), "{}", tally.summary("t"));
+        assert!(
+            !tally.passes(),
+            "missing selected output fails: {}",
+            tally.summary("t")
+        );
         assert_eq!(tally.compared, 2, "equal and allowed are compared");
     }
 

@@ -4,7 +4,7 @@
 //! Tree comparison of the `CryXml` unforge converted with what P4KX reads.
 
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 
 use p4kx_extraction::cryxml::{self, Xml};
@@ -13,8 +13,10 @@ use p4kx_testkit::{real_archive_key, real_archive_path, reference_unforge_path};
 use rayon::prelude::*;
 
 use super::TestResult;
+use super::reference_error::Result as ReferenceResult;
+use super::reference_manifest::{Expected, Tool};
+use super::reference_run::{self, Dataset};
 use super::tally::{Compared, Tally};
-use super::walk::{files_under, index_entries, relative_key};
 use super::xml_tree::{XmlNode, compare};
 
 const MAX_XML_SIZE: u64 = 64 << 20;
@@ -42,69 +44,57 @@ fn our_tree(archive: &Archive, entry: &Entry) -> Result<XmlNode, String> {
     }
 }
 
-fn reference_tree(file: &Path) -> Result<XmlNode, String> {
-    let text = std::fs::read_to_string(file).map_err(|error| error.to_string())?;
-    let parsed = roxmltree::Document::parse(&text).map_err(|error| error.to_string())?;
+fn reference_tree(bytes: &[u8]) -> Result<XmlNode, String> {
+    let text = std::str::from_utf8(bytes).map_err(|error| error.to_string())?;
+    let parsed = roxmltree::Document::parse(text).map_err(|error| error.to_string())?;
     XmlNode::from_roxml(parsed.root_element()).map_err(|_| "tree too deep".to_owned())
 }
 
-fn compare_file(archive: &Archive, entry: &Entry, file: &Path) -> Compared {
-    match (our_tree(archive, entry), reference_tree(file)) {
-        (Ok(ours), Ok(reference)) => compare(&ours, &reference),
-        (Err(error), _) => Compared::Different(format!("{}: P4KX: {error}", entry.path())),
-        (_, Err(error)) => Compared::Different(format!("{}: reference: {error}", file.display())),
-    }
+fn reference(dataset: &Dataset, expected: &Expected) -> Result<XmlNode, String> {
+    let target = expected
+        .targets
+        .first()
+        .ok_or("selected source has no target")?;
+    let bytes = dataset
+        .read(&target.path)
+        .map_err(|error| error.to_string())?;
+    reference_tree(&bytes)
+}
+fn one(archive: &Archive, dataset: &Dataset, expected: &Expected) -> Tally {
+    let mut tally = Tally::default();
+    let source = dataset.source.entry(archive, &expected.identity);
+    let reference = reference(dataset, expected);
+    let compared = match source {
+        Err(error) => Compared::Different(error.to_string()),
+        Ok(entry) => match (our_tree(archive, entry), reference) {
+            (Ok(ours), Ok(reference)) => compare(&ours, &reference),
+            (Err(error), _) | (_, Err(error)) => Compared::Different(error),
+        },
+    };
+    tally.record("selected XML source", compared);
+    tally
 }
 
-/// The extensions of the sources unforge converts; it writes `<stem>.xml` next to the source.
-const SOURCE_EXTENSIONS: [&str; 2] = ["chrparams", "cdf"];
-
-/// Returns the Entry file a converted `.xml` next to its source comes from: the sibling with a
-/// source extension, or the file itself when it has none.
-fn source_of(converted: &Path) -> PathBuf {
-    SOURCE_EXTENSIONS
-        .iter()
-        .map(|extension| converted.with_extension(extension))
-        .find(|candidate| candidate.is_file())
-        .unwrap_or_else(|| converted.to_path_buf())
-}
-
-fn run(archive: &Archive, root: &Path) -> Result<Tally, std::io::Error> {
-    let files: Vec<PathBuf> = files_under(root)?
-        .into_iter()
-        .filter(|file| file.extension().is_some_and(|extension| extension == "xml"))
-        .collect();
-    let index = index_entries(archive.entries());
-    let tally = files
+pub(crate) fn verify(archive: &Archive, root: &Path) -> ReferenceResult<Tally> {
+    let dataset = Dataset::load(root, archive, Tool::Unforge)?;
+    let tally = dataset
+        .manifest
+        .expected
         .par_iter()
-        .map(|file| {
-            let mut tally = Tally::default();
-            let Some(key) = relative_key(root, &source_of(file)) else {
-                return tally;
-            };
-            match index.get(&key) {
-                None => tally.missing_in_archive(format!("{key}: no such Entry")),
-                Some(entry) => tally.record(&key, compare_file(archive, entry, file)),
-            }
-            tally
-        })
+        .map(|expected| one(archive, &dataset, expected))
         .reduce(Tally::default, Tally::merge);
+    dataset.finish(archive, &tally, "unforge tree comparison")?;
     Ok(tally)
 }
 
 #[test]
 #[ignore = "real Archive and reference output: set P4KX_DATA_P4K and P4KX_REF_UNFORGE and pass --ignored"]
 fn every_cryxml_tree_unforge_converted_is_identical() -> TestResult {
-    let Some(root) = reference_unforge_path() else {
-        super::report("skipped: P4KX_REF_UNFORGE is not set");
-        return Ok(());
-    };
-    let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let started = Instant::now();
-
-    let tally = run(&archive, &root)?;
-
-    super::report(&format!("unforge run took {:?}", started.elapsed()));
-    tally.finish("unforge tree comparison")?;
-    Ok(())
+    reference_run::optional(reference_unforge_path(), "P4KX_REF_UNFORGE", |root| {
+        let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
+        let started = Instant::now();
+        verify(&archive, root)?;
+        super::report(&format!("unforge run took {:?}", started.elapsed()));
+        Ok(())
+    })
 }

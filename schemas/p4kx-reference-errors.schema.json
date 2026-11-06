@@ -1,0 +1,158 @@
+{
+  "$defs": {
+    "Algorithm": {
+      "enum": [
+        "sha256"
+      ],
+      "type": "string"
+    },
+    "Capability": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "pinnedSourceProfile",
+              "type": "string"
+            },
+            "profile": {
+              "$ref": "#/$defs/Profile"
+            }
+          },
+          "required": [
+            "kind",
+            "profile"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "reviewRequired",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Digest": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "$ref": "#/$defs/Algorithm"
+        },
+        "value": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "properties": {
+        "line": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "message": {
+          "type": "string"
+        },
+        "stream": {
+          "$ref": "#/$defs/Stream"
+        }
+      },
+      "required": [
+        "stream",
+        "line",
+        "message"
+      ],
+      "type": "object"
+    },
+    "Fingerprint": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "bytes",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "Profile": {
+      "enum": [
+        "unp4kB492",
+        "unforgeB492",
+        "starbreaker450",
+        "starbreaker7d3"
+      ],
+      "type": "string"
+    },
+    "Stream": {
+      "enum": [
+        "stdout",
+        "stderr"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capability": {
+      "$ref": "#/$defs/Capability"
+    },
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "type": "array"
+    },
+    "reviewRequired": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "type": "array"
+    },
+    "schemaVersion": {
+      "format": "uint32",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "stderr": {
+      "$ref": "#/$defs/Fingerprint"
+    },
+    "stdout": {
+      "$ref": "#/$defs/Fingerprint"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "capability",
+    "stdout",
+    "stderr",
+    "errors",
+    "reviewRequired"
+  ],
+  "title": "Report",
+  "type": "object"
+}

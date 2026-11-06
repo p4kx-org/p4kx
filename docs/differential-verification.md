@@ -1,126 +1,246 @@
 # Differential verification against unp4k, unforge and StarBreaker
 
-The real-Archive tests check plausibility. The tests in `crates/p4kx-extraction/tests/reference/`
-check P4KX against three independent tools, so that an error both of P4KX and of its own tests
-cannot hide ([ADR-0234](adr/0234-differential-verification-reads-reference-output-from-folders.md)).
-Each test is `#[ignore]`d, reads a folder of reference output the owner produced beforehand and
-returns early with a note when its variable is unset. No test runs a foreign tool, CI downloads
-nothing, and no reference output or game data is committed.
+Differential checks compare P4KX with independently produced output. The ignored tests in
+`crates/p4kx-extraction/tests/reference/` never launch or download foreign tools. Hosted CI runs
+their synthetic mutation and integration tests; game files, binaries, keys and real manifests stay
+outside the repository.
 
-| Variable | Folder | Test | Comparison |
-|----------|--------|------|------------|
-| `P4KX_REF_UNP4K` | extracted by unp4k, paths as in the Archive | `unp4k::every_entry_unp4k_extracted_is_byte_identical` | bytes of every file against the decoded Entry, streamed in 64 KiB blocks; counts per compression and encryption kind |
-| `P4KX_REF_UNFORGE` | `CryXml` converted by unforge, `<stem>.xml` next to its source | `unforge::every_cryxml_tree_unforge_converted_is_identical` | element trees: tag, attributes in order, trimmed text, children |
-| `P4KX_REF_STARBREAKER` | `starbreaker dcb extract --format json` | `starbreaker::every_record_starbreaker_wrote_has_the_same_values` | per Record: GUID, name, tag, then every field by name, kind and value |
+A configured reference root requires a version-1 `.p4kx-reference.json`. An unset optional variable
+skips explicitly. An existing empty folder, partial producer run or zero meaningful comparisons
+fails verification. A genuinely declared empty selection reports `no independent comparisons`;
+it does not become a successful oracle run.
 
-The real Archive and its key come as for every real-Archive test (`P4KX_DATA_P4K`, the stored
-key). `tools\real-archive.ps1` sets the three reference variables when the folders exist. Run with
-`cargo test --release -p p4kx-extraction --test reference --locked -- --ignored --nocapture
---test-threads 1`.
+| Variable | Producer output | Comparison |
+| --- | --- | --- |
+| `P4KX_REF_UNP4K` | Raw extracted Entries | Streamed exact bytes, with a narrowly evidenced zero-trim allowance |
+| `P4KX_REF_UNFORGE` | Converted CryXml with declared original Entry identities | Element trees: names, ordered attributes, trimmed text and children |
+| `P4KX_REF_STARBREAKER` | Record JSON with declared GUID/DCB identities and optional JSON pointers | Typed Record values and explicitly selected embedded content |
 
-## Producing the reference folders
+Run configured comparisons with the existing Archive/key helpers:
 
-Use the official releases of the tools (unp4k and unforge 4.0.87 from dolkensp/unp4k, StarBreaker
-CLI 0.3.2 from diogotr7/StarBreaker) and the same `Data.p4k` as the test. Extract only what the
-comparison needs; the whole Archive is not required.
-
-```text
-unp4k.exe <Data.p4k> *.dcb              (in the folder for P4KX_REF_UNP4K)
-unp4k.exe <Data.p4k> *.chrparams
-unp4k.exe <Data.p4k> *.cdf
-unforge.cli.exe <copy of the .chrparams and .cdf files>
-starbreaker.exe dcb extract --dcb Data\Game2.dcb --format json --output <folder>
+```powershell
+cargo test --release -p p4kx-extraction --test reference --locked -- --ignored --nocapture --test-threads 1
 ```
 
-unp4k must write the raw bytes; the folder must keep the Archive paths below its root. The folder
-of unforge keeps the sources next to the converted `.xml` files; only the `.xml` files are
-compared, each against the Entry of its source. StarBreaker exports the main Record of each file
-unless `--all` is given; Records without a file are counted as missing in the reference and do not
-fail the test.
+The manual preparation and schema-writing tests skip unless their own request variables are set.
+No reference test reads a launcher credential file.
 
-## Output and failing
+## Trust and source identity
 
-Each test prints one summary line: compared, equal, different, allowed (items with at least one
-allowed value), missing in the reference and missing in the Archive, then one line per allowed
-reason with the number of allowed values, and at most 25 examples of differences (400 characters
-each). The StarBreaker test also prints the number of embedded Records compared as a Reference.
-The test fails on any difference that is not on the allow-list and on any reference file with no
-Entry or Record in the Archive.
+The checked-in schemas describe the versioned contract:
 
-The allow-list holds the known behaviour of the reference tools. Each entry names one case and
-applies to it only; each allowed value is counted under its reason, so one Record can count
-several:
+- [Reference manifest](../schemas/p4kx-reference.schema.json)
+- [Pre-conversion plan](../schemas/p4kx-reference-plan.schema.json)
+- [Derived producer error report](../schemas/p4kx-reference-errors.schema.json)
 
-- unp4k: a nonempty all-zero suffix of encrypted Stored or effective method-100 pass-through
-  data, only with validated source identity and the exact unmodified producer revision.
-  The retained reference prefix must have one byte (possibly zero), or at least three bytes
-  ending in nonzero. Empty/two-byte prefixes, inconsistent retained zeros, actual Deflate/Zstandard
-  logical-byte loss and unknown/patched/mismatched contexts fail. Allowed values are counted under
-  their specific producer reason, never exact equality
-  ([ADR-0341](adr/0341-reference-zero-trimming-requires-effective-decoder-and-producer-evidence.md)).
-- unforge: an attribute value or text `BUGGED` against a non-empty P4KX value, and text that is
-  P4KX's non-ASCII UTF-8 read byte by byte.
-- StarBreaker:
-  - `null` for a weak pointer in a Record whose weak pointers sit in derived types (#262). A weak
-    pointer is compared by kind only: against `null` or another weak pointer, never against any
-    other value.
-  - `null` for a Reference to a Record that does not exist (`DanglingReference`). Every other
-    value P4KX reports as an error, and every kind of value the comparison does not map, is a
-    difference against `null`.
-  - `true` for a bool byte that is neither 0 nor 1 (`InvalidBool`); against `false` it is a
-    difference.
-  - `null` for a non-finite single or double, or its own text: `NaN` for not a number, `INF` and
-    `-INF` for the infinities. A finite number against `null` or those texts is a difference.
+The manifest records producer name, version, immutable revision, binary SHA-256 and declared
+unmodified/local-patch scope separately. Preparation measures the actual binary before conversion;
+finalization checks it again. That identifies the local binary file. Its relationship to the
+declared source revision and the owner's success receipt are **claims**, not build attestations or
+proof that a foreign process executed.
 
-A difference beside an allowed one still fails. Numbers are compared at the precision of the
-field P4KX read: a single as `f32`, a double exactly, an integer exactly, `-0.0` equal to `0.0`.
-Fields are sorted by name, ignoring case, and then compared by name; names, GUIDs and Record
-paths are compared case-sensitively, because StarBreaker keeps the case of all three (the LIVE
-run below passes that way). A Record that StarBreaker embeds where it is referenced is compared
-by content with the Record P4KX holds under that GUID: name, struct type and every field, with the
-same allow-list, and again for the Records embedded inside it. The Reference itself is compared by
-GUID first. The number of embedded Records compared is reported; for a Record that differs, it
-is the number reached before its first difference, so a lower bound. `crates/p4kx-extraction/tests/reference/starbreaker_json.rs` is the one place that
-encodes the JSON shape of StarBreaker.
+The verifier locally recomputes SHA-256 of the current Archive, its canonical Entry inventory and,
+for Record references, the decoded preferred DCB. Channel and all Build identifiers must also match.
+A digest stored in JSON alone is not considered verified. The Archive watch rejects observed
+source changes. Hashing a large Archive is deliberate and can dominate a bounded comparison run.
 
-## Effective decoder and producer evidence
+Expected logical identities and output locations are frozen **before conversion**. They are Entry
+paths or canonical Record GUIDs plus DCB identity, not surviving filenames. All selected identities
+must exist in the measured source dataset. Duplicate identities cannot replace missing members.
+Every declared artifact is present, uniquely named, fingerprinted and accounted for; extra JSON,
+logs and nested manifests fail. Only the exact root `.p4kx-reference.json` is excluded.
 
-The declared compression method is not the effective encoding: CIG method 100 may contain a
-Zstandard frame or direct bytes. The additive public `EntryReader::effective_encoding` API reports
-`Stored`, `Deflate`, `Zstandard`, `PassThrough` or `Undetermined` from the same decoder that produces
-the comparison bytes. Calling it performs no I/O and consumes no prefix; method 100 remains
-undetermined until ordinary reading selects its decoder. An empty logical Entry can remain
-undetermined. The enum is also re-exported by `p4kx-extraction`; no CLI/output schema changes.
+Artifact paths are bounded relative paths. Absolute/drive/UNC paths, parent traversal, ambiguous
+components, symlinks, junctions, resolved escapes, case aliases and hard-linked artifact aliases
+are rejected before payload comparison. Multiple Records may share one file only through distinct,
+declared JSON locations that contain their actual identities. One Record may have several declared
+artifacts; it still counts as one logical source.
 
-The zero-trim classifier requires already-validated source and producer context. The inspected
-producer is unmodified unp4k revision
-`b492ab14d26280c6ec91c4365ff0faf5f3e24a6b`; its
-[trim loop](https://github.com/dolkensp/unp4k/blob/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b/src/ICSharpCode.SharpZipLib/Zip/ZipFile.cs#L3116-L3140)
-runs before decompression and retains at least one byte. The classifier does not parse manifests,
-prove producer success or excuse partial runs: those checks precede it in the reference harness.
-An unmanifested run supplies no allowance context, so exact bytes may compare equal but missing
-bytes remain differences. A local patch scope is not assumed equivalent to the inspected source.
-The current public API observation does not verify hashes or prove reference completeness.
+## Preparing a new reference run
 
-## Mutation self-tests
+Keep the plan, producer binary and owner completion receipt **outside** the output root. Use a
+fresh output root; `begin` refuses pre-existing payloads, preventing post-hoc certification of
+whatever happened to survive. Explicit source-copy artifacts may exist before conversion and must
+match their original Archive Entries byte for byte.
 
-Without any variable, `mutation_bytes`, `mutation_unp4k`, `mutation_xml`, `mutation_value` and
-`mutation_embedded` change a copy of
-synthetic reference data and require every change to be detected: a byte changed, deleted or
-appended at any block; a tag, attribute, text or child renamed, changed, swapped, deleted or
-invented; an integer plus one, a single and a double by the smallest step, a boolean flipped,
-texts swapped, an enum option, GUID or Reference changed, a value of another kind, an array
-element deleted or invented, a field deleted or invented, and the Record name, GUID and tag
-changed. They also check that `-0.0`, the short text of a single and whitespace around text are no
-difference, and that each allow-list entry applies only to its case (`mutation_allow`,
-`mutation_xml`, `mutation_bytes`): a weak pointer, a missing Reference, an invalid bool and a
-non-finite number against every other kind of value, an array error or an unmapped kind against
-`null`, `false` against an invalid bool, a finite number against `null` or `NaN`, `BUGGED`
-against an empty value, and a difference in the case of a name, a GUID or a path. The content of
-an embedded Record is mutated like a Record of its own (a value, name, type or GUID changed, a
-field deleted or invented), also when it is nested inside another embedded Record, and an
-embedded Record with no Record of P4KX to compare with is a difference. Every allowed value is
-counted, not one reason per Record or tree.
+A plan supplies `schemaVersion: 1`, producer metadata, the declared selection, expected logical
+identities/output locations and artifact paths/roles. Its artifacts have `fingerprint: null`:
+finalization supplies measured fingerprints. The roles include `payload`, optional `sourceCopy`,
+exactly one `producerStdout`, `producerStderr` and `producerErrorLog`.
+
+An illustrative pair of XML mappings is:
+
+```json
+{
+  "expected": [
+    {
+      "identity": {"kind": "entry", "path": "Data/example/shared.cdf"},
+      "targets": [{"path": "cdf/shared.xml", "subresource": null}]
+    },
+    {
+      "identity": {"kind": "entry", "path": "Data/example/shared.chrparams"},
+      "targets": [{"path": "chrparams/shared.xml", "subresource": null}]
+    }
+  ]
+}
+```
+
+These are synthetic paths, not a runnable inventory. Build the actual expected list from the
+selected source Archive/DCB before running the producer. Isolate CDF and CHRPARAMS families so
+unforge's same-stem `.xml` names cannot overwrite one another. The manifest maps each result to
+its original extension; the verifier never guesses from neighboring files. Original input files
+retained inside the root require explicit `sourceCopy` roles.
+
+With existing `P4KX_DATA_P4K` and key configuration, prepare the source snapshot and frozen plan:
+
+```powershell
+$env:P4KX_REF_PREPARE_ROOT = '<private fresh reference root>'
+$env:P4KX_REF_PREPARE_PLAN = '<private pre-conversion plan.json outside that root>'
+$env:P4KX_REF_PRODUCER_BINARY = '<actual producer executable>'
+$env:P4KX_REF_PREPARE_STAGE = 'begin'
+cargo test --release -p p4kx-extraction --test reference --locked reference_prepare::prepare_reference_manifest -- --ignored --exact --nocapture
+```
+
+Run the chosen foreign tool separately, from the intended private working folder, capturing its
+raw UTF-8 stdout and stderr at the two predeclared paths. Do not run these commands from an
+Installation or let the producer overwrite game files. Keep unp4k isolated from outbound exception
+reporting: the inspected source can report extraction exceptions remotely. Network isolation does
+not justify falsely declaring a modified binary unmodified.
+
+The supported reference commands remain the producers' own commands, for example unp4k raw
+Extraction, isolated unforge file/family Conversion and StarBreaker `dcb extract --format json`.
+Official StarBreaker CLI 0.3.2 is main-only and does not accept `--all`; the separately pinned
+current-source build supports it. A matching version string alone does not identify those builds.
+Do not invent flags or infer all-Record coverage from a main-only release.
+
+Create a completion receipt from the actual observed exit status and errors, after inspecting the
+captured streams. Its shape is:
+
+```json
+{"ownerAssertsSuccess": false, "exitCode": null, "errors": []}
+```
+
+The example intentionally makes no success claim. For several producer invocations, the receipt
+must cover all invocations and preserve any nonzero exit/error rather than just the final command.
+Set `ownerAssertsSuccess` only after that review; it is retained as an owner assertion.
+
+Finalize without launching any foreign process:
+
+```powershell
+$env:P4KX_REF_PREPARE_RECEIPT = '<private actual completion receipt.json outside the root>'
+$env:P4KX_REF_PREPARE_STAGE = 'finalize'
+cargo test --release -p p4kx-extraction --test reference --locked reference_prepare::prepare_reference_manifest -- --ignored --exact --nocapture
+Remove-Item Env:P4KX_REF_PREPARE_STAGE
+```
+
+Finalization recomputes source and binary fingerprints, checks the frozen mapping, derives the
+typed producer error report from the captured streams, fingerprints the complete artifact inventory
+and verifies source copies. A failure leaves the manifest explicitly unfinalized. No preparation
+step claims to run or observe the foreign process itself.
+
+Legacy folders without preserved pre-conversion expectations must be reproduced in a fresh root.
+Scanning old survivors and labeling them complete is not a migration path.
+
+## Producer errors and review status
+
+Captured stderr is not synonymous with failure: both inspected StarBreaker revisions write normal
+loading/export/completion progress there. The separate error report records hashes of both captured
+streams and is recomputed during verification; a forged empty error report cannot hide their errors.
+
+The classifiers are pinned to these primary-source contracts:
+
+- unp4k/unforge revision
+  [b492ab14](https://github.com/dolkensp/unp4k/tree/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b):
+  per-Entry extraction exceptions and conversion failures are printed to stdout and can coexist
+  with exit code zero. [unp4k entrypoint](https://github.com/dolkensp/unp4k/blob/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b/src/unp4k/Program.cs),
+  [unforge entrypoint](https://github.com/dolkensp/unp4k/blob/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b/src/unforge.cli/Program.cs).
+- StarBreaker
+  [release 450fa284](https://github.com/diogotr7/StarBreaker/blob/450fa284d4b1cbed6832675297dfb02579c0abd3/cli/src/dcb.rs)
+  and [source 7d3f01e7](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/cli/src/dcb.rs):
+  individual export/write/directory errors appear on stderr without necessarily failing the
+  command. Expected progress/completion markers and exported-file counts are checked separately.
+
+Unknown revisions, local patches, unclassified log lines, invalid log encoding or missing completion
+markers produce `review_required`/incomplete verification. They are not silently treated as
+error-free. A reviewed new log contract requires primary-source evidence and regression tests;
+the receipt alone cannot waive that gate. No invented empty error log bypasses actual streams,
+additional error files or missing outputs.
+
+## Scope and accounting
+
+`all` requires the full logical universe: all Entries for raw comparison, the CDF/CHRPARAMS
+families for unforge, or every Record of the preferred DCB for StarBreaker. A filtered, sampled or
+main-only run compares its explicit predeclared subset; the declaration describes the selection,
+not a predicate guessed from surviving output. `mainOnly` is an unverified producer claim:
+StarBreaker selects the last Record per raw file-name offset, which the public P4KX Record API
+does not expose. The verifier proves membership of the declared GUID/DCB subset and compares its
+outputs; it does not attest that every selected GUID satisfies that foreign main-record rule.
+
+Reports show selected logical sources versus the source universe, standalone and explicitly
+embedded locations, and verified artifact counts. Multiple artifacts or embedded occurrences do
+not compensate for a missing identity. Unselected Records are outside the declared scope, not
+missing requested outputs. Embedded-content walk counts can repeat a Record at several locations
+and are reported separately from unique selected-source coverage.
+
+A comparison fails on any missing/extra/duplicate/unreadable selected artifact, mismatched hash,
+invalid provenance, producer error, incomplete run or unallowed semantic difference. Every selected
+logical source must contribute exactly one reconciled result. Building all P4KX Record trees is a
+separate self-check and cannot substitute for an independent reference comparison.
+
+| Bound | Limit |
+| --- | --- |
+| Manifest or preparation JSON | 64 MiB before parsing |
+| Logical identities | 1,000,000 |
+| Artifacts and mappings | 2,000,000 |
+| Decoded metadata text, relative path or JSON pointer | 4,096 UTF-8 bytes before field allocation |
+| Escaped JSON metadata token scratch | 24 KiB before parsing |
+| Hashed artifact | 8 GiB, streamed |
+| Structured JSON/XML or captured log | 64 MiB |
+| Captured log line / recorded findings | 64 KiB / 1,000 |
+
+## Narrow comparison allowances
+
+An allowed difference is separately counted under its reason, never exact equality.
+
+- unp4k: only a nonempty all-zero suffix of encrypted Stored or effective method-100 pass-through
+  bytes with validated matching source and the inspected unmodified producer revision. The retained
+  prefix has one byte (possibly zero), or at least three bytes ending in nonzero. Unknown context,
+  inconsistent retained zeros/two-byte prefixes, nonzero loss and actual Deflate/Zstandard logical
+  loss fail ([ADR-0341](adr/0341-reference-zero-trimming-requires-effective-decoder-and-producer-evidence.md)).
+- unforge: `BUGGED` against a nonempty value, and its documented byte-wise interpretation of
+  non-ASCII UTF-8. Other value changes fail.
+- StarBreaker: the narrowly typed weak-pointer, dangling-reference, invalid-bool and non-finite
+  number differences described in ADR-0234. An unrelated error/unmapped kind never becomes null.
+
+`EntryReader::effective_encoding` observes the existing decoder without additional reads.
+Method 100 stays `Undetermined` until its decrypted prefix is read; an empty logical Entry can
+remain undetermined. The additive read-only enum is also re-exported by extraction. It does not
+prove checksum validity, producer success or reference completeness.
+
+## Synthetic verification and schema maintenance
+
+The ordinary `reference` suite runs without game data or foreign binaries:
+
+```powershell
+cargo test -p p4kx-extraction --test reference --locked
+```
+
+Its mutation tests cover byte/XML/Record changes, source/producer/Build/DCB fingerprints, failed
+receipts and logs, unknown capabilities, empty scopes, missing/extra/duplicate outputs, same-stem
+XML, multiple artifacts, explicit embedded positions, path escapes/aliases and size bounds.
+Preparation fixtures exercise the same before/after helpers as a real manual run.
+
+After intentionally changing the versioned DTOs, regenerate and verify their schemas:
+
+```powershell
+$env:P4KX_WRITE_REFERENCE_SCHEMAS = '1'
+cargo test -p p4kx-extraction --test reference --locked reference_schema::write_reference_schemas -- --ignored --exact
+Remove-Item Env:P4KX_WRITE_REFERENCE_SCHEMAS
+cargo test -p p4kx-extraction --test reference --locked
+```
+
+All examples and committed fixtures are synthetic. Publish only aggregate outcomes from real runs,
+not manifests, source identities, private paths or game payloads.
 
 ## First run on LIVE 4.10, 2026-10-27
 

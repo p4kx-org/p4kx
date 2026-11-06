@@ -8,6 +8,8 @@ Amended for issue #807: embedded Records are compared by content.
 
 ## Decision
 
+- Configured reference roots require [ADR-0342](0342-independent-references-require-preconversion-manifests.md): source-bound pre-conversion manifests, complete logical source accounting and reviewed producer-error contracts. Empty/partial roots cannot pass; unset optional variables still skip explicitly.
+
 - P4KX is compared with unp4k, unforge and StarBreaker by `#[ignore]`d tests in
   `crates/p4kx-extraction/tests/reference/`. A test reads a folder of output the owner produced
   beforehand, named by `P4KX_REF_UNP4K`, `P4KX_REF_UNFORGE` or `P4KX_REF_STARBREAKER`, and returns
