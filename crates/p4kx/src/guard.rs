@@ -86,7 +86,7 @@ pub(crate) fn on_archive_open(path: &Path) {
         if running {
             let _ignored = writeln!(
                 io::stderr().lock(),
-                "warning: StarCitizen.exe is running; use this tool with the game closed"
+                "warning: StarCitizen.exe may be running; use this tool with the game closed"
             );
         }
     });

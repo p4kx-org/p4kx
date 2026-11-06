@@ -7,6 +7,8 @@
 mod installation;
 mod proc_tree;
 mod process;
+#[cfg(any(windows, test))]
+mod process_windows;
 mod registry;
 
 use std::path::PathBuf;
@@ -14,7 +16,7 @@ use std::path::PathBuf;
 pub use installation::{Installation, without_verbatim_prefix};
 pub use proc_tree::game_in_proc_tree;
 pub use process::{
-    any_game_process, game_is_running, is_game_process, process_count_lists_game,
+    any_game_process, game_is_running, game_process_status, is_game_process, process_count_lists_game,
     qprocess_lists_game,
 };
 pub use registry::{

@@ -77,7 +77,7 @@ archive-issues =
         [one] Das Verzeichnis des Archivs hat einen Fehler in einem Eintrag. Der Eintrag bleibt aufgelistet, seine Daten sind aber womöglich nicht lesbar; eine Extraktion meldet ihn, wenn er scheitert, und `p4kx info` nennt ihn.
        *[other] Das Verzeichnis des Archivs hat { $count } Fehler in seinen Einträgen. Die Einträge bleiben aufgelistet, ihre Daten sind aber womöglich nicht lesbar; eine Extraktion meldet die gescheiterten, und `p4kx info` nennt sie.
     }
-game-running = Star Citizen läuft. Nutze dieses Werkzeug bei beendetem Spiel: Lesen funktioniert weiter, aber der RSI Launcher kann das Archiv beim Aktualisieren ändern, und das Werkzeug schreibt nie in die Installation.
+game-running = Star Citizen läuft möglicherweise. Nutze dieses Werkzeug bei beendetem Spiel: Lesen funktioniert weiter, aber der RSI Launcher kann das Archiv beim Aktualisieren ändern, und das Werkzeug schreibt nie in die Installation.
 archive-test-build =
     { $kind ->
         [one] Dieses Archiv gehört zum Channel { $channel }, der Testbuilds von Star Citizen enthält. Material aus Testbuilds ist nach den Nutzungsbedingungen von Star Citizen vertraulich: Gib nichts daraus weiter und veröffentliche nichts davon.
