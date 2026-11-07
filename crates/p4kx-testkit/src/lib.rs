@@ -95,6 +95,7 @@ mod model_skeleton;
 mod model_skin;
 mod model_zoned;
 mod mtl;
+pub mod offline_seam;
 mod opus;
 mod opus_encode;
 mod prefab;

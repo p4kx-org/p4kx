@@ -27,6 +27,7 @@ p4kx-foundation.workspace = true
 png.workspace = true
 ruzstd.workspace = true
 sha2.workspace = true
+same-file.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
