@@ -6,6 +6,33 @@ $root = [IO.Path]::GetFullPath($Directory)
 if (Test-Path -LiteralPath $root) { throw 'MSI PATH test directory must be new.' }
 New-Item -ItemType Directory -Path $root | Out-Null
 
+$key = [pscustomobject]@{ Names=@('Path'); Raw='%USERPROFILE%\工具;' }
+$key | Add-Member -MemberType ScriptMethod -Name GetValueNames -Value { return $this.Names }
+$key | Add-Member -MemberType ScriptMethod -Name GetValueKind -Value {
+    param($Name)
+    if ($Name -cne 'Path') { throw 'The getter truncated the complete registry value name.' }
+    return [Microsoft.Win32.RegistryValueKind]::ExpandString
+}
+$key | Add-Member -MemberType ScriptMethod -Name GetValue -Value {
+    param($Name, $Default, $Options)
+    if ($Name -cne 'Path' -or $null -ne $Default -or
+        $Options -ne [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) { throw 'The getter expanded or renamed the original registry value.' }
+    return $this.Raw
+}
+$captured = Get-P4kxPathStateFromKey $key 'C:\Synthetic\工具;'
+if (-not $captured.exists -or $captured.registry_name -cne 'Path' -or
+    $captured.registry_kind -cne 'ExpandString' -or $captured.raw_value -cne $key.Raw -or
+    $captured.user_api_value -cne 'C:\Synthetic\工具;') { throw 'A single complete registry value was not captured exactly.' }
+$key.Names = @('Other')
+$missing = Get-P4kxPathStateFromKey $key $null
+if ($missing.exists -or $null -ne $missing.raw_value) { throw 'An absent PATH was fabricated from another value.' }
+$missingKey = Get-P4kxPathStateFromKey $null $null
+if ($missingKey.exists -or $null -ne $missingKey.registry_kind) { throw 'An absent registry key was fabricated.' }
+$key.Names = @('Path', 'PATH')
+$ambiguous = $false
+try { Get-P4kxPathStateFromKey $key $null | Out-Null } catch { $ambiguous = $true }
+if (-not $ambiguous) { throw 'Ambiguous PATH value names were accepted.' }
+
 function New-PathState {
     param($Raw, $Api = $Raw, [string]$Kind = 'ExpandString', [bool]$Exists = $true)
     return [pscustomobject]@{

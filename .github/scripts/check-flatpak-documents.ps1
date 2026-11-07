@@ -36,11 +36,11 @@ try {
         "--env=P4KX_FOLDERS_ROOT=$data/portal-smoke", '--env=P4KX_GAME_CHECK=off',
         "--env=P4KX_PROTECT_FOLDERS=$game", "--filesystem=${game}:ro", $settings.application_id)
     $null = Invoke-P4kxFlatpakDocumentCommand $prefix @('list', $source) $output (Join-Path $output 'read-only-list.log')
-    $null = Invoke-P4kxFlatpakDocumentCommand $prefix @('extract', $source, '--out', $outside) $output (Join-Path $output 'portal-extract.log')
+    $null = Invoke-P4kxFlatpakDocumentCommand $prefix @('extract', $source, '--filter', '*', '--out', $outside) $output (Join-Path $output 'portal-extract.log')
     $expected = (Get-FileHash -LiteralPath (Join-Path $FixtureDirectory 'hello.txt') -Algorithm SHA256).Hash
     if ((Get-FileHash -LiteralPath (Join-Path $destination 'Data/hello.txt') -Algorithm SHA256).Hash -cne $expected) { throw 'Portal output grant exported different bytes.' }
-    $null = Invoke-P4kxFlatpakDocumentCommand $prefix @('extract', $source, '--out', (Join-Path $game 'direct-refused')) $output (Join-Path $output 'direct-refused.log') -Refused
-    $null = Invoke-P4kxFlatpakDocumentCommand $prefix @('extract', $source, '--out', $alias) $output (Join-Path $output 'portal-refused.log') -Refused
+    $null = Invoke-P4kxFlatpakDocumentCommand $prefix @('extract', $source, '--filter', '*', '--out', (Join-Path $game 'direct-refused')) $output (Join-Path $output 'direct-refused.log') -Refused
+    $null = Invoke-P4kxFlatpakDocumentCommand $prefix @('extract', $source, '--filter', '*', '--out', $alias) $output (Join-Path $output 'portal-refused.log') -Refused
     if ((Get-ChildItem -LiteralPath $inside -Force).Count -ne 0 -or (Test-Path -LiteralPath (Join-Path $game 'direct-refused'))) { throw 'A rejected export changed the game folder.' }
     $sourceWritable = @('run', '--user', "--arch=$($platform.unix_arch)", '--command=test', $settings.application_id, '-w', $source)
     $PSNativeCommandUseErrorActionPreference = $false

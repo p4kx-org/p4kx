@@ -7,18 +7,27 @@ Reads the user PATH without expanding or modifying its registry value.
 function Get-P4kxUserPathState {
     $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
     try {
-        $names = if ($null -eq $key) { @() } else { @($key.GetValueNames() | Where-Object { $_ -ieq 'Path' }) }
-        if ($names.Count -gt 1) { throw 'The user PATH has ambiguous registry value names.' }
-        $exists = $names.Count -eq 1
-        return [pscustomobject]@{
-            exists = $exists
-            registry_name = $(if ($exists) { $names[0] } else { $null })
-            registry_kind = $(if ($exists) { $key.GetValueKind($names[0]).ToString() } else { $null })
-            raw_value = $(if ($exists) { $key.GetValue($names[0], $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) } else { $null })
-            user_api_value = [Environment]::GetEnvironmentVariable('Path', 'User')
-        }
+        return Get-P4kxPathStateFromKey $key ([Environment]::GetEnvironmentVariable('Path', 'User'))
     }
     finally { if ($null -ne $key) { $key.Dispose() } }
+}
+
+<#
+.SYNOPSIS
+Captures one registry key's complete PATH value name and unexpanded data.
+#>
+function Get-P4kxPathStateFromKey {
+    param($Key, $UserValue)
+    $names = @(if ($null -ne $Key) { $Key.GetValueNames() | Where-Object { $_ -ieq 'Path' } })
+    if ($names.Count -gt 1) { throw 'The user PATH has ambiguous registry value names.' }
+    $exists = $names.Count -eq 1
+    return [pscustomobject]@{
+        exists = $exists
+        registry_name = $(if ($exists) { $names[0] } else { $null })
+        registry_kind = $(if ($exists) { $Key.GetValueKind($names[0]).ToString() } else { $null })
+        raw_value = $(if ($exists) { $Key.GetValue($names[0], $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) } else { $null })
+        user_api_value = $UserValue
+    }
 }
 
 <#
