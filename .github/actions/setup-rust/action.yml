@@ -32,17 +32,16 @@ runs:
       shell: pwsh
       env:
         NATIVE_TARGET: ${{ steps.toolchain.outputs.target }}
-      run: |
-        $name = 'CARGO_TARGET_' + $env:NATIVE_TARGET.Replace('-', '_').ToUpperInvariant() + '_LINKER'
-        "$name=rust-lld.exe" >> $env:GITHUB_ENV
+      run: .github/scripts/check-build-tools.ps1 -Target $env:NATIVE_TARGET -SelectEnvironment linker
     - name: Link with native mold on Linux
       if: runner.os == 'Linux'
       uses: rui314/setup-mold@339e96b4ff1f3bd865856ba4cbbe8818a7acb038 # v1
     - name: Select mold as the Linux linker
       if: runner.os == 'Linux'
       shell: pwsh
-      run: |
-        "RUSTFLAGS=-Clink-arg=-fuse-ld=mold" >> $env:GITHUB_ENV
+      env:
+        NATIVE_TARGET: ${{ steps.toolchain.outputs.target }}
+      run: .github/scripts/check-build-tools.ps1 -Target $env:NATIVE_TARGET -SelectEnvironment linker
     - name: Mount a ReFS Dev Drive as the target directory
       if: runner.os == 'Windows'
       uses: samypr100/setup-dev-drive@562171fe8df7401fdf582d766cd3b6ab80d5b1a0 # v4.1.0

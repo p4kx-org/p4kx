@@ -1,6 +1,7 @@
 param(
     [switch]$Verify,
     [switch]$Nextest,
+    [ValidateSet('toolchain', 'linker')][string]$SelectEnvironment,
     [string]$Target
 )
 
@@ -23,6 +24,26 @@ $platform = if ($Target) { Get-P4kxPlatform -Target $Target } else { Get-P4kxCur
 Assert-P4kxNativeHost -Platform $platform
 $nativeToolchain = "$rustVersion-$($platform.target)"
 $outputs = @("rust-version=$rustVersion", "nextest-version=$nextestVersion", "rust-toolchain=$nativeToolchain", "target=$($platform.target)")
+
+if ($SelectEnvironment) {
+    $SelectEnvironment = $SelectEnvironment.ToLowerInvariant()
+    if ($Verify -or $Nextest) { throw 'Environment selection cannot be combined with tool verification.' }
+    if (-not $env:GITHUB_ENV -or -not [IO.Path]::IsPathFullyQualified($env:GITHUB_ENV) -or
+        -not (Test-Path -LiteralPath $env:GITHUB_ENV -PathType Leaf)) {
+        throw 'Environment selection requires an existing absolute GitHub environment file.'
+    }
+    $line = if ($SelectEnvironment -ceq 'toolchain') {
+        "RUSTUP_TOOLCHAIN=$nativeToolchain"
+    } elseif ($platform.os -ceq 'windows') {
+        $name = 'CARGO_TARGET_' + $platform.target.Replace('-', '_').ToUpperInvariant() + '_LINKER'
+        "$name=rust-lld.exe"
+    } else {
+        'RUSTFLAGS=-Clink-arg=-fuse-ld=mold'
+    }
+    if ($line.Contains("`n") -or $line.Contains("`r")) { throw 'A build environment setting must be one line.' }
+    Add-Content -LiteralPath $env:GITHUB_ENV -Value $line -Encoding utf8NoBOM
+    return
+}
 
 if (-not $Verify) {
     if ($env:GITHUB_OUTPUT) {

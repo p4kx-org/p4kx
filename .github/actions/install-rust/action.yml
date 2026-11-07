@@ -39,9 +39,8 @@ runs:
     - name: Select the native pinned toolchain
       shell: pwsh
       env:
-        NATIVE_TOOLCHAIN: ${{ steps.pins.outputs.rust-toolchain }}
-      run: |
-        "RUSTUP_TOOLCHAIN=$env:NATIVE_TOOLCHAIN" >> $env:GITHUB_ENV
+        NATIVE_TARGET: ${{ steps.pins.outputs.target }}
+      run: .github/scripts/check-build-tools.ps1 -Target $env:NATIVE_TARGET -SelectEnvironment toolchain
     - name: Install cargo-nextest
       if: inputs.nextest == 'true'
       uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
@@ -53,3 +52,8 @@ runs:
         INSTALL_NEXTEST: ${{ inputs.nextest }}
         P4KX_TARGET: ${{ steps.pins.outputs.target }}
       run: .github/scripts/check-build-tools.ps1 -Verify -Nextest:($env:INSTALL_NEXTEST -eq 'true') -Target $env:P4KX_TARGET
+    - name: Verify bounded build environment selection
+      shell: pwsh
+      env:
+        NATIVE_TARGET: ${{ steps.pins.outputs.target }}
+      run: .github/scripts/test-build-environment.ps1 -Target $env:NATIVE_TARGET -Directory (Join-Path $env:RUNNER_TEMP 'build-environment-contract')
