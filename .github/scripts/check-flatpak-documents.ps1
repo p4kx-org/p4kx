@@ -19,6 +19,11 @@ New-Item -ItemType Directory -Force -Path (Join-Path $game 'Bin64'), $inside, $d
 $archive = Join-Path $game 'Data.p4k'
 Copy-Item -LiteralPath (Join-Path $FixtureDirectory 'native-smoke.p4k') -Destination $archive
 $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+@{
+    target=$Target; revision=$env:GITHUB_SHA
+    flatpak=(Invoke-P4kxLinuxTool flatpak @('--version') | Out-String).Trim()
+    findmnt=(Invoke-P4kxLinuxTool findmnt @('--version') | Out-String).Trim()
+} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'portal-tools.json') -Encoding utf8NoBOM
 $documents = [Collections.Generic.List[string]]::new()
 try {
     $source = Export-P4kxFlatpakDocument $archive $settings.application_id
@@ -27,9 +32,10 @@ try {
     $documents.Add($outside)
     $alias = Export-P4kxFlatpakDocument $inside $settings.application_id -Writable
     $documents.Add($alias)
-    foreach ($document in $documents) {
-        $filesystem = (Invoke-P4kxLinuxTool stat @('--file-system', '--format=%T', $document) | Out-String).Trim()
-        if ($filesystem -cne 'fuse' -and $filesystem -cne 'fuse.portal') { throw 'Document test is not using the portal FUSE filesystem.' }
+    for ($index = 0; $index -lt $documents.Count; $index++) {
+        $mount = Invoke-P4kxLinuxTool findmnt @('--kernel', '--json', '--list', '--output', 'TARGET,FSTYPE,SOURCE', '--target', $documents[$index]) | Out-String
+        $mount | Set-Content -LiteralPath (Join-Path $output "portal-mount-$index.json") -Encoding utf8NoBOM
+        Assert-P4kxFlatpakDocumentMount -Metadata $mount -MountPoint (Join-Path $env:XDG_RUNTIME_DIR 'doc')
     }
     $data = (Invoke-P4kxLinuxTool flatpak @('run', '--user', "--arch=$($platform.unix_arch)", '--command=printenv', $settings.application_id, 'XDG_DATA_HOME') | Out-String).Trim()
     $prefix = @('run', '--user', "--arch=$($platform.unix_arch)", '--command=p4kx',

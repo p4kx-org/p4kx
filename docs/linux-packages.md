@@ -124,6 +124,11 @@ effective-metadata check requires both markers and still rejects unrestricted X1
 `fallback-x11`, extra sockets, filesystem access or bus permissions. The installed metadata is
 retained in the native consumer logs before validation.
 
+Documents-portal checks inspect the kernel mount table with `findmnt`: each granted path must
+belong to the single `fuse.portal` mount with source `portal` at `$XDG_RUNTIME_DIR/doc`.
+Generic FUSE filesystem labels from `stat` do not establish portal identity. The native logs
+retain the actual mount metadata and Flatpak/findmnt versions before testing portal operations.
+
 [`release-linux.yml`](../.github/workflows/release-linux.yml) builds on the matching Ubuntu 24.04
 native CPU and verifies packages on a fresh matching runner. The consumer validates the source
 SHA, pinned compiler/nextest, baseline, CPU and package hashes before execution. It then runs:

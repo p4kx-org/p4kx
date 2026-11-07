@@ -2,6 +2,19 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'linux-package-contract.ps1')
 . (Join-Path $PSScriptRoot 'package-process.ps1')
 
+function Assert-P4kxFlatpakDocumentMount {
+    <#
+    .SYNOPSIS
+    Requires one kernel mount belonging to the session Documents portal.
+    #>
+    param([string]$Metadata, [string]$MountPoint)
+    $mounts = @(($Metadata | ConvertFrom-Json -Depth 6).filesystems)
+    if ($mounts.Count -ne 1 -or $mounts[0].target -cne $MountPoint -or
+        $mounts[0].fstype -cne 'fuse.portal' -or $mounts[0].source -cne 'portal') {
+        throw "Document portal requires one fuse.portal mount from portal at '$MountPoint'; observed $Metadata"
+    }
+}
+
 function Export-P4kxFlatpakDocument {
     param([string]$Path, [string]$ApplicationId, [switch]$Writable)
     $access = if ($Writable) { '--allow-write' } else { '--forbid-write' }
