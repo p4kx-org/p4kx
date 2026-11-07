@@ -3,6 +3,7 @@
 
 use winreg::enums;
 
+use crate::installer::binding::Binding;
 use crate::installer::fault::Fault;
 use crate::installer::journal_codec;
 use crate::installer::raw_path::{RawPath, StringKind};
@@ -66,6 +67,13 @@ impl Store for Registry {
         replacement: Snapshot,
     ) -> Result<(), AdapterFault> {
         let encoded = journal_codec::encode(&replacement)?;
+        let binding = replacement
+            .reservation
+            .as_ref()
+            .map(|reservation| RawValue {
+                kind: enums::REG_SZ,
+                bytes: reservation.binding().registry_bytes(),
+            });
         let sequence = RawValue {
             kind: enums::REG_SZ,
             bytes: sequence::encode(replacement.sequence),
@@ -84,6 +92,7 @@ impl Store for Registry {
             path,
             state: Some(encoded),
             sequence: Some(sequence),
+            binding,
         };
         registry_store::compare_replace(&expected.revision, &next)?;
         Ok(())
@@ -91,24 +100,33 @@ impl Store for Registry {
 }
 
 fn stored(revision: &RegistrySnapshot) -> Result<Snapshot, Fault> {
-    match (&revision.state, &revision.sequence) {
-        (None, None) => Ok(Snapshot {
+    let state = match (&revision.state, &revision.sequence) {
+        (None, None) => Snapshot {
             path: RawPath::Absent,
             owner: None,
             journal: None,
+            reservation: None,
+            cancelled_binding: None,
             sequence: 0,
-        }),
+        },
         (Some(bytes), Some(scalar)) => {
             let state = journal_codec::decode(bytes)?;
             if sequence::decode(&scalar.bytes)? != state.sequence {
                 return Err(Fault::CorruptState);
             }
-            Ok(state)
+            state
         }
-        _ => Err(Fault::CorruptState),
+        _ => return Err(Fault::CorruptState),
+    };
+    match (&state.reservation, &revision.binding) {
+        (None, None) => {}
+        (Some(reservation), Some(value))
+            if value.kind == enums::REG_SZ
+                && Binding::from_registry(&value.bytes)? == reservation.binding() => {}
+        _ => return Err(Fault::CorruptState),
     }
+    Ok(state)
 }
-
 fn path(value: Option<&RawValue>) -> Result<RawPath, Fault> {
     let Some(value) = value else {
         return Ok(RawPath::Absent);
@@ -125,3 +143,7 @@ fn path(value: Option<&RawValue>) -> Result<RawPath, Fault> {
     path.split()?;
     Ok(path)
 }
+
+#[cfg(test)]
+#[path = "registry_image_tests.rs"]
+mod tests;

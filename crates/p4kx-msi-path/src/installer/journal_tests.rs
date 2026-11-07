@@ -59,6 +59,8 @@ fn all_truncated_inputs_and_trailing_data_are_rejected() -> TestResult {
 #[test]
 fn unknown_version_and_value_tags_are_rejected() -> TestResult {
     let mut encoded = journal_codec::encode(&Snapshot {
+        reservation: None,
+        cancelled_binding: None,
         path: RawPath::Absent,
         owner: None,
         journal: None,
@@ -75,7 +77,9 @@ fn unknown_version_and_value_tags_are_rejected() -> TestResult {
     );
     *encoded
         .get_mut(journal_codec::MAGIC.len() - 1)
-        .ok_or("missing version")? = 2;
+        .ok_or("missing version")? = *journal_codec::MAGIC
+        .last()
+        .ok_or("missing current version")?;
     let tag_offset = journal_codec::MAGIC.len() + size_of::<u64>();
     *encoded.get_mut(tag_offset).ok_or("missing path tag")? = 255;
     assert_eq!(

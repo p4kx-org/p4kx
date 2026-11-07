@@ -3,12 +3,13 @@
 
 use crate::installer::argument_identity;
 use crate::installer::arguments::{self, Command, Stage};
+use crate::installer::binding::Binding;
 use crate::installer::caller::Goal;
 use crate::installer::fault::Fault;
+use crate::installer::invocation_nonce::InvocationNonce;
 
 const PRODUCT: &str = "{00000000-0000-0000-0000-000000000001}";
 const PACKAGE: &str = "{00000000-0000-0000-0000-000000000002}";
-const NONCE: &str = "0101010101010101010101010101010101010101010101010101010101010101";
 
 fn words(values: &[&str]) -> Vec<Vec<u16>> {
     values
@@ -18,32 +19,24 @@ fn words(values: &[&str]) -> Vec<Vec<u16>> {
 }
 
 fn ensure(folder: &str) -> Vec<Vec<u16>> {
-    words(&[
-        "prepare", "ensure", "0", PRODUCT, PACKAGE, NONCE, "", folder,
-    ])
+    words(&["reserve", "ensure", PRODUCT, PACKAGE, "", folder])
 }
 
 #[test]
-fn queued_requests_preserve_spaces_unicode_and_the_exact_own_folder_separator() -> Result<(), Fault>
-{
+fn reservations_preserve_spaces_unicode_and_the_exact_own_folder_separator() -> Result<(), Fault> {
     let command = arguments::parse(ensure(r"C:\P4KX 日本語\bin\."))?;
-    let Command::Transaction(invocation) = command else {
+    let Command::Reserve(declaration) = command else {
         return Err(Fault::InvalidArguments);
     };
     assert_eq!(
-        invocation.stage,
-        Stage::Prepare,
-        "the write-ahead phase is explicit"
-    );
-    assert_eq!(
-        invocation.caller.product, 1,
+        declaration.product, 1,
         "the MSI product is parsed as a typed identifier"
     );
     assert_eq!(
-        invocation.caller.package, 2,
+        declaration.package, 2,
         "the package identifier is independent of product identity"
     );
-    let Goal::Ensure(lease) = invocation.caller.goal else {
+    let Goal::Ensure(lease) = declaration.goal else {
         return Err(Fault::InvalidArguments);
     };
     let expected: Vec<u8> = r"C:\P4KX 日本語\bin\"
@@ -59,12 +52,22 @@ fn queued_requests_preserve_spaces_unicode_and_the_exact_own_folder_separator() 
 
 #[test]
 fn removal_has_no_authority_to_invent_a_folder_or_predecessor() -> Result<(), Fault> {
-    let result = arguments::parse(words(&[
-        "rollback", "remove", "12", PRODUCT, PACKAGE, NONCE,
-    ]))?;
+    let result = arguments::parse(words(&["reserve", "remove", PRODUCT, PACKAGE]))?;
     assert!(
-        matches!(result, Command::Transaction(ref request) if request.stage == Stage::Rollback && request.expected == 12 && request.caller.goal == Goal::Remove && request.caller.predecessor.is_none()),
-        "remove has the exact captured caller and sequence without a guessed target"
+        matches!(result, Command::Reserve(ref declaration) if declaration.goal == Goal::Remove && declaration.predecessor.is_none()),
+        "removal reserves only its typed product/package"
+    );
+    let binding = Binding {
+        sequence: 12,
+        product: 1,
+        package: 2,
+        nonce: InvocationNonce::from_bytes([1; 32])?,
+    }
+    .encode();
+    let result = arguments::parse(words(&["rollback", PRODUCT, PACKAGE, &binding]))?;
+    assert!(
+        matches!(result, Command::Transaction(ref request) if request.stage == Stage::Rollback && request.binding.sequence == 12),
+        "rollback carries the exact captured binding without a guessed target"
     );
     assert_eq!(
         arguments::parse(words(&[
@@ -73,16 +76,15 @@ fn removal_has_no_authority_to_invent_a_folder_or_predecessor() -> Result<(), Fa
             "0",
             PRODUCT,
             PACKAGE,
-            NONCE,
+            "nonce",
             "",
             r"C:\P4KX\."
         ])),
-        Err(Fault::InvalidArguments),
-        "unused removal fields are rejected"
+        Err(Fault::ArgumentLimit),
+        "the old unbound goal/nonce transport is not accepted"
     );
     Ok(())
 }
-
 #[test]
 fn notify_is_a_distinct_command_without_registry_arguments() {
     assert_eq!(
@@ -169,4 +171,38 @@ fn sequence_parser_rejects_prefixes_aliases_and_wraparound() {
             "a captured receipt has exactly one decimal spelling"
         );
     }
+}
+
+#[test]
+fn bound_callbacks_reject_another_packages_identity_and_missing_transport() -> Result<(), Fault> {
+    let binding = Binding {
+        sequence: 0,
+        product: 1,
+        package: 2,
+        nonce: InvocationNonce::from_bytes([1; 32])?,
+    }
+    .encode();
+    for head in [
+        "prepare",
+        "apply",
+        "commit",
+        "rollback",
+        "cancel-reserved",
+        "recover-reserved",
+    ] {
+        assert!(
+            arguments::parse(words(&[head, PRODUCT, PACKAGE, &binding])).is_ok(),
+            "every phase uses the same canonical captured transport"
+        );
+        assert_eq!(
+            arguments::parse(words(&[head, PACKAGE, PACKAGE, &binding])),
+            Err(Fault::InvalidIdentity),
+            "a foreign MSI product cannot adopt a binding"
+        );
+        assert!(
+            arguments::parse(words(&[head, PRODUCT, PACKAGE, "unavailable"])).is_err(),
+            "AppSearch miss/sentinel cannot authorise a callback"
+        );
+    }
+    Ok(())
 }

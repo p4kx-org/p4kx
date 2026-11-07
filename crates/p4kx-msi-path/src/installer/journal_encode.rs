@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::installer::binding::Binding;
 use crate::installer::caller::{Caller, Goal};
 use crate::installer::claim::Claim;
 use crate::installer::fault::Fault;
 use crate::installer::journal_codec;
 use crate::installer::raw_path::{RawPath, StringKind};
+use crate::installer::reservation::Reservation;
 use crate::installer::rollback_receipt::{RollbackReceipt, RollbackSource};
 use crate::installer::state::{Journal, Ownership, Phase, Snapshot};
 
@@ -16,6 +18,8 @@ pub(crate) fn snapshot(snapshot: &Snapshot) -> Result<Vec<u8>, Fault> {
     writer.path(&snapshot.path)?;
     writer.owner(snapshot.owner.as_ref())?;
     writer.journal(snapshot.journal.as_ref())?;
+    writer.reservation(snapshot.reservation.as_ref())?;
+    writer.cancelled(snapshot.cancelled_binding)?;
     Ok(writer.bytes)
 }
 
@@ -105,6 +109,23 @@ impl Writer {
             RollbackSource::Committed => 2,
         }])?;
         self.path(&receipt.observed_path)
+    }
+
+    fn cancelled(&mut self, binding: Option<Binding>) -> Result<(), Fault> {
+        let Some(binding) = binding else {
+            return self.put(&[0]);
+        };
+        self.put(&[1])?;
+        self.blob(&binding.registry_bytes())
+    }
+
+    fn reservation(&mut self, reservation: Option<&Reservation>) -> Result<(), Fault> {
+        let Some(reservation) = reservation else {
+            return self.put(&[0]);
+        };
+        self.put(&[1])?;
+        self.put(&reservation.base_sequence.to_le_bytes())?;
+        self.caller(&reservation.caller)
     }
 
     fn caller(&mut self, caller: &Caller) -> Result<(), Fault> {

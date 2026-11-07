@@ -23,18 +23,8 @@ pub(crate) struct Caller {
 
 impl Caller {
     pub(crate) fn validate(&self) -> Result<(), Fault> {
-        if self.product == 0 || self.package == 0 || self.predecessor == Some(0) {
-            return Err(Fault::InvalidIdentity);
-        }
-        if self.predecessor == Some(self.product) {
-            return Err(Fault::InvalidIdentity);
-        }
-        if matches!(self.goal, Goal::Remove) && self.predecessor.is_some() {
-            return Err(Fault::InvalidIdentity);
-        }
-        Ok(())
+        validate_identity(self.product, self.package, self.predecessor, &self.goal)
     }
-
     pub(crate) fn request(&self, owner: Option<&Ownership>) -> Result<Request, Fault> {
         self.validate()?;
         let Goal::Ensure(lease) = &self.goal else {
@@ -80,4 +70,21 @@ impl Caller {
         }
         Ok(())
     }
+}
+
+pub(crate) fn validate_identity(
+    product: u128,
+    package: u128,
+    predecessor: Option<u128>,
+    goal: &Goal,
+) -> Result<(), Fault> {
+    if product == 0
+        || package == 0
+        || predecessor == Some(0)
+        || predecessor == Some(product)
+        || (matches!(goal, Goal::Remove) && predecessor.is_some())
+    {
+        return Err(Fault::InvalidIdentity);
+    }
+    Ok(())
 }

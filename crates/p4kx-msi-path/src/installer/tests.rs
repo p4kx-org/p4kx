@@ -61,6 +61,8 @@ fn lease() -> Result<Lease, Fault> {
 fn memory(original: RawPath) -> Memory {
     Memory {
         state: Snapshot {
+            reservation: None,
+            cancelled_binding: None,
             path: original,
             owner: None,
             journal: None,
@@ -174,3 +176,14 @@ mod rollback_claim;
 mod rollback_receipt;
 #[path = "upgrade_tests.rs"]
 mod upgrade;
+
+#[path = "reservation_tests.rs"]
+mod reservation;
+#[path = "reservation_race_tests.rs"]
+mod reservation_race;
+
+#[path = "bootstrap_tests.rs"]
+mod bootstrap;
+
+#[path = "cancellation_tests.rs"]
+mod cancellation;

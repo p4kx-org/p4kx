@@ -7,12 +7,15 @@ use winreg::enums::{self, RegType};
 use winreg::transaction::Transaction;
 use winreg::{RegKey, RegValue};
 
+use crate::installer::binding;
 use crate::installer::sequence;
 
 const ENVIRONMENT: &str = "Environment";
 const PATH_VALUE: &str = "Path";
 const STATE_KEY: &str = r"Software\P4KX-Installer\PathOwnership";
 const STATE_VALUE: &str = "StateV1";
+const BINDING_KEY: &str = r"Software\P4KX-Installer\PathOwnership\Invocation";
+const BINDING_VALUE: &str = "Binding";
 const SEQUENCE_VALUE: &str = "Sequence";
 const MAX_PATH_BYTES: usize = 1 << 20;
 const MAX_STATE_BYTES: usize = 16 << 20;
@@ -29,6 +32,7 @@ pub(crate) struct RegistrySnapshot {
     pub(crate) path: Option<RawValue>,
     pub(crate) state: Option<Vec<u8>>,
     pub(crate) sequence: Option<RawValue>,
+    pub(crate) binding: Option<RawValue>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -36,10 +40,12 @@ pub(crate) enum Stage {
     Begin,
     OpenPath,
     OpenState,
+    OpenBinding,
     ReadSize,
     ReadValue,
     WritePath,
     WriteState,
+    WriteBinding,
     Commit,
 }
 
@@ -123,6 +129,17 @@ pub(crate) fn compare_replace(
             Stage::WriteState,
         )?;
     }
+    if next.binding != expected.binding {
+        let (binding, _) = root
+            .create_subkey_transacted_with_flags(BINDING_KEY, &transaction, RIGHTS)
+            .map_err(|source| fault(Stage::OpenBinding, source))?;
+        replace(
+            &binding,
+            BINDING_VALUE,
+            next.binding.as_ref(),
+            Stage::WriteBinding,
+        )?;
+    }
     transaction
         .commit()
         .map_err(|source| fault(Stage::Commit, source))
@@ -147,10 +164,15 @@ fn read(transaction: &Transaction) -> Result<RegistrySnapshot, RegistryFault> {
         Some(_) => return Err(RegistryFault::UnsupportedType),
         None => None,
     };
+    let binding = match open_optional(&root, BINDING_KEY, transaction, Stage::OpenBinding)? {
+        None => None,
+        Some(key) => read_optional(&key, BINDING_VALUE, binding::MAX_REGISTRY_BYTES)?,
+    };
     let result = RegistrySnapshot {
         path,
         state,
         sequence,
+        binding,
     };
     validate(&result)?;
     Ok(result)
@@ -206,6 +228,14 @@ fn validate(snapshot: &RegistrySnapshot) -> Result<(), RegistryFault> {
         .is_some_and(|bytes| bytes.len() > MAX_STATE_BYTES)
     {
         return Err(RegistryFault::Limit);
+    }
+    if let Some(value) = &snapshot.binding {
+        if value.kind != enums::REG_SZ {
+            return Err(RegistryFault::UnsupportedType);
+        }
+        if value.bytes.len() > binding::MAX_REGISTRY_BYTES {
+            return Err(RegistryFault::Limit);
+        }
     }
     if let Some(value) = &snapshot.sequence {
         if value.kind != enums::REG_SZ {

@@ -9,11 +9,17 @@ mod argument_identity;
 #[cfg(any(windows, test))]
 mod arguments;
 #[cfg(any(windows, test))]
+mod binding;
+#[cfg(any(windows, test))]
+mod bound_phase;
+#[cfg(any(windows, test))]
 mod caller;
 #[cfg(any(windows, test))]
 mod claim;
 #[cfg(any(windows, test))]
 mod compensation;
+#[cfg(any(windows, test))]
+mod declaration;
 #[cfg(any(windows, test))]
 mod driver;
 #[cfg(any(windows, test))]
@@ -33,6 +39,8 @@ pub mod notification;
 mod path_edit;
 #[cfg(any(windows, test))]
 mod raw_path;
+#[cfg(any(windows, test))]
+mod reservation;
 #[cfg(any(windows, test))]
 mod rollback_receipt;
 #[cfg(any(windows, test))]

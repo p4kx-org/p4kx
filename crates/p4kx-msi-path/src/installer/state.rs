@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::installer::binding::Binding;
 use crate::installer::caller::Caller;
 use crate::installer::claim::Claim;
 use crate::installer::fault::Fault;
 use crate::installer::lease::Lease;
 use crate::installer::raw_path::RawPath;
+use crate::installer::reservation::Reservation;
 use crate::installer::rollback_receipt::RollbackReceipt;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Ownership {
@@ -38,6 +40,8 @@ pub(crate) struct Journal {
 /// A committed journal remains available for later MSI commit-action rollback.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Snapshot {
+    pub(crate) reservation: Option<Reservation>,
+    pub(crate) cancelled_binding: Option<Binding>,
     pub(crate) path: RawPath,
     pub(crate) owner: Option<Ownership>,
     pub(crate) journal: Option<Journal>,

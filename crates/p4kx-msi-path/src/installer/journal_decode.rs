@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::installer::binding::{self, Binding};
 use crate::installer::caller::{Caller, Goal};
 use crate::installer::claim::Claim;
 use crate::installer::fault::Fault;
@@ -9,6 +10,7 @@ use crate::installer::journal_codec;
 use crate::installer::lease::Lease;
 use crate::installer::path_edit::Insertion;
 use crate::installer::raw_path::{self, RawPath, StringKind};
+use crate::installer::reservation::Reservation;
 use crate::installer::rollback_receipt::{RollbackReceipt, RollbackSource};
 use crate::installer::state::{Journal, Ownership, Phase, Snapshot};
 
@@ -24,10 +26,14 @@ pub(crate) fn snapshot(bytes: &[u8]) -> Result<Snapshot, Fault> {
     let path = reader.path()?;
     let owner = reader.owner()?;
     let journal = reader.journal()?;
+    let reservation = reader.reservation()?;
+    let cancelled_binding = reader.cancelled()?;
     if !reader.remaining.is_empty() {
         return Err(Fault::CorruptState);
     }
     Ok(Snapshot {
+        reservation,
+        cancelled_binding,
         path,
         owner,
         journal,
@@ -56,9 +62,13 @@ impl<'a> Reader<'a> {
     }
 
     fn blob(&mut self) -> Result<Vec<u8>, Fault> {
+        self.bounded_blob(raw_path::MAX_PATH_BYTES)
+    }
+
+    fn bounded_blob(&mut self, maximum: usize) -> Result<Vec<u8>, Fault> {
         let count =
             usize::try_from(u32::from_le_bytes(self.array()?)).map_err(|_| Fault::StateLimit)?;
-        if count > raw_path::MAX_PATH_BYTES {
+        if count > maximum {
             return Err(Fault::StateLimit);
         }
         Ok(self.take(count)?.to_vec())
@@ -146,6 +156,29 @@ impl<'a> Reader<'a> {
         Ok(Some(RollbackReceipt {
             from,
             observed_path: self.path()?,
+        }))
+    }
+
+    fn cancelled(&mut self) -> Result<Option<Binding>, Fault> {
+        match self.tag()? {
+            0 => return Ok(None),
+            1 => {}
+            _ => return Err(Fault::CorruptState),
+        }
+        Ok(Some(Binding::from_registry(
+            &self.bounded_blob(binding::MAX_REGISTRY_BYTES)?,
+        )?))
+    }
+
+    fn reservation(&mut self) -> Result<Option<Reservation>, Fault> {
+        match self.tag()? {
+            0 => return Ok(None),
+            1 => {}
+            _ => return Err(Fault::CorruptState),
+        }
+        Ok(Some(Reservation {
+            base_sequence: u64::from_le_bytes(self.array()?),
+            caller: self.caller()?,
         }))
     }
 

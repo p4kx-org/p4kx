@@ -66,7 +66,7 @@ impl std::error::Error for Error {
 /// Executes one private MSI phase with the fixed environment notifier.
 ///
 /// # Errors
-/// Returns malformed arguments, ownership/accounting failures, original Registry errors or incomplete notification.
+/// Returns malformed arguments, random-source or ownership failures, original Registry errors or incomplete notification.
 #[cfg(windows)]
 pub fn execute(
     arguments: impl IntoIterator<Item = OsString>,
@@ -85,6 +85,7 @@ pub fn execute(
     crate::installer::driver::execute(
         &mut crate::installer::registry_adapter::Registry,
         command,
+        crate::installer::invocation_nonce::InvocationNonce::generate,
         notify,
     )
     .map_err(|error| Error {

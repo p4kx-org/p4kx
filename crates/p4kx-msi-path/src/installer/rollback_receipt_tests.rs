@@ -65,8 +65,8 @@ fn every_rollback_origin_produces_a_canonical_complete_receipt() -> TestResult {
 fn legacy_versions_and_unknown_receipt_tags_fail_closed() -> TestResult {
     let encoded = journal_codec::encode(&rolled_back_install(RollbackSource::Prepared)?)?;
     assert!(
-        encoded.ends_with(&[1, 0, 0]),
-        "the canonical suffix is receipt-present, Prepared, absent observed PATH"
+        encoded.ends_with(&[1, 0, 0, 0, 0]),
+        "the canonical suffix preserves receipt, phase, PATH and absent reservation/fence tags"
     );
     let mut legacy = encoded.clone();
     *legacy
@@ -77,7 +77,7 @@ fn legacy_versions_and_unknown_receipt_tags_fail_closed() -> TestResult {
         Err(Fault::CorruptState),
         "a version-one owner cannot bypass the receipt contract"
     );
-    for offset in [1, 2, 3] {
+    for offset in [1, 2, 3, 4, 5] {
         let mut unknown = encoded.clone();
         *unknown
             .get_mut(encoded.len() - offset)
@@ -85,7 +85,7 @@ fn legacy_versions_and_unknown_receipt_tags_fail_closed() -> TestResult {
         assert_eq!(
             journal_codec::decode(&unknown),
             Err(Fault::CorruptState),
-            "unknown receipt, origin and raw PATH tags are rejected"
+            "unknown receipt, origin, raw PATH, reservation and fence tags are rejected"
         );
     }
     let mut trailing = encoded;

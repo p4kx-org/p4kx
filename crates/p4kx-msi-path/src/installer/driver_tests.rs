@@ -4,13 +4,15 @@
 use std::cell::Cell;
 
 use crate::installer::arguments::{Command, Invocation, Stage};
+use crate::installer::binding::Binding;
 use crate::installer::caller::{Caller, Goal};
 use crate::installer::driver::{self, DriverError};
 use crate::installer::fault::Fault;
-use crate::installer::invocation_nonce::InvocationNonce;
+use crate::installer::invocation_nonce::{InvocationNonce, NonceError};
 use crate::installer::journal_codec;
 use crate::installer::notification::{Failure, FailureKind, Report, Stop};
 use crate::installer::raw_path::StringKind;
+use crate::installer::reservation;
 use crate::installer::state::Phase;
 use crate::installer::tests::{self, Memory, TestResult};
 
@@ -27,9 +29,12 @@ fn caller(byte: u8) -> Result<Caller, Fault> {
 fn request(stage: Stage, expected: u64, caller: &Caller) -> Command {
     Command::Transaction(Invocation {
         stage,
-        expected,
-        caller: caller.clone(),
+        binding: Binding::for_caller(expected, caller),
     })
+}
+
+const fn no_random() -> Result<InvocationNonce, NonceError> {
+    Err(NonceError::ReservedValue)
 }
 
 fn complete() -> Report {
@@ -47,7 +52,15 @@ fn run(
     expected: u64,
     caller: &Caller,
 ) -> Result<(), DriverError<Fault>> {
-    driver::execute(store, request(stage, expected, caller), || Ok(complete()))
+    if stage == Stage::Prepare
+        && store.state.sequence == expected
+        && store.state.reservation.is_none()
+    {
+        reservation::create(store, caller.clone()).map_err(DriverError::Store)?;
+    }
+    driver::execute(store, request(stage, expected, caller), no_random, || {
+        Ok(complete())
+    })
 }
 
 #[test]
@@ -56,8 +69,9 @@ fn phase_boundary_persists_receipt_before_path_and_notifies_only_changes() -> Te
     let mut store = tests::memory(original.clone());
     let caller = caller(1)?;
     let notifications = Cell::new(0);
+    reservation::create(&mut store, caller.clone())?;
     for stage in [Stage::Preflight, Stage::Prepare, Stage::Prepare] {
-        driver::execute(&mut store, request(stage, 0, &caller), || {
+        driver::execute(&mut store, request(stage, 0, &caller), no_random, || {
             notifications.set(notifications.get() + 1);
             Ok(complete())
         })?;
@@ -74,7 +88,7 @@ fn phase_boundary_persists_receipt_before_path_and_notifies_only_changes() -> Te
         "durable reload retains the exact nonce-bound caller"
     );
     for stage in [Stage::Apply, Stage::Apply, Stage::Commit, Stage::Commit] {
-        driver::execute(&mut store, request(stage, 0, &caller), || {
+        driver::execute(&mut store, request(stage, 0, &caller), no_random, || {
             notifications.set(notifications.get() + 1);
             Ok(complete())
         })?;
@@ -147,9 +161,12 @@ fn notification_failure_leaves_applied_wal_for_matching_compensation() -> TestRe
             ..complete()
         },
     };
-    let result = driver::execute(&mut store, request(Stage::Apply, 0, &caller), || {
-        Err(failure.clone())
-    });
+    let result = driver::execute(
+        &mut store,
+        request(Stage::Apply, 0, &caller),
+        no_random,
+        || Err(failure.clone()),
+    );
     assert!(
         matches!(result, Err(DriverError::Notification(error)) if error.kind == FailureKind::Native(5)),
         "the actual notification failure is retained"
@@ -172,14 +189,19 @@ fn incomplete_notification_is_not_reported_as_success() -> TestResult {
     let mut store = tests::memory(tests::path("A", StringKind::Plain));
     let caller = caller(4)?;
     run(&mut store, Stage::Prepare, 0, &caller)?;
-    let result = driver::execute(&mut store, request(Stage::Apply, 0, &caller), || {
-        Ok(Report {
-            stop: Stop::WindowLimit,
-            acknowledged: 1,
-            vanished: 0,
-            timed_out: 0,
-        })
-    });
+    let result = driver::execute(
+        &mut store,
+        request(Stage::Apply, 0, &caller),
+        no_random,
+        || {
+            Ok(Report {
+                stop: Stop::WindowLimit,
+                acknowledged: 1,
+                vanished: 0,
+                timed_out: 0,
+            })
+        },
+    );
     assert!(
         matches!(result, Err(DriverError::IncompleteNotification(report)) if report.stop == Stop::WindowLimit),
         "a bounded partial broadcast remains a failure requiring compensation"

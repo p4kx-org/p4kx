@@ -23,7 +23,7 @@ Prepare, apply, commit and rollback require that complete binding. Random-source
 all-zero result fail explicitly; there is no clock, counter or identifier fallback.
 
 The safe `winreg` transactional API atomically compares and replaces the raw PATH, ownership,
-journal and sequence in HKCU's explicit 64-bit Registry view. There is no nontransactional
+journal, sequence and active invocation binding in HKCU's explicit 64-bit Registry view. There is no nontransactional
 fallback. Actual Registry errors retain their typed original causes. The pure codec checks blob
 limits before copying. Native reads check key metadata before winreg's allocation and the returned
 value afterward; concurrent native allocation/isolation bounds require runner evidence.
@@ -31,11 +31,44 @@ Prepared state changes no PATH; applied state and its proof commit
 together. A committed proof remains available to its matching MSI rollback callback if a later
 commit action fails. Separate invocations cannot claim that terminal proof.
 
-The private binary WAL uses version 2 and rejects incompatible versions. Prepared, Applied and
+The private binary WAL uses version 3 and rejects incompatible versions, including versions 1
+and 2. Prepared, Applied and
 Committed bind the entire current owner, including its Borrowed or canonical Inserted claim, to
 their original projection. RolledBack carries its source phase and exact observed PATH. One pure
 compensation projection derives its complete durable owner, including legitimate borrowed or
 reacquired claims. This historical proof does not constrain subsequent foreign PATH edits.
+
+## Invocation reservation and transport
+
+Reserve captures the complete immutable caller and base sequence N, generates one fresh nonce,
+and atomically reserves that invocation without changing PATH, ownership or a terminal journal.
+A later bound Prepare consumes only that reservation and builds receipt N+1 from the live PATH;
+foreign PATH edits and predecessor cleanup before Prepare remain observable. Every mutation,
+including terminal callback no-ops, refuses a foreign active reservation or cancellation fence.
+
+The canonical binding is `v1|N|product32lowerhex|package32lowerhex|nonce64lowerhex`, at most
+154 UTF16 words. Its Registry representation has exactly one NUL. The active Binding lives in
+`Software\P4KX-Installer\PathOwnership\Invocation`; separating this small value from the large
+WAL key keeps its 310-byte metadata bound meaningful. State, sequence, binding and PATH still
+participate in one native transaction and full-image compare-and-replace. Torn or orphan fields
+are rejected. Binding is transport, not authority independent of its complete stored caller.
+
+Cancelling an unprepared reservation retains its exact binding as a cleanup-only fence at the
+same N. Only the matching repeated cancel or rollback may become a no-op; Prepare, Apply and
+Commit cannot reactivate it. A new reservation atomically replaces this fence with a fresh nonce.
+No missing-state or product-only success is inferred.
+
+Pending reservations fail closed by default. Explicit `recover-reserved` requires the exact
+previous binding and replaces only its nonce through compare-and-replace. Product, Package,
+goal, predecessor, N, owner, terminal journal and live PATH remain unchanged. Recovery cannot
+reclaim a cancellation fence or Prepared/Applied journal; only active Reserved state is recoverable. If old Prepare wins the race, recovery
+fails; if recovery wins, stale callbacks fail. No timeout or guessed process-liveness authority
+is used.
+
+The private EXE supports Reserve, captured-binding phases, explicit reserved recovery and the
+fixed notification. Standard MSI AppSearch transport, actual SummaryInformation PackageCode
+binding, major-upgrade callback exclusion and native lifecycle evidence must be completed before
+release activation; the pure protocol does not establish those MSI integration facts.
 
 ## Approved notification exception
 

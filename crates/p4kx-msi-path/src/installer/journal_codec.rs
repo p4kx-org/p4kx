@@ -7,10 +7,11 @@ use crate::installer::fault::Fault;
 use crate::installer::journal_decode;
 use crate::installer::journal_encode;
 use crate::installer::path_edit;
+use crate::installer::reservation;
 use crate::installer::state::{Ownership, Phase, Snapshot};
 use crate::installer::transaction;
 
-pub(crate) const MAGIC: &[u8] = b"P4KXPATH\x02";
+pub(crate) const MAGIC: &[u8] = b"P4KXPATH\x03";
 pub(crate) const MAX_STATE_BYTES: usize = 16 << 20;
 
 pub(crate) fn encode(snapshot: &Snapshot) -> Result<Vec<u8>, Fault> {
@@ -26,6 +27,7 @@ pub(crate) fn decode(bytes: &[u8]) -> Result<Snapshot, Fault> {
 
 fn validate(snapshot: &Snapshot) -> Result<(), Fault> {
     snapshot.path.split()?;
+    reservation::validate(snapshot)?;
     owner(snapshot.owner.as_ref())?;
     let Some(record) = &snapshot.journal else {
         return if snapshot.sequence == 0 && snapshot.owner.is_none() {

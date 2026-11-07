@@ -22,6 +22,9 @@ pub(crate) enum Fault {
     InvalidFolder,
     ArgumentLimit,
     InvalidNonce,
+    InvalidBinding,
+    MissingReservation,
+    PendingReservation,
 }
 
 impl std::fmt::Display for Fault {

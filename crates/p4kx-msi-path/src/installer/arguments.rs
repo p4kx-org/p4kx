@@ -3,12 +3,13 @@
 
 use crate::installer::argument_folder;
 use crate::installer::argument_identity;
-use crate::installer::caller::{Caller, Goal};
+use crate::installer::binding::Binding;
+use crate::installer::caller::Goal;
+use crate::installer::declaration::Declaration;
 use crate::installer::fault::Fault;
-use crate::installer::invocation_nonce::InvocationNonce;
 
 pub(crate) const MAX_ARGUMENT_WORDS: usize = 8192;
-const MAX_ARGUMENTS: usize = 8;
+const MAX_ARGUMENTS: usize = 6;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Stage {
@@ -17,36 +18,21 @@ pub(crate) enum Stage {
     Apply,
     Commit,
     Rollback,
+    Cancel,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Invocation {
     pub(crate) stage: Stage,
-    pub(crate) expected: u64,
-    pub(crate) caller: Caller,
+    pub(crate) binding: Binding,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Command {
+    Reserve(Declaration),
+    Recover(Binding),
     Transaction(Invocation),
     Notify,
-}
-
-enum RawGoal<'a> {
-    Remove,
-    Ensure {
-        predecessor: &'a [u16],
-        folder: &'a [u16],
-    },
-}
-
-struct Raw<'a> {
-    head: &'a [u16],
-    expected: &'a [u16],
-    product: &'a [u16],
-    package: &'a [u16],
-    nonce: &'a [u16],
-    goal: RawGoal<'a>,
 }
 
 pub(crate) fn parse(input: impl IntoIterator<Item = Vec<u16>>) -> Result<Command, Fault> {
@@ -57,75 +43,65 @@ pub(crate) fn parse(input: impl IntoIterator<Item = Vec<u16>>) -> Result<Command
         }
         arguments.push(argument);
     }
-    if let [verb] = arguments.as_slice()
-        && word(verb, "notify")
-    {
-        return Ok(Command::Notify);
-    }
-    decode(&raw(&arguments)?)
-}
-
-fn raw(arguments: &[Vec<u16>]) -> Result<Raw<'_>, Fault> {
-    match arguments {
-        [head, mode, expected, product, package, nonce] if word(mode, "remove") => Ok(Raw {
-            head,
-            expected,
-            product,
-            package,
-            nonce,
-            goal: RawGoal::Remove,
-        }),
-        [
-            head,
-            mode,
-            expected,
-            product,
-            package,
-            nonce,
-            predecessor,
-            folder,
-        ] if word(mode, "ensure") => Ok(Raw {
-            head,
-            expected,
-            product,
-            package,
-            nonce,
-            goal: RawGoal::Ensure {
-                predecessor,
-                folder,
-            },
-        }),
+    match arguments.as_slice() {
+        [head] if word(head, "notify") => Ok(Command::Notify),
+        [head, mode, product, package] if word(head, "reserve") && word(mode, "remove") => {
+            reserve(product, package, None)
+        }
+        [head, mode, product, package, predecessor, folder]
+            if word(head, "reserve") && word(mode, "ensure") =>
+        {
+            reserve(product, package, Some((predecessor, folder)))
+        }
+        [head, product, package, captured] => bound(head, product, package, captured),
         _ => Err(Fault::InvalidArguments),
     }
 }
 
-fn decode(raw: &Raw<'_>) -> Result<Command, Fault> {
-    let (goal, predecessor) = match &raw.goal {
-        RawGoal::Remove => (Goal::Remove, None),
-        RawGoal::Ensure {
-            predecessor,
-            folder,
-        } => {
-            let previous = if predecessor.is_empty() {
+fn reserve(
+    product: &[u16],
+    package: &[u16],
+    ensure: Option<(&[u16], &[u16])>,
+) -> Result<Command, Fault> {
+    let (goal, predecessor) = match ensure {
+        None => (Goal::Remove, None),
+        Some((predecessor, folder)) => {
+            let predecessor = if predecessor.is_empty() {
                 None
             } else {
                 Some(argument_identity::code(predecessor)?)
             };
-            (Goal::Ensure(argument_folder::lease(folder)?), previous)
+            (Goal::Ensure(argument_folder::lease(folder)?), predecessor)
         }
     };
-    let caller = Caller {
-        product: argument_identity::code(raw.product)?,
-        package: argument_identity::code(raw.package)?,
-        nonce: InvocationNonce::parse(raw.nonce)?,
+    let declaration = Declaration {
+        product: argument_identity::code(product)?,
+        package: argument_identity::code(package)?,
         predecessor,
         goal,
     };
-    caller.validate()?;
+    declaration.validate()?;
+    Ok(Command::Reserve(declaration))
+}
+
+fn bound(
+    head: &[u16],
+    product: &[u16],
+    package: &[u16],
+    captured: &[u16],
+) -> Result<Command, Fault> {
+    let binding = Binding::parse(captured)?;
+    if binding.product != argument_identity::code(product)?
+        || binding.package != argument_identity::code(package)?
+    {
+        return Err(Fault::InvalidIdentity);
+    }
+    if word(head, "recover-reserved") {
+        return Ok(Command::Recover(binding));
+    }
     Ok(Command::Transaction(Invocation {
-        stage: stage(raw.head)?,
-        expected: argument_identity::sequence(raw.expected)?,
-        caller,
+        stage: stage(head)?,
+        binding,
     }))
 }
 
@@ -136,6 +112,7 @@ fn stage(words: &[u16]) -> Result<Stage, Fault> {
         ("apply", Stage::Apply),
         ("commit", Stage::Commit),
         ("rollback", Stage::Rollback),
+        ("cancel-reserved", Stage::Cancel),
     ] {
         if word(words, name) {
             return Ok(stage);
