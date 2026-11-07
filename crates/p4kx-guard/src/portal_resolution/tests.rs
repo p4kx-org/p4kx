@@ -299,3 +299,94 @@ fn an_empty_protection_set_does_not_change_source_identity_evidence() {
         "neither a Data.p4k name nor a resolved host spelling classifies an installation"
     );
 }
+
+#[test]
+fn official_tokens_and_legacy_ids_keep_their_exact_query_identity() {
+    for id in ["aabbccdd", "AbCdEfGhIjKlMnOpQ1St_Q"] {
+        let path = format!("/run/user/1001/doc/{id}/exports/new/file.txt");
+        let mut transport = Transport::reply();
+        transport.edit(|reply| reply.paths[0].0 = id.to_owned());
+        let result = super::resolve_with(
+            path.as_bytes(),
+            MOUNTS,
+            MOUNT,
+            DocumentGrant::Directory,
+            &mut transport,
+        )
+        .expect("official token and legacy hexadecimal document IDs resolve");
+        assert_eq!(
+            result,
+            MappingOutcome::Resolved(PortalMapping {
+                host_path: b"/home/user/exports/new/file.txt".to_vec(),
+                document_id: id.to_owned(),
+                grant: DocumentGrant::Directory,
+            }),
+            "the complete authenticated identity and descendant suffix are preserved"
+        );
+        assert_eq!(
+            transport.requested,
+            [id],
+            "the lookup preserves every ID byte"
+        );
+    }
+}
+
+#[test]
+fn token_reply_identity_is_case_sensitive() {
+    let id = "AbCdEfGhIjKlMnOpQ1St_Q";
+    let path = format!("/run/user/1001/doc/{id}/exports");
+    let mut transport = Transport::reply();
+    transport.edit(|reply| reply.paths[0].0 = id.to_ascii_lowercase());
+    assert_eq!(
+        super::resolve_with(
+            path.as_bytes(),
+            MOUNTS,
+            MOUNT,
+            DocumentGrant::Directory,
+            &mut transport,
+        )
+        .expect_err("a differently cased reply does not authenticate the queried document")
+        .reason(),
+        AliasUncertainty::MalformedReply,
+        "document tokens are opaque case-sensitive identities"
+    );
+    assert_eq!(
+        transport.requested,
+        [id],
+        "the query never normalizes the token"
+    );
+}
+
+#[test]
+fn malformed_id_components_never_trigger_a_document_query() {
+    for id in [
+        "",
+        "/ab",
+        ".",
+        "..",
+        "ab\0cd",
+        "é",
+        "a-b",
+        "012345678901234567890123456789012",
+    ] {
+        let path = format!("/run/user/1001/doc/{id}/exports");
+        let mut transport = Transport::reply();
+        assert_eq!(
+            super::resolve_with(
+                path.as_bytes(),
+                MOUNTS,
+                MOUNT,
+                DocumentGrant::Directory,
+                &mut transport,
+            )
+            .expect_err("malformed ID components cannot select a document")
+            .reason(),
+            AliasUncertainty::DocumentPath,
+            "ID components retain their lexical and byte bounds"
+        );
+        assert!(
+            transport.requested.is_empty(),
+            "invalid IDs never reach the service"
+        );
+    }
+}

@@ -21,7 +21,7 @@ function Export-P4kxFlatpakDocument {
     $result = (Invoke-P4kxLinuxTool flatpak @('document-export', '--unique', '--transient', "--app=$ApplicationId", '--allow-read', $access, $Path) | Out-String).Trim()
     $prefix = Join-Path $env:XDG_RUNTIME_DIR 'doc'
     if (-not $result.StartsWith("$prefix/", [StringComparison]::Ordinal) -or
-        $result.Substring($prefix.Length + 1) -cnotmatch '^[0-9a-f]+/[^\r\n]+$') { throw 'Document export did not return an actual portal path.' }
+        $result.Substring($prefix.Length + 1) -cnotmatch '\A[A-Za-z0-9_]{1,32}/[^\r\n]+\z') { throw 'Document export did not return an actual portal path.' }
     return $result
 }
 

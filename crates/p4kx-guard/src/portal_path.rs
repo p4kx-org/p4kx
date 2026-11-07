@@ -21,7 +21,12 @@ pub(crate) fn document_path(path: &[u8], mount: &[u8]) -> Result<DocumentPath, U
         .ok_or_else(|| UnknownAlias::new(AliasUncertainty::UntrustedMount))?;
     let mut components = relative.split(|byte| *byte == b'/');
     let id = components.next().unwrap_or_default();
-    if id.is_empty() || id.len() > MAX_DOCUMENT_ID_BYTES || !id.iter().all(u8::is_ascii_hexdigit) {
+    if id.is_empty()
+        || id.len() > MAX_DOCUMENT_ID_BYTES
+        || !id
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
+    {
         return Err(UnknownAlias::new(AliasUncertainty::DocumentPath));
     }
     let name = components

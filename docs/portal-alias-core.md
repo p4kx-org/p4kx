@@ -40,6 +40,10 @@ change, invalid signature, duplicate IDs and missing mappings remain `Unknown`. 
 user xattr, `Info`/`List` fallback, host-spawn command or wider filesystem permission
 contributes identity. Kernel mount metadata alone is not host-origin evidence.
 
+Document IDs are opaque and case sensitive. The resolver accepts ASCII letters, digits
+and underscores within its existing 32-byte limit, including legacy hexadecimal IDs
+and the portal's 22-byte tokens. Requests and reply comparisons preserve every ID byte.
+
 The transport uses the existing zbus 5.19 blocking client with internal async-io. A
 same-user Unix peer, EXTERNAL authentication and the local session-bus/proxy's owner
 authority are trust assumptions; this is not executable attestation. The service's

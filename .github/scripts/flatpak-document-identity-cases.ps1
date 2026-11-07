@@ -18,7 +18,7 @@ function Get-P4kxDocumentId {
     $root = Join-Path $env:XDG_RUNTIME_DIR 'doc'
     if (-not $Path.StartsWith("$root/", [StringComparison]::Ordinal)) { throw 'Document identity is outside its normal mount.' }
     $parts = $Path.Substring($root.Length + 1) -split '/'
-    if ($parts.Count -lt 2 -or $parts[0] -cnotmatch '^[0-9a-f]+$') { throw 'Document identity is malformed.' }
+    if ($parts.Count -lt 2 -or $parts[0] -cnotmatch '\A[A-Za-z0-9_]{1,32}\z') { throw 'Document identity is malformed.' }
     return $parts[0]
 }
 
