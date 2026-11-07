@@ -6,7 +6,9 @@ same packaged application binaries on the Ubuntu 24.04/glibc 2.39 baseline.
 
 The first session uses the stock services. It runs tar.gz, AppImage and deb checks, then proves
 that all three real Flatpak applications reject API4 operational startup with
-`[p4kx.runtime.documents-api5]` and exit 1. Help and version remain usable; the GUI prerequisite
+`[p4kx.runtime.documents-api5]`, the typed cause `[p4kx.documents.unsupported-interface:4]`
+and exit 1. The generic prerequisite code alone is insufficient: session-bus, authentication,
+access, timeout or malformed-reply failures do not establish an API4 refusal. Help and version remain usable; the GUI prerequisite
 smoke uses `P4KX_SMOKE_FRAMES=3`. No operational profile, stored-key root or export may be created.
 These negative checks are recorded as expected refusals and never satisfy runtime checks.
 
@@ -83,6 +85,15 @@ completed teardown cannot turn a failed worker into runtime success. PowerShell 
 mocks, direct-child toy controllers and injected pidfd tests establish orchestration behavior;
 only the disposable native runner proves
 real services, grants, kernel FUSE behavior and packaged application execution.
+
+The API4 prerequisite subproof has schema 1. Each app retains its actual exit code, the
+`unsupported-interface` reason and the typed interface version from the machine diagnostic.
+The version must equal the independently measured integer API4 capability. Its capability owner
+must match the Documents owner in the retained initial and final stock-session identities;
+the negative record and both observations must name the same owned session. These are bounded
+session observations, not a claim of a separate per-app owner measurement. Repeated identical
+markers from the diagnostic's cause chain are allowed; malformed or mixed versions are refused.
+The API5 positive cases and their runtime-success requirements remain independent.
 
 Primary contracts: [official 1.22.1 release](https://github.com/flatpak/xdg-desktop-portal/releases/tag/1.22.1),
 [official Meson inputs](https://github.com/flatpak/xdg-desktop-portal/blob/1.22.1/meson.build),

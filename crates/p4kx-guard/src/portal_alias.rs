@@ -109,7 +109,9 @@ pub enum AliasUncertainty {
     #[error("document access denied")]
     AccessDenied,
     /// The service does not provide authenticated host-path lookup.
-    #[error("Documents interface {0} does not provide host paths")]
+    #[error(
+        "[p4kx.documents.unsupported-interface:{0}] Documents interface {0} does not provide host paths"
+    )]
     UnsupportedInterface(u32),
     /// An expected method is absent despite the advertised interface.
     #[error("Documents method unavailable")]
@@ -126,6 +128,52 @@ pub enum AliasUncertainty {
     /// The reply did not contain the requested document.
     #[error("document host path unavailable")]
     MissingDocument,
+}
+
+#[cfg(test)]
+mod prerequisite_marker_tests {
+    use super::{AliasUncertainty, UnknownAlias};
+
+    #[test]
+    fn an_unsupported_interface_reports_its_exact_unsigned_version() {
+        for version in [0, 4, 5, u32::MAX] {
+            let reason = AliasUncertainty::UnsupportedInterface(version);
+            let expected = format!("[p4kx.documents.unsupported-interface:{version}]");
+            assert!(
+                reason.to_string().starts_with(expected.as_str()),
+                "typed version {version}"
+            );
+            let failure = UnknownAlias::new(reason);
+            assert_eq!(failure.reason(), reason, "typed cause is retained");
+            assert!(
+                failure.to_string().contains(expected.as_str()),
+                "wrapped marker is retained"
+            );
+        }
+    }
+
+    #[test]
+    fn transport_and_other_failures_never_emit_an_unsupported_version_marker() {
+        for reason in [
+            AliasUncertainty::SessionBus,
+            AliasUncertainty::ServiceUnavailable,
+            AliasUncertainty::OwnerChanged,
+            AliasUncertainty::AccessDenied,
+            AliasUncertainty::UnsupportedMethod,
+            AliasUncertainty::Timeout,
+            AliasUncertainty::Cancelled,
+            AliasUncertainty::MalformedReply,
+            AliasUncertainty::Filesystem,
+            AliasUncertainty::Limit,
+        ] {
+            assert!(
+                !UnknownAlias::new(reason)
+                    .to_string()
+                    .contains("[p4kx.documents.unsupported-interface:"),
+                "{reason:?}"
+            );
+        }
+    }
 }
 
 /// An uncertainty result preserving local failures without copying remote error text.

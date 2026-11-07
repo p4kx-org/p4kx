@@ -167,6 +167,8 @@ jobs:
           .github/scripts/test-documents-portal-session.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/documents-session')
           .github/scripts/test-documents-session-controller.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/documents-controller')
           .github/scripts/test-flatpak-prerequisites.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/flatpak-prerequisites')
+          .github/scripts/test-flatpak-prerequisite-outcomes.ps1
+          .github/scripts/test-documents-stock-observations.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/documents-observations')
           .github/scripts/test-documents-portal-evidence.ps1
           python3 -B .github/scripts/test-stop-owned-portals.py
           if ($LASTEXITCODE -ne 0) { throw 'Owned process cleanup contract failed.' }

@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'documents-portal-source.ps1')
 . (Join-Path $PSScriptRoot 'documents-session-proof.ps1')
+. (Join-Path $PSScriptRoot 'flatpak-prerequisite-proof.ps1')
 
 function Assert-P4kxDocumentsServiceBuild {
     param($Build, [string]$Target, [string]$Revision)
@@ -60,11 +61,7 @@ function Assert-P4kxDocumentsSessionsEvidence {
     param($Documents)
     $negative = $Documents.api4_prerequisite
     if ($negative.target -cne $Documents.target -or $negative.revision -cne $Documents.revision -or $negative.interface.interface_version -ne 4 -or $negative.prerequisite.outcome -cne 'expected-refusal' -or $negative.prerequisite.runtime_pass -ne $false) { throw 'API4 negative was omitted, rebound or promoted to runtime success.' }
-    $applications = @($negative.prerequisite.applications)
-    if ((@($applications.application | Sort-Object) -join ',') -cne 'p4kx,p4kx-gui,p4kx-mcp') { throw 'API4 negative does not cover all three real apps.' }
-    foreach ($application in $applications) {
-        if ($application.prerequisite -cne 'expected-refusal' -or $application.help -cne 'success' -or $application.version -cne 'success') { throw 'API4 app prerequisite/help/version did not execute.' }
-    }
+    Assert-P4kxFlatpakApi4Evidence $negative $Documents.stock_session
     if ($Documents.api5_interface.interface_version -ne 5 -or $Documents.api5_interface.get_host_paths -ne $true -or $Documents.api5_interface.empty_host_paths -cne 'success') { throw 'Real API5 interface/method evidence is missing.' }
     foreach ($session in @($Documents.stock_session, $Documents.api5_session)) {
         if ($session.controller.worker.exit_code -ne 0) { throw 'Documents main-session worker failed; teardown is not runtime success.' }
@@ -93,6 +90,7 @@ function Get-P4kxDocumentsCombinedEvidence {
     $package = Get-Content -LiteralPath (Join-Path $Phases.positive 'package.json') -Raw | ConvertFrom-Json
     $negative = Get-Content -LiteralPath (Join-Path $Phases.stock 'negative.json') -Raw | ConvertFrom-Json
     $stock = Get-Content -LiteralPath (Join-Path $Phases.stock 'session-services-final.json') -Raw | ConvertFrom-Json
+    $stockInitial = Get-Content -LiteralPath (Join-Path $Phases.stock 'session-services-initial.json') -Raw | ConvertFrom-Json
     $positive = Get-Content -LiteralPath (Join-Path $Phases.positive 'session-services-initial.json') -Raw | ConvertFrom-Json
     $stockEnd = Get-Content -LiteralPath (Join-Path $Phases.stock 'teardown.json') -Raw | ConvertFrom-Json
     $positiveEnd = Get-Content -LiteralPath (Join-Path $Phases.positive 'teardown.json') -Raw | ConvertFrom-Json
@@ -105,7 +103,7 @@ function Get-P4kxDocumentsCombinedEvidence {
     $documents | Add-Member -NotePropertyName package_sha256 -NotePropertyValue $PackageHash
     $documents | Add-Member -NotePropertyName service_build -NotePropertyValue $Services
     $documents | Add-Member -NotePropertyName api4_prerequisite -NotePropertyValue $negative
-    $documents | Add-Member -NotePropertyName stock_session -NotePropertyValue @{session=$stock.session; teardown=$stockEnd; controller=$stockController}
+    $documents | Add-Member -NotePropertyName stock_session -NotePropertyValue @{session=$stock.session; initial_session=$stockInitial.session; initial_services=$stockInitial.services; final_services=$stock.observed_services; teardown=$stockEnd; controller=$stockController}
     $documents | Add-Member -NotePropertyName api5_session -NotePropertyValue @{session=$positive.session; controller=$positiveController; user_uid=$positive.user_uid; initial_services=$positive.services; teardown=$positiveEnd; auth=$config.SelectSingleNode('/busconfig/auth').InnerText; configuration_sha256=(Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash.ToLowerInvariant()}
     return $package
 }

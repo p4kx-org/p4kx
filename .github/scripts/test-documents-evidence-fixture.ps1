@@ -19,12 +19,16 @@ function New-P4kxDocumentsEvidenceFixture {
     $positive = 'unix:abstract=p4kx-docs-' + ('c' * 32)
     $proof = @{schema=2; target=$Platform.target; revision=$Revision; package_sha256=$PackageHash;
         service_build=@{schema=1; target=$Platform.target; revision=$Revision; role='disposable CI services only'; source=(Get-P4kxDocumentsPortalRecipe); binaries=$binaries};
-        api4_prerequisite=@{target=$Platform.target; revision=$Revision; interface=@{interface_version=4}; prerequisite=@{outcome='expected-refusal'; runtime_pass=$false; applications=@(
-            @{application='p4kx'; prerequisite='expected-refusal'; help='success'; version='success'},
-            @{application='p4kx-gui'; prerequisite='expected-refusal'; help='success'; version='success'},
-            @{application='p4kx-mcp'; prerequisite='expected-refusal'; help='success'; version='success'})}};
+        api4_prerequisite=@{target=$Platform.target; revision=$Revision; session=$stock;
+            interface=@{interface_version=4; owner=':1.4'}; prerequisite=@{schema=1; outcome='expected-refusal'; runtime_pass=$false; applications=@(
+            @{application='p4kx'; prerequisite='expected-refusal'; help='success'; version='success'; refusal_reason='unsupported-interface'; interface_version=4; exit_code=1},
+            @{application='p4kx-gui'; prerequisite='expected-refusal'; help='success'; version='success'; refusal_reason='unsupported-interface'; interface_version=4; exit_code=1},
+            @{application='p4kx-mcp'; prerequisite='expected-refusal'; help='success'; version='success'; refusal_reason='unsupported-interface'; interface_version=4; exit_code=1})}};
         api5_interface=@{interface_version=5; get_host_paths=$true; empty_host_paths='success'; owner=':1.10'};
-        stock_session=@{session=$stock; teardown=@{source_session=$stock; processes_exited='success'; mount_gone='success'; controller_processes_exited='success'}};
+        stock_session=@{session=$stock; initial_session=$stock;
+            initial_services=@(@{service='org.freedesktop.portal.Documents'; owner=':1.4'});
+            final_services=@(@{service='org.freedesktop.portal.Documents'; owner=':1.4'});
+            teardown=@{source_session=$stock; processes_exited='success'; mount_gone='success'; controller_processes_exited='success'}};
         api5_session=@{session=$positive; user_uid=1000; auth='EXTERNAL'; configuration_sha256=('d' * 64); initial_services=$observed; teardown=@{source_session=$positive; processes_exited='success'; mount_gone='success'; controller_processes_exited='success'}};
         hardlink=@{outcome='success'; host_hardlink='proven'; separate_documents=$true; classification='target-identity'; source_unchanged='success'};
         forged_underlying_xattr=@{outcome='success'; underlying='forged'; fuse_view='portal-synthesized'; product_visible_forgery_proven=$false}}

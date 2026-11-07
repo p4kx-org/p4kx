@@ -33,8 +33,8 @@ try {
         $images = @(Get-P4kxLinuxApplicationEvidence $state.binaries $platform)
         Assert-P4kxLinuxPackageExecution @{target=$Target; package='flatpak'; binaries=$images} $producer.proof $platform
         @{state=$state; producer=$producer.proof; binaries=$images; target=$Target; revision=$env:GITHUB_SHA} | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'flatpak-state.json') -Encoding utf8NoBOM
-        $negative = Test-P4kxFlatpakPrerequisites $state $platform $FixtureDirectory (Join-Path $directory 'prerequisites')
-        @{target=$Target; revision=$env:GITHUB_SHA; interface=$interface; prerequisite=$negative} | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'negative.json') -Encoding utf8NoBOM
+        $negative = Test-P4kxFlatpakPrerequisites $state $platform $FixtureDirectory (Join-Path $directory 'prerequisites') $interface.interface_version
+        @{target=$Target; revision=$env:GITHUB_SHA; session=$env:DBUS_SESSION_BUS_ADDRESS; interface=$interface; prerequisite=$negative} | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'negative.json') -Encoding utf8NoBOM
     }
     catch { $failures.Add($_.Exception) }
 }

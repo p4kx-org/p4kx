@@ -10,6 +10,9 @@ the JSON shapes are in [cli-json.md](cli-json.md).
 Flatpak execution requires host Documents-portal API 5 or later with authenticated
 `GetHostPaths`. CLI and MCP check this before profiles, stored keys or normal work. A missing
 capability reports `[p4kx.runtime.documents-api5]` and exits 1; help/version remain available.
+An observed unsupported Documents version also reports
+`[p4kx.documents.unsupported-interface:N]`, with its exact unsigned version. Transport or
+authentication failures retain their own typed cause and do not report that version marker.
 The native package and Flatpak host requirements are described in [Linux packages](linux-packages.md).
 
 Archive-derived writes retain their actual source Archive context. A known installation is

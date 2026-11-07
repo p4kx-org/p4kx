@@ -32,7 +32,22 @@ foreach ($mutation in @(
     { param($value) $value.stock_session.controller.worker.pid = $value.stock_session.controller.bus.pid },
     { param($value) $value.stock_session.controller.worker.exit_code = 37 },
     { param($value) $value.api5_session.controller.worker.exit_code = 37 },
-    { param($value) $value.api5_session.teardown.controller_processes_exited = 'skipped' }
+    { param($value) $value.api5_session.teardown.controller_processes_exited = 'skipped' },
+    { param($value) $value.api4_prerequisite.prerequisite.schema = $null },
+    { param($value) $value.api4_prerequisite.prerequisite.runtime_pass = 0 },
+    { param($value) $value.api4_prerequisite.prerequisite.applications[0].refusal_reason = 'session-bus' },
+    { param($value) $value.api4_prerequisite.prerequisite.applications[0].interface_version = 5 },
+    { param($value) $value.api4_prerequisite.prerequisite.applications[1].interface_version = '4' },
+    { param($value) $value.api4_prerequisite.prerequisite.applications[2].interface_version = 4.0 },
+    { param($value) $value.api4_prerequisite.prerequisite.applications[0].exit_code = '1' },
+    { param($value) $value.api4_prerequisite.interface.interface_version = '4' },
+    { param($value) $value.api4_prerequisite.interface.owner = ':1.99' },
+    { param($value) $value.api4_prerequisite.session = 'unix:abstract=foreign' },
+    { param($value) $value.stock_session.initial_session = 'unix:abstract=foreign' },
+    { param($value) $value.stock_session.initial_services = @() },
+    { param($value) $value.stock_session.final_services[0].owner = ':1.99' },
+    { param($value) $value.stock_session.initial_services += $value.stock_session.initial_services[0] },
+    { param($value) $value.stock_session.final_services = @() }
 )) {
     $changed = $original | ConvertFrom-Json
     & $mutation $changed
@@ -51,5 +66,5 @@ foreach ($text in @('other failure', 'the tool never writes there', '[p4kx.write
     try { Assert-P4kxFlatpakDocumentOutcome @{exit_code=2; stderr=$text} 'SourceMembership' | Out-Null } catch { $rejected = $true }
     if (-not $rejected) { throw 'Another refusal category was promoted to neutral membership.' }
 }
-Assert-P4kxFlatpakPrerequisiteOutcome @{exit_code=1; stderr='[p4kx.runtime.documents-api5] synthetic'}
-'PASS: structural contract, thirty-three provenance/capability/controller mutations and exact typed refusals; no portal or runtime executed.'
+Assert-P4kxFlatpakPrerequisiteOutcome @{exit_code=1; stderr='[p4kx.runtime.documents-api5] [p4kx.documents.unsupported-interface:4] synthetic'} | Out-Null
+'PASS: structural contract, provenance/capability/controller/API4 mutations and exact typed refusals; no portal or runtime executed.'

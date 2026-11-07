@@ -64,6 +64,7 @@ function Save-P4kxDocumentsSessionIdentity {
         if ($Build -and $identity.sha256 -cne @($Build.binaries | Where-Object name -CEQ $name)[0].sha256) { throw 'Running portal differs from the native service build.' }
         $identity
     })
+    $observedServices = @($services)
     $initial = Join-Path $Directory 'session-services-initial.json'
     if ($Stage -ceq 'final' -and (Test-Path -LiteralPath $initial)) {
         $previous = Get-Content -LiteralPath $initial -Raw | ConvertFrom-Json
@@ -72,7 +73,7 @@ function Save-P4kxDocumentsSessionIdentity {
             if (@($services | Where-Object { $_.pid -eq $record.pid -and $_.start -ceq $record.start }).Count -eq 0) { $services += $record }
         }
     }
-    $proof = @{session=$env:DBUS_SESSION_BUS_ADDRESS; user_uid=(Get-P4kxPortalUserId); stage=$Stage; inventory_complete=$true; services=$services}
+    $proof = @{session=$env:DBUS_SESSION_BUS_ADDRESS; user_uid=(Get-P4kxPortalUserId); stage=$Stage; inventory_complete=$true; services=$services; observed_services=$observedServices}
     $encoded = $proof | ConvertTo-Json -Depth 6
     $encoded | Set-Content -LiteralPath (Join-Path $Directory "session-services-$Stage.json") -Encoding utf8NoBOM
     $encoded | Set-Content -LiteralPath (Join-Path $Directory 'session-services.json') -Encoding utf8NoBOM
