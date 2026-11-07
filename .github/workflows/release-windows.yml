@@ -44,6 +44,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           cache-key: release
+          cache-on-failure: "true"
           nextest: "true"
       - name: Build all shipped native release applications
         run: |

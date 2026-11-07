@@ -38,6 +38,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           cache-key: linux-release
+          cache-on-failure: "true"
           nextest: "true"
       - name: Install native baseline, desktop, source and package dependencies
         run: .github/scripts/install-linux-package-dependencies.ps1 -Build

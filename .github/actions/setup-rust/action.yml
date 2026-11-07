@@ -14,6 +14,9 @@ inputs:
   nextest:
     description: Install cargo-nextest
     default: "false"
+  cache-on-failure:
+    description: Retain dependency builds when a later job step fails
+    default: "false"
 
 runs:
   using: composite
@@ -49,6 +52,7 @@ runs:
     - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:
         key: ${{ inputs.cache-key }}-${{ steps.toolchain.outputs.target }}
+        cache-on-failure: ${{ inputs.cache-on-failure }}
     - name: Install the native ALSA headers
       if: runner.os == 'Linux'
       shell: pwsh
