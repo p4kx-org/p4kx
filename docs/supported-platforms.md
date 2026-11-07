@@ -73,6 +73,11 @@ package, and `Release::link()` returns the selected link or page. The GUI uses t
 
 ## Release preflight and evidence
 
+Manual Release workflow runs can select `linux-only` or `windows-only` to validate both native
+CPUs and package formats for that OS without external scans or publication. The options are
+mutually exclusive. These scoped checks do not replace the final full release matrix from one
+source commit.
+
 Before checksums and release notes are assembled, `check-release-matrix.ps1` requires:
 
 - Twelve non-empty native package assets: four Windows packages and eight Linux packages.

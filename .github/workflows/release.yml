@@ -24,6 +24,11 @@ on:
         type: boolean
         default: false
         required: false
+      windows-only:
+        description: Validate native Windows packages without Linux, external scans or publication
+        type: boolean
+        default: false
+        required: false
 
 permissions: {}
 
@@ -48,6 +53,12 @@ jobs:
       run:
         shell: pwsh
     steps:
+      - name: Validate manual package scope
+        env:
+          LINUX_ONLY: ${{ inputs.linux-only }}
+          WINDOWS_ONLY: ${{ inputs.windows-only }}
+        run: |
+          if ($env:LINUX_ONLY -eq 'true' -and $env:WINDOWS_ONLY -eq 'true') { throw 'Choose at most one native package scope.' }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -112,6 +123,7 @@ jobs:
 
   linux:
     name: Linux native packages and execution
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows-only
     needs: prepare
     permissions:
       contents: read
@@ -123,7 +135,7 @@ jobs:
   scan:
     name: VirusTotal scan of package assets
     needs: [prepare, windows, linux]
-    if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && !inputs.linux-only)
+    if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && !inputs.linux-only && !inputs.windows-only)
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     permissions:
