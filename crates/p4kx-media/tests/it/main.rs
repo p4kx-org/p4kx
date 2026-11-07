@@ -6,6 +6,7 @@
 mod archive;
 mod budgets;
 mod capabilities;
+mod entry_metadata_schema;
 mod interruptions;
 #[cfg(windows)]
 mod junctions;
@@ -16,6 +17,11 @@ mod recovery;
 mod reference_context;
 mod references;
 mod schema;
+mod shader_provider_failures;
+mod shader_provider_schema;
+mod shader_provider_sources;
+mod shader_provider_status;
+mod shader_support;
 mod source_errors;
 mod streaming;
 mod support;

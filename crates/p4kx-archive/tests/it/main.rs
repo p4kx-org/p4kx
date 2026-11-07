@@ -9,6 +9,7 @@ mod container_limits;
 mod containers;
 mod decoding;
 mod effective_encoding;
+mod entry_metadata;
 mod hash_block;
 mod installation_v2;
 mod key_demand;

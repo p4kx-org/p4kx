@@ -12,6 +12,10 @@ fn checked_in_media_schemas_match_the_typed_contracts() -> TestResult {
         ("media-index.schema.json", p4kx_media::index_schema()),
         ("media-record.schema.json", p4kx_media::record_schema()),
         (
+            "media-builtin-record.schema.json",
+            p4kx_media::builtin_record_schema()?,
+        ),
+        (
             "media-reference.schema.json",
             p4kx_media::reference_schema(),
         ),

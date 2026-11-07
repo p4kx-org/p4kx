@@ -16,8 +16,15 @@ p4kx-channels.workspace = true
 same-file.workspace = true
 thiserror.workspace = true
 
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix.workspace = true
+serde.workspace = true
+zbus.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
+serde.workspace = true
+zbus = { workspace = true, features = ["p2p"] }
 
 [lints]
 workspace = true

@@ -4,7 +4,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{ArchiveProvider, MediaError, MediaKind, MediaWriter, RootSource, SourceContext};
+use crate::{
+    ArchiveProvider, MediaError, MediaKind, MediaWriter, RootSource, ShaderProvider, SourceContext,
+};
 
 /// Whether a registered provider can execute in this build.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -136,7 +138,10 @@ pub struct ProviderRegistry {
 impl Default for ProviderRegistry {
     fn default() -> Self {
         Self {
-            providers: vec![Box::new(ArchiveProvider)],
+            providers: vec![
+                Box::new(ArchiveProvider),
+                Box::new(ShaderProvider::default()),
+            ],
         }
     }
 }

@@ -5,6 +5,26 @@
 //! refused, and a running game is noticed from the process list alone.
 
 mod installation;
+#[cfg(any(target_os = "linux", test))]
+mod portal_alias;
+#[cfg(any(target_os = "linux", test))]
+mod portal_dbus;
+#[cfg(any(target_os = "linux", test))]
+mod portal_deadline;
+#[cfg(target_os = "linux")]
+mod portal_filesystem;
+#[cfg(any(target_os = "linux", test))]
+mod portal_mount;
+#[cfg(target_os = "linux")]
+mod portal_native;
+#[cfg(any(target_os = "linux", test))]
+mod portal_path;
+#[cfg(any(target_os = "linux", test))]
+mod portal_reply;
+#[cfg(any(target_os = "linux", test))]
+mod portal_resolution;
+#[cfg(target_os = "linux")]
+mod portal_socket;
 mod proc_tree;
 mod process;
 #[cfg(any(windows, test))]
@@ -14,6 +34,10 @@ mod registry;
 use std::path::PathBuf;
 
 pub use installation::{Installation, without_verbatim_prefix};
+#[cfg(any(target_os = "linux", test))]
+pub use portal_alias::{AliasUncertainty, DocumentGrant, HostAlias, PortalAlias, UnknownAlias};
+#[cfg(target_os = "linux")]
+pub use portal_native::resolve_portal_alias;
 pub use proc_tree::game_in_proc_tree;
 pub use process::{
     any_game_process, game_is_running, game_process_status, is_game_process,

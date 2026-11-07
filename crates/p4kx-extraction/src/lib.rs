@@ -30,6 +30,7 @@ mod dataforge_source;
 mod dependent;
 mod disk_case;
 mod entry_content;
+mod entry_metadata_info;
 mod entry_path;
 mod entry_tree;
 mod exclusion;
@@ -129,6 +130,7 @@ pub use entry_content::{
     EntryBytes, EntryReadError, EntryText, MIN_TEXT_LEN, TextEncoding, find_entry, read_bytes,
     read_text,
 };
+pub use entry_metadata_info::{DosCalendarInfo, DosTimestampInfo, EntryMetadataInfo};
 pub use entry_tree::{EntryTree, Folder, FolderId};
 pub use exclusion::{Exclusion, LeftOut, MAX_EXCLUSIONS};
 pub use extract::extract;
@@ -151,10 +153,11 @@ pub use options::{
 };
 pub use output_file::{Replaced, write_bytes_replacing, write_replacing, write_replacing_counted};
 pub use p4kx_archive::{
-    Archive, ArchiveError, Build, BuildError, Checksum, Compression, DemandScope,
-    EffectiveEncoding, Entry, EntryIssue, EntryReader, InstallationStatus, KeyCheck, KeyDemand,
-    KeyDemandSnapshot, MAX_COMPRESSION_RATIO, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES,
-    MAX_CONTAINER_LEN, MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN, OpenOptions, UnreadEntries,
+    Archive, ArchiveError, Build, BuildError, Checksum, Compression, DemandScope, DosCalendar,
+    DosTimestamp, EffectiveEncoding, Entry, EntryIssue, EntryMetadata, EntryReader,
+    InstallationStatus, KeyCheck, KeyDemand, KeyDemandSnapshot, MAX_COMPRESSION_RATIO,
+    MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN, MAX_RECOVERED_ENTRIES,
+    MAX_RECOVERY_SCAN, OpenOptions, UnreadEntries,
 };
 pub use p4kx_audio::{
     ActionTarget, BankError, BankHeader, BankWarning, Container, ContainerKind, EmbeddedWem,

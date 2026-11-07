@@ -14,15 +14,29 @@ p4kx media schema --source
 
 Repeat `--kind` for an explicit selection. The known names are `archive`, `model`, `material`,
 `texture`, `shader`, `animation`, `animation-definition`, `audio` and `audio-control`. Omission
-selects every registered provider. The foundation registers the permanent minimal `archive`
-provider. An explicitly requested kind without an available provider returns a typed capability
+selects every registered provider. The built-in providers are the permanent minimal `archive`
+provider and the source-preserving `shader` provider. An explicitly requested kind without an
+available provider returns a typed capability
 failure and a non-zero exit status, even if the selection would otherwise be empty.
+
+`--kind shader` exports nested `.ext` declarations and ordered Property fields, with exact raw
+source ranges and lossless mask strings. Selected `.cfib`, `.cfxb` and `.shcb` caches are inventoried
+with explicitly unsupported semantic decoding. Material-to-definition links are separate work;
+the provider does not compile or execute shaders. [Shader projection](media-shader-backend.md)
+defines its precise typed fields, statuses and counting units.
 
 The include and exclusion expressions use the existing search Filter syntax. A nested source
 can also be matched through `outer.socpak!inner.pak!path`. Excluding a container excludes its
 descendants without opening it. A split texture header exclusion also excludes its part Entries.
 The pipeline walks physical directory order and traverses `.pak` and `.socpak` containers within
 the configured depth and the Archive reader's hard size/depth limits.
+
+Archive Entry rows include `data.metadata` from the shared
+[`EntryMetadataInfo` projection](archive-entry-metadata.md#shared-export-representation):
+the exact physical metadata owner, raw unsigned16 DOS words and a separate timezone-free
+calendar-validity view. Invalid calendar words remain complete raw metadata; they do not
+change CRC/SHA or installation/recovery status. Other Archive-layout enrichment remains
+outside this timestamp projection.
 
 ## Files and identities
 
@@ -37,6 +51,9 @@ selected retained Entry. Even when every selected domain provider skips an unsup
 this source mapping and its bytes remain available without inventing a successful typed projection.
 
 Every metadata record contains `kind`, `source`, `subresource`, `status`, `data` and `issues`.
+`media schema --record` validates built-in payloads within their owned namespaces; custom provider
+namespaces retain the generic record data contract. The library's `record_schema()` remains the
+generic envelope; `builtin_record_schema()` supplies the fallible built-in composite schema.
 Source identity includes the root SHA-256 and ordered physical container and leaf Entry indices.
 Duplicate names and duplicate format-specific short IDs retain their original order and distinct
 ordinal identities. A display path is the existing reader's exposed path; its separators can

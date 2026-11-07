@@ -187,8 +187,12 @@ a new test file goes into `tests/it/` and `main.rs` gets its `mod` line.
   --release <version>` assembles the fragments at the Release.
 - Shell work uses PowerShell 7 (`pwsh`). Commit messages go through `git commit -s -F <file>`,
   PR and issue bodies through `--body-file <file>`.
-- Worktrees use `D:\Coding\Agents\Worktrees\<agent>\<repo>\<name>`; scratch files use
-  `D:\Coding\Agents\Temp\<agent>\<task>`. Keep each agent's files in its own folder.
+- Worktrees and temporary files only under `D:\Coding\Agents`, in each agent's own folder (Claude:
+  `claude`, Codex: `codex`): worktrees in `D:\Coding\Agents\Worktrees\<agent>\p4k-extractor\<name>`,
+  temporary files (scratch scripts, test `TMP`, cargo target dirs, extraction output, commit-message
+  files) in `D:\Coding\Agents\Temp\<agent>\<task>`, one folder per piece of work. Remove the task
+  folder when the work is done and a worktree once its branch is merged or abandoned; never touch
+  another agent's folder.
 
 ## Agent skills
 

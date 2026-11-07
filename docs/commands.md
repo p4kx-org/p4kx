@@ -376,7 +376,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   [--exclude <filter>] [--conflict skip|overwrite|if-changed] [--diagnostic]` writes the
   versioned `p4kx-media` inventory as JSONL streams, exact decoded raw payloads and an atomic
   `media-index.json`. Repeat `--kind` and `--exclude` for explicit selections. Omission selects
-  all registered providers; the initial provider is `archive`. A known kind without a provider
+  all registered providers: `archive` and `shader`. The shader stream preserves nested `.ext`
+  declarations and inventories `.cfib`/`.cfxb`/`.shcb` caches without semantic decoding.
+  A known kind without a provider
   fails explicitly. Incomplete diagnostic generations remain separate from the complete root
   index. Byte, count, nesting and reference limits are exposed as `--max-*` options; their defaults,
   scopes, publication rules and provider API are in [media-export.md](media-export.md).

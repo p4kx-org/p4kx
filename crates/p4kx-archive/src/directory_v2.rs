@@ -8,9 +8,8 @@ use crate::entry::stated_sha256;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog, decode_path};
 use crate::source::Source;
-use crate::{Checksum, Compression, Entry, EntryIssue};
+use crate::{Checksum, Compression, DosTimestamp, Entry, EntryIssue, EntryMetadata};
 
-const RECORD_TIME_AND_DATE_LEN: usize = 4;
 const RECORD_SIGNATURE_LEN: usize = 128;
 const RECORD_SHA256_LEN: usize = 32;
 
@@ -104,7 +103,8 @@ fn parse_record(
     let (index, data_limit) = at;
     let mut reader = ByteReader::with_base(record, offset);
     let method = reader.read_u16()?;
-    reader.skip(RECORD_TIME_AND_DATE_LEN)?;
+    let time = reader.read_u16()?;
+    let date = reader.read_u16()?;
     let crc32c = reader.read_u32()?;
     let compressed_size = reader.read_u64()?;
     let uncompressed_size = reader.read_u64()?;
@@ -126,6 +126,7 @@ fn parse_record(
         );
     }
     Ok(Entry {
+        metadata: EntryMetadata::new(DosTimestamp::new(date, time)),
         path: read_name(names, name_offset, offset, index, log)?,
         compressed_size,
         uncompressed_size,

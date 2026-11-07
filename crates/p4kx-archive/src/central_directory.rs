@@ -6,12 +6,11 @@ use p4kx_foundation::{ByteReader, ParseError};
 use crate::entry::stated_sha256;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog, decode_path};
-use crate::{Checksum, Compression, Entry, EntryIssue};
+use crate::{Checksum, Compression, DosTimestamp, Entry, EntryIssue, EntryMetadata};
 
 const CENTRAL_HEADER_SIGNATURE: u32 = 0x0201_4B50;
 const CENTRAL_HEADER_LEN: usize = 46;
 const VERSIONS_AND_FLAGS_LEN: usize = 6;
-const TIME_AND_DATE_LEN: usize = 4;
 const DISK_AND_ATTRIBUTES_LEN: usize = 8;
 const ZIP64_MARKER_32: u32 = 0xFFFF_FFFF;
 const BLOCK_ZIP64: u16 = 0x0001;
@@ -22,6 +21,7 @@ const ENCRYPTION_BLOCK_LEN: u16 = 6;
 const SHA256_LEN: usize = 32;
 
 struct FixedFields {
+    dos_timestamp: DosTimestamp,
     method: u16,
     crc32c: u32,
     compressed_size: u32,
@@ -110,6 +110,7 @@ fn parse_entry_parts<'a>(
     let extra = parse_extra(extra, extra_offset, &fixed, index, log)?;
     let zip64_block = extra.zip64_block;
     let entry = Entry {
+        metadata: EntryMetadata::new(fixed.dos_timestamp),
         path,
         compressed_size: extra.compressed_size,
         uncompressed_size: extra.uncompressed_size,
@@ -135,7 +136,8 @@ fn read_fixed_fields(reader: &mut ByteReader<'_>, offset: u64) -> Result<FixedFi
     }
     reader.skip(VERSIONS_AND_FLAGS_LEN)?;
     let method = reader.read_u16()?;
-    reader.skip(TIME_AND_DATE_LEN)?;
+    let time = reader.read_u16()?;
+    let date = reader.read_u16()?;
     let crc32c = reader.read_u32()?;
     let compressed_size = reader.read_u32()?;
     let uncompressed_size = reader.read_u32()?;
@@ -145,6 +147,7 @@ fn read_fixed_fields(reader: &mut ByteReader<'_>, offset: u64) -> Result<FixedFi
     reader.skip(DISK_AND_ATTRIBUTES_LEN)?;
     let local_header_offset = reader.read_u32()?;
     Ok(FixedFields {
+        dos_timestamp: DosTimestamp::new(date, time),
         method,
         crc32c,
         compressed_size,

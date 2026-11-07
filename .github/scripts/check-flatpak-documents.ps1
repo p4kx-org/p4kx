@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'linux-package-installation.ps1')
 . (Join-Path $PSScriptRoot 'flatpak-documents.ps1')
+. (Join-Path $PSScriptRoot 'portal-measurement.ps1')
 $platform = Get-P4kxLinuxPlatform $Target
 Assert-P4kxDisposableLinuxRunner $platform
 $settings = Get-P4kxLinuxPackaging
@@ -32,6 +33,14 @@ try {
     $documents.Add($outside)
     $alias = Export-P4kxFlatpakDocument $inside $settings.application_id -Writable
     $documents.Add($alias)
+    $service = 'org.freedesktop.portal.Documents'
+    $object = '/org/freedesktop/portal/documents'
+    $version = Invoke-P4kxPortalMeasurement busctl @('--user', '--no-pager', '--timeout=2', 'get-property', $service, $object, $service, 'version') $output 'documents-version'
+    $introspection = Invoke-P4kxPortalMeasurement busctl @('--user', '--no-pager', '--timeout=2', '--xml-interface', 'introspect', $service, $object, $service) $output 'documents-introspection'
+    $packages = Invoke-P4kxPortalMeasurement dpkg-query @('--show', '--showformat=${binary:Package}\t${Version}\n', 'xdg-desktop-portal', 'xdg-desktop-portal-gtk', 'flatpak', 'dbus') $output 'documents-packages'
+    $measured = ConvertFrom-P4kxDocumentsInterface $version $introspection
+    @{target=$Target; revision=$env:GITHUB_SHA; interface=$measured; packages=$packages.Trim()} |
+        ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $output 'documents-interface.json') -Encoding utf8NoBOM
     for ($index = 0; $index -lt $documents.Count; $index++) {
         $mount = Invoke-P4kxLinuxTool findmnt @('--kernel', '--json', '--list', '--output', 'TARGET,FSTYPE,SOURCE', '--target', $documents[$index]) | Out-String
         $mount | Set-Content -LiteralPath (Join-Path $output "portal-mount-$index.json") -Encoding utf8NoBOM
