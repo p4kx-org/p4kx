@@ -115,7 +115,7 @@ try{
         if($noopLog -notmatch 'Component: Application;[^\r\n]*Action: Null' -or
             $noopLog -notmatch 'Action ended [^\r\n]*P4kxPathCancelNoop\. Return value 1\.' -or
             $noopLog -match 'Action start [^\r\n]*P4kxPath(?:SealEnsure|SealRemove|Prepare)\.') {throw 'Maintenance did not execute the genuine no-component-action cancellation path.'}
-        $disabled=Invoke-LifecycleMsi @('/fa',$current.product,'DISABLEROLLBACK=1') 'rollback-disabled' 1603
+        $disabled=Invoke-LifecycleMsi @('/i',$Msi,'REINSTALL=ALL','REINSTALLMODE=a','DISABLEROLLBACK=1') 'rollback-disabled' 1603
         Assert-P4kxMsiReservedCleanup $disabled.raw_before $disabled.raw_after $current
         $disabledLog=Get-Content (Join-Path $logs 'rollback-disabled.log') -Raw
         if($disabledLog -notmatch 'Action ended [^\r\n]*P4kxRequireRollback\. Return value 3\.' -or

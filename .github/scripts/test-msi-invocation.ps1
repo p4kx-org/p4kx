@@ -30,6 +30,34 @@ try {
     for ($index = 0; $index -lt $expected.Count; $index++) {
         if ($start.ArgumentList[$index] -cne $expected[$index]) { throw 'MSI invocation changed an argument boundary.' }
     }
+    $tokens = $null; $errors = $null
+    $source = [Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'check-msi.ps1'), [ref]$tokens, [ref]$errors)
+    if ($errors.Count -ne 0) { throw 'The actual MSI lifecycle source does not parse.' }
+    $calls = @($source.FindAll({param($node)
+        $node -is [Management.Automation.Language.CommandAst] -and $node.GetCommandName() -ceq 'Invoke-LifecycleMsi' -and
+        @($node.CommandElements | Where-Object { $_ -is [Management.Automation.Language.StringConstantExpressionAst] -and $_.Value -ceq 'rollback-disabled' }).Count -eq 1
+    }, $true))
+    if ($calls.Count -ne 1) { throw 'Expected one actual rollback-disabled lifecycle command.' }
+    $script:rollbackInvocation = $null
+    & {
+        param($Command, [string]$InstallerPath)
+        $Msi = $InstallerPath
+        $current = @{product='{11111111-2222-4333-8444-555555555555}'}
+        function Invoke-LifecycleMsi {
+            param([string[]]$Arguments, [string]$Name, [int]$Code=0)
+            $script:rollbackInvocation = @{arguments=$Arguments; name=$Name; code=$Code}
+        }
+        & ([ScriptBlock]::Create($Command.Extent.Text))
+    } $calls[0] $resolved
+    $repair = @('/i', $resolved, 'REINSTALL=ALL', 'REINSTALLMODE=a', 'DISABLEROLLBACK=1')
+    if ($script:rollbackInvocation.name -cne 'rollback-disabled' -or $script:rollbackInvocation.code -ne 1603 -or
+        $script:rollbackInvocation.arguments.Count -ne $repair.Count) { throw 'Rollback-disabled repair uses a property-ignoring command or a different failure contract.' }
+    $repairStart = New-P4kxMsiexecStartInfo -Arguments $script:rollbackInvocation.arguments -Log $log
+    for ($index = 0; $index -lt $repair.Count; $index++) {
+        if ($script:rollbackInvocation.arguments[$index] -cne $repair[$index] -or $repairStart.ArgumentList[$index] -cne $repair[$index]) {
+            throw 'Rollback-disabled repair lost its exact public-property activation or argv boundary.'
+        }
+    }
     $productCode = '{11111111-2222-4333-8444-555555555555}'
     $uninstall = New-P4kxMsiexecStartInfo -Arguments @('/x', $productCode) -Log $log
     if ($uninstall.ArgumentList[1] -cne $productCode) { throw 'MSI uninstall changed the product identity.' }
