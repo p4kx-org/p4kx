@@ -32,12 +32,23 @@ fn a_child_checks_the_actual_process_folders() -> TestResult {
         Some(root.join("config")),
         "explicit root wins over Windows known folders and XDG"
     );
-    assert_eq!(cache_folder(), Some(root.join("cache/P4KX")), "isolated cache");
+    assert_eq!(
+        cache_folder(),
+        Some(root.join("cache/P4KX")),
+        "isolated cache"
+    );
     assert_eq!(data_folder(), Some(root.join("data/P4KX")), "isolated data");
     let file = default_settings_file().ok_or("an isolated settings path")?;
-    assert_eq!(file, root.join("config/P4KX/settings.toml"), "isolated settings");
+    assert_eq!(
+        file,
+        root.join("config/P4KX/settings.toml"),
+        "isolated settings"
+    );
     Settings::default().save(&file)?;
-    assert!(file.is_file(), "the settings write stays under the explicit root");
+    assert!(
+        file.is_file(),
+        "the settings write stays under the explicit root"
+    );
     Ok(())
 }
 

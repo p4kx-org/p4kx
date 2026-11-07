@@ -16,8 +16,8 @@ use std::path::PathBuf;
 pub use installation::{Installation, without_verbatim_prefix};
 pub use proc_tree::game_in_proc_tree;
 pub use process::{
-    any_game_process, game_is_running, game_process_status, is_game_process, process_count_lists_game,
-    qprocess_lists_game,
+    any_game_process, game_is_running, game_process_status, is_game_process,
+    process_count_lists_game, qprocess_lists_game,
 };
 pub use registry::{
     ensure_writable, protect, protect_archive_folder, protect_libraries, protect_manual,
