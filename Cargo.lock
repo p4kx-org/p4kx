@@ -3878,6 +3878,7 @@ version = "0.4.2"
 dependencies = [
  "jsonschema",
  "p4kx-extraction",
+ "p4kx-shader",
  "p4kx-testkit",
  "schemars",
  "semver",

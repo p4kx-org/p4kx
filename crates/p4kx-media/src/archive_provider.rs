@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::EntryMetadataInfo;
 use serde::Serialize;
 
 use crate::{
@@ -8,16 +9,18 @@ use crate::{
     Provider, RootSource, Source, SourceContext, Status, Subresource,
 };
 
+pub(crate) const ENTRY_NAMESPACE: &str = "archive-entry";
+
 /// Permanent minimal provider of existing public Archive metadata.
 pub struct ArchiveProvider;
 
 impl Provider for ArchiveProvider {
     fn capability(&self) -> Capability {
-        Capability { kind: MediaKind::Archive, id: "p4kx.archive.public-metadata".into(), version: "1.0.0".into(),
+        Capability { kind: MediaKind::Archive, id: "p4kx.archive.public-metadata".into(), version: "1.1.0".into(),
             availability: Availability::Available,
             preservation: "exact decoded selected Entry payloads; root Archive layout bytes are not retained".into(),
             field_groups: vec![
-                FieldGroup { name: "public-entry-metadata".into(), projected: true, scope: "physical index, display path, available raw path bytes, sizes, declared checksum, compression, encryption, installed bytes".into() },
+                FieldGroup { name: "public-entry-metadata".into(), projected: true, scope: "physical index, display path, available raw path bytes, sizes, declared checksum, compression, encryption, installed bytes, original DOS words and timezone-free calendar status".into() },
                 FieldGroup { name: "root-build".into(), projected: true, scope: "adjacent public launcher Build declaration, without inferred values".into() },
                 FieldGroup { name: "raw-archive-layout".into(), projected: false, scope: "directory layout, signatures and unknown root bytes require a separate raw-layout reader".into() },
             ] }
@@ -53,7 +56,8 @@ impl Provider for ArchiveProvider {
         writer: &mut MediaWriter<'_>,
     ) -> Result<Projection, MediaError> {
         #[derive(Serialize)]
-        struct Metadata {
+        struct EntryData {
+            metadata: EntryMetadataInfo,
             compressed_size: u64,
             uncompressed_size: u64,
             declared_compression: String,
@@ -63,7 +67,8 @@ impl Provider for ArchiveProvider {
             stored_sha256_checked_by_reader: bool,
         }
         let entry = context.entry;
-        let data = Metadata {
+        let data = EntryData {
+            metadata: EntryMetadataInfo::of(entry),
             compressed_size: entry.compressed_size(),
             uncompressed_size: entry.uncompressed_size(),
             declared_compression: entry.compression().to_string(),
@@ -75,7 +80,7 @@ impl Provider for ArchiveProvider {
             stored_sha256_checked_by_reader: entry.is_sha256_verified(),
         };
         writer.record(
-            &Subresource::new("archive-entry", Vec::new()),
+            &Subresource::new(ENTRY_NAMESPACE, Vec::new()),
             Status::Complete,
             &data,
             &[],

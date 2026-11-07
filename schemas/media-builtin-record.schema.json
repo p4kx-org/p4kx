@@ -1,0 +1,2019 @@
+{
+  "$defs": {
+    "Algorithm": {
+      "description": "Integrity algorithm, without conflating CRC checks with cryptographic hashes.",
+      "oneOf": [
+        {
+          "const": "sha256",
+          "description": "SHA-256 cryptographic hash.",
+          "type": "string"
+        },
+        {
+          "const": "crc32",
+          "description": "ZIP CRC-32 polynomial.",
+          "type": "string"
+        },
+        {
+          "const": "crc32c",
+          "description": "Castagnoli CRC-32C polynomial.",
+          "type": "string"
+        }
+      ]
+    },
+    "ByteScope": {
+      "description": "Exact byte scope of a computed or declared integrity value.",
+      "oneOf": [
+        {
+          "const": "root-archive-file",
+          "description": "Every byte streamed from the root Archive file.",
+          "type": "string"
+        },
+        {
+          "const": "stored-entry-payload",
+          "description": "Entry bytes before decryption and decompression.",
+          "type": "string"
+        },
+        {
+          "const": "decoded-entry-payload",
+          "description": "Entry bytes after decryption and decompression.",
+          "type": "string"
+        },
+        {
+          "const": "artifact-file",
+          "description": "Every byte of a generated artifact file.",
+          "type": "string"
+        }
+      ]
+    },
+    "ContainerIdentity": {
+      "description": "A physical container Entry in the ordered path from the root Archive.",
+      "properties": {
+        "entry_index": {
+          "description": "Zero-based directory index in the immediately enclosing Archive.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "Reader-exposed display path, whose separators may already be normalised.",
+          "type": "string"
+        },
+        "raw_path_hex": {
+          "description": "Original non-UTF-8 path bytes when the display path is lossy.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "entry_index",
+        "path"
+      ],
+      "type": "object"
+    },
+    "Digest": {
+      "description": "An explicitly scoped integrity value.",
+      "properties": {
+        "algorithm": {
+          "$ref": "#/$defs/Algorithm",
+          "description": "Algorithm name, including the CRC polynomial where relevant."
+        },
+        "hex": {
+          "description": "Lower-case hexadecimal spelling.",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/ByteScope",
+          "description": "Exact bytes over which the value was computed or declared."
+        }
+      },
+      "required": [
+        "algorithm",
+        "scope",
+        "hex"
+      ],
+      "type": "object"
+    },
+    "DosCalendarInfo": {
+      "description": "Calendar interpretation of stored DOS words, independent of integrity verification.",
+      "oneOf": [
+        {
+          "description": "The source words do not encode a valid calendar date and time.",
+          "properties": {
+            "state": {
+              "const": "invalid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Valid calendar fields without a known timezone.",
+          "properties": {
+            "day": {
+              "description": "Calendar day, validated against the stated month and year.",
+              "format": "uint8",
+              "maximum": 31,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "hour": {
+              "description": "Hour of the stated calendar day.",
+              "format": "uint8",
+              "maximum": 23,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "minute": {
+              "description": "Minute of the stated hour.",
+              "format": "uint8",
+              "maximum": 59,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "month": {
+              "description": "Calendar month.",
+              "format": "uint8",
+              "maximum": 12,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "second": {
+              "description": "Even second from the DOS two-second encoding.",
+              "format": "uint8",
+              "maximum": 58,
+              "minimum": 0,
+              "multipleOf": 2,
+              "type": "integer"
+            },
+            "state": {
+              "const": "valid",
+              "type": "string"
+            },
+            "year": {
+              "description": "Calendar year.",
+              "format": "uint16",
+              "maximum": 2107,
+              "minimum": 1980,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "state",
+            "year",
+            "month",
+            "day",
+            "hour",
+            "minute",
+            "second"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DosTimestampInfo": {
+      "description": "Stored DOS date/time words with no timezone conversion.",
+      "properties": {
+        "calendar": {
+          "$ref": "#/$defs/DosCalendarInfo",
+          "description": "Valid calendar fields or an explicit invalid interpretation; no zone is implied."
+        },
+        "raw_date": {
+          "description": "Unmodified unsigned 16-bit date word, including zero and invalid encodings.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "raw_time": {
+          "description": "Unmodified unsigned 16-bit time word, including zero and invalid encodings.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "raw_date",
+        "raw_time",
+        "calendar"
+      ],
+      "type": "object"
+    },
+    "EntryMetadataInfo": {
+      "description": "Shared encoded directory metadata of one physical admitted Entry.",
+      "properties": {
+        "dos_timestamp": {
+          "$ref": "#/$defs/DosTimestampInfo",
+          "description": "Exact source words and their separate calendar interpretation."
+        },
+        "owner_entry_index": {
+          "description": "Index in the immediately owning Archive, not a grouped texture's aggregate identity.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner_entry_index",
+        "dos_timestamp"
+      ],
+      "title": "EntryMetadataInfo",
+      "type": "object"
+    },
+    "Identity": {
+      "description": "Identity that remains distinct for duplicate names and nested containers.",
+      "oneOf": [
+        {
+          "description": "The complete root Archive file.",
+          "properties": {
+            "type": {
+              "const": "root",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A physical Entry identified through each containing directory.",
+          "properties": {
+            "containers": {
+              "description": "Ordered outermost-to-innermost physical container identities.",
+              "items": {
+                "$ref": "#/$defs/ContainerIdentity"
+              },
+              "type": "array"
+            },
+            "entry": {
+              "$ref": "#/$defs/ContainerIdentity",
+              "description": "Identity in the immediate directory."
+            },
+            "type": {
+              "const": "entry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "containers",
+            "entry"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MediaIssue": {
+      "description": "A source-local issue with an unambiguous location.",
+      "properties": {
+        "code": {
+          "description": "Stable machine-readable diagnosis code.",
+          "type": "string"
+        },
+        "detail": {
+          "description": "Technical detail, without invented fallback values.",
+          "type": "string"
+        },
+        "location": {
+          "description": "Field, section or object path within this source.",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "description": "Severity of the observation."
+        }
+      },
+      "required": [
+        "code",
+        "location",
+        "severity",
+        "detail"
+      ],
+      "type": "object"
+    },
+    "MediaKind": {
+      "description": "A separately selectable provider output stream.",
+      "oneOf": [
+        {
+          "const": "archive",
+          "description": "Public Archive and Entry metadata.",
+          "type": "string"
+        },
+        {
+          "const": "model",
+          "description": "Model geometry and definitions.",
+          "type": "string"
+        },
+        {
+          "const": "material",
+          "description": "Material definitions.",
+          "type": "string"
+        },
+        {
+          "const": "texture",
+          "description": "Texture storage and images.",
+          "type": "string"
+        },
+        {
+          "const": "shader",
+          "description": "Shader source or compiled data.",
+          "type": "string"
+        },
+        {
+          "const": "animation",
+          "description": "Animation samples.",
+          "type": "string"
+        },
+        {
+          "const": "animation-definition",
+          "description": "Animation definitions and references.",
+          "type": "string"
+        },
+        {
+          "const": "audio",
+          "description": "Audio media and samples.",
+          "type": "string"
+        },
+        {
+          "const": "audio-control",
+          "description": "Audio control definitions.",
+          "type": "string"
+        }
+      ]
+    },
+    "RawReference": {
+      "description": "Retained exact decoded payload, addressed relative to its generation.",
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/Digest",
+          "description": "SHA-256 of the entire decoded payload."
+        },
+        "path": {
+          "description": "Relative artifact path.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Decoded byte length.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "size",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "Severity": {
+      "description": "Severity attached to a stable diagnostic.",
+      "oneOf": [
+        {
+          "const": "info",
+          "description": "Informative source limitation without advertised projection loss.",
+          "type": "string"
+        },
+        {
+          "const": "warning",
+          "description": "Some advertised projection is unavailable.",
+          "type": "string"
+        },
+        {
+          "const": "error",
+          "description": "The record could not be projected.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShaderBudget": {
+      "description": "Bounded domain resources; independent of central media generation budgets.",
+      "oneOf": [
+        {
+          "const": "source-bytes",
+          "description": "Input source bytes.",
+          "type": "string"
+        },
+        {
+          "const": "token-bytes",
+          "description": "One atom, quoted token or comment.",
+          "type": "string"
+        },
+        {
+          "const": "value-bytes",
+          "description": "One declaration value.",
+          "type": "string"
+        },
+        {
+          "const": "tokens",
+          "description": "Lexical token count.",
+          "type": "string"
+        },
+        {
+          "const": "declarations",
+          "description": "Ordered declaration count.",
+          "type": "string"
+        },
+        {
+          "const": "properties",
+          "description": "Braced Property count across scopes.",
+          "type": "string"
+        },
+        {
+          "const": "depth",
+          "description": "Combined braces and parentheses.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShaderCache": {
+      "additionalProperties": false,
+      "description": "Inventory of one retained compiled cache, without definition or Property claims.",
+      "properties": {
+        "compiled_caches": {
+          "description": "This one inventoried cache source.",
+          "format": "uint64",
+          "maximum": 1,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "definitions": {
+          "description": "No source definition was decoded from this payload.",
+          "format": "uint64",
+          "maximum": 0,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "family": {
+          "$ref": "#/$defs/ShaderCacheKind",
+          "description": "Extension family, without a guessed binary layout version."
+        },
+        "properties": {
+          "description": "No Property was decoded from this payload.",
+          "format": "uint64",
+          "maximum": 0,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "semantic_decode": {
+          "$ref": "#/$defs/ShaderCacheDecode",
+          "description": "Explicit unsupported semantic decoder."
+        }
+      },
+      "required": [
+        "family",
+        "semantic_decode",
+        "compiled_caches",
+        "definitions",
+        "properties"
+      ],
+      "type": "object"
+    },
+    "ShaderCacheDecode": {
+      "description": "Honest semantic coverage of a retained compiled cache.",
+      "oneOf": [
+        {
+          "const": "unsupported",
+          "description": "Inventory and raw bytes exist; the compiled payload has no semantic decoder.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShaderCacheKind": {
+      "description": "Compiled family identified only by its selected source extension.",
+      "oneOf": [
+        {
+          "const": "cfib",
+          "description": "Compiled include cache.",
+          "type": "string"
+        },
+        {
+          "const": "cfxb",
+          "description": "Compiled effect cache.",
+          "type": "string"
+        },
+        {
+          "const": "shcb",
+          "description": "Compiled shader cache.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShaderConstruct": {
+      "description": "Lexical and structural construct categories of a definition failure.",
+      "oneOf": [
+        {
+          "const": "comment",
+          "description": "Block comment.",
+          "type": "string"
+        },
+        {
+          "const": "quote",
+          "description": "Quoted token.",
+          "type": "string"
+        },
+        {
+          "const": "brace",
+          "description": "Braced scope.",
+          "type": "string"
+        },
+        {
+          "const": "parenthesis",
+          "description": "Parenthesised value.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShaderDeclaration": {
+      "additionalProperties": false,
+      "description": "One bounded source-spanned declaration; child bodies are never embedded again.",
+      "properties": {
+        "child_count": {
+          "description": "Number of original immediate children, each emitted once as another row.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "form": {
+          "$ref": "#/$defs/ShaderForm",
+          "description": "Original authored form."
+        },
+        "literal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShaderText"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sole lexical atom or quoted token when one exists; quotes and escapes remain raw."
+        },
+        "meaning": {
+          "$ref": "#/$defs/ShaderMeaning",
+          "description": "Meaning established only for supported root or direct Property fields."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShaderText"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exact name token, absent for unnamed or unrecognised constructs."
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShaderParent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Parent row identity; absent for complete top-level declaration paths."
+        },
+        "span": {
+          "$ref": "#/$defs/ShaderSpan",
+          "description": "Complete original construct, addressed through the retained Entry bytes."
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShaderText"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Complete raw value range, absent for marker and block forms."
+        }
+      },
+      "required": [
+        "span",
+        "name",
+        "form",
+        "value",
+        "literal",
+        "meaning",
+        "child_count",
+        "parent"
+      ],
+      "type": "object"
+    },
+    "ShaderDefinition": {
+      "additionalProperties": false,
+      "description": "One source-definition header; all individual declarations use separate rows.",
+      "properties": {
+        "counts": {
+          "$ref": "#/$defs/ShaderDefinitionCounts",
+          "description": "Distinct complete counting units of the structured source."
+        },
+        "encoding": {
+          "$ref": "#/$defs/ShaderEncoding",
+          "description": "Original supported source encoding."
+        },
+        "file_name": {
+          "description": "Reader-exposed filename with its original display spelling.",
+          "type": "string"
+        },
+        "name_origin": {
+          "$ref": "#/$defs/ShaderNameOrigin",
+          "description": "Explicit filename-derived origin of the display name."
+        },
+        "shader_name": {
+          "description": "Display stem; physical source identity remains the complete container/Entry chain.",
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/ShaderSpan",
+          "description": "Entire retained Entry payload, including comments, whitespace and any BOM."
+        }
+      },
+      "required": [
+        "file_name",
+        "shader_name",
+        "name_origin",
+        "encoding",
+        "span",
+        "counts"
+      ],
+      "type": "object"
+    },
+    "ShaderDefinitionCounts": {
+      "additionalProperties": false,
+      "description": "Complete observed units of one successfully structured extension source.",
+      "properties": {
+        "compiled_caches": {
+          "description": "No compiled cache is decoded as a source definition.",
+          "format": "uint64",
+          "maximum": 0,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "declarations": {
+          "description": "Every emitted declaration, including Property blocks and unknown nested scopes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "definitions": {
+          "description": "This one definition source.",
+          "format": "uint64",
+          "maximum": 1,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "properties": {
+          "description": "Top-level Property blocks, independent of missing or duplicate Name fields.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "root_declarations": {
+          "description": "Complete top-level declaration count, including known and unknown names.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "definitions",
+        "properties",
+        "declarations",
+        "root_declarations",
+        "compiled_caches"
+      ],
+      "type": "object"
+    },
+    "ShaderDefinitionFailure": {
+      "additionalProperties": false,
+      "description": "Failed structured projection whose exact raw Entry is retained independently.",
+      "properties": {
+        "counts": {
+          "description": "Definition/Property/declaration counts are unavailable, rather than fabricated as zero.",
+          "type": "null"
+        },
+        "failure": {
+          "$ref": "#/$defs/ShaderFailureReason",
+          "description": "Exact structural or budget diagnosis."
+        },
+        "file_name": {
+          "description": "Reader-exposed filename spelling.",
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/ShaderSpan",
+          "description": "Original Entry byte range at which projection failed."
+        }
+      },
+      "required": [
+        "file_name",
+        "failure",
+        "span",
+        "counts"
+      ],
+      "type": "object"
+    },
+    "ShaderEncoding": {
+      "description": "Supported original source encodings, without rewritten payload bytes.",
+      "oneOf": [
+        {
+          "const": "utf8",
+          "description": "UTF-8 without a leading byte-order marker.",
+          "type": "string"
+        },
+        {
+          "const": "utf8-bom",
+          "description": "UTF-8 with its original leading byte-order marker.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShaderFailureReason": {
+      "description": "Structured source or budget failure without replacing retained bytes with defaults.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Bytes cannot be interpreted as supported UTF-8.",
+          "properties": {
+            "reason": {
+              "const": "unknown-encoding",
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A lexical or structural closing delimiter is absent.",
+          "properties": {
+            "construct": {
+              "$ref": "#/$defs/ShaderConstruct",
+              "description": "Exact bounded reader construct category."
+            },
+            "reason": {
+              "const": "unterminated",
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason",
+            "construct"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A closing delimiter has no matching open construct.",
+          "properties": {
+            "construct": {
+              "$ref": "#/$defs/ShaderConstruct",
+              "description": "Exact bounded reader construct category."
+            },
+            "reason": {
+              "const": "unexpected-closing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason",
+            "construct"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Bounded source reading or syntax storage refused the next unit.",
+          "properties": {
+            "budget": {
+              "$ref": "#/$defs/ShaderBudget",
+              "description": "Precise exhausted domain budget."
+            },
+            "limit": {
+              "description": "Actual configured bound.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reason": {
+              "const": "limit",
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason",
+            "budget",
+            "limit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The bounded reader could not allocate its next storage unit.",
+          "properties": {
+            "reason": {
+              "const": "allocation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A newer reader diagnosis has no supported structured mapping.",
+          "properties": {
+            "detail": {
+              "description": "Preserved diagnostic category spelling.",
+              "type": "string"
+            },
+            "reason": {
+              "const": "unsupported-reader-variant",
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason",
+            "detail"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ShaderForm": {
+      "description": "Authored declaration shape, independent of marker or value interpretation.",
+      "oneOf": [
+        {
+          "const": "marker",
+          "description": "Bare authored marker.",
+          "type": "string"
+        },
+        {
+          "const": "equals",
+          "description": "Equals value, including explicit empty data.",
+          "type": "string"
+        },
+        {
+          "const": "parentheses",
+          "description": "Parenthesised value, including explicit empty data.",
+          "type": "string"
+        },
+        {
+          "const": "block",
+          "description": "Braced body whose children have individual rows.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "Source-preserved shape outside the supported declaration profile.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShaderMask": {
+      "description": "Explicit interpretation outcome of one authored Mask occurrence.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A literal in the supported explicit-hexadecimal or unambiguous-zero profile.",
+          "properties": {
+            "state": {
+              "const": "parsed",
+              "type": "string"
+            },
+            "word": {
+              "$ref": "#/$defs/ShaderWord",
+              "description": "Exact unsigned 64-bit source word as decimal text."
+            }
+          },
+          "required": [
+            "state",
+            "word"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The occurrence is a marker or block, rather than a value declaration.",
+          "properties": {
+            "state": {
+              "const": "missing-value",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A value declaration is explicitly empty.",
+          "properties": {
+            "state": {
+              "const": "empty-value",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A nonzero unprefixed numeric token has no established radix.",
+          "properties": {
+            "state": {
+              "const": "unknown-radix",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A symbolic, quoted or compound expression remains uninterpreted.",
+          "properties": {
+            "state": {
+              "const": "unsupported-expression",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An explicit hexadecimal token has invalid digits or no digits.",
+          "properties": {
+            "state": {
+              "const": "malformed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An explicit hexadecimal value exceeds this reader's 64-bit support.",
+          "properties": {
+            "state": {
+              "const": "overflow",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A newer reader outcome has no supported typed mapping.",
+          "properties": {
+            "detail": {
+              "description": "Exact diagnostic variant spelling, without evaluating its source expression.",
+              "type": "string"
+            },
+            "state": {
+              "const": "unsupported-reader-variant",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "detail"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ShaderMeaning": {
+      "description": "Typed meaning of one occurrence, without last-wins selection or inferred defaults.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Raw source syntax with no assigned semantic interpretation.",
+          "properties": {
+            "role": {
+              "const": "unknown",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Top-level braced Property whose child occurrences have separate rows.",
+          "properties": {
+            "role": {
+              "const": "property",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Authored root Version; its raw value is retained without a guessed version grammar.",
+          "properties": {
+            "role": {
+              "const": "version",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Authored root common-global-flags declaration; no inheritance is inferred.",
+          "properties": {
+            "role": {
+              "const": "uses-common-global-flags",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Original Property Name.",
+          "properties": {
+            "role": {
+              "const": "name",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Original Property Mask with an explicit interpretation result.",
+          "properties": {
+            "interpretation": {
+              "$ref": "#/$defs/ShaderMask",
+              "description": "Supported integer value or precise noninterpretation state."
+            },
+            "role": {
+              "const": "mask",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "interpretation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Original editor Property label.",
+          "properties": {
+            "role": {
+              "const": "label",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Original Property Description.",
+          "properties": {
+            "role": {
+              "const": "description",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Original dependency-set expression, not a filesystem path.",
+          "properties": {
+            "role": {
+              "const": "dependency-set",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Original dependency-reset expression, not a filesystem path.",
+          "properties": {
+            "role": {
+              "const": "dependency-reset",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Authored Hidden occurrence; absence creates no synthetic boolean.",
+          "properties": {
+            "role": {
+              "const": "hidden",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ShaderNameOrigin": {
+      "description": "Source of the display shader name, without inventing an authored identifier.",
+      "oneOf": [
+        {
+          "const": "file-stem",
+          "description": "Original display filename stem exposed by the Archive reader.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShaderOffsetBasis": {
+      "description": "Origin of every shader byte range.",
+      "oneOf": [
+        {
+          "const": "entry",
+          "description": "Start of the original decoded Entry payload, including any byte-order marker.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShaderParent": {
+      "additionalProperties": false,
+      "description": "Parent identity within the same physical Entry.",
+      "properties": {
+        "indices": {
+          "description": "Original complete declaration ordinal path.",
+          "items": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "namespace": {
+          "$ref": "#/$defs/ShaderParentNamespace",
+          "description": "Namespace of the emitted parent row."
+        }
+      },
+      "required": [
+        "namespace",
+        "indices"
+      ],
+      "type": "object"
+    },
+    "ShaderParentNamespace": {
+      "description": "Source-local parent namespace of an ordered declaration.",
+      "oneOf": [
+        {
+          "const": "shader-property",
+          "description": "Top-level Property declaration.",
+          "type": "string"
+        },
+        {
+          "const": "shader-declaration",
+          "description": "Other known or unknown declaration.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShaderPayload": {
+      "description": "Typed payloads produced by the built-in shader extension provider.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Successfully structured definition source header.",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ShaderDefinition"
+            },
+            "record_type": {
+              "const": "definition",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One source declaration outside the top-level Property row namespace.",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ShaderDeclaration"
+            },
+            "record_type": {
+              "const": "declaration",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One ordered top-level Property block.",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ShaderProperty"
+            },
+            "record_type": {
+              "const": "property",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One retained cache with explicitly unsupported semantics.",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ShaderCache"
+            },
+            "record_type": {
+              "const": "compiled-cache",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A selected extension source could not be structurally projected.",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ShaderDefinitionFailure"
+            },
+            "record_type": {
+              "const": "definition-failure",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ShaderPayload"
+    },
+    "ShaderProperty": {
+      "additionalProperties": false,
+      "description": "A top-level braced Property, independent of its optional name or mask fields.",
+      "properties": {
+        "declaration": {
+          "$ref": "#/$defs/ShaderDeclaration",
+          "description": "Original declaration and the count of separately emitted child fields."
+        },
+        "ordinal": {
+          "description": "Zero-based order among top-level Property declarations, including duplicates.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ordinal",
+        "declaration"
+      ],
+      "type": "object"
+    },
+    "ShaderSpan": {
+      "additionalProperties": false,
+      "description": "Half-open original Entry byte offsets, independent of decoded character counts.",
+      "properties": {
+        "basis": {
+          "$ref": "#/$defs/ShaderOffsetBasis",
+          "description": "Start of the decoded Entry payload."
+        },
+        "end_exclusive": {
+          "description": "First excluded byte.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "start": {
+          "description": "First included byte.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "basis",
+        "start",
+        "end_exclusive"
+      ],
+      "type": "object"
+    },
+    "ShaderText": {
+      "additionalProperties": false,
+      "description": "Exact source text of one bounded name, value or literal token.",
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/ShaderSpan",
+          "description": "Range into the retained decoded source."
+        },
+        "text": {
+          "description": "Exact original text in that range, without escape or whitespace normalisation.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "span",
+        "text"
+      ],
+      "type": "object"
+    },
+    "ShaderWord": {
+      "description": "Canonical unsigned 64-bit decimal text, from 0 through 18446744073709551615.",
+      "maxLength": 20,
+      "not": {
+        "pattern": "[^0-9]"
+      },
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|1844674407370955[0-0][0-9]{3}|18446744073709551[0-5][0-9]{2}|184467440737095516[0-0][0-9]{1}|1844674407370955161[0-4][0-9]{0}|18446744073709551615)$",
+      "type": "string"
+    },
+    "Source": {
+      "description": "Provenance shared by records from one physical input.",
+      "properties": {
+        "declared_integrity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Directory-declared checksum, never substituted for a cryptographic digest."
+        },
+        "identity": {
+          "$ref": "#/$defs/Identity",
+          "description": "Physical source identity."
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RawReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exact decoded Entry payload when available."
+        },
+        "root": {
+          "$ref": "#/$defs/Digest",
+          "description": "SHA-256 of every byte of the root Archive file."
+        },
+        "size": {
+          "description": "Decoded Entry size, or root file size.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "verification": {
+          "$ref": "#/$defs/Verification",
+          "description": "Whether the retained payload passed the reader's available directory checks."
+        }
+      },
+      "required": [
+        "root",
+        "identity",
+        "size",
+        "verification"
+      ],
+      "type": "object"
+    },
+    "Status": {
+      "description": "Terminal projection status of one record.",
+      "oneOf": [
+        {
+          "const": "complete",
+          "description": "Every field group claimed as projected by this provider was projected.",
+          "type": "string"
+        },
+        {
+          "const": "partial",
+          "description": "Useful data survives with explicitly diagnosed loss.",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "No usable projection was produced.",
+          "type": "string"
+        }
+      ]
+    },
+    "Subresource": {
+      "description": "Source-local identity of a metadata object or ordered subresource.",
+      "properties": {
+        "indices": {
+          "description": "Zero-based original ordinal path, including duplicate named objects.",
+          "items": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "namespace": {
+          "description": "Provider-owned semantic namespace.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "indices"
+      ],
+      "type": "object"
+    },
+    "Verification": {
+      "description": "Comparison against available source-declared integrity, independent of hash computation.",
+      "oneOf": [
+        {
+          "const": "not-available",
+          "description": "The source has no comparable integrity declaration.",
+          "type": "string"
+        },
+        {
+          "const": "not-performed",
+          "description": "A declaration exists but its interpretation does not permit verification.",
+          "type": "string"
+        },
+        {
+          "const": "verified",
+          "description": "Available source checks passed while the entire Entry was retained.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "shader"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "shader-definition"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ShaderPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "definition"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "issues": {
+            "items": {
+              "properties": {
+                "severity": {
+                  "const": "info"
+                }
+              },
+              "required": [
+                "severity"
+              ]
+            }
+          },
+          "status": {
+            "const": "complete"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "shader"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "shader-property"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ShaderPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "property"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "issues": {
+            "items": {
+              "properties": {
+                "severity": {
+                  "const": "info"
+                }
+              },
+              "required": [
+                "severity"
+              ]
+            }
+          },
+          "status": {
+            "const": "complete"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "shader"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "shader-cache-inventory"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ShaderPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "compiled-cache"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "issues": {
+            "items": {
+              "properties": {
+                "severity": {
+                  "const": "info"
+                }
+              },
+              "required": [
+                "severity"
+              ]
+            }
+          },
+          "status": {
+            "const": "complete"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "shader"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "shader-definition-failure"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ShaderPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "definition-failure"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "issues": {
+            "contains": {
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "error"
+                  ]
+                }
+              },
+              "required": [
+                "severity"
+              ]
+            },
+            "minItems": 1
+          },
+          "status": {
+            "const": "failed"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "shader"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "shader-declaration"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ShaderPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "declaration"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "shader"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "shader-declaration"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "else": {
+          "properties": {
+            "issues": {
+              "items": {
+                "properties": {
+                  "severity": {
+                    "const": "info"
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              }
+            },
+            "status": {
+              "const": "complete"
+            }
+          }
+        },
+        "if": {
+          "properties": {
+            "data": {
+              "properties": {
+                "payload": {
+                  "properties": {
+                    "meaning": {
+                      "properties": {
+                        "interpretation": {
+                          "properties": {
+                            "state": {
+                              "enum": [
+                                "malformed",
+                                "unsupported-reader-variant"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "state"
+                          ]
+                        },
+                        "role": {
+                          "const": "mask"
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "interpretation"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "meaning"
+                  ]
+                }
+              },
+              "required": [
+                "payload"
+              ]
+            }
+          },
+          "required": [
+            "data"
+          ]
+        },
+        "then": {
+          "properties": {
+            "issues": {
+              "contains": {
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "warning",
+                      "error"
+                    ]
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              },
+              "minItems": 1
+            },
+            "status": {
+              "const": "partial"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-entry"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "properties": {
+              "metadata": {
+                "$ref": "#/$defs/EntryMetadataInfo"
+              }
+            },
+            "required": [
+              "metadata"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    }
+  ],
+  "description": "One JSONL metadata or subresource record.",
+  "properties": {
+    "data": {
+      "description": "Provider-specific typed data described by its field-group contract."
+    },
+    "issues": {
+      "description": "Every issue affecting this projection.",
+      "items": {
+        "$ref": "#/$defs/MediaIssue"
+      },
+      "type": "array"
+    },
+    "kind": {
+      "$ref": "#/$defs/MediaKind",
+      "description": "Provider output kind."
+    },
+    "source": {
+      "$ref": "#/$defs/Source",
+      "description": "Physical source and exact preservation evidence."
+    },
+    "status": {
+      "$ref": "#/$defs/Status",
+      "description": "Projection result."
+    },
+    "subresource": {
+      "$ref": "#/$defs/Subresource",
+      "description": "Source-local ordered identity."
+    }
+  },
+  "required": [
+    "kind",
+    "source",
+    "subresource",
+    "status",
+    "data",
+    "issues"
+  ],
+  "title": "MediaRecord",
+  "type": "object"
+}

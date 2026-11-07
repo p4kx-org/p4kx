@@ -99,6 +99,7 @@ mod list_textures;
 mod loc;
 mod loc_notes;
 mod media;
+mod media_shader;
 mod model;
 mod model_animation;
 mod model_animation_sources;

@@ -3,6 +3,7 @@
 
 //! Bounded media export with physical identities and atomic generation publication.
 
+mod archive_metadata_schema;
 mod archive_provider;
 mod artifact;
 mod checkpoint;
@@ -36,6 +37,20 @@ mod reference;
 mod reference_resolve;
 mod retained_source;
 mod schema;
+mod schema_merge;
+#[cfg(test)]
+mod schema_merge_tests;
+mod shader_declaration;
+mod shader_diagnostic;
+mod shader_mask;
+mod shader_payload;
+mod shader_projection;
+mod shader_provider;
+mod shader_schema;
+mod shader_source;
+mod shader_span;
+mod shader_values;
+mod shader_word;
 mod source;
 mod traversal;
 
@@ -61,8 +76,23 @@ pub use reference::{
     ReferenceResolution, ReferenceTarget, ReferenceUnavailable,
 };
 pub use schema::{
-    MediaFormat, MediaVersion, index_schema, record_schema, reference_schema, source_schema,
+    MediaFormat, MediaVersion, builtin_record_schema, index_schema, record_schema,
+    reference_schema, source_schema,
 };
+pub use shader_declaration::{
+    ShaderDeclaration, ShaderForm, ShaderMeaning, ShaderParent, ShaderParentNamespace,
+    ShaderProperty,
+};
+pub use shader_mask::ShaderMask;
+pub use shader_payload::{
+    ShaderBudget, ShaderCache, ShaderCacheDecode, ShaderCacheKind, ShaderConstruct,
+    ShaderDefinition, ShaderDefinitionCounts, ShaderDefinitionFailure, ShaderEncoding,
+    ShaderFailureReason, ShaderNameOrigin, ShaderPayload,
+};
+pub use shader_provider::ShaderProvider;
+pub use shader_schema::{shader_payload_schema, shader_record_schema};
+pub use shader_span::{ShaderOffsetBasis, ShaderSpan, ShaderText};
+pub use shader_word::ShaderWord;
 pub use source::{
     BuildProvenance, ContainerIdentity, Digest, Identity, RawReference, RootSource, Source,
     SourceContext, Subresource,

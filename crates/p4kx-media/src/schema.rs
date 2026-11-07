@@ -5,6 +5,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::MediaError;
+
 /// Exact discriminator of the media contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum MediaFormat {
@@ -32,6 +34,16 @@ pub fn index_schema() -> Value {
 #[must_use]
 pub fn record_schema() -> Value {
     schemars::schema_for!(crate::MediaRecord).to_value()
+}
+
+/// Returns the record envelope with namespace-specific built-in payload constraints.
+/// Custom provider namespaces retain the generic record data contract.
+///
+/// # Errors
+/// Returns incompatible generated schema definitions or structural schema failures.
+pub fn builtin_record_schema() -> Result<Value, MediaError> {
+    let shader = crate::shader_schema::bind_record_schema(record_schema())?;
+    crate::archive_metadata_schema::bind_record_schema(shader)
 }
 
 /// Returns the JSON Schema of the common typed reference envelope.

@@ -23,7 +23,7 @@ pub(crate) fn run(args: &MediaArgs, as_json: bool) -> anyhow::Result<ExitCode> {
             } else if *reference {
                 p4kx_media::reference_schema()
             } else if *record {
-                p4kx_media::record_schema()
+                p4kx_media::builtin_record_schema()?
             } else {
                 p4kx_media::index_schema()
             };

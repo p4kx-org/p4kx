@@ -30,9 +30,38 @@ components separately. They exercise v1, ordinary ZIP, recovery, v2 base/extensi
 and extension-only records, plus stored and compressed nested ZIPs. They do not use
 the production decoder to generate expected values and contain no game data.
 
-This reader step retains directory timestamps. Local-header timestamps, further
-layout/signature/extra-range metadata and encoded CLI/MCP/media projections are
-separate enrichment work; the full metadata-export issue remains open.
+## Shared export representation
+
+`p4kx-extraction::EntryMetadataInfo::of(entry)` encodes these facts for frontends.
+The Archive media provider writes that same object at `data.metadata` on each
+`archive-entry` record in `archive.jsonl`:
+
+| Field | Meaning |
+| --- | --- |
+| `owner_entry_index` | The admitted physical Entry index in its immediately owning Archive |
+| `dos_timestamp.raw_date` | Unmodified unsigned 16-bit directory date word |
+| `dos_timestamp.raw_time` | Unmodified unsigned 16-bit directory time word |
+| `dos_timestamp.calendar.state` | `valid` or `invalid`, separately from source-word presence |
+| `dos_timestamp.calendar.year`, `month`, `day`, `hour`, `minute`, `second` | Present for `valid`, without a timezone or epoch interpretation |
+
+Read the owner index together with the record's complete source/container identity;
+it is not a global identifier or an original directory ordinal before folder removal.
+A grouped texture row must keep the physical base Entry as metadata owner instead
+of implying that one timestamp describes every part.
+
+Raw words are exact JSON integers in the range 0–65535. All-zero words encode as
+`calendar: {"state":"invalid"}` and remain present; they do not become a missing
+source field or a fabricated 1980 calendar. Invalid calendar input does not mark
+otherwise complete metadata or verified payload bytes as corrupt. The typed schema
+bounds calendar fields and restricts seconds to even values from 0 through 58.
+
+The generic media envelope remains available through `record_schema()`.
+`builtin_record_schema()` also constrains this metadata object only for the built-in
+Archive Entry namespace; other provider namespaces keep their general contract.
+
+This projection covers directory timestamps. CLI/MCP Entry summaries, local-header
+timestamps and further layout/signature/extra-range metadata remain separate parts
+of the full metadata-export work.
 
 The packed field definition follows
 [Microsoft's DOS date/time contract](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-dosdatetimetofiletime).

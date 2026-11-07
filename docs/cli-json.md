@@ -25,9 +25,11 @@ A stdout reporting failure does not undo an already committed generation.
 
 `p4kx media schema` prints [media-index.schema.json](../schemas/media-index.schema.json).
 `--record`, `--reference` and `--source` print the corresponding
-[record](../schemas/media-record.schema.json), [reference](../schemas/media-reference.schema.json)
+[built-in record](../schemas/media-builtin-record.schema.json), [reference](../schemas/media-reference.schema.json)
 and [source](../schemas/media-source.schema.json) schemas. These schemas also describe the streamed
 files referenced by `index`; the JSONL streams and binary artifacts stay in the output directory.
+The library's [generic record envelope](../schemas/media-record.schema.json) stays available without
+built-in payload restrictions. Custom provider namespaces remain generic in the CLI schema as well.
 
 ## Entry
 
