@@ -162,3 +162,30 @@ fn root_and_child_entries_with_the_same_index_and_path_are_distinct() -> TestRes
     assert_eq!(counts(&archive.key_demand().snapshot()), [2, 0, 2]);
     Ok(())
 }
+
+#[test]
+fn united_scopes_count_each_physical_entry_once_whatever_its_path() -> TestResult {
+    let (_folder, archive) = open(
+        &ArchiveBuilder::new()
+            .entry(secret("same.xml"))
+            .entry(secret("same.xml")),
+    )?;
+    let demand = archive.key_demand();
+    let first = demand.scope();
+    assert!(refused(&archive, 0)?.is_key_required());
+    let first = first.unread();
+    let second = demand.scope();
+    assert!(refused(&archive, 0)?.is_key_required());
+    assert!(refused(&archive, 1)?.is_key_required());
+
+    let mut united = first.clone();
+    united.union(&first);
+    assert_eq!(united.unread(), 1, "the same Entry twice");
+    united.union(&second.unread());
+    assert_eq!(
+        [united.missing(), united.wrong(), united.unread()],
+        [2, 0, 2],
+        "two physical Entries with one path"
+    );
+    Ok(())
+}

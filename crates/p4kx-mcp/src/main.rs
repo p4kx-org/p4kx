@@ -28,7 +28,10 @@ mod forge_state;
 mod gate;
 mod image;
 mod image_tools;
+#[cfg(test)]
+mod key_fixture;
 mod key_report;
+mod key_stamp;
 mod keys;
 mod loadout;
 mod loadout_cache;

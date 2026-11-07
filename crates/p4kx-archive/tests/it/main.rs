@@ -12,6 +12,7 @@ mod effective_encoding;
 mod entry_metadata;
 mod hash_block;
 mod installation_v2;
+mod key_demand;
 mod key_demand_identity;
 mod layout_v2;
 mod layout_v2_extensions;

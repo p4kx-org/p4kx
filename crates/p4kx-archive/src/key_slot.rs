@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fmt;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock};
 
 use p4kx_foundation::ArchiveKey;
@@ -26,9 +26,16 @@ pub(crate) struct KeySlot {
     state: Arc<RwLock<State>>,
     turn: Arc<Mutex<()>>,
     demand: KeyDemand,
+    generation: Arc<AtomicU64>,
 }
 
 impl KeySlot {
+    /// Returns how often the key held here changed: it grows when a different key is set and when
+    /// a key is cleared, and stays when the same key is set again.
+    pub(crate) fn generation(&self) -> u64 {
+        self.generation.load(Ordering::Acquire)
+    }
+
     /// Takes the turn to check the key, so that threads that open Entries at once check it once.
     pub(crate) fn check_turn(&self) -> MutexGuard<'_, ()> {
         self.turn.lock().unwrap_or_else(PoisonError::into_inner)
@@ -48,7 +55,11 @@ impl KeySlot {
     }
 
     pub(crate) fn set(&self, key: ArchiveKey) {
-        *self.state.write().unwrap_or_else(PoisonError::into_inner) = State {
+        let mut state = self.state.write().unwrap_or_else(PoisonError::into_inner);
+        if state.key.as_ref() != Some(&key) {
+            self.generation.fetch_add(1, Ordering::AcqRel);
+        }
+        *state = State {
             key: Some(key),
             ..State::default()
         };
@@ -73,7 +84,11 @@ impl KeySlot {
     }
 
     pub(crate) fn clear(&self) {
-        *self.state.write().unwrap_or_else(PoisonError::into_inner) = State::default();
+        let mut state = self.state.write().unwrap_or_else(PoisonError::into_inner);
+        if state.key.is_some() {
+            self.generation.fetch_add(1, Ordering::AcqRel);
+        }
+        *state = State::default();
     }
 
     pub(crate) fn is_set(&self) -> bool {

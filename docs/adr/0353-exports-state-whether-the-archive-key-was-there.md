@@ -29,6 +29,14 @@ result whose call left encrypted Entries unread carries a text block with the hi
 says `given`. The scope counts every distinct Entry asked for while it is open, whoever asked, so
 a call running at the same time on the same Archive counts into it.
 
+A result the server keeps across calls (the audio index and the Loadout trees) is built inside a
+`DemandScope`, and its `KeyStamp` keeps the `ArchiveKeyUse` of that build with the key generation
+(`Archive::key_generation`, raised when a different key is set or a key is cleared) it ran with.
+A call that reuses it adds that use to its own report once, whichever thread reuses it, so its note
+and `_meta` equal those of the call that built it; the building call does not add it again. A kept
+result built with encrypted Entries unread is built again on next use once the generation is no
+longer the one it was built with; a complete one is never built again for the key.
+
 ## Consequences
 
 The catalog stays version 3 under ADR-0339: the two fields are additive in the unreleased version

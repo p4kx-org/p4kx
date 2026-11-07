@@ -4,7 +4,7 @@
 use std::sync::{Arc, Mutex, PoisonError};
 
 use crate::entry_identity::PhysicalEntryId;
-use crate::key_demand_counts::{KeyDemandCounts, KeyFailure};
+use crate::key_demand_counts::{KeyDemandCounts, KeyFailure, UnreadEntries};
 
 /// The encrypted Entries of an Archive that were asked for while no key was set or the one set did
 /// not fit.
@@ -73,6 +73,12 @@ impl KeyDemand {
         self.lock(|record| record.total.snapshot())
     }
 
+    /// Returns whether `other` is a handle to the same record, that is of the same Archive.
+    #[must_use]
+    pub fn is_same_record(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.record, &other.record)
+    }
+
     /// Opens a [`DemandScope`] that counts from now on, until it is dropped.
     #[must_use]
     pub fn scope(&self) -> DemandScope {
@@ -106,12 +112,22 @@ impl DemandScope {
     /// Returns what has been recorded since the scope was opened.
     #[must_use]
     pub fn snapshot(&self) -> KeyDemandSnapshot {
+        self.with_counts(KeyDemandCounts::snapshot)
+    }
+
+    /// Returns the distinct physical Entries recorded since the scope was opened.
+    #[must_use]
+    pub fn unread(&self) -> UnreadEntries {
+        self.with_counts(KeyDemandCounts::unread_entries)
+    }
+
+    fn with_counts<T: Default>(&self, read: impl FnOnce(&KeyDemandCounts) -> T) -> T {
         self.demand.lock(|record| {
             record
                 .scopes
                 .iter()
                 .find(|(id, _)| *id == self.id)
-                .map(|(_, counts)| counts.snapshot())
+                .map(|(_, counts)| read(counts))
                 .unwrap_or_default()
         })
     }

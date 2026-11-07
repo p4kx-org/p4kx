@@ -64,7 +64,7 @@ pub(crate) fn search(
             entities: users.as_mut().and_then(Iterator::next),
         }
     });
-    let (issues, issues_total) = convert::issues(index);
+    let (issues, issues_total) = convert::issues(&index);
     let mut result = TriggerSearchResult {
         archive: opened.archive().path().display().to_string(),
         search: params.search.clone(),
@@ -164,7 +164,7 @@ pub(crate) fn entity_sounds(
                 audio.matched_count(),
             ))
         })?;
-    let (issues, issues_total) = convert::issues(opened.audio_index());
+    let (issues, issues_total) = convert::issues(&opened.audio_index());
     let mut result = EntitySoundsResult {
         archive: opened.archive().path().display().to_string(),
         entity,
@@ -231,7 +231,8 @@ pub(crate) fn resolve(
     params: &TriggerParams,
     page: Page,
 ) -> Result<TriggerSoundsResult, ToolError> {
-    let audio = opened.audio();
+    let index = opened.audio_index();
+    let audio = opened.audio(&index);
     let index = audio.index();
     let choice = language_choice(
         index,

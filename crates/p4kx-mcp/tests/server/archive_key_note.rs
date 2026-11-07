@@ -8,7 +8,7 @@ use crate::support::{Install, Server, TestResult};
 
 /// An Archive whose only ATL definition is encrypted, so the audio index of a call without the
 /// key lacks it without the call failing.
-fn install() -> TestResult<Install> {
+pub(crate) fn install() -> TestResult<Install> {
     let definitions = TestAtl::new("SC_Ship").trigger("Play_Engine", &["Play_Engine_Start"]);
     Install::new(vec![
         TestEntry::stored("Data/plain.xml", b"<plain/>".to_vec()),
@@ -20,18 +20,18 @@ fn install() -> TestResult<Install> {
     ])
 }
 
-fn search(server: &mut Server) -> TestResult<Value> {
+pub(crate) fn search(server: &mut Server) -> TestResult<Value> {
     server.call("search_audio_triggers", &json!({ "search": "engine" }))
 }
 
-fn texts(result: &Value) -> Vec<&str> {
+pub(crate) fn texts(result: &Value) -> Vec<&str> {
     result["content"]
         .as_array()
         .map(|blocks| blocks.iter().filter_map(|b| b["text"].as_str()).collect())
         .unwrap_or_default()
 }
 
-fn hint_of<'a>(result: &'a Value, needle: &str) -> Option<&'a str> {
+pub(crate) fn hint_of<'a>(result: &'a Value, needle: &str) -> Option<&'a str> {
     texts(result).into_iter().find(|text| text.contains(needle))
 }
 
