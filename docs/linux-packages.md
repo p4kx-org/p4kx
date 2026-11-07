@@ -128,6 +128,9 @@ Documents-portal checks inspect the kernel mount table with `findmnt`: each gran
 belong to the single `fuse.portal` mount with source `portal` at `$XDG_RUNTIME_DIR/doc`.
 Generic FUSE filesystem labels from `stat` do not establish portal identity. The native logs
 retain the actual mount metadata and Flatpak/findmnt versions before testing portal operations.
+They also record the measured Documents API version, XML introspection and installed portal
+package versions through a bounded probe. The [portal identity core](portal-alias-core.md)
+documents the separate host-mapping and write-policy contracts.
 
 [`release-linux.yml`](../.github/workflows/release-linux.yml) builds on the matching Ubuntu 24.04
 native CPU and verifies packages on a fresh matching runner. The consumer validates the source

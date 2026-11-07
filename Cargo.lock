@@ -3790,9 +3790,12 @@ name = "p4kx-guard"
 version = "0.4.2"
 dependencies = [
  "p4kx-channels",
+ "rustix 1.1.5",
  "same-file",
+ "serde",
  "tempfile",
  "thiserror 2.0.21",
+ "zbus",
 ]
 
 [[package]]
