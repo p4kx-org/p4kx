@@ -11,9 +11,10 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'linux-debian.ps1')
 $platform = Get-P4kxLinuxPlatform -Target $Target
 $name = Get-P4kxAssetName -Target $Target -Version $Version -Package deb
-$payload = Join-Path $StagingDirectory 'payload'
+$stage = [IO.Path]::GetFullPath($StagingDirectory, $PWD.ProviderPath)
+$payload = Join-Path $stage 'payload'
 $original = @(New-P4kxLinuxPayload -Target $Target -Version $Version -Package deb -BinaryDirectory $BinaryDirectory -OutputDirectory $payload)
-$packageRoot = Join-Path $StagingDirectory 'package'
+$packageRoot = Join-Path $stage 'package'
 $private = Join-Path $packageRoot 'usr/lib/p4kx'
 $commands = Join-Path $packageRoot 'usr/bin'
 New-Item -ItemType Directory -Force -Path $private, $commands | Out-Null
@@ -38,15 +39,10 @@ $changelog = "p4kx ($debianVersion) unstable; urgency=medium`n`n  * Upstream rel
 [IO.File]::WriteAllText((Join-Path $documents 'changelog.Debian'), $changelog, [Text.UTF8Encoding]::new($false))
 Invoke-P4kxLinuxTool gzip @('--no-name', '--best', (Join-Path $documents 'changelog.Debian')) | Out-Null
 Invoke-P4kxLinuxTool gzip @('--no-name', '--best', (Join-Path $documents 'changelog')) | Out-Null
-$debian = Join-Path $StagingDirectory 'debian'
+$debian = Join-Path $stage 'debian'
 New-Item -ItemType Directory -Force -Path $debian | Out-Null
 "Source: p4kx`n`nPackage: p4kx`nArchitecture: any`nDescription: browser for Star Citizen Archives" | Set-Content (Join-Path $debian 'control') -Encoding utf8NoBOM
-Push-Location $StagingDirectory
-try {
-    $scan = @('p4kx', 'p4kx-gui', 'p4kx-mcp') | ForEach-Object { '-e' + [IO.Path]::GetFullPath((Join-Path 'package/usr/lib/p4kx' $_)) }
-    $dependencies = Get-P4kxDebianDependencies @(Invoke-P4kxLinuxTool dpkg-shlibdeps (@('-O') + $scan))
-}
-finally { Pop-Location }
+$dependencies = Get-P4kxDebianPackageDependencies -StagingDirectory $stage
 $control = Join-Path $packageRoot 'DEBIAN'
 New-Item -ItemType Directory -Force -Path $control | Out-Null
 $size = [long][Math]::Ceiling((Get-ChildItem -LiteralPath $packageRoot -Recurse -File | Measure-Object Length -Sum).Sum / 1KB)

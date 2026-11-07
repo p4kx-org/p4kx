@@ -41,6 +41,7 @@ The deb installs real executables and the shared distribution identity in `/usr/
 with `/usr/bin` symlinks, desktop metadata, icons, manual pages and legal notices in standard
 locations. Its architecture field follows the target, and generated native shared-library
 dependencies are combined with the window/audio/portal libraries loaded dynamically.
+Dependency analysis uses the three absolute staged executable paths and the staged Debian control directory.
 The Debian version adds packaging revision `-1` and maps an upstream prerelease separator to
 `~`, retaining Debian's prerelease ordering.
 `lintian` warnings and errors fail packaging.

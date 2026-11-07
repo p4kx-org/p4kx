@@ -1,6 +1,26 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'linux-package-contract.ps1')
 
+function Get-P4kxDebianPackageDependencies {
+    <#
+    .SYNOPSIS
+    Scans the three staged executables with their matching Debian control directory.
+    #>
+    param([Parameter(Mandatory)][string]$StagingDirectory)
+    $stage = [IO.Path]::GetFullPath($StagingDirectory, $PWD.ProviderPath)
+    if (-not (Test-Path -LiteralPath (Join-Path $stage 'debian/control') -PathType Leaf)) { throw 'Debian dependency scan requires its staged source control file.' }
+    $scan = @(foreach ($binary in @('p4kx', 'p4kx-gui', 'p4kx-mcp')) {
+        $path = Join-Path $stage "package/usr/lib/p4kx/$binary"
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Debian dependency scan payload is missing: $binary" }
+        '-e' + $path
+    })
+    Push-Location -LiteralPath $stage
+    try {
+        return Get-P4kxDebianDependencies @(Invoke-P4kxLinuxTool dpkg-shlibdeps (@('-O') + $scan))
+    }
+    finally { Pop-Location }
+}
+
 function Get-P4kxDebianVersion {
     param([Parameter(Mandatory)][string]$Version)
     if ($Version -cnotmatch '^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?$') { throw 'Invalid upstream package version.' }
