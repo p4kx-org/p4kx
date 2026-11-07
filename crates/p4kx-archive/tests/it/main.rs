@@ -11,6 +11,7 @@ mod decoding;
 mod effective_encoding;
 mod hash_block;
 mod installation_v2;
+mod key_demand;
 mod layout_v2;
 mod layout_v2_extensions;
 mod listing;

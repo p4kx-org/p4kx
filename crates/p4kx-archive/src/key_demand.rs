@@ -54,6 +54,40 @@ impl Unread {
     }
 }
 
+/// The distinct encrypted Entries a [`DemandScope`] saw asked for without a usable key, by path,
+/// for counting the Entries of several records once.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct UnreadEntries {
+    missing: HashSet<String>,
+    wrong: HashSet<String>,
+}
+
+impl UnreadEntries {
+    /// Adds the Entries of `other`.
+    pub fn union(&mut self, other: &Self) {
+        self.missing.extend(other.missing.iter().cloned());
+        self.wrong.extend(other.wrong.iter().cloned());
+    }
+
+    /// Returns how many distinct Entries were asked for while no key was set.
+    #[must_use]
+    pub fn missing(&self) -> usize {
+        self.missing.len()
+    }
+
+    /// Returns how many distinct Entries were asked for with a key that does not fit.
+    #[must_use]
+    pub fn wrong(&self) -> usize {
+        self.wrong.len()
+    }
+
+    /// Returns how many distinct Entries could not be read, for either reason.
+    #[must_use]
+    pub fn unread(&self) -> usize {
+        self.missing().saturating_add(self.wrong())
+    }
+}
+
 /// What a [`KeyDemand`] recorded at one moment.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct KeyDemandSnapshot {
@@ -100,6 +134,12 @@ impl KeyDemand {
         self.lock(|record| record.total.snapshot())
     }
 
+    /// Returns whether `other` is a handle to the same record, that is of the same Archive.
+    #[must_use]
+    pub fn is_same_record(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.record, &other.record)
+    }
+
     /// Opens a [`DemandScope`] that counts from now on, until it is dropped.
     #[must_use]
     pub fn scope(&self) -> DemandScope {
@@ -137,6 +177,24 @@ impl DemandScope {
                 .iter()
                 .find(|(id, _)| *id == self.id)
                 .map(|(_, counts)| counts.snapshot())
+                .unwrap_or_default()
+        })
+    }
+}
+
+impl DemandScope {
+    /// Returns the distinct Entries recorded since the scope was opened, by path.
+    #[must_use]
+    pub fn unread(&self) -> UnreadEntries {
+        self.demand.lock(|record| {
+            record
+                .scopes
+                .iter()
+                .find(|(id, _)| *id == self.id)
+                .map(|(_, counts)| UnreadEntries {
+                    missing: counts.missing.paths.clone(),
+                    wrong: counts.wrong.paths.clone(),
+                })
                 .unwrap_or_default()
         })
     }

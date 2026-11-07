@@ -154,7 +154,7 @@ pub use p4kx_archive::{
     Archive, ArchiveError, Build, BuildError, Checksum, Compression, DemandScope,
     EffectiveEncoding, Entry, EntryIssue, EntryReader, InstallationStatus, KeyCheck, KeyDemand,
     KeyDemandSnapshot, MAX_COMPRESSION_RATIO, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES,
-    MAX_CONTAINER_LEN, MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN, OpenOptions,
+    MAX_CONTAINER_LEN, MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN, OpenOptions, UnreadEntries,
 };
 pub use p4kx_audio::{
     ActionTarget, BankError, BankHeader, BankWarning, Container, ContainerKind, EmbeddedWem,

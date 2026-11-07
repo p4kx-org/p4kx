@@ -796,8 +796,11 @@ Entries it could not read adds a text block that says how many and how to give t
 `_meta.archive_key` (`missing` or `wrong`) and `_meta.encrypted_entries_unread` on the result. With
 a key set, a result of a tool that read an Archive carries `_meta.archive_key` `given` and no text.
 The count is of the distinct Entries asked for while that call ran, so it does not repeat an
-earlier call's; a call running at the same time on the same Archive counts into it too, and a
-result the server kept from an earlier call is not counted again. `--key-file` (or `P4KX_KEY_FILE`) names another file for the stored key.
+earlier call's; a call running at the same time on the same Archive counts into it too. A result
+the server keeps across calls (the audio index, the Loadout trees) remembers how the key served
+its build: a call that reuses it reports that, so it says the same as the call that built it, and
+such a result built with encrypted Entries unread is built again on next use once the Archive has
+another key. `--key-file` (or `P4KX_KEY_FILE`) names another file for the stored key.
 
 The MSI installs `p4kx-mcp.exe` next to `p4kx.exe` in
 `%LOCALAPPDATA%\Programs\P4KX`, and the portable ZIP holds it too. Add it to the AI

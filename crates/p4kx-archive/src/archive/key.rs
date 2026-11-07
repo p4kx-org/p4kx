@@ -45,6 +45,14 @@ impl Archive {
         self.key.is_set()
     }
 
+    /// Returns a number that changes whenever the key does: setting a different key, or clearing
+    /// one, raises it; setting the key that is set already does not. A result built while the
+    /// number was `n` was built with the same key as one built later while it is `n` again.
+    #[must_use]
+    pub fn key_generation(&self) -> u64 {
+        self.key.generation()
+    }
+
     /// Returns whether an encrypted Entry was needed since the last call while no key was set or
     /// the one set was found not to fit, and forgets that, so that a window can ask for the key
     /// once.

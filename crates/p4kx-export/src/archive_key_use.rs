@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, DemandScope, KeyDemandSnapshot};
+use p4kx_extraction::{Archive, DemandScope, KeyDemandSnapshot, UnreadEntries};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -45,6 +45,23 @@ impl ArchiveKeyUse {
     #[must_use]
     pub fn scoped(archive: &Archive, scope: &DemandScope) -> Self {
         Self::from_demand(archive, &scope.snapshot())
+    }
+
+    /// Returns how `archive` served reads that left `unread` unread, with the state rules of
+    /// [`ArchiveKeyUse::scoped`].
+    #[must_use]
+    pub fn of_unread(archive: &Archive, unread: &UnreadEntries) -> Self {
+        let state = if unread.wrong() > 0 {
+            ArchiveKeyState::Wrong
+        } else if archive.has_key() {
+            ArchiveKeyState::Given
+        } else {
+            ArchiveKeyState::Missing
+        };
+        Self {
+            state,
+            entries_unread: unread.unread() as u64,
+        }
     }
 
     /// Returns the use that covers both: the more serious state and the sum of the counts.

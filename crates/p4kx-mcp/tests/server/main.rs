@@ -5,6 +5,7 @@
 //! synthetic Library folder and Archive.
 
 mod archive_key;
+mod archive_key_cache;
 mod archive_key_note;
 mod archives;
 mod audio;
