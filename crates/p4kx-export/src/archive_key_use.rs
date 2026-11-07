@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, DemandScope, KeyDemandSnapshot};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{BuiltShipBase, CatalogSummary};
 
 /// Whether the Archive key was there for the encrypted Entries an export asked for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 #[schemars(transform = crate::closed_set::closed_string_set)]
 pub enum ArchiveKeyState {
@@ -35,7 +35,28 @@ impl ArchiveKeyUse {
     /// one that did not fit since the Archive was opened.
     #[must_use]
     pub fn of(archive: &Archive) -> Self {
-        let demand = archive.key_demand().snapshot();
+        Self::from_demand(archive, &archive.key_demand().snapshot())
+    }
+
+    /// Returns how `archive` served the reads made while `scope` was open.
+    ///
+    /// The state is `Given` when a key is set and none of those reads failed because of it, and
+    /// `Missing` when no key is set, even if the reads asked for no encrypted Entry.
+    #[must_use]
+    pub fn scoped(archive: &Archive, scope: &DemandScope) -> Self {
+        Self::from_demand(archive, &scope.snapshot())
+    }
+
+    /// Returns the use that covers both: the more serious state and the sum of the counts.
+    #[must_use]
+    pub fn merge(self, other: Self) -> Self {
+        Self {
+            state: self.state.max(other.state),
+            entries_unread: self.entries_unread.saturating_add(other.entries_unread),
+        }
+    }
+
+    fn from_demand(archive: &Archive, demand: &KeyDemandSnapshot) -> Self {
         let state = if demand.wrong > 0 {
             ArchiveKeyState::Wrong
         } else if archive.has_key() {

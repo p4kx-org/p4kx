@@ -10,7 +10,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use p4kx_channels::PublicPatches;
 use p4kx_export::{
-    BuiltShipBase, CatalogFailure, Filter, ShipBaseError, ShipBaseOptions, build_ship_base,
+    ArchiveKeyState, BuiltShipBase, CatalogFailure, Filter, ShipBaseError, ShipBaseOptions,
+    build_ship_base,
 };
 use serde::Serialize;
 
@@ -26,6 +27,8 @@ struct SummaryJson<'a> {
     archive: String,
     out: String,
     format: &'static str,
+    archive_key: ArchiveKeyState,
+    encrypted_entries_unread: u64,
     ships: usize,
     skipped: usize,
     mass: usize,
@@ -126,6 +129,8 @@ fn summary<'a>(built: &'a BuiltShipBase, args: &ShipsArgs, archive: String) -> S
             ShipsFormat::Json => "json",
             ShipsFormat::Ndjson => "ndjson",
         },
+        archive_key: built.archive_key().state(),
+        encrypted_entries_unread: built.archive_key().entries_unread(),
         ships: ships.len(),
         skipped: built.skipped(),
         mass: ships.iter().filter(|ship| ship.mass.is_some()).count(),

@@ -3856,6 +3856,7 @@ dependencies = [
  "clap",
  "p4kx-assembly",
  "p4kx-channels",
+ "p4kx-export",
  "p4kx-extraction",
  "p4kx-settings",
  "p4kx-testkit",

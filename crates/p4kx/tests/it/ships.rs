@@ -17,6 +17,12 @@ const XML: &str = r#"<Vehicle name="ACME_Alpha"><Parts>
 </Parts></Vehicle>"#;
 
 fn archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    archive_with(dir, true)
+}
+
+/// The archive with the DataForge encrypted or not, and the vehicle XML always encrypted when the
+/// DataForge is not, so that a run without a key can read the ships but not their parts.
+fn archive_with(dir: &Path, forge_encrypted: bool) -> Result<PathBuf, Box<dyn Error>> {
     let ship = TestEntity::new(
         0x1,
         "ACME_Alpha",
@@ -36,12 +42,19 @@ fn archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
         .record(ship.record())
         .record(other.record());
     let path = dir.join("Data.p4k");
+    let forge = TestEntry::zstd("Data\\Game2.dcb", database.build());
+    let vehicle = TestEntry::zstd(
+        "Data\\Scripts\\Entities\\Vehicles\\Implementations\\Xml\\ACME_Alpha.xml",
+        XML.as_bytes().to_vec(),
+    );
+    let (forge, vehicle) = if forge_encrypted {
+        (forge.encrypted(), vehicle)
+    } else {
+        (forge, vehicle.encrypted())
+    };
     ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database.build()).encrypted())
-        .entry(TestEntry::zstd(
-            "Data\\Scripts\\Entities\\Vehicles\\Implementations\\Xml\\ACME_Alpha.xml",
-            XML.as_bytes().to_vec(),
-        ))
+        .entry(forge)
+        .entry(vehicle)
         .write_to(&path)?;
     Ok(path)
 }
@@ -100,6 +113,8 @@ fn ships_writes_ndjson_and_a_json_summary() -> TestResult {
     assert_eq!(summary["ships"], 1);
     assert_eq!(summary["format"], "ndjson");
     assert_eq!(summary["mass"], 1);
+    assert_eq!(summary["archive_key"], "given");
+    assert_eq!(summary["encrypted_entries_unread"], 0);
     let text = fs::read_to_string(&out)?;
     let lines: Vec<_> = text.lines().collect();
     assert_eq!(lines.len(), 1);
@@ -109,5 +124,34 @@ fn ships_writes_ndjson_and_a_json_summary() -> TestResult {
         ship["mass"]["sources"][0]["kind"], "vehicleXml",
         "each value names its source"
     );
+    Ok(())
+}
+
+#[test]
+fn the_json_summary_says_when_encrypted_entries_stayed_unread_without_a_key() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive_with(dir.path(), false)?;
+    let out = dir.path().join("ships.json");
+
+    let output = p4kx_testkit::p4kx()?
+        .arg("ships")
+        .arg(&archive)
+        .arg("--out")
+        .arg(&out)
+        .arg("--json")
+        .env_remove("P4KX_ARCHIVE_KEY")
+        .env(
+            "P4KX_KEY_FILE",
+            dir.path().join("profile").join("archive.key"),
+        )
+        .output()?;
+
+    let summary: Value =
+        serde_json::from_slice(&output.stdout).map_err(|error| format!("{error}: {output:?}"))?;
+    assert_eq!(summary["archive_key"], "missing", "{summary}");
+    assert_eq!(summary["encrypted_entries_unread"], 1, "{summary}");
+    let document: Value = serde_json::from_slice(&fs::read(&out)?)?;
+    assert_eq!(document["source"]["archiveKey"], "missing");
+    assert_eq!(document["source"]["encryptedEntriesUnread"], 1);
     Ok(())
 }

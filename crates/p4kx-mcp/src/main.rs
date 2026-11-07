@@ -28,6 +28,7 @@ mod forge_state;
 mod gate;
 mod image;
 mod image_tools;
+mod key_report;
 mod keys;
 mod loadout;
 mod loadout_cache;
