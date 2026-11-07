@@ -89,7 +89,9 @@ function Install-P4kxFlatpak {
         throw 'Installed Flatpak application/runtime ref or OSTree commit differs.'
     }
     $location = (Invoke-P4kxLinuxTool flatpak @('info', '--user', "--arch=$($Platform.unix_arch)", '--show-location', $settings.application_id) | Out-String).Trim()
-    Assert-P4kxFlatpakMetadata @(Invoke-P4kxLinuxTool flatpak @('info', '--user', "--arch=$($Platform.unix_arch)", '--show-metadata', $settings.application_id)) $Platform
+    $metadata = @(Invoke-P4kxLinuxTool flatpak @('info', '--user', "--arch=$($Platform.unix_arch)", '--show-metadata', $settings.application_id))
+    $metadata | Set-Content -LiteralPath (Join-Path $CheckDirectory 'flatpak-effective-metadata.log') -Encoding utf8NoBOM
+    Assert-P4kxFlatpakMetadata $metadata $Platform
     $data = (Invoke-P4kxLinuxTool flatpak @('run', '--user', "--arch=$($Platform.unix_arch)", '--command=printenv', $settings.application_id, 'XDG_DATA_HOME') | Out-String).Trim()
     if (-not [IO.Path]::IsPathFullyQualified($data)) { throw 'Flatpak did not provide an absolute writable application data directory.' }
     $drivers = @(Invoke-P4kxLinuxTool flatpak @('run', '--user', "--arch=$($Platform.unix_arch)", '--command=find', $settings.application_id, '/usr/lib', '-name', 'lvp_icd*.json', '-type', 'f'))

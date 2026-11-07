@@ -48,20 +48,25 @@ Assert-P4kxGlibcBaseline $requirements '2.39'
 $rejected = $false
 try { Assert-P4kxGlibcBaseline @('2.40') '2.39' } catch { $rejected = $true }
 if (-not $rejected) { throw 'A newer glibc ABI requirement was accepted.' }
-$metadata = @(
-    '[Application]', "name=$($settings.application_id)", "runtime=$($settings.flatpak.runtime)/$($rows[0].unix_arch)/25.08", 'command=p4kx-gui',
-    '[Context]', 'shared=network;ipc;', 'sockets=pulseaudio;wayland;fallback-x11;', 'devices=dri;', 'filesystems=~/Games/star-citizen:ro;'
-)
-Assert-P4kxFlatpakMetadata $metadata $rows[0]
-foreach ($changed in @(
-    ($metadata + @('[Session Bus Policy]', 'org.freedesktop.Flatpak=talk')),
-    @($metadata | ForEach-Object { $_ -replace '^filesystems=.*', 'filesystems=host;' }),
-    @($metadata | ForEach-Object { $_ -replace '^runtime=.*', 'runtime=org.freedesktop.Platform/foreign/25.08' }),
-    ($metadata + 'devices=all;')
-)) {
-    $rejected = $false
-    try { Assert-P4kxFlatpakMetadata $changed $rows[0] } catch { $rejected = $true }
-    if (-not $rejected) { throw 'Wrong runtime, host capability or duplicate Flatpak metadata was accepted.' }
+foreach ($row in $rows) {
+    $metadata = @(
+        '[Application]', "name=$($settings.application_id)", "runtime=$($settings.flatpak.runtime)/$($row.unix_arch)/25.08", 'command=p4kx-gui',
+        '[Context]', 'shared=network;ipc;', 'sockets=pulseaudio;wayland;x11;fallback-x11;', 'devices=dri;', 'filesystems=~/Games/star-citizen:ro;'
+    )
+    Assert-P4kxFlatpakMetadata $metadata $row
+    foreach ($changed in @(
+        ($metadata + @('[Session Bus Policy]', 'org.freedesktop.Flatpak=talk')),
+        @($metadata | ForEach-Object { $_ -replace '^filesystems=.*', 'filesystems=host;' }),
+        @($metadata | ForEach-Object { $_ -replace '^runtime=.*', 'runtime=org.freedesktop.Platform/foreign/25.08' }),
+        @($metadata | ForEach-Object { $_ -replace '^sockets=.*', 'sockets=pulseaudio;wayland;x11;' }),
+        @($metadata | ForEach-Object { $_ -replace '^sockets=.*', 'sockets=pulseaudio;wayland;fallback-x11;' }),
+        @($metadata | ForEach-Object { $_ -replace '^sockets=.*', 'sockets=pulseaudio;wayland;x11;fallback-x11;ssh-auth;' }),
+        ($metadata + 'devices=all;')
+    )) {
+        $rejected = $false
+        try { Assert-P4kxFlatpakMetadata $changed $row } catch { $rejected = $true }
+        if (-not $rejected) { throw 'Wrong runtime, expanded capability, noncanonical fallback or duplicate Flatpak metadata was accepted.' }
+    }
 }
 $sentinels = @(New-P4kxProfileSentinels (Join-Path $Directory 'profile'))
 Assert-P4kxProfileSentinels $sentinels

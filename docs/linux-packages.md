@@ -119,6 +119,11 @@ compiling applications, native checks compose the shipped desktop assets, compos
 copy and require a corrupt SVG to fail with a detailed filename/decoder report. This verifies
 AppStream image decoding independently of optional packages preinstalled on the runner image.
 
+Flatpak stores the declared `fallback-x11` socket together with its implied `x11` marker. The
+effective-metadata check requires both markers and still rejects unrestricted X11 without
+`fallback-x11`, extra sockets, filesystem access or bus permissions. The installed metadata is
+retained in the native consumer logs before validation.
+
 [`release-linux.yml`](../.github/workflows/release-linux.yml) builds on the matching Ubuntu 24.04
 native CPU and verifies packages on a fresh matching runner. The consumer validates the source
 SHA, pinned compiler/nextest, baseline, CPU and package hashes before execution. It then runs:
