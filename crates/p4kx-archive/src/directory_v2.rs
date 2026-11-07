@@ -113,6 +113,8 @@ fn parse_record(
     reader.skip(RECORD_SIGNATURE_LEN)?;
     let encryption = reader.read_u16()?;
     let sha256 = stated_sha256(reader.read_bytes(RECORD_SHA256_LEN)?);
+    let ordinal = u64::try_from(index)
+        .map_err(|_| FormatError::corrupt(offset, "v2 record ordinal exceeds u64"))?;
     if data_offset
         .checked_add(compressed_size)
         .is_none_or(|end| end > data_limit)
@@ -126,7 +128,12 @@ fn parse_record(
         );
     }
     Ok(Entry {
-        metadata: EntryMetadata::new(DosTimestamp::new(date, time)),
+        metadata: EntryMetadata::from_v2(
+            DosTimestamp::new(date, time),
+            method,
+            ordinal,
+            encryption,
+        ),
         path: read_name(names, name_offset, offset, index, log)?,
         compressed_size,
         uncompressed_size,

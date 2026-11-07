@@ -3,6 +3,8 @@
 
 //! Directory timestamp retention through independent ZIP, v1, v2 and recovery bytes.
 
+mod fixed_header_fixture;
+mod fixed_headers;
 mod fixture;
 mod v2;
 mod zip;

@@ -1,7 +1,9 @@
 # Archive Entry source metadata
 
 `p4kx-archive` exposes read-only directory facts through `Entry::metadata()`. The
-`EntryMetadata` object has private fields and currently provides `dos_timestamp()`.
+`EntryMetadata` object has private fields and exposes the actual DOS words, source
+record format, original directory ordinal, raw compression method and format-specific
+fixed header words.
 It is the common lower-layer seam for later metadata enrichment; no frontend or
 export dependency is required by the reader.
 
@@ -30,9 +32,34 @@ components separately. They exercise v1, ordinary ZIP, recovery, v2 base/extensi
 and extension-only records, plus stored and compressed nested ZIPs. They do not use
 the production decoder to generate expected values and contain no game data.
 
+## Fixed directory fields
+
+`record_format()` distinguishes a ZIP central-directory record (including P4K v1)
+from a fixed P4K v2 record. `raw_compression_method()` retains the complete unsigned
+16-bit method word independently of decoder selection.
+
+`original_directory_ordinal()` is the zero-based source position before container
+folder removal and admitted-Entry reindexing. v2 extension records follow all base
+records. Recovery-scanned headers return `None`: their original table positions
+cannot be established from the surviving records. Requesting `recover(true)` does
+not erase known positions when the intact directory is read normally.
+
+For ZIP records, `zip_header()` returns the original version-made-by and
+version-needed words, all general-purpose flags, the 16-bit disk-start word and
+all internal/external attribute bits. A ZIP64 marker remains the raw 16-bit word.
+Host-system bytes and unknown bits are not reinterpreted, masked or replaced by
+supported-feature values. v2 records instead provide `raw_v2_encryption_word()`,
+including zero and unknown nonzero words; ZIP records return `None` for this field.
+ZIP-only fields are absent on v2, while the actual DOS words remain present on both.
+
+These facts do not change compression selection, the CIG encryption-block policy,
+v2 nonzero-encryption interpretation, Entry issues, checksum verification,
+installation flags or installed-byte progress. Local-header words, signatures,
+ordered extra blocks and complete layout/range metadata are separate field groups.
 ## Shared export representation
 
-`p4kx-extraction::EntryMetadataInfo::of(entry)` encodes these facts for frontends.
+`p4kx-extraction::EntryMetadataInfo::of(entry)` encodes directory timestamp facts
+for frontends; the additional fixed fields above remain reader APIs.
 The Archive media provider writes that same object at `data.metadata` on each
 `archive-entry` record in `archive.jsonl`:
 

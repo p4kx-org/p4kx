@@ -6,12 +6,12 @@ use p4kx_foundation::{ByteReader, ParseError};
 use crate::entry::stated_sha256;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog, decode_path};
-use crate::{Checksum, Compression, DosTimestamp, Entry, EntryIssue, EntryMetadata};
+use crate::{
+    Checksum, Compression, DosTimestamp, Entry, EntryIssue, EntryMetadata, ZipHeaderMetadata,
+};
 
 const CENTRAL_HEADER_SIGNATURE: u32 = 0x0201_4B50;
 const CENTRAL_HEADER_LEN: usize = 46;
-const VERSIONS_AND_FLAGS_LEN: usize = 6;
-const DISK_AND_ATTRIBUTES_LEN: usize = 8;
 const ZIP64_MARKER_32: u32 = 0xFFFF_FFFF;
 const BLOCK_ZIP64: u16 = 0x0001;
 const BLOCK_CIG_ENCRYPTION: u16 = 0x5002;
@@ -22,6 +22,7 @@ const SHA256_LEN: usize = 32;
 
 struct FixedFields {
     dos_timestamp: DosTimestamp,
+    header: ZipHeaderMetadata,
     method: u16,
     crc32c: u32,
     compressed_size: u32,
@@ -30,6 +31,12 @@ struct FixedFields {
     name_len: usize,
     extra_len: usize,
     comment_len: usize,
+}
+
+#[derive(Clone, Copy)]
+struct RecordPosition {
+    index: usize,
+    original_directory_ordinal: Option<u64>,
 }
 
 struct ExtraFields {
@@ -49,8 +56,12 @@ pub(crate) fn parse_entries(bytes: &[u8], base: u64, count: u64) -> Result<Direc
         .min(bytes.len() / CENTRAL_HEADER_LEN);
     let mut entries = Vec::with_capacity(capacity);
     let mut log = IssueLog::default();
-    for _ in 0..count {
-        let entry = parse_entry(&mut reader, entries.len(), &mut log)?;
+    for ordinal in 0..count {
+        let position = RecordPosition {
+            index: entries.len(),
+            original_directory_ordinal: Some(ordinal),
+        };
+        let entry = parse_entry(&mut reader, position, &mut log)?;
         entries.push(entry);
     }
     Ok(Directory {
@@ -68,8 +79,7 @@ pub(crate) struct ParsedHeader<'a> {
     pub(crate) zip64_block: bool,
 }
 
-/// Parses the single header at the start of `bytes`, which lies at file offset `base`, as the
-/// Entry at `index`.
+/// Parses the standalone header at `base` as Entry `index`, without an original directory ordinal.
 pub(crate) fn parse_header<'a>(
     bytes: &'a [u8],
     base: u64,
@@ -77,7 +87,11 @@ pub(crate) fn parse_header<'a>(
     log: &mut IssueLog,
 ) -> Result<ParsedHeader<'a>, FormatError> {
     let mut reader = ByteReader::with_base(bytes, base);
-    let (entry, name, zip64_block) = parse_entry_parts(&mut reader, index, log)?;
+    let position = RecordPosition {
+        index,
+        original_directory_ordinal: None,
+    };
+    let (entry, name, zip64_block) = parse_entry_parts(&mut reader, position, log)?;
     let len = bytes.len() - reader.remaining();
     Ok(ParsedHeader {
         entry,
@@ -89,17 +103,21 @@ pub(crate) fn parse_header<'a>(
 
 fn parse_entry(
     reader: &mut ByteReader<'_>,
-    index: usize,
+    position: RecordPosition,
     log: &mut IssueLog,
 ) -> Result<Entry, FormatError> {
-    parse_entry_parts(reader, index, log).map(|(entry, _, _)| entry)
+    parse_entry_parts(reader, position, log).map(|(entry, _, _)| entry)
 }
 
 fn parse_entry_parts<'a>(
     reader: &mut ByteReader<'a>,
-    index: usize,
+    position: RecordPosition,
     log: &mut IssueLog,
 ) -> Result<(Entry, &'a [u8], bool), FormatError> {
+    let RecordPosition {
+        index,
+        original_directory_ordinal,
+    } = position;
     let offset = reader.offset();
     let fixed = read_fixed_fields(reader, offset)?;
     let name = reader.read_bytes(fixed.name_len)?;
@@ -110,7 +128,12 @@ fn parse_entry_parts<'a>(
     let extra = parse_extra(extra, extra_offset, &fixed, index, log)?;
     let zip64_block = extra.zip64_block;
     let entry = Entry {
-        metadata: EntryMetadata::new(fixed.dos_timestamp),
+        metadata: EntryMetadata::from_zip(
+            fixed.dos_timestamp,
+            fixed.method,
+            original_directory_ordinal,
+            fixed.header,
+        ),
         path,
         compressed_size: extra.compressed_size,
         uncompressed_size: extra.uncompressed_size,
@@ -134,7 +157,9 @@ fn read_fixed_fields(reader: &mut ByteReader<'_>, offset: u64) -> Result<FixedFi
             "central directory header signature missing",
         ));
     }
-    reader.skip(VERSIONS_AND_FLAGS_LEN)?;
+    let version_made_by = reader.read_u16()?;
+    let version_needed = reader.read_u16()?;
+    let general_purpose_flags = reader.read_u16()?;
     let method = reader.read_u16()?;
     let time = reader.read_u16()?;
     let date = reader.read_u16()?;
@@ -144,10 +169,20 @@ fn read_fixed_fields(reader: &mut ByteReader<'_>, offset: u64) -> Result<FixedFi
     let name_len = usize::from(reader.read_u16()?);
     let extra_len = usize::from(reader.read_u16()?);
     let comment_len = usize::from(reader.read_u16()?);
-    reader.skip(DISK_AND_ATTRIBUTES_LEN)?;
+    let disk_start = reader.read_u16()?;
+    let internal_attributes = reader.read_u16()?;
+    let external_attributes = reader.read_u32()?;
     let local_header_offset = reader.read_u32()?;
     Ok(FixedFields {
         dos_timestamp: DosTimestamp::new(date, time),
+        header: ZipHeaderMetadata::new(
+            version_made_by,
+            version_needed,
+            general_purpose_flags,
+            disk_start,
+            internal_attributes,
+            external_attributes,
+        ),
         method,
         crc32c,
         compressed_size,
