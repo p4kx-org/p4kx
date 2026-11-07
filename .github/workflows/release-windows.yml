@@ -40,6 +40,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Verify CRT resolution and copy contracts with synthetic PE fixtures
+        run: .github/scripts/test-windows-runtime.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'windows-runtime-contract')
       - uses: ./.github/actions/setup-rust
         with:
           target: ${{ matrix.target }}

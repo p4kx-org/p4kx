@@ -33,6 +33,29 @@ function Assert-P4kxWindowsRuntimeInventory {
     if (-not (Test-Path -LiteralPath (Join-Path $Directory 'MICROSOFT-REDISTRIBUTABLE-NOTICE.txt'))) { throw 'Runtime redistribution notice is missing.' }
 }
 
+function Get-P4kxCrtDirectory {
+    param(
+        [Parameter(Mandatory)][string]$Redistributables,
+        [Parameter(Mandatory)][ValidateSet('x64', 'arm64')][string]$Architecture
+    )
+    $version = Get-ChildItem -LiteralPath $Redistributables -Directory |
+        Where-Object { $_.Name -cmatch '^\d+\.\d+\.\d+$' } |
+        Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+    if (-not $version) { throw 'No Microsoft C++ redistributable inventory was found.' }
+    $target = Join-Path $version.FullName $Architecture
+    if (-not (Test-Path -LiteralPath $target -PathType Container)) {
+        throw "Missing target C++ redistributable directory: $target"
+    }
+    $candidates = @(Get-ChildItem -LiteralPath $target -Directory | Where-Object {
+        $_.Name -cmatch '^Microsoft\.VC\d+\.CRT$' -and
+        -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint)
+    })
+    if ($candidates.Count -ne 1) {
+        throw "Expected one regular target CRT directory in $target; found $($candidates.Count)."
+    }
+    return $candidates[0]
+}
+
 function Copy-P4kxWindowsRuntime {
     param([string]$Directory, $Platform)
     $studio = Get-P4kxVisualStudio
@@ -42,10 +65,8 @@ function Copy-P4kxWindowsRuntime {
     $dumpbin = Join-Path $version.FullName "bin/Host$hostCpu/$($Platform.msi_arch)/dumpbin.exe"
     if (-not (Test-Path -LiteralPath $dumpbin)) { throw "Missing host PE analyzer: $dumpbin" }
     $redistributables = Join-Path $studio 'VC/Redist/MSVC'
-    $redist = Get-ChildItem -LiteralPath $redistributables -Directory | Where-Object Name -Match '^\d+\.\d+\.\d+$' |
-        Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
-    if (-not $redist) { throw 'No Microsoft C++ redistributable inventory was found.' }
-    $crt = Join-Path $redist.FullName "$($Platform.msi_arch)/Microsoft.VC143.CRT"
+    $crt = Get-P4kxCrtDirectory -Redistributables $redistributables -Architecture $Platform.msi_arch
+    $crtSource = [IO.Path]::GetRelativePath($redistributables, $crt.FullName).Replace('\', '/')
     $pending = [Collections.Generic.Queue[string]]::new()
     foreach ($file in Get-ChildItem -LiteralPath $Directory -Filter '*.exe') { $pending.Enqueue($file.FullName) }
     $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
@@ -55,7 +76,7 @@ function Copy-P4kxWindowsRuntime {
         foreach ($dependency in Get-P4kxPeDependencies $dumpbin $image) {
             if (-not $seen.Add($dependency)) { continue }
             if ($dependency -match '^(vcruntime|msvcp|concrt)140.*\.dll$') {
-                $source = Join-Path $crt $dependency
+                $source = Join-Path $crt.FullName $dependency
                 if (-not (Test-Path -LiteralPath $source)) { throw "Missing target CRT dependency: $source" }
                 $machine = Get-ImageMachine -Path $source -Os windows
                 if ($machine -ne $Platform.pe_machine) { throw "Wrong CPU in CRT dependency: $source" }
@@ -63,7 +84,7 @@ function Copy-P4kxWindowsRuntime {
                 $pending.Enqueue((Join-Path $Directory $dependency))
                 $inventory.Add([ordered]@{
                     name=$dependency; machine=$machine; sha256=(Get-FileHash $source -Algorithm SHA256).Hash.ToLowerInvariant()
-                    source="Visual Studio/VC/Redist/MSVC/$($redist.Name)/$($Platform.msi_arch)/Microsoft.VC143.CRT/$dependency"
+                    source="Visual Studio/VC/Redist/MSVC/$crtSource/$dependency"
                 })
             }
             elseif ($dependency -notmatch '^(api-ms-win-|ext-ms-)' -and
@@ -80,12 +101,14 @@ function Copy-P4kxWindowsRuntime {
 Microsoft Visual C++ runtime redistribution
 
 Any Microsoft runtime DLLs listed in windows-runtime.json are unmodified files from
-the architecture-specific Microsoft Visual Studio 2022 C++ Redistributable (VC143).
+the architecture-specific Microsoft Visual Studio C++ redistributable directories
+recorded by their source paths in that inventory.
 Copyright Microsoft Corporation. All rights reserved.
-Their use and redistribution are governed by the Microsoft Visual Studio licence:
+Their use and redistribution remain subject to the applicable Visual Studio terms:
 https://visualstudio.microsoft.com/license-terms/
 Redistributable list and deployment documentation:
 https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution
+https://learn.microsoft.com/en-us/visualstudio/releases/2026/redistribution
 https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files
 
 The inventory records each bundled file's source, PE machine and SHA-256 digest.

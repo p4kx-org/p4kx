@@ -11,6 +11,21 @@ GUI, CLI and MCP server, licence files, third-party notices, a distribution iden
 DLL has its target PE machine, SHA-256 and Visual Studio redistributable source recorded.
 Windows system DLLs and Universal CRT are operating-system prerequisites, not copied files.
 
+Runtime selection reads the newest stable three-component version below the selected Visual
+Studio installation's `VC/Redist/MSVC`, then the exact target `x64` or `arm64` directory. That
+directory must contain exactly one regular `Microsoft.VC<digits>.CRT` directory. Debug CRT,
+`onecore`, foreign CPUs, missing targets and ambiguous CRT families are not fallbacks. The host
+import analyzer follows the applications' actual dependency graph; copied DLLs retain their PE
+machine and SHA-256 checks. Inventory source paths record the selected version and actual CRT
+family, including VC143 and VC145. The notice links the applicable Microsoft terms and official
+[2022](https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution) and
+[2026](https://learn.microsoft.com/en-us/visualstudio/releases/2026/redistribution) lists.
+
+Before native compilation, each Windows producer runs `test-windows-runtime.ps1`. Synthetic PE
+headers and controlled import results exercise both CPU choices and CRT families through the real
+copy/inventory validation path, including rejection cases. This establishes packaging logic, not
+native runtime execution; the packaged application checks below remain required.
+
 ## Installation and replacement
 
 The MSI installs for the current user without administrator rights in
