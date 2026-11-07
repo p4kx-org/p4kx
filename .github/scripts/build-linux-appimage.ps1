@@ -12,6 +12,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'linux-payload.ps1')
 . (Join-Path $PSScriptRoot 'linux-shared-libraries.ps1')
 . (Join-Path $PSScriptRoot 'linux-source-tree.ps1')
+. (Join-Path $PSScriptRoot 'linux-appdir-root.ps1')
 $platform = Get-P4kxLinuxPlatform -Target $Target
 $settings = Get-P4kxLinuxPackaging
 $name = Get-P4kxAssetName -Target $Target -Version $Version -Package app-image
@@ -44,9 +45,7 @@ Copy-Item -LiteralPath (Join-Path $RuntimeDirectory 'licences') -Destination (Jo
 Copy-Item -LiteralPath (Join-Path $RuntimeDirectory 'licences') -Destination (Join-Path $appDir 'usr/share/licenses/appimage-runtime') -Recurse
 Copy-Item -LiteralPath (Join-Path $RuntimeDirectory 'runtime-inventory.json') -Destination (Join-Path $appDir 'usr/share/licenses/appimage-runtime/inventory.json')
 Write-P4kxAppImageLibraryInventory -AppDir $appDir -SourceDirectory (Join-Path $sourceRoot 'shared-libraries') -Platform $platform
-Copy-Item -LiteralPath $desktop -Destination (Join-Path $appDir "$($settings.application_id).desktop")
-Copy-Item -LiteralPath $icon -Destination (Join-Path $appDir "$($settings.application_id).png")
-Invoke-P4kxLinuxTool ln @('--symbolic', "$($settings.application_id).png", (Join-Path $appDir '.DirIcon')) | Out-Null
+Complete-P4kxAppDirRoot -AppDir $appDir
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $asset = [IO.Path]::GetFullPath((Join-Path $OutputDirectory $name))
 Invoke-P4kxLinuxTool (Join-Path $ToolsDirectory "appimagetool-$($platform.unix_arch).AppImage") @(

@@ -26,6 +26,10 @@ For AppImage systems without usable FUSE, the same real runtime supports
 `./P4KX-<version>-<target>.AppImage --appimage-extract-and-run`. Add `--cli` or `--mcp`
 after that runtime option. An installed AppImage is not required for this extraction mode.
 
+The AppImage retains linuxdeploy's relative root desktop and icon links and adds the matching
+`.DirIcon` link. Packaging checks their installed targets and original bytes, preserves the exact
+three-command `AppRun`, and tests link resolution and dispatch after relocating a synthetic AppDir.
+
 Flatpak CLI and MCP commands are selected before the application ID:
 
 ```text
