@@ -45,7 +45,7 @@ function Assert-P4kxFixtureLintian {
     Builds the current fixture and verifies exact Lintian outcomes without relaxing severities.
     #>
     param([int]$ExitCode, [string]$Tag)
-    $measurement = Invoke-P4kxLinuxTool du @('--kilobytes', '--summarize', (Join-Path $package 'usr'))
+    $measurement = Invoke-P4kxLinuxTool du @('--block-size=1024', '--summarize', (Join-Path $package 'usr'))
     $measured = ($measurement -split '\s+', 2)[0]
     if ($measured -cnotmatch '^[0-9]+$') { throw 'Synthetic installed size could not be measured.' }
     $path = Join-Path $control 'control'
