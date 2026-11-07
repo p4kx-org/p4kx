@@ -13,7 +13,7 @@ use crate::sound_workers::{run_parallel, within};
 use crate::source::{EntrySource, SourceEntry};
 use crate::texture_job::{Item, group_textures};
 use crate::tracker::Tracker;
-use crate::write::EntryWriter;
+use crate::write::{EntryTarget, EntryWriter};
 use crate::{
     EntryFailure, ExtractOptions, ExtractionError, ExtractionReport, MAX_SOUND_LEN,
     MAX_SOUNDBANK_LEN,
@@ -65,6 +65,7 @@ pub fn extract(
         .collect();
     let rules = Rules {
         copy_other: true,
+        entry_target: EntryTarget::Source,
         pick: &|entries, stop| located(archive, entries, stop),
     };
     extract_files(archive, &files, target, options, &rules)
@@ -72,6 +73,8 @@ pub fn extract(
 
 /// What differs between an Extraction of an Archive and a Conversion of a folder.
 pub(crate) struct Rules<'p> {
+    /// Output naming independent of the actual source Entry identity.
+    pub(crate) entry_target: EntryTarget<'p>,
     /// Whether a file that Conversion leaves unchanged is written too; without it such a file is
     /// not written but counted in [`ExtractionReport::not_converted`].
     pub(crate) copy_other: bool,
@@ -158,6 +161,7 @@ fn run_guarded(
     let tracker = Tracker::new(entries, options.cancel, options.watch, options.progress);
     let absolute = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
     let writer = EntryWriter {
+        entry_target: rules.entry_target,
         protection,
         cancel: options.cancel,
         source,

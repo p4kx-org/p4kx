@@ -28,11 +28,7 @@ fn duplicate_physical_entries_retain_different_bytes_and_count_units() -> TestRe
         )
     );
     let records = support::records(&output, &index, "archive.jsonl")?;
-    assert_eq!(
-        records.len(),
-        4,
-        "one root record plus three physical Entries"
-    );
+    assert_archive_counts(&index, &records)?;
     let payloads = retained_payloads(&output, &index, &records)?;
     assert_eq!(
         payloads,
@@ -50,16 +46,82 @@ fn duplicate_physical_entries_retain_different_bytes_and_count_units() -> TestRe
         [0, 1, 2],
         "duplicate display paths have distinct physical indices"
     );
-    let kind = index.kinds.first().ok_or("archive summary")?;
-    assert_eq!(kind.counts.source_entries.written, 3);
-    assert_eq!(kind.counts.records.written, 4);
-    assert_eq!(
-        kind.counts.converted_outputs.written, 0,
-        "source retention is not conversion"
-    );
     assert_eq!(
         index.source.digest.hex,
         Checksum::Sha256(Sha256::digest(fs::read(archive.path())?).into()).hex()
+    );
+    Ok(())
+}
+
+fn assert_archive_counts(
+    index: &p4kx_media::Index,
+    records: &[p4kx_media::MediaRecord],
+) -> TestResult {
+    assert_eq!(
+        records
+            .iter()
+            .filter(|record| record.subresource.namespace == "archive-root")
+            .count(),
+        1,
+        "one root summary"
+    );
+    assert_eq!(
+        records
+            .iter()
+            .filter(|record| record.subresource.namespace == "archive-entry")
+            .count(),
+        3,
+        "three physical Entry projections remain distinct"
+    );
+    let kind = index.kinds.first().ok_or("archive summary")?;
+    assert_eq!(
+        kind.counts.source_entries.written, 3,
+        "metadata records do not add physical Entry projections"
+    );
+    assert_eq!(
+        kind.counts.records.written,
+        u64::try_from(records.len())?,
+        "actual stream records, including source-layout projections"
+    );
+    assert_metadata_outputs(&kind.counts.converted_outputs, records)
+}
+
+fn assert_metadata_outputs(
+    tally: &p4kx_media::Tally,
+    records: &[p4kx_media::MediaRecord],
+) -> TestResult {
+    let chunks: Vec<_> = records
+        .iter()
+        .filter(|record| record.subresource.namespace == "archive-raw-chunk")
+        .collect();
+    let paths = chunks
+        .iter()
+        .map(|record| {
+            record
+                .data
+                .pointer("/chunk/artifact/path")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("metadata artifact path")
+        })
+        .collect::<Result<std::collections::BTreeSet<_>, _>>()?;
+    assert!(
+        !paths.is_empty(),
+        "layout bytes have actual typed artifacts"
+    );
+    assert!(
+        paths.iter().all(|path| path.starts_with("chunks/")),
+        "selected raw Entry retention is excluded"
+    );
+    assert_eq!(
+        (
+            tally.enumerated,
+            tally.written,
+            tally.partial,
+            tally.failed,
+            tally.skipped
+        ),
+        (0, 0, 0, 0, 0),
+        "retained source metadata and Entry payloads are not conversion"
     );
     Ok(())
 }

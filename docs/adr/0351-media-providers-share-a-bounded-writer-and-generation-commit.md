@@ -3,9 +3,10 @@
 The media export contract is a service in `p4kx-media`: CLI → Media → Extraction. Format readers
 remain independent of Media, CLI and Blender, and Extraction does not depend on Assembly.
 Providers describe their version, availability and precise projected field groups, then project
-one retained physical source at a time through a common writer. The permanent initial Archive
-provider exposes supported public metadata; declaring the raw-layout group unsupported does not
-claim that unknown root bytes were preserved. Later domain providers extend the registry.
+one retained physical source at a time through a common writer. The Archive provider projects
+cached declarations and bounded lazy metadata from each already-open owning Archive. A separate
+directory callback retains root or parent-container identity without inventing an Entry. Domain
+providers extend the same registry.
 
 The envelope is `p4kx-media` version `1.0`, independent of catalog schema versions. Physical
 identities contain the root file SHA-256, ordered container Entry indices and the leaf Entry
@@ -23,15 +24,22 @@ missing or uniquely resolved target. Resolution, typed projection and raw preser
 claims. The initial provider context has no Archive handle or implicit companion-read capability.
 
 Every selected payload is retained by a verified public Extraction of exactly one `&Entry` into
-its own temporary destination, without name lookup, globbing or conversion. The actual report,
+its own temporary destination under one validated portable leaf, without name lookup, globbing
+or conversion. The original Entry identity and source name remain intact. The actual report,
 byte count and SHA-256 are checked before the next source. Raw references preserve decoded Entry
-payloads; they do not preserve compression, encryption or unknown root layout. The root digest
+payloads; they do not preserve compression or encryption. Source-local metadata chunks preserve
+only the exact validated ranges named by their raw references; unavailable or malformed layout
+claims retain explicit structural health. The root digest
 streams the complete root file with cancellation and ArchiveWatch checks, and names that exact
 byte scope. ArchiveWatch is change detection rather than an immutable filesystem snapshot.
 
 The synchronous pipeline has one active source and a bounded container chain. Limits cover root
 hashing, observed Entries, decoded source work, individual payloads, records, lines, typed chunks,
-output work and container depth. JSONL and the artifact inventory stream to disk; the root index
+output work and container depth. Directory callbacks share one global metadata-work limit;
+actual metadata reads also consume the shared source-byte budget. Metadata sidecars do not count
+as converted payload outputs or retained Entry sources. The default metadata-work limit is
+omitted from the index to preserve existing canonical generation hashes. JSONL and the artifact
+inventory stream to disk; the root index
 does not accumulate an archive-wide list of payloads. Scalar source floats retain finite values
 and original IEEE-754 words, with explicit null plus raw bits for non-finite values. A delegating
 serializer rejects unwrapped non-finite numbers during the actual bounded write.
@@ -55,6 +63,11 @@ uses the still-valid root index and leaves unreferenced generations available fo
 Synthetic provider, process, corruption, budget and filesystem-boundary tests exercise these
 contracts; opt-in real-Archive tests declare a deterministic bounded selection without implying
 full media-provider coverage.
+
+Archive payload schemas describe serialized output, including mandatory keys with explicit null
+values for unavailable facts. Their independent layout payload version does not change the
+generic media envelope. Shared cached header projections retain that presence contract for MCP
+schema generation as well.
 
 Public capability, provenance and output structs are non-exhaustive; provider-facing constructors
 cover the required declarations without exposing publication control. Extensible reason, origin,

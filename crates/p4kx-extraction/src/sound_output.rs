@@ -121,7 +121,7 @@ mod tests {
 
     use super::Step;
     use crate::tracker::Tracker;
-    use crate::write::{Destination, EntryWriter};
+    use crate::write::{Destination, EntryTarget, EntryWriter};
     use crate::{Archive, AudioConversion, CancelToken, ConflictPolicy, TextureConversion};
 
     #[test]
@@ -140,6 +140,7 @@ mod tests {
             crate::ArchiveWriteProtection::new(&path, cancel.flag()).expect("source protection");
         let tracker = Tracker::new(&[], Some(&cancel), None, None);
         let writer = EntryWriter {
+            entry_target: EntryTarget::Source,
             protection: Some(&protection),
             cancel: Some(&cancel),
             source: &archive,

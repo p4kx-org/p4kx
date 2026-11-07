@@ -14,8 +14,15 @@ pub struct Limits {
     pub root_bytes: u64,
     /// Physical Entries examined during traversal, including filtered Entries.
     pub sources: u64,
-    /// Decoded bytes retained or used to open nested containers.
+    /// Decoded retention/container bytes and actual metadata-read bytes across owning sources.
     pub source_bytes: u64,
+    /// Metadata cursor/read work items admitted across all providers and owning sources.
+    #[serde(
+        default = "default_metadata_work",
+        skip_serializing_if = "is_default_metadata_work"
+    )]
+    #[schemars(range(min = 1, max = u64::MAX), extend("default" = default_metadata_work()))]
+    pub metadata_work: u64,
     /// Decoded bytes of one Entry.
     pub entry_bytes: u64,
     /// Metadata and subresource records over all providers.
@@ -36,6 +43,18 @@ pub struct Limits {
     pub reference_candidates: u32,
 }
 
+const fn default_metadata_work() -> u64 {
+    100_000_000
+}
+
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if predicates receive a field reference"
+)]
+const fn is_default_metadata_work(value: &u64) -> bool {
+    *value == default_metadata_work()
+}
+
 impl Default for Limits {
     fn default() -> Self {
         const GIB: u64 = 1 << 30;
@@ -43,6 +62,7 @@ impl Default for Limits {
             root_bytes: 4_096 * GIB,
             sources: 10_000_000,
             source_bytes: 8_192 * GIB,
+            metadata_work: default_metadata_work(),
             entry_bytes: 8 * GIB,
             records: 10_000_000,
             record_bytes: 1 << 20,
@@ -72,6 +92,7 @@ impl Limits {
             ("root_bytes", self.root_bytes),
             ("sources", self.sources),
             ("source_bytes", self.source_bytes),
+            ("metadata_work", self.metadata_work),
             ("entry_bytes", self.entry_bytes),
             ("records", self.records),
             ("record_bytes", self.record_bytes),

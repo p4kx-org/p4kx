@@ -77,6 +77,9 @@ pub enum MediaError {
     /// A container could not be enumerated.
     #[error("cannot enumerate media container: {0}")]
     Archive(#[source] Box<ArchiveError>),
+    /// Source-bound layout access retained its original parser or I/O cause.
+    #[error("cannot read Archive source metadata: {0}")]
+    Metadata(#[source] Box<p4kx_extraction::MetadataReadError>),
     /// A requested provider is absent or unavailable.
     #[error("media capability {kind} is unavailable: {detail}")]
     Unsupported {
@@ -156,6 +159,20 @@ impl From<WriteProtectionError> for MediaError {
     }
 }
 
+impl From<p4kx_extraction::MetadataReadError> for MediaError {
+    fn from(cause: p4kx_extraction::MetadataReadError) -> Self {
+        use p4kx_extraction::MetadataReadError;
+        match cause {
+            MetadataReadError::Cancelled => Self::Cancelled,
+            MetadataReadError::Budget(cause) => match cause.downcast::<Self>() {
+                Ok(cause) => cause,
+                Err(cause) => Self::Metadata(Box::new(MetadataReadError::Budget(cause))),
+            },
+            cause => Self::Metadata(Box::new(cause)),
+        }
+    }
+}
+
 impl From<OwnedOutputCleanupError> for MediaError {
     fn from(cause: OwnedOutputCleanupError) -> Self {
         Self::Cleanup(cause)
@@ -198,9 +215,12 @@ pub(crate) fn finish<T>(
 }
 
 pub(crate) fn io(path: &Path, source: io::Error) -> MediaError {
-    MediaError::Io {
-        path: path.to_path_buf(),
-        source,
+    match source.downcast::<MediaError>() {
+        Ok(cause) => cause,
+        Err(source) => MediaError::Io {
+            path: path.to_path_buf(),
+            source,
+        },
     }
 }
 

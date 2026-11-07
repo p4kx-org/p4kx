@@ -20,6 +20,1427 @@
         }
       ]
     },
+    "ArchiveByteRange": {
+      "additionalProperties": false,
+      "description": "Exact half-open extent in immediately owning source coordinates.",
+      "properties": {
+        "length": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Number of bytes, including an explicitly empty extent."
+        },
+        "offset": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original start measured from this Archive source, not the backing root file."
+        }
+      },
+      "required": [
+        "offset",
+        "length"
+      ],
+      "type": "object"
+    },
+    "ArchiveCigInstallation": {
+      "additionalProperties": false,
+      "description": "Positively recognised CIG installation declaration without payload verification claims.",
+      "properties": {
+        "freeCount": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Unmodified free-row count."
+        },
+        "sectorSize": {
+          "description": "Unmodified 16-bit sector-size word.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tables": {
+          "$ref": "#/$defs/ArchiveTableDeclaration",
+          "description": "Independently checked table locations or explicit declaration failure."
+        }
+      },
+      "required": [
+        "sectorSize",
+        "freeCount",
+        "tables"
+      ],
+      "type": "object"
+    },
+    "ArchiveDeclarationState": {
+      "description": "Cached header declaration availability without a lazy-row or payload-verification claim.",
+      "oneOf": [
+        {
+          "const": "available",
+          "description": "Header extents are available; record and table checks remain lazy.",
+          "type": "string"
+        },
+        {
+          "const": "malformed",
+          "description": "A retained extent declaration is malformed.",
+          "type": "string"
+        },
+        {
+          "const": "recovered",
+          "description": "Recovery did not establish global declarations.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "The reader exposes an uninterpreted declaration state.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArchiveDirectoryRecord": {
+      "additionalProperties": false,
+      "description": "One original directory record, including unadmitted folder records.",
+      "properties": {
+        "admittedEntryIndex": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Existing physical index, absent for omitted folder records."
+        },
+        "comment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveRawSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original ZIP comment, preserving an explicitly empty section."
+        },
+        "extras": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveRawSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original ordered extra section, including malformed remaining bytes."
+        },
+        "format": {
+          "$ref": "#/$defs/EntryRecordFormatInfo",
+          "description": "Record format actually established by the reader."
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntryMetadataInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Shared CLI/MCP/Media physical Entry metadata, absent for omitted records."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveRawSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original ZIP name bytes, preserving invalid UTF-8 and empty names."
+        },
+        "originalDirectoryOrdinal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original directory ordinal, explicitly unavailable after recovery."
+        },
+        "position": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Observed cursor position, distinguished from an unknown recovered original ordinal."
+        },
+        "raw": {
+          "$ref": "#/$defs/ArchiveRawSpan",
+          "description": "Complete original record bytes."
+        },
+        "signature": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveRawSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "All 128 authored v2 signature bytes without an authentication claim."
+        },
+        "storedDigest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveRawSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "All 32 authored v2 digest-slot bytes, including zeros, without verification inference."
+        },
+        "version": {
+          "$ref": "#/$defs/ArchiveMetadataVersion",
+          "description": "Source-layout payload contract."
+        }
+      },
+      "required": [
+        "version",
+        "position",
+        "originalDirectoryOrdinal",
+        "admittedEntryIndex",
+        "format",
+        "metadata",
+        "raw",
+        "name",
+        "extras",
+        "comment",
+        "signature",
+        "storedDigest"
+      ],
+      "title": "ArchiveDirectoryRecord",
+      "type": "object"
+    },
+    "ArchiveExtraData": {
+      "additionalProperties": false,
+      "description": "One ordered extra retaining unknown and duplicate IDs without interpretation.",
+      "properties": {
+        "body": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveRawSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original body or partial prefix, absent when no body start is established."
+        },
+        "declaredTotalLength": {
+          "description": "Original total length including the four-byte header.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Original ID word when available.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original field position; duplicate IDs retain independent positions."
+        },
+        "raw": {
+          "$ref": "#/$defs/ArchiveRawSpan",
+          "description": "Every available original byte of this field or malformed tail."
+        },
+        "recordPosition": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Owning record's observed cursor position."
+        },
+        "state": {
+          "$ref": "#/$defs/ArchiveExtraState",
+          "description": "Framing validity independently of ID semantics."
+        },
+        "version": {
+          "$ref": "#/$defs/ArchiveMetadataVersion",
+          "description": "Source-layout payload contract."
+        }
+      },
+      "required": [
+        "version",
+        "recordPosition",
+        "ordinal",
+        "id",
+        "declaredTotalLength",
+        "state",
+        "raw",
+        "body"
+      ],
+      "title": "ArchiveExtraData",
+      "type": "object"
+    },
+    "ArchiveExtraState": {
+      "description": "Exact framing coverage of an ordered original extra field.",
+      "oneOf": [
+        {
+          "const": "complete",
+          "description": "Header and declared body are available.",
+          "type": "string"
+        },
+        {
+          "const": "short-header",
+          "description": "The remaining section ends inside its header.",
+          "type": "string"
+        },
+        {
+          "const": "length-before-header",
+          "description": "The declared total length is shorter than its four-byte header.",
+          "type": "string"
+        },
+        {
+          "const": "truncated-body",
+          "description": "Only an original body prefix is available.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArchiveFreeRange": {
+      "additionalProperties": false,
+      "description": "Original free-space row without interpreting filesystem allocation.",
+      "properties": {
+        "extent": {
+          "$ref": "#/$defs/ArchiveRegion",
+          "description": "Original extent words and their independently readable prefix."
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original free-list ordinal."
+        },
+        "raw": {
+          "$ref": "#/$defs/ArchiveRawSpan",
+          "description": "Exact original fixed row bytes."
+        },
+        "state": {
+          "$ref": "#/$defs/ArchiveFreeState",
+          "description": "Validation of this declared free range."
+        },
+        "version": {
+          "$ref": "#/$defs/ArchiveMetadataVersion",
+          "description": "Source-layout payload contract."
+        }
+      },
+      "required": [
+        "version",
+        "ordinal",
+        "raw",
+        "extent",
+        "state"
+      ],
+      "title": "ArchiveFreeRange",
+      "type": "object"
+    },
+    "ArchiveFreeState": {
+      "description": "Structural validity of a declared free-space extent.",
+      "oneOf": [
+        {
+          "const": "within-source",
+          "description": "Nonempty extent inside the owning source.",
+          "type": "string"
+        },
+        {
+          "const": "zero-size",
+          "description": "Authored extent has no bytes.",
+          "type": "string"
+        },
+        {
+          "const": "outside-source",
+          "description": "Authored extent exceeds the owning source.",
+          "type": "string"
+        },
+        {
+          "const": "overflow",
+          "description": "Offset-plus-size overflows the source width.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArchiveInstallation": {
+      "additionalProperties": false,
+      "description": "Authored installation progress, not a verified amount of payload.",
+      "properties": {
+        "bound": {
+          "$ref": "#/$defs/ArchiveProgressBound",
+          "description": "Independent progress bound check."
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original table ordinal before folder admission."
+        },
+        "raw": {
+          "$ref": "#/$defs/ArchiveRawSpan",
+          "description": "Exact original fixed row bytes."
+        },
+        "reserved": {
+          "description": "Original reserved word, absent only in v2's eight-byte format.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reservedState": {
+          "$ref": "#/$defs/ArchiveReservedState",
+          "description": "Independent reserved-word validation."
+        },
+        "version": {
+          "$ref": "#/$defs/ArchiveMetadataVersion",
+          "description": "Source-layout payload contract."
+        },
+        "written": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original progress word."
+        }
+      },
+      "required": [
+        "version",
+        "ordinal",
+        "raw",
+        "written",
+        "reserved",
+        "reservedState",
+        "bound"
+      ],
+      "title": "ArchiveInstallation",
+      "type": "object"
+    },
+    "ArchiveLayout": {
+      "description": "Actual reader route independently of an authored layout-version word.",
+      "oneOf": [
+        {
+          "const": "zip",
+          "description": "Classic ZIP declarations.",
+          "type": "string"
+        },
+        {
+          "const": "zip64",
+          "description": "ZIP64 declarations, including positively recognised P4K v1.",
+          "type": "string"
+        },
+        {
+          "const": "p4k-v2",
+          "description": "Fixed P4K v2 trailer and directory.",
+          "type": "string"
+        },
+        {
+          "const": "recovered-unknown",
+          "description": "Surviving records without a proved global layout.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "A reader route this projection does not interpret.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArchiveLayoutInfo": {
+      "additionalProperties": false,
+      "description": "Shared cached root/nested layout declarations without raw sidecars or additional I/O.",
+      "properties": {
+        "declarationState": {
+          "$ref": "#/$defs/ArchiveDeclarationState",
+          "description": "Availability of cached headers, without claiming valid lazy records."
+        },
+        "layout": {
+          "$ref": "#/$defs/ArchiveLayout",
+          "description": "Reader route actually used for this source."
+        },
+        "sourceLength": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Immediately owning source length, not the backing root file length."
+        },
+        "v2": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveV2Layout"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original v2 words, absent for other known routes."
+        },
+        "version": {
+          "$ref": "#/$defs/ArchiveMetadataVersion",
+          "description": "Source-layout payload contract independently of any media envelope."
+        },
+        "zip": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveZipLayout"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original ZIP/ZIP64 words, absent for other known routes."
+        }
+      },
+      "required": [
+        "declarationState",
+        "layout",
+        "sourceLength",
+        "v2",
+        "version",
+        "zip"
+      ],
+      "title": "ArchiveLayoutInfo",
+      "type": "object"
+    },
+    "ArchiveMetadataDiagnostic": {
+      "additionalProperties": false,
+      "description": "Explicit failed operation retained in diagnostic exports.",
+      "properties": {
+        "failure": {
+          "$ref": "#/$defs/ArchiveMetadataFailure",
+          "description": "Structural failure category."
+        },
+        "length": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original unparsed-tail length when available."
+        },
+        "offset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exact owning-source failure offset when supplied by the reader."
+        },
+        "operation": {
+          "description": "Stable affected operation or section namespace.",
+          "type": "string"
+        },
+        "version": {
+          "$ref": "#/$defs/ArchiveMetadataVersion",
+          "description": "Source-layout payload contract."
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "failure",
+        "offset",
+        "length"
+      ],
+      "title": "ArchiveMetadataDiagnostic",
+      "type": "object"
+    },
+    "ArchiveMetadataFailure": {
+      "description": "Structural failure of a lazy metadata operation, independently of raw retention.",
+      "oneOf": [
+        {
+          "const": "unavailable-layout",
+          "description": "Recovery did not prove a global layout.",
+          "type": "string"
+        },
+        {
+          "const": "malformed-section",
+          "description": "A declaration does not establish a bounded section.",
+          "type": "string"
+        },
+        {
+          "const": "parse",
+          "description": "A source header failed the shared parser.",
+          "type": "string"
+        },
+        {
+          "const": "malformed-record",
+          "description": "A record does not fit the declared section.",
+          "type": "string"
+        },
+        {
+          "const": "unparsed-directory-tail",
+          "description": "Declared record count leaves unparsed directory bytes.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArchiveMetadataVersion": {
+      "description": "Version of source-layout payloads independently of the media envelope.",
+      "oneOf": [
+        {
+          "const": "1.0",
+          "description": "Source-layout payload version 1.0.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArchiveProgressBound": {
+      "description": "Comparison of authored progress to an admitted physical Entry's stored size.",
+      "oneOf": [
+        {
+          "const": "unavailable",
+          "description": "An omitted record provides no admitted Entry size to compare.",
+          "type": "string"
+        },
+        {
+          "const": "within-stored-size",
+          "description": "Progress does not exceed the stored size.",
+          "type": "string"
+        },
+        {
+          "const": "exceeds-stored-size",
+          "description": "Progress exceeds the stored size.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArchiveRawChunk": {
+      "additionalProperties": false,
+      "description": "One bounded, verified sidecar segment of an owning source's metadata.",
+      "properties": {
+        "chunk": {
+          "$ref": "#/$defs/ChunkReference",
+          "description": "Existing typed chunk contract, hash and actual output size."
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original zero-based chunk position within this series."
+        },
+        "range": {
+          "$ref": "#/$defs/ArchiveByteRange",
+          "description": "Exact owning-source bytes stored by the artifact."
+        },
+        "series": {
+          "$ref": "#/$defs/ArchiveRawKey",
+          "description": "Series shared by its range references."
+        },
+        "version": {
+          "$ref": "#/$defs/ArchiveMetadataVersion",
+          "description": "Source-layout payload contract."
+        }
+      },
+      "required": [
+        "version",
+        "series",
+        "ordinal",
+        "range",
+        "chunk"
+      ],
+      "title": "ArchiveRawChunk",
+      "type": "object"
+    },
+    "ArchiveRawKey": {
+      "description": "Source-local series of verified raw chunks without a new physical identity.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A proved global metadata section.",
+          "properties": {
+            "section": {
+              "$ref": "#/$defs/ArchiveSection",
+              "description": "Original semantic section, independent of overlap aliases."
+            },
+            "type": {
+              "const": "section",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "section"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One surviving record when recovery provides no global layout.",
+          "properties": {
+            "record": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Stable surviving physical record position; not an invented original ordinal."
+            },
+            "type": {
+              "const": "recovered-record",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "record"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ArchiveRawSpan": {
+      "additionalProperties": false,
+      "description": "A proved subrange of a fully emitted source-local raw series.",
+      "properties": {
+        "range": {
+          "$ref": "#/$defs/ArchiveByteRange",
+          "description": "Exact source-relative range covered by that series' chunk intervals."
+        },
+        "series": {
+          "$ref": "#/$defs/ArchiveRawKey",
+          "description": "Series named by archive-raw-chunk rows of the same owning Source."
+        }
+      },
+      "required": [
+        "series",
+        "range"
+      ],
+      "type": "object"
+    },
+    "ArchiveRegion": {
+      "additionalProperties": false,
+      "description": "Source declarations distinguished from their readable prefix.",
+      "properties": {
+        "available": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveByteRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Actual readable prefix, including an explicitly empty range."
+        },
+        "declaredLength": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Authored length, even when invalid."
+        },
+        "offset": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Authored source-relative start."
+        },
+        "state": {
+          "$ref": "#/$defs/ArchiveRegionState",
+          "description": "Independent extent validation."
+        }
+      },
+      "required": [
+        "available",
+        "declaredLength",
+        "offset",
+        "state"
+      ],
+      "type": "object"
+    },
+    "ArchiveRegionState": {
+      "description": "Structural availability of the exact authored extent.",
+      "oneOf": [
+        {
+          "const": "complete",
+          "description": "The entire declared extent is available.",
+          "type": "string"
+        },
+        {
+          "const": "truncated",
+          "description": "Only a prefix is available.",
+          "type": "string"
+        },
+        {
+          "const": "outside-source",
+          "description": "The start lies outside the source.",
+          "type": "string"
+        },
+        {
+          "const": "overflow",
+          "description": "Source-width arithmetic overflowed.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "The reader exposes a declaration state this projection does not interpret.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArchiveReservedState": {
+      "description": "Separate meaning of an optional authored reserved word.",
+      "oneOf": [
+        {
+          "const": "not-present",
+          "description": "This row format has no reserved word.",
+          "type": "string"
+        },
+        {
+          "const": "zero",
+          "description": "The original reserved word is zero.",
+          "type": "string"
+        },
+        {
+          "const": "nonzero",
+          "description": "The original reserved word is malformed nonzero data.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArchiveSection": {
+      "description": "An original metadata section without a semantic claim for opaque bytes.",
+      "oneOf": [
+        {
+          "const": "directory",
+          "description": "Original complete directory, including omitted folders.",
+          "type": "string"
+        },
+        {
+          "const": "v2-trailer",
+          "description": "Fixed v2 trailer.",
+          "type": "string"
+        },
+        {
+          "const": "zip-end",
+          "description": "Classic ZIP end record.",
+          "type": "string"
+        },
+        {
+          "const": "zip64-end",
+          "description": "Fixed ZIP64 end record.",
+          "type": "string"
+        },
+        {
+          "const": "zip64-locator",
+          "description": "Selected ZIP64 locator.",
+          "type": "string"
+        },
+        {
+          "const": "zip-comment",
+          "description": "Classic ZIP comment.",
+          "type": "string"
+        },
+        {
+          "const": "zip-following",
+          "description": "Uninterpreted bytes following the ZIP comment.",
+          "type": "string"
+        },
+        {
+          "const": "zip64-extension",
+          "description": "ZIP64 extensible data.",
+          "type": "string"
+        },
+        {
+          "const": "v2-base-directory",
+          "description": "Original v2 base records.",
+          "type": "string"
+        },
+        {
+          "const": "v2-extension-directory",
+          "description": "Original v2 extension records.",
+          "type": "string"
+        },
+        {
+          "const": "v2-base-names",
+          "description": "Original v2 base names.",
+          "type": "string"
+        },
+        {
+          "const": "v2-extension-names",
+          "description": "Original v2 extension names.",
+          "type": "string"
+        },
+        {
+          "const": "v2-opaque-first",
+          "description": "First opaque trailer slot.",
+          "type": "string"
+        },
+        {
+          "const": "v2-opaque-second",
+          "description": "Second opaque trailer slot.",
+          "type": "string"
+        },
+        {
+          "const": "v2-trie",
+          "description": "Unparsed v2 trie cache.",
+          "type": "string"
+        },
+        {
+          "const": "installation",
+          "description": "Declared installation progress.",
+          "type": "string"
+        },
+        {
+          "const": "free-ranges",
+          "description": "Declared free-space records.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArchiveSectionData": {
+      "additionalProperties": false,
+      "description": "One section declaration and its independently verified raw coverage.",
+      "properties": {
+        "presence": {
+          "$ref": "#/$defs/ArchiveSectionPresence",
+          "description": "Presence and structural availability of the declaration."
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveRawSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Fully retained available prefix, independently of declaration completeness."
+        },
+        "region": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveRegion"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exact declaration and readable prefix when established."
+        },
+        "section": {
+          "$ref": "#/$defs/ArchiveSection",
+          "description": "Original logical section."
+        },
+        "version": {
+          "$ref": "#/$defs/ArchiveMetadataVersion",
+          "description": "Source-layout payload contract."
+        }
+      },
+      "required": [
+        "version",
+        "section",
+        "presence",
+        "region",
+        "raw"
+      ],
+      "title": "ArchiveSectionData",
+      "type": "object"
+    },
+    "ArchiveSectionPresence": {
+      "description": "Presence of a source section without conflating absent, invalid and empty.",
+      "oneOf": [
+        {
+          "const": "absent",
+          "description": "This format has no such authored section.",
+          "type": "string"
+        },
+        {
+          "const": "declared",
+          "description": "The reader established the section's raw declaration.",
+          "type": "string"
+        },
+        {
+          "const": "invalid-declaration",
+          "description": "Its declaration is malformed and does not establish a location.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable-layout",
+          "description": "Recovery cannot establish this global section.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArchiveTableDeclaration": {
+      "description": "Cached table-location declarations without reading or validating individual rows.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Header-established table extents; row validation remains lazy.",
+          "properties": {
+            "free": {
+              "$ref": "#/$defs/ArchiveByteRange",
+              "description": "Original free-list extent."
+            },
+            "progress": {
+              "$ref": "#/$defs/ArchiveByteRange",
+              "description": "Original progress-table extent."
+            },
+            "state": {
+              "const": "located",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "progress",
+            "free"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Source-width count arithmetic overflowed.",
+          "properties": {
+            "state": {
+              "const": "overflow",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Declared tables cannot fit inside their owning source.",
+          "properties": {
+            "state": {
+              "const": "outside-source",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The reader exposes an uninterpreted table-location state.",
+          "properties": {
+            "state": {
+              "const": "unknown",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ArchiveV2Layout": {
+      "additionalProperties": false,
+      "description": "All original v2 trailer words without authentication or alignment inference.",
+      "properties": {
+        "baseCount": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original base record count."
+        },
+        "baseDirectorySize": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original base directory size."
+        },
+        "baseNamesSize": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original base names size."
+        },
+        "directoryOffset": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original combined directory start."
+        },
+        "extensionCount": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original extension record count."
+        },
+        "extensionDirectorySize": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original extension directory size."
+        },
+        "extensionNamesSize": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original extension names size."
+        },
+        "flags": {
+          "description": "All authored installation flag bits.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "freeCount": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original free-row count."
+        },
+        "layoutVersion": {
+          "description": "Actual authored layout-version word.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "magic": {
+          "description": "Actual authored magic word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "namesOffset": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original combined names start."
+        },
+        "payloadEnd": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original payload-end word."
+        },
+        "sectorSize": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original sector-size word, without an alignment claim."
+        },
+        "trailer": {
+          "$ref": "#/$defs/ArchiveByteRange",
+          "description": "Actual fixed trailer extent; both opaque slots are retained separately."
+        },
+        "trieOffset": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original trie-cache start, including invalid declarations."
+        },
+        "trieSize": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original trie-cache size."
+        }
+      },
+      "required": [
+        "baseCount",
+        "extensionCount",
+        "directoryOffset",
+        "baseDirectorySize",
+        "extensionDirectorySize",
+        "namesOffset",
+        "baseNamesSize",
+        "extensionNamesSize",
+        "payloadEnd",
+        "freeCount",
+        "trieOffset",
+        "trieSize",
+        "sectorSize",
+        "flags",
+        "layoutVersion",
+        "magic",
+        "trailer"
+      ],
+      "type": "object"
+    },
+    "ArchiveZip64End": {
+      "additionalProperties": false,
+      "description": "Original ZIP64 words without assuming multi-disk support or extension semantics.",
+      "properties": {
+        "declaredSize": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Size word excluding signature and size word."
+        },
+        "directoryDisk": {
+          "description": "Original directory disk word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "directoryOffset": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original directory-offset word."
+        },
+        "directorySize": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original directory-size word."
+        },
+        "disk": {
+          "description": "Original disk word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "entries": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original total count."
+        },
+        "entriesOnDisk": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original per-disk count."
+        },
+        "extension": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveRegion"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Authored extension, absent only when its size cannot establish an extent."
+        },
+        "fixed": {
+          "$ref": "#/$defs/ArchiveByteRange",
+          "description": "Actual fixed record extent."
+        },
+        "versionMadeBy": {
+          "description": "Original version-made-by word.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "versionNeeded": {
+          "description": "Original version-needed word.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "declaredSize",
+        "directoryDisk",
+        "directoryOffset",
+        "directorySize",
+        "disk",
+        "entries",
+        "entriesOnDisk",
+        "extension",
+        "fixed",
+        "versionMadeBy",
+        "versionNeeded"
+      ],
+      "type": "object"
+    },
+    "ArchiveZip64Locator": {
+      "additionalProperties": false,
+      "description": "Original selected locator words and its actual source position.",
+      "properties": {
+        "disk": {
+          "description": "Original ZIP64 end-record disk word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "disks": {
+          "description": "Original total-disk declaration.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "range": {
+          "$ref": "#/$defs/ArchiveByteRange",
+          "description": "Actual locator extent."
+        },
+        "target": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original target offset, independently of the locator's actual position."
+        }
+      },
+      "required": [
+        "range",
+        "disk",
+        "target",
+        "disks"
+      ],
+      "type": "object"
+    },
+    "ArchiveZipEnd": {
+      "additionalProperties": false,
+      "description": "Original classic ZIP end words without replacing sentinels by selected values.",
+      "properties": {
+        "comment": {
+          "$ref": "#/$defs/ArchiveRegion",
+          "description": "Exact comment declaration and readable prefix."
+        },
+        "commentLength": {
+          "description": "Original comment-length word.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "directoryDisk": {
+          "description": "Original directory disk word.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "directoryOffset": {
+          "description": "Original 32-bit directory-offset word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "directorySize": {
+          "description": "Original 32-bit directory-size word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "disk": {
+          "description": "Original disk word.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "entries": {
+          "description": "Original total count.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "entriesOnDisk": {
+          "description": "Original per-disk count.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fixed": {
+          "$ref": "#/$defs/ArchiveByteRange",
+          "description": "Actual fixed end-record extent."
+        },
+        "following": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveByteRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Uninterpreted bytes after the declared comment."
+        }
+      },
+      "required": [
+        "comment",
+        "commentLength",
+        "directoryDisk",
+        "directoryOffset",
+        "directorySize",
+        "disk",
+        "entries",
+        "entriesOnDisk",
+        "fixed",
+        "following"
+      ],
+      "type": "object"
+    },
+    "ArchiveZipLayout": {
+      "additionalProperties": false,
+      "description": "Selected directory plus every original ZIP and ZIP64 end declaration.",
+      "properties": {
+        "count": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Original record count before folder admission."
+        },
+        "end": {
+          "$ref": "#/$defs/ArchiveZipEnd",
+          "description": "Original classic ZIP words, including ZIP64 sentinels."
+        },
+        "installation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveCigInstallation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Positively recognised CIG comment declaration."
+        },
+        "locator": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveZip64Locator"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Selected locator, including its actual physical position."
+        },
+        "records": {
+          "$ref": "#/$defs/ArchiveByteRange",
+          "description": "Selected source-relative directory extent."
+        },
+        "zip64": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveZip64End"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Selected ZIP64 end declaration."
+        }
+      },
+      "required": [
+        "count",
+        "end",
+        "installation",
+        "locator",
+        "records",
+        "zip64"
+      ],
+      "type": "object"
+    },
+    "Artifact": {
+      "description": "A completed artifact described without loading its contents.",
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/Digest",
+          "description": "SHA-256 over all file bytes."
+        },
+        "path": {
+          "description": "Generation-relative artifact path.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Length in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "size",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "ByteOrder": {
+      "description": "Byte order used inside each numeric element.",
+      "oneOf": [
+        {
+          "const": "little",
+          "description": "Least significant byte first.",
+          "type": "string"
+        },
+        {
+          "const": "big",
+          "description": "Most significant byte first.",
+          "type": "string"
+        }
+      ]
+    },
     "ByteScope": {
       "description": "Exact byte scope of a computed or declared integrity value.",
       "oneOf": [
@@ -44,6 +1465,85 @@
           "type": "string"
         }
       ]
+    },
+    "ChunkLayout": {
+      "description": "Typed element range written as one bounded binary artifact.",
+      "properties": {
+        "byte_order": {
+          "$ref": "#/$defs/ByteOrder",
+          "description": "Element byte order."
+        },
+        "convention": {
+          "description": "Explicit domain units and coordinate, frame or sample convention.",
+          "type": "string"
+        },
+        "count": {
+          "description": "Number of elements in this chunk.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dtype": {
+          "$ref": "#/$defs/DataType",
+          "description": "Element representation."
+        },
+        "end_exclusive": {
+          "description": "First element index excluded from this chunk.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "first": {
+          "description": "First element index in the complete source array.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "order": {
+          "$ref": "#/$defs/DataOrder",
+          "description": "Original array traversal order."
+        },
+        "source_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Source byte range when the provider knows it exactly."
+        }
+      },
+      "required": [
+        "dtype",
+        "byte_order",
+        "order",
+        "count",
+        "first",
+        "end_exclusive",
+        "source_range",
+        "convention"
+      ],
+      "type": "object"
+    },
+    "ChunkReference": {
+      "description": "One verified typed artifact and its interpretation.",
+      "properties": {
+        "artifact": {
+          "$ref": "#/$defs/Artifact",
+          "description": "Actual artifact bytes and integrity."
+        },
+        "layout": {
+          "$ref": "#/$defs/ChunkLayout",
+          "description": "Typed element metadata."
+        }
+      },
+      "required": [
+        "artifact",
+        "layout"
+      ],
+      "type": "object"
     },
     "ContainerIdentity": {
       "description": "A physical container Entry in the ordered path from the root Archive.",
@@ -71,6 +1571,66 @@
         "path"
       ],
       "type": "object"
+    },
+    "DataOrder": {
+      "description": "Array traversal order without inferred coordinate or sample conventions.",
+      "oneOf": [
+        {
+          "const": "row-major",
+          "description": "Rows before columns.",
+          "type": "string"
+        },
+        {
+          "const": "column-major",
+          "description": "Columns before rows.",
+          "type": "string"
+        },
+        {
+          "const": "source",
+          "description": "Original sequential source order.",
+          "type": "string"
+        }
+      ]
+    },
+    "DataType": {
+      "description": "Element representation of a typed payload chunk.",
+      "oneOf": [
+        {
+          "const": "u8",
+          "description": "Unsigned byte.",
+          "type": "string"
+        },
+        {
+          "const": "i16",
+          "description": "Signed 16-bit integer.",
+          "type": "string"
+        },
+        {
+          "const": "u16",
+          "description": "Unsigned 16-bit integer.",
+          "type": "string"
+        },
+        {
+          "const": "i32",
+          "description": "Signed 32-bit integer.",
+          "type": "string"
+        },
+        {
+          "const": "u32",
+          "description": "Unsigned 32-bit integer.",
+          "type": "string"
+        },
+        {
+          "const": "f32",
+          "description": "IEEE-754 single precision, preserving every bit pattern.",
+          "type": "string"
+        },
+        {
+          "const": "f64",
+          "description": "IEEE-754 double precision, preserving every bit pattern.",
+          "type": "string"
+        }
+      ]
     },
     "DecimalU64": {
       "description": "Canonical unsigned 64-bit decimal text, from 0 through 18446744073709551615.",
@@ -461,6 +2021,92 @@
           "const": "audio-control",
           "description": "Audio control definitions.",
           "type": "string"
+        }
+      ]
+    },
+    "OffsetBasis": {
+      "description": "Origin against which a source byte offset is measured.",
+      "oneOf": [
+        {
+          "description": "Start of the decoded Entry payload.",
+          "properties": {
+            "type": {
+              "const": "entry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Start of an explicitly identified source section.",
+          "properties": {
+            "index": {
+              "description": "Original zero-based section ordinal.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "section",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "index"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Start of an explicitly identified source object.",
+          "properties": {
+            "indices": {
+              "description": "Ordered original object ordinal path.",
+              "items": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "object",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "indices"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Start of an explicitly identified nested payload.",
+          "properties": {
+            "index": {
+              "description": "Original payload ordinal.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "namespace": {
+              "description": "Stable provider namespace and original ordinal.",
+              "type": "string"
+            },
+            "type": {
+              "const": "payload",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "namespace",
+            "index"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -1576,6 +3222,33 @@
       ],
       "type": "object"
     },
+    "SourceRange": {
+      "description": "A half-open byte range with an explicit origin.",
+      "properties": {
+        "basis": {
+          "$ref": "#/$defs/OffsetBasis",
+          "description": "Origin of both offsets."
+        },
+        "end_exclusive": {
+          "description": "First byte excluded.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "start": {
+          "description": "First byte included.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "basis",
+        "start",
+        "end_exclusive"
+      ],
+      "type": "object"
+    },
     "Status": {
       "description": "Terminal projection status of one record.",
       "oneOf": [
@@ -2142,6 +3815,1570 @@
               "metadata"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-layout"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ArchiveLayoutInfo"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-section"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ArchiveSectionData"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-raw-chunk"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ArchiveRawChunk"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-directory-record"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ArchiveDirectoryRecord"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-extra"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ArchiveExtraData"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-installation"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ArchiveInstallation"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-free-range"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ArchiveFreeRange"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-metadata-diagnostic"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ArchiveMetadataDiagnostic"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-layout"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "else": {
+          "properties": {
+            "issues": {
+              "items": {
+                "properties": {
+                  "severity": {
+                    "const": "info"
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              }
+            },
+            "status": {
+              "const": "complete"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        },
+        "if": {
+          "properties": {
+            "data": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "declarationState": {
+                      "not": {
+                        "const": "available"
+                      }
+                    }
+                  },
+                  "required": [
+                    "declarationState"
+                  ]
+                },
+                {
+                  "properties": {
+                    "layout": {
+                      "const": "unknown"
+                    }
+                  },
+                  "required": [
+                    "layout"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "data"
+          ]
+        },
+        "then": {
+          "properties": {
+            "issues": {
+              "contains": {
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "warning",
+                      "error"
+                    ]
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              },
+              "minItems": 1
+            },
+            "status": {
+              "const": "partial"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-section"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "else": {
+          "properties": {
+            "issues": {
+              "items": {
+                "properties": {
+                  "severity": {
+                    "const": "info"
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              }
+            },
+            "status": {
+              "const": "complete"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        },
+        "if": {
+          "properties": {
+            "data": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "presence": {
+                      "enum": [
+                        "invalid-declaration",
+                        "unavailable-layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "presence"
+                  ]
+                },
+                {
+                  "properties": {
+                    "region": {
+                      "properties": {
+                        "state": {
+                          "not": {
+                            "const": "complete"
+                          }
+                        }
+                      },
+                      "required": [
+                        "state"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "region"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "data"
+          ]
+        },
+        "then": {
+          "properties": {
+            "issues": {
+              "contains": {
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "warning",
+                      "error"
+                    ]
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              },
+              "minItems": 1
+            },
+            "status": {
+              "const": "partial"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-directory-record"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "else": {
+          "properties": {
+            "issues": {
+              "items": {
+                "properties": {
+                  "severity": {
+                    "const": "info"
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              }
+            },
+            "status": {
+              "const": "complete"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        },
+        "if": {
+          "properties": {
+            "data": {
+              "properties": {
+                "format": {
+                  "const": "unknown"
+                }
+              },
+              "required": [
+                "format"
+              ]
+            }
+          },
+          "required": [
+            "data"
+          ]
+        },
+        "then": {
+          "properties": {
+            "issues": {
+              "contains": {
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "warning",
+                      "error"
+                    ]
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              },
+              "minItems": 1
+            },
+            "status": {
+              "const": "partial"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-extra"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "else": {
+          "properties": {
+            "issues": {
+              "items": {
+                "properties": {
+                  "severity": {
+                    "const": "info"
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              }
+            },
+            "status": {
+              "const": "complete"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        },
+        "if": {
+          "properties": {
+            "data": {
+              "properties": {
+                "state": {
+                  "not": {
+                    "const": "complete"
+                  }
+                }
+              },
+              "required": [
+                "state"
+              ]
+            }
+          },
+          "required": [
+            "data"
+          ]
+        },
+        "then": {
+          "properties": {
+            "issues": {
+              "contains": {
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "warning",
+                      "error"
+                    ]
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              },
+              "minItems": 1
+            },
+            "status": {
+              "const": "partial"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-installation"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "else": {
+          "properties": {
+            "issues": {
+              "items": {
+                "properties": {
+                  "severity": {
+                    "const": "info"
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              }
+            },
+            "status": {
+              "const": "complete"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        },
+        "if": {
+          "properties": {
+            "data": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "reservedState": {
+                      "const": "nonzero"
+                    }
+                  },
+                  "required": [
+                    "reservedState"
+                  ]
+                },
+                {
+                  "properties": {
+                    "bound": {
+                      "const": "exceeds-stored-size"
+                    }
+                  },
+                  "required": [
+                    "bound"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "data"
+          ]
+        },
+        "then": {
+          "properties": {
+            "issues": {
+              "contains": {
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "warning",
+                      "error"
+                    ]
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              },
+              "minItems": 1
+            },
+            "status": {
+              "const": "partial"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-free-range"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "else": {
+          "properties": {
+            "issues": {
+              "items": {
+                "properties": {
+                  "severity": {
+                    "const": "info"
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              }
+            },
+            "status": {
+              "const": "complete"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        },
+        "if": {
+          "properties": {
+            "data": {
+              "properties": {
+                "state": {
+                  "not": {
+                    "enum": [
+                      "within-source",
+                      "zero-size"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "state"
+              ]
+            }
+          },
+          "required": [
+            "data"
+          ]
+        },
+        "then": {
+          "properties": {
+            "issues": {
+              "contains": {
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "warning",
+                      "error"
+                    ]
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              },
+              "minItems": 1
+            },
+            "status": {
+              "const": "partial"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-metadata-diagnostic"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "else": {
+          "properties": {
+            "issues": {
+              "items": {
+                "properties": {
+                  "severity": {
+                    "const": "info"
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              }
+            },
+            "status": {
+              "const": "complete"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        },
+        "if": {
+          "properties": {
+            "data": true
+          },
+          "required": [
+            "data"
+          ]
+        },
+        "then": {
+          "properties": {
+            "issues": {
+              "contains": {
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "warning",
+                      "error"
+                    ]
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              },
+              "minItems": 1
+            },
+            "status": {
+              "const": "partial"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-raw-chunk"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "else": {
+          "properties": {
+            "issues": {
+              "items": {
+                "properties": {
+                  "severity": {
+                    "const": "info"
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              }
+            },
+            "status": {
+              "const": "complete"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        },
+        "if": {
+          "properties": {
+            "data": false
+          },
+          "required": [
+            "data"
+          ]
+        },
+        "then": {
+          "properties": {
+            "issues": {
+              "contains": {
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "warning",
+                      "error"
+                    ]
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              },
+              "minItems": 1
+            },
+            "status": {
+              "const": "partial"
+            }
+          },
+          "required": [
+            "status",
+            "issues"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-layout"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "layout": {
+                      "enum": [
+                        "zip",
+                        "zip64"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "layout"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "v2": {
+                      "type": "null"
+                    },
+                    "zip": {
+                      "type": "object"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "layout": {
+                      "const": "p4k-v2"
+                    }
+                  },
+                  "required": [
+                    "layout"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "v2": {
+                      "type": "object"
+                    },
+                    "zip": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "layout": {
+                      "const": "recovered-unknown"
+                    }
+                  },
+                  "required": [
+                    "layout"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "v2": {
+                      "type": "null"
+                    },
+                    "zip": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-section"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "else": {
+                  "properties": {
+                    "raw": {
+                      "type": "null"
+                    },
+                    "region": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "presence": {
+                      "const": "declared"
+                    }
+                  },
+                  "required": [
+                    "presence"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "region": {
+                      "type": "object"
+                    }
+                  }
+                }
+              },
+              {
+                "else": {
+                  "properties": {
+                    "raw": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "region": {
+                      "properties": {
+                        "available": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "available"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "region"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "raw": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-directory-record"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "format": {
+                      "const": "p4k_v2"
+                    }
+                  },
+                  "required": [
+                    "format"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "comment": {
+                      "type": "null"
+                    },
+                    "extras": {
+                      "type": "null"
+                    },
+                    "name": {
+                      "type": "null"
+                    },
+                    "signature": {
+                      "type": "object"
+                    },
+                    "storedDigest": {
+                      "type": "object"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "format": {
+                      "const": "zip_central_directory"
+                    }
+                  },
+                  "required": [
+                    "format"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "signature": {
+                      "type": "null"
+                    },
+                    "storedDigest": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              {
+                "else": {
+                  "properties": {
+                    "metadata": {
+                      "type": "object"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "admittedEntryIndex": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "admittedEntryIndex"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "metadata": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-extra"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "else": {
+                  "properties": {
+                    "declaredTotalLength": {
+                      "type": "integer"
+                    },
+                    "id": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "state": {
+                      "const": "short-header"
+                    }
+                  },
+                  "required": [
+                    "state"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "body": {
+                      "type": "null"
+                    },
+                    "declaredTotalLength": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "state": {
+                      "const": "length-before-header"
+                    }
+                  },
+                  "required": [
+                    "state"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "body": {
+                      "type": "null"
+                    },
+                    "declaredTotalLength": {
+                      "maximum": 3
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "state": {
+                      "enum": [
+                        "complete",
+                        "truncated-body"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "state"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "body": {
+                      "type": "object"
+                    },
+                    "declaredTotalLength": {
+                      "minimum": 4
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "archive"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "archive-installation"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "reservedState": {
+                      "const": "not-present"
+                    }
+                  },
+                  "required": [
+                    "reservedState"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "reserved": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "reservedState": {
+                      "const": "zero"
+                    }
+                  },
+                  "required": [
+                    "reservedState"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "reserved": {
+                      "const": 0
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "reservedState": {
+                      "const": "nonzero"
+                    }
+                  },
+                  "required": [
+                    "reservedState"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "reserved": {
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            ]
           }
         },
         "required": [

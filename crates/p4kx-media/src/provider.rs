@@ -119,6 +119,18 @@ pub trait Provider: Send + Sync {
         Ok(())
     }
 
+    /// Projects metadata of each already opened owning source without physical Entry tallies.
+    ///
+    /// # Errors
+    /// Returns metadata, shared budget, cancellation, source-change or output failures.
+    fn directory(
+        &self,
+        _context: &mut crate::DirectoryContext<'_, '_, '_>,
+        _writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        Ok(())
+    }
+
     /// Streams records for one exact retained source.
     ///
     /// # Errors

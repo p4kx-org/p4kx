@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use p4kx_extraction::{Archive, ConflictPolicy, Entry, ExtractOptions, ExtractionReport};
 
-use crate::error;
 use crate::hashing;
 use crate::output_path;
 use crate::raw_output;
 use crate::staged_directory::StagedDirectory;
 use crate::{ByteScope, ExtractionCounts, MediaError, MediaWriter, RawReference};
+
+const PAYLOAD_FILE: &str = "payload";
 
 #[cfg(test)]
 #[path = "retained_source_tests.rs"]
@@ -42,7 +42,12 @@ pub(crate) fn retain(
     let temporary = StagedDirectory::create(&writer.root, ".entry-", writer.checkpoint)?;
     let result = (|| {
         extract_one(archive, entry, temporary.path(), writer)?;
-        let payload = only_payload(temporary.path())?;
+        let payload = temporary.path().join(PAYLOAD_FILE);
+        if !output_path::file(&payload)? {
+            return Err(MediaError::Destination(
+                "retained Entry payload is missing".into(),
+            ));
+        }
         let (digest, actual) = hashing::file(
             &payload,
             ByteScope::DecodedEntryPayload,
@@ -73,7 +78,8 @@ fn extract_one(
         protection: Some(writer.checkpoint.protection),
         ..ExtractOptions::default()
     };
-    let report = p4kx_extraction::extract(archive, &[entry], destination, &options);
+    let report =
+        p4kx_extraction::extract_entry_payload(archive, entry, destination, PAYLOAD_FILE, &options);
     finish_extraction(report, writer)
 }
 
@@ -108,43 +114,4 @@ fn finish_extraction(report: ExtractionReport, writer: &MediaWriter<'_>) -> Resu
         ));
     }
     Ok(())
-}
-
-fn only_payload(root: &Path) -> Result<PathBuf, MediaError> {
-    let mut current = root.to_path_buf();
-    loop {
-        if !output_path::directory(&current)? {
-            return Err(MediaError::Destination(
-                "extraction staging directory is missing".into(),
-            ));
-        }
-        let mut entries = fs::read_dir(&current).map_err(|source| error::io(&current, source))?;
-        let entry = entries
-            .next()
-            .transpose()
-            .map_err(|source| error::io(&current, source))?
-            .ok_or_else(|| MediaError::Contract("extraction produced no payload".into()))?;
-        if entries.next().is_some() {
-            return Err(MediaError::Contract(
-                "single Entry extraction produced multiple files".into(),
-            ));
-        }
-        let metadata = entry
-            .file_type()
-            .map_err(|source| error::io(&entry.path(), source))?;
-        if metadata.is_file() {
-            if !output_path::file(&entry.path())? {
-                return Err(MediaError::Destination(
-                    "extracted payload is missing".into(),
-                ));
-            }
-            return Ok(entry.path());
-        }
-        if !metadata.is_dir() {
-            return Err(MediaError::Contract(
-                "extracted payload is not a regular file".into(),
-            ));
-        }
-        current = entry.path();
-    }
 }

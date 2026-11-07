@@ -1,9 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use schemars::JsonSchema;
+use schemars::generate::SchemaSettings;
 use serde_json::{Map, Value};
 
 use crate::MediaError;
+
+pub(crate) fn serialized_payload<T: JsonSchema>() -> Value {
+    SchemaSettings::draft2020_12()
+        .for_serialize()
+        .into_generator()
+        .into_root_schema_for::<T>()
+        .to_value()
+}
 
 pub(crate) fn insert_payload(
     base: &mut Value,

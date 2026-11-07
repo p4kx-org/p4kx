@@ -18,6 +18,7 @@ fn skip_and_if_changed_retain_the_validated_complete_generation() -> TestResult 
         &output,
         &ExportOptions::default(),
     )?)?;
+    let first_rows = fs::read_to_string(output.join(&first.artifact_base).join("archive.jsonl"))?;
     let bytes = fs::read(output.join("media-index.json"))?;
     assert!(matches!(
         p4kx_media::export(&archive, &output, &ExportOptions::default())?,
@@ -36,7 +37,11 @@ fn skip_and_if_changed_retain_the_validated_complete_generation() -> TestResult 
         return Err("content generation identity is deterministic".into());
     };
     assert_eq!(index.artifact_base, first.artifact_base);
-    assert_eq!(support::records(&output, &index, "archive.jsonl")?.len(), 4);
+    let current_rows = fs::read_to_string(output.join(&index.artifact_base).join("archive.jsonl"))?;
+    assert_eq!(
+        current_rows, first_rows,
+        "unchanged generation retains every metadata and Entry record byte"
+    );
     assert_eq!(fs::read(output.join("media-index.json"))?, bytes);
     assert!(output.join("generations").join(first.generation).is_dir());
     Ok(())

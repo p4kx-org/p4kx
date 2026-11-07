@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 
 use crate::buffers::Buffers;
 use crate::convert::{PEEK_LEN, is_cryxml};
-use crate::entry_path::{escaped_raw_path, relative_path};
-use crate::portable_name::check_path_length;
+use crate::entry_path;
+use crate::portable_name;
 use crate::source::{EntrySource, SourceEntry, SourceReader};
 use crate::tracker::Tracker;
 use crate::{
@@ -48,7 +48,7 @@ impl Destination {
     /// already there.
     pub(crate) fn new(folder: PathBuf, name: &OsStr) -> Result<Self, ExtractionError> {
         let file = folder.join(name);
-        check_path_length(&file)?;
+        portable_name::check_path_length(&file)?;
         let existing = match fs::symlink_metadata(&file) {
             Ok(metadata) => Some(metadata),
             Err(error) if error.kind() == io::ErrorKind::NotFound => None,
@@ -62,8 +62,16 @@ impl Destination {
     }
 }
 
+/// Source-derived names or a caller-selected single portable output leaf.
+#[derive(Clone, Copy)]
+pub(crate) enum EntryTarget<'a> {
+    Source,
+    Leaf(&'a str),
+}
+
 /// Writes the files of one source below one target folder under one Conflict policy.
 pub(crate) struct EntryWriter<'a> {
+    pub(crate) entry_target: EntryTarget<'a>,
     pub(crate) protection: Option<&'a ArchiveWriteProtection>,
     pub(crate) cancel: Option<&'a CancelToken>,
     pub(crate) source: &'a dyn EntrySource,
@@ -249,7 +257,7 @@ impl EntryWriter<'_> {
     pub(crate) fn disk_name<'a>(&self, entry: &'a SourceEntry<'_>) -> Cow<'a, str> {
         self.source.raw_path(entry.index()).map_or_else(
             || Cow::Borrowed(entry.path()),
-            |raw| Cow::Owned(escaped_raw_path(raw)),
+            |raw| Cow::Owned(entry_path::escaped_raw_path(raw)),
         )
     }
 
@@ -258,7 +266,16 @@ impl EntryWriter<'_> {
         &self,
         entry: &SourceEntry<'_>,
     ) -> Result<PathBuf, ExtractionError> {
-        relative_path(&self.disk_name(entry))
+        match self.entry_target {
+            EntryTarget::Source => entry_path::relative_path(&self.disk_name(entry)),
+            EntryTarget::Leaf(name) => {
+                portable_name::check_part(name).map_err(|rule| ExtractionError::InvalidName {
+                    part: name.to_owned(),
+                    rule,
+                })?;
+                Ok(PathBuf::from(name))
+            }
+        }
     }
 
     /// Creates the folder of `entry` below the target and returns where its file goes; fails when
@@ -270,7 +287,7 @@ impl EntryWriter<'_> {
     ) -> Result<Destination, ExtractionError> {
         let relative = self.relative_path(entry)?;
         self.check_output(&self.target.join(&relative))?;
-        check_path_length(&self.target.join(&relative))?;
+        portable_name::check_path_length(&self.target.join(&relative))?;
         self.case_collision(&relative, entry)?;
         let name = relative.file_name().ok_or(ExtractionError::UnsafePath)?;
         let folder = self.folder(relative.parent())?;

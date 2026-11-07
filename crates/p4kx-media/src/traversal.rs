@@ -15,6 +15,7 @@ pub(crate) struct Traversal<'a> {
     pub(crate) exclude: &'a Exclusion,
     pub(crate) entries: Tally,
     pub(crate) bytes: u64,
+    pub(crate) metadata_work: u64,
 }
 
 impl Traversal<'_> {
@@ -24,6 +25,15 @@ impl Traversal<'_> {
         chain: &mut Vec<ContainerIdentity>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
+        crate::directory_run::run(
+            archive,
+            self.root,
+            chain,
+            self.providers,
+            &mut self.bytes,
+            &mut self.metadata_work,
+            writer,
+        )?;
         for entry in archive.entries() {
             writer.checkpoint()?;
             self.entries.enumerated += 1;

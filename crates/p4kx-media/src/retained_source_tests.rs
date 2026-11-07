@@ -78,10 +78,11 @@ fn cancel_during_extraction(
             token.cancel();
         }
     };
-    Ok(p4kx_extraction::extract(
+    Ok(p4kx_extraction::extract_entry_payload(
         archive,
-        &[entry],
+        entry,
         output,
+        "payload",
         &ExtractOptions {
             verify: true,
             cancel: Some(token),

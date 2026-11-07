@@ -74,9 +74,12 @@ pub(crate) struct MediaLimitsArgs {
     /// Maximum physical Entries examined, including filtered Entries.
     #[arg(long = "max-sources", default_value_t = Limits::default().sources, value_parser = clap::value_parser!(u64).range(1..))]
     pub(crate) sources: u64,
-    /// Maximum decoded source work, including container traversal.
+    /// Maximum decoded source work and actual metadata-read bytes across owning sources.
     #[arg(long = "max-source-bytes", default_value_t = Limits::default().source_bytes, value_parser = clap::value_parser!(u64).range(1..))]
     pub(crate) source_bytes: u64,
+    /// Maximum metadata cursor/read work items across owning sources and providers.
+    #[arg(long = "max-metadata-work", default_value_t = Limits::default().metadata_work, value_parser = clap::value_parser!(u64).range(1..))]
+    pub(crate) metadata_work: u64,
     /// Maximum decoded bytes of one selected Entry or opened container.
     #[arg(long = "max-entry-bytes", default_value_t = Limits::default().entry_bytes, value_parser = clap::value_parser!(u64).range(1..))]
     pub(crate) entry_bytes: u64,
@@ -112,6 +115,7 @@ impl MediaLimitsArgs {
         limits.root_bytes = self.root_bytes;
         limits.sources = self.sources;
         limits.source_bytes = self.source_bytes;
+        limits.metadata_work = self.metadata_work;
         limits.entry_bytes = self.entry_bytes;
         limits.records = self.records;
         limits.record_bytes = self.record_bytes;

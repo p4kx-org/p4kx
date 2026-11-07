@@ -16,14 +16,22 @@ pub struct ArchiveProvider;
 
 impl Provider for ArchiveProvider {
     fn capability(&self) -> Capability {
-        Capability { kind: MediaKind::Archive, id: "p4kx.archive.public-metadata".into(), version: "1.2.0".into(),
+        Capability { kind: MediaKind::Archive, id: "p4kx.archive.public-metadata".into(), version: "1.3.0".into(),
             availability: Availability::Available,
-            preservation: "exact decoded selected Entry payloads; root Archive layout bytes are not retained".into(),
+            preservation: "exact decoded selected Entry payloads and verified source-local metadata chunks; unavailable global recovery layout is diagnosed".into(),
             field_groups: vec![
                 FieldGroup { name: "public-entry-metadata".into(), projected: true, scope: "physical index, display path, available raw path bytes, sizes, declared checksum, compression, encryption, installed bytes, original DOS words, timezone-free calendar status, source record format, original directory ordinal and fixed header words".into() },
                 FieldGroup { name: "root-build".into(), projected: true, scope: "adjacent public launcher Build declaration, without inferred values".into() },
-                FieldGroup { name: "raw-archive-layout".into(), projected: false, scope: "directory layout, signatures and unknown root bytes require a separate raw-layout reader".into() },
+                FieldGroup { name: "raw-archive-layout".into(), projected: true, scope: "root and nested source layout declarations, ordered original records/extras, opaque signatures/digest slots and installation/free rows with verified bounded sidecars and independent structural health".into() },
             ] }
+    }
+
+    fn directory(
+        &self,
+        context: &mut crate::DirectoryContext<'_, '_, '_>,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        crate::archive_layout_projection::write(context, writer)
     }
 
     fn root(&self, root: &RootSource, writer: &mut MediaWriter<'_>) -> Result<(), MediaError> {

@@ -210,6 +210,13 @@ impl<'a> MediaWriter<'a> {
         Ok(())
     }
 
+    pub(crate) fn end_directory(&mut self) -> Result<(), MediaError> {
+        self.active = None;
+        self.source = None;
+        self.terminal = None;
+        self.checkpoint()
+    }
+
     pub(crate) fn reference_root(&self) -> Result<&crate::Digest, MediaError> {
         self.source
             .as_ref()

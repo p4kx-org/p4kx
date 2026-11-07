@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::chunk_copy;
 use crate::hashing;
 use crate::output_path;
+use crate::temporary_file::TemporaryFile;
 use crate::{Artifact, ByteScope, MediaError, MediaWriter};
 
 /// Element representation of a typed payload chunk.
@@ -170,6 +171,12 @@ impl SourceRange {
     }
 }
 
+#[derive(Clone, Copy)]
+enum ChunkAccounting {
+    Converted,
+    RetainedMetadata,
+}
+
 impl MediaWriter<'_> {
     /// Streams one exact typed chunk without collecting the array in memory.
     ///
@@ -179,6 +186,23 @@ impl MediaWriter<'_> {
         &mut self,
         layout: ChunkLayout,
         input: &mut dyn Read,
+    ) -> Result<ChunkReference, MediaError> {
+        self.write_chunk(layout, input, ChunkAccounting::Converted)
+    }
+
+    pub(crate) fn metadata_chunk(
+        &mut self,
+        layout: ChunkLayout,
+        input: &mut dyn Read,
+    ) -> Result<ChunkReference, MediaError> {
+        self.write_chunk(layout, input, ChunkAccounting::RetainedMetadata)
+    }
+
+    fn write_chunk(
+        &mut self,
+        layout: ChunkLayout,
+        input: &mut dyn Read,
+        accounting: ChunkAccounting,
     ) -> Result<ChunkReference, MediaError> {
         self.checkpoint()?;
         let size = chunk_size(&layout, self.limits.chunk_bytes)?;
@@ -193,31 +217,46 @@ impl MediaWriter<'_> {
             size,
             digest,
         };
-        let path = self.root.join(&artifact.path);
         let result = (|| {
-            self.namespace
-                .ensure_namespace_writable(&path, self.checkpoint.cancel.flag())?;
-            let created = if output_path::file(&path)? {
-                let (digest, actual) =
-                    hashing::file(&path, ByteScope::ArtifactFile, size, &self.checkpoint)?;
-                if digest != artifact.digest || actual != size {
-                    return Err(MediaError::Contract(
-                        "typed chunk content-address collision".into(),
-                    ));
-                }
-                false
-            } else {
-                temporary.persist(
-                    &path,
-                    crate::publication::Publication::Namespace(self.namespace),
-                )?;
-                true
-            };
+            let created = place_chunk(self, &artifact, &mut temporary)?;
             self.artifact(&artifact)?;
-            self.converted_output(created)?;
+            if matches!(accounting, ChunkAccounting::Converted) {
+                self.converted_output(created)?;
+            }
             Ok(ChunkReference { artifact, layout })
         })();
         temporary.finish(result)
+    }
+}
+
+fn place_chunk(
+    writer: &MediaWriter<'_>,
+    artifact: &Artifact,
+    temporary: &mut TemporaryFile<'_>,
+) -> Result<bool, MediaError> {
+    let path = writer.root.join(&artifact.path);
+    writer
+        .namespace
+        .ensure_namespace_writable(&path, writer.checkpoint.cancel.flag())?;
+    if output_path::file(&path)? {
+        let (digest, actual) = hashing::file(
+            &path,
+            ByteScope::ArtifactFile,
+            artifact.size,
+            &writer.checkpoint,
+        )?;
+        if digest != artifact.digest || actual != artifact.size {
+            return Err(MediaError::Contract(
+                "typed chunk content-address collision".into(),
+            ));
+        }
+        Ok(false)
+    } else {
+        temporary.persist(
+            &path,
+            crate::publication::Publication::Namespace(writer.namespace),
+        )?;
+        Ok(true)
     }
 }
 

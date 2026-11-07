@@ -10,7 +10,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
     schema_merge::insert_payload(
         &mut base,
         "EntryMetadataInfo",
-        schemars::schema_for!(EntryMetadataInfo).to_value(),
+        schema_merge::serialized_payload::<EntryMetadataInfo>(),
     )?;
     let root = base
         .as_object_mut()

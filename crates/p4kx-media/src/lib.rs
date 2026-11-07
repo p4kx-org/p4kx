@@ -3,14 +3,30 @@
 
 //! Bounded media export with physical identities and atomic generation publication.
 
+mod archive_extras_read;
+mod archive_layout_consistency_schema;
+mod archive_layout_projection;
+mod archive_layout_schema;
+mod archive_layout_status_schema;
+mod archive_metadata_diagnostic;
 mod archive_metadata_schema;
 mod archive_provider;
+mod archive_raw;
+mod archive_record;
+mod archive_records_read;
+mod archive_retention;
+mod archive_section;
+mod archive_sections_read;
+mod archive_table;
+mod archive_tables_read;
 mod artifact;
 mod checkpoint;
 mod chunk;
 mod chunk_copy;
 mod contract;
+mod directory_context;
 mod directory_issue;
+mod directory_run;
 mod error;
 mod export;
 mod export_run;
@@ -30,6 +46,9 @@ mod limits;
 mod lock_namespace;
 mod media_record;
 mod media_writer;
+mod metadata_input;
+#[cfg(test)]
+mod metadata_input_tests;
 mod numeric;
 mod observed_write;
 mod output_path;
@@ -63,13 +82,22 @@ mod traversal;
 #[cfg(test)]
 mod write_context_tests;
 
+pub use archive_metadata_diagnostic::{ArchiveMetadataDiagnostic, ArchiveMetadataFailure};
 pub use archive_provider::ArchiveProvider;
+pub use archive_raw::{ArchiveRawChunk, ArchiveRawKey, ArchiveRawSpan};
+pub use archive_record::{ArchiveDirectoryRecord, ArchiveExtraData, ArchiveExtraState};
+pub use archive_section::{ArchiveSection, ArchiveSectionData, ArchiveSectionPresence};
+pub use archive_table::{
+    ArchiveFreeRange, ArchiveFreeState, ArchiveInstallation, ArchiveProgressBound,
+    ArchiveReservedState,
+};
 pub use chunk::{
     ByteOrder, ChunkLayout, ChunkReference, DataOrder, DataType, OffsetBasis, SourceRange,
 };
 pub use contract::{
     Artifact, Counts, Index, KindSummary, MediaIssue, MediaRecord, Severity, Status, Tally,
 };
+pub use directory_context::DirectoryContext;
 pub use directory_issue::DirectoryIssue;
 pub use error::{ExtractionCounts, MediaError};
 pub use export::{ExportOptions, ExportOutcome, export, export_with};
@@ -79,6 +107,12 @@ pub use kind::MediaKind;
 pub use limits::Limits;
 pub use media_writer::MediaWriter;
 pub use numeric::{Float32, Float64, ValueOrigin};
+pub use p4kx_extraction::{
+    ArchiveByteRange, ArchiveCigInstallation, ArchiveDeclarationState, ArchiveLayout,
+    ArchiveLayoutInfo as ArchiveLayoutData, ArchiveMetadataVersion, ArchiveRegion,
+    ArchiveRegionState, ArchiveTableDeclaration, ArchiveV2Layout, ArchiveZip64End,
+    ArchiveZip64Locator, ArchiveZipEnd, ArchiveZipLayout,
+};
 pub use provider::{Availability, Capability, FieldGroup, Projection, Provider, ProviderRegistry};
 pub use reference::{
     CandidateInventory, CandidateState, NotSelectedReason, Reference, ReferenceCandidate,

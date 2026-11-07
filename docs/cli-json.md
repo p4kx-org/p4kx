@@ -86,7 +86,7 @@ when nothing matches.
 
 ```json
 {"archive": "…", "channel": "LIVE", "build": Build, "entry_count": 4, "encrypted_count": 1,
- "issue_count": 0, "compressed_size": 35, "size": 118}
+ "issue_count": 0, "compressed_size": 35, "size": 118, "metadata": ArchiveLayoutInfo}
 ```
 
 `issue_count` is the number of Entry issues found in the directory of the Archive (ADR-0025); `info`,
@@ -98,6 +98,12 @@ itself (two when a scan limit cut the scan short), which every command prints on
 
 `channel` is the name of the folder holding the Archive, or `null` when there is none; `build` is
 `null` when the Build is unknown.
+
+`metadata` is the shared cached `ArchiveLayoutInfo` object: `version`, decimal-string
+`sourceLength`, actual `layout`, `declarationState`, and mandatory `zip`/`v2` keys with explicit
+null for the absent layout. Nested ZIP/ZIP64/v2 declarations retain their original words and
+source-relative extents. This adds no body reads or lazy-row validation. MCP `archive_info`
+returns the same object; [Archive source layout](media-archive-layout.md) defines its contract.
 
 ## `p4kx dcb info <archive> --json`
 

@@ -88,6 +88,7 @@ fn collect(
         exclude: &options.exclude,
         entries: Tally::default(),
         bytes: 0,
+        metadata_work: 0,
     };
     traversal.walk(archive, &mut Vec::new(), writer)?;
     Ok(traversal.entries)

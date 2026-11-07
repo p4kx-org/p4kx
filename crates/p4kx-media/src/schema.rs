@@ -43,7 +43,8 @@ pub fn record_schema() -> Value {
 /// Returns incompatible generated schema definitions or structural schema failures.
 pub fn builtin_record_schema() -> Result<Value, MediaError> {
     let shader = crate::shader_schema::bind_record_schema(record_schema())?;
-    crate::archive_metadata_schema::bind_record_schema(shader)
+    let archive = crate::archive_metadata_schema::bind_record_schema(shader)?;
+    crate::archive_layout_schema::bind_record_schema(archive)
 }
 
 /// Returns the JSON Schema of the common typed reference envelope.

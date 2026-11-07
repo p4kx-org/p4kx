@@ -5,7 +5,7 @@ use std::io::{self, Write};
 
 use anyhow::Result;
 use p4kx_channels::{PublicPatches, channel_name};
-use p4kx_extraction::{Archive, Build, Entry};
+use p4kx_extraction::{Archive, ArchiveLayoutInfo, Build, Entry};
 use serde::Serialize;
 
 use crate::cli::InfoArgs;
@@ -18,6 +18,7 @@ struct Summary<'a> {
     archive: String,
     channel: Option<String>,
     build: Option<BuildJson<'a>>,
+    metadata: ArchiveLayoutInfo,
     entry_count: usize,
     encrypted_count: usize,
     issue_count: usize,
@@ -39,6 +40,7 @@ pub(crate) fn run(args: &InfoArgs, as_json: bool) -> Result<()> {
         archive: json::path(archive.path()),
         channel: channel_name(archive.path()),
         build: build.as_ref().map(BuildJson::from),
+        metadata: ArchiveLayoutInfo::of(archive.metadata()),
         entry_count: entries.len(),
         encrypted_count: entries.iter().filter(|entry| entry.is_encrypted()).count(),
         issue_count: archive.issue_count(),

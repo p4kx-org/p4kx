@@ -14,7 +14,7 @@ p4kx media schema --source
 
 Repeat `--kind` for an explicit selection. The known names are `archive`, `model`, `material`,
 `texture`, `shader`, `animation`, `animation-definition`, `audio` and `audio-control`. Omission
-selects every registered provider. The built-in providers are the permanent minimal `archive`
+selects every registered provider. The built-in providers are the source-preserving `archive`
 provider and the source-preserving `shader` provider. An explicitly requested kind without an
 available provider returns a typed capability
 failure and a non-zero exit status, even if the selection would otherwise be empty.
@@ -37,6 +37,11 @@ the exact physical metadata owner, raw unsigned16 DOS words and a separate timez
 calendar-validity view. Invalid calendar words remain complete raw metadata; they do not
 change CRC/SHA or installation/recovery status. Other Archive-layout enrichment remains
 outside this timestamp projection.
+
+The Archive provider also emits [source-layout metadata](media-archive-layout.md) for the root and
+each traversed nested Archive. Original directory records, signatures, unknown extras and
+installation/free tables refer to bounded, verified raw sidecars. These metadata records do not
+add physical Entries or claim that an entire Archive file has been retained.
 
 ## Files and identities
 
@@ -83,11 +88,15 @@ adversarial writer that preserves this metadata.
 
 Raw sidecars retain the exact decrypted and decompressed selected Entry payloads. The writer uses
 one exact physical `&Entry` per unique Extraction destination and validates the actual report,
-size and hash. CRC-32, CRC-32C and SHA-256 declarations retain their algorithms and byte scopes;
+size and hash. A fixed portable staging filename keeps original directory-like or undecodable
+source names out of destination selection while retaining their physical identities and bytes.
+This uses the shared raw-payload extraction kernel, including verification and write protection.
+CRC-32, CRC-32C and SHA-256 declarations retain their algorithms and byte scopes;
 `not-available`, `not-performed` and `verified` comparisons are distinct from digest computation.
-Raw retention does not claim to preserve stored ciphertext, compressed representation, signatures
-or unknown root layout bytes. The initial Archive provider explicitly marks raw-layout projection
-unsupported while exposing the supported public metadata and Build declaration.
+Selected Entry retention does not claim stored ciphertext or compressed representations.
+The Archive provider separately retains established metadata sections, including opaque signatures
+and unknown metadata bytes; absent or unavailable declarations are explicit. Unproved gaps outside
+those sections do not receive a raw-preservation claim.
 
 ## Values, coverage and counting
 
@@ -121,7 +130,8 @@ real Archives and can be lowered or raised explicitly:
 | --- | ---: | --- |
 | `--max-root-bytes` | 4 TiB | Entire root file fingerprint |
 | `--max-sources` | 10,000,000 | Observed physical Entries, including filtered Entries |
-| `--max-source-bytes` | 8 TiB | Retention and container-opening decoded work |
+| `--max-source-bytes` | 8 TiB | Retention, container-opening decoded work and actual metadata-read bytes across sources |
+| `--max-metadata-work` | 100,000,000 | Shared metadata cursor/read work items across owning sources and providers |
 | `--max-entry-bytes` | 8 GiB | One retained payload or opened container |
 | `--max-records` | 10,000,000 | All metadata and subresource records |
 | `--max-record-bytes` | 1 MiB | One JSONL line or index |
@@ -138,6 +148,10 @@ decoding also retains the existing 512 MiB chain budget, entry-count and expansi
 Sizes are checked before Extraction or container allocation. Hashing and copy loops check
 cancellation and ArchiveWatch between bounded chunks, and reports are checked before continuing.
 First Ctrl+C cancels safely; a second uses the CLI's immediate-interruption convention.
+
+The normative `metadata_work` default is 100,000,000. Its default value is omitted canonically
+from serialized index limits; a nondefault value is explicit. Omission on read means that same
+bound, preserving the generation fingerprint of supported older indexes without the field.
 
 ## Publication and recovery
 

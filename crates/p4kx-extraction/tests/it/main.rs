@@ -13,6 +13,8 @@ mod dataforge;
 mod dataforge_conversion;
 mod dataforge_file;
 mod entry_metadata_info;
+mod entry_payload;
+mod entry_payload_control;
 mod entry_tree;
 mod exclusion;
 mod extraction;

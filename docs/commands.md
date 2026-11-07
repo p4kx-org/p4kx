@@ -166,6 +166,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   that is not UTF-8, an encryption value other than 0 or 1 or v2 data outside the file, does not
   stop an Archive from opening: `info`, `list` and `extract` print up to ten `warning: Entry …`
   lines to stderr for the Entries concerned.
+  JSON output also includes cached source-layout `metadata`, with exact declarations and
+  explicit absence as defined in [Archive source layout](media-archive-layout.md).
 - **Input of every `p4kx dcb` command:** `<archive>` is a `Data.p4k` Archive or a DataForge file
   on disk, e.g. a `Game2.dcb` kept from an earlier patch (ADR-0249). A file is recognised by its
   content, a DataForge header, not by its name; the file is only read, never written. The limits
@@ -759,7 +761,7 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | Tool | Result |
 |------|--------|
 | `list_channels` | The detected Channels with Archive path, source and Build, found like `p4kx channels` |
-| `archive_info` | Channel, Build, number of Entries and encrypted Entries, sizes, `issue_count` and the first 50 `issues` (Entry path and defect) of the directory |
+| `archive_info` | Channel, Build, number of Entries and encrypted Entries, sizes, cached source-layout `metadata`, `issue_count` and the first 50 `issues` (Entry path and defect) of the directory |
 | `list_entries` | One folder of an Archive (`folder`, e.g. `Data/Libs`): its subfolders with their Entry count, then its Entries |
 | `search_entries` | The Entries matching a Filter (`filter`), with the rules of `p4kx search` |
 | `read_entry_text` | A range of an Entry as text (`path`, `offset`, `max_bytes`): CryXml as XML, UTF-16 by its byte order mark, otherwise UTF-8 |

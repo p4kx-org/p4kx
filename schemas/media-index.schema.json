@@ -347,6 +347,14 @@
           "minimum": 0,
           "type": "integer"
         },
+        "metadata_work": {
+          "default": 100000000,
+          "description": "Metadata cursor/read work items admitted across all providers and owning sources.",
+          "format": "uint64",
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": "integer"
+        },
         "output_bytes": {
           "description": "Bytes written to generation artifacts, excluding the separately bounded index.",
           "format": "uint64",
@@ -384,7 +392,7 @@
           "type": "integer"
         },
         "source_bytes": {
-          "description": "Decoded bytes retained or used to open nested containers.",
+          "description": "Decoded retention/container bytes and actual metadata-read bytes across owning sources.",
           "format": "uint64",
           "minimum": 0,
           "type": "integer"

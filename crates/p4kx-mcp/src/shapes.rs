@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_channels::Channel;
-use p4kx_extraction::{Build, Entry, EntryMetadataInfo};
+use p4kx_extraction::{ArchiveLayoutInfo, Build, Entry, EntryMetadataInfo};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -79,6 +79,8 @@ pub(crate) struct ArchiveInfo {
     pub(crate) channel: Option<String>,
     /// The Build, absent when the manifest cannot be read.
     pub(crate) build: Option<BuildShape>,
+    /// Cached source-layout headers without a lazy-record validation claim.
+    pub(crate) metadata: ArchiveLayoutInfo,
     /// The number of Entries.
     pub(crate) entry_count: usize,
     /// The number of encrypted Entries.

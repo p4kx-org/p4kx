@@ -4,6 +4,7 @@
 //! Synthetic media contract, source preservation and provider integration tests.
 
 mod archive;
+mod archive_layout;
 mod budgets;
 mod capabilities;
 mod entry_metadata_provider;
@@ -12,6 +13,14 @@ mod entry_metadata_words;
 mod interruptions;
 #[cfg(windows)]
 mod junctions;
+mod layout_artifacts;
+mod layout_fixture;
+mod layout_health;
+mod layout_legacy_index;
+mod layout_mutations;
+mod layout_schema;
+mod layout_scope;
+mod layout_support;
 mod non_finite;
 mod owned_outputs;
 mod process_lock;
@@ -19,6 +28,7 @@ mod providers;
 mod recovery;
 mod reference_context;
 mod references;
+mod retained_entry_names;
 mod schema;
 mod shader_provider_failures;
 mod shader_provider_schema;
