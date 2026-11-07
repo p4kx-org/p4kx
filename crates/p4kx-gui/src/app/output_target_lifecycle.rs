@@ -8,7 +8,7 @@ use p4kx_extraction::RuntimeEnvironment;
 
 use super::App;
 use super::output_target_route;
-use super::picker::NativeDialog;
+use super::picker::{NativeDialog, NativeStartError};
 use crate::dialog::Dialog;
 use crate::output_target::{ParentTicket, PickerFailure};
 
@@ -44,7 +44,7 @@ impl App {
     }
 
     pub(super) fn start_dialog(&mut self, ctx: &egui::Context, dialog: Dialog) {
-        if self.dialog.is_some() {
+        if self.dialog.is_some() || self.dialog_failure.is_some() {
             return;
         }
         let parent = if self.uses_parent_dialog(dialog) {
@@ -57,12 +57,22 @@ impl App {
             None
         };
         let native = NativeDialog::start(ctx, &self.model, dialog, parent);
+        self.accept_native_dialog_start(native);
+        ctx.request_repaint();
+    }
+
+    pub(super) fn accept_native_dialog_start(
+        &mut self,
+        native: Result<NativeDialog, NativeStartError>,
+    ) {
         match native {
             Ok(native) => self.dialog = Some(native),
             Err(error) => {
                 if let Some(ticket) = error.parent {
                     self.output_target
                         .picker_failed(&ticket, PickerFailure::Spawn(error.source));
+                } else {
+                    self.dialog_failure = Some(PickerFailure::Spawn(error.source));
                 }
             }
         }
@@ -82,11 +92,13 @@ impl App {
             Ok(path) => path,
             Err(TryRecvError::Empty) => return None,
             Err(TryRecvError::Disconnected) => {
-                if let Some(native) = self.dialog.take()
-                    && let Some(ticket) = native.parent
-                {
-                    self.output_target
-                        .picker_failed(&ticket, PickerFailure::Disconnected);
+                if let Some(native) = self.dialog.take() {
+                    if let Some(ticket) = native.parent {
+                        self.output_target
+                            .picker_failed(&ticket, PickerFailure::Disconnected);
+                    } else {
+                        self.dialog_failure = Some(PickerFailure::Disconnected);
+                    }
                 }
                 return None;
             }

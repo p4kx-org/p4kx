@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::dialog::Dialog;
-use crate::output_target::{OutputScope, TargetSelection, Witness};
+use crate::output_target::{OutputScope, PickerFailure, TargetSelection, Witness};
 use crate::{Language, OutputTargetText as T, Texts};
 
 pub(super) struct Window {
@@ -13,6 +13,7 @@ pub(super) struct Window {
     pub(super) target: TargetSelection,
     pub(super) parent_request: Option<Dialog>,
     pub(super) parent_requests: u32,
+    pub(super) failure: Option<PickerFailure>,
     owner: Arc<()>,
 }
 
@@ -43,11 +44,26 @@ impl Window {
             target,
             parent_request: None,
             parent_requests: 0,
+            failure: None,
             owner,
         }
     }
 
+    pub(super) fn failed_picker(language: Language) -> Self {
+        let mut window = Self::new(language, Dialog::ModelFile, true);
+        window.target.cancel();
+        window.failure = Some(PickerFailure::Spawn(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "synthetic chooser failure",
+        )));
+        window
+    }
+
     pub(super) fn show(&mut self, ui: &egui::Ui) {
+        if self.failure.is_some() {
+            crate::ui::picker_failure(ui, &self.texts, &mut self.failure);
+            return;
+        }
         if let Some(dialog) = super::show(ui, &self.texts, &mut self.target) {
             self.parent_request = Some(dialog);
             self.parent_requests += 1;

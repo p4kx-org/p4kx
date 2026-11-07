@@ -6,7 +6,7 @@ use egui::{Align, Align2, Frame, Key, Layout, Margin, TextEdit, Ui, vec2};
 use super::extraction::{foot, group_label, path_field};
 use super::regions;
 use crate::dialog::Dialog;
-use crate::output_target::{NameProblem, PickerFailure, Selection, TargetSelection};
+use crate::output_target::{NameProblem, Selection, TargetSelection};
 use crate::theme::desktop::MODAL_GROUP_GAP;
 use crate::theme::palette;
 use crate::theme::tokens::{FS_BODY, FS_SM, SPACE_3, TOUCH_TARGET, Weight, font};
@@ -184,13 +184,9 @@ fn notices(ui: &mut Ui, texts: &Texts, pending: &Selection) {
             NameProblem::Control => T::Control,
         })
     });
-    let picker = pending.picker_failure().map(|failure| match failure {
-        PickerFailure::Spawn(error) => {
-            texts.format(T::PickerFailed, &[("reason", error.to_string().into())])
-        }
-        PickerFailure::Disconnected => texts.get(T::PickerDisconnected),
-        PickerFailure::RelativePath => texts.get(T::PickerRelative),
-    });
+    let picker = pending
+        .picker_failure()
+        .map(|failure| failure.message(texts));
     for message in [problem, picker].into_iter().flatten() {
         frames::danger_alert(ui, |ui| {
             ui.add(egui::Label::new(plain(message, FS_SM, Weight::Regular)).wrap());

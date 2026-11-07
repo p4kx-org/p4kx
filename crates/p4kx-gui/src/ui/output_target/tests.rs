@@ -45,18 +45,7 @@ fn draw(
     invalid: bool,
     kind: &str,
 ) -> TestResult {
-    let renderer = WgpuTestRenderer::from_render_state(create_render_state(
-        software_wgpu_setup(),
-        RendererOptions::PREDICTABLE,
-    ));
-    let mut harness = Harness::builder()
-        .with_context_setup(crate::theme::apply)
-        .with_size(size)
-        .renderer(renderer)
-        .build_ui_state(
-            |ui, state: &mut Window| state.show(ui),
-            Window::new(language, dialog, invalid),
-        );
+    let mut harness = harness(Window::new(language, dialog, invalid), size);
     harness.run();
     assert_eq!(
         harness.state().parent_requests,
@@ -71,6 +60,63 @@ fn draw(
         image.height()
     );
     save(&name, image.width(), image.height(), &image.into_raw())
+}
+
+fn harness(window: Window, size: [f32; 2]) -> Harness<'static, Window> {
+    let renderer = WgpuTestRenderer::from_render_state(create_render_state(
+        software_wgpu_setup(),
+        RendererOptions::PREDICTABLE,
+    ));
+    Harness::builder()
+        .with_context_setup(crate::theme::apply)
+        .with_size(size)
+        .renderer(renderer)
+        .build_ui_state(|ui, state: &mut Window| state.show(ui), window)
+}
+
+#[test]
+fn failed_system_choosers_show_the_reason_and_can_be_closed_in_both_languages() -> TestResult {
+    for (language, tag) in [
+        (Language::BritishEnglish, "en-GB"),
+        (Language::German, "de-DE"),
+    ] {
+        for size in [[640.0, 400.0], [1280.0, 800.0]] {
+            let mut harness = harness(Window::failed_picker(language), size);
+            harness.run();
+            let title = harness.state().texts.get(T::PickerFailureTitle);
+            assert!(
+                harness.query_by_label(&title).is_some(),
+                "localized failure title"
+            );
+            assert!(
+                harness
+                    .query_by_label_contains("synthetic chooser failure")
+                    .is_some(),
+                "original failure reason"
+            );
+            let image = harness.render()?;
+            let name = format!(
+                "picker-failure-{tag}-{}x{}.png",
+                image.width(),
+                image.height()
+            );
+            save(&name, image.width(), image.height(), &image.into_raw())?;
+            let close = harness.state().texts.get(crate::ExtractionText::Close);
+            harness
+                .get_by_role_and_label(egui::accesskit::Role::Button, &close)
+                .click();
+            harness.run_steps(3);
+            assert!(
+                harness.state().failure.is_none(),
+                "close dismisses the failure"
+            );
+            assert!(
+                harness.state().target.pending().is_none(),
+                "no output selection"
+            );
+        }
+    }
+    Ok(())
 }
 
 fn assert_content(harness: &Harness<'_, Window>, dialog: Dialog, invalid: bool) {

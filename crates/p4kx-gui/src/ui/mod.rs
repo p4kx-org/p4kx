@@ -82,6 +82,7 @@ mod model_preview;
 mod model_view;
 mod moved_path;
 mod output_target;
+mod picker_failure;
 mod preview;
 mod preview_bar;
 mod preview_tab;
@@ -148,6 +149,7 @@ use crate::widgets::{frames, tab};
 
 pub use dialog::Dialog;
 pub(crate) use output_target::show as output_target;
+pub(crate) use picker_failure::show as picker_failure;
 pub use regions::{Regions, regions};
 
 const RESIZE_GAP: i8 = 6;

@@ -9,6 +9,8 @@ mod output_target_route;
 #[cfg(test)]
 mod output_target_tests;
 mod picker;
+#[cfg(test)]
+mod picker_failure_tests;
 
 use std::path::{Path, PathBuf};
 
@@ -28,6 +30,7 @@ pub struct App {
     window: Option<WindowGeometry>,
     language_chosen: bool,
     dialog: Option<picker::NativeDialog>,
+    dialog_failure: Option<crate::output_target::PickerFailure>,
     output_target: crate::output_target::TargetSelection,
     runtime: p4kx_extraction::RuntimeEnvironment,
     smoke: Option<Frames>,
@@ -48,6 +51,7 @@ impl App {
             window,
             language_chosen: false,
             dialog: None,
+            dialog_failure: None,
             output_target: crate::output_target::TargetSelection::new(),
             runtime: p4kx_extraction::RuntimeEnvironment::Native,
             smoke: None,
@@ -231,10 +235,15 @@ impl eframe::App for App {
         let requests = ui::show_with_output_target(
             ui,
             &mut self.model,
-            self.output_target.pending().is_some(),
+            self.output_target.pending().is_some() || self.dialog_failure.is_some(),
         );
         self.retain_output_target();
-        let parent = ui::output_target(ui, self.model.texts(), &mut self.output_target);
+        let parent = if self.dialog_failure.is_none() {
+            ui::output_target(ui, self.model.texts(), &mut self.output_target)
+        } else {
+            None
+        };
+        ui::picker_failure(ui, self.model.texts(), &mut self.dialog_failure);
         if let Some(dialog) = requests.dialog.or(parent) {
             self.start_dialog(ui.ctx(), dialog);
         }

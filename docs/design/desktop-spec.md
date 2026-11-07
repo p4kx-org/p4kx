@@ -114,6 +114,12 @@ Schriftlizenz sind modal, mit flachem Scrim `rgba(0,0,0,0.8)`. „Extraktion lä
 weiter browsen und die Vorschau nutzen, das Archiv wird nur gelesen. Die drei
 Extraktionsaktionen und „Neu laden" sind gesperrt, bis die Extraktion endet.
 
+Ein Startfehler oder unerwartetes Ende des Systemdialogs erscheint als breites Gefahrenmodal
+mit der lokalisierten Überschrift „Auswahldialog fehlgeschlagen“, dem tatsächlichen Grund
+in einer Gefahrenmeldung und „Schließen“ als einziger Fußaktion. Kopf und Fuß stehen fest;
+lange Gründe verwenden den vorhandenen scrollbaren Körper. Ein regulärer Abbruch ist kein
+Fehler. Das Modal verwendet ausschließlich die bestehenden Dark-/Lato-Tokens.
+
 **D.4 Marke: Logo-Zeichen vor der Wortmarke, in Orange.** In der Kopfzeile steht das Logo-Zeichen
 (Datenklammern um ein X, [`logo.md`](logo.md), ADR-0075) 32 px groß (`brandMarkSize`), 8 px
 (`brandGap`) davor die Wortmarke „P4KX" Bold 700, 14,4 px, `color-primary`. Fenster, Taskleiste,

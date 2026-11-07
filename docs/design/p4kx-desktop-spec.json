@@ -1187,6 +1187,12 @@
     "glow-danger-lg": {"x": 0, "y": 0, "blur": 20, "spread": 0, "color": "rgba(163,0,10,0.2)"},
     "shadow-dropdown": {"x": 0, "y": 8, "blur": 16, "spread": 0, "color": "rgba(0,0,0,0.8)"}
   },
+  "systemChooserFailure": {
+    "decision": "D.3",
+    "presentation": "modal--wide danger frame, localized title, original reason in danger-alert, one Close CTA; existing Lato/dark tokens",
+    "layout": "fixed header and footer, existing bounded scrolling body",
+    "lifecycle": "Startup failure and unexpected disconnect remain visible; no output dispatch; normal cancellation is not an error"
+  },
   "flatpakOutputSelection": {
     "decision": "D.20, D.50",
     "scope": "File exports and Blender packages only; existing folder-output choosers stay unchanged",

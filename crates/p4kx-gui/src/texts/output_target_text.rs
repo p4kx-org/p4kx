@@ -43,6 +43,8 @@ pub enum OutputTargetText {
     Control,
     /// Native picker creation failed; takes `reason`.
     PickerFailed,
+    /// The failed system chooser notice title.
+    PickerFailureTitle,
     /// The native picker ended without a reply.
     PickerDisconnected,
     /// The picker returned a relative path.
@@ -50,7 +52,7 @@ pub enum OutputTargetText {
 }
 
 impl OutputTargetText {
-    pub(crate) const ALL: [Self; 21] = [
+    pub(crate) const ALL: [Self; 22] = [
         Self::Title,
         Self::Parent,
         Self::ChooseParent,
@@ -70,6 +72,7 @@ impl OutputTargetText {
         Self::Component,
         Self::Control,
         Self::PickerFailed,
+        Self::PickerFailureTitle,
         Self::PickerDisconnected,
         Self::PickerRelative,
     ];
@@ -95,6 +98,7 @@ impl OutputTargetText {
             Self::Component => "output-target-component",
             Self::Control => "output-target-control",
             Self::PickerFailed => "output-target-picker-failed",
+            Self::PickerFailureTitle => "output-target-picker-failure-title",
             Self::PickerDisconnected => "output-target-picker-disconnected",
             Self::PickerRelative => "output-target-picker-relative",
         }

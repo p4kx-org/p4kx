@@ -16,6 +16,10 @@ to its export setup. **Start export** starts the catalog, Query, report or pictu
 Cancelling discards this choice, including permission for a diagnostic catalog. The dialog
 scrolls in a small window while its action buttons stay visible.
 
+If a system chooser cannot open or closes without a reply, the window shows the reason.
+Close that notice before opening the chooser again. Cancelling a chooser does not show an
+error and starts no output job.
+
 An export refusal distinguishes a known Star Citizen installation from a source or destination
 whose identity cannot be verified. A file chooser grant can hide the Archive's host parent; a
 write grant does not establish that writing there is safe. Choose a source and destination with
