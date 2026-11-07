@@ -17,6 +17,6 @@ fn main() -> Result<(), p4kx_msi_path::Error> {
 }
 
 #[cfg(not(windows))]
-fn main() -> Result<(), p4kx_msi_path::Error> {
+const fn main() -> Result<(), p4kx_msi_path::Error> {
     Err(p4kx_msi_path::Error::unsupported_platform())
 }

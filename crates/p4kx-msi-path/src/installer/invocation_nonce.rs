@@ -15,6 +15,7 @@ pub struct InvocationNonce {
 
 /// Failure to obtain a nonzero invocation identity from the operating system.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum NonceError {
     /// The operating system did not provide the requested random bytes.
     Unavailable(getrandom::Error),

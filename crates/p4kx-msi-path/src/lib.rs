@@ -8,5 +8,6 @@
 mod installer;
 
 pub use installer::api::{Error, execute};
+#[cfg(any(windows, test))]
 pub use installer::invocation_nonce::{InvocationNonce, NonceError};
 pub use installer::notification;
