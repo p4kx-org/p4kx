@@ -3958,6 +3958,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "p4kx-shader"
+version = "0.4.2"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "p4kx-testkit"
 version = "0.4.2"
 dependencies = [

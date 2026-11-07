@@ -34,6 +34,7 @@ p4kx-render = { path = "crates/p4kx-render" }
 p4kx-screens = { path = "crates/p4kx-screens" }
 p4kx-search = { path = "crates/p4kx-search" }
 p4kx-settings = { path = "crates/p4kx-settings" }
+p4kx-shader = { path = "crates/p4kx-shader" }
 p4kx-testkit = { path = "crates/p4kx-testkit" }
 p4kx-texture = { path = "crates/p4kx-texture" }
 p4kx-update = { path = "crates/p4kx-update" }
