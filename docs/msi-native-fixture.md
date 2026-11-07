@@ -31,6 +31,31 @@ Native CI checks the opt-in feature with Clippy on all four targets and runs the
 on both Windows CPUs after verifying application machine types. These steps never call the
 Registry fixture commands and do not establish native transaction or installer behavior.
 
+## Private helper process status
+
+The Windows helper preserves the operation's original success or failure and error output.
+Success returns 0; a failure without an observed notification failure returns 1. Notification
+diagnostics use the same callback result, without another send or a change to rollback policy.
+
+| Status | Observed notification result |
+| --- | --- |
+| `0x20000000..=0x3fffffff` | Exact native error `status XOR 0x20000000`, including native zero |
+| `0x60000001` | Invalid clock |
+| `0x60000002` | Current-thread recipient |
+| `0x60000003` | Unrecognised failure kind |
+| `0x60000004` | Native error outside the exact payload range; no truncated value is reported |
+| `0x60000101` | Complete enumeration with a timeout |
+| `0x60000102` / `0x60000103` | Deadline without / with a timeout |
+| `0x60000104` / `0x60000105` | Window limit without / with a timeout |
+| `0x60000106` / `0x60000107` | Unrecognised enumeration stop without / with a timeout |
+
+Decode only the helper's actual process status in the MSI log, such as
+`CustomAction P4kxPathApply returned actual error code ...`. MSI's translated
+`Action ended ... Return value 3` is a separate value. Native package evidence must establish
+that the log retains the full status. A native error does not identify its originating window
+or native call. The status does not encode delivery counts or out-of-range native values;
+the original typed error remains intact.
+
 ## Commands and evidence
 
 Arguments are separate command-line values. Every evidence argument is one canonical lowercase
