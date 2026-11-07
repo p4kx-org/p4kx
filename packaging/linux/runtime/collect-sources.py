@@ -8,6 +8,8 @@ import re
 import shutil
 import subprocess
 import tarfile
+import time
+import urllib.error
 import urllib.request
 
 import build_inputs
@@ -18,8 +20,17 @@ def download(url, destination, expected=None):
     """Downloads an HTTPS source file and checks its expected digest."""
     if not url.startswith("https://"):
         raise ValueError("source downloads require HTTPS")
-    with urllib.request.urlopen(url, timeout=120) as response, destination.open("wb") as output:
-        shutil.copyfileobj(response, output)
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as response, destination.open("wb") as output:
+                shutil.copyfileobj(response, output)
+            break
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+            if isinstance(error, urllib.error.HTTPError) and error.code not in (408, 429, 500, 502, 503, 504):
+                raise
+            if attempt == 3:
+                raise
+            time.sleep(2 ** attempt)
     actual = digest(destination)
     if expected is not None and actual != expected:
         raise ValueError(f"source digest mismatch for {url}")

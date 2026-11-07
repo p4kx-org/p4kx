@@ -49,6 +49,46 @@ class SourceInventoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "digest mismatch"):
                 collect_sources.download("https://example.invalid/source", destination, "0" * 64)
 
+    def test_transient_download_failure_retries_the_same_pinned_source(self):
+        """A bounded retry keeps the original source URL and verifies its pinned digest."""
+        destination = self.directory / "source.tar"
+        payload = b"synthetic pinned source"
+        expected = hashlib.sha256(payload).hexdigest()
+        responses = [collect_sources.urllib.error.URLError("synthetic unreachable"), io.BytesIO(payload)]
+        with patch.object(collect_sources.urllib.request, "urlopen", side_effect=responses) as request:
+            with patch.object(collect_sources.time, "sleep") as sleep:
+                actual = collect_sources.download("https://example.invalid/source", destination, expected)
+        self.assertEqual(actual, expected)
+        self.assertEqual(destination.read_bytes(), payload)
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(request.call_args_list[0], request.call_args_list[1])
+        sleep.assert_called_once_with(1)
+
+    def test_download_retry_exhaustion_preserves_the_original_network_error(self):
+        """Four failed attempts stop collection without treating incomplete source as verified."""
+        failure = collect_sources.urllib.error.URLError("synthetic unreachable")
+        with patch.object(collect_sources.urllib.request, "urlopen", side_effect=failure) as request:
+            with patch.object(collect_sources.time, "sleep") as sleep:
+                with self.assertRaises(collect_sources.urllib.error.URLError) as caught:
+                    collect_sources.download("https://example.invalid/source", self.directory / "source.tar")
+        self.assertIs(caught.exception, failure)
+        self.assertEqual(request.call_count, 4)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [1, 2, 4])
+        self.assertFalse((self.directory / "source.tar").exists())
+
+    def test_missing_or_changed_source_is_not_retried(self):
+        """Permanent HTTP failures and digest drift fail without an alternate source or retry."""
+        missing = collect_sources.urllib.error.HTTPError("https://example.invalid/source", 404, "missing", None, None)
+        cases = [(missing, collect_sources.urllib.error.HTTPError), (io.BytesIO(b"changed"), ValueError)]
+        for response, failure_type in cases:
+            with self.subTest(failure=failure_type.__name__):
+                effect = {"side_effect": response} if isinstance(response, Exception) else {"return_value": response}
+                with patch.object(collect_sources.urllib.request, "urlopen", **effect) as request:
+                    with patch.object(collect_sources.time, "sleep") as sleep:
+                        with self.assertRaises(failure_type):
+                            collect_sources.download("https://example.invalid/source", self.directory / "source.tar", "0" * 64)
+                request.assert_called_once()
+                sleep.assert_not_called()
     def test_static_archive_requires_locked_owner(self):
         """An archive outside the pinned source/APK closure prevents release."""
         library = self.directory / "libcompiler.a"

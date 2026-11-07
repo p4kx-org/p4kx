@@ -80,4 +80,20 @@ finally {
     $global:LASTEXITCODE = $previousExitCode
     foreach ($name in $variables) { [Environment]::SetEnvironmentVariable($name, $original[$name], 'Process') }
 }
+function Invoke-P4kxFailingToolFixture {
+    $global:LASTEXITCODE = 37
+    'synthetic package failure detail'
+}
+$messages = [Collections.Generic.List[object]]::new()
+$failure = $null
+$previousExitCode = $global:LASTEXITCODE
+try {
+    Invoke-P4kxLinuxTool Invoke-P4kxFailingToolFixture @() 6>&1 | ForEach-Object { $messages.Add($_) }
+}
+catch { $failure = $_.Exception.Message }
+finally { $global:LASTEXITCODE = $previousExitCode }
+if ($failure -cne 'Linux package tool failed (37): Invoke-P4kxFailingToolFixture' -or
+    @($messages | Where-Object { $_.ToString() -ceq 'synthetic package failure detail' }).Count -ne 1) {
+    throw 'Failed package tool stdout was discarded or its original exit code was lost.'
+}
 'PASS: actual scanner invocation uses absolute staged executables despite distinct PowerShell/.NET locations, preserves dependencies, propagates failure and refuses missing payloads.'

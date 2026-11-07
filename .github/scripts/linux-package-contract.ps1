@@ -38,6 +38,9 @@ function Get-P4kxLinuxPlatform {
 function Invoke-P4kxLinuxTool {
     param([Parameter(Mandatory)][string]$Executable, [string[]]$Arguments)
     $output = & $Executable @Arguments
-    if ($LASTEXITCODE -ne 0) { throw "Linux package tool failed ($LASTEXITCODE): $Executable" }
+    if ($LASTEXITCODE -ne 0) {
+        foreach ($line in $output) { Write-Host $line }
+        throw "Linux package tool failed ($LASTEXITCODE): $Executable"
+    }
     return $output
 }
