@@ -30,6 +30,7 @@ pub(crate) use crate::cli_extract::ExtractArgs;
 pub(crate) use crate::cli_grep::{GrepArgs, GrepFormat};
 pub(crate) use crate::cli_key::{KeyAction, KeyArgs};
 use crate::cli_loc::LocArgs;
+use crate::cli_media::MediaArgs;
 use crate::cli_model::ModelArgs;
 pub(crate) use crate::cli_output::{AudioOutput, TextureOutput};
 pub(crate) use crate::cli_ships::{ShipsArgs, ShipsFormat};
@@ -117,6 +118,9 @@ pub(crate) enum Command {
         subcommand_negates_reqs = true
     )]
     Catalog(CatalogArgs),
+    /// Exports versioned media metadata and retained sources, or prints their schemas.
+    #[command(after_help = EXIT_CODES_HELP)]
+    Media(MediaArgs),
     /// Checks the game data a companion app reads against the Archive: whether each listed Record
     /// type, `EntityClassDefinition` component and vehicle folder exists, how many it has and
     /// whether it reads, exports and converts; exits with 1 when something listed fails.

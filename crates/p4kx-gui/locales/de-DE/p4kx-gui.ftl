@@ -77,7 +77,7 @@ archive-issues =
         [one] Das Verzeichnis des Archivs hat einen Fehler in einem Eintrag. Der Eintrag bleibt aufgelistet, seine Daten sind aber womöglich nicht lesbar; eine Extraktion meldet ihn, wenn er scheitert, und `p4kx info` nennt ihn.
        *[other] Das Verzeichnis des Archivs hat { $count } Fehler in seinen Einträgen. Die Einträge bleiben aufgelistet, ihre Daten sind aber womöglich nicht lesbar; eine Extraktion meldet die gescheiterten, und `p4kx info` nennt sie.
     }
-game-running = Star Citizen läuft. Nutze dieses Werkzeug bei beendetem Spiel: Lesen funktioniert weiter, aber der RSI Launcher kann das Archiv beim Aktualisieren ändern, und das Werkzeug schreibt nie in die Installation.
+game-running = Star Citizen läuft möglicherweise. Nutze dieses Werkzeug bei beendetem Spiel: Lesen funktioniert weiter, aber der RSI Launcher kann das Archiv beim Aktualisieren ändern, und das Werkzeug schreibt nie in die Installation.
 archive-test-build =
     { $kind ->
         [one] Dieses Archiv gehört zum Channel { $channel }, der Testbuilds von Star Citizen enthält. Material aus Testbuilds ist nach den Nutzungsbedingungen von Star Citizen vertraulich: Gib nichts daraus weiter und veröffentliche nichts davon.
@@ -461,6 +461,13 @@ record-export-failed = Der Record-Export nach { $path } ist fehlgeschlagen: { $r
 record-export-stopped = Der Record-Export nach { $path } brach ohne Ergebnis ab.
 
 catalog-action = Basetool-Katalog …
+catalog-diagnostic-action = Basetool-Diagnosekatalog …
+catalog-diagnostic-running-title = Erstelle Basetool-Diagnosekatalog
+catalog-diagnostic-summary-title = Basetool-Diagnosekatalog geschrieben
+catalog-diagnostic-notice = Diagnosekatalog. Prüfe den gemeldeten Exportzustand, bevor fehlende Daten als Löschungen gewertet werden.
+catalog-incomplete = Einige ausgewählte Daten konnten nicht gelesen oder übernommen werden. Es wurde keine Datei erstellt oder ersetzt. Nutze einen Diagnosekatalog, um das Teilergebnis zu untersuchen.
+catalog-health-complete = Exportzustand: Alle ausgewählten Quellen wurden erfolgreich gelesen und übernommen.
+catalog-health-incomplete = Exportzustand: unvollständig. Einige ausgewählte Quellen konnten nicht gelesen oder übernommen werden.
 catalog-file-filter = Basetool-Katalog (JSON)
 catalog-file-filter-compressed = Basetool-Katalog (JSON, zstd-komprimiert)
 catalog-running-title = Erstelle Basetool-Katalog
@@ -484,7 +491,7 @@ catalog-warning = { $kind ->
 catalog-warning-more = und { $number } weitere
 catalog-writing = Schreibe { $path } …
 catalog-summary-title = Basetool-Katalog erstellt
-catalog-kinds-heading = Arten
+catalog-kinds-heading = Arten (Auswahlumfang)
 catalog-summary-kind = { $kind ->
     [manufacturers] Hersteller
     [items] Items
@@ -492,6 +499,8 @@ catalog-summary-kind = { $kind ->
     [commodities] Waren
     [blueprints] Blaupausen
     [resourceGroups] Ressourcengruppen
+    [resourceTypes] Ressourcentypen
+    [missionPropertySets] Eigenschaftssätze für Missionen
     [blueprintCategories] Blaupausenkategorien
     [paints] Lackierungen
     [loadouts] Loadouts
@@ -1464,3 +1473,40 @@ folder-conversion-summary-input = Eingabeordner: { $path }
 folder-conversion-failed-title = Umwandlung fehlgeschlagen
 folder-conversion-failed = { $path } lässt sich nicht umwandeln: { $reason }
 folder-conversion-stopped = Die Umwandlung von { $path } wurde ohne Ergebnis beendet.
+
+protection-target-identity = Der Hostpfad des Ziels konnte nicht verifiziert werden. Das Schreiben ist hier gesperrt. Wähle einen anderen Ordner oder prüfe den Zugriff auf seinen Hostpfad.
+protection-source-identity = Der Hostpfad des Archivs konnte nicht verifiziert werden. Das Schreiben von Daten aus diesem Archiv ist gesperrt. Gib das Archiv erneut frei.
+protection-source-membership = Es konnte nicht festgestellt werden, ob der übergeordnete Archivordner { $parent } zu einer Spielinstallation gehört. Wähle einen Exportordner außerhalb dieses Ordners oder gib den Quellordner frei.
+protection-identity-unavailable = Der Ausgabepfad konnte nicht sicher identifiziert werden. Das Schreiben ist hier gesperrt.
+protection-prerequisite-title = Flatpak-Voraussetzung fehlt
+protection-prerequisite = Dieses Flatpak benötigt ein Documents-Portal mit API 5 oder neuer und funktionierender Hostpfadabfrage. Aktualisiere dein Desktop-Portal oder nutze das Paket als tar.gz, AppImage oder deb.
+protection-source-overwrite = Diese Ausgabe würde ein Eingabearchiv ersetzen. Wähle eine andere Datei oder einen anderen Ordner.
+gui-command-help =
+    P4KX Desktop
+    Aufruf: p4kx-gui [ARCHIV]
+    -h, --help: Diese Hilfe anzeigen
+    -V, --version: Die Version anzeigen
+    Flatpak benötigt das Documents-Portal mit API 5 oder neuer und authentifizierter Hostpfadabfrage.
+
+output-target-title = Exportziel wählen
+output-target-parent = Übergeordneter Ordner
+output-target-choose-parent = Ordner wählen …
+output-target-no-parent = Kein übergeordneter Ordner gewählt
+output-target-file-name = Dateiname
+output-target-package-name = Name des Paketordners
+output-target-destination = Ziel
+output-target-no-destination = Wähle einen übergeordneten Ordner und gib einen Namen ein.
+output-target-parent-hint = Wähle den übergeordneten Ordner. Darin erhält die Ausgabe den unten eingegebenen Namen.
+output-target-file-hint = Die Datei wird im gewählten Ordner gespeichert.
+output-target-package-hint = Das Paket ist ein Unterordner des gewählten Ordners. Ein vorhandenes P4KX-Paket wird erst ersetzt, wenn das neue vollständig ist.
+output-target-diagnostic-hint = Diese Diagnosefreigabe gilt nur für diesen Export. Beim Schließen dieser Auswahl verfällt sie.
+output-target-confirm = Ziel übernehmen
+output-target-start-export = Export starten
+output-target-cancel = Abbrechen
+output-target-empty = Gib einen Namen ein.
+output-target-component = Gib einen einzelnen Namen ohne übergeordneten oder absoluten Pfad ein; . und .. sind nicht zulässig.
+output-target-control = Der Name darf keine Steuerzeichen enthalten.
+output-target-picker-failed = Der Auswahldialog konnte nicht geöffnet werden: { $reason }
+output-target-picker-failure-title = Auswahldialog fehlgeschlagen
+output-target-picker-disconnected = Der Auswahldialog wurde ohne Antwort beendet. Öffne ihn erneut.
+output-target-picker-relative = Der Ordnerdialog hat keinen absoluten Elternpfad zurückgegeben. Die bisherige Auswahl bleibt erhalten.

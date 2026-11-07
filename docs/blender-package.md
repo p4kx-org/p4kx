@@ -84,7 +84,7 @@ written (there are no `null`s).
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.8` today. |
+| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.9` today. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
@@ -93,6 +93,7 @@ written (there are no `null`s).
 | `meshes` | The GLB meshes, see below. |
 | `textures` | The PNG textures, see below. |
 | `materials` | The material descriptions, see "Materials". Added in 1.1; absent in 1.0 packages. |
+| `material_libraries` | Original authored library-root descriptions (1.9), once per distinct retained reader path/root; optional and default-empty for older manifests. |
 | `palettes` | The tint palettes, see "Palettes". Added in 1.1; absent in 1.0 packages. |
 | `issues` | What could not be resolved or written. |
 
@@ -107,9 +108,9 @@ the game's Z-up axes to the same axes (`x` stays, `z` becomes `y`, `y` becomes `
 `basis` is `gltf_y_up` for everything in the package and an importer only maps glTF's axes to its
 own (Blender's glTF importer does exactly that).
 
-A node's local matrix is composed as in glTF: `M = T · R · S`, with the translation `T`, the
+A node's local matrix is composed as in glTF: `M = T ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· R ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· S`, with the translation `T`, the
 rotation `R` from the quaternion and the scale `S`. The matrix of a node in the scene is
-`M(parent) · M(node)`, from the root down. A mesh is placed by that matrix times the identity
+`M(parent) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· M(node)`, from the root down. A mesh is placed by that matrix times the identity
 transform of the root node of its GLB file; the mesh file's own nodes are in the space of that
 root. A negative X scale is a mirror; a reader that cannot mirror flips the winding of the mesh.
 A shear in the game's transform is not stored.
@@ -231,7 +232,7 @@ library entry point is `p4kx_blender::write_character_package`.
 
 `p4kx entity package` of a creature whose root geometry is a character file outside the human rigs
 and whose skeleton the Archive holds, with a skin bound to it (`Assembly::creature_skins` yields a
-part, ADR-0275), writes a package of version 1.8 with one mesh, the rig form of a Character
+part, ADR-0275), writes a package with one mesh, the rig form of a Character
 ([ADR-0316](adr/0316-a-creature-with-its-skeleton-is-packaged-as-one-skinned-rig-mesh.md)):
 
 - `nodes` has one node of the kind `entity`, the root Entity at the identity transform, with its
@@ -330,7 +331,7 @@ shader still has every value the file holds.
 | `shininess`, `opacity`, `alpha_test`, `glow` | Scalars of the file (`shininess` from 0 to 255). |
 | `alpha_mode` | `opaque`, `mask` (`alpha_test` above 0) or `blend` (`opacity` below 1, or a glass or decal shader): derived from the fields above. |
 | `reads_vertex_colours` | (1.4) `true` when the material reads the vertex colours of its mesh: `GlassPBR` with `PER_VERTEX_TINT`, or a layered surface without a blend map (`_blend`, `_mask`, `_opac`) that has a layer to blend over its base ([ADR-0253](adr/0253-glass-with-per-vertex-tint-takes-its-colour-from-the-vertex-colours.md)). The GLB meshes of the package carry `COLOR_0` on the primitives of such materials only ([ADR-0318](adr/0318-the-glb-writes-vertex-colours-for-tinted-glass-only-and-the-package-also-for-layer-shares.md)); a plain GLB carries it for tinted glass only. Absent in 1.3 and older; the add-on then applies the rule it had before. |
-| `layer_shares` | (1.5) One number per entry of `layers`: the share the layer has without a blend map or vertex colours, by position and `WearBlendBase` (the rule the GLB shades by, [ADR-0097](adr/0097-layered-materials-are-drawn-as-the-blend-of-their-layer-files.md)). The first layer weighs `1 − WearBlendBase`, the others `WearBlendBase` between them; a layer without a `material` has 0 and the rest are renormalised. When nothing has weight, the first layer takes everything if it has a `material`, else all shares are 0 and the material keeps its own colours. Absent without layers and in 1.4 and older; the add-on then applies the same rule itself. |
+| `layer_shares` | (1.5) One number per entry of `layers`: the share the layer has without a blend map or vertex colours, by position and `WearBlendBase` (the rule the GLB shades by, [ADR-0097](adr/0097-layered-materials-are-drawn-as-the-blend-of-their-layer-files.md)). The first layer weighs `1 ÃƒÆ’Ã‚Â¢Ãƒâ€¹Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ WearBlendBase`, the others `WearBlendBase` between them; a layer without a `material` has 0 and the rest are renormalised. When nothing has weight, the first layer takes everything if it has a `material`, else all shares are 0 and the material keeps its own colours. Absent without layers and in 1.4 and older; the add-on then applies the same rule itself. |
 | `stencil` | (1.6) How a stencil decal, a `MeshDecal` with `STENCIL_MAP` in its `gen_mask`, is drawn: `drawn`, `colour` and `opacity`. The motif is the texture with the usage `stencil`, which exists only when no diffuse map is there. `drawn` is `false` when the decal has nothing to draw: its motif is a livery's emblem the game fills in at run time (`$TintPaletteDecal`), or its stencil and diffuse maps were not written; the GLB leaves the first kind out and the add-on draws nothing for both. `colour` (`StencilDiffuseColor`, linear; absent when the file gives none, and `diffuse` counts) and `opacity` (`StencilOpacity` from 0 to 1, 1 when absent), which multiplies the material's `opacity`, are stated for a decal drawn by its stencil map only; one with a diffuse map is drawn by that map, as any decal. Absent for any other material and in 1.5 and older, which draw a decal by its diffuse colour and map only. See [ADR-0100](adr/0100-the-add-on-builds-material-node-trees-from-the-package-descriptions-by-a-pure-mapping.md) and ADR-0298. |
 | `palette` | `primary`, `secondary`, `tertiary`, `glass` or `decal`: the palette entry the material takes (the first layer with a `PaletteTint` from 1 to 3, the tint-palette glass colour, or, for a stencil decal drawn by its stencil map, `primary` when its `StencilTintOverride` is above 0 and `decal` (1.7) when it rounds to 2). Absent when it takes none. |
 | `default_palette` | The Record path of the library's default palette. |
@@ -515,6 +516,11 @@ field `decal` and the material `palette` value `decal`.
 **1.8** makes `rig.body` optional and adds the part origin `skin` (`entity package` of a creature
 with its skeleton); a reader of 1.7 expects a `body`, so it treats such a package as a higher minor
 version.
+
+**1.9** adds `material_libraries` and the optional material `source_library` ordinal.
+Original submaterial indices and existing rendering fields keep their meanings. The new
+source descriptions preserve authored roots without inheriting root values into children;
+they do not prove physical Archive identity. Media records provide that provenance.
 
 The schema file is the schema of the version in `FORMAT_VERSION`: a change of the Rust types that
 changes the schema is a change of the format, and the checked-in schema changes with it. A schema

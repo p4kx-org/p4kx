@@ -71,6 +71,7 @@ impl Kind {
                 | Self::ContractLocationQueries
                 | Self::ContractNpcSpawns
                 | Self::ContractEntitySpawns
+                | Self::MissionPropertySets
         )
     }
 }

@@ -92,8 +92,13 @@ fn tier<'f>(tier: &StructValue<'f>) -> ScenarioTier<'f> {
 pub(crate) fn link_scenario_factions(
     forge: &DataForge<'_>,
     scenarios: &mut [ContractScenario<'_>],
-) {
-    let mut trees = TreeBuilder::new();
+    cancel: Option<&p4kx_extraction::CancelToken>,
+) -> Result<crate::export_ledger::ExportLedger, crate::CatalogError> {
+    let capture = std::sync::Arc::new(crate::export_builder_capture::BuilderCapture::for_kind(
+        crate::Kind::ContractScenarios,
+        cancel,
+    ));
+    let mut trees = TreeBuilder::with_read_observer(capture.clone());
     for tiers in scenarios
         .iter_mut()
         .flat_map(|scenario| scenario.faction_reward_tiers.iter_mut())
@@ -104,4 +109,5 @@ pub(crate) fn link_scenario_factions(
             .and_then(|record| trees.build(&record).ok())
             .and_then(|tree| reference(Some(tree.root()), "factionReputationRef"));
     }
+    capture.finish()
 }

@@ -11,9 +11,12 @@ mod contract_properties;
 mod contracts;
 mod crafters;
 mod harvest;
+mod health;
 mod loadouts;
 mod loot;
+mod mission_sets;
 mod npc_spawns;
+mod objective_properties;
 mod recovery;
 mod reputation;
 mod slugs;
@@ -22,13 +25,15 @@ mod spawns;
 use recovery::item_recovery;
 
 pub(crate) fn minimal_catalog() -> serde_json::Value {
-    json!({
-        "schemaVersion": 2,
+    let mut catalog = json!({
+        "schemaVersion": p4kx_export::SCHEMA_VERSION,
         "source": {
             "channel": null,
             "build": null,
             "archiveSize": 0,
             "archiveModified": null,
+            "archiveKey": "given",
+            "encryptedEntriesUnread": 0,
             "toolVersion": "0.1.0",
             "exportedAt": "2026-10-18T00:00:00Z"
         },
@@ -39,6 +44,7 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "commodities": {"status": "complete"},
             "blueprints": {"status": "complete"},
             "resourceGroups": {"status": "complete"},
+            "resourceTypes": {"status": "complete"},
             "blueprintCategories": {"status": "partial", "filter": "*/blueprintcategories/*"},
             "gameplayProperties": {"status": "complete"},
             "qualityDistributions": {"status": "complete"},
@@ -69,6 +75,7 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "contractLocationQueries": {"status": "complete"},
             "contractTemplates": {"status": "complete"},
             "missionBrokerEntries": {"status": "complete"},
+            "missionPropertySets": {"status": "complete"},
             "contractNpcSpawns": {"status": "complete"},
             "contractEntitySpawns": {"status": "complete"},
             "lootTables": {"status": "complete"},
@@ -185,12 +192,36 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
                 "tierIndex": 0
             }
         }],
+        "resourceTypes": [{
+            "guid": "00000000-0000-0000-0000-000000007001",
+            "className": "FixtureResource",
+            "recordPath": "libs/foundry/records/resourcetypedatabase/fixture_resource",
+            "name": {"key": null, "en": null, "de": null},
+            "description": {"key": null, "en": null, "de": null},
+            "groupGuids": [],
+            "refinedVersion": null,
+            "density": null,
+            "defaultThumbnailPath": null,
+            "defaultThumbnailPathSVG": null,
+            "rttThumbnailEntityClass": null,
+            "validateDefaultCargoBox": false,
+            "defaultCargoContainers": null,
+            "properties": [null, {
+                "sourceType": "ResourceTypeVolatility", "name": "",
+                "payload": {"type": "volatility", "volatility": 0.0, "healthDecayPerSecond": 0.0}
+            }]
+        }],
         "resourceGroups": [{
             "guid": "b1000000-0000-4000-8000-000000000001",
             "className": "Metal",
             "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
             "name": {"key": "@items_commodities_type_metal", "en": "Metal", "de": null},
-            "parentGuid": null
+            "parentGuid": null,
+            "description": {"key": null, "en": null, "de": null},
+            "defaultThumbnailPath": null,
+            "defaultThumbnailPathSVG": null,
+            "groups": [],
+            "resources": [null]
         }],
         "blueprintCategories": [{
             "guid": "d1000000-0000-4000-8000-000000000001",
@@ -213,7 +244,7 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
                 "locationGuid": "e3000000-0000-4000-8000-000000000001",
                 "distribution": {
                     "kind": "CraftingQualityDistributionNormal",
-                    "min": 1.0, "max": 1000.0, "mean": 269.0, "stddev": null
+                    "min": 1, "max": 1000, "mean": 269.0, "stddev": null
                 }
             }]
         }],
@@ -302,6 +333,7 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
         "contractLocationQueries": spawns::location_queries(),
         "contractTemplates": spawns::contract_templates(),
         "missionBrokerEntries": brokers::broker_entries(),
+        "missionPropertySets": mission_sets::sets(),
         "contractNpcSpawns": npc_spawns::npc_spawns(),
         "contractEntitySpawns": npc_spawns::entity_spawns(),
         "lootTables": loot::tables(),
@@ -315,5 +347,11 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
         "cargoManifests": contracts::manifests(),
         "shipStoreSlugs": slugs::ship_store_slugs(),
         "itemRecovery": item_recovery()
-    })
+    });
+    let export_health = health::fixture(&catalog);
+    let serde_json::Value::Object(fields) = &mut catalog else {
+        unreachable!("the authored catalog fixture is a JSON object");
+    };
+    fields.insert("exportHealth".to_owned(), export_health);
+    catalog
 }

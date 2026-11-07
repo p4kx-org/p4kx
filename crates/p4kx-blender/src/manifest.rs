@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::manifest_light::Light;
-use crate::manifest_materials::{MaterialDescription, Palette};
+use crate::manifest_materials::{MaterialDescription, MaterialLibrarySourceDescription, Palette};
 use crate::manifest_rig::Rig;
 
 /// The value of [`Manifest::format`] as text.
@@ -15,7 +15,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 ///
 /// A new minor version only adds fields and values readers may ignore; a new major version changes
 /// the meaning of existing ones.
-pub const FORMAT_VERSION: &str = "1.8";
+pub const FORMAT_VERSION: &str = "1.9";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
@@ -137,6 +137,9 @@ pub struct Manifest {
     /// version 1.0.
     #[serde(default)]
     pub materials: Vec<MaterialDescription>,
+    /// Authored material-library roots retained once, without inheriting values into children.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub material_libraries: Vec<MaterialLibrarySourceDescription>,
     /// The tint palettes of the meshes, each written once; absent in version 1.0.
     #[serde(default)]
     pub palettes: Vec<Palette>,

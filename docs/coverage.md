@@ -20,6 +20,10 @@ The JSON is defined in [cli-json.md](cli-json.md). The exit code is 1 when a lis
 or folder is missing, unreadable or does not convert; candidates do not count. The ignored test
 prints the whole table before it asserts, and needs `P4KX_DATA_P4K`.
 
+Typed catalog field retention and same-Build published comparisons use the separate
+[development field verification](catalog-field-verification.md). Generic readability alone does
+not establish typed field coverage.
+
 ## What is checked
 
 - **Record type**: the DataForge defines it; how many Records it has, counting the types that

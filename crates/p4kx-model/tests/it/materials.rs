@@ -95,7 +95,29 @@ fn text_xml_and_every_cryxml_form_read_alike() -> TestResult {
     ] {
         for byte_order in [CryXmlByteOrder::Little, CryXmlByteOrder::Big] {
             let library = parse(&file.cryxml_as(signature, byte_order))?;
-            assert_eq!(library, expected, "{signature:?} {byte_order:?}");
+            assert_eq!(
+                (
+                    &library.path,
+                    &library.default_palette,
+                    library.single,
+                    library.unknown_entries,
+                    &library.unresolved_layers,
+                    &library.materials
+                ),
+                (
+                    &expected.path,
+                    &expected.default_palette,
+                    expected.single,
+                    expected.unknown_entries,
+                    &expected.unresolved_layers,
+                    &expected.materials
+                ),
+                "all pre-existing surface/library fields agree across {signature:?} {byte_order:?}"
+            );
+            assert_eq!(
+                library.authored.entries, expected.authored.entries,
+                "source positions and fallback dispositions agree across encodings"
+            );
         }
     }
     assert_eq!(expected.materials.len(), 2, "both sub-materials");

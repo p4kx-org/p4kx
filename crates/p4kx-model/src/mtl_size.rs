@@ -3,7 +3,9 @@
 
 use std::mem::size_of;
 
-use crate::{Attributes, Material, MaterialLayer, MaterialLibrary, RawElement, TextureSlot};
+use crate::{
+    Attributes, Material, MaterialLayer, MaterialLibrary, RawElement, TextureSlot, mtl_source_size,
+};
 
 const fn text(value: &str) -> usize {
     value.len()
@@ -17,8 +19,9 @@ fn attributes(list: &Attributes) -> usize {
             .sum::<usize>()
 }
 
-fn element(raw: &RawElement) -> usize {
-    text(&raw.name)
+pub(crate) fn element(raw: &RawElement) -> usize {
+    mtl_source_size::element(&raw.authored)
+        + text(&raw.name)
         + attributes(&raw.attributes)
         + raw.children.capacity() * size_of::<RawElement>()
         + raw.children.iter().map(element).sum::<usize>()
@@ -71,6 +74,7 @@ impl MaterialLibrary {
     #[must_use]
     pub fn estimated_bytes(&self) -> usize {
         size_of::<Self>()
+            + mtl_source_size::library(&self.authored)
             + text(&self.path)
             + self.default_palette.as_deref().map_or(0, text)
             + self.unresolved_layers.capacity() * size_of::<String>()

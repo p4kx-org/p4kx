@@ -7,7 +7,9 @@
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, CraftingWarning, build_catalog};
+use p4kx_export::{
+    BuiltCatalog, CatalogOptions, CatalogPublicationMode, CraftingWarning, build_catalog,
+};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
@@ -63,28 +65,109 @@ fn output_and_embedded_properties_state_their_values_by_type() -> TestResult {
         properties[2]["value"],
         json!({"type": "boolean", "value": true})
     );
-    assert_eq!(
-        properties[3]["value"],
-        json!({"type": "stringHash", "options": [{
-            "displayName": {"key": "@place_name", "en": "Hijacked Ship", "de": null},
-            "value": "calm",
-            "weighting": 3,
-            "dependentProperties": ["Home_BP"]
-        }]})
-    );
+    verify_string_option(
+        properties
+            .get(3)
+            .and_then(|property| property.get("value"))
+            .ok_or("string property missing")?,
+    )?;
     assert_eq!(
         properties[4]["value"],
         json!({"type": "integer", "options": [{
             "displayName": {"key": null, "en": null, "de": null},
-            "value": 5.0,
-            "variation": 1.0,
-            "weighting": 2,
+            "textId": "@LOC_UNINITIALIZED",
+            "value": 5,
+            "variation": 1,
+            "weighting": 2.0,
+            "debugForceChooseThisOption": false,
             "dependentProperties": []
         }]})
     );
+    let tags = &properties[5]["value"];
+    assert_eq!(tags["type"], "tags", "the source union stays typed");
     assert_eq!(
-        properties[5]["value"],
-        json!({"type": "tags", "tags": ["Kill"], "negativeTags": []})
+        tags["tags"],
+        json!(["Kill"]),
+        "resolved positive tags remain"
+    );
+    assert_eq!(
+        tags["negativeTags"],
+        json!([]),
+        "resolved negative tags remain"
+    );
+    assert_eq!(
+        tags["sourceTags"]["tags"][0]["status"], "present",
+        "raw tag identity is retained"
+    );
+    assert_eq!(
+        tags["sourceNegativeTags"]["tags"],
+        json!([]),
+        "raw empty tags remain empty"
+    );
+    assert_eq!(
+        tags["options"],
+        json!([]),
+        "an empty option array remains empty"
+    );
+    Ok(())
+}
+
+fn verify_string_option(value: &Value) -> TestResult {
+    assert_eq!(
+        value.get("type").and_then(Value::as_str),
+        Some("stringHash"),
+        "the source union stays typed"
+    );
+    let option = value
+        .get("options")
+        .and_then(Value::as_array)
+        .and_then(|options| options.first())
+        .ok_or("string option missing")?;
+    assert_eq!(
+        *option.get("displayName").ok_or("displayName missing")?,
+        json!({"key":"@place_name","en":"Hijacked Ship","de":null}),
+        "localised option text remains"
+    );
+    assert_eq!(
+        *option.get("value").ok_or("value missing")?,
+        "calm",
+        "the authored String remains"
+    );
+    assert_eq!(
+        *option.get("weighting").ok_or("weighting missing")?,
+        3.0,
+        "the Single weighting remains"
+    );
+    assert_eq!(
+        *option
+            .get("debugForceChooseThisOption")
+            .ok_or("debug flag missing")?,
+        false,
+        "the source flag remains"
+    );
+    let dependency = option
+        .get("dependentProperties")
+        .and_then(Value::as_array)
+        .and_then(|dependencies| dependencies.first())
+        .ok_or("dependency missing")?;
+    assert_eq!(
+        *dependency
+            .pointer("/property/variable")
+            .ok_or("dependent variable missing")?,
+        "Home_BP",
+        "the same dependent property remains linked"
+    );
+    assert_eq!(
+        *dependency
+            .pointer("/property/status")
+            .ok_or("dependent status missing")?,
+        "resolved",
+        "owner-local dependency resolution remains"
+    );
+    assert_eq!(
+        *dependency.get("values").ok_or("dependent values missing")?,
+        json!([]),
+        "the source option selection is empty"
     );
     Ok(())
 }
@@ -177,7 +260,8 @@ fn records_that_nest_phases_or_conditions_too_deep_fail_instead_of_being_cut() -
         spawns_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     let built = build_catalog(&archive, &options)?;
     let failed = failures(&built);
     assert_eq!(failed.len(), UNKNOWN_STRUCTS.len() + TOO_DEEP, "{failed:?}");
@@ -240,7 +324,8 @@ fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_
         spawns_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     let built = build_catalog(&archive, &options)?;
     assert_failures(&failures(&built), &UNKNOWN_STRUCTS);
     Ok(())
@@ -275,7 +360,8 @@ fn stored_names_the_catalog_does_not_know_are_counted_in_a_warning() -> TestResu
         spawns_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     let built = build_catalog(&archive, &options)?;
     let warning = built
         .summary()

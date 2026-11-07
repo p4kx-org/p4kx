@@ -3,11 +3,12 @@
 
 mod job;
 mod name;
+mod output;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
 
-use p4kx_export::{CatalogPhase, CatalogProgress, CatalogSummary};
+use p4kx_export::{CatalogPhase, CatalogProgress, CatalogPublicationMode, CatalogSummary, Filter};
 
 pub use job::{CatalogExport, CatalogExportStatus};
 pub(crate) use job::{refused, refused_gzip, start};
@@ -18,6 +19,18 @@ use crate::read_gate::ReadGate;
 /// The file name the save dialog of the Basetool catalog suggests: the compressed form the
 /// Basetool takes for upload; plain `.json` stays selectable.
 pub const CATALOG_FILE: &str = "basetool-catalog.json.zst";
+
+/// The distinct filename proposed for explicitly requested diagnostic catalogs.
+pub const DIAGNOSTIC_CATALOG_FILE: &str = "basetool-catalog.diagnostic.json.zst";
+
+/// The selection and publication policy of one catalog job.
+#[derive(Debug, Default)]
+pub struct CatalogExportOptions {
+    /// The source-Record Filter, or the full source selection.
+    pub filter: Option<Filter>,
+    /// Whether this one job may publish an explicitly marked diagnostic result.
+    pub publication_mode: CatalogPublicationMode,
+}
 
 /// The step a running Basetool catalog is at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

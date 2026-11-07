@@ -10,7 +10,7 @@ use crate::crafting_detail_fixture;
 
 use std::error::Error;
 
-use catalog_crafting_support::{blueprint, build_from, text};
+use catalog_crafting_support::{blueprint, build_from, diagnostic_from, text};
 use crafting_detail_fixture as fixture;
 use p4kx_export::{BuiltCatalog, CraftingWarning, Filter, Kind, read_crafting};
 use p4kx_extraction::DataForge;
@@ -159,7 +159,7 @@ fn quality_distributions_keep_their_location_overrides() -> TestResult {
     assert_eq!(
         list[0]["distribution"],
         json!({"kind": "CraftingQualityDistributionNormal",
-               "min": 1.0, "max": 1000.0, "mean": 269.0, "stddev": 254.0})
+               "min": 1, "max": 1000, "mean": 269.0, "stddev": 254.0})
     );
     assert_eq!(list[0]["overrides"], json!([]));
     assert_eq!(list[1]["distribution"], Value::Null);
@@ -172,9 +172,8 @@ fn quality_distributions_keep_their_location_overrides() -> TestResult {
         "the override curve"
     );
     assert_eq!(
-        list[1]["overrides"][0]["distribution"]["stddev"],
-        Value::Null,
-        "a double beyond f32 is no number"
+        list[1]["overrides"][0]["distribution"]["stddev"], 1.0,
+        "the finite override standard deviation"
     );
     Ok(())
 }
@@ -274,7 +273,7 @@ fn a_default_blueprint_is_marked_available() -> TestResult {
 
 #[test]
 fn several_dismantle_processes_leave_no_link_and_the_summary_incomplete() -> TestResult {
-    let (built, catalog) = build_from(&fixture::ambiguous_database(), None)?;
+    let (built, catalog) = diagnostic_from(&fixture::ambiguous_database(), None)?;
     for entry in catalog["blueprints"].as_array().ok_or("blueprints")? {
         assert_eq!(entry["dismantle"], Value::Null, "{}", entry["className"]);
     }

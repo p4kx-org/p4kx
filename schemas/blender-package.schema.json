@@ -357,6 +357,202 @@
         }
       ]
     },
+    "MaterialAttributeInfo": {
+      "description": "One original attribute and its independent semantic/lexical values.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/MaterialAttributeKindInfo",
+          "description": "Attribute or namespace-declaration meaning."
+        },
+        "lexeme": {
+          "description": "Original UTF-8 XML value token without quotes; absent for binary XML.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Original qualified attribute name.",
+          "type": "string"
+        },
+        "value": {
+          "description": "XML-decoded value without float or flag conversion.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "lexeme",
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "MaterialAttributeKindInfo": {
+      "description": "Explicit namespace interpretation of an authored attribute.",
+      "oneOf": [
+        {
+          "description": "A regular attribute.",
+          "properties": {
+            "namespace": {
+              "description": "Expanded URI when proved; library encoding distinguishes unqualified plain input from unresolved binary semantics.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "attribute",
+              "type": "string"
+            }
+          },
+          "required": [
+            "namespace",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A namespace declaration.",
+          "properties": {
+            "prefix": {
+              "description": "Authored prefix, absent for the default namespace.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "namespace",
+              "type": "string"
+            }
+          },
+          "required": [
+            "prefix",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The reader supplies a kind this projection does not support.",
+          "properties": {
+            "type": {
+              "const": "unsupported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MaterialContentInfo": {
+      "description": "An ordered plain-XML content unit or an original element-child ordinal.",
+      "oneOf": [
+        {
+          "description": "Plain XML text with a separate original token.",
+          "properties": {
+            "lexeme": {
+              "description": "Original UTF-8 source token, including any CDATA/entity spelling.",
+              "type": "string"
+            },
+            "type": {
+              "const": "text",
+              "type": "string"
+            },
+            "value": {
+              "description": "XML-decoded value.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value",
+            "lexeme"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An original element-child position, including a diagnosed unretained child.",
+          "properties": {
+            "ordinal": {
+              "description": "Original element-child ordinal.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "element",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "ordinal"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An authored comment.",
+          "properties": {
+            "type": {
+              "const": "comment",
+              "type": "string"
+            },
+            "value": {
+              "description": "Content without comment delimiters.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An authored processing instruction.",
+          "properties": {
+            "target": {
+              "description": "Instruction target.",
+              "type": "string"
+            },
+            "type": {
+              "const": "processing-instruction",
+              "type": "string"
+            },
+            "value": {
+              "description": "Optional instruction data.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "target",
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The reader supplies content this projection does not support.",
+          "properties": {
+            "type": {
+              "const": "unsupported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "MaterialDescription": {
       "description": "A material as the game defines it: the inputs of a Blender or any other renderer's material.\n\nColours are linear and exactly those of the file; a palette is not applied. The\n`parameters`, `attributes` and `elements` hold what the writer does not interpret, name and\nvalue as the file has them.",
       "properties": {
@@ -505,6 +701,15 @@
           "format": "float",
           "type": "number"
         },
+        "source_library": {
+          "description": "Source-library ordinal in `Manifest.material_libraries`, independent of renderer identity.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "specular": {
           "description": "The specular colour, linear.",
           "items": {
@@ -567,6 +772,135 @@
         "elements"
       ],
       "type": "object"
+    },
+    "MaterialElementInfo": {
+      "description": "Bounded material XML syntax, independent of original byte retention and surface interpretation.",
+      "properties": {
+        "attributes": {
+          "description": "Existing decoded attributes in reader order.",
+          "items": {
+            "$ref": "#/$defs/MaterialParameterInfo"
+          },
+          "type": "array"
+        },
+        "children": {
+          "description": "Retained children in source order; their original ordinals remain in syntax.",
+          "items": {
+            "$ref": "#/$defs/MaterialElementInfo"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Existing XML-reader element name.",
+          "type": "string"
+        },
+        "syntax": {
+          "$ref": "#/$defs/MaterialElementSyntaxInfo",
+          "description": "Encoding-aware authored names, namespace declarations and content."
+        }
+      },
+      "required": [
+        "name",
+        "attributes",
+        "children",
+        "syntax"
+      ],
+      "type": "object"
+    },
+    "MaterialElementSyntaxInfo": {
+      "description": "Authored syntax supplementing the existing material element view.",
+      "properties": {
+        "attributes": {
+          "description": "Attributes and namespace declarations in one authored order.",
+          "items": {
+            "$ref": "#/$defs/MaterialAttributeInfo"
+          },
+          "type": "array"
+        },
+        "binary_text": {
+          "description": "Binary node text, with unspecified ordering relative to its children.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "content": {
+          "description": "Plain XML mixed-content sequence; no original-byte offset is implied.",
+          "items": {
+            "$ref": "#/$defs/MaterialContentInfo"
+          },
+          "type": "array"
+        },
+        "namespace": {
+          "description": "Expanded URI proved for plain XML; binary namespace semantics stay unasserted.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ordinal": {
+          "description": "Original element-child position, absent for the captured root.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "qualified_name": {
+          "description": "Original qualified name, including its prefix.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attributes",
+        "binary_text",
+        "content",
+        "namespace",
+        "ordinal",
+        "qualified_name"
+      ],
+      "type": "object"
+    },
+    "MaterialEncodingInfo": {
+      "description": "Actual source encoding, separate from generated XML or rendering output.",
+      "oneOf": [
+        {
+          "const": "text",
+          "description": "Original UTF-8 XML tokens.",
+          "type": "string"
+        },
+        {
+          "const": "cry-xml",
+          "description": "Binary XML strings and node-content declarations.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "The reader supplies an unsupported encoding.",
+          "type": "string"
+        }
+      ]
+    },
+    "MaterialEntryDispositionInfo": {
+      "description": "Existing surface-reader disposition of an original submaterial slot.",
+      "oneOf": [
+        {
+          "const": "material",
+          "description": "An interpreted material.",
+          "type": "string"
+        },
+        {
+          "const": "engine-default",
+          "description": "An unknown slot rendered with the existing engine-default fallback.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "The reader supplies an unsupported disposition.",
+          "type": "string"
+        }
+      ]
     },
     "MaterialLayer": {
       "description": "One layer of a material: another material blended into the surface.",
@@ -660,6 +994,161 @@
         "attributes"
       ],
       "type": "object"
+    },
+    "MaterialLibrarySourceDescription": {
+      "description": "One authored library root retained independently of its interpreted child materials.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/MaterialLibrarySourceInfo",
+          "description": "Bounded source root, namespaces/content and actual projection boundaries."
+        },
+        "path": {
+          "description": "Library path exposed by the model reader, without a unique physical-source claim.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "authored"
+      ],
+      "type": "object"
+    },
+    "MaterialLibrarySourceInfo": {
+      "description": "One bounded canonical authored material root, kept once per source library.",
+      "properties": {
+        "encoding": {
+          "$ref": "#/$defs/MaterialEncodingInfo",
+          "description": "Actual original source encoding."
+        },
+        "entries": {
+          "description": "Original submaterial dispositions; empty for a single-material library.",
+          "items": {
+            "$ref": "#/$defs/MaterialSourceEntryInfo"
+          },
+          "type": "array"
+        },
+        "losses": {
+          "description": "Actual structured loss categories and first source locations.",
+          "items": {
+            "$ref": "#/$defs/MaterialSourceLossInfo"
+          },
+          "type": "array"
+        },
+        "root": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialElementInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Retained root syntax, absent only with an explicit loss boundary."
+        }
+      },
+      "required": [
+        "encoding",
+        "entries",
+        "losses",
+        "root"
+      ],
+      "type": "object"
+    },
+    "MaterialParameterInfo": {
+      "description": "One decoded material attribute without numeric reinterpretation.",
+      "properties": {
+        "name": {
+          "description": "Reader-exposed name with its original case.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Uninterpreted decoded value.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "MaterialSourceEntryInfo": {
+      "description": "One original submaterial position without renumbering unknown entries.",
+      "properties": {
+        "disposition": {
+          "$ref": "#/$defs/MaterialEntryDispositionInfo",
+          "description": "Existing rendering fallback or interpreted material disposition."
+        },
+        "element_name": {
+          "description": "Source-reader element name.",
+          "type": "string"
+        },
+        "ordinal": {
+          "description": "Original slot position.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ordinal",
+        "element_name",
+        "disposition"
+      ],
+      "type": "object"
+    },
+    "MaterialSourceLossInfo": {
+      "description": "First original element location for one actual coverage boundary.",
+      "properties": {
+        "indices": {
+          "description": "Original element ordinals from the root.",
+          "items": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/MaterialSourceLossInfoKind",
+          "description": "Observed boundary, independent of raw byte preservation."
+        }
+      },
+      "required": [
+        "kind",
+        "indices"
+      ],
+      "type": "object"
+    },
+    "MaterialSourceLossInfoKind": {
+      "description": "Structured source coverage boundary actually reached by the material reader.",
+      "oneOf": [
+        {
+          "const": "repaired-encoding",
+          "description": "Invalid binary string-table bytes were repaired.",
+          "type": "string"
+        },
+        {
+          "const": "elements",
+          "description": "Canonical authored element capacity was exhausted.",
+          "type": "string"
+        },
+        {
+          "const": "text-bytes",
+          "description": "Canonical authored syntax/text storage was exhausted.",
+          "type": "string"
+        },
+        {
+          "const": "depth",
+          "description": "A populated child list reached the depth bound.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "The reader supplies an unsupported loss category.",
+          "type": "string"
+        }
+      ]
     },
     "MaterialStencil": {
       "description": "How a stencil decal is drawn (1.6); the stencil map itself is the texture with the usage\n`stencil`.",
@@ -1572,6 +2061,13 @@
       "description": "What could not be resolved or written, with the node or texture it concerns.",
       "items": {
         "$ref": "#/$defs/Issue"
+      },
+      "type": "array"
+    },
+    "material_libraries": {
+      "description": "Authored material-library roots retained once, without inheriting values into children.",
+      "items": {
+        "$ref": "#/$defs/MaterialLibrarySourceDescription"
       },
       "type": "array"
     },

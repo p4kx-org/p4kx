@@ -3,23 +3,20 @@
 
 use std::borrow::Cow;
 use std::ffi::OsStr;
-use std::fs::{self, File, Metadata, OpenOptions};
+use std::fs::{self, File, Metadata};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::buffers::Buffers;
 use crate::convert::{PEEK_LEN, is_cryxml};
-use crate::entry_path::{escaped_raw_path, relative_path};
-use crate::portable_name::check_path_length;
+use crate::entry_path;
+use crate::portable_name;
 use crate::source::{EntrySource, SourceEntry, SourceReader};
 use crate::tracker::Tracker;
-use crate::{AudioConversion, ConflictPolicy, ExtractionError, TextureConversion};
-
-const MAX_TEMPORARY_ATTEMPTS: u32 = 100;
-
-static TEMPORARY_COUNTER: AtomicU64 = AtomicU64::new(0);
+use crate::{
+    ArchiveWriteProtection, AudioConversion, CancelToken, ConflictPolicy, ExtractionError,
+    TextureConversion,
+};
 
 /// How one Entry of an Extraction ended.
 pub(crate) enum Outcome {
@@ -51,7 +48,7 @@ impl Destination {
     /// already there.
     pub(crate) fn new(folder: PathBuf, name: &OsStr) -> Result<Self, ExtractionError> {
         let file = folder.join(name);
-        check_path_length(&file)?;
+        portable_name::check_path_length(&file)?;
         let existing = match fs::symlink_metadata(&file) {
             Ok(metadata) => Some(metadata),
             Err(error) if error.kind() == io::ErrorKind::NotFound => None,
@@ -65,8 +62,18 @@ impl Destination {
     }
 }
 
+/// Source-derived names or a caller-selected single portable output leaf.
+#[derive(Clone, Copy)]
+pub(crate) enum EntryTarget<'a> {
+    Source,
+    Leaf(&'a str),
+}
+
 /// Writes the files of one source below one target folder under one Conflict policy.
 pub(crate) struct EntryWriter<'a> {
+    pub(crate) entry_target: EntryTarget<'a>,
+    pub(crate) protection: Option<&'a ArchiveWriteProtection>,
+    pub(crate) cancel: Option<&'a CancelToken>,
     pub(crate) source: &'a dyn EntrySource,
     pub(crate) target: &'a Path,
     pub(crate) policy: ConflictPolicy,
@@ -81,6 +88,23 @@ pub(crate) struct EntryWriter<'a> {
 }
 
 impl EntryWriter<'_> {
+    pub(crate) fn check_output(&self, target: &Path) -> Result<(), ExtractionError> {
+        crate::check_protected_output(target, self.protection, self.cancel)?;
+        Ok(())
+    }
+
+    pub(crate) fn folder(&self, relative: Option<&Path>) -> Result<PathBuf, ExtractionError> {
+        self.tracker
+            .folders
+            .folder_protected(self.target, relative, self.protection, self.cancel)
+    }
+
+    pub(crate) fn temporary(
+        &self,
+        folder: &Path,
+    ) -> Result<(PathBuf, File, crate::OwnedFileToken), ExtractionError> {
+        crate::output_creation::create_temporary_protected(folder, self.protection, self.cancel)
+    }
     /// Opens the data of `entry`, checked against its directory checksum when the run verifies.
     pub(crate) fn open_entry<'e>(
         &self,
@@ -112,6 +136,9 @@ impl EntryWriter<'_> {
         let mut written = 0;
         let outcome = match self.try_write(entry, buffers, convert, &mut written) {
             Ok(outcome) => outcome,
+            Err(error) if crate::guard_cancellation::retained_output(&error) => {
+                Outcome::Failed(error)
+            }
             Err(_) if self.tracker.archive_file_changed() => Outcome::Cancelled,
             Err(error) => Outcome::Failed(error),
         };
@@ -187,7 +214,7 @@ impl EntryWriter<'_> {
             Some(reader) => reader,
             None => self.open_entry(entry)?,
         };
-        let (temporary, mut file) = create_temporary(&destination.folder)?;
+        let (temporary, mut file, ownership) = self.temporary(&destination.folder)?;
         let start = prefix.get(..peeked).unwrap_or_default();
         let copied = file
             .write_all(start)
@@ -201,7 +228,13 @@ impl EntryWriter<'_> {
                     written,
                 )
             });
-        self.put_in_place(&temporary, &destination.file, copied, Outcome::Written)
+        self.put_in_place(
+            &temporary,
+            &ownership,
+            &destination.file,
+            copied,
+            Outcome::Written,
+        )
     }
 
     /// Opens `entry` and reads its first bytes into `prefix`; returns the reader and how many
@@ -224,7 +257,7 @@ impl EntryWriter<'_> {
     pub(crate) fn disk_name<'a>(&self, entry: &'a SourceEntry<'_>) -> Cow<'a, str> {
         self.source.raw_path(entry.index()).map_or_else(
             || Cow::Borrowed(entry.path()),
-            |raw| Cow::Owned(escaped_raw_path(raw)),
+            |raw| Cow::Owned(entry_path::escaped_raw_path(raw)),
         )
     }
 
@@ -233,7 +266,16 @@ impl EntryWriter<'_> {
         &self,
         entry: &SourceEntry<'_>,
     ) -> Result<PathBuf, ExtractionError> {
-        relative_path(&self.disk_name(entry))
+        match self.entry_target {
+            EntryTarget::Source => entry_path::relative_path(&self.disk_name(entry)),
+            EntryTarget::Leaf(name) => {
+                portable_name::check_part(name).map_err(|rule| ExtractionError::InvalidName {
+                    part: name.to_owned(),
+                    rule,
+                })?;
+                Ok(PathBuf::from(name))
+            }
+        }
     }
 
     /// Creates the folder of `entry` below the target and returns where its file goes; fails when
@@ -244,13 +286,11 @@ impl EntryWriter<'_> {
         entry: &SourceEntry<'_>,
     ) -> Result<Destination, ExtractionError> {
         let relative = self.relative_path(entry)?;
-        check_path_length(&self.target.join(&relative))?;
+        self.check_output(&self.target.join(&relative))?;
+        portable_name::check_path_length(&self.target.join(&relative))?;
         self.case_collision(&relative, entry)?;
         let name = relative.file_name().ok_or(ExtractionError::UnsafePath)?;
-        let folder = self
-            .tracker
-            .folders
-            .folder(self.target, relative.parent())?;
+        let folder = self.folder(relative.parent())?;
         Destination::new(folder, name)
     }
 
@@ -259,19 +299,31 @@ impl EntryWriter<'_> {
     pub(crate) fn put_in_place(
         &self,
         temporary: &Path,
+        ownership: &crate::OwnedFileToken,
         destination: &Path,
         copied: Result<Chunk, ExtractionError>,
         done: Outcome,
     ) -> Result<Outcome, ExtractionError> {
         if !matches!(copied, Ok(Chunk::End)) || self.tracker.archive_file_changed() {
-            let _ignored = fs::remove_file(temporary);
-            return copied.map(|_| Outcome::Cancelled);
+            return crate::output_cleanup::extraction(
+                copied.map(|_| Outcome::Cancelled),
+                ownership,
+                temporary,
+                self.cancel,
+            );
         }
-        if let Err(source) = fs::rename(temporary, destination) {
-            let _ignored = fs::remove_file(temporary);
-            return Err(write_error(destination.to_path_buf(), source));
+        let result = (|| {
+            ownership.ensure_writable(temporary, crate::output_file::cancel_flag(self.cancel))?;
+            self.check_output(destination)?;
+            fs::rename(temporary, destination)
+                .map_err(|source| write_error(destination.to_path_buf(), source))?;
+            Ok(done)
+        })();
+        if result.is_err() {
+            crate::output_cleanup::extraction(result, ownership, temporary, self.cancel)
+        } else {
+            result
         }
-        Ok(done)
     }
 
     fn copy(
@@ -314,48 +366,6 @@ impl EntryWriter<'_> {
             }
         }
     }
-}
-
-pub(crate) fn create_folders(
-    target: &Path,
-    relative: Option<&Path>,
-) -> Result<PathBuf, ExtractionError> {
-    let mut folder = target.to_path_buf();
-    for component in relative.into_iter().flat_map(Path::components) {
-        folder.push(component);
-        match fs::create_dir(&folder) {
-            Ok(()) => {}
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-                let metadata = fs::symlink_metadata(&folder)
-                    .map_err(|source| write_error(folder.clone(), source))?;
-                if metadata.file_type().is_symlink() {
-                    return Err(ExtractionError::UnsafePath);
-                }
-                if !metadata.is_dir() {
-                    return Err(write_error(folder, error));
-                }
-            }
-            Err(source) => return Err(write_error(folder, source)),
-        }
-    }
-    Ok(folder)
-}
-
-pub(crate) fn create_temporary(folder: &Path) -> Result<(PathBuf, File), ExtractionError> {
-    let mut last_error = None;
-    for _ in 0..MAX_TEMPORARY_ATTEMPTS {
-        let number = TEMPORARY_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = folder.join(format!(".p4kx-{}-{number}.part", process::id()));
-        match OpenOptions::new().write(true).create_new(true).open(&path) {
-            Ok(file) => return Ok((path, file)),
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => last_error = Some(error),
-            Err(source) => return Err(write_error(path, source)),
-        }
-    }
-    Err(write_error(
-        folder.to_path_buf(),
-        last_error.unwrap_or_else(|| io::Error::from(io::ErrorKind::AlreadyExists)),
-    ))
 }
 
 pub(crate) const fn write_error(path: PathBuf, source: io::Error) -> ExtractionError {

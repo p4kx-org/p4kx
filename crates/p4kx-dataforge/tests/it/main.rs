@@ -33,6 +33,7 @@ mod query_references;
 mod query_run;
 mod query_shared_prefixes;
 mod query_syntax;
+mod read_observer;
 mod record_flat;
 mod record_flat_names;
 mod record_flat_tag;

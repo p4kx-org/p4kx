@@ -225,3 +225,20 @@ pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
         .write_to(&path)?;
     Ok(path)
 }
+
+/// Writes an Archive whose DataForge is plain and whose vehicle file of `ACME_Alpha` is
+/// encrypted, so that the ship base needs the Archive key for it.
+pub(crate) fn write_encrypted_vehicle_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    let path = dir.join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()))
+        .entry(
+            TestEntry::zstd(
+                format!("{XML_DIR}ACME_Alpha.xml"),
+                ALPHA_XML.as_bytes().to_vec(),
+            )
+            .encrypted(),
+        )
+        .write_to(&path)?;
+    Ok(path)
+}

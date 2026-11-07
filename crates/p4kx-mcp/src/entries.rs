@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_channels::PublicPatches;
-use p4kx_extraction::{Archive, Filter};
+use p4kx_extraction::{Archive, ArchiveLayoutInfo, Filter};
 
 use crate::container::Place;
 use crate::error::ToolError;
@@ -32,6 +32,7 @@ pub(crate) fn info(archive: &Archive, patches: &PublicPatches) -> ArchiveInfo {
         build: archive
             .build()
             .map(|build| BuildShape::from(&patches.attach(build))),
+        metadata: ArchiveLayoutInfo::of(archive.metadata()),
         entry_count: entries.len(),
         encrypted_count,
         issue_count: archive.issue_count(),
@@ -122,3 +123,7 @@ pub(crate) fn list(place: &Place<'_>, folder: &str, page: Page) -> Result<Folder
         next_cursor: page.next_cursor(total)?,
     })
 }
+
+#[cfg(test)]
+#[path = "entries_layout_tests.rs"]
+mod tests;

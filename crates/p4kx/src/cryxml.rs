@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::ffi::OsString;
-use std::fs::{self, File};
+use std::fs;
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
@@ -85,15 +84,6 @@ pub(crate) fn run(args: &CryXmlArgs, as_json: bool) -> Result<()> {
 
 /// Writes the XML to a `.part` file next to `out` and renames it, so `out` is never half written.
 fn write_file(xml: &Xml<'_>, out: &Path) -> Result<()> {
-    crate::guard::ensure_writable(out)?;
-    let mut part = OsString::from(out.as_os_str());
-    part.push(".part");
-    let part = PathBuf::from(part);
-    let written = File::create(&part)
-        .and_then(|file| xml.write_to(BufWriter::new(file)))
-        .and_then(|()| fs::rename(&part, out));
-    if written.is_err() {
-        let _ignored = fs::remove_file(&part);
-    }
-    written.with_context(|| format!("cannot write {}", out.display()))
+    crate::query_file::write_replacing(out, |writer| xml.write_to(writer))
+        .with_context(|| format!("cannot write {}", out.display()))
 }

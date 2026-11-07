@@ -38,6 +38,7 @@ mod location;
 mod nested;
 mod probe;
 pub mod query;
+mod read_observer;
 mod record;
 mod record_table;
 mod reference_index;
@@ -80,13 +81,15 @@ pub use layout::{MAX_INHERITANCE_DEPTH, MAX_RECORD_FIELDS};
 pub use location::{Location, Step};
 pub use nested::{Reference, StructValue};
 pub use probe::PointerProbe;
+pub use read_observer::CanonicalReadObserver;
 pub use record::Record;
 pub use reference_index::{FileGraph, IndexedReference, MAX_INDEXED_REFERENCES, ReferenceIndex};
 pub use schema::{Enum, Property, Struct};
 pub use survey::{FormatSurvey, PointerSurvey, TrailingSurvey};
 pub use tags::{
     MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES, MAX_TAG_TEXT_BYTES, TAG_DATABASE_TYPE,
-    TAG_PATH_SEPARATOR, Tag, TagTree, TagTreeIssues,
+    TAG_PATH_SEPARATOR, Tag, TagBuildEvent, TagProjectionFailure, TagRelationIssue, TagTree,
+    TagTreeIssues,
 };
 pub use texts::{Resolution, TextResolver};
 pub use tree::RecordTree;

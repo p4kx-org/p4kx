@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::PaletteSlot;
+use crate::mtl_source::ElementAuthored;
 use crate::mtl_xml::XmlElement;
 use crate::{LayerSurface, TintEntry};
+use crate::{MaterialError, PaletteSlot};
 
 /// The deepest nesting of elements the reader keeps in a [`RawElement`].
 pub const MAX_RAW_DEPTH: usize = 8;
@@ -28,6 +29,8 @@ pub struct RawElement {
     pub attributes: Attributes,
     /// The element's child elements in file order.
     pub children: Vec<Self>,
+    /// Ordered source syntax supplement, independent of the existing interpreted fields.
+    pub authored: ElementAuthored,
 }
 
 /// One layer of a material's `MatLayers` list: another material blended into the surface.
@@ -67,6 +70,7 @@ pub(crate) struct Budget {
     left: usize,
     elements_cut: bool,
     layers_cut: bool,
+    depth_cut: bool,
 }
 
 impl Budget {
@@ -75,6 +79,7 @@ impl Budget {
             left: MAX_RAW_ELEMENTS,
             elements_cut: false,
             layers_cut: false,
+            depth_cut: false,
         }
     }
 
@@ -94,6 +99,9 @@ impl Budget {
         if self.layers_cut {
             cut.push(format!("layers beyond {MAX_LAYERS}"));
         }
+        if self.depth_cut {
+            cut.push(format!("raw nesting beyond {MAX_RAW_DEPTH}"));
+        }
         if self.elements_cut {
             cut.push(format!("elements beyond {MAX_RAW_ELEMENTS}"));
         }
@@ -112,25 +120,29 @@ pub(crate) fn raw<'a>(
     element: impl XmlElement<'a>,
     depth: usize,
     budget: &mut Budget,
-) -> Option<RawElement> {
+    ordinal: Option<usize>,
+) -> Result<Option<RawElement>, MaterialError> {
     if !budget.take() {
-        return None;
+        return Ok(None);
     }
-    let children = if depth < MAX_RAW_DEPTH {
-        element
-            .children()
-            .filter_map(|child| raw(child, depth + 1, budget))
-            .collect()
-    } else {
-        Vec::new()
-    };
-    Some(RawElement {
+    let mut children = Vec::new();
+    let children_in_order = element.children().enumerate();
+    for (position, child) in children_in_order {
+        if depth >= MAX_RAW_DEPTH {
+            budget.depth_cut = true;
+            break;
+        }
+        if let Some(child) = raw(child, depth + 1, budget, Some(position))? {
+            children.push(child);
+        }
+    }
+    Ok(Some(RawElement {
         name: element.name().to_owned(),
         attributes: attributes(element),
         children,
-    })
+        authored: element.syntax()?.into_owned(ordinal),
+    }))
 }
-
 pub(crate) fn layers<'a>(element: impl XmlElement<'a>, budget: &mut Budget) -> Vec<MaterialLayer> {
     let mut layers = Vec::new();
     let lists = element
@@ -167,15 +179,20 @@ pub(crate) fn public_params<'a>(element: impl XmlElement<'a>) -> Attributes {
 pub(crate) fn other_elements<'a>(
     element: impl XmlElement<'a>,
     budget: &mut Budget,
-) -> Vec<RawElement> {
+) -> Result<Vec<RawElement>, MaterialError> {
     const INTERPRETED: [&str; 4] = ["SubMaterials", "Textures", "MatLayers", "PublicParams"];
-    element
-        .children()
-        .filter(|child| {
-            !INTERPRETED
-                .iter()
-                .any(|known| child.name().eq_ignore_ascii_case(known))
-        })
-        .filter_map(|child| raw(child, 1, budget))
-        .collect()
+    let mut elements = Vec::new();
+    let children_in_order = element.children().enumerate();
+    for (ordinal, child) in children_in_order {
+        if INTERPRETED
+            .iter()
+            .any(|known| child.name().eq_ignore_ascii_case(known))
+        {
+            continue;
+        }
+        if let Some(child) = raw(child, 1, budget, Some(ordinal))? {
+            elements.push(child);
+        }
+    }
+    Ok(elements)
 }

@@ -12,16 +12,18 @@ use crate::contract::{
     CraftingGlobal, DismantleProcess, GameplayProperty, HarvestableLocation,
     HarvestableProviderPreset, Item, Loadout, LootContainer, Manufacturer, MineableComposition,
     MineableElement, MineableEntity, MiningGlobalParams, Paint, QualityDistribution,
-    QualityQuantization, RefiningProcess, ResourceGroup, Ship, Shop, StarmapObject,
+    QualityQuantization, RefiningProcess, ResourceGroup, ResourceType, Ship, Shop, StarmapObject,
     SubHarvestableMultiConfig,
 };
 use crate::contract_template::ContractTemplate;
 use crate::crafting_warning::CraftingWarning;
 use crate::entity_spawn_model::EntitySpawnPool;
+use crate::export_ledger::ExportLedger;
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::location_template::{LocationTemplates, MissionLocationTemplate};
 use crate::loot_kinds::LootKinds;
 use crate::mission_kinds::MissionKinds;
+use crate::mission_property_set::MissionPropertySet;
 use crate::npc_spawn_model::NpcSpawnPool;
 use crate::paint_port::VehicleFacts;
 use crate::picked::Picked;
@@ -35,12 +37,14 @@ use crate::{CatalogFailure, ItemClassSummary, Kind, KindSummary, QuantizationSum
 
 /// The entities of every kind, ordered by GUID, with the counts of the summary.
 pub(crate) struct Collected<'f> {
+    pub(crate) ledger: ExportLedger,
     pub(crate) manufacturers: Vec<Manufacturer<'f>>,
     pub(crate) items: Vec<Item<'f>>,
     pub(crate) ships: Vec<Ship<'f>>,
     pub(crate) commodities: Vec<Commodity<'f>>,
     pub(crate) blueprints: Vec<Blueprint<'f>>,
     pub(crate) resource_groups: Vec<ResourceGroup<'f>>,
+    pub(crate) resource_types: Vec<ResourceType<'f>>,
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayProperty<'f>>,
     pub(crate) quality_distributions: Vec<QualityDistribution<'f>>,
@@ -59,7 +63,8 @@ pub(crate) struct Collected<'f> {
     pub(crate) mission_broker_entries: Vec<BrokerEntry<'f>>,
     pub(crate) contract_npc_spawns: Vec<NpcSpawnPool<'f>>,
     pub(crate) contract_entity_spawns: Vec<EntitySpawnPool>,
-    pub(crate) port_items: Vec<CatalogGuid>,
+    pub(crate) mission_property_sets: Vec<MissionPropertySet<'f>>,
+    pub(crate) port_items: Vec<crate::loadout::Wanted>,
     pub(crate) starmap_objects: Vec<StarmapObject<'f>>,
     pub(crate) mineable_elements: Vec<MineableElement<'f>>,
     pub(crate) refining_processes: Vec<RefiningProcess<'f>>,
@@ -88,12 +93,14 @@ impl<'f> Collected<'f> {
     pub(crate) fn new(picked: Vec<Picked<'f>>, crafting: CraftingKinds<'f>) -> Self {
         let skipped = Self::crafting_skipped(&crafting);
         let mut collected = Self {
+            ledger: crafting.ledger,
             manufacturers: Vec::new(),
             items: Vec::new(),
             ships: Vec::new(),
             commodities: Vec::new(),
             blueprints: crafting.blueprints,
             resource_groups: Vec::new(),
+            resource_types: Vec::new(),
             blueprint_categories: Vec::new(),
             gameplay_properties: crafting.properties,
             quality_distributions: crafting.distributions,
@@ -112,6 +119,7 @@ impl<'f> Collected<'f> {
             mission_broker_entries: Vec::new(),
             contract_npc_spawns: Vec::new(),
             contract_entity_spawns: Vec::new(),
+            mission_property_sets: Vec::new(),
             port_items: Vec::new(),
             starmap_objects: Vec::new(),
             mineable_elements: Vec::new(),
@@ -152,7 +160,11 @@ impl<'f> Collected<'f> {
             Picked::Item(entity, line, ports) => {
                 self.item_classes.count(line);
                 if ports {
-                    self.port_items.push(entity.guid);
+                    self.port_items.push(crate::loadout::Wanted {
+                        guid: entity.guid,
+                        kind: crate::contract_loadout::EntityKind::Item,
+                        record_index: entity.source_record_index,
+                    });
                 }
                 self.playability.items.count(entity.playability);
                 self.items.push(entity);
@@ -164,6 +176,7 @@ impl<'f> Collected<'f> {
             }
             Picked::Commodity(entity) => self.commodities.push(entity),
             Picked::ResourceGroup(entity) => self.resource_groups.push(entity),
+            Picked::ResourceType(entity) => self.resource_types.push(entity),
             Picked::BlueprintCategory(entity) => self.blueprint_categories.push(entity),
             Picked::Starmap(entity) => self.starmap_objects.push(entity),
             Picked::Mineable(entity) => self.mineable_elements.push(entity),
@@ -234,6 +247,7 @@ impl<'f> Collected<'f> {
         mut pools: SpawnPools<'f>,
         texts: &Texts<'f>,
     ) {
+        self.ledger.merge(templates.ledger);
         self.mission_location_templates = templates.items;
         if let Some(slot) = self.skipped.get_mut(Kind::MissionLocationTemplates.index()) {
             *slot = templates.skipped;
@@ -253,6 +267,7 @@ impl<'f> Collected<'f> {
         templates: KindRead<ContractTemplate<'f>>,
         unknowns: Unknowns,
     ) {
+        self.ledger.merge(templates.ledger);
         self.contract_templates = templates.items;
         if let Some(slot) = self.skipped.get_mut(Kind::ContractTemplates.index()) {
             *slot = templates.skipped;
@@ -268,6 +283,7 @@ impl<'f> Collected<'f> {
     /// Stores the mission broker entries, counts the ones left out as `skipped` and adds the
     /// failures.
     pub(crate) fn add_broker_entries(&mut self, entries: KindRead<BrokerEntry<'f>>) {
+        self.ledger.merge(entries.ledger);
         self.mission_broker_entries = entries.items;
         if let Some(slot) = self.skipped.get_mut(Kind::MissionBrokerEntries.index()) {
             *slot = entries.skipped;
@@ -296,6 +312,7 @@ impl<'f> Collected<'f> {
         sort_by_guid(&mut self.ships, |entity| entity.guid);
         sort_by_guid(&mut self.commodities, |entity| entity.guid);
         sort_by_guid(&mut self.resource_groups, |entity| entity.guid);
+        sort_by_guid(&mut self.resource_types, |entity| entity.guid);
         sort_by_guid(&mut self.blueprint_categories, |entity| entity.guid);
         sort_by_guid(&mut self.starmap_objects, |entity| entity.guid);
         sort_by_guid(&mut self.mineable_elements, |entity| entity.guid);
@@ -325,6 +342,7 @@ impl<'f> Collected<'f> {
                     Kind::Commodities => self.commodities.len(),
                     Kind::Blueprints => self.blueprints.len(),
                     Kind::ResourceGroups => self.resource_groups.len(),
+                    Kind::ResourceTypes => self.resource_types.len(),
                     Kind::BlueprintCategories => self.blueprint_categories.len(),
                     Kind::GameplayProperties => self.gameplay_properties.len(),
                     Kind::QualityDistributions => self.quality_distributions.len(),
@@ -342,6 +360,7 @@ impl<'f> Collected<'f> {
                     Kind::MissionBrokerEntries => self.mission_broker_entries.len(),
                     Kind::ContractNpcSpawns => self.contract_npc_spawns.len(),
                     Kind::ContractEntitySpawns => self.contract_entity_spawns.len(),
+                    Kind::MissionPropertySets => self.mission_property_sets.len(),
                     Kind::MineableElements => self.mineable_elements.len(),
                     Kind::RefiningProcesses => self.refining_processes.len(),
                     Kind::MineableCompositions => self.mineable_compositions.len(),

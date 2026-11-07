@@ -41,6 +41,16 @@ fn class_names<'a>(catalog: &'a Value, kind: &str) -> Vec<&'a str> {
         .unwrap_or_default()
 }
 
+fn reference(guid: &str, target_record_index: u32, target_type: &str) -> Value {
+    json!({
+        "guid": guid,
+        "targetRecordIndex": target_record_index,
+        "targetType": target_type,
+        "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
+        "status": "present"
+    })
+}
+
 #[test]
 fn resource_groups_are_the_group_records_ordered_by_guid_not_the_resource_types() -> TestResult {
     let (built, catalog) = build(None)?;
@@ -68,6 +78,14 @@ fn a_resource_group_carries_its_name_and_the_group_that_lists_it() -> TestResult
             "className": "Metal",
             "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
             "name": {"key": "@items_commodities_type_metal", "en": "Metal", "de": "Metall"},
+            "description": {"key": null, "en": null, "de": null},
+            "defaultThumbnailPath": null,
+            "defaultThumbnailPathSVG": null,
+            "groups": [reference("c3000000-0000-4000-8000-000000000003", 6, "ResourceTypeGroup")],
+            "resources": [
+                reference("b1000000-0000-4000-8000-000000000001", 0, "ResourceType"),
+                reference("b2000000-0000-4000-8000-000000000002", 1, "ResourceType")
+            ],
             "parentGuid": null,
         }),
         "a top-level group"
@@ -226,6 +244,8 @@ fn the_kinds_follow_the_existing_ones_in_the_catalog_order() {
             "missionBrokerEntries",
             "contractNpcSpawns",
             "contractEntitySpawns",
+            "missionPropertySets",
+            "resourceTypes",
         ],
         "order of the catalog"
     );

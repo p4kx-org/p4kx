@@ -137,7 +137,9 @@ impl LoadoutResolver<'_> {
         if child.choice != GeometryChoice::Main || !is_character_item(child.attach_type()) {
             return;
         }
-        let spec = self.spec(child.guid);
+        let Some(spec) = self.spec_of(child) else {
+            return;
+        };
         let Ok(spec) = spec.as_ref() else {
             return;
         };

@@ -67,7 +67,8 @@ fn a_name_of_two_starmap_objects_links_to_none_and_is_counted() {
         &links,
         &lists,
         &mut summary,
-    );
+    )
+    .shops;
     assert_eq!(shops.len(), 3);
     assert_eq!((summary.linked, summary.unlinked), (1, 2));
     assert_eq!(summary.ambiguous_link, 1, "only Spot is ambiguous");
@@ -92,7 +93,8 @@ fn a_key_is_lower_case_and_a_non_guid_element_is_malformed() {
         &links,
         &lists,
         &mut summary,
-    );
+    )
+    .shops;
     assert_eq!(shops.len(), 1, "the case-duplicate is dropped");
     assert_eq!((summary.duplicate, summary.malformed), (1, 1));
     let shop = &shops[0];

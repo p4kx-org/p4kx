@@ -6,7 +6,9 @@ use std::time::Duration;
 
 use egui::{Id, Ui};
 use fluent_bundle::FluentValue;
-use p4kx_export::{CatalogSummary, DECOMPRESSED_LIMIT, SizeWarning, UPLOAD_LIMIT};
+use p4kx_export::{
+    CatalogPublicationMode, CatalogSummary, DECOMPRESSED_LIMIT, SizeWarning, UPLOAD_LIMIT,
+};
 
 use super::catalog_lines::{Notice, failure_lines, kinds, languages, notices, playability, sizes};
 use super::extraction::{group_label, number};
@@ -41,13 +43,7 @@ pub(super) fn show(ui: &Ui, model: &mut Model) {
             cancel = running_window(ui, texts, run, progress);
         }
         CatalogExportStatus::Finished(summary) => {
-            let laid = Laid::get(ui, texts, (run.id(), summary));
-            close = outcome_window(
-                ui,
-                texts,
-                (OUTCOME, T::SummaryTitle.into(), Tone::Normal),
-                |ui| finished(ui, &laid),
-            );
+            close = finished_window(ui, texts, run, summary);
         }
         CatalogExportStatus::Cancelled => {
             close = outcome_window(
@@ -67,6 +63,9 @@ pub(super) fn show(ui: &Ui, model: &mut Model) {
             let text = texts.format(T::GzipNotSupported, &[("path", run.shown_file().into())]);
             close = failure_window(ui, texts, text);
         }
+        CatalogExportStatus::Incomplete(_) => {
+            close = failure_window(ui, texts, texts.get(T::Incomplete));
+        }
         CatalogExportStatus::Failed(reason) => {
             let path = ("path", run.shown_file().into());
             let text = match reason {
@@ -82,6 +81,34 @@ pub(super) fn show(ui: &Ui, model: &mut Model) {
     if close {
         model.close_catalog();
     }
+}
+
+fn finished_window(
+    ui: &Ui,
+    texts: &Texts,
+    run: &CatalogExport,
+    summary: &CatalogExportSummary,
+) -> bool {
+    let diagnostic = run.publication_mode() == CatalogPublicationMode::DiagnosticPartial;
+    let title = if diagnostic {
+        T::DiagnosticSummaryTitle
+    } else {
+        T::SummaryTitle
+    };
+    let laid = Laid::get(ui, texts, (run.id(), summary));
+    outcome_window(ui, texts, (OUTCOME, title.into(), Tone::Normal), |ui| {
+        if diagnostic {
+            ui.colored_label(palette::WARNING, texts.get(T::DiagnosticNotice));
+            ui.add_space(SPACE_3);
+        }
+        if summary.summary().export_health().is_complete() {
+            ui.label(texts.get(T::HealthComplete));
+        } else {
+            ui.colored_label(palette::WARNING, texts.get(T::HealthIncomplete));
+        }
+        ui.add_space(SPACE_3);
+        finished(ui, &laid);
+    })
 }
 
 /// Shows the danger window of a catalog that wrote nothing, saying why; returns whether it was
@@ -106,7 +133,13 @@ fn running_window(
 ) -> bool {
     let mut cancel = false;
     let cancelling = run.is_cancelled();
-    let title = texts.get(T::RunningTitle);
+    let title = texts.get(
+        if run.publication_mode() == CatalogPublicationMode::DiagnosticPartial {
+            T::DiagnosticRunningTitle
+        } else {
+            T::RunningTitle
+        },
+    );
     let path = run.shown_file();
     let shown = placement::window(ui.ctx(), &title, Tone::Normal)
         .id(Id::unique(WINDOW))

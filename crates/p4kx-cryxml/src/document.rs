@@ -23,6 +23,7 @@ pub struct Document<'a> {
     signature: Signature,
     byte_order: ByteOrder,
     pub(crate) text: Cow<'a, str>,
+    repaired_utf8: bool,
     pub(crate) nodes: Vec<Node>,
     pub(crate) attributes: Vec<(Span, Span)>,
     pub(crate) child_starts: Vec<u32>,
@@ -55,6 +56,7 @@ pub fn parse(bytes: &[u8]) -> Result<Document<'_>, CryXmlError> {
     Ok(Document {
         signature,
         byte_order: header.byte_order,
+        repaired_utf8: strings.repaired_utf8(),
         text: strings.into_text(),
         nodes,
         attributes,
@@ -64,6 +66,11 @@ pub fn parse(bytes: &[u8]) -> Result<Document<'_>, CryXmlError> {
 }
 
 impl Document<'_> {
+    /// Returns whether invalid input string-table bytes were actually repaired.
+    #[must_use]
+    pub const fn is_lossy(&self) -> bool {
+        self.repaired_utf8
+    }
     /// Returns the signature the file starts with.
     #[must_use]
     pub const fn signature(&self) -> Signature {

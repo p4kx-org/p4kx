@@ -20,7 +20,9 @@ pub use assembly_export::AssemblyExportSettings;
 pub use key_choice::{ChosenKey, KeyChoiceError, KeySource, choose_key};
 pub use key_store::{KEY_VARIABLE, KeyStore, KeyStoreError};
 pub use key_text::KeyText;
-pub use locations::{FolderKind, XdgEnvironment, base_folder, cache_folder, data_folder};
+pub use locations::{
+    FOLDERS_ROOT_VARIABLE, FolderKind, XdgEnvironment, base_folder, cache_folder, data_folder,
+};
 pub use model_export::{ModelExportSettings, ModelMaterials};
 pub use profile::{ProfileMigration, migrate_profile, profile_folder, profile_folder_in};
 pub use queries::{NameProblem, SavedQueries, SavedQuery, SavedQueryEdit};

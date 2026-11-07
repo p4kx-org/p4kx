@@ -1,23 +1,30 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use super::elem::find_modification;
-use super::patch::{ModificationReport, apply_elems, apply_patch};
-use super::{ElemOverride, VehicleImplementation, read};
-use crate::markup::{self, Budget, Element, MAX_ELEMENT_DEPTH};
-use crate::{LoadoutError, LoadoutFileError, LoadoutFiles};
+use super::elem;
+use super::file_read;
+use super::patch::{self, ModificationReport};
+use super::{ElemOverride, VehicleImplementation};
+use crate::markup::{Budget, Element};
+use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
+use crate::{LoadoutDocumentKind, LoadoutError, LoadoutFiles};
 
 const DIRECTORY: &str = "Scripts/Entities/Vehicles/Implementations/Xml";
 
 const LISTED: usize = 8;
 
-fn issue(path: &str, reason: impl Into<String>) -> LoadoutError {
+pub(super) fn issue(path: &str, reason: impl Into<String>) -> LoadoutError {
     LoadoutError::VehicleImplementation {
         path: path.to_owned(),
         reason: reason.into(),
     }
 }
 
+fn missing(path: &str) -> LoadoutError {
+    LoadoutError::MissingVehicleImplementation {
+        path: path.to_owned(),
+    }
+}
 /// What selects the Modification: the implementation file, its name, the Entity's class name and
 /// the Modification's name.
 struct Selection<'a> {
@@ -42,6 +49,16 @@ pub(crate) fn load(
     definition: &str,
     modification: &str,
 ) -> Result<VehicleImplementation, LoadoutError> {
+    load_observed(files, class_name, definition, modification, None)
+}
+
+pub(crate) fn load_observed(
+    files: &dyn LoadoutFiles,
+    class_name: &str,
+    definition: &str,
+    modification: &str,
+    observation: Option<&Observation>,
+) -> Result<VehicleImplementation, LoadoutError> {
     let stem = file_stem(definition);
     let candidates = definition_candidates(class_name, definition, stem);
     let shown = if definition.is_empty() {
@@ -49,26 +66,24 @@ pub(crate) fn load(
     } else {
         definition
     };
-    let (path, bytes) = match read_first(files, &candidates) {
+    let (path, bytes) = match file_read::first(
+        files,
+        &candidates,
+        LoadoutDocumentKind::VehicleImplementation,
+        observation,
+    ) {
         Ok(Some(found)) => found,
         Ok(None) => {
-            let reason = if candidates.is_empty() {
-                format!("the path is not below {DIRECTORY}")
+            return Err(if candidates.is_empty() {
+                issue(shown, format!("the path is not below {DIRECTORY}"))
             } else {
-                LoadoutFileError::NotFound.to_string()
-            };
-            return Err(issue(shown, reason));
+                missing(shown)
+            });
         }
-        Err(reason) => return Err(issue(shown, reason)),
+        Err(error) => return Err(error),
     };
     let mut budget = Budget::new(bytes.len());
-    let mut root = markup::parse(&bytes, &mut budget).map_err(|reason| issue(&path, reason))?;
-    if !root.name.eq_ignore_ascii_case("Vehicle") {
-        return Err(issue(
-            &path,
-            format!("its root element is {}, not Vehicle", root.name),
-        ));
-    }
+    let mut root = file_read::base(files, &path, &bytes, &mut budget, observation)?;
     let mut issues = Vec::new();
     let mut patch_path = None;
     let mut report = None;
@@ -81,10 +96,16 @@ pub(crate) fn load(
             class_name,
             modification: name,
         };
-        (patch_path, report, elems) =
-            apply_modification(files, &mut root, &selection, &mut budget, &mut issues);
+        (patch_path, report, elems) = apply_modification(
+            files,
+            &mut root,
+            &selection,
+            &mut budget,
+            &mut issues,
+            observation,
+        );
     }
-    let parts = read::parts(&root);
+    let parts = super::read::parts(&root);
     Ok(VehicleImplementation {
         structure: super::structure::digest(&root),
         path,
@@ -93,7 +114,7 @@ pub(crate) fn load(
         report,
         elems,
         name: root.attribute("name").unwrap_or_default().to_owned(),
-        port_paths: read::port_paths(&parts),
+        port_paths: super::read::port_paths(&parts),
         parts,
         issues,
     })
@@ -121,25 +142,31 @@ fn apply_modification(
     selection: &Selection<'_>,
     budget: &mut Budget,
     issues: &mut Vec<LoadoutError>,
+    observation: Option<&Observation>,
 ) -> (
     Option<String>,
     Option<ModificationReport>,
     Vec<ElemOverride>,
 ) {
     let mut taken = Vec::new();
-    let found = find_modification(root, selection.modification);
+    let found = elem::find_modification(root, selection.modification);
     let patch_file = found.as_ref().and_then(|found| found.patch_file.as_deref());
     let (candidates, explicit) = patch_candidates(selection, patch_file, issues);
     let mut applied = None;
     let mut report = None;
-    match read_first(files, &candidates) {
+    match file_read::first(
+        files,
+        &candidates,
+        LoadoutDocumentKind::VehiclePatch,
+        observation,
+    ) {
         Ok(Some((path, bytes))) => {
             if let Some(wanted) = explicit.as_ref().filter(|w| !w.eq_ignore_ascii_case(&path)) {
-                issues.push(issue(wanted, LoadoutFileError::NotFound.to_string()));
+                issues.push(missing(wanted));
             }
             budget.grow(bytes.len());
-            match guarded(root, budget, |root, budget| {
-                patch_stage(root, &bytes, budget)
+            match guarded(root, budget, observation, |root, budget| {
+                file_read::patch(root, &bytes, budget, files, &path, observation)
             }) {
                 Ok(done) => {
                     report_issues(&path, &done, issues);
@@ -151,14 +178,14 @@ fn apply_modification(
         }
         Ok(None) => {
             if let Some(wanted) = &explicit {
-                issues.push(issue(wanted, LoadoutFileError::NotFound.to_string()));
+                issues.push(missing(wanted));
             }
         }
-        Err(reason) => issues.push(issue(selection.path, reason)),
+        Err(error) => issues.push(error),
     }
     match &found {
-        Some(found) => match guarded(root, budget, |root, budget| {
-            apply_elems(root, &found.elems, budget)
+        Some(found) => match guarded(root, budget, observation, |root, budget| {
+            patch::apply_elems(root, &found.elems, budget)
         }) {
             Ok(missed) => {
                 taken = found
@@ -171,7 +198,7 @@ fn apply_modification(
                     .get_or_insert_with(ModificationReport::default)
                     .unmatched_elems = missed;
             }
-            Err(reason) => issues.push(issue(selection.path, reason)),
+            Err(error) => issues.push(issue(selection.path, error)),
         },
         None if applied.is_none() => issues.push(issue(
             selection.path,
@@ -219,30 +246,26 @@ fn patch_candidates(
     (candidates, explicit)
 }
 
-/// Parses the patch `bytes` and applies it to `root`, within `budget`.
-fn patch_stage(
-    root: &mut Element,
-    bytes: &[u8],
-    budget: &mut Budget,
-) -> Result<ModificationReport, String> {
-    let patch = markup::parse(bytes, budget)?;
-    let done = apply_patch(root, &patch, budget)?;
-    if markup::depth(root) > MAX_ELEMENT_DEPTH {
-        return Err(markup::too_deep());
-    }
-    Ok(done)
-}
-
 /// Runs `run` on `root` and restores `root` as it was when `run` fails; the copy that makes this
 /// possible must fit the budget, which it does not spend.
 fn guarded<T>(
     root: &mut Element,
     budget: &mut Budget,
+    observation: Option<&Observation>,
     run: impl FnOnce(&mut Element, &mut Budget) -> Result<T, String>,
 ) -> Result<T, String> {
-    budget.check_copy(root)?;
+    if let Err(error) = budget.check_copy(root) {
+        resolver_observation::notify(observation, LoadoutReadEvent::InventoryIncomplete)
+            .map_err(|error| error.to_string())?;
+        return Err(error);
+    }
     let backup = root.clone();
-    run(&mut *root, budget).inspect_err(|_| *root = backup)
+    let result = run(&mut *root, budget).inspect_err(|_| *root = backup);
+    if result.is_err() && budget.exhausted() {
+        resolver_observation::notify(observation, LoadoutReadEvent::InventoryIncomplete)
+            .map_err(|error| error.to_string())?;
+    }
+    result
 }
 
 fn report_issues(path: &str, report: &ModificationReport, issues: &mut Vec<LoadoutError>) {
@@ -275,22 +298,6 @@ fn report_issues(path: &str, report: &ModificationReport, issues: &mut Vec<Loado
             ),
         ));
     }
-}
-
-/// Returns the first of `candidates` the files hold with its bytes, `None` when none exists,
-/// or why a file that exists cannot be read.
-fn read_first(
-    files: &dyn LoadoutFiles,
-    candidates: &[String],
-) -> Result<Option<(String, Vec<u8>)>, String> {
-    for path in candidates {
-        match files.read(path) {
-            Ok(bytes) => return Ok(Some((path.clone(), bytes))),
-            Err(LoadoutFileError::NotFound) => {}
-            Err(error) => return Err(format!("{path}: {error}")),
-        }
-    }
-    Ok(None)
 }
 
 /// Adds `path` to the candidates when it lies below the implementation folder.

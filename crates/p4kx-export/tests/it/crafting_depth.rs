@@ -5,7 +5,7 @@
 
 use std::error::Error;
 
-use crate::catalog_crafting_support::{build_from, text};
+use crate::catalog_crafting_support::{diagnostic_from, text};
 use crate::crafting_detail::guid;
 use crate::crafting_detail_fixture as fixture;
 use p4kx_export::{Kind, read_crafting};
@@ -51,7 +51,7 @@ fn thirty_two_nested_selections_are_kept() -> TestResult {
 
 #[test]
 fn the_catalog_leaves_a_too_deep_blueprint_out_and_counts_the_failure() -> TestResult {
-    let (built, catalog) = build_from(&fixture::nested_database(33), None)?;
+    let (built, catalog) = diagnostic_from(&fixture::nested_database(33), None)?;
     let listed = catalog["blueprints"].as_array().ok_or("blueprints")?;
     let deep = text(fixture::TOO_DEEP);
     assert!(

@@ -4,7 +4,18 @@
 //! Tests of `p4kx` on a real Archive, built as one test binary; they run with `--ignored`
 //! when `P4KX_DATA_P4K` names one.
 
+#[path = "../../../p4kx-assembly/tests/support/media_fixtures/geometry_only.rs"]
+mod media_fixtures;
+
+mod package_character;
+mod package_fault;
+mod package_fixture_tests;
+mod package_fixtures;
+mod package_measures;
+mod package_process;
+mod package_scratch;
 mod package_support;
+mod package_types;
 mod real_action_map;
 mod real_audio_loop;
 mod real_blender_packages;

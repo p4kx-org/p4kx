@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use p4kx_assembly::audio::{ExportOptions, ExportReport, ExportWatch, SoundFormat};
-use p4kx_extraction::{ConflictPolicy, WriteRefused};
+use p4kx_extraction::{ConflictPolicy, WriteProtectionError};
 
 use super::worker::{ExportRequest, Request, Worker, Written};
 use crate::installation::refusal_of;
@@ -20,14 +20,14 @@ pub enum SoundsScope {
 }
 
 /// The choices of a sound export before it starts: the triggers, the format and the folder.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct SoundsExportSetup {
     scope: SoundsScope,
     selected: Option<String>,
     all: Vec<String>,
     format: SoundFormat,
     folder: Option<PathBuf>,
-    refusal: Option<WriteRefused>,
+    refusal: Option<WriteProtectionError>,
     policy: ConflictPolicy,
 }
 
@@ -104,7 +104,7 @@ impl SoundsExportSetup {
     /// Returns why the chosen folder cannot be written to, when it lies inside a Star Citizen
     /// installation.
     #[must_use]
-    pub const fn refusal(&self) -> Option<&WriteRefused> {
+    pub const fn refusal(&self) -> Option<&WriteProtectionError> {
         self.refusal.as_ref()
     }
 

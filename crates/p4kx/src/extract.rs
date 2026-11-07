@@ -11,9 +11,9 @@ use std::time::SystemTime;
 use anyhow::{Context, Result};
 use p4kx_channels::channel_name;
 use p4kx_extraction::{
-    Archive, ArchiveWatch, AudioConversion, Build, CancelToken, ConflictPolicy, Entry,
-    ExtractOptions, ExtractionReport, Progress, TextureConversion, create_default_target, extract,
-    select_entries,
+    Archive, ArchiveWatch, ArchiveWriteProtection, AudioConversion, Build, CancelToken,
+    ConflictPolicy, Entry, ExtractOptions, ExtractionReport, Progress, TextureConversion,
+    create_default_target_protected, extract, select_entries,
 };
 
 use crate::cli::{AudioOutput, Conflict, ExtractArgs, TextureOutput};
@@ -74,8 +74,9 @@ pub(crate) fn execute(
 ) -> Result<ExitCode> {
     crate::key::require(archive, entries)?;
     let watch = ArchiveWatch::new(archive);
-    let target = prepare_target(settings.out, Some(archive))?;
     let cancel = cancel_on_interrupt()?;
+    let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let target = prepare_target_protected(settings.out, Some(archive), &protection, &cancel)?;
 
     let line = ProgressLine::new();
     let on_progress = |progress: Progress| {
@@ -88,6 +89,7 @@ pub(crate) fn execute(
         line.show(progress);
     };
     let options = ExtractOptions {
+        protection: Some(&protection),
         policy: policy(settings.conflict),
         convert: settings.convert,
         textures: settings.textures,
@@ -191,21 +193,31 @@ fn requested_entries<'a>(args: &ExtractArgs, archive: &'a Archive) -> Result<Vec
     filter_pair::extracting(archive, text, &args.exclude, args.convert)
 }
 
-/// Creates the target folder `out`, or a new default target folder in the current directory,
-/// named after the Channel and build of `archive` when there is one.
-pub(crate) fn prepare_target(out: Option<&Path>, archive: Option<&Archive>) -> Result<PathBuf> {
+/// Creates each requested or default target under the retained Archive source protection.
+pub(crate) fn prepare_target_protected(
+    out: Option<&Path>,
+    archive: Option<&Archive>,
+    protection: &ArchiveWriteProtection,
+    cancel: &CancelToken,
+) -> Result<PathBuf> {
     if let Some(out) = out {
-        crate::guard::ensure_writable(out)?;
+        protection.ensure_writable(out, cancel.flag())?;
         fs::create_dir_all(out)
             .with_context(|| format!("cannot create the target folder {}", out.display()))?;
         return Ok(out.to_path_buf());
     }
     let parent = std::env::current_dir().context("cannot read the current directory")?;
-    crate::guard::ensure_writable(&parent)?;
     let channel = archive.and_then(|archive| channel_name(archive.path()));
     let version = archive.and_then(Archive::build).map(Build::version);
-    create_default_target(&parent, channel.as_deref(), version, SystemTime::now())
-        .with_context(|| format!("cannot create a target folder in {}", parent.display()))
+    create_default_target_protected(
+        &parent,
+        channel.as_deref(),
+        version,
+        SystemTime::now(),
+        protection,
+        cancel,
+    )
+    .with_context(|| format!("cannot create a target folder in {}", parent.display()))
 }
 
 /// Returns the folder the Records of the converted DataForge Entry `entry` were written into: the

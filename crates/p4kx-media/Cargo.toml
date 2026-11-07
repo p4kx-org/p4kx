@@ -1,0 +1,30 @@
+[package]
+name = "p4kx-media"
+description = "Versioned streaming media export contracts and providers."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[package.metadata.p4kx]
+layer = "service"
+
+[dependencies]
+p4kx-extraction.workspace = true
+p4kx-shader.workspace = true
+schemars.workspace = true
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+p4kx-testkit.workspace = true
+jsonschema.workspace = true
+
+[lints]
+workspace = true

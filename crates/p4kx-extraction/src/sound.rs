@@ -9,7 +9,8 @@ use p4kx_archive::Archive;
 use p4kx_audio::{AudioError, OggReport, WavReport, Wem};
 
 use crate::entry_content::find_entry;
-use crate::output_file::{read_error, write_error, write_replacing};
+use crate::output_file::{read_error, write_error, write_replacing_protected};
+use crate::source_protection::SourceProtection;
 use crate::texture_parts::is_same_file;
 use crate::{ConversionError, UnknownEntries};
 
@@ -21,6 +22,7 @@ const MAX_UP_FRONT_RESERVATION: u64 = 64 << 20;
 /// A Wwise WEM sound read from an Entry of an Archive or from a file on disk.
 #[derive(Debug)]
 pub struct Sound {
+    protection: SourceProtection,
     name: String,
     file: Option<PathBuf>,
     wem: Wem<Vec<u8>>,
@@ -36,6 +38,7 @@ impl Sound {
     /// [`ConversionError::SoundTooLarge`] when it exceeds [`MAX_SOUND_LEN`], and another
     /// [`ConversionError`] when it cannot be read or is no valid WEM.
     pub fn from_archive(archive: &Archive, path: &str) -> Result<Self, ConversionError> {
+        let protection = SourceProtection::new(Some(archive.path()));
         let entry =
             find_entry(archive, path).ok_or_else(|| UnknownEntries(vec![path.to_owned()]))?;
         let name = entry.path().to_owned();
@@ -47,7 +50,7 @@ impl Sound {
                     source,
                 }
             })?;
-        Self::parse(name, None, bytes)
+        Self::parse(name, None, bytes, protection)
     }
 
     /// Reads and parses the WEM file at `path`.
@@ -74,13 +77,19 @@ impl Sound {
         let name = path.display().to_string();
         let bytes =
             read_capped(file, len, MAX_SOUND_LEN).map_err(|source| read_error(path, source))?;
-        Self::parse(name, Some(path.to_path_buf()), bytes)
+        Self::parse(
+            name,
+            Some(path.to_path_buf()),
+            bytes,
+            SourceProtection::new(None),
+        )
     }
 
     fn parse(
         name: String,
         file: Option<PathBuf>,
         bytes: Option<Vec<u8>>,
+        protection: SourceProtection,
     ) -> Result<Self, ConversionError> {
         let Some(bytes) = bytes else {
             return Err(ConversionError::SoundTooLarge {
@@ -89,7 +98,12 @@ impl Sound {
             });
         };
         match Wem::parse(bytes) {
-            Ok(wem) => Ok(Self { name, file, wem }),
+            Ok(wem) => Ok(Self {
+                protection,
+                name,
+                file,
+                wem,
+            }),
             Err(source) => Err(ConversionError::Audio {
                 sound: name,
                 source,
@@ -119,7 +133,7 @@ impl Sound {
     /// [`ConversionError::Write`] when the file cannot be written.
     pub fn write_wav_to_file(&self, out: &Path) -> Result<WavReport, ConversionError> {
         self.refuse_input_as_output(out)?;
-        write_replacing(out, |writer| {
+        write_replacing_protected(out, self.protection.context()?, None, |writer| {
             self.wem
                 .write_wav(writer)
                 .map_err(|source| self.audio_error(out, source))
@@ -137,7 +151,7 @@ impl Sound {
     /// WEM file itself, and [`ConversionError::Write`] when the file cannot be written.
     pub fn write_ogg_to_file(&self, out: &Path) -> Result<OggReport, ConversionError> {
         self.refuse_input_as_output(out)?;
-        write_replacing(out, |writer| {
+        write_replacing_protected(out, self.protection.context()?, None, |writer| {
             self.wem
                 .write_ogg(writer)
                 .map_err(|source| self.audio_error(out, source))

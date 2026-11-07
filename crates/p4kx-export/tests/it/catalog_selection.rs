@@ -9,7 +9,7 @@ use std::time::{Duration, UNIX_EPOCH};
 
 use p4kx_export::{
     BuiltCatalog, CancelToken, CatalogError, CatalogOptions, CatalogProgress, EXCLUDED_TOKENS,
-    Filter, Kind, SizeWarning, build_catalog,
+    Filter, Kind, build_catalog,
 };
 use p4kx_extraction::Archive;
 use p4kx_testkit::{
@@ -269,7 +269,11 @@ fn a_filter_restricts_the_selection_and_marks_the_kind_partial() -> TestResult {
 #[test]
 fn the_source_names_channel_build_archive_tool_and_export_time() -> TestResult {
     let (built, catalog) = catalog_with(&options())?;
-    assert_eq!(catalog["schemaVersion"], 2, "schema version");
+    assert_eq!(
+        catalog["schemaVersion"],
+        p4kx_export::SCHEMA_VERSION,
+        "schema version"
+    );
     let source = &catalog["source"];
     assert_eq!(source["channel"], "PTU", "channel");
     assert_eq!(
@@ -294,6 +298,9 @@ fn the_source_names_channel_build_archive_tool_and_export_time() -> TestResult {
         "tool version"
     );
     assert_eq!(source["exportedAt"], "2026-10-14T17:46:40Z", "export time");
+    assert_eq!(source["archiveKey"], "given", "key");
+    assert_eq!(source["encryptedEntriesUnread"], 0, "nothing unread");
+    assert_eq!(built.summary().archive_key().entries_unread(), 0, "summary");
     assert_eq!(
         built.summary().size(),
         u64::try_from(built.json().len())?,
@@ -363,28 +370,6 @@ fn an_archive_without_dataforge_is_an_error() -> TestResult {
     let result = build_catalog(&archive, &options());
     assert!(matches!(result, Err(CatalogError::Load(_))), "load error");
     Ok(())
-}
-
-#[test]
-fn the_size_warning_comes_before_the_64_mb_upload_limit() {
-    let limit = 64_000_000;
-    assert_eq!(SizeWarning::for_size(1_000_000), None, "small");
-    assert_eq!(SizeWarning::for_size(57_599_999), None, "below 90 %");
-    assert_eq!(
-        SizeWarning::for_size(57_600_000),
-        Some(SizeWarning::NearLimit),
-        "from 90 %"
-    );
-    assert_eq!(
-        SizeWarning::for_size(limit),
-        Some(SizeWarning::NearLimit),
-        "at the limit"
-    );
-    assert_eq!(
-        SizeWarning::for_size(limit + 1),
-        Some(SizeWarning::OverLimit),
-        "over the limit"
-    );
 }
 
 #[test]

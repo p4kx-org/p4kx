@@ -5,10 +5,16 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::broker_terms::MissionReward;
-use crate::contract::{LocalisedText, every_field_required};
+use crate::contract::every_field_required;
 use crate::contract_hauling::HaulingRequirement;
 use crate::guid_text::CatalogGuid;
+use crate::mission_property_auto::AutoSpawns;
+use crate::mission_property_investigation::Investigation;
+use crate::mission_property_option::{FloatOption, IntegerOption, StringOption, TagOption};
+use crate::mission_property_race::TimeTrialSplit;
+use crate::mission_property_source::SourceTagList;
 use crate::npc_spawn_model::AiName;
+use crate::scoped_location::ScopedLocation;
 use crate::spawn_model::{LocationCondition, TagPaths};
 
 /// How an objective holds a mission property (`ObjectiveProperty_*`). A struct the catalog does
@@ -72,44 +78,16 @@ pub(crate) struct LinkedOutput {
     pub(crate) variable: Option<String>,
 }
 
-/// An option of a string hash property.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct StringOption<'a> {
-    /// The `textId`.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) display_name: LocalisedText<'a>,
-    /// The `value`, `null` when empty.
-    pub(crate) value: Option<String>,
-    /// The `weighting` of the option among the others.
-    pub(crate) weighting: Option<i64>,
-    /// The `missionVariableName` of the properties the option makes dependent.
-    pub(crate) dependent_properties: Vec<String>,
-}
-
-/// An option of an integer or float property.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct NumberOption<'a> {
-    /// The `textId`.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) display_name: LocalisedText<'a>,
-    /// The `value`, as stored.
-    pub(crate) value: Option<f32>,
-    /// The `variation` the game applies around the value, as stored.
-    pub(crate) variation: Option<f32>,
-    /// The `weighting` of the option among the others.
-    pub(crate) weighting: Option<i64>,
-    /// The `missionVariableName` of the properties the option makes dependent.
-    pub(crate) dependent_properties: Vec<String>,
-}
-
 /// The value of a mission property (`MissionPropertyValue_*`), tagged by `type`.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum PropertyValue<'a> {
+    /// `MissionPropertyValue_ScopedLocation` with all declared source filters.
+    ScopedLocation(Box<ScopedLocation>),
+    /// `MissionPropertyValue_AutoSpawns` without computing runtime spawns.
+    AutoSpawns(Box<AutoSpawns>),
+    /// `MissionPropertyValue_Investigation` with all authored clue variants.
+    Investigation(Box<Investigation<'a>>),
     /// `MissionPropertyValue_Object`: an object the mission scripting provides.
     Object,
     /// `MissionPropertyValue_DeliveryOrder`: a delivery order the mission scripting provides.
@@ -122,17 +100,17 @@ pub(crate) enum PropertyValue<'a> {
     /// `MissionPropertyValue_StringHash`.
     StringHash {
         /// The `options` in stored order.
-        options: Vec<StringOption<'a>>,
+        options: Option<Vec<Option<StringOption<'a>>>>,
     },
     /// `MissionPropertyValue_Integer`.
     Integer {
         /// The `options` in stored order.
-        options: Vec<NumberOption<'a>>,
+        options: Option<Vec<Option<IntegerOption<'a>>>>,
     },
     /// `MissionPropertyValue_Float`.
     Float {
         /// The `options` in stored order.
-        options: Vec<NumberOption<'a>>,
+        options: Option<Vec<Option<FloatOption<'a>>>>,
     },
     /// `MissionPropertyValue_Tags`.
     #[serde(rename_all = "camelCase")]
@@ -141,6 +119,12 @@ pub(crate) enum PropertyValue<'a> {
         tags: TagPaths,
         /// The `negativeTags` as tag paths.
         negative_tags: TagPaths,
+        /// The source positive tag identities.
+        source_tags: Option<SourceTagList>,
+        /// The source negative tag identities.
+        source_negative_tags: Option<SourceTagList>,
+        /// The complete authored tag options in source order.
+        options: Option<Vec<Option<TagOption<'a>>>>,
     },
     /// `MissionPropertyValue_ShipSpawnDescriptions`.
     #[serde(rename_all = "camelCase")]
@@ -210,8 +194,12 @@ pub(crate) enum PropertyValue<'a> {
         /// The `rewardDef`, `null` when absent.
         reward: Option<MissionReward>,
     },
-    /// `MissionPropertyValue_TimeTrialRace`: a race the mission scripting provides.
-    TimeTrialRace,
+    /// `MissionPropertyValue_TimeTrialRace` without evaluating race results.
+    #[serde(rename_all = "camelCase")]
+    TimeTrialRace {
+        /// The authored split structures in source order.
+        target_splits: Option<Vec<Option<TimeTrialSplit>>>,
+    },
     /// `MissionPropertyValue_StarMapLocation`: a star map location the mission scripting provides.
     StarMapLocation,
 }

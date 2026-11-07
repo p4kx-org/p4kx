@@ -137,6 +137,7 @@ impl<'f> Record<'f> {
         );
         let def = def.ok_or(ValueError::DanglingReference { guid })?;
         Ok(Reference {
+            record_index: self.index(),
             guid,
             record_path: forge.text.value(self.def.file_name).map(strip_xml)?,
             type_name: forge.blob.value(def.name)?,

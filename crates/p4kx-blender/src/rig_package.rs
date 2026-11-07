@@ -20,7 +20,7 @@ use crate::manifest_rig::Rig;
 use crate::plan::mesh_id;
 use crate::stage::Staging;
 use crate::write::write_manifest;
-use crate::{Cancelled, PackageError, PackageInfo, PackageResult, PackageSummary};
+use crate::{PackageError, PackageInfo, PackageResult, PackageSummary, PackageWriteContext};
 
 /// What the manifest of a rigged package says besides the file's size: where it comes from, the
 /// node that draws the mesh, the mesh's geometry file and rig, and the issues.
@@ -80,6 +80,7 @@ pub(crate) fn rig_manifest(
         }],
         textures: Vec::new(),
         materials: Vec::new(),
+        material_libraries: Vec::new(),
         palettes: Vec::new(),
         issues,
     }
@@ -88,7 +89,7 @@ pub(crate) fn rig_manifest(
 /// Stops a write when the caller asks to.
 pub(crate) struct Stoppable<'a, W> {
     inner: W,
-    cancelled: &'a Cancelled<'a>,
+    cancelled: &'a PackageWriteContext<'a>,
 }
 
 impl<W: Write> Write for Stoppable<'_, W> {
@@ -117,39 +118,57 @@ pub(crate) fn write_rig_package(
     out: &Path,
     name: &str,
     options: &GlbOptions,
-    cancelled: &(dyn Fn() -> bool + Sync),
+    cancelled: &PackageWriteContext<'_>,
     write_glb: impl FnOnce(&GlbOptions, &mut RigWriter<'_>) -> Result<GlbSummary, GltfError>,
     manifest_of: impl FnOnce(&GlbSummary) -> Manifest,
 ) -> PackageResult<PackageSummary> {
-    let cancelled = Cancelled::new(cancelled);
-    let staging = Staging::create(out)?;
+    let staging = Staging::create(out, *cancelled)?;
+    let result = write_rig_files(
+        staging.path(),
+        name,
+        options,
+        cancelled,
+        write_glb,
+        manifest_of,
+    );
+    staging.complete(result)
+}
+
+fn write_rig_files(
+    staging: &Path,
+    name: &str,
+    options: &GlbOptions,
+    cancelled: &PackageWriteContext<'_>,
+    write_glb: impl FnOnce(&GlbOptions, &mut RigWriter<'_>) -> Result<GlbSummary, GltfError>,
+    manifest_of: impl FnOnce(&GlbSummary) -> Manifest,
+) -> PackageResult<PackageSummary> {
     cancelled.check()?;
     let id = mesh_id(0);
-    let path = staging.path().join(MESHES_FOLDER).join(format!("{id}.glb"));
-    let file = File::create_new(&path).map_err(|source| PackageError::write(&path, source))?;
+    let path = staging.join(MESHES_FOLDER).join(format!("{id}.glb"));
+    let (file, ownership) = cancelled.create_file(&path)?.into_parts();
     let mut writer = Stoppable {
         inner: BufWriter::new(file),
-        cancelled: &cancelled,
+        cancelled,
     };
     let written = write_glb(&package_mesh_options(options), &mut writer)
-        .map_err(|error| glb_error(error, &path, (&id, name), &cancelled))?;
+        .map_err(|error| glb_error(error, &path, (&id, name), cancelled))?;
     writer
         .flush()
-        .map_err(|source| flush_error(source, &path, &cancelled))?;
+        .map_err(|source| flush_error(source, &path, cancelled))?;
     let file = writer
         .inner
         .into_inner()
         .map_err(|error| PackageError::write(&path, error.into_error()))?;
+    ownership.ensure_writable(&path, cancelled.cancel_flag())?;
     file.sync_all()
         .map_err(|source| PackageError::write(&path, source))?;
     drop(file);
     cancelled.check()?;
     let mut manifest = manifest_of(&written);
     sanitise(&mut manifest);
-    let manifest_len = write_manifest(&staging.path().join(MANIFEST_FILE), &manifest)?;
+    let manifest_len = write_manifest(&staging.join(MANIFEST_FILE), &manifest, cancelled)?;
     let summary = summarise(&manifest, &written, manifest_len);
     cancelled.check()?;
-    staging.commit()?;
     Ok(summary)
 }
 
@@ -157,7 +176,7 @@ fn glb_error(
     error: GltfError,
     path: &Path,
     (id, name): (&str, &str),
-    cancelled: &Cancelled<'_>,
+    cancelled: &PackageWriteContext<'_>,
 ) -> PackageError {
     match error {
         GltfError::Write(source) => flush_error(source, path, cancelled),
@@ -169,7 +188,11 @@ fn glb_error(
     }
 }
 
-fn flush_error(source: io::Error, path: &Path, cancelled: &Cancelled<'_>) -> PackageError {
+fn flush_error(
+    source: io::Error,
+    path: &Path,
+    cancelled: &PackageWriteContext<'_>,
+) -> PackageError {
     if cancelled.check().is_err() {
         PackageError::Cancelled
     } else {

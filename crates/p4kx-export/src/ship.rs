@@ -66,6 +66,7 @@ pub(crate) fn ship<'f>(
     let vehicle = component(tree, "VehicleComponentParams");
     let guid = CatalogGuid(tree.guid());
     let ship = Ship {
+        source_record_index: tree.record_index(),
         guid,
         class_name: class_name(tree),
         record_path: tree.record_path(),
@@ -88,6 +89,7 @@ pub(crate) fn ship<'f>(
         insurance: insurance(tree),
     };
     let facts = VehicleFacts {
+        source_record_index: None,
         ship: guid,
         tags: lowered_tags(tree),
         paint_ports: paint_ports(tree),

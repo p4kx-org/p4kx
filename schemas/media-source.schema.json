@@ -1,0 +1,240 @@
+{
+  "$defs": {
+    "Algorithm": {
+      "description": "Integrity algorithm, without conflating CRC checks with cryptographic hashes.",
+      "oneOf": [
+        {
+          "const": "sha256",
+          "description": "SHA-256 cryptographic hash.",
+          "type": "string"
+        },
+        {
+          "const": "crc32",
+          "description": "ZIP CRC-32 polynomial.",
+          "type": "string"
+        },
+        {
+          "const": "crc32c",
+          "description": "Castagnoli CRC-32C polynomial.",
+          "type": "string"
+        }
+      ]
+    },
+    "ByteScope": {
+      "description": "Exact byte scope of a computed or declared integrity value.",
+      "oneOf": [
+        {
+          "const": "root-archive-file",
+          "description": "Every byte streamed from the root Archive file.",
+          "type": "string"
+        },
+        {
+          "const": "stored-entry-payload",
+          "description": "Entry bytes before decryption and decompression.",
+          "type": "string"
+        },
+        {
+          "const": "decoded-entry-payload",
+          "description": "Entry bytes after decryption and decompression.",
+          "type": "string"
+        },
+        {
+          "const": "artifact-file",
+          "description": "Every byte of a generated artifact file.",
+          "type": "string"
+        }
+      ]
+    },
+    "ContainerIdentity": {
+      "description": "A physical container Entry in the ordered path from the root Archive.",
+      "properties": {
+        "entry_index": {
+          "description": "Zero-based directory index in the immediately enclosing Archive.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "Reader-exposed display path, whose separators may already be normalised.",
+          "type": "string"
+        },
+        "raw_path_hex": {
+          "description": "Original non-UTF-8 path bytes when the display path is lossy.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "entry_index",
+        "path"
+      ],
+      "type": "object"
+    },
+    "Digest": {
+      "description": "An explicitly scoped integrity value.",
+      "properties": {
+        "algorithm": {
+          "$ref": "#/$defs/Algorithm",
+          "description": "Algorithm name, including the CRC polynomial where relevant."
+        },
+        "hex": {
+          "description": "Lower-case hexadecimal spelling.",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/ByteScope",
+          "description": "Exact bytes over which the value was computed or declared."
+        }
+      },
+      "required": [
+        "algorithm",
+        "scope",
+        "hex"
+      ],
+      "type": "object"
+    },
+    "Identity": {
+      "description": "Identity that remains distinct for duplicate names and nested containers.",
+      "oneOf": [
+        {
+          "description": "The complete root Archive file.",
+          "properties": {
+            "type": {
+              "const": "root",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A physical Entry identified through each containing directory.",
+          "properties": {
+            "containers": {
+              "description": "Ordered outermost-to-innermost physical container identities.",
+              "items": {
+                "$ref": "#/$defs/ContainerIdentity"
+              },
+              "type": "array"
+            },
+            "entry": {
+              "$ref": "#/$defs/ContainerIdentity",
+              "description": "Identity in the immediate directory."
+            },
+            "type": {
+              "const": "entry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "containers",
+            "entry"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RawReference": {
+      "description": "Retained exact decoded payload, addressed relative to its generation.",
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/Digest",
+          "description": "SHA-256 of the entire decoded payload."
+        },
+        "path": {
+          "description": "Relative artifact path.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Decoded byte length.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "size",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "Verification": {
+      "description": "Comparison against available source-declared integrity, independent of hash computation.",
+      "oneOf": [
+        {
+          "const": "not-available",
+          "description": "The source has no comparable integrity declaration.",
+          "type": "string"
+        },
+        {
+          "const": "not-performed",
+          "description": "A declaration exists but its interpretation does not permit verification.",
+          "type": "string"
+        },
+        {
+          "const": "verified",
+          "description": "Available source checks passed while the entire Entry was retained.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Provenance shared by records from one physical input.",
+  "properties": {
+    "declared_integrity": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Digest"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Directory-declared checksum, never substituted for a cryptographic digest."
+    },
+    "identity": {
+      "$ref": "#/$defs/Identity",
+      "description": "Physical source identity."
+    },
+    "raw": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RawReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Exact decoded Entry payload when available."
+    },
+    "root": {
+      "$ref": "#/$defs/Digest",
+      "description": "SHA-256 of every byte of the root Archive file."
+    },
+    "size": {
+      "description": "Decoded Entry size, or root file size.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "verification": {
+      "$ref": "#/$defs/Verification",
+      "description": "Whether the retained payload passed the reader's available directory checks."
+    }
+  },
+  "required": [
+    "root",
+    "identity",
+    "size",
+    "verification"
+  ],
+  "title": "Source",
+  "type": "object"
+}

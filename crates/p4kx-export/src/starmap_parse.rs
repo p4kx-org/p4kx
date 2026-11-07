@@ -8,6 +8,10 @@ use p4kx_extraction::cryxml::{self, Xml};
 use p4kx_extraction::{Archive, CancelToken, Guid};
 use rayon::prelude::*;
 
+use crate::Kind;
+use crate::entry_source::EntrySource;
+use crate::export_entry_ledger::EntryOperation;
+use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::starmap_index::Index;
 use crate::starmap_read::main_xml;
 use crate::starmap_report::clip;
@@ -82,12 +86,6 @@ impl Bounds {
 
 /// Returns the Children of `node`; `depth` is the number of lists above it.
 fn level<'d, N: Node<'d>>(node: N, depth: usize, bounds: &Bounds) -> Level {
-    if depth >= bounds.depth {
-        return Level {
-            capped: true,
-            ..Level::default()
-        };
-    }
     let Some(list) = first_below(node, CHILDREN) else {
         return Level::default();
     };
@@ -96,6 +94,15 @@ fn level<'d, N: Node<'d>>(node: N, depth: usize, bounds: &Bounds) -> Level {
         .filter(|sibling| sibling.name().eq_ignore_ascii_case(CHILDREN))
         .nth(1)
         .is_some();
+    if depth >= bounds.depth {
+        return Level {
+            capped: list
+                .children()
+                .any(|child| child.name().eq_ignore_ascii_case(CHILD)),
+            extra_lists,
+            ..Level::default()
+        };
+    }
     let mut children = Vec::new();
     let mut truncated = false;
     for child in list
@@ -150,33 +157,93 @@ fn read_child<'d, N: Node<'d>>(child: N, depth: usize, bounds: &Bounds) -> Child
 }
 
 /// Reads and parses the container at `entry`.
-fn parse(archive: &Archive, index: &Index<'_>, entry: usize, bounds: &Bounds) -> Body {
+fn parse(
+    archive: &Archive,
+    index: &Index<'_>,
+    entry: usize,
+    bounds: &Bounds,
+) -> (Body, ExportLedger) {
+    let mut ledger = ExportLedger::default();
+    let body = parse_body(archive, index, entry, bounds, &mut ledger);
+    (body, ledger)
+}
+
+fn parse_body(
+    archive: &Archive,
+    index: &Index<'_>,
+    entry: usize,
+    bounds: &Bounds,
+    ledger: &mut ExportLedger,
+) -> Body {
     let Some(socpak) = index.entries.get(entry) else {
+        ledger.incomplete_inventory(Kind::StarmapObjects);
         return Body::Unreadable("no such entry".to_owned());
     };
-    let main = match main_xml(archive, socpak) {
+    let main = match main_xml(archive, socpak, ledger) {
         Ok(main) => main,
-        Err(reason) => return Body::Unreadable(reason),
+        Err(reason) => {
+            ledger.incomplete_inventory(Kind::StarmapObjects);
+            return Body::Unreadable(reason);
+        }
     };
-    let root = match cryxml::read(&main.bytes) {
-        Ok(Xml::CryXml(document)) => level(document.root(), 0, bounds),
+    let Some(root) = parsed_root(&main.bytes, bounds) else {
+        ledger.incomplete_inventory(Kind::StarmapObjects);
+        main.source.record(
+            ledger,
+            Kind::StarmapObjects,
+            SourceDisposition::ProjectionFailed,
+        );
+        return Body::Unparsed;
+    };
+    let loss = source_loss(&root);
+    if loss.inventory {
+        ledger.incomplete_inventory(Kind::StarmapObjects);
+    }
+    let disposition = if loss.projection {
+        SourceDisposition::ProjectionFailed
+    } else {
+        SourceDisposition::Projected
+    };
+    main.source
+        .record(ledger, Kind::StarmapObjects, disposition);
+    Body::Parsed {
+        root,
+        fallback: main.fallback,
+    }
+}
+
+fn parsed_root(bytes: &[u8], bounds: &Bounds) -> Option<Level> {
+    match cryxml::read(bytes) {
+        Ok(Xml::CryXml(document)) => Some(level(document.root(), 0, bounds)),
         Ok(Xml::Text(text)) => {
             let parsed = std::str::from_utf8(text)
                 .ok()
                 .map(|text| text.trim_start_matches('\u{feff}'))
                 .filter(|text| cryxml::check_text_depth(text).is_ok())
                 .and_then(|text| roxmltree::Document::parse(text).ok());
-            match parsed {
-                Some(document) => level(document.root_element(), 0, bounds),
-                None => return Body::Unparsed,
-            }
+            parsed.map(|document| level(document.root_element(), 0, bounds))
         }
-        Err(_) => return Body::Unparsed,
-    };
-    Body::Parsed {
-        root,
-        fallback: main.fallback,
+        Err(_) => None,
     }
+}
+
+struct SourceLoss {
+    projection: bool,
+    inventory: bool,
+}
+
+fn source_loss(level: &Level) -> SourceLoss {
+    let inventory = level.capped || level.truncated || level.extra_lists;
+    let mut loss = SourceLoss {
+        projection: inventory,
+        inventory,
+    };
+    for child in &level.children {
+        let below = source_loss(&child.below);
+        loss.projection |= matches!(&child.pose, Pose::Malformed { .. }) || below.projection;
+        loss.inventory |= below.inventory;
+    }
+    loss
 }
 
 fn externals<'l>(level: &'l Level, out: &mut Vec<&'l str>) {
@@ -188,6 +255,7 @@ fn externals<'l>(level: &'l Level, out: &mut Vec<&'l str>) {
 
 /// The containers read, and how many parses that took.
 pub(crate) struct Read {
+    pub(crate) ledger: ExportLedger,
     pub(crate) bodies: HashMap<usize, Body>,
     #[cfg_attr(
         not(test),
@@ -212,6 +280,7 @@ pub(crate) fn read_all(
         children: AtomicUsize::new(children),
     };
     let mut bodies: HashMap<usize, Body> = HashMap::new();
+    let mut ledger = ExportLedger::default();
     let mut parsed = 0;
     let mut frontier: Vec<usize> = roots
         .iter()
@@ -223,26 +292,72 @@ pub(crate) fn read_all(
         if frontier.is_empty() || cancel.is_some_and(CancelToken::is_cancelled) {
             break;
         }
-        let read: Vec<(usize, Body)> = frontier
+        let read: Vec<_> = frontier
             .par_iter()
             .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
             .map(|&entry| (entry, parse(archive, index, entry, &bounds)))
             .collect();
         parsed += read.len();
-        let mut next: HashSet<usize> = HashSet::new();
-        let mut paths = Vec::new();
-        for (_, body) in &read {
-            if let Body::Parsed { root, .. } = body {
-                paths.clear();
-                externals(root, &mut paths);
-                next.extend(paths.iter().filter_map(|path| index.find(path)));
-            }
+        let next = next_sources(read.iter().map(|(_, (body, _))| body), index, &mut ledger);
+        for (entry, (body, observed)) in read {
+            bodies.insert(entry, body);
+            ledger.merge(observed);
         }
-        bodies.extend(read);
         frontier = next
             .into_iter()
             .filter(|entry| !bodies.contains_key(entry))
             .collect();
     }
-    Read { bodies, parsed }
+    if !cancel.is_some_and(CancelToken::is_cancelled) {
+        record_unread(archive, &frontier, &mut ledger);
+    }
+    Read {
+        ledger,
+        bodies,
+        parsed,
+    }
 }
+
+fn next_sources<'a>(
+    bodies: impl Iterator<Item = &'a Body>,
+    index: &Index<'_>,
+    ledger: &mut ExportLedger,
+) -> HashSet<usize> {
+    let mut next = HashSet::new();
+    let mut paths = Vec::new();
+    for body in bodies {
+        if let Body::Parsed { root, .. } = body {
+            paths.clear();
+            externals(root, &mut paths);
+            for path in &paths {
+                if let Some(entry) = index.find(path) {
+                    next.insert(entry);
+                } else {
+                    EntrySource::missing(path).dependency().record(
+                        ledger,
+                        Kind::StarmapObjects,
+                        SourceDisposition::ReadFailed,
+                    );
+                }
+            }
+        }
+    }
+    next
+}
+
+fn record_unread(archive: &Archive, entries: &[usize], ledger: &mut ExportLedger) {
+    if !entries.is_empty() {
+        ledger.incomplete_inventory(Kind::StarmapObjects);
+    }
+    for index in entries {
+        if let Some(entry) = archive.entries().get(*index) {
+            EntrySource::outer(entry)
+                .dependency()
+                .operation(EntryOperation::Enumeration)
+                .record(ledger, Kind::StarmapObjects, SourceDisposition::ReadFailed);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests;

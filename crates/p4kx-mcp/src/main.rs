@@ -28,6 +28,10 @@ mod forge_state;
 mod gate;
 mod image;
 mod image_tools;
+#[cfg(test)]
+mod key_fixture;
+mod key_report;
+mod key_stamp;
 mod keys;
 mod loadout;
 mod loadout_cache;
@@ -101,6 +105,7 @@ struct Args {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    p4kx_extraction::check_runtime_prerequisites()?;
     let settings_file = args
         .config_dir
         .as_ref()

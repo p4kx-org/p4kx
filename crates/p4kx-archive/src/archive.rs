@@ -8,16 +8,20 @@ use std::time::SystemTime;
 
 use p4kx_foundation::ArchiveKey;
 
+use crate::archive_metadata::ArchiveMetadata;
 use crate::container::{self, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN};
+use crate::entry_identity::ContainerChain;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog};
 use crate::key_slot::KeySlot;
 use crate::source::Source;
 use crate::{
-    ArchiveError, Build, Entry, EntryIssue, EntryReader, OpenOptions, entry_reader, layout,
+    ArchiveError, Build, Entry, EntryIssue, EntryReader, InstallationStatus, OpenOptions,
+    entry_reader, layout,
 };
 
 mod key;
+mod metadata;
 
 /// The most decoded bytes [`Archive::open_entry_at`] skips in a compressed Entry to reach an offset.
 pub const MAX_DECODED_SKIP: u64 = 1 << 30;
@@ -27,6 +31,7 @@ pub const MAX_DECODED_SKIP: u64 = 1 << 30;
 pub struct Archive {
     path: PathBuf,
     location: PathBuf,
+    container_chain: ContainerChain,
     file_len: u64,
     file_modified: Option<SystemTime>,
     depth: usize,
@@ -34,11 +39,22 @@ pub struct Archive {
     source: Source,
     entries: Vec<Entry>,
     log: IssueLog,
+    installation_flags: Option<u8>,
+    metadata: ArchiveMetadata,
     build: Option<Build>,
     key: KeySlot,
 }
 
 impl Archive {
+    /// Returns the source installation declaration, independently of payload integrity.
+    #[must_use]
+    pub const fn installation_status(&self) -> InstallationStatus {
+        match self.installation_flags {
+            None => InstallationStatus::Unavailable,
+            Some(flags) => InstallationStatus::DeclaredComplete { flags },
+        }
+    }
+
     /// Opens the Archive at `path` and reads its central directory, in the v1 or the v2 layout.
     ///
     /// The file is opened read-only and stays readable and writable for other processes such as
@@ -72,13 +88,19 @@ impl Archive {
         } else {
             layout::read_entries(&source, None)
         };
-        let Directory { entries, log } = directory.map_err(|error| error.at(path))?;
+        let Directory {
+            entries,
+            log,
+            installation_flags,
+            metadata,
+        } = directory.map_err(|error| error.at(path))?;
         let build = path
             .parent()
             .and_then(|folder| Build::read_from(folder).ok().flatten());
         Ok(Self {
             path: path.to_path_buf(),
             location: path.to_path_buf(),
+            container_chain: ContainerChain::default(),
             file_len: source.len(),
             file_modified: source.modified(),
             depth: 0,
@@ -86,6 +108,8 @@ impl Archive {
             source,
             entries,
             log,
+            installation_flags,
+            metadata,
             build,
             key: KeySlot::with(options.key),
         })
@@ -113,9 +137,19 @@ impl Archive {
                 .map_err(|error| error.at(&location))
         });
         match container {
-            Ok((source, decoded_budget, Directory { entries, log })) => Ok(Self {
+            Ok((
+                source,
+                decoded_budget,
+                Directory {
+                    entries,
+                    log,
+                    installation_flags,
+                    metadata,
+                },
+            )) => Ok(Self {
                 path: self.path.clone(),
                 location,
+                container_chain: self.container_chain.child(entry.index),
                 file_len: self.file_len,
                 file_modified: self.file_modified,
                 depth: self.depth + 1,
@@ -123,6 +157,8 @@ impl Archive {
                 source,
                 entries,
                 log,
+                installation_flags,
+                metadata,
                 build: self.build.clone(),
                 key: self.key.clone(),
             }),

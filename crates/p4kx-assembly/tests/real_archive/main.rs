@@ -3,6 +3,9 @@
 
 //! Tests of `p4kx-assembly` against a real Archive; run with `--ignored` when `P4KX_DATA_P4K` names one.
 
+#[path = "../support/media_fixtures/mod.rs"]
+mod media_fixtures;
+
 mod real_archive;
 mod real_armour;
 mod real_armour_backpack;

@@ -16,7 +16,7 @@ use crate::cli::{ChfAction, ChfArgs};
 use crate::cryxml::JsonNeedsOut;
 use crate::exit;
 use crate::json;
-use crate::query_file::write_replacing;
+use crate::query_file::{write_replacing, write_replacing_protected};
 
 /// The largest JSON file `p4kx chf from-json` reads.
 const MAX_CHF_JSON_LEN: u64 = 1024 * 1024;
@@ -95,6 +95,10 @@ fn to_json(file: &Path, out: Option<&Path>, archive: Option<&Path>, as_json: boo
     if as_json && out.is_none() {
         return Err(JsonNeedsOut.into());
     }
+    let cancel = crate::extract::cancel_on_interrupt()?;
+    let protection = archive
+        .map(|path| p4kx_extraction::ArchiveWriteProtection::new(path, cancel.flag()))
+        .transpose()?;
     let bytes = read_capped(file, CHF_SIZE as u64)?;
     let chf = Chf::read(&bytes).map_err(|source| InvalidChf {
         path: file.to_owned(),
@@ -110,8 +114,10 @@ fn to_json(file: &Path, out: Option<&Path>, archive: Option<&Path>, as_json: boo
         io::stdout().lock().write_all(text.as_bytes())?;
         return Ok(chf_names::note(&summary)?);
     };
-    write_replacing(out, |writer| writer.write_all(text.as_bytes()))
-        .with_context(|| format!("cannot write {}", out.display()))?;
+    write_replacing_protected(out, protection.as_ref(), Some(&cancel), |writer| {
+        writer.write_all(text.as_bytes())
+    })
+    .with_context(|| format!("cannot write {}", out.display()))?;
     report(
         file,
         out,

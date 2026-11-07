@@ -26,11 +26,12 @@ impl LoadoutResolver<'_> {
             class_name.to_ascii_lowercase()
         );
         let loaded = self.vehicles.entry(key).or_insert_with(|| {
-            vehicle::load(
+            vehicle::load_observed(
                 files,
                 class_name,
                 &vehicle_spec.definition,
                 &vehicle_spec.modification,
+                self.observation.as_deref(),
             )
             .map(Arc::new)
         });
@@ -55,16 +56,22 @@ impl LoadoutResolver<'_> {
         if !self.landing.contains_key(&guid) {
             let read = match self.entities.forge().record_by_guid(guid) {
                 None => Err(LoadoutError::DanglingReference { guid }),
-                Some(record) => self
-                    .builder
-                    .build(&record)
+                Some(record) => {
+                    self.remember_read(crate::resolver_observation::Cache::LandingGear, record);
+                    crate::resolver_observation::canonical(
+                        &mut self.builder,
+                        &record,
+                        self.observation.as_deref(),
+                    )
                     .map(|tree| vehicle::gears(&tree))
-                    .map_err(|error| LoadoutError::UnreadableRecord {
-                        guid,
-                        reason: error.to_string(),
-                    }),
+                }
             };
             self.landing.insert(guid, read);
+        } else if let Err(error) =
+            self.reuse_read(crate::resolver_observation::Cache::LandingGear, guid)
+        {
+            issues.push(error);
+            return Arc::from([]);
         }
         match self.landing.get(&guid) {
             Some(Ok(gears)) => Arc::clone(gears),

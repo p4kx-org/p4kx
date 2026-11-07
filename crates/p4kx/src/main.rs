@@ -17,6 +17,7 @@ mod catalog_json;
 mod catalog_json_shops;
 mod catalog_json_slugs;
 mod catalog_size;
+mod catalog_summary;
 mod channels;
 mod character_package;
 mod chf;
@@ -48,6 +49,7 @@ mod cli_hologram;
 mod cli_interior;
 mod cli_key;
 mod cli_loc;
+mod cli_media;
 mod cli_model;
 mod cli_output;
 mod cli_prefab;
@@ -106,9 +108,11 @@ mod interior_package;
 mod issues;
 mod json;
 mod key;
+mod key_note;
 mod layers_json;
 mod list;
 mod loc;
+mod media;
 mod model;
 mod model_animations;
 mod model_bones;
@@ -151,6 +155,10 @@ use crate::cli::{Cli, Command};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    if let Err(error) = p4kx_extraction::check_runtime_prerequisites() {
+        report(&anyhow::Error::new(error));
+        return ExitCode::from(exit::PARTIAL_FAILURE);
+    }
     let json = cli.json;
     guard::protect_installations();
     if !matches!(cli.command, Command::Key(_)) {
@@ -165,20 +173,29 @@ fn main() -> ExitCode {
         file: cli.key_file.clone(),
     };
     let result = dispatch(cli.command, json, &given);
-    match result {
+    let code = match result {
         Ok(code) => code,
         Err(error) if is_broken_pipe(&error) => ExitCode::from(exit::SUCCESS),
         Err(error) => {
             report(&error);
             exit::for_error(&error)
         }
-    }
+    };
+    key_note::print();
+    code
 }
 
 fn report(error: &anyhow::Error) {
     let mut stderr = io::stderr().lock();
     let _ignored = writeln!(stderr, "error: {error:#}");
-    if let Some(hint) = key::hint(error).or_else(|| no_match::no_match_hint(error)) {
+    let key_hint = key::hint(error);
+    if key_hint.is_some() {
+        key_note::suppress();
+    }
+    if let Some(hint) = key_hint
+        .or_else(|| no_match::no_match_hint(error))
+        .or_else(|| catalog::hint(error))
+    {
         let _ignored = writeln!(stderr, "hint: {hint}");
     }
 }
@@ -203,6 +220,7 @@ fn dispatch(command: Command, json: bool, given: &key::Given) -> anyhow::Result<
         Command::Dcb(args) => dcb::run(&args, json),
         Command::Grep(args) => grep::run(&args, json),
         Command::Catalog(args) => catalog::run(&args, json),
+        Command::Media(args) => media::run(&args, json),
         Command::Coverage(args) => coverage::run(&args, json),
         Command::Ships(args) => ships::run(&args, json),
         Command::Entity(args) => entity::run(&args, json),

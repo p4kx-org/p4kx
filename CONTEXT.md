@@ -704,6 +704,13 @@ One group of entities in the Basetool catalog, e.g. manufacturers or items, sele
 prefix and type and complete or partial on its own.
 _Avoid_: category, entity type
 
+**Export health**:
+Measured source-read and projection outcomes carried by the Basetool catalog, independently of
+Filter completeness. Physical source Records, required Archive Entry operations and emitted rows
+have separate accounting units; an incomplete result requires explicit diagnostic publication
+(`exportHealth`, ADR-0347).
+_Avoid_: completeness (when describing read failures), successful absence (without source evidence)
+
 **Contract template**:
 A `ContractTemplate` Record that a contract names by `templateGuid`: its mission properties, ship
 spawn and location links, hauling orders, modifiers, mission flow and reward contributions, stated
@@ -715,6 +722,12 @@ A `MissionBrokerEntry` Record, an offer of the mission board with its texts, ava
 schedule, reward and requirements; a contract names it by `brokerEntryGuid`
 (`missionBrokerEntries`, ADR-0320).
 _Avoid_: mission offer, board entry
+
+**Mission property set**:
+One authored collection of mission declarations at a handler, contract or sub-contract of a
+Generator, shared by the contract rows that refer to that source position. It preserves the
+declarations without choosing their runtime values (`missionPropertySets`, ADR-0345).
+_Avoid_: effective properties, resolved location
 
 **Export**:
 A structured file derived from DataForge for another tool, as opposed to an Extraction of Entries.

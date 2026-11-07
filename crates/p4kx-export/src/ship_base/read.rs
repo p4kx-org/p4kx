@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::Arc;
+#[path = "observe.rs"]
+mod observation;
 
 use p4kx_assembly::{
-    Attachment, Entities, EntityNode, LoadoutEntry, LoadoutFiles, LoadoutResolver, OriginTally,
-    PartThreshold, PortNode, PortSource, UnreadableValue, ValueOrigin, VehicleImplementation,
-    VehicleTotals,
+    Attachment, EntityNode, LoadoutEntry, LoadoutResolver, OriginTally, PartThreshold, PortNode,
+    PortSource, UnreadableValue, ValueOrigin, VehicleImplementation, VehicleTotals,
 };
-use p4kx_extraction::{DataForge, Record, RecordTree, TreeBuilder};
+use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
 use super::cargo::{CargoReader, rounded};
 use super::model::{
@@ -47,28 +47,6 @@ impl std::fmt::Debug for ShipReader<'_> {
 }
 
 impl<'f> ShipReader<'f> {
-    /// Creates a reader over `forge` that reads the vehicle implementations and XML Loadouts from
-    /// `files`. Docked vehicles in a Loadout stay in their port, marked, and are not expanded.
-    #[must_use]
-    pub fn new(forge: &'f DataForge<'f>, files: &'f dyn LoadoutFiles) -> Self {
-        Self::with_entities(Arc::new(Entities::new(forge)), files)
-    }
-
-    /// Creates a reader like [`new`](Self::new) over the DataForge of `entities`, sharing its
-    /// index with every reader built from the same `Arc`, so that readers working in parallel
-    /// walk the Records once.
-    #[must_use]
-    pub fn with_entities(entities: Arc<Entities<'f>>, files: &'f dyn LoadoutFiles) -> Self {
-        let forge = entities.forge();
-        Self {
-            resolver: LoadoutResolver::with_entities(entities)
-                .with_files(files)
-                .stopping_at_docked_vehicles(),
-            trees: TreeBuilder::new(),
-            cargo: CargoReader::new(forge),
-        }
-    }
-
     /// Reads the base data of the ship `record`.
     ///
     /// # Errors

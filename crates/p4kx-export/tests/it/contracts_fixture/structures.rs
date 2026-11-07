@@ -183,7 +183,7 @@ fn property_structs() -> Vec<TestStruct> {
             .array("options", class("MissionPropertyValueOption_StringHash")),
         TestStruct::new("MissionPropertyValueOption_StringHash")
             .field("textId", TestType::Locale)
-            .field("weighting", TestType::Int32),
+            .field("weighting", TestType::Single),
         value("MissionPropertyValue_Organization")
             .array("matchConditions", pointer("DataSetMatchCondition")),
         TestStruct::new("DataSetMatchCondition"),

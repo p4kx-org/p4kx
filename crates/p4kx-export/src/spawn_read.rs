@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{StructValue, TagTree, Value};
+use p4kx_extraction::{Guid, RecordTree, Reference, StructValue, TagTree, Value};
 
 use crate::blueprint::as_struct;
 use crate::entity_spawn_model::EntitySpawnPool;
@@ -9,6 +9,8 @@ use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{items, one};
 use crate::npc_spawn_model::NpcSpawnPool;
 use crate::record_fields::{boolean, guid_value, integer, nonnil_guid, number, reference, text};
+use crate::record_read::ReadError;
+use crate::source_fields::Fields;
 use crate::spawn_error::SpawnError;
 use crate::spawn_model::{
     LocationCondition, LocationCount, LocationQuery, ShipSpawnGroup, ShipSpawnOption,
@@ -41,12 +43,32 @@ pub(crate) enum Spawn<'f> {
 pub(crate) struct Reader<'x, 'f> {
     tags: &'x TagTree,
     root: &'x StructValue<'f>,
+    owner: u32,
+    owner_guid: Guid,
 }
 
 impl<'x, 'f> Reader<'x, 'f> {
-    /// Creates the reader of the Record whose root struct is `root`.
-    pub(crate) const fn new(tags: &'x TagTree, root: &'x StructValue<'f>) -> Self {
-        Self { tags, root }
+    /// Creates an owner-aware reader for a canonical Record tree.
+    pub(crate) const fn for_record(tags: &'x TagTree, tree: &'x RecordTree<'f>) -> Self {
+        Self {
+            tags,
+            root: tree.root(),
+            owner: tree.record_index(),
+            owner_guid: tree.guid(),
+        }
+    }
+
+    /// Returns whether a weak reference names the original owning Record.
+    pub(crate) fn owns(&self, target: &Reference<'_>) -> bool {
+        self.owner == target.record_index() && self.owner_guid == target.guid()
+    }
+
+    /// Returns a weak target only within the original owning Record.
+    pub(crate) fn owned_target(&self, target: &Reference<'_>) -> Option<&'x StructValue<'f>> {
+        if !self.owns(target) {
+            return None;
+        }
+        self.target(target.location()?.as_str())
     }
 
     /// Reads the value of a property, `None` for a value that is no spawn description and no
@@ -99,6 +121,7 @@ impl<'x, 'f> Reader<'x, 'f> {
             weight: number(Some(option), "weight"),
             concurrent_amount: integer(Some(option), "concurrentAmount"),
             include_location_ai_spawn_tags: boolean(Some(option), "includeLocationAISpawnTags"),
+            crew_inherits_location_faction: boolean(Some(option), "crewInheritsLocationFaction"),
             tags: self.tag_list(Some(option), "tags"),
             negative_tags: self.tag_list(Some(option), "negativeTags"),
             markup_tags: self.tag_list(Some(option), "markupTags"),
@@ -150,7 +173,7 @@ impl<'x, 'f> Reader<'x, 'f> {
         &self,
         parent: Option<&StructValue<'f>>,
         what: &'static str,
-    ) -> Result<Vec<LocationCondition>, TemplateError> {
+    ) -> Result<Vec<LocationCondition>, ReadError> {
         items(parent, "matchConditions")
             .iter()
             .filter_map(as_struct)
@@ -162,7 +185,7 @@ impl<'x, 'f> Reader<'x, 'f> {
         &self,
         condition: &StructValue<'f>,
         what: &'static str,
-    ) -> Result<LocationCondition, TemplateError> {
+    ) -> Result<LocationCondition, ReadError> {
         let parent = Some(condition);
         let name = condition.type_name();
         let owned = |field: &str| text(parent, field).map(str::to_owned);
@@ -179,11 +202,11 @@ impl<'x, 'f> Reader<'x, 'f> {
                     .collect(),
             },
             "ExcludeNearbyLocationsDef" => LocationCondition::ExcludeNearbyLocations {
-                range_km: integer(parent, "exclusionRangeKm"),
+                range_km: Fields::new(condition, "matchConditions").number("exclusionRangeKm")?,
                 location_property: self.property_variable(parent, "locationProperty"),
             },
             "ExcludeDistantLocationsDef" => LocationCondition::ExcludeDistantLocations {
-                range_km: integer(parent, "exclusionRangeKm"),
+                range_km: Fields::new(condition, "matchConditions").number("exclusionRangeKm")?,
                 location_property: self.property_variable(parent, "locationProperty"),
             },
             "ExcludeProperty" => LocationCondition::ExcludeProperty {
@@ -202,7 +225,11 @@ impl<'x, 'f> Reader<'x, 'f> {
             "SpecificItemsDef" => LocationCondition::SpecificItems {
                 item_guids: crate::record_fields::references(parent, "items"),
             },
-            _ => return Err(TemplateError::unknown(what, condition)),
+            "FactionIdentityDef" => LocationCondition::FactionIdentity {
+                faction_identity: Fields::new(condition, "matchConditions")
+                    .reference("factionIdentity")?,
+            },
+            _ => return Err(TemplateError::unknown(what, condition).into()),
         })
     }
 
@@ -267,7 +294,7 @@ impl<'x, 'f> Reader<'x, 'f> {
         parent: Option<&StructValue<'f>>,
         name: &str,
     ) -> Option<CatalogGuid> {
-        let token = self.target(Self::place(parent?.field(name)?)?)?;
+        let token = self.target(self.place(parent?.field(name)?)?)?;
         guid_value(Some(token), "id")
             .and_then(nonnil_guid)
             .map(CatalogGuid)
@@ -281,7 +308,7 @@ impl<'x, 'f> Reader<'x, 'f> {
         parent: Option<&StructValue<'f>>,
         name: &str,
     ) -> Option<(Option<CatalogGuid>, Option<String>)> {
-        let place = Self::place(parent?.field(name)?)?;
+        let place = self.place(parent?.field(name)?)?;
         let output = self.target(place)?;
         let (token, _) = place.rsplit_once(".properties[")?;
         let id = self
@@ -294,15 +321,18 @@ impl<'x, 'f> Reader<'x, 'f> {
     }
 
     fn variable_of(&self, pointer: &Value<'f>) -> Option<String> {
-        let property = self.target(Self::place(pointer)?)?;
+        let property = self.target(self.place(pointer)?)?;
         text(Some(property), "missionVariableName").map(str::to_owned)
     }
 
     /// Returns where inside this Record the weak pointer `pointer` points.
-    fn place<'v>(pointer: &'v Value<'f>) -> Option<&'v str> {
+    fn place<'v>(&self, pointer: &'v Value<'f>) -> Option<&'v str> {
         let Value::Reference(target) = pointer else {
             return None;
         };
+        if !self.owns(target) {
+            return None;
+        }
         let location = target.location()?;
         Some(location.as_str())
     }
@@ -354,3 +384,7 @@ impl Cursor<'_, '_> {
         Some(at)
     }
 }
+
+#[cfg(test)]
+#[path = "spawn_owner_tests.rs"]
+mod owner_tests;

@@ -12,6 +12,9 @@ use crate::{MAX_LOADOUT_DEPTH, MAX_LOADOUT_PORTS};
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum LoadoutError {
+    /// The optional source observer stopped the resolution.
+    #[error("the loadout source observer stopped resolution")]
+    ObservationStopped,
     /// A Reference names a Record that does not exist.
     #[error("the Reference refers to the Record {guid}, which does not exist")]
     DanglingReference {
@@ -78,6 +81,18 @@ pub enum LoadoutError {
         /// The path the Record names.
         path: String,
     },
+    /// A configured XML Loadout has no matching Archive Entry.
+    #[error("the XML Loadout {path} cannot be read: there is no such file")]
+    MissingXmlLoadout {
+        /// The configured file path.
+        path: String,
+    },
+    /// A configured vehicle implementation or explicit patch has no matching Archive Entry.
+    #[error("the vehicle implementation {path}: there is no such file")]
+    MissingVehicleImplementation {
+        /// The configured implementation or patch path.
+        path: String,
+    },
     /// An XML Loadout cannot be read.
     #[error("the XML Loadout {path} cannot be read: {reason}")]
     XmlLoadout {
@@ -135,6 +150,7 @@ impl LoadoutError {
     #[must_use]
     pub const fn kind(&self) -> &'static str {
         match self {
+            Self::ObservationStopped => "observation_stopped",
             Self::DanglingReference { .. } => "dangling_reference",
             Self::InvalidReference { .. } => "invalid_reference",
             Self::UnknownClass { .. } => "unknown_class",
@@ -145,10 +161,12 @@ impl LoadoutError {
             Self::TooDeep => "too_deep",
             Self::TooManyPorts => "too_many_ports",
             Self::NoLoadoutFiles { .. } => "no_loadout_files",
-            Self::XmlLoadout { .. } => "xml_loadout",
+            Self::XmlLoadout { .. } | Self::MissingXmlLoadout { .. } => "xml_loadout",
             Self::Assortment { .. } | Self::UnknownPick { .. } => "assortment",
             Self::AssortmentRequirement { .. } => "assortment_requirement",
-            Self::VehicleImplementation { .. } => "vehicle_implementation",
+            Self::VehicleImplementation { .. } | Self::MissingVehicleImplementation { .. } => {
+                "vehicle_implementation"
+            }
         }
     }
 

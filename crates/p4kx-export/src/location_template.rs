@@ -90,7 +90,7 @@ fn template<'f>(
     texts: &Texts<'f>,
     tags: &TagTree,
 ) -> MissionLocationTemplate<'f> {
-    let reader = Reader::new(tags, tree.root());
+    let reader = Reader::for_record(tags, tree);
     let data = one(Some(tree.root()), "locationData");
     MissionLocationTemplate {
         guid: CatalogGuid(tree.guid()),

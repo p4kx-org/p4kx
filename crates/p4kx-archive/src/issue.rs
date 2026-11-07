@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use thiserror::Error;
 
 use crate::Entry;
+use crate::archive_metadata::ArchiveMetadata;
 
 /// How many Entry issues [`Archive::issues`](crate::Archive::issues) lists at most;
 /// [`Archive::issue_count`](crate::Archive::issue_count) still counts all of them.
@@ -149,4 +150,6 @@ fn lossy_path<'a>(bytes: &'a [u8], index: usize, log: &mut IssueLog) -> Cow<'a, 
 pub(crate) struct Directory {
     pub(crate) entries: Vec<Entry>,
     pub(crate) log: IssueLog,
+    pub(crate) installation_flags: Option<u8>,
+    pub(crate) metadata: ArchiveMetadata,
 }

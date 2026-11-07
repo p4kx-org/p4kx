@@ -174,6 +174,62 @@ fn text_without_a_component_gives_nothing() {
 }
 
 #[test]
+fn a_populated_unsupported_inventory_does_not_become_an_empty_component() {
+    let bytes = stream(&[
+        ENTITY,
+        "EntityComponentShop",
+        "offlineInventoryJSON",
+        "Scripts/ShopInventories/unsupported.csv",
+    ]);
+    let scan = components(&bytes, &anchors());
+    assert!(
+        scan.malformed,
+        "the authored file value could not be represented"
+    );
+    assert_eq!(
+        scan.components,
+        Vec::<ShopComponent>::new(),
+        "an invalid value is not an authored empty inventory"
+    );
+    assert_eq!(
+        scan.rejected, 0,
+        "unattributed valid paths retain their established count"
+    );
+}
+
+#[test]
+fn invalid_utf8_in_an_inventory_value_retains_other_valid_components() {
+    let mut bytes = stream(&[ENTITY, "EntityComponentShop", "offlineInventoryJSON"]);
+    bytes.extend_from_slice(b"\xff\0");
+    push(
+        &mut bytes,
+        &[
+            OTHER,
+            "EntityComponentShop",
+            "offlineInventoryJSON",
+            "Scripts/ShopInventories/valid.json",
+        ],
+    );
+    let scan = components(&bytes, &anchors());
+    assert!(
+        scan.malformed,
+        "populated undecodable value remains visible"
+    );
+    assert_eq!(
+        scan.components.len(),
+        1,
+        "a separate valid component survives"
+    );
+    assert_eq!(
+        scan.components
+            .first()
+            .map(|component| component.entity.as_str()),
+        Some(OTHER),
+        "only the intact Entity remains"
+    );
+}
+
+#[test]
 fn two_positions_between_name_and_path_are_two_objects() {
     let bytes = stream(&[
         "offlineInventoryJSON",

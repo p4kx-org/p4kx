@@ -240,7 +240,7 @@ pub(crate) fn candidates(
             let location = LocationShape {
                 kind: "entry",
                 path: entry.path().to_owned(),
-                language: folder_language(opened.audio_index(), entry.path()),
+                language: folder_language(&opened.audio_index(), entry.path()),
                 offset: None,
                 len: entry.uncompressed_size(),
             };

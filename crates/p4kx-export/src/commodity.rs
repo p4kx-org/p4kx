@@ -1,27 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{RecordTree, StructValue, Value, is_placeholder_key};
+use p4kx_extraction::{RecordTree, StructValue, is_placeholder_key};
 
 use crate::contract::Commodity;
 use crate::guid_text::CatalogGuid;
 use crate::record_fields::{
-    class_name, component, element, elements, locale_key, reference, single, structure,
+    class_name, component, element, locale_key, reference, single, structure,
 };
 use crate::resource_group::Groups;
 use crate::texts::Texts;
-
-/// Returns the GUID of the `ResourceType` Record the default composition of the commodity
-/// `tree` holds first.
-pub(crate) fn resource_type_guid(tree: &RecordTree<'_>) -> Option<CatalogGuid> {
-    let container = component(tree, "ResourceContainer");
-    elements(container, "defaultComposition")
-        .iter()
-        .find_map(|entry| match entry {
-            Value::Struct(entry) => reference(Some(entry), "entry"),
-            _ => None,
-        })
-}
 
 /// Returns the commodity the Record tree `tree` describes, its texts resolved by `texts`.
 ///
@@ -33,8 +21,8 @@ pub(crate) fn commodity<'f>(
     texts: &Texts<'f>,
     resource_type: Option<&RecordTree<'f>>,
     groups: &Groups,
+    subtype: Option<CatalogGuid>,
 ) -> Commodity<'f> {
-    let subtype = resource_type_guid(tree);
     let purchasable = component(tree, "SCItemPurchasableParams");
     let display = element(
         Some(tree.root()),

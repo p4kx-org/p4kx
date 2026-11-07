@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process;
 
 use p4kx_texture::TextureError;
 
-use crate::ConversionError;
 use crate::counting::{Counting, holds};
+use crate::{ArchiveWriteProtection, CancelToken, ConversionError, OwnedFileToken};
 
 const WRITE_BUFFER_LEN: usize = 256 * 1024;
 
@@ -24,8 +24,21 @@ pub fn write_replacing<T>(
     out: &Path,
     write: impl FnOnce(&mut BufWriter<File>) -> Result<T, ConversionError>,
 ) -> Result<T, ConversionError> {
-    p4kx_guard::ensure_writable(out)?;
-    let (temporary, file) = create_temporary(out)?;
+    write_replacing_protected(out, None, None, write)
+}
+
+/// Atomically replaces `out` while retaining the Archive job's source protection.
+///
+/// # Errors
+/// Returns write failures or source/target protection refusals before creating or publishing.
+pub fn write_replacing_protected<T>(
+    out: &Path,
+    protection: Option<&ArchiveWriteProtection>,
+    cancel: Option<&CancelToken>,
+    write: impl FnOnce(&mut BufWriter<File>) -> Result<T, ConversionError>,
+) -> Result<T, ConversionError> {
+    check_protected_output(out, protection, cancel)?;
+    let (temporary, file, ownership) = create_temporary(out, protection, cancel)?;
     let mut writer = BufWriter::with_capacity(WRITE_BUFFER_LEN, file);
     let written = write(&mut writer);
     let result = match written {
@@ -34,23 +47,29 @@ pub fn write_replacing<T>(
             .map_err(io::IntoInnerError::into_error)
             .and_then(|file| file.sync_all())
             .map_err(|source| write_error(out, source))
-            .and_then(|()| fs::rename(&temporary, out).map_err(|source| write_error(out, source)))
+            .and_then(|()| {
+                ownership.ensure_writable(&temporary, cancel_flag(cancel))?;
+                check_protected_output(out, protection, cancel)?;
+                fs::rename(&temporary, out).map_err(|source| write_error(out, source))
+            })
             .map(|()| value),
         Err(error) => {
             drop(writer);
             Err(error)
         }
     };
-    if result.is_err() {
-        let _ignored = fs::remove_file(&temporary);
-    }
-    result.map_err(|error| match error {
+    let result = result.map_err(|error| match error {
         ConversionError::Texture {
             source: TextureError::Write(source),
             ..
         } => write_error(out, source),
         other => other,
-    })
+    });
+    if result.is_err() {
+        crate::output_cleanup::conversion(result, &ownership, &temporary, cancel)
+    } else {
+        result
+    }
 }
 
 /// Writes `bytes` to the file `out` like [`write_replacing`].
@@ -91,8 +110,22 @@ pub fn write_replacing_counted(
     if_changed: bool,
     write: impl FnOnce(&mut dyn Write) -> Result<(), ConversionError>,
 ) -> Result<Replaced, ConversionError> {
-    p4kx_guard::ensure_writable(out)?;
-    let (temporary, file) = create_temporary(out)?;
+    write_replacing_counted_protected(out, if_changed, None, None, write)
+}
+
+/// Streams an atomic counted replacement under one Archive job's protection.
+///
+/// # Errors
+/// Returns protection, write or comparison failures without replacing the prior output.
+pub fn write_replacing_counted_protected(
+    out: &Path,
+    if_changed: bool,
+    protection: Option<&ArchiveWriteProtection>,
+    cancel: Option<&CancelToken>,
+    write: impl FnOnce(&mut dyn Write) -> Result<(), ConversionError>,
+) -> Result<Replaced, ConversionError> {
+    check_protected_output(out, protection, cancel)?;
+    let (temporary, file, ownership) = create_temporary(out, protection, cancel)?;
     let mut counting = Counting::new(BufWriter::with_capacity(WRITE_BUFFER_LEN, file));
     let written = write(&mut counting);
     let (len, crc) = (counting.len(), counting.crc());
@@ -102,14 +135,18 @@ pub fn write_replacing_counted(
             .into_inner()
             .map_err(io::IntoInnerError::into_error)
             .map_err(|source| write_error(out, source))
-            .and_then(|file| place(&temporary, file, out, if_changed, len, crc)),
+            .and_then(|file| {
+                ownership.ensure_writable(&temporary, cancel_flag(cancel))?;
+                check_protected_output(out, protection, cancel)?;
+                place(&temporary, file, out, if_changed, len, crc)
+            }),
         Err(error) => {
             drop(counting);
             Err(error)
         }
     };
     if result.as_ref().map_or(true, |replaced| !replaced.changed) {
-        let _ignored = fs::remove_file(&temporary);
+        return crate::output_cleanup::conversion(result, &ownership, &temporary, cancel);
     }
     result
 }
@@ -136,19 +173,46 @@ fn place(
     Ok(Replaced { len, changed: true })
 }
 
-fn create_temporary(out: &Path) -> Result<(PathBuf, File), ConversionError> {
+fn create_temporary(
+    out: &Path,
+    protection: Option<&ArchiveWriteProtection>,
+    cancel: Option<&CancelToken>,
+) -> Result<(PathBuf, File, OwnedFileToken), ConversionError> {
     let file_name = out
         .file_name()
         .ok_or_else(|| write_error(out, io::Error::from(io::ErrorKind::InvalidInput)))?;
     let mut name = file_name.to_os_string();
     name.push(format!(".p4kx-{}.part", process::id()));
     let temporary = out.with_file_name(name);
-    let file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&temporary)
-        .map_err(|source| write_error(out, source))?;
-    Ok((temporary, file))
+    check_protected_output(&temporary, protection, cancel)?;
+    let (file, ownership) = crate::create_output_file(&temporary, protection, cancel_flag(cancel))
+        .map_err(|error| match error {
+            crate::OwnedOutputError::Io { source, .. } => write_error(out, source),
+            other => other.into(),
+        })?
+        .into_parts();
+    Ok((temporary, file, ownership))
+}
+
+/// Checks a leaf output using its job context, or target-only protection for independent data.
+///
+/// # Errors
+/// Returns an established installation refusal or unavailable source/target identity.
+pub fn check_protected_output(
+    path: &Path,
+    protection: Option<&ArchiveWriteProtection>,
+    cancel: Option<&CancelToken>,
+) -> Result<(), p4kx_guard::WriteProtectionError> {
+    protection.map_or_else(
+        || p4kx_guard::ensure_writable(path),
+        |protection| protection.ensure_writable(path, cancel_flag(cancel)),
+    )
+}
+
+pub(crate) fn cancel_flag(cancel: Option<&CancelToken>) -> &std::sync::atomic::AtomicBool {
+    static NEVER_CANCELLED: std::sync::atomic::AtomicBool =
+        std::sync::atomic::AtomicBool::new(false);
+    cancel.map_or(&NEVER_CANCELLED, CancelToken::flag)
 }
 
 pub(crate) fn read_error(path: &Path, source: io::Error) -> ConversionError {
@@ -240,5 +304,62 @@ mod tests {
         });
         assert!(failed.is_err());
         assert_eq!(fs::read_dir(dir.path()).expect("read").count(), 0);
+    }
+
+    #[test]
+    fn cancellation_removes_a_fresh_ordinary_temporary_and_preserves_the_target() {
+        use std::io::Write;
+
+        let dir = tempfile::tempdir().expect("folder");
+        let source = dir.path().join("source.p4k");
+        let out = dir.path().join("result.bin");
+        fs::write(&source, b"source").expect("source");
+        fs::write(&out, b"prior").expect("prior output");
+        let cancel = crate::CancelToken::default();
+        let protection =
+            crate::ArchiveWriteProtection::new(&source, cancel.flag()).expect("context");
+        let result =
+            super::write_replacing_protected(&out, Some(&protection), Some(&cancel), |writer| {
+                writer
+                    .write_all(b"unpublished")
+                    .map_err(|error| super::write_error(&out, error))?;
+                cancel.cancel();
+                Ok(())
+            });
+        assert!(matches!(result, Err(crate::ConversionError::Cancelled)));
+        assert_eq!(fs::read(&out).expect("output"), b"prior");
+        assert_eq!(fs::read(&source).expect("source"), b"source");
+        assert_eq!(names(dir.path()).len(), 2);
+    }
+
+    #[test]
+    fn a_retargeted_temporary_is_retained_as_a_failure_during_cancellation() {
+        let dir = tempfile::tempdir().expect("folder");
+        let source = dir.path().join("source.p4k");
+        let out = dir.path().join("result.bin");
+        let temporary = out.with_file_name(format!("result.bin.p4kx-{}.part", std::process::id()));
+        let retained = dir.path().join("original.part");
+        fs::write(&source, b"source").expect("source");
+        let cancel = crate::CancelToken::default();
+        let protection =
+            crate::ArchiveWriteProtection::new(&source, cancel.flag()).expect("context");
+        let result =
+            super::write_replacing_protected(&out, Some(&protection), Some(&cancel), |_| {
+                fs::rename(&temporary, &retained).expect("retarget owned namespace");
+                fs::hard_link(&source, &temporary).expect("source alias");
+                cancel.cancel();
+                Ok(())
+            });
+        assert!(matches!(
+            result,
+            Err(crate::ConversionError::CleanupFailed { .. })
+        ));
+        assert_eq!(fs::read(&source).expect("source"), b"source");
+        assert_eq!(
+            fs::read(&temporary).expect("unowned alias remains"),
+            b"source"
+        );
+        assert!(retained.is_file());
+        assert!(!out.exists());
     }
 }

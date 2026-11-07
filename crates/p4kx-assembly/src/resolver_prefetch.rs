@@ -7,7 +7,8 @@ use std::sync::Arc;
 use p4kx_dataforge::{Guid, Record, TreeBuilder};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::resolver::{SpecResult, read_spec};
+use crate::resolver::SpecResult;
+use crate::resolver_observation::{self, LoadoutReadEvent};
 use crate::spec::{EntrySpec, LoadoutSpec};
 use crate::{LoadoutResolver, MAX_LOADOUT_DEPTH};
 
@@ -26,20 +27,38 @@ impl<'f> LoadoutResolver<'f> {
             }
             let (cached, missing): (Vec<_>, Vec<_>) = frontier
                 .into_iter()
-                .partition(|record| self.specs.contains_key(&record.guid()));
-            let read: Vec<(Guid, SpecResult)> = missing
+                .partition(|record| self.specs.contains_key(&record.index()));
+            for record in &cached {
+                if resolver_observation::notify(
+                    self.observation.as_deref(),
+                    LoadoutReadEvent::Reused { record },
+                )
+                .is_err()
+                {
+                    return;
+                }
+            }
+            let observation = self.observation.clone();
+            let read: Vec<(Record<'f>, SpecResult)> = missing
                 .into_par_iter()
                 .map_init(TreeBuilder::new, |builder, record| {
-                    (record.guid(), Arc::new(read_spec(builder, &record)))
+                    (
+                        record,
+                        Arc::new(resolver_observation::read_spec(
+                            builder,
+                            &record,
+                            observation.as_deref(),
+                        )),
+                    )
                 })
                 .collect();
             let mut level: Vec<SpecResult> = cached
                 .iter()
-                .filter_map(|record| self.specs.get(&record.guid()).cloned())
+                .filter_map(|record| self.specs.get(&record.index()).cloned())
                 .collect();
-            for (guid, spec) in read {
+            for (record, spec) in read {
                 level.push(Arc::clone(&spec));
-                self.specs.insert(guid, spec);
+                self.specs.insert(record.index(), spec);
             }
             if self.stop_at_docked && depth > 0 {
                 level.retain(|spec| spec.as_ref().as_ref().is_ok_and(|s| !s.docked_vehicle));
@@ -71,7 +90,7 @@ impl<'f> LoadoutResolver<'f> {
         }
         let mut seen = HashSet::new();
         named.retain(|record| {
-            !self.specs.contains_key(&record.guid()) && seen.insert(record.guid())
+            !self.specs.contains_key(&record.index()) && seen.insert(record.index())
         });
         named
     }
@@ -95,7 +114,7 @@ impl<'f> LoadoutResolver<'f> {
                 self.entry_records(nested, out, deferred);
                 continue;
             };
-            match self.specs.get(&record.guid()) {
+            match self.specs.get(&record.index()) {
                 None => deferred.push((record.guid(), Arc::clone(nested))),
                 Some(spec) if spec.as_ref().as_ref().is_ok_and(|s| s.docked_vehicle) => {}
                 Some(_) => self.entry_records(nested, out, deferred),
@@ -104,8 +123,10 @@ impl<'f> LoadoutResolver<'f> {
     }
 
     fn is_docked(&self, guid: Guid) -> bool {
-        self.specs
-            .get(&guid)
+        self.entities
+            .forge()
+            .record_by_guid(guid)
+            .and_then(|record| self.specs.get(&record.index()))
             .is_some_and(|spec| spec.as_ref().as_ref().is_ok_and(|s| s.docked_vehicle))
     }
 }

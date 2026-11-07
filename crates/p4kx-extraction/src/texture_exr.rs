@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use p4kx_texture::{HdrImage, TextureError, cube_cross_hdr, write_exr};
 use rayon::prelude::*;
 
-use crate::output_file::write_replacing;
+use crate::output_file::write_replacing_protected;
 use crate::texture_names::{image_suffixes, suffixed_path};
 use crate::{ConversionError, CubemapLayout, Texture};
 
@@ -114,7 +114,7 @@ impl Texture<'_> {
             .par_iter()
             .zip(&images)
             .try_for_each(|(file, image)| {
-                write_replacing(file, |writer| {
+                write_replacing_protected(file, self.write_protection()?, None, |writer| {
                     write_exr(image, writer)
                         .map_err(|error| ConversionError::of_texture(self.name(), error))
                 })

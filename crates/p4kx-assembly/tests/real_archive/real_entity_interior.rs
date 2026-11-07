@@ -67,11 +67,10 @@ fn rooms_outside_the_hull(class_name: &str) -> Result<(usize, usize), Box<dyn Er
     let models = ArchiveModels::new(&archive);
     let assembly = Assembly::build(&tree, &models, &AssemblyOptions::default())?;
     let interior = EntityInterior::build(&archive, &assembly, &tree, &InteriorOptions::default())?;
-    placement_against_hull(class_name, &assembly, &interior)
+    placement_against_hull(&assembly, &interior)
 }
 
 pub(super) fn placement_against_hull(
-    class_name: &str,
     assembly: &Assembly,
     interior: &EntityInterior,
 ) -> Result<(usize, usize), Box<dyn Error>> {
@@ -89,12 +88,10 @@ pub(super) fn placement_against_hull(
             Some(at) if !near(at, [0.0; 3]) => at,
             _ => reference.position(),
         };
-        assert!(
+        crate::media_fixtures::require(
             near(container.placement().translation(), expected),
-            "{class_name}: {} sits at {:?}, not at {expected:?}",
-            reference.file(),
-            container.placement().translation()
-        );
+            crate::media_fixtures::Check::ContainerPlacement,
+        )?;
         let models = container
             .interior()
             .parts()

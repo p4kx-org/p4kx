@@ -9,6 +9,13 @@ it.
 
 ## Versioning and consumers
 
+Version 3 is the catalog contract for 0.5.0 (ADR-0339). Consumers must accept version 3 before
+importing it. Tagged payload unions are closed: a new variant requires a version decision, unlike
+an unknown additive field or kind. The schema describes serialization, so emitted nullable payload
+fields are required even when their value is null. The previous released schema is retained as a
+compatibility-test fixture; ResourceType alone remains an additive extension.
+
+
 The rule is ADR-0054 (amending ADR-0002):
 
 - **Additive changes keep `schemaVersion`:** a new kind, a new field on an entity, on `source` or
@@ -137,19 +144,23 @@ same in every kind. Every field is always present; one that has no value is `nul
 
 | Field | Meaning |
 |-------|---------|
-| `schemaVersion` | The version of the shape, now `2`; an import rejects a version it does not know |
+| `schemaVersion` | The version of the shape, now `3`; an import rejects a version it does not know |
 | `source.channel` | The Channel: the folder holding the Archive, e.g. `LIVE` |
 | `source.build` | `branch`, `version`, `changeNumber` and `buildId` from the build manifest, or `null` |
 | `source.build.publicPatch` | The public patch version, e.g. `4.7.2`, from the RSI Launcher log line `SC <CHANNEL> <version>-<tag>.<change>` (`<version>`: two or three dot-separated numbers, kept as logged) whose change equals `changeNumber`; `null` when the log has no such line (never guessed from a neighbouring one) |
 | `source.archiveSize` | The size of the Archive file in bytes |
 | `source.archiveModified` | The modification time of the Archive file, UTC in RFC 3339 form |
+| `source.archiveKey` | Whether the Archive key was there for the encrypted Entries the export read: `given`, `missing` (no key was set) or `wrong` (the key did not fit). Without a usable key the file is valid but incomplete: vehicle implementations, XML Loadouts, shop inventories and the like are absent |
+| `source.encryptedEntriesUnread` | How many distinct encrypted Entries the export asked for and could not read because the key was missing or wrong; `0` when none was needed ([ADR-0353](adr/0353-exports-state-whether-the-archive-key-was-there.md)) |
 | `source.toolVersion` | The version of P4KX that wrote the catalog |
 | `source.exportedAt` | When the catalog was written, UTC in RFC 3339 form |
 | `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "…"}` when a Filter selected the Records |
+| `exportHealth` | Measured source-read and projection health, exact affected identities, separate Record/Archive Entry counters and bounded diagnostics; independent of Filter completeness ([contract](catalog-export-health.md)) |
 | `manufacturers` | The manufacturers, ordered by GUID |
 | `items` | The items, ordered by GUID |
 | `ships` | The ships and ground vehicles, ordered by GUID |
 | `commodities` | The commodities, ordered by GUID |
+| `resourceTypes` | Independently selected resource definitions, with density, packaging, authored properties and quality sources, ordered by GUID ([contract](catalog-resource-types.md)) |
 | `blueprints` | The crafting blueprints with their ingredients, all tiers, default availability and dismantle link, ordered by GUID |
 | `resourceGroups` | The groups of resource types, the targets of `typeGuid`, ordered by GUID |
 | `blueprintCategories` | The blueprint categories, the targets of `categoryGuid`, ordered by GUID |
@@ -185,6 +196,7 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `missionBrokerEntries` | The mission broker entries (`MissionBrokerEntry`), the targets of `contracts[].brokerEntryGuid`, ordered by GUID |
 | `contractNpcSpawns` | The distinct NPC spawn descriptions of the contracts, templates and broker entries, ordered by identifier |
 | `contractEntitySpawns` | The distinct entity spawn descriptions of the contracts, templates and broker entries, ordered by identifier |
+| `missionPropertySets` | The authored Generator property arrays, ordered by stable source identifier; contract rows join them through `propertySetGuids` |
 | `lootTables` | The loot tables (`LootTableV3Record`) with the weighted archetypes of each, ordered by GUID |
 | `lootArchetypes` | The loot archetypes (`LootArchetypeV3Record`) with the weighted selectors of each, ordered by GUID |
 | `lootPoolFilters` | The pool filters of the loot generation, ordered by GUID |
@@ -197,8 +209,10 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `craftingGlobal` | Not a kind: the global crafting parameters that apply to every dismantle |
 | `itemRecovery` | Not a kind: the item recovery multipliers and rates behind claims, with the override groups of entity classes, `null` without the Record; see "Item recovery rules" below |
 
-A complete kind lists every Record of its kind in the Build, so the import may treat a Record it
-knows but no longer finds as removed. A partial kind lists only what the Filter selected.
+An unfiltered kind with complete catalog-wide `exportHealth` lists its successfully read sources,
+so an import can use absence as removal evidence within that kind's selection policy. A partial
+kind lists only what the Filter selected. Incomplete health, including global blocking diagnostics,
+cannot establish removal even when a kind's Filter scope is complete.
 
 ### Ordering Builds
 
@@ -671,8 +685,8 @@ from the entity:
 |-------|--------|
 | `name` | `SCItemPurchasableParams.displayName` |
 | `description` | `EntityUIDisplayParams.displayDescription` in `StaticEntityClassData` |
-| `typeGuid` | The GUID of the `ResourceTypeGroup` Record that directly lists the `ResourceType` in its `resources` (19 groups on LIVE: Metal, Mineral, Gas, …), the `guid` of a `resourceGroups` entry; `null` without a `ResourceType` or a group |
-| `subtypeGuid` | The GUID of the `ResourceType` Record that the first entry of `ResourceContainer.defaultComposition` links to; `null` without one, e.g. `Special_HolidayLetter` |
+| `typeGuid` | The first selected, readable, non-leftover `ResourceTypeGroup` in source Record order that directly lists this ResourceType; `null` without one. All direct memberships are in `resourceTypes[].groupGuids` |
+| `subtypeGuid` | The ResourceType GUID of the first non-null `entry` of the first `ResourceContainer.defaultComposition`; nullable and non-unique. A configured dangling first GUID is retained rather than replaced by a later link |
 | `displayType` | A text: `SCItemPurchasableParams.displayType`, e.g. `@items_commodities_type_metal` |
 | `densityGramsPerCubicCentimetre` | The number `densityType.densityUnit.gramsPerCubicCentimeter` of the `ResourceType` holds (a fact, no game text); `null` without a `ResourceType`, a density or a density in another unit |
 | `refinedSubtypeGuid` | The GUID `refinedVersion` of the `ResourceType` links to; `null` without a `ResourceType` or a `refinedVersion`. It equals the `subtypeGuid` of the refined commodity only when the catalog has that commodity |
@@ -698,10 +712,12 @@ and `description` are those of the `ResourceType`, `typeGuid` is its group, `sub
 GUID and `displayType` has no key. With a `--filter`, such an entry is listed only when its record
 path matches.
 
-The join from an ingredient to its commodity is `resourceGuid` = `subtypeGuid`. A `ResourceType`
-that a commodity Record carries yields no second entry, so every `resourceGuid` of the catalog
-matches exactly one commodity (checked against LIVE). A `ResourceType` that several commodity
-Records share (on LIVE the Slam variants and the med pens) matches several; no recipe uses one.
+`commodities[].guid` is the commodity identity. Several commodities can share one nullable
+`subtypeGuid`; a ResourceType can also have no commodity. Join an ingredient's `resourceGuid` to
+`resourceTypes[].guid` for resource facts and to every matching `commodities[].subtypeGuid` for
+commodity alternatives. Never index commodities uniquely by `subtypeGuid`. The independent
+[`resourceTypes` contract](catalog-resource-types.md) retains every selected resource even when
+the existing commodity fallback does not apply.
 
 A blueprint (`CraftingBlueprintRecord`) takes its fields from `blueprint`:
 
@@ -745,20 +761,23 @@ takes its fields from the Record:
 |-------|--------|
 | `className` | The Record name without its type, e.g. `Metal` |
 | `name` | `displayName`, e.g. `@items_commodities_type_metal`; a placeholder key (`@LOC_PLACEHOLDER`, 7 groups on LIVE) leaves `en` and `de` `null`, and the Basetool falls back to `className` |
+| `description` | `description` as LocalisedText, marked as game text (`x-gameText`) |
+| `defaultThumbnailPath`, `defaultThumbnailPathSVG` | Raw source asset-path strings, preserving an empty string |
+| `resources`, `groups` | Nullable ordered source Record-reference lists, retaining repeated links and null positions |
 | `parentGuid` | The GUID of the group that lists this group in its `groups`, the `guid` of another `resourceGroups` entry; `null` for a top-level group; the first group in Record order wins when several list it. Only the groups of the kind list: a group left out as a development leftover or unreadable names no parent and no `ResourceType` |
 
-The groups form a forest, and `parentGuid` is the direct parent only. The import must not assume
-a fixed depth and must guard against a cycle: the catalog exports the lists as the game stores
-them, so a group that lists itself has no parent and two groups that list each other (A lists B, B
-lists A) are each other's parent, with no root.
+`parentGuid` retains the first direct parent among selected groups. Importers must guard against
+cycles and must not assume a fixed depth or a forest. The source lists preserve repeated parents,
+self-links and cycles; the legacy singular `parentGuid` excludes a group's own self-link.
 
 Groups nest one level on LIVE: Metal lists Alloy and UnrefinedOres, Mineral lists Raw_Minerals,
 Nonmetal lists Halogen, Organic lists Food, ProcessedGoods lists SyntheticMaterials, Vice and
 Bulk_Supplies. A commodity points at the group that lists its `ResourceType` directly, so a
-commodity of Alloy has the child as `typeGuid`, not Metal. `description`, the thumbnail paths and
-the lists `resources` and `groups` are not exported: the descriptions are game texts, the paths are
-media, and the membership is `typeGuid` of the commodities. All groups share one `recordPath`, the
-Record file `resourcetypedatabase`; `className` and `guid` tell them apart.
+commodity of Alloy has the child as `typeGuid`, not Metal. `resources` and `groups` preserve the
+authored lists independently of these singular convenience fields. `resourceTypes[].groupGuids`
+contains all distinct selected direct memberships, sorted by GUID. The descriptions and raw
+thumbnail paths are exported as source facts; cataloging does not extract the media. The source
+Record path is retained, and `className` and `guid` distinguish Records that share one file.
 
 A blueprint category (`BlueprintCategoryRecord`, 21 on LIVE) is the target of the `categoryGuid` of
 a blueprint. The Record holds no field at all, so the category has `guid`, `className` (e.g.
@@ -773,7 +792,8 @@ Every `typeGuid` of a commodity and every `categoryGuid` of a blueprint resolves
 `resourceGroups` or `blueprintCategories` (checked against LIVE; a commodity without a
 `ResourceType` or group, 1 on LIVE, and a blueprint without a category or whose category is a
 left-out leftover or unreadable have `null`; a commodity whose `ResourceType` only a leftover or
-unreadable group lists has a `null` `typeGuid`). The groups are found whatever the `--filter`; a
+unreadable group lists has a `null` `typeGuid`). Only selected groups affect group and commodity
+membership fields; an additional diagnostic read of an unselected group does not affect them. A
 category is only found missing when the `--filter` selects it, so under a `--filter` a
 `categoryGuid` may still name a leftover category outside it. With a
 `--filter`, a kind is partial and the references need not resolve.
@@ -827,7 +847,7 @@ the record path and marks the kind partial).
 | Kind | Fields |
 |------|--------|
 | `gameplayProperties` | `name`: the localisation key `propertyName` and its texts; a placeholder key stays as `key` and leaves `en` and `de` `null`, as for `items` and `blueprints`. The target of a modifier's `propertyGuid` |
-| `qualityDistributions` | `distribution`: a normal distribution `kind`, `min`, `max`, `mean`, `stddev` (`null` for an override Record or a value beyond a 32-bit float), and `overrides`: per location a `locationGuid` and its `distribution` (empty for a default Record). Both Record types of `crafting/qualitydistribution` are listed |
+| `qualityDistributions` | `distribution`: shared QualityCurve with `kind`, exact nullable Int32 `min`/`max` and nullable finite f32 `mean`/`stddev`; `null` for an override Record. `overrides`: per-location `locationGuid` and its distribution, empty for a default Record. Both Record types of `crafting/qualitydistribution` are listed |
 | `qualityQuantizations` | `bands` and `resourceTypeGuids`, described under "Quality quantizations" below |
 | `blueprintPools` | `entries`: per entry `blueprintGuid` and `weight`; `totalWeight`, the sum of the positive weights; `rewardSources`: every struct of any Record with a Reference to the pool (on LIVE the `BlueprintRewards` result of a contract) with `recordGuid`, `recordPath`, `contractId`, `contractName` (both from the nearest enclosing struct that has an `id`) and `chance`, ordered by `recordGuid` and then in stored order. A `blueprintGuid` may point at a blueprint that is left out of `blueprints` as a failure |
 | `dismantleProcesses` | `efficiency` (0.5 on LIVE) and `timeSeconds` (15 on LIVE) of the `GenericCraftingProcess_Dismantle` |
@@ -835,7 +855,13 @@ the record path and marks the kind partial).
 A blueprint's chance from a source is `chance` x the entry's `weight` / `totalWeight`; a source
 without a chance or with one outside 0 to 1, a pool without a positive weight and an entry with a
 weight of zero or less give none. The quality distributions carry no link to a blueprint or source:
-the Records do not hold one, so the catalog lists them as they are.
+the Records do not hold one, so the catalog lists them as they are. Resource-owned inline and
+linked forms preserve their source ownership in
+[`resourceTypes[].properties`](catalog-resource-types.md#quality-source-wrappers-and-exact-curves).
+Wrong numeric source types, nonfinite parameters and values outside finite f32 representation
+produce explicit projection failures; they do not silently become null. Known fieldless curve
+bases retain their `kind` with null numeric fields. The public Rust QualityCurve shares exact
+`Option<i32>` bounds through both existing reexport paths.
 
 #### Quality quantizations
 
@@ -849,8 +875,11 @@ and
 | `bands` | `qualityQuantization.bands` in stored order: per band `start`, `end` (inclusive) and `mappedValue`, whole numbers. Every quality from `start` to `end` counts as `mappedValue`. LIVE has 8 bands per Record with the same ranges (0-399, 400-599, 600-699, 700-799, 800-899, 900-949, 950-998, 999-1000) that together cover the qualities 0 to 1000; only the `mappedValue`s differ per resource |
 | `resourceTypeGuids` | The GUIDs of the `ResourceType` Records whose crafting data link to the Record, without repeats and ordered by GUID. The link goes from the `ResourceType` (`properties[].qualityQuantization.qualityQuantizationRecord`); the quantization Record holds none. On LIVE 43 links reach 42 Records (`Carinite` and `CarinitePure` share one); every linked `ResourceType` is the `subtypeGuid` of a commodity of the catalog, because a `ResourceType` a kept quantization links to is backfilled as a commodity (ADR-0184); with a `--filter`, only those whose record path matches |
 
-The links are read from every `ResourceType` Record whatever the Filter, except those that are
-development leftovers: such a `ResourceType` neither links nor counts. A Record no `ResourceType`
+When a catalog has a selected non-leftover quantization target, or its target metadata is
+uncertain, its reverse links are read from every non-leftover ResourceType, including sources
+outside the Filter. Without such a target, only selected ResourceType inputs contribute link
+evidence and the existing catalog counter. The public `read_crafting` API retains its unfiltered
+ResourceType-link contract. A development-leftover ResourceType neither links nor counts. A Record no `ResourceType`
 uses is ordinary game data and stays in the kind with an empty `resourceTypeGuids` (20 on LIVE);
 `CatalogSummary::quantizations().unused` and `quantizations.unused` of `p4kx catalog --json` count
 them, with no effect on the exit code. The same summary counts `unresolved_links`, the links to a
@@ -1439,6 +1468,7 @@ at a lower level and is itself left out.
 | `shipSpawns` | `variable`, `token` (`extendedTextToken`, `null` when empty), `level` and `poolGuid`, an entry of `contractShipSpawns`; ordered by variable |
 | `npcSpawns`, `entitySpawns` | The same links for the NPC and entity spawn descriptions (see "NPC and entity spawns"): `poolGuid` is an entry of `contractNpcSpawns` or `contractEntitySpawns` |
 | `locationQueries` | `variable`, `token`, `level` and `queryGuid`, an entry of `contractLocationQueries`; ordered by variable |
+| `propertySetGuids` | Links to `missionPropertySets` in handler, contract and sub-contract order, preserving source declarations without computing runtime precedence |
 | `locationPrerequisites` | The `ContractPrerequisite_LocationProperty` prerequisites of the handler, the contract and the sub contract, in that order, as stored: `level` (`handler`, `contract`, `subContract`), `variable` (the `propertyVariableName`, a `variable` of `locationQueries`; on LIVE 4 of the 479 name a variable no query states), `token` and `locationLevelType` |
 
 **Identifiers.** The Archive gives these inline structures no GUID, so equal content shares one
@@ -1487,6 +1517,17 @@ mission modules and limits and the security network manifest.
 
 Not exported: SCMDB's own pools, waves and region lists, which are derived and not stated by the
 Archive.
+
+### Authored mission property sets
+
+`missionPropertySets` preserves the complete typed `propertyOverrides` declarations of Generator
+handlers, contracts and sub-contracts. Each source array is emitted once and contract rows refer
+to it through ordered `propertySetGuids`. The owner GUID, Record path and struct, exact authored
+location and level remain available, along with ordered nullable declarations containing exact
+variable/token strings and the shared `PropertyValue` union. Empty strings stay empty in this
+source kind. Stable identifiers depend on the owner GUID and authored array position, so a value
+edit does not change identity. See [the full field and identity contract](mission-property-sets.md)
+and ADR-0345. Template and broker property fields keep their existing meanings.
 
 ### Contract templates
 
@@ -1556,9 +1597,11 @@ referenced property the `missionVariableName` of the property of the template it
 `value` (for an output, embedded or input property) and `linkedOutput` (for an input: the
 `objectiveId` of the objective that holds the output and its `variable`). The `value` is tagged by
 `type`: `object` and `deliveryOrder` (no fields), `boolean` (`value`), `stringHash` (`options`, each
-`displayName`, a game text, `value`, `weighting` and `dependentProperties`, the variables of the
-properties the option makes dependent), `integer` and `float` (`options`, each `displayName`,
-`value`, `variation`, `weighting` and `dependentProperties`), `tags` (`tags` and `negativeTags`),
+`displayName`, a game text, `value`, fractional `weighting`, `debugForceChooseThisOption` and
+structured `dependentProperties` with the property and selected option links), `integer` and
+`float` (`options`, each with the same metadata and `value`/`variation`; integer fields retain
+exact `Int32` values), `tags` (`tags`, `negativeTags`, raw `sourceTags`/`sourceNegativeTags` and
+complete `options`),
 `shipSpawnDescriptions` (`poolGuid`, an entry of `contractShipSpawns`, `null` for a description
 without a group), `location` (`queryGuid`, an entry of `contractLocationQueries`),
 `npcSpawnDescriptions` and `entitySpawnDescriptions` (`poolGuid`, an entry of `contractNpcSpawns` or
@@ -1571,11 +1614,22 @@ and `maxItemsToFind`), `aiName` (the fields of an embedded NPC name, see "NPC an
 `randomName`, `randomLastName`, `randomNickName`, `givenName`, `givenLastName`, `givenNickName`,
 `chanceOfNickName` and `nameDataGuid`), `combinedDataSetEntries` (`entryProperties`, the variables
 of the `dataSetEntryProperties`), `haulingOrders` (`requirements` as in "Hauling orders"), `reward`
-(`reward`, the `rewardDef` as the `reward` of a broker entry, `null` without one), and `timeTrialRace`
-and `starMapLocation` (no fields). The spawn descriptions and location queries are read as for the
-contracts and added to their kinds. A value of any other struct fails the Record (on LIVE the
-values of all properties are of the types above); so does an organisation or a mission item whose
-condition is of a struct the catalog does not know.
+(`reward`, the `rewardDef` as the `reward` of a broker entry, `null` without one), `timeTrialRace`
+(`targetSplits`, ordered structures with `targetSplit`) and `starMapLocation` (no fields).
+`autoSpawns` retains its definition Reference and concrete closet-search options; `investigation`
+retains journal entries, suspects, locations and every clue/item subtype. Their complete fields,
+null conventions and owner-local weak references are described in
+[Typed mission property values](mission-property-values.md). The spawn descriptions and location
+queries are read as for contracts and added to their kinds. An unsupported value or data-set
+condition fails its owning Record instead of being represented as absent data.
+
+**Scoped location properties (schema 3).** `scopedLocation` retains all six optional source
+filters: `factionFilter`, `locationClassFilter`, `locationSizeFilter`, `locationFunctionFilter`,
+`otherLocationFilter` and `relativeLocationFilter`. Their concrete required/excluded/same/different
+variants, raw enum names, ordered definition References and owner-scoped weak links are described
+in [Scoped mission-location values](scoped-locations.md), including null/empty states, source
+identity and unresolved/error statuses. No runtime-selected location is calculated. These values
+use the same reader in objective, template, broker and Generator source-set mission properties.
 
 **Contract-level properties.** The `value` of an entry of `contractProperties` of a template and of
 `missionProperties` of a broker entry is read by the reader of the objective values and states the
@@ -1601,8 +1655,9 @@ with a condition, an action or a modifier of a struct the catalog does not know:
 the build and not an entry (none on LIVE). A future Build that meets such a struct therefore
 lacks the whole Record: it is not in the kind, the summary counts it in the `failed` list of the
 build (`p4kx catalog` prints it, with the record path and the struct name as reason, and exits with
-code 1), and the contracts that name it keep a GUID that resolves to no entry, so a consumer must
-check the failure list before it relies on the links being complete.
+code 1). Normal publication refuses that incomplete result. An explicit diagnostic artifact can
+retain contracts whose template GUID resolves to no entry; its `exportHealth` identifies the
+failure, so consumers preserve the affected stored data rather than infer removal.
 
 ### Mission broker entries
 
@@ -2483,6 +2538,7 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `contractLocationQueries` | None: derived from the properties of the contracts and their templates, no Records | |
 | `contractNpcSpawns` | None: derived from the properties of the contracts, templates and broker entries, no Records | |
 | `contractEntitySpawns` | None: derived from the properties of the contracts, templates and broker entries, no Records | |
+| `missionPropertySets` | None: derived from the authored property overrides of selected Generator Records | |
 | `contractTemplates` | `libs/foundry/records/` (every folder; see "Contract templates") | `ContractTemplate` |
 | `missionBrokerEntries` | `libs/foundry/records/` (every folder; see "Mission broker entries") | `MissionBrokerEntry` |
 | `lootTables` | `libs/foundry/records/lootgeneration/loottables/` | `LootTableV3Record` |
@@ -2525,12 +2581,19 @@ kinds keep their `display` and `temp` Records (radar displays, shop displays and
 changed the selection of `ships` for `schemaVersion` 2 (ADR-0167): 21 ships on LIVE are skipped
 that version 1 listed.
 
-A selected Record that cannot be read, such as one whose struct layout is corrupt, does not stop
-the catalog: it is left out, counted as a failure and reported with its record path, GUID and
-reason (a ship whose loadout cannot be resolved is the exception: it stays in `ships`, see
-"Loadouts"). `p4kx catalog` prints each failure on stderr, lists them under `failed` in `--json` and
-exits with code 1, with the catalog written; the desktop app lists them in the summary. The
-catalog file itself, its schema and its completeness are not affected.
+A selected Record that cannot be read or projected is recorded in the measured `exportHealth`,
+with its physical source index, GUID, readable path, stage and stable diagnostic category. A ship
+whose loadout fails can retain its original ship row; that secondary failure is distinct from an
+omitted ship source. Unreadable owned fields also remain visible when an optional mapper retained
+the row. Source warning codes retain their producer counts and explicit units.
+
+Normal publication refuses incomplete health before creating or replacing the destination.
+Explicit `--diagnostic-partial`, or the separate diagnostic action in the desktop window, permits
+the diagnostic file and records that mode inside it. A successful diagnostic write remains an
+incomplete result. `completeness` retains its Filter-selection meaning. Consumers require both an
+unfiltered selection and complete export health before treating absent rows as removals; preserve
+existing data when a diagnostic artifact cannot establish absence. The complete field and counter
+contract is [catalog export health](catalog-export-health.md) and ADR-0347.
 
 ## Determinism and size
 

@@ -10,12 +10,16 @@ use crate::assortment::Assorted;
 use crate::entities::is_entity;
 use crate::pick::LoadoutPicks;
 use crate::plan::Plan;
+use crate::resolver_observation::{self, Cache, LoadoutReadEvent, Observation};
 use crate::spec::{EntitySpec, EntrySpec, LoadoutSpec, TargetSpec};
 use crate::walk::Walk;
 use crate::{
     ChangeError, ChangedLoadout, Entities, EntityNode, ItemFacts, LandingGear, LoadoutChanges,
     LoadoutError, LoadoutFiles, VehicleImplementation, Wearable, xml,
 };
+
+#[path = "resolver_specs.rs"]
+mod specs;
 
 pub(crate) type SpecResult = Arc<Result<EntitySpec, LoadoutError>>;
 pub(crate) type EntriesResult = Result<Entries, LoadoutError>;
@@ -47,11 +51,13 @@ impl Entries {
 pub struct LoadoutResolver<'f> {
     pub(crate) entities: Arc<Entities<'f>>,
     pub(crate) files: Option<&'f dyn LoadoutFiles>,
-    pub(crate) specs: HashMap<Guid, SpecResult>,
+    pub(crate) specs: HashMap<u32, SpecResult>,
     xml: HashMap<String, EntriesResult>,
     pub(crate) vehicles: HashMap<String, VehicleResult>,
     pub(crate) landing: HashMap<Guid, Result<Arc<[LandingGear]>, LoadoutError>>,
     pub(crate) builder: TreeBuilder<'f>,
+    pub(crate) observation: Option<Arc<Observation>>,
+    pub(crate) read_sources: HashMap<(Cache, Guid), Record<'f>>,
     pub(crate) assortments: HashMap<Guid, Assorted>,
     pub(crate) assorting: Vec<Guid>,
     pub(crate) picks: LoadoutPicks,
@@ -59,7 +65,7 @@ pub struct LoadoutResolver<'f> {
     pub(crate) seen_groups: HashSet<String>,
     pub(crate) stop_at_docked: bool,
     stop: Option<&'f (dyn Fn() -> bool + Sync)>,
-    serial_reads: usize,
+    pub(crate) serial_reads: usize,
     pub(crate) tag_tree: OnceLock<TagTree>,
 }
 
@@ -93,6 +99,8 @@ impl<'f> LoadoutResolver<'f> {
             vehicles: HashMap::new(),
             landing: HashMap::new(),
             builder: TreeBuilder::new(),
+            observation: None,
+            read_sources: HashMap::new(),
             assortments: HashMap::new(),
             assorting: Vec::new(),
             picks: LoadoutPicks::new(),
@@ -123,7 +131,7 @@ impl<'f> LoadoutResolver<'f> {
     }
 
     pub(crate) fn stopped(&self) -> bool {
-        self.stop.is_some_and(|stop| stop())
+        self.observation_stopped() || self.stop.is_some_and(|stop| stop())
     }
 
     /// Reads the XML Loadouts Records name from `files`.
@@ -149,13 +157,22 @@ impl<'f> LoadoutResolver<'f> {
     /// [`LoadoutError::UnreadableRecord`] when its tree cannot be built; every error below the
     /// root is kept in the tree instead.
     pub fn resolve(&mut self, entity: &Record<'f>) -> Result<EntityNode, LoadoutError> {
+        if self.observation_stopped() {
+            return Err(LoadoutError::ObservationStopped);
+        }
         self.picks = LoadoutPicks::new();
         self.prefetch(*entity);
-        let spec = self.spec(entity.guid());
+        if self.observation_stopped() {
+            return Err(LoadoutError::ObservationStopped);
+        }
+        let spec = self.spec_record(entity);
         let spec = spec.as_ref().as_ref().map_err(Clone::clone)?;
         let mut walk = Walk::new(entity.guid(), None);
         let mut node = self.node(spec, None, &mut walk);
         self.dress_body(&mut node);
+        if self.observation_stopped() {
+            return Err(LoadoutError::ObservationStopped);
+        }
         Ok(node)
     }
 
@@ -171,12 +188,19 @@ impl<'f> LoadoutResolver<'f> {
         entity: &Record<'f>,
         tree: &RecordTree<'f>,
     ) -> Result<EntityNode, LoadoutError> {
-        if tree.guid() == entity.guid()
-            && !self.specs.contains_key(&entity.guid())
+        if (tree.guid(), tree.record_index()) == (entity.guid(), entity.index())
+            && !self.specs.contains_key(&entity.index())
             && is_entity(entity)
         {
+            resolver_observation::notify(
+                self.observation.as_deref(),
+                LoadoutReadEvent::ProvidedTree {
+                    record: entity,
+                    tree,
+                },
+            )?;
             self.specs
-                .insert(entity.guid(), Arc::new(Ok(EntitySpec::read(tree))));
+                .insert(entity.index(), Arc::new(Ok(EntitySpec::read(tree))));
         }
         self.resolve(entity)
     }
@@ -239,7 +263,7 @@ impl<'f> LoadoutResolver<'f> {
             })?)
         };
         self.prefetch(*entity);
-        let spec = self.spec(entity.guid());
+        let spec = self.spec_record(entity);
         let spec = spec.as_ref().as_ref().map_err(Clone::clone)?;
         let mut walk = Walk::new(entity.guid(), plan);
         walk.cancellable = true;
@@ -263,7 +287,7 @@ impl<'f> LoadoutResolver<'f> {
     ///
     /// Returns the reason when the Record is no Entity or cannot be read.
     pub fn item_facts(&mut self, entity: &Record<'f>) -> Result<ItemFacts, LoadoutError> {
-        let spec = self.spec(entity.guid());
+        let spec = self.spec_record(entity);
         spec.as_ref()
             .as_ref()
             .map(EntitySpec::item_facts)
@@ -277,7 +301,7 @@ impl<'f> LoadoutResolver<'f> {
     ///
     /// Returns the reason when the Record is no Entity or cannot be read.
     pub fn wearable(&mut self, entity: &Record<'f>) -> Result<Wearable, LoadoutError> {
-        let spec = self.spec(entity.guid());
+        let spec = self.spec_record(entity);
         spec.as_ref()
             .as_ref()
             .map(Wearable::from_spec)
@@ -305,21 +329,6 @@ impl<'f> LoadoutResolver<'f> {
         Ok((record.guid(), facts))
     }
 
-    /// Returns the cached spec of the Record `guid`, reading it on a miss.
-    pub(crate) fn spec(&mut self, guid: Guid) -> SpecResult {
-        if let Some(spec) = self.specs.get(&guid) {
-            return Arc::clone(spec);
-        }
-        self.serial_reads = self.serial_reads.saturating_add(1);
-        let forge = self.entities.forge();
-        let spec = Arc::new(match forge.record_by_guid(guid) {
-            Some(record) => read_spec(&mut self.builder, &record),
-            None => Err(LoadoutError::DanglingReference { guid }),
-        });
-        self.specs.insert(guid, Arc::clone(&spec));
-        spec
-    }
-
     /// Returns the entries of a Loadout, reading an XML Loadout once per resolver.
     pub(crate) fn entries(&mut self, loadout: Option<&LoadoutSpec>) -> EntriesResult {
         match loadout {
@@ -336,9 +345,11 @@ impl<'f> LoadoutResolver<'f> {
                 self.xml
                     .entry(path.to_ascii_lowercase())
                     .or_insert_with(|| {
-                        xml::load(files, path).map(|loaded| Entries {
-                            list: Arc::from(loaded.entries),
-                            issues: Arc::from(loaded.issues),
+                        xml::load_observed(files, path, self.observation.as_deref()).map(|loaded| {
+                            Entries {
+                                list: Arc::from(loaded.entries),
+                                issues: Arc::from(loaded.issues),
+                            }
                         })
                     })
                     .clone()
@@ -361,35 +372,4 @@ impl<'f> LoadoutResolver<'f> {
     pub fn records_read(&self) -> usize {
         self.specs.len()
     }
-
-    /// Returns how many Records were read one at a time while a tree was built, outside the
-    /// parallel prefetch.
-    #[doc(hidden)]
-    #[must_use]
-    pub const fn serial_reads(&self) -> usize {
-        self.serial_reads
-    }
-}
-/// Reads the spec of one Record, which must be an Entity.
-pub(crate) fn read_spec<'f>(
-    builder: &mut TreeBuilder<'f>,
-    record: &Record<'f>,
-) -> Result<EntitySpec, LoadoutError> {
-    let guid = record.guid();
-    if !is_entity(record) {
-        return Err(LoadoutError::NotAnEntity {
-            guid,
-            type_name: record
-                .type_name()
-                .unwrap_or("Record of an unreadable type")
-                .to_owned(),
-        });
-    }
-    builder
-        .build(record)
-        .map(|tree| EntitySpec::read(&tree))
-        .map_err(|error| LoadoutError::UnreadableRecord {
-            guid,
-            reason: error.to_string(),
-        })
 }

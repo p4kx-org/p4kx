@@ -14,12 +14,14 @@ use crate::chunk_source::ChunkSource;
 use crate::disk_case::CaseIndex;
 use crate::model_companions::{ArchiveCompanions, DiskCompanions};
 use crate::path_index::PathIndex;
+use crate::source_protection::SourceProtection;
 use crate::texture_grey::TextureVerdicts;
 
 /// A model read from a chunk file Entry of an Archive or from a file on disk, with the
 /// companions next to it.
 #[derive(Debug)]
 pub struct ModelSource {
+    pub(crate) protection: SourceProtection,
     name: String,
     inputs: Vec<PathBuf>,
     model: Model,
@@ -118,6 +120,7 @@ impl ModelSource {
             source,
         })?;
         Ok(Self {
+            protection: source.into_protection(),
             name,
             inputs: vec![index.archive().path().to_path_buf()],
             model,
@@ -258,6 +261,7 @@ impl ModelSource {
             source,
         })?;
         Ok(Self {
+            protection: source.into_protection(),
             name: path.display().to_string(),
             inputs: companions.read,
             model,

@@ -8,16 +8,12 @@
 //! Record per line in record-path order, and returns a [`RecordExportSummary`]. Record JSON is
 //! defined in `docs/record-json.md` and `schemas/record-json.schema.json`.
 //!
-//! [`build_catalog`] reads the DataForge of an open Archive, selects the Records of every kind by
-//! record-path prefix and type in parallel, leaves out development leftovers, resolves names and
-//! descriptions in English and German from the Archive's `global.ini` files, takes the blueprints
-//! with all tiers, the quality, pool, reward-source and dismantle Records from [`read_crafting`],
-//! reads each item's
-//! [`ItemClass`] from its English description, classifies every ship and item as a
-//! [`Playability`] and writes the
-//! catalog as deterministic UTF-8 JSON. A selected Record that cannot be read is left out and
-//! reported as a [`CatalogFailure`] in the [`CatalogSummary`]. [`catalog_schema`] returns its JSON Schema, generated from
-//! the same types (`docs/basetool-catalog.md`).
+//! [`build_catalog`] selects Records by path and type, excludes development leftovers, resolves
+//! English/German texts, and writes deterministic UTF-8 JSON with crafting, [`ItemClass`] and
+//! [`Playability`] data. Normal publication refuses incomplete source reads or projections.
+//! [`CatalogPublicationMode::DiagnosticPartial`] retains readable results with explicit health
+//! and failure evidence. [`catalog_schema`] generates the schema from the same catalog types
+//! (`docs/basetool-catalog.md`).
 //!
 //! The starmap objects of the catalog take their world positions from the system containers
 //! (`ObjectContainers/PU/system`): the position of every `Child` element is composed with the
@@ -64,6 +60,7 @@ mod action_map;
 #[cfg(test)]
 mod action_map_tests;
 mod action_map_write;
+mod archive_key_use;
 mod blueprint;
 mod blueprint_category;
 mod broker_entry;
@@ -82,13 +79,20 @@ mod build_starmap;
 mod cargo_manifest;
 mod catalog_crafting;
 mod catalog_file;
+mod catalog_file_write;
 mod catalog_output;
 mod catalog_recipe;
+mod catalog_reference;
+mod catalog_reference_health;
+mod catalog_row;
+mod catalog_rows;
+mod catalog_target_index;
 mod closed_set;
 mod collected;
 #[cfg(test)]
 mod collected_tests;
 mod commodity;
+mod commodity_resource;
 mod condition_schema;
 mod container_read;
 mod contract;
@@ -139,10 +143,36 @@ mod crafting_sources;
 mod crafting_tier;
 mod crafting_types;
 mod crafting_warning;
+mod definition_reference;
 mod digest;
 mod entity_selection;
 mod entity_spawn_model;
+mod entry_source;
 mod error;
+mod export_archive_health;
+mod export_builder_capture;
+mod export_dependency_read;
+mod export_diagnostic;
+mod export_entry_counts;
+mod export_entry_ledger;
+mod export_evidence_lock;
+mod export_field_collect;
+mod export_field_error;
+mod export_field_inspection;
+mod export_field_walk;
+mod export_health;
+mod export_health_api;
+mod export_health_compile;
+mod export_health_derived;
+mod export_health_entries;
+mod export_health_fields;
+mod export_health_records;
+mod export_health_warning;
+mod export_ledger;
+mod export_projection_fields;
+mod export_reference_issue;
+mod export_source_failure;
+mod export_tag_read;
 mod failure;
 mod form;
 mod guid_text;
@@ -150,6 +180,7 @@ mod harvest_config;
 mod harvest_link;
 mod harvest_locations;
 mod harvest_preset;
+mod harvest_source;
 mod item;
 mod item_class;
 mod item_stats;
@@ -159,6 +190,7 @@ mod loadout;
 mod loadout_port;
 mod localization_table;
 mod location_template;
+mod loot_container_source;
 mod loot_containers;
 mod loot_entry;
 mod loot_entxml;
@@ -166,6 +198,7 @@ mod loot_kinds;
 mod loot_legacy;
 mod loot_records;
 mod loot_soc;
+mod loot_soc_source;
 mod loot_unreadable;
 mod loot_walk;
 mod manufacturer;
@@ -175,6 +208,7 @@ mod mining_params;
 mod mission_blueprints;
 mod mission_cooldown;
 mod mission_data;
+mod mission_entry_source;
 mod mission_facts;
 mod mission_giver;
 mod mission_hauling;
@@ -183,7 +217,27 @@ mod mission_index;
 mod mission_intros;
 mod mission_kinds;
 mod mission_layers;
+mod mission_ledger;
 mod mission_places;
+mod mission_pool_ledger;
+mod mission_property_auto;
+mod mission_property_auto_read;
+mod mission_property_clue;
+mod mission_property_clue_read;
+mod mission_property_fields;
+mod mission_property_investigation;
+mod mission_property_investigation_read;
+mod mission_property_name;
+mod mission_property_name_read;
+mod mission_property_option;
+mod mission_property_option_read;
+mod mission_property_race;
+mod mission_property_set;
+mod mission_property_set_index;
+mod mission_property_set_registry;
+mod mission_property_source;
+mod mission_property_sources;
+mod mission_property_value_read;
 mod mission_results;
 mod mission_shared;
 mod mission_siblings;
@@ -192,14 +246,20 @@ mod mission_title;
 mod mission_titles;
 mod missions;
 mod ndjson;
+mod ndjson_output;
 mod npc_spawn_model;
 mod npc_spawn_read;
 mod options;
+mod owned_reference;
+mod owned_reference_read;
 mod paint;
+mod paint_ledger;
 mod paint_port;
 mod picked;
 mod playability;
 mod playability_rules;
+mod quality_curve;
+mod quality_curve_read;
 mod quantization_summary;
 mod record_export;
 mod record_fields;
@@ -207,9 +267,24 @@ mod record_read;
 mod record_summary;
 mod recovery;
 mod reputation;
+mod resource_density_read;
+mod resource_density_source;
 mod resource_group;
+mod resource_group_read;
+mod resource_property_read;
+mod resource_quality_read;
+mod resource_quality_source;
+mod resource_read;
+mod resource_type_contract;
 mod scan;
+mod scan_health;
 mod scan_signature;
+mod schema_fields;
+mod scoped_location;
+mod scoped_location_fields;
+mod scoped_location_link;
+mod scoped_location_read;
+mod scoped_location_weak;
 mod selection;
 mod selection_index;
 mod selection_lookup;
@@ -220,14 +295,20 @@ mod ship_pool;
 mod ship_store_slugs;
 mod shop_container_scan;
 mod shop_containers;
+mod shop_entry_read;
 mod shop_inventories;
 mod shop_links;
+#[cfg(test)]
+mod shop_observation_tests;
 mod shop_prefabs;
 mod shop_registry;
 mod shop_soc;
 mod shop_summary;
 mod shops;
 mod soc_preset;
+mod source_fields;
+mod source_pointer;
+mod source_projection_notes;
 mod spawn_error;
 mod spawn_layers;
 mod spawn_model;
@@ -263,8 +344,10 @@ pub use action_map::{
     parse_action_maps, read_action_maps,
 };
 pub use action_map_write::{ActionMapCounts, ActionMapFormat, write_action_maps};
+pub use archive_key_use::{ArchiveKeyState, ArchiveKeyUse};
 pub use build::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
 pub use catalog_file::CatalogFile;
+pub use catalog_file_write::{write_catalog_file, write_catalog_file_from};
 pub use catalog_output::{Compression, ZSTD_LEVEL, ZSTD_WINDOW_LOG};
 pub use contract::{SCHEMA_VERSION, catalog_schema};
 pub use crafting::{Crafting, read_crafting};
@@ -276,6 +359,7 @@ pub use crafting_types::{
 };
 pub use crafting_warning::CraftingWarning;
 pub use error::CatalogError;
+pub use export_health_api::*;
 pub use failure::CatalogFailure;
 pub use form::{FLAT_CSV_FILE, FLAT_NDJSON_FILE, NDJSON_FILE, RecordForm};
 pub use item_class::{ItemClass, ItemClassSummary};
@@ -290,7 +374,7 @@ pub use playability::{Playability, PlayabilityCounts, PlayabilitySummary};
 pub use quantization_summary::QuantizationSummary;
 pub use record_export::{RecordFilePlans, write_planned_record_export, write_record_export};
 pub use record_summary::RecordExportSummary;
-pub use selection::{EXCLUDED_TOKENS, Kind, KindRule, SHIP_EXCLUDED_TOKENS};
+pub use selection::{EXCLUDED_TOKENS, Kind, KindRule, SHIP_EXCLUDED_TOKENS, is_kind_leftover};
 pub use ship_base::{
     BuiltShipBase, Cargo, CargoGrid, Hull, HullThreshold, Implementation, LoadoutPort, Mass,
     MassBasis, PartialPartValue, SHIP_BASE_VERSION, ShipBase, ShipBaseError, ShipBaseOptions,

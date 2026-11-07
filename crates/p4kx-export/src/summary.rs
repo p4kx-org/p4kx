@@ -173,6 +173,7 @@ pub struct TextSummary {
 /// What a catalog holds: the counts per kind, how its texts resolved and its size.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CatalogSummary {
+    pub(crate) export_health: crate::ExportHealth,
     pub(crate) kinds: Vec<KindSummary>,
     pub(crate) texts: Vec<TextSummary>,
     pub(crate) notes: Vec<LocalizationNote>,
@@ -190,9 +191,15 @@ pub struct CatalogSummary {
     pub(crate) warnings: Vec<CraftingWarning>,
     pub(crate) size: u64,
     pub(crate) compressed_size: Option<u64>,
+    pub(crate) archive_key: crate::ArchiveKeyUse,
 }
 
 impl CatalogSummary {
+    /// Returns the actual source-read and projection health of the serialized catalog.
+    #[must_use]
+    pub const fn export_health(&self) -> &crate::ExportHealth {
+        &self.export_health
+    }
     /// Returns the counts of the paints: how many the catalog holds, how many fit a ship and how
     /// many fit none.
     #[must_use]
@@ -236,29 +243,22 @@ impl CatalogSummary {
         &self.store_slugs
     }
 
-    /// Returns the Records that could not be read and were left out, the selected ones and those
-    /// a rule reads, ordered by GUID.
-    ///
-    /// Their entries are left out of the catalog; a ship whose loadout cannot be resolved stays in
-    /// `ships` without a loadout.
+    /// Returns Record failures ordered by GUID, including failures that retain partial rows.
     #[must_use]
     pub fn failures(&self) -> &[CatalogFailure] {
         &self.failures
     }
 
-    /// Returns what makes the crafting data incomplete or ambiguous although every Record was
-    /// read: a truncated reference index (reward sources missing), Records it could not read,
-    /// several dismantle processes.
+    /// Returns source warnings and incomplete or ambiguous catalog relationships.
     #[must_use]
     pub fn warnings(&self) -> &[CraftingWarning] {
         &self.warnings
     }
 
-    /// Returns whether every selected Record could be read and the crafting data has no
-    /// [warning](Self::warnings).
+    /// Returns whether every required source read and projection completed without a source warning.
     #[must_use]
     pub const fn is_complete(&self) -> bool {
-        self.failures.is_empty() && self.warnings.is_empty()
+        self.export_health.is_complete()
     }
 
     /// Returns how the item classes of the items were read.

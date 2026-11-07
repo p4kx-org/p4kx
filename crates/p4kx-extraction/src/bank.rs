@@ -10,8 +10,9 @@ use p4kx_audio::{AudioError, EmbeddedWem, MediaClass, Soundbank};
 use rayon::prelude::*;
 
 use crate::entry_content::find_entry;
-use crate::output_file::{read_error, write_error, write_replacing};
+use crate::output_file::{read_error, write_error, write_replacing_protected};
 use crate::sound::read_capped;
+use crate::source_protection::SourceProtection;
 use crate::{ConversionError, UnknownEntries};
 
 /// The largest soundbank read into memory, far above the largest soundbank of a real Archive.
@@ -75,6 +76,7 @@ pub struct BankExtraction {
 /// A Wwise BNK soundbank read from an Entry of an Archive or from a file on disk.
 #[derive(Debug)]
 pub struct Bank {
+    protection: SourceProtection,
     name: String,
     soundbank: Soundbank<Vec<u8>>,
 }
@@ -90,6 +92,7 @@ impl Bank {
     /// [`ConversionError::Soundbank`] when it is no valid soundbank, and another
     /// [`ConversionError`] when it cannot be read.
     pub fn from_archive(archive: &Archive, path: &str) -> Result<Self, ConversionError> {
+        let protection = SourceProtection::new(Some(archive.path()));
         let entry =
             find_entry(archive, path).ok_or_else(|| UnknownEntries(vec![path.to_owned()]))?;
         let name = entry.path().to_owned();
@@ -100,7 +103,7 @@ impl Bank {
                 source,
             },
         )?;
-        Self::parse(name, bytes)
+        Self::parse(name, bytes, protection)
     }
 
     /// Reads and parses the soundbank file at `path`.
@@ -127,10 +130,18 @@ impl Bank {
             .len();
         let bytes =
             read_capped(file, len, MAX_SOUNDBANK_LEN).map_err(|source| read_error(path, source))?;
-        Self::parse(path.display().to_string(), bytes)
+        Self::parse(
+            path.display().to_string(),
+            bytes,
+            SourceProtection::new(None),
+        )
     }
 
-    fn parse(name: String, bytes: Option<Vec<u8>>) -> Result<Self, ConversionError> {
+    fn parse(
+        name: String,
+        bytes: Option<Vec<u8>>,
+        protection: SourceProtection,
+    ) -> Result<Self, ConversionError> {
         let Some(bytes) = bytes else {
             return Err(ConversionError::SoundTooLarge {
                 sound: name,
@@ -138,7 +149,11 @@ impl Bank {
             });
         };
         match Soundbank::parse(bytes) {
-            Ok(soundbank) => Ok(Self { name, soundbank }),
+            Ok(soundbank) => Ok(Self {
+                protection,
+                name,
+                soundbank,
+            }),
             Err(source) => Err(ConversionError::Soundbank { bank: name, source }),
         }
     }
@@ -166,7 +181,7 @@ impl Bank {
         folder: &Path,
         format: WemFormat,
     ) -> Result<BankExtraction, ConversionError> {
-        p4kx_guard::ensure_writable(folder)?;
+        crate::check_protected_output(folder, self.protection.context()?, None)?;
         fs::create_dir_all(folder).map_err(|source| write_error(folder, source))?;
         let wems: Vec<EmbeddedWem<'_>> = self.soundbank.wems().collect();
         let outcomes: Vec<(u32, Result<WrittenWem, ConversionError>)> = wems
@@ -208,24 +223,30 @@ impl Bank {
                 source,
             },
         };
-        let size = write_replacing(&path, |writer| match format {
-            WemFormat::Wem => {
-                writer
-                    .write_all(wem.bytes())
-                    .map_err(|source| write_error(&path, source))?;
-                Ok(wem.bytes().len() as u64)
-            }
-            WemFormat::Wav => wem
-                .parse()
-                .and_then(|parsed| parsed.write_wav(writer))
-                .map(|report| report.size)
-                .map_err(audio_error),
-            WemFormat::Ogg => wem
-                .parse()
-                .and_then(|parsed| parsed.write_ogg(writer))
-                .map(|report| report.size)
-                .map_err(audio_error),
-        })?;
+        let size =
+            write_replacing_protected(
+                &path,
+                self.protection.context()?,
+                None,
+                |writer| match format {
+                    WemFormat::Wem => {
+                        writer
+                            .write_all(wem.bytes())
+                            .map_err(|source| write_error(&path, source))?;
+                        Ok(wem.bytes().len() as u64)
+                    }
+                    WemFormat::Wav => wem
+                        .parse()
+                        .and_then(|parsed| parsed.write_wav(writer))
+                        .map(|report| report.size)
+                        .map_err(audio_error),
+                    WemFormat::Ogg => wem
+                        .parse()
+                        .and_then(|parsed| parsed.write_ogg(writer))
+                        .map(|report| report.size)
+                        .map_err(audio_error),
+                },
+            )?;
         Ok(WrittenWem {
             id: wem.id(),
             path,

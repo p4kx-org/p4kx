@@ -3,7 +3,7 @@
 
 use std::borrow::Cow;
 
-use schemars::{JsonSchema, Schema};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::guid_text::CatalogGuid;
@@ -42,15 +42,14 @@ pub(crate) use crate::contract_store_slugs::ShipStoreSlug;
 pub(crate) use crate::contract_template::ContractTemplate;
 pub(crate) use crate::entity_spawn_model::EntitySpawnPool;
 pub(crate) use crate::location_template::MissionLocationTemplate;
+pub(crate) use crate::mission_property_set::MissionPropertySet;
 pub(crate) use crate::npc_spawn_model::NpcSpawnPool;
+pub(crate) use crate::resource_type_contract::ResourceType;
+pub(crate) use crate::schema_fields::every_field_required;
 pub(crate) use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 
-/// The version of the catalog shape.
-///
-/// Added kinds and fields keep it; renaming, removing or retyping a field, or restructuring a kind,
-/// raises it (ADR-0054). Version 2 changes which ships a paint fits (ADR-0161) and has the
-/// `qualityQuantizations` kind (ADR-0177).
-pub const SCHEMA_VERSION: u32 = 2;
+/// The version of the catalog shape and its closed payload unions.
+pub const SCHEMA_VERSION: u32 = 3;
 
 /// The Basetool catalog: the game data the basetool's P4K import reads.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -59,12 +58,14 @@ pub const SCHEMA_VERSION: u32 = 2;
 #[schemars(title = "P4KX Basetool catalog")]
 pub(crate) struct Catalog<'a> {
     /// The version of the catalog shape; an import rejects a version it does not know.
-    #[schemars(extend("const" = 2))]
+    #[schemars(extend("const" = SCHEMA_VERSION))]
     pub(crate) schema_version: u32,
     /// The Archive and Build the catalog was made from.
     pub(crate) source: Source<'a>,
     /// Whether each kind is a complete snapshot of the Build.
     pub(crate) completeness: Completeness<'a>,
+    /// The measured source-read and projection health, separately from Filter selection scope.
+    pub(crate) export_health: crate::ExportHealth,
     /// The manufacturers, ordered by GUID.
     pub(crate) manufacturers: Vec<Manufacturer<'a>>,
     /// The items, ordered by GUID.
@@ -77,6 +78,8 @@ pub(crate) struct Catalog<'a> {
     pub(crate) blueprints: Vec<Blueprint<'a>>,
     /// The resource groups, ordered by GUID.
     pub(crate) resource_groups: Vec<ResourceGroup<'a>>,
+    /// The resource definitions, independently of commodity packaging, ordered by GUID.
+    pub(crate) resource_types: Vec<ResourceType<'a>>,
     /// The blueprint categories, ordered by GUID.
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'a>>,
     /// The gameplay property definitions the quality modifiers refer to, ordered by GUID.
@@ -168,6 +171,8 @@ pub(crate) struct Catalog<'a> {
     /// The distinct entity spawn descriptions of the contracts, templates and broker entries,
     /// ordered by identifier.
     pub(crate) contract_entity_spawns: Vec<EntitySpawnPool>,
+    /// Canonical authored mission-property sets, ordered by stable source identifier.
+    pub(crate) mission_property_sets: Vec<MissionPropertySet<'a>>,
     /// The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered
     /// by `slug`. A curated list, not read from the Archive.
     pub(crate) ship_store_slugs: Vec<ShipStoreSlug<'a>>,
@@ -212,27 +217,12 @@ pub(crate) struct LocalisedText<'a> {
     pub(crate) de: Option<Cow<'a, str>>,
 }
 
-/// Makes every property of an object schema required: the catalog writes `null`, never omits.
-pub(crate) fn every_field_required(schema: &mut Schema) {
-    let Some(object) = schema.as_object_mut() else {
-        return;
-    };
-    let names: Vec<serde_json::Value> = object
-        .get("properties")
-        .and_then(serde_json::Value::as_object)
-        .map(|properties| {
-            properties
-                .keys()
-                .cloned()
-                .map(serde_json::Value::String)
-                .collect()
-        })
-        .unwrap_or_default();
-    object.insert("required".to_owned(), serde_json::Value::Array(names));
-}
-
 /// Returns the JSON Schema (draft 2020-12) of the Basetool catalog.
 #[must_use]
 pub fn catalog_schema() -> serde_json::Value {
-    schemars::schema_for!(Catalog<'static>).to_value()
+    schemars::generate::SchemaSettings::draft2020_12()
+        .for_serialize()
+        .into_generator()
+        .into_root_schema_for::<Catalog<'static>>()
+        .to_value()
 }

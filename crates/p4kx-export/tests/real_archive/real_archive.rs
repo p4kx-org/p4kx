@@ -67,6 +67,7 @@ fn builds_a_valid_catalog_of_a_real_archive() -> TestResult {
         assert!(named, "manufacturer {code} has a localisation key");
     }
     check_texts(summary, list)?;
+    crate::real_archive_texts::check_texts(&archive, &catalog, true)?;
     assert!(
         list.iter()
             .filter_map(|m| m["recordPath"].as_str())
@@ -141,8 +142,8 @@ fn check_texts(summary: &CatalogSummary, list: &[Value]) -> TestResult {
         let texts = summary.text(language).ok_or("a text summary")?;
         assert!(texts.available, "the Archive holds {language}");
         assert!(
-            texts.resolved > texts.unresolved,
-            "most {language} texts resolve: {texts:?}"
+            texts.resolved > 0,
+            "the {language} resolver counts the verified manufacturer names: {texts:?}"
         );
     }
     Ok(())

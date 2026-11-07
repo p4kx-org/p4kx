@@ -277,7 +277,7 @@ impl Server {
         Ok(Sounded {
             value,
             wav,
-            notice: done.notice,
+            notes: done.notes,
         })
     }
 }

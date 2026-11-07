@@ -5,7 +5,7 @@
 
 use serde_json::json;
 
-const GAME_TEXT: [&str; 23] = [
+const GAME_TEXT: [&str; 26] = [
     "description",
     "displayName",
     "displayType",
@@ -29,6 +29,9 @@ const GAME_TEXT: [&str; 23] = [
     "givenName",
     "givenLastName",
     "givenNickName",
+    "objectiveLongDescription",
+    "objectiveShortDescription",
+    "causeOfDeath",
 ];
 
 fn collect_properties<'s>(
@@ -43,9 +46,14 @@ fn collect_properties<'s>(
                         .iter()
                         .map(|(name, value)| (name.as_str(), value)),
                 );
+                for value in properties.values() {
+                    collect_properties(value, found);
+                }
             }
-            for value in map.values() {
-                collect_properties(value, found);
+            for (name, value) in map {
+                if name != "properties" {
+                    collect_properties(value, found);
+                }
             }
         }
         serde_json::Value::Array(items) => {
@@ -69,12 +77,16 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
     let mut marked = 0;
     for (name, value) in properties {
         let carries = value.get("x-gameText") == Some(&json!(true));
-        assert_eq!(carries, GAME_TEXT.contains(&name), "x-gameText on {name}");
+        assert_eq!(
+            carries,
+            GAME_TEXT.contains(&name),
+            "x-gameText on {name}: {value}"
+        );
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 38,
-        "the given name, last name and nick name of an NPC, the title, HUD title, description, giver, comms channel and end reason of a mission broker entry, four descriptions, two display types, the contract title and description, mission type, contractor, faction name, pickup place, the process name, the deposit name, the names of a faction, a scope, a standing and a mission type, the variant of a location template, the title of a contract template, the three texts of an objective display, the two overrides of the mission details, the HUD text of an instance handler, the name of a marker and the texts of the options of a string and a number property"
+        marked, 48,
+        "the expected resource, mission, name and option game-text fields"
     );
     let mut starmap_properties = Vec::new();
     collect_properties(&starmap, &mut starmap_properties);

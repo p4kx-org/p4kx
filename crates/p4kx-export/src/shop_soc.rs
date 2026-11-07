@@ -69,6 +69,8 @@ pub(crate) struct Scan {
     pub(crate) components: Vec<ShopComponent>,
     /// The inventory paths no anchor could be tied to.
     pub(crate) rejected: usize,
+    /// A populated inventory value could not be represented.
+    pub(crate) malformed: bool,
 }
 
 /// Returns the shop components of the container file `bytes` that belong to an Entity of
@@ -97,6 +99,11 @@ pub(crate) fn components(bytes: &[u8], anchors: &Anchors) -> Scan {
             && (is_inventory_folder(text) || window.back().is_some_and(|last| is_property(last)))
         {
             state.path(at, stem, owner(&window, anchors));
+        } else if window.back().is_some_and(|last| is_property(last))
+            && invalid_inventory_value(part)
+        {
+            state.malformed = true;
+            state.uncertain(at);
         }
         if window.len() == MAX_BACK {
             window.pop_front();
@@ -112,6 +119,7 @@ struct State {
     uncertain: HashSet<usize>,
     last_mark: Option<(usize, usize)>,
     rejected: usize,
+    malformed: bool,
 }
 
 impl State {
@@ -136,11 +144,7 @@ impl State {
     fn path(&mut self, at: usize, stem: String, owner: Option<String>) {
         let Some(entity) = owner else {
             self.rejected += 1;
-            if let Some((index, mark)) = self.last_mark
-                && at - mark <= MAX_BACK
-            {
-                self.uncertain.insert(index);
-            }
+            self.uncertain(at);
             return;
         };
         match self
@@ -153,6 +157,14 @@ impl State {
                 entity,
                 inventory: Some(stem),
             }),
+        }
+    }
+
+    fn uncertain(&mut self, at: usize) {
+        if let Some((index, mark)) = self.last_mark
+            && at - mark <= MAX_BACK
+        {
+            self.uncertain.insert(index);
         }
     }
 
@@ -169,8 +181,20 @@ impl State {
         Scan {
             components,
             rejected: self.rejected,
+            malformed: self.malformed,
         }
     }
+}
+
+fn invalid_inventory_value(part: &[u8]) -> bool {
+    if part.is_empty() {
+        return false;
+    }
+    let Ok(text) = std::str::from_utf8(part) else {
+        return true;
+    };
+    // An omitted value can place the next property name directly after this property.
+    text.len() > MAX_PATH_LEN || text.contains(['/', '\\', '.', ' '])
 }
 
 fn owner(window: &VecDeque<&str>, anchors: &Anchors) -> Option<String> {

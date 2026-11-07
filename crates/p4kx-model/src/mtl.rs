@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::mtl_parse::parse_library;
 use crate::mtl_raw::Attributes;
+use std::sync::Arc;
+
+use crate::mtl_source::MaterialSource;
 use crate::{
-    CompanionResolver, LayerCache, MaterialError, MaterialLayer, MaterialReading, PaletteSlot,
-    RawElement,
+    CompanionResolver, LayerCache, MaterialLayer, MaterialReading, PaletteSlot, RawElement,
 };
 
 /// The most sub-materials a material library may hold; the engine allows 128.
@@ -251,6 +252,8 @@ impl Material {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MaterialLibrary {
+    /// Ordered authored root syntax, original submaterial dispositions and actual loss boundaries.
+    pub authored: Arc<MaterialSource>,
     /// The path the model gave, below `Data` without `.mtl`.
     pub path: String,
     /// The tint palette the library names as its default, a Record path.
@@ -267,37 +270,6 @@ pub struct MaterialLibrary {
     pub unresolved_layers: Vec<String>,
     /// The sub-materials in material ID order; one material when [`Self::single`].
     pub materials: Vec<Material>,
-}
-
-impl MaterialLibrary {
-    /// Reads the `.mtl` file `bytes`, text XML or `CryXml`, of the library `path`.
-    ///
-    /// A file with a `SubMaterials` element is a list: the material ID is the position of the
-    /// sub-material, and an entry that is no `Material` element counts as a position and reads
-    /// as the engine's default material. A file without is one material that serves every ID. Numbers that are
-    /// missing, malformed or not finite read as white diffuse, a dim dielectric specular, no
-    /// emission, full opacity and a shininess of 10.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MaterialError::Xml`] when the file is no XML or `CryXml`,
-    /// [`MaterialError::NotMaterial`] when its root is no `Material`, and
-    /// [`MaterialError::TooMany`] when it holds more sub-materials or texture slots than the
-    /// limits allow.
-    pub fn parse(path: &str, bytes: &[u8]) -> Result<Self, MaterialError> {
-        parse_library(path, bytes)
-    }
-
-    /// Returns the material of `id`, or `None` when the library has no sub-material at that
-    /// position and the engine falls back to its default material.
-    #[must_use]
-    pub fn material(&self, id: u16) -> Option<&Material> {
-        if self.single {
-            self.materials.first()
-        } else {
-            self.materials.get(usize::from(id))
-        }
-    }
 }
 
 /// What reading a model's material library came to.

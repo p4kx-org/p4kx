@@ -3,6 +3,7 @@
 
 use thiserror::Error;
 
+use crate::record_read::ReadError;
 use crate::template_issues::TemplateError;
 
 /// Why the spawn descriptions and location queries of a Record cannot be read.
@@ -14,4 +15,7 @@ pub(crate) enum SpawnError {
     /// A location condition is of a struct the catalog does not know.
     #[error(transparent)]
     Template(#[from] TemplateError),
+    /// A known spawn source has a malformed or unreadable field.
+    #[error("the spawn source cannot be projected: {0}")]
+    Source(#[from] ReadError),
 }

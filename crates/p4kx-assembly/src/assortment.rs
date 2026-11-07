@@ -114,22 +114,31 @@ impl Undecided {
 /// deterministic default. An assortment or group whose Requirement the Archive decides as unmet
 /// gives nothing; one that depends on spawn tags still gives its groups and is one
 /// `assortment_requirement` note.
-fn read_assorted<'f>(builder: &mut TreeBuilder<'f>, record: &Record<'f>) -> Assorted {
+fn read_assorted<'f>(
+    builder: &mut TreeBuilder<'f>,
+    record: &Record<'f>,
+    observation: Option<&crate::resolver_observation::Observation>,
+) -> Assorted {
     let guid = record.guid();
     if !matches!(record.type_name(), Ok(ASSORTMENT_TYPE)) {
         let found = record.type_name().unwrap_or("Record of an unreadable type");
         let reason = format!("the Record is a {found}, not an assortment");
         let issue = LoadoutError::Assortment { guid, reason };
+        if let Err(error) = crate::resolver_observation::notify(
+            observation,
+            crate::LoadoutReadEvent::Rejected {
+                record,
+                error: &issue,
+            },
+        ) {
+            return Assorted::new(guid, Vec::new(), vec![error]);
+        }
         return Assorted::new(guid, Vec::new(), vec![issue]);
     }
-    let tree = match builder.build(record) {
+    let tree = match crate::resolver_observation::canonical(builder, record, observation) {
         Ok(tree) => tree,
         Err(error) => {
-            let issue = LoadoutError::UnreadableRecord {
-                guid,
-                reason: error.to_string(),
-            };
-            return Assorted::new(guid, Vec::new(), vec![issue]);
+            return Assorted::new(guid, Vec::new(), vec![error]);
         }
     };
     let path: Arc<str> = Arc::from(tree.record_path());
@@ -169,6 +178,7 @@ impl LoadoutResolver<'_> {
     /// Returns the assortment `guid` with every alternative, read once per resolver.
     fn assorted(&mut self, guid: Guid) -> Result<Assorted, LoadoutError> {
         if let Some(assorted) = self.assortments.get(&guid) {
+            self.reuse_read(crate::resolver_observation::Cache::Assortment, guid)?;
             return Ok(assorted.clone());
         }
         let record = self
@@ -176,7 +186,8 @@ impl LoadoutResolver<'_> {
             .forge()
             .record_by_guid(guid)
             .ok_or(LoadoutError::DanglingReference { guid })?;
-        let assorted = read_assorted(&mut self.builder, &record);
+        self.remember_read(crate::resolver_observation::Cache::Assortment, record);
+        let assorted = read_assorted(&mut self.builder, &record, self.observation.as_deref());
         self.assortments.insert(guid, assorted.clone());
         Ok(assorted)
     }

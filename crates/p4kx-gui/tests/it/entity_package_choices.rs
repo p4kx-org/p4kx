@@ -24,7 +24,7 @@ fn a_package_folder_inside_an_installation_is_refused_and_nothing_is_written() -
 
     assert!(matches!(
         setup.package_problem(),
-        Some(PackageProblem::Installation(_))
+        Some(PackageProblem::Protected(_))
     ));
     assert!(setup.refusal().is_some());
     assert!(!setup.is_ready());

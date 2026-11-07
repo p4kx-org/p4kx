@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_cryxml::Xml;
+use std::sync::Arc;
 
 use crate::mtl::{MAX_SUB_MATERIALS, MAX_TEXTURE_SLOTS};
 use crate::mtl_raw::{Budget, attributes, layers, other_elements, public_params, raw};
 use crate::mtl_shader::GLASS_SHADER;
+use crate::mtl_source::{MaterialEntryDisposition, MaterialSource, MaterialSourceEntry};
+use crate::mtl_source_error::MaterialReadError;
 use crate::mtl_xml::XmlElement;
 use crate::{
     Material, MaterialError, MaterialFlags, MaterialLibrary, PaletteSlot, StencilTint, TextureSlot,
@@ -15,23 +17,17 @@ const DEFAULT_DIFFUSE: [f32; 3] = [1.0; 3];
 const DEFAULT_SPECULAR: [f32; 3] = [0.04; 3];
 const DEFAULT_SHININESS: f32 = 10.0;
 
-pub(crate) fn parse_library(path: &str, bytes: &[u8]) -> Result<MaterialLibrary, MaterialError> {
-    match p4kx_cryxml::read(bytes)? {
-        Xml::CryXml(document) => library(path, document.root()),
-        Xml::Text(text) => {
-            let text = String::from_utf8_lossy(text);
-            p4kx_cryxml::check_text_depth(&text)?;
-            let document = roxmltree::Document::parse(&text)?;
-            library(path, document.root_element())
-        }
-    }
-}
-
-fn library<'a>(path: &str, root: impl XmlElement<'a>) -> Result<MaterialLibrary, MaterialError> {
+pub(crate) fn library<'a, Interrupted>(
+    path: &str,
+    root: impl XmlElement<'a>,
+    mut authored: MaterialSource,
+    checkpoint: &mut impl FnMut() -> Result<(), Interrupted>,
+) -> Result<MaterialLibrary, MaterialReadError<Interrupted>> {
     if !root.name().eq_ignore_ascii_case("Material") {
         return Err(MaterialError::NotMaterial {
             found: root.name().to_owned(),
-        });
+        }
+        .into());
     }
     let default_palette = root
         .attribute("DefaultPalette")
@@ -41,8 +37,10 @@ fn library<'a>(path: &str, root: impl XmlElement<'a>) -> Result<MaterialLibrary,
         .children()
         .find(|child| child.name().eq_ignore_ascii_case("SubMaterials"));
     let Some(sub_materials) = sub_materials else {
+        checkpoint().map_err(MaterialReadError::Interrupted)?;
         return Ok(MaterialLibrary {
             path: path.to_owned(),
+            authored: Arc::new(authored),
             default_palette,
             single: true,
             unknown_entries: 0,
@@ -50,15 +48,43 @@ fn library<'a>(path: &str, root: impl XmlElement<'a>) -> Result<MaterialLibrary,
             materials: vec![material(root, &mut Budget::new())?],
         });
     };
+    let (materials, unknown_entries) = submaterials(sub_materials, &mut authored, checkpoint)?;
+    Ok(MaterialLibrary {
+        path: path.to_owned(),
+        authored: Arc::new(authored),
+        default_palette,
+        single: false,
+        unknown_entries,
+        unresolved_layers: Vec::new(),
+        materials,
+    })
+}
+
+fn submaterials<'a, Interrupted>(
+    sub_materials: impl XmlElement<'a>,
+    authored: &mut MaterialSource,
+    checkpoint: &mut impl FnMut() -> Result<(), Interrupted>,
+) -> Result<(Vec<Material>, usize), MaterialReadError<Interrupted>> {
     let mut materials = Vec::new();
     let mut unknown_entries = 0;
     for child in sub_materials.children() {
+        checkpoint().map_err(MaterialReadError::Interrupted)?;
         if materials.len() == MAX_SUB_MATERIALS {
             return Err(MaterialError::TooMany {
                 what: "sub-materials",
                 limit: MAX_SUB_MATERIALS,
-            });
+            }
+            .into());
         }
+        authored.entries.push(MaterialSourceEntry {
+            ordinal: materials.len(),
+            element_name: child.name().to_owned(),
+            disposition: if child.name().eq_ignore_ascii_case("Material") {
+                MaterialEntryDisposition::Material
+            } else {
+                MaterialEntryDisposition::EngineDefault
+            },
+        });
         if child.name().eq_ignore_ascii_case("Material") {
             materials.push(material(child, &mut Budget::new())?);
         } else {
@@ -66,14 +92,7 @@ fn library<'a>(path: &str, root: impl XmlElement<'a>) -> Result<MaterialLibrary,
             materials.push(Material::engine_default());
         }
     }
-    Ok(MaterialLibrary {
-        path: path.to_owned(),
-        default_palette,
-        single: false,
-        unknown_entries,
-        unresolved_layers: Vec::new(),
-        materials,
-    })
+    Ok((materials, unknown_entries))
 }
 
 const TYPED_ATTRIBUTES: [&str; 12] = [
@@ -102,7 +121,7 @@ fn material<'a>(
         |name: &str, default: [f32; 3]| element.attribute(name).and_then(vector).unwrap_or(default);
     let textures = textures(element, budget)?;
     let layers = layers(element, budget);
-    let elements = other_elements(element, budget);
+    let elements = other_elements(element, budget)?;
     let mut built = Material {
         name: text("Name"),
         flags: flags(element.attribute("MtlFlags")),
@@ -201,10 +220,16 @@ fn textures<'a>(
                     !name.eq_ignore_ascii_case("Map") && !name.eq_ignore_ascii_case("File")
                 })
                 .collect(),
-            children: texture
-                .children()
-                .filter_map(|child| raw(child, 1, budget))
-                .collect(),
+            children: {
+                let mut children = Vec::new();
+                let children_in_order = texture.children().enumerate();
+                for (ordinal, child) in children_in_order {
+                    if let Some(child) = raw(child, 1, budget, Some(ordinal))? {
+                        children.push(child);
+                    }
+                }
+                children
+            },
         });
     }
     Ok(slots)

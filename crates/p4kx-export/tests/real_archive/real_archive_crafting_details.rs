@@ -257,7 +257,7 @@ fn check_distributions(crafting: &Crafting<'_>) -> TestResult {
     assert_eq!(curve.kind, "CraftingQualityDistributionNormal", "kind");
     assert_eq!(
         (curve.min, curve.max, curve.mean, curve.stddev),
-        (Some(1.0), Some(1000.0), Some(269.0), Some(254.0)),
+        (Some(1), Some(1000), Some(269.0), Some(254.0)),
         "the curve"
     );
     let pyro = guid(PYRO)?;

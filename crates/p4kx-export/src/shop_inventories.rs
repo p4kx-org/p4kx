@@ -2,11 +2,17 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{BTreeSet, HashMap};
-use std::io::Read;
 
 use p4kx_extraction::{Archive, Entry};
 use serde::Deserialize;
+use serde::de::IgnoredAny;
 
+use crate::Kind;
+use crate::entry_source::EntrySource;
+use crate::export_diagnostic::ExportDiagnosticCode;
+use crate::export_entry_ledger::EntryOperation;
+use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::shop_entry_read;
 use crate::shop_registry::is_guid;
 use crate::starmap_index::key;
 
@@ -25,7 +31,7 @@ const MAX_INVENTORY_LEN: u64 = 16 << 20;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ItemList {
     /// The item GUIDs of the file, lower case, ordered and without repeats (possibly none), and
-    /// how many `ID` values were no GUID and left out.
+    /// how many malformed item/ID values were left out.
     Items { guids: Vec<String>, dropped: usize },
     /// The Archive holds no such file.
     Missing,
@@ -55,7 +61,14 @@ struct Collection {
 }
 
 #[derive(Deserialize)]
-struct Element {
+#[serde(untagged)]
+enum Element {
+    Known(Identified),
+    Malformed(IgnoredAny),
+}
+
+#[derive(Deserialize)]
+struct Identified {
     #[serde(rename = "ID")]
     id: Id,
 }
@@ -63,7 +76,14 @@ struct Element {
 #[derive(Deserialize)]
 struct Id {
     #[serde(rename = "ID")]
-    ids: Vec<String>,
+    ids: Vec<StoredId>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum StoredId {
+    Text(String),
+    Malformed(IgnoredAny),
 }
 
 impl<'a> Inventories<'a> {
@@ -98,35 +118,69 @@ impl<'a> Inventories<'a> {
 
     /// Reads the item GUIDs of the inventory file with the lower-case stem `stem`. Prices, stock
     /// and rental offerings are not read.
-    pub(crate) fn items(&self, stem: &str) -> ItemList {
+    pub(crate) fn items(&self, stem: &str, ledger: &mut ExportLedger) -> ItemList {
         let Some(entry) = self.by_stem.get(stem) else {
-            return ItemList::Missing;
+            return missing(stem, ledger);
         };
+        let source = EntrySource::outer(entry)
+            .operation(EntryOperation::ShopInventory)
+            .dependency();
         let unreadable = |reason: &dyn std::fmt::Display| {
             ItemList::Unreadable(format!("{}: {reason}", entry.path()))
         };
-        if entry.uncompressed_size() > MAX_INVENTORY_LEN {
-            return unreadable(&"the file is too large");
-        }
-        let mut bytes = Vec::new();
-        let read = self
-            .archive
-            .open_entry(entry)
-            .map_err(|error| format!("the file cannot be opened: {error}"))
-            .and_then(|reader| {
-                reader
-                    .take(MAX_INVENTORY_LEN)
-                    .read_to_end(&mut bytes)
-                    .map_err(|error| format!("the file cannot be read: {error}"))
-            });
-        if let Err(reason) = read {
-            return unreadable(&reason);
-        }
-        match parse(&bytes) {
-            Some((guids, dropped)) => ItemList::Items { guids, dropped },
-            None => unreadable(&why_unparsed(&bytes)),
+        let bytes = match shop_entry_read::read(self.archive, entry, MAX_INVENTORY_LEN) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                source.diagnosed(
+                    ledger,
+                    Kind::Shops,
+                    SourceDisposition::ReadFailed,
+                    error.diagnosis(),
+                );
+                return unreadable(&error);
+            }
+        };
+        if let Some((guids, dropped)) = parse(&bytes) {
+            if dropped > 0 {
+                source.diagnosed(
+                    ledger,
+                    Kind::Shops,
+                    SourceDisposition::ProjectionFailed,
+                    shop_entry_read::diagnosis(
+                        ExportDiagnosticCode::MalformedSource,
+                        "Inventory[].ID.ID[]",
+                    ),
+                );
+            } else {
+                source.record(ledger, Kind::Shops, SourceDisposition::Projected);
+            }
+            ItemList::Items { guids, dropped }
+        } else {
+            source.diagnosed(
+                ledger,
+                Kind::Shops,
+                SourceDisposition::ProjectionFailed,
+                shop_entry_read::diagnosis(
+                    ExportDiagnosticCode::MalformedSource,
+                    "Collection.Inventory",
+                ),
+            );
+            unreadable(&why_unparsed(&bytes))
         }
     }
+}
+
+fn missing(stem: &str, ledger: &mut ExportLedger) -> ItemList {
+    EntrySource::missing(&format!("{FOLDER}{stem}.json"))
+        .operation(EntryOperation::ShopInventory)
+        .dependency()
+        .diagnosed(
+            ledger,
+            Kind::Shops,
+            SourceDisposition::ReadFailed,
+            shop_entry_read::diagnosis(ExportDiagnosticCode::DanglingReference, "offlineInventory"),
+        );
+    ItemList::Missing
 }
 
 /// Returns why `bytes`, which [`parse`] rejects, are no inventory.
@@ -148,11 +202,18 @@ fn parse(bytes: &[u8]) -> Option<(Vec<String>, usize)> {
     let mut items = BTreeSet::new();
     let mut dropped = 0;
     for element in elements {
+        let Element::Known(element) = element else {
+            dropped += 1;
+            continue;
+        };
         for id in element.id.ids {
-            if is_guid(&id) {
-                items.insert(id.to_ascii_lowercase());
-            } else {
-                dropped += 1;
+            match id {
+                StoredId::Text(id) if is_guid(&id) => {
+                    items.insert(id.to_ascii_lowercase());
+                }
+                StoredId::Text(_) | StoredId::Malformed(_) => {
+                    dropped += 1;
+                }
             }
         }
     }

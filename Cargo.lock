@@ -2917,6 +2917,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -3514,6 +3515,7 @@ dependencies = [
  "p4kx-comparison",
  "p4kx-export",
  "p4kx-extraction",
+ "p4kx-media",
  "p4kx-render",
  "p4kx-screens",
  "p4kx-search",
@@ -3735,9 +3737,11 @@ dependencies = [
  "png",
  "rayon",
  "roxmltree",
+ "same-file",
  "schemars",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror 2.0.21",
 ]
@@ -3786,10 +3790,15 @@ dependencies = [
 name = "p4kx-guard"
 version = "0.4.2"
 dependencies = [
+ "nix",
  "p4kx-channels",
+ "rustix 1.1.5",
  "same-file",
+ "serde",
  "tempfile",
  "thiserror 2.0.21",
+ "uds_windows",
+ "zbus",
 ]
 
 [[package]]
@@ -3853,6 +3862,7 @@ dependencies = [
  "clap",
  "p4kx-assembly",
  "p4kx-channels",
+ "p4kx-export",
  "p4kx-extraction",
  "p4kx-settings",
  "p4kx-testkit",
@@ -3864,6 +3874,23 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
+]
+
+[[package]]
+name = "p4kx-media"
+version = "0.4.2"
+dependencies = [
+ "jsonschema",
+ "p4kx-extraction",
+ "p4kx-shader",
+ "p4kx-testkit",
+ "schemars",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -3879,6 +3906,17 @@ dependencies = [
  "rayon",
  "roxmltree",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "p4kx-msi-path"
+version = "0.4.2"
+dependencies = [
+ "getrandom 0.4.3",
+ "serde",
+ "serde_json",
+ "windows-sys 0.61.2",
+ "winreg",
 ]
 
 [[package]]
@@ -3939,6 +3977,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "p4kx-shader"
+version = "0.4.2"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "p4kx-testkit"
 version = "0.4.2"
 dependencies = [
@@ -3956,6 +4001,7 @@ dependencies = [
  "p4kx-foundation",
  "png",
  "ruzstd",
+ "same-file",
  "sha2",
  "tempfile",
 ]
@@ -6477,6 +6523,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "winreg"
+version = "0.56.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
+dependencies = [
+ "cfg-if",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

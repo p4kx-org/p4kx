@@ -16,13 +16,41 @@ env:
   NEXTEST_PROFILE: ci
 
 jobs:
+  platforms:
+    name: Native platform contract
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.platforms.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate and publish the four native rows
+        id: platforms
+        shell: pwsh
+        run: .github/scripts/read-platform-matrix.ps1
+      - name: Platform contract regression cases
+        shell: pwsh
+        run: .github/scripts/test-platform-contract.ps1
+      - name: Native image and archive evidence regression cases
+        shell: pwsh
+        run: .github/scripts/test-native-evidence.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'native-evidence-fixtures')
+      - name: Complete release matrix regression cases
+        shell: pwsh
+        run: .github/scripts/test-release-matrix.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'release-matrix-fixtures')
+
   lint:
-    name: Lint (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Lint (${{ matrix.target }})
+    needs: platforms
+    runs-on: ${{ matrix.runner }}
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+    defaults:
+      run:
+        shell: pwsh
     strategy:
       fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
     steps:
       - name: Disk space before the build
         if: runner.os == 'Linux'
@@ -33,14 +61,19 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: lint
+          target: ${{ matrix.target }}
           components: rustfmt, clippy
       - name: Formatting, one package at a time to keep the Windows command line short
-        shell: bash
         run: |
-          for package in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name' | tr -d '\r'); do
-            cargo fmt -p "$package" --check
-          done
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+          $metadata = cargo metadata --no-deps --format-version 1 --locked | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Workspace metadata failed.' }
+          foreach ($package in $metadata.packages) {
+            cargo fmt -p $package.name --check
+            if ($LASTEXITCODE -ne 0) { throw "Formatting failed for $($package.name)." }
+          }
+      - run: cargo clippy --workspace --all-targets --target $env:P4KX_TARGET --locked -- -D warnings
+      - name: Check the opt-in MSI fixture on the native target
+        run: cargo clippy -p p4kx-msi-path --all-targets --features native-fixtures --target $env:P4KX_TARGET --locked -- -D warnings
       - run: cargo xtask
       - name: Install cargo-about
         if: runner.os == 'Linux'
@@ -57,28 +90,31 @@ jobs:
         if: runner.os == 'Linux'
         run: df -h /
 
-  tests-windows:
-    name: Tests (windows-latest)
-    uses: ./.github/workflows/tests.yml
-    with:
-      os: windows-latest
-      partitions: "[1, 2, 3, 4]"
-      count: 4
-
-  tests-ubuntu:
-    name: Tests (ubuntu-24.04)
-    uses: ./.github/workflows/tests.yml
-    with:
-      os: ubuntu-24.04
-      partitions: "[1, 2]"
-      count: 2
-  doctests:
-    name: Doctests (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+  tests:
+    name: Native tests (${{ matrix.target }})
+    needs: platforms
     strategy:
       fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
+    uses: ./.github/workflows/tests.yml
+    with:
+      os: ${{ matrix.runner }}
+      target: ${{ matrix.target }}
+      partitions: ${{ toJSON(matrix.partitions) }}
+      count: ${{ matrix.count }}
+
+  doctests:
+    name: Doctests (${{ matrix.target }})
+    needs: platforms
+    runs-on: ${{ matrix.runner }}
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+    defaults:
+      run:
+        shell: pwsh
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
     steps:
       - name: Disk space before the build
         if: runner.os == 'Linux'
@@ -89,18 +125,24 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: doctests
+          target: ${{ matrix.target }}
       - name: Doctests, which nextest does not run
-        run: cargo test --workspace --locked --doc
+        run: cargo test --workspace --target $env:P4KX_TARGET --locked --doc
       - name: Disk space after the build
         if: runner.os == 'Linux'
         run: df -h /
   focused:
-    name: Schemas and concurrency (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Schemas and concurrency (${{ matrix.target }})
+    needs: platforms
+    runs-on: ${{ matrix.runner }}
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+    defaults:
+      run:
+        shell: pwsh
     strategy:
       fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
     steps:
       - name: Disk space before the build
         if: runner.os == 'Linux'
@@ -111,19 +153,20 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: focused
+          target: ${{ matrix.target }}
           nextest: "true"
       - name: Comparison report schema is current
-        run: cargo nextest run --locked -p p4kx-comparison --test report_schema
+        run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-comparison --test report_schema
       - name: Blender package schema is current
-        run: cargo nextest run --locked -p p4kx-blender --test schema
+        run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-blender --test schema
       - name: Record JSON schema matches the export
-        run: cargo nextest run --locked -p p4kx-export --test record_json_schema
+        run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-export --test record_json_schema
       - name: Basetool catalog schema is current
-        run: cargo nextest run --locked -p p4kx-export --test catalog_schema
+        run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-export --test catalog_schema
       - name: DataForge lazy indexes survive concurrent lookups
-        run: cargo nextest run --cargo-profile concurrency --locked -p p4kx-dataforge --test lazy_indexes
+        run: cargo nextest run --cargo-profile concurrency --target $env:P4KX_TARGET --locked -p p4kx-dataforge --test lazy_indexes
       - name: Audio index survives concurrent first use
-        run: cargo nextest run --cargo-profile concurrency --locked -p p4kx-assembly --test audio_lazy_index
+        run: cargo nextest run --cargo-profile concurrency --target $env:P4KX_TARGET --locked -p p4kx-assembly --test audio_lazy_index
       - name: Disk space after the build
         if: runner.os == 'Linux'
         run: df -h /
@@ -183,7 +226,7 @@ jobs:
 
   check:
     name: Check (${{ matrix.os }})
-    needs: [lint, tests-windows, tests-ubuntu, doctests, focused, blender-addon, glb-validator]
+    needs: [platforms, lint, tests, doctests, focused, blender-addon, glb-validator]
     if: always()
     runs-on: ubuntu-latest
     strategy:

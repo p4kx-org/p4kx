@@ -11,7 +11,10 @@ use p4kx_assembly::{
     ArchiveFiles, ArchiveModels, Assembly, AssemblyOptions, ForgePalettes, HologramCamera,
     LoadoutResolver,
 };
-use p4kx_extraction::{ConversionError, DataForgeEntry, is_same_file, write_replacing};
+use p4kx_extraction::{
+    ArchiveWriteProtection, CancelToken, ConversionError, DataForgeEntry, is_same_file,
+    write_replacing_protected,
+};
 use p4kx_render::{
     Adapters, AssemblyDraw, AssemblyScene, BuildOptions, Camera, Colours, DrawList, Frame,
     Hologram, HologramView, Hooks, Look, Offscreen, Picture, Released, Shading, Subject,
@@ -137,8 +140,13 @@ fn frame(scene: &Arc<AssemblyScene>, view: &HologramView, args: &HologramArgs) -
     }
 }
 
-fn write(picture: &Picture, out: &std::path::Path) -> Result<u64> {
-    write_replacing(out, |writer| {
+fn write(
+    picture: &Picture,
+    out: &std::path::Path,
+    protection: &ArchiveWriteProtection,
+    cancel: &CancelToken,
+) -> Result<u64> {
+    write_replacing_protected(out, Some(protection), Some(cancel), |writer| {
         picture
             .write_png(writer)
             .map_err(|error| ConversionError::Write {
@@ -167,6 +175,8 @@ fn draw_picture(
     (assembly, class_name): (&Assembly, &str),
     record: Option<HologramCamera>,
     (started, assembled): (Instant, Duration),
+    protection: &ArchiveWriteProtection,
+    cancel: &CancelToken,
 ) -> Result<Outcome> {
     let camera = view_of(args, record);
     let scene = AssemblyScene::build(
@@ -176,7 +186,7 @@ fn draw_picture(
             textures: None,
         },
         &Hooks {
-            cancelled: &|| false,
+            cancelled: &|| cancel.is_cancelled(),
             progress: &|_| {},
         },
     )
@@ -190,7 +200,7 @@ fn draw_picture(
     })?;
     let picture = offscreen.draw(&frame(&scene, &camera.0, args))?;
     let drawn = started.elapsed();
-    let bytes = write(&picture, &args.out)?;
+    let bytes = write(&picture, &args.out, protection, cancel)?;
     let total = started.elapsed();
     let adapter = offscreen.adapter_name().to_owned();
     if let Released::Abandoned(stage) = offscreen.close() {
@@ -222,6 +232,8 @@ pub(crate) fn run(args: &HologramArgs, as_json: bool) -> Result<ExitCode> {
     }
     let changes = args.changes.changes()?;
     let archive = crate::key::open(&args.archive)?;
+    let cancel = crate::extract::cancel_on_interrupt()?;
+    let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     crate::guard::ensure_writable(&args.out)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
@@ -242,6 +254,8 @@ pub(crate) fn run(args: &HologramArgs, as_json: bool) -> Result<ExitCode> {
         (&assembly, tree.class_name()),
         HologramCamera::read(&forge),
         (started, started.elapsed()),
+        &protection,
+        &cancel,
     )?;
     let summary = Summary {
         args,

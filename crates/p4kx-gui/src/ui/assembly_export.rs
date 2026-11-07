@@ -226,7 +226,7 @@ pub(super) fn folder_notice(
             let text = plain(texts.get(T::PackageReplaces), FS_SM, Weight::Regular);
             ui.add(egui::Label::new(text.color(palette::WARNING)).wrap());
         }
-        Some(PackageProblem::Installation(_)) | None => {}
+        Some(PackageProblem::Protected(_)) | None => {}
     }
 }
 

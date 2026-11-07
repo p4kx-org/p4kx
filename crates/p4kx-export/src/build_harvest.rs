@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use p4kx_extraction::{Archive, CancelToken};
 
 use crate::CatalogError;
+use crate::Kind;
 use crate::collected::Collected;
 use crate::crafting_warning::CraftingWarning;
 use crate::harvest_locations::{Objects, locate};
@@ -25,8 +26,14 @@ pub(crate) fn add_harvest_locations(
     cancel: Option<&CancelToken>,
 ) -> Result<(), CatalogError> {
     if collected.harvestable_provider_presets.is_empty() {
+        collected.ledger.inventory(Kind::HarvestableLocations);
         return Ok(());
     }
+    crate::entry_source::dependencies(
+        &placements.ledger,
+        &mut collected.ledger,
+        Kind::HarvestableLocations,
+    );
     let presets: HashSet<_> = collected
         .harvestable_provider_presets
         .iter()
@@ -42,6 +49,7 @@ pub(crate) fn add_harvest_locations(
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
+    collected.ledger.merge(located.ledger);
     if !located.unreadable.is_empty() {
         collected
             .warnings

@@ -1,0 +1,10 @@
+{
+  "version": "1.0", "sourceLength": "389", "layout": "p4k-v2", "declarationState": "available", "zip": null,
+  "v2": {
+    "baseCount": "1", "extensionCount": "0", "directoryOffset": "8",
+    "baseDirectorySize": "204", "extensionDirectorySize": "0", "namesOffset": "212",
+    "baseNamesSize": "2", "extensionNamesSize": "0", "payloadEnd": "0", "freeCount": "0",
+    "trieOffset": "0", "trieSize": "0", "sectorSize": "4096", "flags": 0,
+    "layoutVersion": 2, "magic": 1768581450, "trailer": {"offset": "214", "length": "175"}
+  }
+}

@@ -27,7 +27,13 @@ fn the_groups_are_the_variant_of_of_every_ship_and_item_of_the_catalog() -> Test
         variants_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
+    let built = build_catalog(
+        &archive,
+        &CatalogOptions {
+            publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+            ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
+        },
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;

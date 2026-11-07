@@ -11,7 +11,7 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use p4kx_gui::theme::logo::{self, Variant};
-use p4kx_gui::window::APP_ID;
+use p4kx_gui::window::LINUX_APP_ID;
 
 use crate::logo::{decode, encode};
 
@@ -53,11 +53,11 @@ fn the_desktop_file_launches_the_window_under_the_application_id() -> TestResult
     assert_eq!(entry(&desktop, "Type"), Some("Application"), "type");
     assert_eq!(entry(&desktop, "Name"), Some("P4KX"), "name");
     assert_eq!(entry(&desktop, "Exec"), Some("p4kx-gui %f"), "command");
-    assert_eq!(entry(&desktop, "Icon"), Some("p4kx"), "icon name");
+    assert_eq!(entry(&desktop, "Icon"), Some(LINUX_APP_ID), "icon name");
     assert_eq!(entry(&desktop, "Terminal"), Some("false"), "no terminal");
     assert_eq!(
         entry(&desktop, "StartupWMClass"),
-        Some(APP_ID),
+        Some(LINUX_APP_ID),
         "the window class the window sets"
     );
     assert!(
@@ -118,18 +118,18 @@ fn the_window_runs_on_x11_and_wayland_through_wgpu() -> TestResult {
 }
 
 #[test]
-fn the_clipboard_reaches_other_programs_on_unix() -> TestResult {
+fn the_system_clipboard_feature_is_enabled_for_windows_and_unix() -> TestResult {
     let manifest =
         std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"))?;
-    let unix = manifest
-        .split("[target.'cfg(unix)'.dependencies]")
+    let native = manifest
+        .split("[target.'cfg(any(unix, windows))'.dependencies]")
         .nth(1)
         .and_then(|rest| rest.split("\n[").next())
-        .ok_or("a unix dependency table")?;
+        .ok_or("the shared Windows and Unix dependency table")?;
 
     assert!(
-        declaration(unix, "eframe").is_some_and(|eframe| eframe.contains("\"clipboard\"")),
-        "eframe enables the clipboard"
+        declaration(native, "eframe").is_some_and(|eframe| eframe.contains("\"clipboard\"")),
+        "eframe enables the native clipboard feature"
     );
     Ok(())
 }

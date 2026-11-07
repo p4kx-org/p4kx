@@ -9,7 +9,7 @@ use anyhow::Result;
 use p4kx_extraction::gfx::{Background, CanvasSize, Localise, RasterOptions, Skipped};
 use p4kx_extraction::{
     Archive, ArchiveImages, DataForgeEntry, Language, ScreenTexts, decode_line_breaks,
-    write_bytes_replacing,
+    write_replacing_protected,
 };
 use p4kx_screens::{
     ImageSources, MAX_SVG_BYTES, Report, ScreenComposer, Still, StillFormat, StillRequest,
@@ -121,8 +121,18 @@ fn draw(archive: &Archive, options: &Options<'_>) -> Result<Still> {
 pub(crate) fn run(archive: &Path, options: &Options<'_>, as_json: bool) -> Result<ExitCode> {
     check_variable_count(options.variables.len())?;
     let archive = crate::key::open(archive)?;
+    let cancel = crate::extract::cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     let still = draw(&archive, options)?;
-    write_bytes_replacing(options.out, &still.encode()?)?;
+    let bytes = still.encode()?;
+    write_replacing_protected(options.out, Some(&protection), Some(&cancel), |writer| {
+        writer
+            .write_all(&bytes)
+            .map_err(|source| p4kx_extraction::ConversionError::Write {
+                path: options.out.to_path_buf(),
+                source,
+            })
+    })?;
     let skipped = skipped_json(still.skipped());
     if as_json {
         json::print(&RenderJson {

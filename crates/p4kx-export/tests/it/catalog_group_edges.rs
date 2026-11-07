@@ -57,6 +57,25 @@ fn build_from(
     forge: &DataForgeBuilder,
     filter: Option<&Filter>,
 ) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
+    build_mode(forge, filter, p4kx_export::CatalogPublicationMode::Normal)
+}
+
+fn diagnostic_from(
+    forge: &DataForgeBuilder,
+    filter: Option<&Filter>,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
+    build_mode(
+        forge,
+        filter,
+        p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+    )
+}
+
+fn build_mode(
+    forge: &DataForgeBuilder,
+    filter: Option<&Filter>,
+    publication_mode: p4kx_export::CatalogPublicationMode,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
     ArchiveBuilder::new()
@@ -66,6 +85,7 @@ fn build_from(
         .write_to(&path)?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
     let options = CatalogOptions {
+        publication_mode,
         filter,
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
     };
@@ -176,7 +196,7 @@ fn unreadable_groups() -> DataForgeBuilder {
 
 #[test]
 fn an_unreadable_group_is_reported_once() -> TestResult {
-    let (built, _) = build_from(&unreadable_groups(), None)?;
+    let (built, _) = diagnostic_from(&unreadable_groups(), None)?;
     let failures: Vec<String> = built
         .summary()
         .failures()
@@ -190,7 +210,7 @@ fn an_unreadable_group_is_reported_once() -> TestResult {
 #[test]
 fn an_unreadable_group_outside_the_filter_is_still_reported_once() -> TestResult {
     let filter = Filter::new("*/blueprintcategories/*");
-    let (built, _) = build_from(&unreadable_groups(), Some(&filter))?;
+    let (built, _) = diagnostic_from(&unreadable_groups(), Some(&filter))?;
     assert_eq!(
         built.summary().failures().len(),
         1,
@@ -240,7 +260,7 @@ fn a_blueprint_whose_category_is_unreadable_has_no_category_guid() -> TestResult
                 ),
             ),
         );
-    let (built, catalog) = build_from(&forge, None)?;
+    let (built, catalog) = diagnostic_from(&forge, None)?;
     assert_eq!(catalog["blueprints"][0]["categoryGuid"], Value::Null);
     assert_eq!(
         built.summary().failures().len(),

@@ -15,9 +15,16 @@ use crate::theme::window_metrics::{WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH};
 const DEFAULT_SIZE: [f32; 2] = [1280.0, 800.0];
 const MIN_SIZE: [f32; 2] = [WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT];
 
-/// The application id of the window: the Wayland `app_id` and the X11 `WM_CLASS`, which a desktop
-/// environment matches to `p4kx.desktop` for the icon and the name in its task switcher.
+/// The Linux desktop identity shared by the window and native packages.
+pub const LINUX_APP_ID: &str = env!("P4KX_LINUX_APP_ID");
+
+/// The application identity used for the native window class and desktop integration.
+#[cfg(not(target_os = "linux"))]
 pub const APP_ID: &str = "p4kx";
+
+/// The application identity used for the native window class and desktop integration.
+#[cfg(target_os = "linux")]
+pub const APP_ID: &str = LINUX_APP_ID;
 
 /// Returns the main window for `title`, placed at `geometry` or at the default size.
 #[must_use]

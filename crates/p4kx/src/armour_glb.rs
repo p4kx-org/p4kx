@@ -11,7 +11,7 @@ use p4kx_assembly::{
 };
 use p4kx_extraction::{
     AnimationSet, ConversionError, DataForgeEntry, GlbOptions, GlbSummary, GltfError, MaterialMode,
-    is_same_file, write_replacing,
+    is_same_file, write_replacing_protected,
 };
 use serde::Serialize;
 
@@ -84,16 +84,14 @@ pub(crate) fn run(args: &ArmourGlbArgs, as_json: bool) -> Result<()> {
         return Err(GlbOutputIsArchive(args.out.clone()).into());
     }
     let archive = crate::key::open(&args.archive)?;
+    let cancel = crate::extract::cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = Files::open(ArchiveFiles::new(&archive), args.loadout.as_deref())?;
     let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
     let selection = gather(&mut resolver, &files, args)?;
-    let variant = args
-        .body
-        .map(BodyVariant::from)
-        .or_else(|| selection.variant())
-        .unwrap_or_else(|| BodyVariant::from(BodyArg::Male));
+    let variant = body_variant(args, &selection);
     let models = ArchiveModels::new(&archive);
     let options = AssemblyOptions::default().with_lod(args.lod);
     let armour = Armour::build_with_palettes(
@@ -111,7 +109,7 @@ pub(crate) fn run(args: &ArmourGlbArgs, as_json: bool) -> Result<()> {
         &folders,
     )?;
     let animated = armour.animate(&found.animations, &models);
-    let summary = write(&armour, &animated, args, &models)?;
+    let summary = write(&armour, &animated, args, &models, &protection, &cancel)?;
     let layers = match args.materials {
         ChfMaterialsArg::Textures => armour.layer_issues(),
         ChfMaterialsArg::Colours => Vec::new(),
@@ -139,6 +137,13 @@ pub(crate) fn run(args: &ArmourGlbArgs, as_json: bool) -> Result<()> {
         Err(error) if error.kind() != io::ErrorKind::BrokenPipe => Err(error.into()),
         _ => Ok(()),
     }
+}
+
+fn body_variant(args: &ArmourGlbArgs, selection: &Selection<'_>) -> BodyVariant {
+    args.body
+        .map(BodyVariant::from)
+        .or_else(|| selection.variant())
+        .unwrap_or_else(|| BodyVariant::from(BodyArg::Male))
 }
 
 /// What was built and written.
@@ -271,6 +276,8 @@ fn write(
     animated: &CharacterAnimations<'_>,
     args: &ArmourGlbArgs,
     models: &ArchiveModels<'_>,
+    protection: &p4kx_extraction::ArchiveWriteProtection,
+    cancel: &p4kx_extraction::CancelToken,
 ) -> Result<GlbSummary> {
     let mode = match args.materials {
         ChfMaterialsArg::Colours => MaterialMode::Colours,
@@ -286,20 +293,25 @@ fn write(
     let out: &Path = &args.out;
     let name = armour.variant().code().to_owned();
     let textures = models.textures();
-    Ok(write_replacing(out, |writer| {
-        armour
-            .write_glb_animated_with(animated, &options, &textures, writer)
-            .map_err(|error| match error {
-                GltfError::Write(source) => ConversionError::Write {
-                    path: out.to_path_buf(),
-                    source,
-                },
-                source => ConversionError::Glb {
-                    file: name.clone(),
-                    source,
-                },
-            })
-    })?)
+    Ok(write_replacing_protected(
+        out,
+        Some(protection),
+        Some(cancel),
+        |writer| {
+            armour
+                .write_glb_animated_with(animated, &options, &textures, writer)
+                .map_err(|error| match error {
+                    GltfError::Write(source) => ConversionError::Write {
+                        path: out.to_path_buf(),
+                        source,
+                    },
+                    source => ConversionError::Glb {
+                        file: name.clone(),
+                        source,
+                    },
+                })
+        },
+    )?)
 }
 
 fn print_report(

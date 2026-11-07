@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>@APPLICATION_ID@</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT OR Apache-2.0</project_license>
+  <name>P4KX</name>
+  <summary>Browse and extract Star Citizen Archives</summary>
+  <description>
+    <p>P4KX opens local Star Citizen Archives, browses their Entries and converts their
+    internal formats into readable files. It includes a desktop window, command line
+    and MCP server. It does not contain game files or an Archive key.</p>
+    <p>P4KX is an unofficial fan project and is not affiliated with the Cloud Imperium
+    group of companies.</p>
+  </description>
+  <developer id="io.github.p4kx_org"><name>P4KX contributors</name></developer>
+  <launchable type="desktop-id">@APPLICATION_ID@.desktop</launchable>
+  <url type="homepage">https://github.com/p4kx-org/p4kx</url>
+  <url type="bugtracker">https://github.com/p4kx-org/p4kx/issues</url>
+  <url type="vcs-browser">https://github.com/p4kx-org/p4kx</url>
+  <provides>
+    <binary>p4kx-gui</binary>
+    <binary>p4kx</binary>
+    <binary>p4kx-mcp</binary>
+  </provides>
+  <categories><category>Utility</category><category>Archiving</category></categories>
+  <content_rating type="oars-1.1" />
+  <releases><release version="@VERSION@" date="@RELEASE_DATE@" /></releases>
+</component>

@@ -33,7 +33,9 @@ pub(crate) fn add_contracts<'f>(
         options.filter,
         options.cancel,
     )?;
+    collected.ledger.merge(missions.ledger);
     collected.add_contracts(missions.contracts, missions.skipped, missions.failures);
+    collected.mission_property_sets = missions.property_sets.into_rows();
     let ContractTemplates {
         read,
         pools: template_pools,
@@ -62,7 +64,15 @@ pub(crate) fn add_paints(
     collected: &mut Collected<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<PaintSummary, CatalogError> {
-    let derived = paints(forge, &collected.items, &collected.vehicles, cancel)?;
+    let derived = paints(
+        forge,
+        &collected.items,
+        &collected.vehicles,
+        &collected.ledger,
+        cancel,
+    )?;
+    collected.ledger.merge(derived.ledger);
+    collected.add_failures(derived.failures);
     collected.paints = derived.list;
     let count = derived.summary.unreadable_vehicles;
     if count > 0 {
@@ -85,13 +95,11 @@ pub(crate) fn add_loadouts(
         .ships
         .iter()
         .map(|ship| Wanted {
+            record_index: ship.source_record_index,
             guid: ship.guid,
             kind: EntityKind::Ship,
         })
-        .chain(collected.port_items.iter().map(|guid| Wanted {
-            guid: *guid,
-            kind: EntityKind::Item,
-        }))
+        .chain(collected.port_items.iter().copied())
         .collect();
     let known: HashSet<Guid> = collected
         .items
@@ -99,7 +107,15 @@ pub(crate) fn add_loadouts(
         .map(|item| item.guid.0)
         .chain(collected.ships.iter().map(|ship| ship.guid.0))
         .collect();
-    let built = loadouts(archive, entities, &wanted, &known, cancel)?;
+    let built = loadouts(
+        archive,
+        entities,
+        &wanted,
+        &known,
+        &collected.ledger,
+        cancel,
+    )?;
+    collected.ledger.merge(built.ledger);
     collected.loadouts = built.entries;
     link_hosts(&mut collected.crafters, &collected.loadouts);
     collected.add_failures(built.failures);

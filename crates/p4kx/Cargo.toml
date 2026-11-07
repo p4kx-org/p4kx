@@ -18,6 +18,7 @@ p4kx-channels.workspace = true
 p4kx-comparison.workspace = true
 p4kx-export.workspace = true
 p4kx-extraction.workspace = true
+p4kx-media.workspace = true
 p4kx-render.workspace = true
 p4kx-screens.workspace = true
 p4kx-search.workspace = true

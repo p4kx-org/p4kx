@@ -23,6 +23,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) blueprints: KindCompleteness<'a>,
     /// The completeness of `resourceGroups`.
     pub(crate) resource_groups: KindCompleteness<'a>,
+    /// The completeness of `resourceTypes`.
+    pub(crate) resource_types: KindCompleteness<'a>,
     /// The completeness of `blueprintCategories`.
     pub(crate) blueprint_categories: KindCompleteness<'a>,
     /// The completeness of `gameplayProperties`.
@@ -105,6 +107,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) contract_npc_spawns: KindCompleteness<'a>,
     /// The completeness of `contractEntitySpawns`.
     pub(crate) contract_entity_spawns: KindCompleteness<'a>,
+    /// The completeness of `missionPropertySets`.
+    pub(crate) mission_property_sets: KindCompleteness<'a>,
     /// The completeness of `shipStoreSlugs`.
     pub(crate) ship_store_slugs: KindCompleteness<'a>,
 }
@@ -119,6 +123,7 @@ impl<'a> Completeness<'a> {
             commodities: completeness,
             blueprints: completeness,
             resource_groups: completeness,
+            resource_types: completeness,
             blueprint_categories: completeness,
             gameplay_properties: completeness,
             quality_distributions: completeness,
@@ -160,6 +165,7 @@ impl<'a> Completeness<'a> {
             mission_broker_entries: completeness,
             contract_npc_spawns: completeness,
             contract_entity_spawns: completeness,
+            mission_property_sets: completeness,
             ship_store_slugs: completeness,
         }
     }

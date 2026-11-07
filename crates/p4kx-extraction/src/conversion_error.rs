@@ -334,56 +334,22 @@ pub enum ConversionError {
         #[source]
         source: io::Error,
     },
-    /// The output lies inside a Star Citizen installation; nothing is written there.
+    /// Source or target protection refused the write.
     #[error(transparent)]
-    Installation(#[from] p4kx_guard::WriteRefused),
+    Installation(p4kx_guard::WriteProtectionError),
     /// The caller cancelled the export; nothing is left at the output.
     #[error("cancelled")]
     Cancelled,
-}
-
-impl ConversionError {
-    /// Names the part of a [`TextureError`] about one part, `<texture>.N` or for an alpha tail
-    /// `<texture>.a` its part `<texture>.Na`, or wraps it with the texture's name.
-    pub(crate) fn of_texture(texture: &str, error: TextureError) -> Self {
-        let part = |index: u32| match texture
-            .len()
-            .checked_sub(2)
-            .and_then(|at| texture.split_at_checked(at))
-        {
-            Some((base, suffix @ (".a" | ".A"))) => {
-                format!("{base}.{index}{}", suffix.trim_start_matches('.'))
-            }
-            _ => format!("{texture}.{index}"),
-        };
-        match error {
-            TextureError::MissingPart { index } => Self::MissingPart { part: part(index) },
-            TextureError::TruncatedPart {
-                index,
-                expected,
-                actual,
-            } => Self::TruncatedPart {
-                part: part(index),
-                expected,
-                actual,
-            },
-            TextureError::OversizedPart {
-                index,
-                expected,
-                actual,
-            } => Self::OversizedPart {
-                part: part(index),
-                expected,
-                actual,
-            },
-            TextureError::ReadPart { index, source } => Self::ReadPart {
-                part: part(index),
-                source,
-            },
-            source => Self::Texture {
-                texture: texture.to_owned(),
-                source,
-            },
-        }
-    }
+    /// Ownership capture or verified cleanup failed without being hidden as cancellation.
+    #[error(transparent)]
+    OwnedOutput(Box<p4kx_guard::OwnedOutputError>),
+    /// An unpublished output could not be removed after completion or failure.
+    #[error("owned output cleanup failed: {cleanup}")]
+    CleanupFailed {
+        /// The original failure when one preceded cleanup.
+        #[source]
+        primary: Option<Box<dyn std::error::Error + Send + Sync>>,
+        /// The separate cleanup failure.
+        cleanup: Box<p4kx_guard::OwnedOutputCleanupError>,
+    },
 }

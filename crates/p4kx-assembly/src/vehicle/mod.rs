@@ -5,6 +5,7 @@
 //! Modification the Entity selects applied.
 
 mod elem;
+mod file_read;
 mod gear;
 mod item_port;
 mod locate;
@@ -23,7 +24,7 @@ pub use elem::ElemOverride;
 pub(crate) use gear::gears;
 pub(crate) use item_port::flags_contain;
 pub use item_port::{VehicleItemPort, VehicleItemType};
-pub(crate) use locate::load;
+pub(crate) use locate::{load, load_observed};
 pub use origin::ValueOrigin;
 pub use patch::ModificationReport;
 pub use totals::{OriginTally, PartThreshold, PartialValue, UnreadableValue, VehicleTotals};
@@ -225,8 +226,8 @@ impl VehicleImplementation {
     ///
     /// # Errors
     ///
-    /// Returns [`LoadoutError::VehicleImplementation`] when no file holds the implementation or
-    /// it is no readable `Vehicle` document.
+    /// Returns [`LoadoutError::MissingVehicleImplementation`] when no candidate file exists and
+    /// [`LoadoutError::VehicleImplementation`] for unreadable or invalid `Vehicle` documents.
     pub fn read(
         files: &dyn LoadoutFiles,
         class_name: &str,

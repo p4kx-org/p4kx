@@ -8,7 +8,7 @@ use anyhow::Result;
 use p4kx_assembly::{Interior, InteriorOptions, Issue};
 use p4kx_extraction::{
     Archive, ConversionError, GlbOptions, GlbSummary, GltfError, MaterialMode, UnknownEntries,
-    is_same_file, select_entries, write_replacing,
+    is_same_file, select_entries, write_replacing_protected,
 };
 use serde::Serialize;
 use thiserror::Error;
@@ -81,10 +81,15 @@ pub(crate) fn run(args: &InteriorGlbArgs, as_json: bool) -> Result<()> {
         return Err(InteriorOutputIsArchive(args.out.clone()).into());
     }
     let (layers, chain) = open(&args.archive, &args.containers)?;
+    let outer = layers
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("the Archive was not opened"))?;
+    let cancel = crate::extract::cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(outer.path(), cancel.flag())?;
     let entry = chain.last().map_or("", String::as_str);
     let options = InteriorOptions::default().with_lod(args.lod);
     let interior = crate::interior_forge::build(&layers, entry, &options)?;
-    let summary = write(&interior, args, entry)?;
+    let summary = write(&interior, args, entry, &protection, &cancel)?;
     let skipped = interior
         .issues()
         .iter()
@@ -127,7 +132,13 @@ pub(crate) fn run(args: &InteriorGlbArgs, as_json: bool) -> Result<()> {
     }
 }
 
-fn write(interior: &Interior, args: &InteriorGlbArgs, entry: &str) -> Result<GlbSummary> {
+fn write(
+    interior: &Interior,
+    args: &InteriorGlbArgs,
+    entry: &str,
+    protection: &p4kx_extraction::ArchiveWriteProtection,
+    cancel: &p4kx_extraction::CancelToken,
+) -> Result<GlbSummary> {
     let mode = match args.materials {
         InteriorMaterialsArg::Colours => MaterialMode::Colours,
     };
@@ -138,20 +149,25 @@ fn write(interior: &Interior, args: &InteriorGlbArgs, entry: &str) -> Result<Glb
         options = options.without_vertex_colours();
     }
     let out: &Path = &args.out;
-    Ok(write_replacing(out, |writer| {
-        interior
-            .write_glb(&options, writer)
-            .map_err(|error| match error {
-                GltfError::Write(source) => ConversionError::Write {
-                    path: out.to_path_buf(),
-                    source,
-                },
-                source => ConversionError::Glb {
-                    file: entry.to_owned(),
-                    source,
-                },
-            })
-    })?)
+    Ok(write_replacing_protected(
+        out,
+        Some(protection),
+        Some(cancel),
+        |writer| {
+            interior
+                .write_glb(&options, writer)
+                .map_err(|error| match error {
+                    GltfError::Write(source) => ConversionError::Write {
+                        path: out.to_path_buf(),
+                        source,
+                    },
+                    source => ConversionError::Glb {
+                        file: entry.to_owned(),
+                        source,
+                    },
+                })
+        },
+    )?)
 }
 
 fn print_issue(out: &mut impl Write, issue: &Issue) -> io::Result<()> {

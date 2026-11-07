@@ -6,7 +6,8 @@ use std::io::{self, BufWriter, Write};
 use anyhow::{Result, anyhow};
 use p4kx_assembly::{ArchiveModels, Interior, InteriorOptions};
 use p4kx_blender::{
-    InteriorScene, Issue, PackageInfo, PackageSummary, check_output, write_interior_package,
+    InteriorScene, Issue, PackageInfo, PackageSummary, PackageWriteContext,
+    check_output_with_context, write_interior_package_with_context,
 };
 use p4kx_channels::channel_name;
 use p4kx_extraction::{GlbOptions, is_same_file};
@@ -55,7 +56,6 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
     if is_same_file(&args.out, &args.archive) {
         return Err(InteriorOutputIsArchive(args.out.clone()).into());
     }
-    check_output(&args.out)?;
     let (layers, chain) = open(&args.archive, &args.containers)?;
     let entry = chain.last().map_or("", String::as_str);
     let options = InteriorOptions::default().with_lod(args.lod);
@@ -63,6 +63,10 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
     let outer = layers
         .first()
         .ok_or_else(|| anyhow!("the Archive was not opened"))?;
+    let cancel = cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(outer.path(), cancel.flag())?;
+    let context = PackageWriteContext::new(&protection, cancel.flag());
+    check_output_with_context(&args.out, &context)?;
     let models = ArchiveModels::new(outer);
     let mut glb = GlbOptions::default()
         .with_lod(args.lod)
@@ -71,14 +75,12 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
         glb = glb.without_vertex_colours();
     }
     let info = PackageInfo::new(channel_name(outer.path()), build_info(outer));
-    let cancel = cancel_on_interrupt()?;
     let name = name_of(entry);
     let scene = InteriorScene::new(&name, &interior);
     let loader = models.textures();
-    let summary =
-        write_interior_package(&scene, &models, &loader, &glb, &info, &args.out, &|| {
-            cancel.is_cancelled()
-        })?;
+    let summary = write_interior_package_with_context(
+        &scene, &models, &loader, &glb, &info, &args.out, &context,
+    )?;
     if as_json {
         json::print(&PackageJson::of(
             &json::path(&args.archive),

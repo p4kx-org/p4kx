@@ -10,7 +10,10 @@ use std::path::PathBuf;
 use anyhow::{Result, anyhow};
 use p4kx_channels::SearchPaths;
 use p4kx_gui::smoke::Frames;
-use p4kx_gui::{App, ChannelList, Language, Model, RecordTextChoice, Text, frame, theme, window};
+use p4kx_gui::{
+    App, ChannelList, Language, Model, PrerequisiteNotice, ProtectionText, RecordTextChoice, Text,
+    Texts, frame, theme, window,
+};
 use p4kx_settings::{
     KEY_VARIABLE, KeyChoiceError, KeyStore, Settings, choose_key, default_settings_file,
 };
@@ -38,12 +41,49 @@ fn set_up_key(model: &mut Model) {
 }
 
 fn main() -> Result<()> {
+    if informational_argument()? {
+        return Ok(());
+    }
+    let runtime = check_runtime()?;
     p4kx_extraction::protect_libraries();
     let settings_file = default_settings_file();
     let settings = settings_file
         .as_deref()
         .and_then(|file| Settings::load(file).ok())
         .unwrap_or_default();
+    let mut model = configured_model(&settings);
+    set_up_key(&mut model);
+    let title = model.texts().get(Text::AppTitle);
+    let options = window::native_options(window::viewport(settings.window, &title));
+    let archive = std::env::args_os().nth(1).map(PathBuf::from);
+    let smoke = Frames::from_environment();
+    eframe::run_native(
+        &title,
+        options,
+        Box::new(move |creation| {
+            theme::apply(&creation.egui_ctx);
+            frame::tint(creation);
+            let mut model = model;
+            if smoke.is_none() {
+                let ctx = creation.egui_ctx.clone();
+                model.check_for_update(move || ctx.request_repaint());
+            }
+            if let Some(path) = archive {
+                let ctx = creation.egui_ctx.clone();
+                model.open(path, move || ctx.request_repaint());
+            }
+            let app =
+                App::new(model, settings_file, settings.window).with_runtime_environment(runtime);
+            Ok(Box::new(match smoke {
+                Some(frames) => app.with_smoke(frames),
+                None => app,
+            }))
+        }),
+    )
+    .map_err(|error| anyhow!("cannot show the window: {error}"))
+}
+
+fn configured_model(settings: &Settings) -> Model {
     let mut model = Model::new(Language::resolve(settings.language.as_deref()));
     model.set_channels(ChannelList::new(
         SearchPaths::standard(),
@@ -66,32 +106,47 @@ fn main() -> Result<()> {
             .as_deref()
             .and_then(RecordTextChoice::from_code),
     );
-    set_up_key(&mut model);
-    let title = model.texts().get(Text::AppTitle);
-    let options = window::native_options(window::viewport(settings.window, &title));
-    let archive = std::env::args_os().nth(1).map(PathBuf::from);
-    let smoke = Frames::from_environment();
+    model
+}
+
+fn informational_argument() -> Result<bool> {
+    use std::io::Write as _;
+    let argument = std::env::args_os().nth(1);
+    let text = match argument.as_deref().and_then(std::ffi::OsStr::to_str) {
+        Some("--version" | "-V") => format!("p4kx-gui {}", env!("CARGO_PKG_VERSION")),
+        Some("--help" | "-h") => {
+            Texts::new(Language::resolve(None)).get(ProtectionText::CommandHelp)
+        }
+        _ => return Ok(false),
+    };
+    writeln!(std::io::stdout().lock(), "{text}")?;
+    Ok(true)
+}
+
+fn check_runtime() -> Result<p4kx_extraction::RuntimeEnvironment> {
+    match p4kx_extraction::check_runtime_environment() {
+        Ok(runtime) => Ok(runtime),
+        Err(error) => {
+            if Frames::from_environment().is_none() {
+                show_prerequisite()?;
+            }
+            Err(error.into())
+        }
+    }
+}
+
+fn show_prerequisite() -> Result<()> {
+    let language = Language::resolve(None);
+    let title = Texts::new(language).get(Text::AppTitle);
+    let options = window::native_options(window::viewport(None, &title));
     eframe::run_native(
         &title,
         options,
         Box::new(move |creation| {
             theme::apply(&creation.egui_ctx);
             frame::tint(creation);
-            let mut model = model;
-            if smoke.is_none() {
-                let ctx = creation.egui_ctx.clone();
-                model.check_for_update(move || ctx.request_repaint());
-            }
-            if let Some(path) = archive {
-                let ctx = creation.egui_ctx.clone();
-                model.open(path, move || ctx.request_repaint());
-            }
-            let app = App::new(model, settings_file, settings.window);
-            Ok(Box::new(match smoke {
-                Some(frames) => app.with_smoke(frames),
-                None => app,
-            }))
+            Ok(Box::new(PrerequisiteNotice::new(language)))
         }),
     )
-    .map_err(|error| anyhow!("cannot show the window: {error}"))
+    .map_err(|error| anyhow!("cannot show the prerequisite notice: {error}"))
 }

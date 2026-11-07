@@ -32,6 +32,9 @@ impl EntryWriter<'_> {
         let credited = AtomicU64::new(0);
         let (outcome, records) = match self.try_write_dataforge(entry, buffers, &credited) {
             Ok(done) => done,
+            Err(error) if crate::guard_cancellation::retained_output(&error) => {
+                (Outcome::Failed(error), None)
+            }
             Err(_) if self.tracker.archive_file_changed() => (Outcome::Cancelled, None),
             Err(error) => (Outcome::Failed(error), None),
         };
@@ -68,14 +71,13 @@ impl EntryWriter<'_> {
             return Ok((Outcome::Cancelled, None));
         }
         let forge = DataForge::open(bytes).map_err(ExtractionError::DataForge)?;
-        let folder = self
-            .tracker
-            .folders
-            .folder(self.target, relative.parent())?;
+        let folder = self.folder(relative.parent())?;
         let records: Vec<Record<'_>> = forge.records().collect();
         let rest = size.saturating_sub(credited.load(Ordering::Relaxed));
         let share = rest.checked_div(records.len() as u64).unwrap_or_default();
         let run = RecordRun {
+            protection: self.protection,
+            cancel: self.cancel,
             policy: self.policy,
             annotations: Annotations::none(),
             stop: &|| self.tracker.should_stop(),

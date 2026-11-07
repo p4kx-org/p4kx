@@ -4,6 +4,11 @@
 use crate::tag_build::layout;
 use crate::{DataForge, Guid, TagResolver};
 
+#[path = "tag_events.rs"]
+mod events;
+
+pub use events::{TagBuildEvent, TagProjectionFailure, TagRelationIssue};
+
 /// The struct of the Record that lists the root tags.
 pub const TAG_DATABASE_TYPE: &str = "TagDatabase";
 
@@ -142,18 +147,36 @@ impl TagTree {
     /// returns `true`; `stop` is polled between Records and between tags.
     #[must_use]
     pub fn build_with(forge: &DataForge<'_>, stop: &dyn Fn() -> bool) -> Option<Self> {
-        let laid = layout(forge, stop)?;
+        layout(forge, stop).map(Self::from_layout)
+    }
+
+    /// Builds a tag tree and reports actual source, relation, and projection operations.
+    ///
+    /// Returns `None` once `stop` requests cancellation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the observer's error without completing the tree.
+    pub fn build_observed<'f, E>(
+        forge: &'f DataForge<'f>,
+        stop: &dyn Fn() -> bool,
+        observe: &mut impl for<'r> FnMut(TagBuildEvent<'r, 'f>) -> Result<(), E>,
+    ) -> Result<Option<Self>, E> {
+        Ok(crate::tag_build::layout_observed(forge, stop, observe)?.map(Self::from_layout))
+    }
+
+    fn from_layout(laid: crate::tag_build::Layout) -> Self {
         let mut by_guid: Vec<(Guid, u32)> = (0..)
             .zip(&laid.nodes)
             .map(|(index, node)| (node.guid, index))
             .collect();
         by_guid.sort_unstable();
-        Some(Self {
+        Self {
             nodes: laid.nodes,
             roots: laid.roots,
             by_guid: by_guid.into_boxed_slice(),
             issues: laid.issues,
-        })
+        }
     }
 
     /// Returns the number of tags in the tree.

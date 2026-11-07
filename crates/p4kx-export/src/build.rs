@@ -9,6 +9,7 @@ use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_channels::{PublicPatches, channel_name};
 use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry, utc_rfc3339};
 
+use crate::archive_key_use::ArchiveKeyUse;
 use crate::build_derived::{add_contracts, add_loadouts, add_paints};
 use crate::build_harvest::add_harvest_locations;
 use crate::build_loot::add_loot_containers;
@@ -20,19 +21,18 @@ use crate::contract::{
     BuildSource, Catalog, Completeness, KindCompleteness, SCHEMA_VERSION, Source,
 };
 use crate::crafting::read_with_progress;
-use crate::crafting_warning::CraftingWarning;
 use crate::mission_data::link_scenario_factions;
 use crate::recovery::{Recovery, read_recovery};
 use crate::scan::Scan;
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
 use crate::starmap_containers::Placements;
-use crate::starmap_report::StarmapReport;
 use crate::texts::{TextSources, Texts};
-use crate::{
-    BuiltCatalog, CatalogError, CatalogFailure, CatalogOptions, CatalogSummary, LoadoutSummary,
-    PaintSummary, ShopSummary, StarmapSummary, StoreSlugSummary,
-};
+use crate::{BuiltCatalog, CatalogError, CatalogOptions, CatalogSummary};
+
+#[path = "build_parts.rs"]
+mod parts;
+use parts::Parts;
 
 /// Builds the Basetool catalog of the DataForge in `archive`.
 ///
@@ -50,15 +50,17 @@ use crate::{
 /// resource group takes its parent from
 /// the group that lists it, a blueprint category only its Record. Entities are ordered by the
 /// text of their GUID, so equal input and export time give byte-identical JSON. A selected
-/// Record that cannot be read is left out and listed in
-/// [`CatalogSummary::failures`].
+/// Record that cannot be read is listed in [`CatalogSummary::failures`] and the artifact's
+/// export health. Normal mode refuses incomplete health; explicit diagnostic mode retains the
+/// available rows and their incomplete status.
 ///
 /// # Errors
 ///
 /// Returns [`CatalogError::Load`] or [`CatalogError::DataForge`] when the DataForge cannot be
 /// read, [`CatalogError::LoadTexts`] or [`CatalogError::Texts`] when a `global.ini` the Archive
 /// holds cannot be read, and [`CatalogError::Cancelled`] once the [`CancelToken`] of `options`
-/// is cancelled.
+/// is cancelled. Returns [`CatalogError::IncompleteExport`] when normal publication is unsafe,
+/// or [`CatalogError::Accounting`] when production evidence is missing or inconsistent.
 pub fn build_catalog(
     archive: &Archive,
     options: &CatalogOptions<'_>,
@@ -114,8 +116,8 @@ pub fn build_catalog_from(
 /// The JSON is never held in memory; zstd serialises it twice, once to count its length for the
 /// frame header.
 ///
-/// `create` is called once, after the catalog is built and before the first byte is written, so a
-/// build that fails or is cancelled has created nothing. Returns the summary, whose
+/// `create` is called once after the build passes its publication policy, before the first byte
+/// is written; a refused or cancelled build creates nothing. Returns the summary, whose
 /// [`size`](CatalogSummary::size) is the JSON size and whose
 /// [`compressed_size`](CatalogSummary::compressed_size) is the size written when compressed, and
 /// the writer, flushed and with the compressed frame finished.
@@ -140,49 +142,6 @@ pub fn write_catalog_from<W: Write>(
         parts.summary(written.size, written.compressed),
         written.sink,
     ))
-}
-
-/// What a build knows of a catalog besides its size.
-pub(crate) struct Parts {
-    kinds: Vec<crate::KindSummary>,
-    texts: Vec<crate::TextSummary>,
-    notes: Vec<p4kx_extraction::LocalizationNote>,
-    item_classes: crate::ItemClassSummary,
-    paints: PaintSummary,
-    loadouts: LoadoutSummary,
-    starmap: StarmapSummary,
-    starmap_report: Box<StarmapReport>,
-    shops: Box<ShopSummary>,
-    store_slugs: Box<StoreSlugSummary>,
-    playability: crate::PlayabilitySummary,
-    variants: crate::VariantSummary,
-    quantizations: crate::QuantizationSummary,
-    failures: Vec<CatalogFailure>,
-    warnings: Vec<CraftingWarning>,
-}
-
-impl Parts {
-    fn summary(self, size: u64, compressed_size: Option<u64>) -> CatalogSummary {
-        CatalogSummary {
-            kinds: self.kinds,
-            texts: self.texts,
-            notes: self.notes,
-            item_classes: self.item_classes,
-            paints: self.paints,
-            loadouts: self.loadouts,
-            starmap: self.starmap,
-            starmap_report: self.starmap_report,
-            shops: self.shops,
-            store_slugs: self.store_slugs,
-            playability: self.playability,
-            variants: self.variants,
-            quantizations: self.quantizations,
-            failures: self.failures,
-            warnings: self.warnings,
-            size,
-            compressed_size,
-        }
-    }
 }
 
 /// Builds the catalog and hands it to `emit`, which serialises it.
@@ -212,6 +171,7 @@ fn assemble<R>(
     let (mut collected, placements) = scan(
         archive, &forge, &files, &entities, options, &texts, crafting,
     )?;
+    collected.ledger.archive_inventory_problem = crate::export_archive_health::inventory(archive);
     let paint_summary = add_paints(&forge, &mut collected, options.cancel)?;
     let loadout_summary = add_loadouts(archive, &entities, &mut collected, options.cancel)?;
     let variants = collected.group_variants();
@@ -219,11 +179,42 @@ fn assemble<R>(
     add_harvest_locations(archive, &placements, &mut collected, options.cancel)?;
     add_loot_containers(archive, &placements, &mut collected, options.cancel)?;
     add_contracts(&forge, &texts, options, &mut collected)?;
-    link_scenario_factions(&forge, &mut collected.mission_kinds.scenarios);
+    collected.ledger.merge(link_scenario_factions(
+        &forge,
+        &mut collected.mission_kinds.scenarios,
+        options.cancel,
+    )?);
     let shop_summary = add_shops(archive, &files, &mut collected, options)?;
-    let Recovery { rules, failures } = read_recovery(&forge, options.filter);
+    let Recovery {
+        rules,
+        failures,
+        ledger,
+    } = read_recovery(&forge, options.filter, options.cancel)?;
+    collected.ledger.merge(ledger);
     collected.add_failures(failures);
     let kinds = collected.summary(options.filter.is_none());
+    let catalog_rows = crate::catalog_rows::snapshot(&collected, options.filter);
+    if collected
+        .ledger
+        .catalog_rows
+        .replace(catalog_rows)
+        .is_some()
+    {
+        collected.ledger.conflicting_catalog_rows = true;
+    }
+    let health = crate::export_health_compile::compile(
+        std::mem::take(&mut collected.ledger),
+        &kinds,
+        &collected.failures,
+        &collected.warnings,
+        options.publication_mode,
+    )?;
+    if !health.permits_publication(options.publication_mode) {
+        return Err(CatalogError::IncompleteExport {
+            health: Box::new(health),
+        });
+    }
+    let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
     let resolved = store_slugs.resolve(
         collected
@@ -234,14 +225,21 @@ fn assemble<R>(
     );
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
-        source: source(archive, options.exported_at, options.public_patches),
+        source: source(
+            archive,
+            options.exported_at,
+            options.public_patches,
+            key_use,
+        ),
         completeness: Completeness::of_every_kind(completeness_of(options)),
+        export_health: health.clone(),
         manufacturers: collected.manufacturers,
         items: collected.items,
         ships: collected.ships,
         commodities: collected.commodities,
         blueprints: collected.blueprints,
         resource_groups: collected.resource_groups,
+        resource_types: collected.resource_types,
         blueprint_categories: collected.blueprint_categories,
         gameplay_properties: collected.gameplay_properties,
         quality_distributions: collected.quality_distributions,
@@ -284,12 +282,14 @@ fn assemble<R>(
         mission_broker_entries: collected.mission_broker_entries,
         contract_npc_spawns: collected.contract_npc_spawns,
         contract_entity_spawns: collected.contract_entity_spawns,
+        mission_property_sets: collected.mission_property_sets,
         ship_store_slugs: resolved.exported,
         item_recovery: rules,
     };
     let output = emit(&catalog)?;
     Ok((
         Parts {
+            export_health: health,
             kinds,
             texts: texts.summary(),
             notes: texts.notes().to_vec(),
@@ -305,6 +305,7 @@ fn assemble<R>(
             quantizations: collected.quantization_summary,
             failures: collected.failures,
             warnings: collected.warnings,
+            archive_key: key_use,
         },
         output,
     ))
@@ -336,7 +337,7 @@ fn scan<'f>(
     } else {
         Placements::default()
     };
-    let picked = Scan::run(
+    let scanned = Scan::run(
         forge,
         files,
         Arc::clone(entities),
@@ -348,7 +349,10 @@ fn scan<'f>(
     if options.cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
-    Ok((Collected::new(picked, crafting), placements))
+    let mut collected = Collected::new(scanned.picked, crafting);
+    collected.ledger.merge(scanned.ledger);
+    collected.ledger.merge(placements.ledger.clone());
+    Ok((collected, placements))
 }
 
 fn completeness_of<'o>(options: &'o CatalogOptions<'_>) -> KindCompleteness<'o> {
@@ -363,6 +367,7 @@ pub(crate) fn source<'a>(
     archive: &'a Archive,
     exported_at: SystemTime,
     patches: Option<&'a PublicPatches>,
+    key_use: ArchiveKeyUse,
 ) -> Source<'a> {
     Source {
         channel: channel_name(archive.path()),
@@ -375,6 +380,8 @@ pub(crate) fn source<'a>(
         }),
         archive_size: archive.file_len(),
         archive_modified: archive.file_modified().map(utc_rfc3339),
+        archive_key: key_use.state(),
+        encrypted_entries_unread: key_use.entries_unread(),
         tool_version: env!("CARGO_PKG_VERSION"),
         exported_at: utc_rfc3339(exported_at),
     }

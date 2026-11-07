@@ -9,9 +9,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use p4kx_channels::PublicPatches;
 use p4kx_export::{
-    CatalogError, CatalogFailure, CatalogFile, CatalogOptions, CatalogSummary, Compression,
-    CraftingWarning, Filter, LoadoutSummary, PaintSummary, Playability, ShopSummary,
-    StarmapSummary, StoreSlugSummary, catalog_schema, write_catalog,
+    CatalogError, CatalogFailure, CatalogFile, CatalogOptions, CatalogPublicationMode,
+    CatalogSummary, Compression, CraftingWarning, Filter, catalog_schema, write_catalog_file,
 };
 use p4kx_extraction::Archive;
 
@@ -25,10 +24,8 @@ use crate::json;
 use crate::loc::print_notes;
 use crate::progress::ProgressLine;
 
-const STALE_SLUGS_SHOWN: usize = 5;
-
-/// Writes the Basetool catalog of the Archive to the output file and prints its summary, or
-/// prints the catalog's JSON Schema; the exit code is 1 when a selected Record could not be read.
+/// Writes a publishable catalog or an explicitly requested diagnostic catalog and prints its summary.
+/// Returns exit code 1 for incomplete diagnostic output; normal incomplete output is refused.
 pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
     if matches!(args.command, Some(CatalogCommand::Schema)) {
         print_schema()?;
@@ -56,30 +53,51 @@ pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
         cancel: Some(&cancel),
         progress: Some(&show),
         public_patches: Some(&patches),
+        publication_mode: if args.diagnostic_partial {
+            CatalogPublicationMode::DiagnosticPartial
+        } else {
+            CatalogPublicationMode::Normal
+        },
     };
     crate::guard::ensure_writable(out)?;
     let written = write_file(&archive, &options, out);
     line.finish();
     let summary = &written?;
+    print_result(&archive, out, summary, as_json)?;
+    Ok(ExitCode::from(if summary.is_complete() {
+        exit::SUCCESS
+    } else {
+        exit::PARTIAL_FAILURE
+    }))
+}
+
+fn print_result(
+    archive: &Archive,
+    out: &Path,
+    summary: &CatalogSummary,
+    as_json: bool,
+) -> Result<()> {
+    if summary.export_health().publication_mode == CatalogPublicationMode::DiagnosticPartial {
+        writeln!(
+            io::stderr().lock(),
+            "diagnostic catalog: publication mode diagnosticPartial"
+        )?;
+    }
     print_notes(summary.text_notes());
     print_failures(summary.failures())?;
     print_warnings(summary.warnings())?;
     warn_about_size(summary)?;
     let printed = if as_json {
-        json::print(&summary_json(&archive, out, summary))
+        json::print(&summary_json(archive, out, summary))
     } else {
-        print_summary(summary, out)
+        crate::catalog_summary::print(summary, out)
     };
     if let Err(error) = printed
         && error.kind() != io::ErrorKind::BrokenPipe
     {
         return Err(error.into());
     }
-    Ok(ExitCode::from(if summary.is_complete() {
-        exit::SUCCESS
-    } else {
-        exit::PARTIAL_FAILURE
-    }))
+    Ok(())
 }
 
 /// Builds the catalog and streams it into a temporary file next to `out`, compressed when the name
@@ -89,13 +107,11 @@ fn write_file(
     options: &CatalogOptions<'_>,
     out: &Path,
 ) -> Result<CatalogSummary> {
-    let written = write_catalog(archive, options, Compression::for_path(out), || {
-        CatalogFile::create(out).map_err(|error| {
-            io::Error::new(
-                error.kind(),
-                format!("cannot write {}: {error}", out.display()),
-            )
-        })
+    let uncancelled = p4kx_extraction::CancelToken::new();
+    let cancel = options.cancel.unwrap_or(&uncancelled);
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let written = write_catalog_file(archive, options, Compression::for_path(out), || {
+        CatalogFile::create_protected(out, &protection, cancel)
     });
     let (summary, file) = written.map_err(into_anyhow)?;
     file.commit()
@@ -139,194 +155,11 @@ fn into_anyhow(error: CatalogError) -> anyhow::Error {
     }
 }
 
-fn print_classification(stdout: &mut impl Write, summary: &CatalogSummary) -> io::Result<()> {
-    let playability = summary.playability();
-    for (kind, counts) in [("items", playability.items), ("ships", playability.ships)] {
-        writeln!(
-            stdout,
-            "{kind} playability: {} player, {} ai, {} mission, {} special, {} unclassified",
-            counts.of(Playability::Player),
-            counts.of(Playability::Ai),
-            counts.of(Playability::Mission),
-            counts.of(Playability::Special),
-            counts.unclassified()
-        )?;
-    }
-    let variants = summary.variants();
-    for (kind, counts) in [("items", variants.items), ("ships", variants.ships)] {
-        writeln!(
-            stdout,
-            "{kind} variants: {} in {} groups",
-            counts.variants, counts.groups
-        )?;
-    }
-    let quantizations = summary.quantizations();
-    writeln!(
-        stdout,
-        "quality quantizations: {} used by no ResourceType, {} links reach no quantization",
-        quantizations.unused, quantizations.unresolved_links
-    )?;
-    Ok(())
-}
-
-fn print_starmap(out: &mut impl Write, starmap: StarmapSummary) -> io::Result<()> {
-    writeln!(
-        out,
-        "starmap placement: {} of {} objects have a position, {} are placed apart, {} systems, {} containers unreadable, {} missing, {} children malformed",
-        starmap.placed,
-        starmap.objects,
-        starmap.ambiguous,
-        starmap.systems,
-        starmap.unreadable_containers,
-        starmap.missing_containers,
-        starmap.malformed_children
+/// Returns the explicit diagnostic-export option for a refused incomplete catalog.
+pub(crate) fn hint(error: &anyhow::Error) -> Option<&'static str> {
+    matches!(
+        error.downcast_ref::<CatalogError>(),
+        Some(CatalogError::IncompleteExport { .. })
     )
-}
-
-fn print_paints(out: &mut impl Write, paints: PaintSummary) -> io::Result<()> {
-    writeln!(
-        out,
-        "paint assignment: {} of {} paints fit a ship, {} fit none, {} ships have paints, {} vehicle files unreadable",
-        paints.assigned, paints.paints, paints.unassigned, paints.ships, paints.unreadable_vehicles
-    )
-}
-
-fn print_store_slugs(out: &mut impl Write, slugs: &StoreSlugSummary) -> io::Result<()> {
-    if slugs.stale_check_skipped {
-        return writeln!(
-            out,
-            "ship store slugs: no catalog ship matches a store slug, stale check skipped"
-        );
-    }
-    writeln!(
-        out,
-        "ship store slugs: {} of {} slugs map to a ship, {} resolve, {} retired, {} unmapped, {} stale",
-        slugs.mapped,
-        slugs.slugs,
-        slugs.resolved,
-        slugs.retired,
-        slugs.unmapped,
-        slugs.stale.len()
-    )?;
-    if !slugs.stale.is_empty() {
-        let shown = slugs
-            .stale
-            .iter()
-            .take(STALE_SLUGS_SHOWN)
-            .map(String::as_str)
-            .collect::<Vec<_>>()
-            .join(", ");
-        let more = slugs.stale.len().saturating_sub(STALE_SLUGS_SHOWN);
-        if more == 0 {
-            writeln!(out, "stale ship store slugs: {shown}")?;
-        } else {
-            writeln!(out, "stale ship store slugs: {shown} and {more} more")?;
-        }
-    }
-    Ok(())
-}
-
-fn print_shops(out: &mut impl Write, shops: &ShopSummary) -> io::Result<()> {
-    writeln!(
-        out,
-        "shops: {} of {} registry entries, {} malformed, {} repeated, {} with a kind, {} linked to a starmap object, {} not, {} commodity exchanges, {} containers unreadable, {} with an item list ({} ambiguous, {} unscanned, {} placeholders, {} files missing, {} files unreadable), registry {}",
-        shops.shops,
-        shops.registry_entries,
-        shops.malformed,
-        shops.duplicate,
-        shops.with_kind,
-        shops.linked,
-        shops.unlinked,
-        shops.commodity_exchanges,
-        shops.containers_unreadable,
-        shops.with_items,
-        shops.inventory_ambiguous,
-        shops.inventory_unscanned,
-        shops.inventory_placeholder,
-        shops.inventories_missing,
-        shops.inventories_unreadable,
-        if shops.registry_unreadable {
-            "unreadable"
-        } else if shops.registry_missing {
-            "missing"
-        } else {
-            "read"
-        }
-    )
-}
-
-fn print_summary(summary: &CatalogSummary, out: &Path) -> io::Result<()> {
-    let mut stdout = io::stdout().lock();
-    for kind in summary.kinds() {
-        writeln!(
-            stdout,
-            "{}: {} written, {} skipped, {}",
-            kind.kind,
-            kind.count,
-            kind.skipped,
-            if kind.complete { "complete" } else { "partial" }
-        )?;
-    }
-    let classes = summary.item_classes();
-    writeln!(
-        stdout,
-        "item classes: {} read, {} other values, {} without a Class: line or English description",
-        classes.classified, classes.other, classes.missing
-    )?;
-    print_paints(&mut stdout, summary.paints())?;
-    print_loadouts(&mut stdout, summary.loadouts())?;
-    print_starmap(&mut stdout, summary.starmap())?;
-    print_shops(&mut stdout, summary.shops())?;
-    print_store_slugs(&mut stdout, summary.store_slugs())?;
-    print_classification(&mut stdout, summary)?;
-    for text in summary.texts() {
-        writeln!(
-            stdout,
-            "{}: {} texts resolved, {} unresolved, {} placeholders{}",
-            text.language,
-            text.resolved,
-            text.unresolved,
-            text.placeholder,
-            if text.available {
-                ""
-            } else {
-                ", the Archive holds no global.ini"
-            }
-        )?;
-    }
-    writeln!(
-        stdout,
-        "wrote {}: {}, {} Records skipped, {} failed",
-        out.display(),
-        size_text(summary),
-        summary.skipped(),
-        summary.failures().len()
-    )
-}
-
-fn print_loadouts(out: &mut impl Write, loadouts: LoadoutSummary) -> io::Result<()> {
-    writeln!(
-        out,
-        "loadouts: {} ships and {} items, {} ports, {} hold an Entity ({} docked vehicles), {} unresolved, {} Entities without an entry in items or ships, {} loadouts with issues",
-        loadouts.ships,
-        loadouts.items,
-        loadouts.ports,
-        loadouts.attached,
-        loadouts.docked_vehicles,
-        loadouts.unresolved,
-        loadouts.outside,
-        loadouts.with_issues
-    )
-}
-
-fn size_text(summary: &CatalogSummary) -> String {
-    summary.compressed_size().map_or_else(
-        || format!("{} bytes", summary.size()),
-        |compressed| {
-            format!(
-                "{compressed} bytes zstd-compressed from {} bytes",
-                summary.size()
-            )
-        },
-    )
+    .then_some("use --diagnostic-partial only to write an explicitly marked diagnostic catalog")
 }

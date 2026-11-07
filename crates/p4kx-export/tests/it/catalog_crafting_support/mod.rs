@@ -24,17 +24,24 @@ pub(crate) fn text(value: u128) -> String {
     )
 }
 
-fn write_archive(dir: &Path, forge: &DataForgeBuilder) -> Result<PathBuf, Box<dyn Error>> {
+fn write_archive(
+    dir: &Path,
+    data: Vec<u8>,
+    entries: Vec<TestEntry>,
+) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", forge.build()).encrypted())
+    let mut builder = ArchiveBuilder::new()
+        .entry(TestEntry::zstd("Data\\Game2.dcb", data).encrypted())
         .entry(TestEntry::zstd(
             "Data\\Localization\\english\\global.ini",
             GlobalIniBuilder::new()
                 .text("StatName_GPP_Armor", "Armour")
                 .build(),
-        ))
-        .write_to(&path)?;
+        ));
+    for entry in entries {
+        builder = builder.entry(entry);
+    }
+    builder.write_to(&path)?;
     Ok(path)
 }
 
@@ -48,18 +55,88 @@ pub(crate) fn build_from(
     Ok((built, json))
 }
 
+/// Builds a catalog with additional Archive Entries required by the fixture.
+pub(crate) fn build_with_entries(
+    forge: &DataForgeBuilder,
+    entries: Vec<TestEntry>,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
+    let built = build_with_mode(
+        forge,
+        None,
+        None,
+        p4kx_export::CatalogPublicationMode::Normal,
+        entries,
+    )?;
+    let json = serde_json::from_slice(built.json())?;
+    Ok((built, json))
+}
+
+/// Builds an intentionally incomplete crafting fixture with explicit diagnostic publication.
+pub(crate) fn diagnostic_from(
+    forge: &DataForgeBuilder,
+    filter: Option<&Filter>,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
+    let built = build_with_mode(
+        forge,
+        filter,
+        None,
+        p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+        Vec::new(),
+    )?;
+    let json = serde_json::from_slice(built.json())?;
+    Ok((built, json))
+}
+
 /// Builds the catalog of an Archive holding `forge`, reporting its progress to `progress`.
 pub(crate) fn build_with(
     forge: &DataForgeBuilder,
     filter: Option<&Filter>,
     progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
 ) -> Result<BuiltCatalog, Box<dyn Error>> {
+    build_with_mode(
+        forge,
+        filter,
+        progress,
+        p4kx_export::CatalogPublicationMode::Normal,
+        Vec::new(),
+    )
+}
+
+fn build_with_mode(
+    forge: &DataForgeBuilder,
+    filter: Option<&Filter>,
+    progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
+    publication_mode: p4kx_export::CatalogPublicationMode,
+    entries: Vec<TestEntry>,
+) -> Result<BuiltCatalog, Box<dyn Error>> {
+    build_data(forge.build(), filter, progress, publication_mode, entries)
+}
+
+/// Builds synthetic DataForge bytes with an explicit catalog publication mode.
+pub(crate) fn build_from_data(
+    data: Vec<u8>,
+    filter: Option<&Filter>,
+    publication_mode: p4kx_export::CatalogPublicationMode,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
+    let built = build_data(data, filter, None, publication_mode, Vec::new())?;
+    let json = serde_json::from_slice(built.json())?;
+    Ok((built, json))
+}
+
+fn build_data(
+    data: Vec<u8>,
+    filter: Option<&Filter>,
+    progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
+    publication_mode: p4kx_export::CatalogPublicationMode,
+    entries: Vec<TestEntry>,
+) -> Result<BuiltCatalog, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(
-        write_archive(dir.path(), forge)?,
+        write_archive(dir.path(), data, entries)?,
         Some(p4kx_testkit::test_key()),
     )?;
     let options = CatalogOptions {
+        publication_mode,
         filter,
         progress,
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Value comparison of the `DataForge` Records `StarBreaker` wrote with the Records P4KX builds.
+//! Value comparison of the manifest-selected DataForge Records `StarBreaker` wrote.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
@@ -10,74 +11,112 @@ use std::time::Instant;
 use p4kx_extraction::{Archive, DataForge, DataForgeEntry, TreeBuilder};
 use p4kx_testkit::{real_archive_key, real_archive_path, reference_starbreaker_path};
 use rayon::prelude::*;
+use serde_json::Value;
 
 use super::TestResult;
-use super::starbreaker_json::record;
+use super::reference_error::{Code, ReferenceError, Result};
+use super::reference_manifest::{Identity, Location, Tool};
+use super::reference_run::{self, Dataset};
+use super::starbreaker_location;
 use super::tally::{Compared, Tally};
-use super::value_tree::RecordDoc;
-use super::value_tree_compare::compare_counting;
-use super::walk::files_under;
 
-pub(crate) const MAIN_RECORDS_ONLY: &str = "StarBreaker exports only the main Record of a file";
+type Group<'a> = Vec<(usize, &'a Location)>;
+type Comparison = (usize, Compared, u64);
 
-/// The Record P4KX builds for a GUID, in the value model.
-fn record_doc<'f>(
-    forge: &'f DataForge<'f>,
-    builder: &mut TreeBuilder<'f>,
-    guid: &str,
-) -> Option<RecordDoc> {
-    let found = forge.record_by_guid(guid.parse().ok()?)?;
-    let tree = builder.build(&found).ok()?;
-    Some(RecordDoc::from_tree(&tree))
+fn groups(dataset: &Dataset) -> Result<BTreeMap<String, Group<'_>>> {
+    let mut groups = BTreeMap::<String, Group<'_>>::new();
+    for (index, expected) in dataset.manifest.expected.iter().enumerate() {
+        for target in &expected.targets {
+            let key = super::reference_paths::key(&target.path)?;
+            groups.entry(key).or_default().push((index, target));
+        }
+    }
+    Ok(groups)
 }
 
-fn compare_file<'f>(
-    forge: &'f DataForge<'f>,
-    builder: &mut TreeBuilder<'f>,
-    file: &Path,
-) -> (Compared, u64) {
-    let different = |difference: String| (Compared::Different(difference), 0);
-    let text = match std::fs::read_to_string(file) {
-        Ok(text) => text,
-        Err(error) => return different(format!("reference: {error}")),
-    };
-    let theirs = match record(&text) {
-        Ok(theirs) => theirs,
-        Err(error) => return different(format!("reference: {error}")),
-    };
-    let Ok(guid) = theirs.guid.parse() else {
-        return different(format!("reference GUID {:?} is no GUID", theirs.guid));
-    };
-    let Some(found) = forge.record_by_guid(guid) else {
-        return different(format!("no Record {} in the Archive", theirs.guid));
-    };
-    let ours = match builder.build(&found) {
-        Ok(tree) => RecordDoc::from_tree(&tree),
-        Err(error) => return different(format!("P4KX: {error}")),
-    };
-    compare_counting(&ours, &theirs, &mut |guid| record_doc(forge, builder, guid))
+fn document(dataset: &Dataset, group: &Group<'_>) -> std::result::Result<Value, String> {
+    let (_, location) = group.first().ok_or("empty output group")?;
+    let bytes = dataset
+        .read(&location.path)
+        .map_err(|error| error.to_string())?;
+    serde_json::from_slice(&bytes).map_err(|error| error.to_string())
 }
 
-fn run<'f>(forge: &'f DataForge<'f>, root: &Path) -> Result<Tally, std::io::Error> {
-    let paths = files_under(root)?;
-    let files = AtomicU64::new(0);
-    let mut tally = paths
+fn compare_group<'f>(
+    forge: &'f DataForge<'f>,
+    builder: &mut TreeBuilder<'f>,
+    dataset: &Dataset,
+    group: &Group<'_>,
+) -> Vec<Comparison> {
+    let document = document(dataset, group);
+    group
+        .iter()
+        .map(|(index, location)| {
+            let result = dataset.manifest.expected.get(*index).and_then(|expected| {
+                if let Identity::Record { guid, .. } = &expected.identity {
+                    Some(guid)
+                } else {
+                    None
+                }
+            });
+            let (compared, embedded) = match (&document, result) {
+                (Ok(document), Some(guid)) => {
+                    starbreaker_location::compare(forge, builder, guid, location, document)
+                }
+                (Err(error), _) => (Compared::Different(error.clone()), 0),
+                _ => (
+                    Compared::Different("mapping has no Record identity".to_owned()),
+                    0,
+                ),
+            };
+            (*index, compared, embedded)
+        })
+        .collect()
+}
+
+fn merge(left: Compared, right: Compared) -> Compared {
+    match (left, right) {
+        (different @ Compared::Different(_), _) | (_, different @ Compared::Different(_)) => {
+            different
+        }
+        (Compared::Allowed(mut left), Compared::Allowed(right)) => {
+            left.extend(right);
+            Compared::Allowed(left)
+        }
+        (allowed @ Compared::Allowed(_), _) | (_, allowed @ Compared::Allowed(_)) => allowed,
+        _ => Compared::Equal,
+    }
+}
+
+fn collect(comparisons: Vec<Vec<Comparison>>) -> Tally {
+    let mut sources = BTreeMap::<usize, (Compared, u64)>::new();
+    for (index, compared, embedded) in comparisons.into_iter().flatten() {
+        let (old, count) = sources.remove(&index).unwrap_or((Compared::Equal, 0));
+        sources.insert(index, (merge(old, compared), count + embedded));
+    }
+    let mut tally = Tally::default();
+    for (index, (compared, embedded)) in sources {
+        tally.record(&format!("logical source {index}"), compared);
+        tally.embedded_records += embedded;
+    }
+    tally
+}
+
+pub(crate) fn verify<'f>(
+    archive: &Archive,
+    forge: &'f DataForge<'f>,
+    root: &Path,
+) -> Result<Tally> {
+    let dataset = Dataset::load(root, archive, Tool::Starbreaker)?;
+    let groups = groups(&dataset)?;
+    let comparisons = groups
         .par_iter()
-        .filter(|file| {
-            file.extension()
-                .is_some_and(|extension| extension == "json")
+        .map_init(TreeBuilder::new, |builder, (_, group)| {
+            compare_group(forge, builder, &dataset, group)
         })
-        .map_init(TreeBuilder::new, |builder, file| {
-            let mut tally = Tally::default();
-            let (compared, embedded) = compare_file(forge, builder, file);
-            files.fetch_add(1, Ordering::Relaxed);
-            tally.record(&file.to_string_lossy(), compared);
-            tally.embedded_records = embedded;
-            tally
-        })
-        .reduce(Tally::default, Tally::merge);
-    let unmatched = (forge.record_count() as u64).saturating_sub(files.into_inner());
-    tally.missing_in_reference = unmatched;
+        .collect();
+    let tally = collect(comparisons);
+    dataset.finish(archive, &tally, "StarBreaker value comparison")?;
     Ok(tally)
 }
 
@@ -102,43 +141,29 @@ fn export_all<'f>(forge: &'f DataForge<'f>) -> (u64, u64) {
 #[test]
 #[ignore = "real Archive and reference output: set P4KX_DATA_P4K and P4KX_REF_STARBREAKER and pass --ignored"]
 fn every_record_starbreaker_wrote_has_the_same_values() -> TestResult {
-    let Some(root) = reference_starbreaker_path() else {
-        super::report("skipped: P4KX_REF_STARBREAKER is not set");
-        return Ok(());
-    };
-    let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let started = Instant::now();
-    let entry = DataForgeEntry::read(&archive)?;
-    let forge = entry.open()?;
-    super::report(&format!(
-        "opened {} ({} Records) in {:?}",
-        entry.path(),
-        forge.record_count(),
-        started.elapsed()
-    ));
-
-    let started = Instant::now();
-    let tally = run(&forge, &root)?;
-    super::report(&format!(
-        "StarBreaker comparison took {:?}",
-        started.elapsed()
-    ));
-    if tally.missing_in_reference > 0 {
-        super::report(&format!(
-            "{} Records have no file in the reference ({MAIN_RECORDS_ONLY} unless --all)",
-            tally.missing_in_reference
-        ));
-    }
-
-    let started = Instant::now();
-    let (built, failed) = export_all(&forge);
-    super::report(&format!(
-        "built the trees of all Records: {built} built, {failed} failed, in {:?}",
-        started.elapsed()
-    ));
-    tally.finish("StarBreaker value comparison")?;
-    if failed > 0 {
-        return Err(format!("{failed} Records did not build").into());
-    }
-    Ok(())
+    reference_run::optional(
+        reference_starbreaker_path(),
+        "P4KX_REF_STARBREAKER",
+        |root| {
+            let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
+            let started = Instant::now();
+            let entry = DataForgeEntry::read(&archive)?;
+            let forge = entry.open()?;
+            verify(&archive, &forge, root)?;
+            super::report(&format!(
+                "StarBreaker comparison took {:?}",
+                started.elapsed()
+            ));
+            let (built, failed) = export_all(&forge);
+            super::report(&format!(
+                "separate self-check: {built} Record trees built, {failed} failed"
+            ));
+            if failed > 0 {
+                return Err(
+                    ReferenceError::new(Code::Coverage, "source Record self-check failed").into(),
+                );
+            }
+            Ok(())
+        },
+    )
 }

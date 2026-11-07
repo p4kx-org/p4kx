@@ -3,7 +3,7 @@
 Writes SHA256SUMS.txt and SHA3-512SUMS.txt for the assets of a release and assembles its notes.
 
 .DESCRIPTION
-Hashes every file in -AssetDirectory (the release assets: ZIPs, MSI, SBOM and attestation
+Requires the complete native package, SBOM and runtime evidence matrix. Hashes every file in -AssetDirectory (the release assets: ZIPs, MSI, SBOM and attestation
 bundles) and writes the two hash files next to them in the usual "<hash>  <file>" format. Then
 joins the notes in this order: the CHANGELOG section, the optional VirusTotal section, the
 "Build provenance" section and the "Checksums" section. GitHub appends its generated "What's
@@ -26,6 +26,12 @@ The section written by virustotal-scan.ps1. Optional; omitted from the notes whe
 .PARAMETER Repository
 The repository in the form owner/name, used in the verification commands.
 
+.PARAMETER Version
+The release version, defaulting to the workspace version.
+
+.PARAMETER Revision
+The full source commit digest, defaulting to GITHUB_SHA or the current commit.
+
 .EXAMPLE
 ./assemble-release.ps1 -AssetDirectory assets -NotesPath release-notes.md -OutputNotesPath notes.md -Repository p4kx-org/p4kx
 #>
@@ -35,10 +41,21 @@ param(
     [Parameter(Mandatory)][string]$NotesPath,
     [Parameter(Mandatory)][string]$OutputNotesPath,
     [string]$VirusTotalNotePath,
-    [Parameter(Mandatory)][string]$Repository
+    [Parameter(Mandatory)][string]$Repository,
+    [string]$Version,
+    [string]$Revision
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not $Version) {
+    $workspace = & cargo metadata --no-deps --format-version 1 --locked | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0) { throw 'Release version query failed.' }
+    $Version = ($workspace.packages | Where-Object name -CEQ 'p4kx').version
+}
+if (-not $Revision) {
+    $Revision = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (& git rev-parse HEAD).Trim() }
+}
+& (Join-Path $PSScriptRoot 'check-release-matrix.ps1') -AssetDirectory $AssetDirectory -Version $Version -Revision $Revision
 
 $sha256Name = 'SHA256SUMS.txt'
 $sha3Name = 'SHA3-512SUMS.txt'
@@ -66,7 +83,7 @@ $provenance = @"
 
 Every asset except the hash files and the attestation bundles is attested (SLSA build
 provenance, Sigstore) and ties the file to the commit and workflow that built it. The SBOM
-attestations of the three SBOMs (``*.cdx.json``) cover the portable ZIP and the MSI. Verify a
+attestations of the target-specific SBOMs (``*.cdx.json``) cover the packages of that target. Verify a
 download with the [GitHub CLI](https://cli.github.com/):
 
 ``````

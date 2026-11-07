@@ -14,6 +14,23 @@ Paths of files on disk are strings as the operating system displays them. Entry 
 as stored in the Archive, with `\` as separator. Sizes are byte counts. Snapshots of every shape
 live in [`crates/p4kx/tests/it/snapshots`](../crates/p4kx/tests/it/snapshots).
 
+## `p4kx media export <archive> --out <directory> --json`
+
+The successful response is `{"status":"published","index":{...}}`; `status` is `published`,
+`unchanged`, `skipped` or `incomplete`. The `index` is the exact versioned
+[media index contract](media-export.md), independent of the catalog schema. An incomplete response
+requires explicit `--diagnostic`, has `index.complete: false` and returns exit code 1. Failures
+before publication write no success response and leave the previous complete generation in place.
+A stdout reporting failure does not undo an already committed generation.
+
+`p4kx media schema` prints [media-index.schema.json](../schemas/media-index.schema.json).
+`--record`, `--reference` and `--source` print the corresponding
+[built-in record](../schemas/media-builtin-record.schema.json), [reference](../schemas/media-reference.schema.json)
+and [source](../schemas/media-source.schema.json) schemas. These schemas also describe the streamed
+files referenced by `index`; the JSONL streams and binary artifacts stay in the output directory.
+The library's [generic record envelope](../schemas/media-record.schema.json) stays available without
+built-in payload restrictions. Custom provider namespaces remain generic in the CLI schema as well.
+
 ## Entry
 
 The shape of one Entry in `list` and `search`:
@@ -26,6 +43,13 @@ The shape of one Entry in `list` and `search`:
 | `compressed_size` | number | Size of the data in the Archive |
 | `size` | number | Size after decompression |
 | `parts` | array of string | Only on the header of a Texture group in `list`: the paths of its parts and Alpha tail; `compressed_size` and `size` are then those of the whole group |
+| `metadata` | object | Shared physical-owner, raw DOS and fixed directory facts described in [Archive Entry metadata](archive-entry-metadata.md) |
+
+`metadata.owner_entry_index` identifies the physical base Entry of a grouped Texture;
+the existing sizes remain group totals. Its `original_directory_ordinal` is a
+canonical unsigned decimal string, or explicit `null` after actual directory
+recovery. ZIP-only words and the v2 encryption word remain explicitly `null` in the
+other layout. `socpak list` and MCP Entry listings use this same metadata object.
 
 ## Build
 
@@ -62,7 +86,7 @@ when nothing matches.
 
 ```json
 {"archive": "…", "channel": "LIVE", "build": Build, "entry_count": 4, "encrypted_count": 1,
- "issue_count": 0, "compressed_size": 35, "size": 118}
+ "issue_count": 0, "compressed_size": 35, "size": 118, "metadata": ArchiveLayoutInfo}
 ```
 
 `issue_count` is the number of Entry issues found in the directory of the Archive (ADR-0025); `info`,
@@ -74,6 +98,12 @@ itself (two when a scan limit cut the scan short), which every command prints on
 
 `channel` is the name of the folder holding the Archive, or `null` when there is none; `build` is
 `null` when the Build is unknown.
+
+`metadata` is the shared cached `ArchiveLayoutInfo` object: `version`, decimal-string
+`sourceLength`, actual `layout`, `declarationState`, and mandatory `zip`/`v2` keys with explicit
+null for the absent layout. Nested ZIP/ZIP64/v2 declarations retain their original words and
+source-relative extents. This adds no body reads or lazy-row validation. MCP `archive_info`
+returns the same object; [Archive source layout](media-archive-layout.md) defines its contract.
 
 ## `p4kx dcb info <archive> --json`
 
@@ -1106,54 +1136,23 @@ printed as a note on stderr. An encrypted DataForge without the key is exit code
 
 ## `p4kx catalog <archive> --out <file> --json`
 
+The following excerpt shows the publication contract; other summary fields and the per-kind
+health and diagnostic lists are omitted. The complete health object is identical to the catalog's
+`exportHealth`; its nested keys retain camelCase inside the CLI's snake_case summary.
+
 ```json
-{"archive": "…", "out": "…", "schema_version": 2, "size": 131969336, "compressed_size": null,
- "upload_limit": 64000000, "decompressed_limit": 1000000000,
- "size_warning": "over_limit", "decompressed_warning": null, "kinds": [{"kind": "manufacturers", "count": 1201, "skipped": 2,
- "complete": true}, {"kind": "items", "count": 23280, "skipped": 1145, "complete": true},
- {"kind": "ships", "count": 1087, "skipped": 57, "complete": true},
- {"kind": "commodities", "count": 145, "skipped": 0, "complete": true},
- {"kind": "blueprints", "count": 1618, "skipped": 0, "complete": true},
- {"kind": "resourceGroups", "count": 19, "skipped": 0, "complete": true},
- {"kind": "blueprintCategories", "count": 21, "skipped": 0, "complete": true},
- {"kind": "gameplayProperties", "count": 29, "skipped": 0, "complete": true},
- {"kind": "qualityDistributions", "count": 21, "skipped": 1, "complete": true},
- {"kind": "qualityQuantizations", "count": 62, "skipped": 1, "complete": true},
- {"kind": "blueprintPools", "count": 160, "skipped": 0, "complete": true},
- {"kind": "dismantleProcesses", "count": 1, "skipped": 0, "complete": true},
- {"kind": "paints", "count": 1064, "skipped": 68, "complete": true},
- {"kind": "loadouts", "count": 10708, "skipped": 0, "complete": true},
- {"kind": "starmapObjects", "count": 2093, "skipped": 0, "complete": true},
- {"kind": "shops", "count": 1184, "skipped": 0, "complete": true}], "skipped": 1205,
- "failed": [{"guid": "…", "path": "libs/foundry/records/entities/scitem/odd", "error": "…"}],
- "warnings": [{"kind": "unreadable_reward_records", "count": 3}],
- "item_classes": {"classified": 347, "other": 408, "missing": 22525},
- "paints": {"paints": 1064, "assigned": 1039, "unassigned": 25, "ships": 1046, "unreadable_vehicles": 0},
- "loadouts": {"ships": 1087, "items": 9621, "ports": 293451, "attached": 152081,
- "docked_vehicles": 65, "unresolved": 505, "outside": 61, "with_issues": 193},
- "starmap": {"objects": 2093, "placed": 1239, "unplaced": 854, "ambiguous": 9, "systems": 3,
- "unreadable_containers": 0, "missing_containers": 2, "malformed_children": 0},
- "shops": {"shops": 1184, "registry_entries": 1184, "registry_missing": false, "registry_unreadable": false, "malformed": 0,
- "duplicate": 0, "containers_listed": 317, "containers_unreadable": 0, "containers_with_shop": 164,
- "other_containers_scanned": 8224, "other_containers_unreadable": 0, "other_containers_with_shop": 171,
- "prefabs_listed": 30, "prefabs_unreadable": 0, "prefab_entities": 8, "prefab_ambiguous": 1, "prefab_only_shops": 0,
- "with_kind": 590, "mixed_kind": 60, "without_container": 534, "with_items": 294, "inventory_ambiguous": 43,
- "inventory_placeholder": 399, "inventory_missing": 0, "inventory_unreadable": 1, "inventory_unscanned": 64,
- "soc_components": 320, "soc_paths_unattributed": 12, "inventories_unreadable": 1, "inventories_missing": 0, "inventories_named": 57,
- "inventories_in_archive": 119, "item_ids_dropped": 0, "commodity_exchanges": 16,
- "linked": 1000, "unlinked": 184, "ambiguous_link": 54, "unlinked_locations": ["…"]},
- "store_slugs": {"slugs": 256, "unmapped": 51, "mapped": 205, "resolved": 205, "retired": 0,
- "exported": 205, "stale": [], "stale_check_skipped": false},
- "playability": {"items": {"player": 7954, "ai": 0, "mission": 522, "special": 8570,
- "unclassified": 6234}, "ships": {"player": 324, "ai": 690, "mission": 25, "special": 35,
- "unclassified": 13}},
- "variants": {"items": {"groups": 1108, "variants": 4732},
- "ships": {"groups": 196, "variants": 850}},
- "quantizations": {"unused": 20, "unresolved_links": 0},
- "texts": [{"language": "en", "available": true, "resolved": 37963, "unresolved": 160,
- "placeholder": 23658}, {"language": "de", "available": true, "resolved": 25497,
- "unresolved": 12626, "placeholder": 23658}], "unresolved": 12786}
+{"archive": "Data.p4k", "out": "diagnostic.json.zst", "schema_version": 3,
+ "archive_key": "missing", "encrypted_entries_unread": 412,
+ "export_health": {"status": "incomplete", "read": "incomplete",
+   "projection": "complete", "publicationMode": "diagnosticPartial"},
+ "size": 12345, "compressed_size": 2345,
+ "failed": [{"guid": "90000000-0000-4000-8000-000000000009",
+   "path": "libs/foundry/records/crafting/blueprints/crafting/broken", "error": "source read failed"}]}
 ```
+
+`archive_key` is `given`, `missing` or `wrong` and `encrypted_entries_unread` counts the distinct
+encrypted Entries the export could not read for want of a usable Archive key, as in the catalog's
+`source`; the same count is printed as a note on stderr, and neither changes the exit code.
 
 `quantizations` counts two facts of the game data that do not affect the exit code: `unused`, the
 quality quantizations of the catalog that no `ResourceType` uses, and `unresolved_links`, the links
@@ -1175,8 +1174,14 @@ does the same for `size` against `decompressed_limit` (1,000,000,000). `kinds` l
 development leftovers `skipped` and whether the kind is `complete` (no `--filter`); `skipped` sums
 them. `failed` lists the selected Records that could not be read and are left out of the catalog,
 with GUID, record path (empty when it cannot be read) and the reason and its causes joined by
-`: `, ordered by GUID; the example shows one, a healthy Archive has none. The catalog is written
-all the same, and the exit code is 1 when `failed` or `warnings` is not empty. `warnings` lists what
+`: `, ordered by GUID; the synthetic diagnostic example shows one, a healthy export has none.
+Normal publication refuses incomplete read/projection health or blocking source warnings, with
+exit code 1, empty stdout and no destination creation or replacement. Use `--diagnostic-partial`
+explicitly to write an incomplete diagnostic artifact and its JSON summary; incomplete diagnostic
+output still exits with 1. Its `export_health.publicationMode` is `diagnosticPartial`, including
+when all selected sources happened to succeed. The same marker travels in the file's
+`exportHealth`, so a copied file retains the publication contract. Filter-only selection scope
+does not itself make health incomplete or require diagnostic permission. `warnings` lists what
 makes the crafting data incomplete or ambiguous although every Record was read, each as an object
 with a `kind`: `unreadable_reward_records` with a `count` (Records that cannot be read although
 their struct type is that of a Record with a reward source, so a source may be missing) and
@@ -1304,13 +1309,17 @@ exports, and every folder has Entries that all convert.
 ## `p4kx ships <archive> --out <file> --json`
 
 ```json
-{"archive": "…", "out": "…", "format": "json", "ships": 1087, "skipped": 57, "mass": 1087,
+{"archive": "…", "out": "…", "format": "json", "archive_key": "missing",
+ "encrypted_entries_unread": 412, "ships": 1087, "skipped": 57, "mass": 1087,
  "hull": 1087, "cargo": 565, "issues": 3,
  "failed": [{"guid": "…", "path": "libs/foundry/records/entities/spaceships/odd", "error": "…"}]}
 ```
 
 The ship data itself goes to `out` ([ship-base-data.md](ship-base-data.md)). `format` is `json` or
-`ndjson`; `ships` counts the ships written, `skipped` the development leftovers; `mass`, `hull`
+`ndjson`; `archive_key` is `given`, `missing` or `wrong` and `encrypted_entries_unread` counts the
+distinct encrypted Entries the export could not read for want of a usable Archive key, as in the
+file's `source` (neither changes the exit code); `ships` counts the ships written, `skipped` the
+development leftovers; `mass`, `hull`
 and `cargo` count the ships with a mass, with a hull (a part that states hit points) and with at
 least one cargo grid in their Loadout; `issues` the ships whose
 `issues` list is not empty. `failed` lists the ships that could not be read and are left out, with

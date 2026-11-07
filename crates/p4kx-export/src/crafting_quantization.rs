@@ -10,10 +10,7 @@ use crate::record_fields::{class_name, elements, integer, reference, structure};
 use crate::selection::{Kind, KindRule};
 
 pub(crate) const QUANTIZATIONS: KindRule = Kind::QualityQuantizations.records();
-pub(crate) const RESOURCE_TYPES: KindRule = KindRule {
-    prefixes: &["libs/foundry/records/resourcetypedatabase/"],
-    type_name: "ResourceType",
-};
+pub(crate) const RESOURCE_TYPES: KindRule = Kind::ResourceTypes.records();
 
 /// Why a `CraftingQualityQuantizationRecord` cannot be read.
 #[derive(Debug, Error, PartialEq, Eq)]

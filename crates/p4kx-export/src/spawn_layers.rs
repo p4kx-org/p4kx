@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
-use p4kx_extraction::{StructValue, TagTree};
+use p4kx_extraction::{RecordTree, StructValue, TagTree};
 
 use crate::blueprint::as_struct;
 use crate::mission_layers::{items, one};
@@ -111,10 +111,10 @@ pub(crate) struct RecordSpawns<'x, 'f> {
 }
 
 impl<'x, 'f> RecordSpawns<'x, 'f> {
-    /// Creates the reader of the Record whose root struct is `root`.
-    pub(crate) fn new(tags: &'x TagTree, root: &'x StructValue<'f>) -> Self {
+    /// Creates the reader of one canonical owning Record.
+    pub(crate) fn new(tags: &'x TagTree, tree: &'x RecordTree<'f>) -> Self {
         Self {
-            reader: Reader::new(tags, root),
+            reader: Reader::for_record(tags, tree),
             pools: RefCell::new(SpawnPools::default()),
         }
     }

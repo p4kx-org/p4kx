@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::{Checksum, Compression};
+use crate::{Checksum, Compression, EntryMetadata};
 
 /// Where the stored data of an Entry begins.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,6 +15,7 @@ pub(crate) enum DataStart {
 /// One file inside an Archive, as described by the central directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
+    pub(crate) metadata: EntryMetadata,
     pub(crate) path: String,
     pub(crate) compressed_size: u64,
     pub(crate) uncompressed_size: u64,
@@ -26,9 +27,23 @@ pub struct Entry {
     pub(crate) index: u32,
     pub(crate) encrypted: bool,
     pub(crate) local_header: bool,
+    pub(crate) installed_bytes: Option<u64>,
 }
 
 impl Entry {
+    /// Returns read-only source facts from this Entry's directory record.
+    #[must_use]
+    pub const fn metadata(&self) -> &EntryMetadata {
+        &self.metadata
+    }
+
+    /// Returns the source installed-byte counter, or none when the layout provides none.
+    /// This counter does not verify payload integrity.
+    #[must_use]
+    pub const fn installed_bytes(&self) -> Option<u64> {
+        self.installed_bytes
+    }
+
     /// Returns where the stored data begins.
     pub(crate) const fn data(&self) -> DataStart {
         if self.local_header {

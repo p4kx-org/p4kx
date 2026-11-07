@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::{EntryFailure, ExtractionReport, RecordExportReport};
+use p4kx_extraction::{Entry, EntryFailure, ExtractionReport, RecordExportReport};
 
 use crate::model::describe;
 use crate::record_export::{FailedRecord, RenamedRecord};
@@ -66,6 +66,23 @@ pub struct ExtractionSummary {
 }
 
 impl ExtractionSummary {
+    /// Lists the selected Entries as cancelled before a target was prepared.
+    pub(crate) fn cancelled_selection(
+        target: PathBuf,
+        entries: &[&Entry],
+        convert: bool,
+        archive_changed: bool,
+    ) -> Self {
+        let mut summary = Self::new(target, &ExtractionReport::default());
+        summary.cancelled = entries
+            .iter()
+            .map(|entry| entry.path().to_owned())
+            .collect();
+        summary.converted = convert.then_some(0);
+        summary.archive_changed = archive_changed;
+        summary
+    }
+
     /// Returns the outcome of a conversion cancelled while its input folder was read: nothing
     /// was written, and the input folder is the one thing listed as cancelled.
     pub(crate) fn cancelled_scan(target: PathBuf, input: &Path) -> Self {

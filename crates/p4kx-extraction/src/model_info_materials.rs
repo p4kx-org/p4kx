@@ -4,6 +4,8 @@
 use p4kx_model::{Material, MaterialStatus, Model};
 use serde::Serialize;
 
+use crate::material_source_info::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
+
 /// What reading a model's material library came to.
 #[derive(Debug, Serialize)]
 pub struct LibraryInfo<'a> {
@@ -12,6 +14,7 @@ pub struct LibraryInfo<'a> {
     problem: Option<String>,
     single: Option<bool>,
     default_palette: Option<&'a str>,
+    authored: Option<MaterialLibrarySourceInfo<'a>>,
 }
 
 impl<'a> LibraryInfo<'a> {
@@ -30,6 +33,7 @@ impl<'a> LibraryInfo<'a> {
             problem: model.materials.problem(),
             single: library.map(|library| library.single),
             default_palette: library.and_then(|library| library.default_palette.as_deref()),
+            authored: library.map(MaterialLibrarySourceInfo::of),
         }
     }
 }
@@ -51,6 +55,7 @@ pub struct MaterialInfo<'a> {
     alpha_test: f32,
     glow: f32,
     textures: Vec<TextureInfo<'a>>,
+    authored: MaterialAuthoredInfo<'a>,
 }
 
 #[derive(Debug, Serialize)]
@@ -89,6 +94,7 @@ impl<'a> MaterialInfo<'a> {
             opacity: material.opacity,
             alpha_test: material.alpha_test,
             glow: material.glow,
+            authored: MaterialAuthoredInfo::of(material),
             textures: material
                 .textures
                 .iter()

@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use p4kx_extraction::model::{MaterialStatus, Model};
-use p4kx_extraction::{AnimationSet, GlbSummary, Guid, TextureRole, WriteRefused};
+use p4kx_extraction::{AnimationSet, GlbSummary, Guid, TextureRole, WriteProtectionError};
 
 use crate::model_info::{MAX_LISTED_ANIMATIONS, printable};
 use crate::{ChunkNote, ModelInfo, NoEntries};
@@ -257,7 +257,7 @@ fn unmatched(written: &GlbSummary, animations: &AnimationSet) -> Vec<AnimationNo
 }
 
 /// Why an Export as GLB wrote no file.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum ModelExportFailure {
     /// The model is encrypted and the Archive has no key.
     KeyRequired,
@@ -265,8 +265,8 @@ pub enum ModelExportFailure {
     KeyRejected,
     /// The Archive changed on disk, so the model was not exported.
     ArchiveChanged,
-    /// The file lies inside a Star Citizen installation.
-    Refused(WriteRefused),
+    /// The output violates a protection or identity boundary.
+    Refused(WriteProtectionError),
     /// The DataForge has no Record with this GUID.
     NoRecord(Guid),
     /// The model could not be read or the file not written, for the reason given.

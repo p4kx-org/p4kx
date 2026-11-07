@@ -11,6 +11,8 @@ use crate::{CancelToken, ConflictPolicy, ExtractionError, NameRule};
 /// The settings of one Record export.
 #[derive(Clone, Copy, Default)]
 pub struct RecordExportOptions<'a> {
+    /// Source-origin protection of an Archive-backed export job.
+    pub protection: Option<&'a crate::ArchiveWriteProtection>,
     /// What to do with files that already exist.
     pub policy: ConflictPolicy,
     /// Stops the run once cancelled.
@@ -39,6 +41,7 @@ impl<'a> RecordExportOptions<'a> {
 impl fmt::Debug for RecordExportOptions<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RecordExportOptions")
+            .field("protection", &self.protection)
             .field("policy", &self.policy)
             .field("cancel", &self.cancel)
             .field("progress", &self.progress.is_some())

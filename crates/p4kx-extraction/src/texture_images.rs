@@ -12,7 +12,7 @@ use crate::texture_convert::{Source, Step};
 use crate::texture_names::image_suffixes;
 use crate::texture_outputs::step_of;
 use crate::texture_siblings::Replay;
-use crate::write::{Chunk, Destination, EntryWriter, Outcome, create_temporary, write_error};
+use crate::write::{Chunk, Destination, EntryWriter, Outcome, write_error};
 use crate::{ConflictPolicy, ExtractionError, Texture};
 
 /// The extensions of the image files a texture is exported to.
@@ -122,14 +122,19 @@ impl EntryWriter<'_> {
         if self.tracker.should_stop() {
             return Ok(Step::Cancelled);
         }
-        let (temporary, mut file) = create_temporary(&destination.folder)?;
+        let (temporary, mut file, ownership) = self.temporary(&destination.folder)?;
         let copied = file
             .write_all(encoded)
             .map(|()| Chunk::End)
             .map_err(|error| write_error(destination.file.clone(), error));
         drop(file);
-        let placed =
-            self.put_in_place(&temporary, &destination.file, copied, Outcome::Converted)?;
+        let placed = self.put_in_place(
+            &temporary,
+            &ownership,
+            &destination.file,
+            copied,
+            Outcome::Converted,
+        )?;
         Ok(step_of(&placed))
     }
 

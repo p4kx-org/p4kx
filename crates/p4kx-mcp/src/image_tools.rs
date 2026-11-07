@@ -34,7 +34,7 @@ impl Server {
     ) -> Result<Pictured<ImageResult>, String> {
         let Noted {
             value: (value, png),
-            notice,
+            notes,
         } = self
             .run(move |state| {
                 let path = capped("path", &params.path, MAX_PATH_LEN)?;
@@ -44,6 +44,6 @@ impl Server {
                 image::preview(&place, &params, inner)
             })
             .await?;
-        Ok(Pictured { value, png, notice })
+        Ok(Pictured { value, png, notes })
     }
 }

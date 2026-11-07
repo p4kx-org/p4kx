@@ -12,7 +12,7 @@ use p4kx_assembly::{
 };
 use p4kx_extraction::{
     AnimationSet, ConversionError, DataForgeEntry, GlbOptions, GlbSummary, GltfError, MaterialMode,
-    is_same_file, write_replacing,
+    is_same_file, write_replacing_protected,
 };
 use serde::Serialize;
 use thiserror::Error;
@@ -152,6 +152,8 @@ pub(crate) fn run(args: &ChfGlbArgs, as_json: bool) -> Result<()> {
         source,
     })?;
     let archive = crate::key::open(&args.archive)?;
+    let cancel = crate::extract::cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let mut resolver = LoadoutResolver::new(&forge);
@@ -170,20 +172,21 @@ pub(crate) fn run(args: &ChfGlbArgs, as_json: bool) -> Result<()> {
         &AnimationFolders::default(),
     )?;
     let animated = armour.animate(&found.animations, &models);
-    let summary = write_replacing(&args.out, |writer| {
-        armour
-            .write_glb_animated_with(&animated, &glb, &textures, writer)
-            .map_err(|error| match error {
-                GltfError::Write(source) => ConversionError::Write {
-                    path: args.out.clone(),
-                    source,
-                },
-                source => ConversionError::Glb {
-                    file: name.clone(),
-                    source,
-                },
-            })
-    })?;
+    let summary =
+        write_replacing_protected(&args.out, Some(&protection), Some(&cancel), |writer| {
+            armour
+                .write_glb_animated_with(&animated, &glb, &textures, writer)
+                .map_err(|error| match error {
+                    GltfError::Write(source) => ConversionError::Write {
+                        path: args.out.clone(),
+                        source,
+                    },
+                    source => ConversionError::Glb {
+                        file: name.clone(),
+                        source,
+                    },
+                })
+        })?;
 
     if as_json {
         let outcome = Outcome {

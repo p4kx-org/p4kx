@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
@@ -10,7 +9,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use p4kx_channels::PublicPatches;
 use p4kx_export::{
-    BuiltShipBase, CatalogFailure, Filter, ShipBaseError, ShipBaseOptions, build_ship_base,
+    ArchiveKeyState, BuiltShipBase, CatalogFailure, Filter, ShipBaseError, ShipBaseOptions,
+    build_ship_base,
 };
 use serde::Serialize;
 
@@ -26,6 +26,8 @@ struct SummaryJson<'a> {
     archive: String,
     out: String,
     format: &'static str,
+    archive_key: ArchiveKeyState,
+    encrypted_entries_unread: u64,
     ships: usize,
     skipped: usize,
     mass: usize,
@@ -55,6 +57,7 @@ pub(crate) fn run(args: &ShipsArgs, as_json: bool) -> Result<ExitCode> {
     let archive = crate::key::open(&args.archive)?;
     let filter = args.filter.as_deref().map(Filter::parse).transpose()?;
     let cancel = cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     let line = ProgressLine::new();
     let show = |progress| line.show_records(progress);
     let patches = PublicPatches::standard();
@@ -69,7 +72,7 @@ pub(crate) fn run(args: &ShipsArgs, as_json: bool) -> Result<ExitCode> {
     line.finish();
     let built = built.map_err(into_anyhow)?;
     print_failures(built.failures())?;
-    write(&built, args.format, &args.out)?;
+    write(&built, args.format, &args.out, &protection, &cancel)?;
     let printed = if as_json {
         json::print(&summary(&built, args, json::path(archive.path())))
     } else {
@@ -87,14 +90,21 @@ pub(crate) fn run(args: &ShipsArgs, as_json: bool) -> Result<ExitCode> {
     }))
 }
 
-fn write(built: &BuiltShipBase, format: ShipsFormat, out: &Path) -> Result<()> {
-    let mut bytes = Vec::new();
-    match format {
-        ShipsFormat::Json => built.write_json(&mut bytes),
-        ShipsFormat::Ndjson => built.write_ndjson(&mut bytes),
-    }
-    .map_err(into_anyhow)?;
-    fs::write(out, bytes).with_context(|| format!("cannot write {}", out.display()))
+fn write(
+    built: &BuiltShipBase,
+    format: ShipsFormat,
+    out: &Path,
+    protection: &p4kx_extraction::ArchiveWriteProtection,
+    cancel: &p4kx_extraction::CancelToken,
+) -> Result<()> {
+    crate::query_file::write_replacing_protected(out, Some(protection), Some(cancel), |writer| {
+        match format {
+            ShipsFormat::Json => built.write_json(writer),
+            ShipsFormat::Ndjson => built.write_ndjson(writer),
+        }
+        .map_err(io::Error::other)
+    })
+    .with_context(|| format!("cannot write {}", out.display()))
 }
 
 fn into_anyhow(error: ShipBaseError) -> anyhow::Error {
@@ -126,6 +136,8 @@ fn summary<'a>(built: &'a BuiltShipBase, args: &ShipsArgs, archive: String) -> S
             ShipsFormat::Json => "json",
             ShipsFormat::Ndjson => "ndjson",
         },
+        archive_key: built.archive_key().state(),
+        encrypted_entries_unread: built.archive_key().entries_unread(),
         ships: ships.len(),
         skipped: built.skipped(),
         mass: ships.iter().filter(|ship| ship.mass.is_some()).count(),

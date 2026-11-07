@@ -126,6 +126,7 @@ fn a_v2_archive_reads_compressed_and_encrypted_entries() -> TestResult {
 fn a_v2_archive_laid_out_by_hand_is_read_at_the_documented_offsets() -> TestResult {
     let dir = tempfile::tempdir()?;
     let mut bytes = b"armor".to_vec();
+    bytes.extend_from_slice(&5_u64.to_le_bytes());
     let mut record = vec![0_u8; 204];
     put_u64(&mut record, 0x0A, 5)?;
     put_u64(&mut record, 0x12, 5)?;
@@ -134,10 +135,11 @@ fn a_v2_archive_laid_out_by_hand_is_read_at_the_documented_offsets() -> TestResu
     bytes.extend_from_slice(names);
     let mut trailer = vec![0_u8; TRAILER_LEN];
     put_u64(&mut trailer, 0x00, 1)?;
-    put_u64(&mut trailer, 0x10, 5)?;
+    put_u64(&mut trailer, 0x10, 13)?;
     put_u64(&mut trailer, 0x18, 204)?;
-    put_u64(&mut trailer, 0x28, 209)?;
+    put_u64(&mut trailer, 0x28, 217)?;
     put_u64(&mut trailer, 0x30, names.len() as u64)?;
+    put_u64(&mut trailer, 0x40, 5)?;
     trailer
         .get_mut(0xA9..)
         .ok_or("trailer too short")?

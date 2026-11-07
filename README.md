@@ -40,6 +40,10 @@ Copyright (c) 2026 the P4KX contributors
   names valid on both Linux and Windows. `--convert` turns CryXml into XML, the DataForge into one
   XML file per Record, textures into PNG, DDS or OpenEXR and sounds into Ogg or WAV on the way;
   `p4kx convert` does the same for a folder extracted earlier.
+- **Versioned media inventory.** `media export` streams physical source identities, retained raw
+  payloads, scoped hashes and provider metadata into atomic generations with a shared JSON Schema.
+  The initial provider exports Archive metadata; see [the media contract](docs/media-export.md)
+  for supported kinds, explicit capability refusals and resource bounds.
 - **DataForge and Records.** Reads DataForge versions 6 and 8, from an Archive or from a
   `Game2.dcb` file on disk, as a canonical Record tree, exports it as Record XML, Record JSON,
   NDJSON or flat CSV, and answers Queries, References, tag trees and field statistics over it.
@@ -94,7 +98,7 @@ codes are in `p4kx --help`. Every command takes the path of a `Data.p4k` as `<ar
 |---|---|
 | Archive | `list`, `search`, `grep`, `info`, `verify`, `extract`, `convert`, `channels`, `socpak`, `key` |
 | DataForge | `dcb info`, `dcb export`, `dcb query`, `dcb refs`, `dcb tags`, `dcb fields`, `prefab` |
-| Exports | `catalog`, `ships`, `actionmap export`, `loc`, `coverage` |
+| Exports | `catalog`, `ships`, `media export\|schema`, `actionmap export`, `loc`, `coverage` |
 | Comparison | `compare` (`--entries`, `--records`, `--schema`, `--diff`) |
 | Formats | `cryxml`, `texture`, `audio`, `bnk`, `chunks`, `model`, `ui assets\|extract\|render` |
 | 3D and Blender | `entity loadout\|glb\|package`, `interior glb\|package`, `armour`, `character package`, `chf`, `ui hologram\|screens` |
@@ -117,12 +121,13 @@ Import > P4KX Package (scene.json)). See [blender_addon/README.md](blender_addon
 
 ## Install
 
-Windows on 64-bit x86 (x86_64). Each [GitHub Release](https://github.com/p4kx-org/p4kx/releases)
-offers:
+Windows packages target AMD64 (`x86_64-pc-windows-msvc`) and ARM64
+(`aarch64-pc-windows-msvc`). Choose your device's CPU in the
+[GitHub Release](https://github.com/p4kx-org/p4kx/releases):
 
-- `P4KX-<version>-x86_64.msi`: installs for the current user, without administrator rights, into
+- `P4KX-<version>-<target>.msi`: installs for the current user, without administrator rights, into
   `%LOCALAPPDATA%\Programs\P4KX`, adds the Start menu entry and puts the folder on your `PATH`.
-- `P4KX-<version>-x86_64-portable.zip`: `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe` to run from
+- `P4KX-<version>-<target>-portable.zip`: `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe` to run from
   any folder.
 - `p4kx_importer-<version>.zip`: the Blender add-on (Edit > Preferences > Get Extensions >
   Install from Disk).
@@ -131,6 +136,16 @@ offers:
 
 Settings live in `%APPDATA%\P4KX`. The window can check GitHub once at start for a newer Release
 if you switch that on in the Help menu; it is off by default, and nothing else touches the network.
+Both CPUs share one per-user MSI installation; an explicitly chosen same-version package
+replaces it. Settings and the stored Archive key survive uninstall. Older AMD64 releases keep
+their `-x86_64` names. [Windows packages](docs/windows-packages.md) defines supported-system
+evidence, runtime DLLs and installer verification.
+
+Linux v0.5.0 packages cover AMD64 and ARM64 as tar.gz, AppImage, deb and Flatpak, each containing
+the GUI, CLI and MCP server. Native tar.gz/AppImage/deb require Ubuntu 24.04 / glibc 2.39;
+Flatpak uses Freedesktop Platform 25.08 and additionally requires host Documents-portal API 5
+with authenticated host-path lookup. See [Linux packages](docs/linux-packages.md) for
+installation, AppImage CLI/MCP dispatch, sandbox grants, source notices and native verification.
 
 ## First run: the Archive key
 
@@ -181,15 +196,18 @@ P4KX only reads the game folders and refuses to write into a Star Citizen instal
 
 ## Build
 
-Requires the stable Rust toolchain (1.99 or newer).
+The repository selects an exact stable compiler in [rust-toolchain.toml](rust-toolchain.toml);
+rustup uses it automatically. The workspace minimum remains Rust 1.99.
+The native v0.5.0 target and verification contract covers Windows and Linux on AMD64 and ARM64;
+see [native platforms and release verification](docs/supported-platforms.md).
 
 ```powershell
 cargo build --release
 .\target\release\p4kx.exe list "C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Data.p4k"
 ```
 
-The release build produces `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe`. The code is platform
-neutral and CI also builds it on Linux, but only Windows is shipped.
+The release build produces `p4kx-gui`, `p4kx` and `p4kx-mcp`, with `.exe` on Windows.
+The v0.5.0 package contract requires native execution evidence for both CPUs on both systems.
 
 ## Contributing
 

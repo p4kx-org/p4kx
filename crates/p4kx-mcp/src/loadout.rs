@@ -199,9 +199,11 @@ pub(crate) fn resolve(
     let stop_at_docked = params.stop_at_docked_vehicles == Some(true);
     let picks = picks_of(params.loadout_pick.as_deref().unwrap_or_default())?;
     let key = picks.normalised();
-    let tree = opened
-        .loadouts()
-        .get_or_resolve(&params.entity, (stop_at_docked, &key), || {
+    let tree = opened.loadouts().get_or_resolve(
+        opened.archive(),
+        &params.entity,
+        (stop_at_docked, &key),
+        || {
             let files = ArchiveFiles::new(opened.archive());
             let mut resolver = LoadoutResolver::new(forge).with_files(&files);
             if stop_at_docked {
@@ -210,7 +212,8 @@ pub(crate) fn resolve(
             let record = resolver.entities().find(&params.entity)?;
             let changes = LoadoutChanges::new().with_picks(picks.clone());
             Ok(resolver.resolve_with(&record, &changes)?)
-        })?;
+        },
+    )?;
     let max_depth = usize::try_from(
         params
             .max_depth

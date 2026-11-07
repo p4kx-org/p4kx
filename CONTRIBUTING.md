@@ -102,8 +102,29 @@ P4KX reads your own Star Citizen installation and ships no game data.
 
 ## Local development setup
 
-You need the stable Rust toolchain (see the [README](README.md#build)) on Windows or Linux, and
-for the Blender add-on Python and Blender 5.2 LTS.
+Install rustup on Windows or Linux; the repository's
+[`rust-toolchain.toml`](rust-toolchain.toml) selects the exact compiler and components. For the
+Blender add-on you also need Python and Blender 5.2 LTS. Install the exact test runner selected by
+[`.config/nextest-version`](.config/nextest-version):
+
+```powershell
+cargo install cargo-nextest --version (Get-Content .config/nextest-version).Trim() --locked
+.github/scripts/check-build-tools.ps1 -Verify -Nextest
+```
+
+CI build jobs, test-archive consumers, packages and SBOM generation use the same verified pins.
+Update both files deliberately and run the configuration check, workspace tests, doctests,
+clippy and repository checks before accepting new versions; see
+[ADR-0340](docs/adr/0340-exact-build-tool-versions.md). Native target/runtime validation is separate
+from pin consistency.
+The [native platform contract](docs/supported-platforms.md) drives all four target rows, target-bound
+test archives and release preflight. Run the PowerShell platform/evidence regression scripts when
+changing their contracts, and preserve the recorded distinction between native synthetic checks
+and physical device verification.
+Linux packaging additionally uses the declared Ubuntu 24.04 / glibc 2.39 baseline, native
+AppImage runtime source builds and fresh native package consumers. Run
+`test-linux-package-contract.ps1` and the source-collector tests when changing their boundaries;
+the [Linux package guide](docs/linux-packages.md) describes the complete evidence and source contract.
 
 On Linux the audio preview builds against the ALSA headers: `sudo apt-get install
 libasound2-dev` (Debian and Ubuntu; CI installs the same package). PipeWire and PulseAudio need
@@ -121,7 +142,7 @@ cargo xtask
 
 `cargo test --workspace --locked` works as well when cargo-nextest is not installed. `cargo xtask`
 checks the layer direction of the crates, the 400-line limit, the SPDX headers, the changelog
-fragments, the lint set and the Archive key. After a dependency change, run
+fragments, the lint set, exact tool pins and the Archive key. After a dependency change, run
 `cargo xtask notices --write` (needs `cargo install cargo-about --version 0.9.2 --locked`).
 
 The tests against a real Archive are ignored by default; see
@@ -270,13 +291,15 @@ everything; nobody uploads assets by hand.
    <version>`) and merge that pull request. The version of `p4kx-gui` is the Release version.
 2. Push the tag `vMAJOR.MINOR.PATCH[-suffix]` on the merge commit. The workflow refuses any other
    tag name.
-3. The workflow builds the portable ZIP, the MSI and the Blender add-on ZIP, tests install,
-   upgrade and uninstall of the MSI, and generates a CycloneDX SBOM per shipped binary
-   (`p4kx-gui`, `p4kx`, `p4kx-mcp`). The add-on is Python without bundled third-party packages
+3. The workflow reads the native platform contract. Windows producers build native AMD64/ARM64
+   MSI and portable ZIP files; separate native consumers execute their release EXEs and test
+   upgrades, blocked downgrades, rollback, explicit CPU replacement and profile preservation.
+   CycloneDX SBOMs identify each target and shipped binary (`p4kx-gui`, `p4kx`, `p4kx-mcp`),
+   including any bundled Microsoft runtime files. The add-on is Python without bundled third-party packages
    and has no SBOM of its own.
-4. The ZIP and the MSI are scanned on VirusTotal. A failed or missing scan never blocks the
+4. Every architecture-specific package is included in VirusTotal scan coverage. A failed or missing scan never blocks the
    Release; the notes then say the scan did not run.
-5. The build provenance of every asset and the SBOMs of the ZIP and the MSI are attested
+5. The build provenance of every asset and each target's package SBOMs are attested
    (Sigstore, via GitHub Artifact Attestations). The bundles become Release assets.
 6. `SHA256SUMS.txt` and `SHA3-512SUMS.txt` list every other asset, as plain text files that open
    in any text editor. The Release notes are the
@@ -286,6 +309,10 @@ everything; nobody uploads assets by hand.
 A pull request that changes the workflow, its scripts, the installer or the add-on runs the same
 jobs as a dry run: everything is built, but nothing is scanned, attested or published.
 The `workflow_dispatch` trigger adds the VirusTotal scan to such a run.
+The complete twelve-package/twelve-SBOM/four-native-proof preflight runs before hashes or
+publication. Windows evidence binds executed package/binary digests to the source SHA.
+[Windows package verification](docs/windows-packages.md) describes the modular workflow interface
+and safe, non-installing MSI contract test.
 
 Secret: the owner sets the repository secret `VIRUSTOTAL_API_KEY` (Settings, Secrets and
 variables, Actions). Without it the scan is skipped.

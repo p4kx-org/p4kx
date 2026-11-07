@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "targets": [
+    {
+      "target": "x86_64-pc-windows-msvc",
+      "os": "windows",
+      "arch": "amd64",
+      "runner": "windows-2025",
+      "runner_os": "Windows",
+      "runner_arch": "X64",
+      "msi_arch": "x64",
+      "deb_arch": null,
+      "unix_arch": null,
+      "packages": [
+        "msi",
+        "portable-zip"
+      ],
+      "pe_machine": 34404,
+      "elf_machine": null
+    },
+    {
+      "target": "aarch64-pc-windows-msvc",
+      "os": "windows",
+      "arch": "arm64",
+      "runner": "windows-11-arm",
+      "runner_os": "Windows",
+      "runner_arch": "ARM64",
+      "msi_arch": "arm64",
+      "deb_arch": null,
+      "unix_arch": null,
+      "packages": [
+        "msi",
+        "portable-zip"
+      ],
+      "pe_machine": 43620,
+      "elf_machine": null
+    },
+    {
+      "target": "x86_64-unknown-linux-gnu",
+      "os": "linux",
+      "arch": "amd64",
+      "runner": "ubuntu-24.04",
+      "runner_os": "Linux",
+      "runner_arch": "X64",
+      "msi_arch": null,
+      "deb_arch": "amd64",
+      "unix_arch": "x86_64",
+      "packages": [
+        "tar-gz",
+        "app-image",
+        "deb",
+        "flatpak"
+      ],
+      "pe_machine": null,
+      "elf_machine": 62
+    },
+    {
+      "target": "aarch64-unknown-linux-gnu",
+      "os": "linux",
+      "arch": "arm64",
+      "runner": "ubuntu-24.04-arm",
+      "runner_os": "Linux",
+      "runner_arch": "ARM64",
+      "msi_arch": null,
+      "deb_arch": "arm64",
+      "unix_arch": "aarch64",
+      "packages": [
+        "tar-gz",
+        "app-image",
+        "deb",
+        "flatpak"
+      ],
+      "pe_machine": null,
+      "elf_machine": 183
+    }
+  ],
+  "packages": {
+    "msi": ".msi",
+    "portable-zip": "-portable.zip",
+    "tar-gz": ".tar.gz",
+    "app-image": ".AppImage",
+    "deb": ".deb",
+    "flatpak": ".flatpak"
+  }
+}

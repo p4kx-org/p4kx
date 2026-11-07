@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
@@ -12,7 +11,7 @@ use rayon::prelude::*;
 use crate::items::Item;
 use crate::mesh_options::package_mesh_options;
 use crate::plan::{MeshPlan, mesh_id};
-use crate::{Cancelled, PackageError, PackageResult};
+use crate::{PackageError, PackageResult, PackageWriteContext};
 
 /// Writes the GLB file `<folder>/<id>.glb` of every distinct mesh of `plan`, in parallel.
 pub(crate) fn write_all(
@@ -20,13 +19,13 @@ pub(crate) fn write_all(
     plan: &MeshPlan,
     options: &GlbOptions,
     folder: &Path,
-    cancelled: &Cancelled<'_>,
+    cancelled: &PackageWriteContext<'_>,
 ) -> PackageResult<Vec<GlbSummary>> {
     (0..plan.len())
         .into_par_iter()
         .map(|index| {
             cancelled.check()?;
-            write_one(items, plan, index, options, folder)
+            write_one(items, plan, index, options, folder, cancelled)
         })
         .collect()
 }
@@ -37,6 +36,7 @@ fn write_one(
     index: usize,
     options: &GlbOptions,
     folder: &Path,
+    context: &PackageWriteContext<'_>,
 ) -> PackageResult<GlbSummary> {
     let id = mesh_id(index);
     let first = plan
@@ -63,12 +63,13 @@ fn write_one(
         &mut glb,
     )
     .map_err(|source| mesh_error(&id, &name, source))?;
-    let file = File::create_new(&path).map_err(|source| PackageError::write(&path, source))?;
+    let (file, ownership) = context.create_file(&path)?.into_parts();
     let mut writer = BufWriter::new(file);
     writer
         .write_all(&glb)
         .and_then(|()| writer.flush())
         .map_err(|source| PackageError::write(&path, source))?;
+    ownership.ensure_writable(&path, context.cancel_flag())?;
     writer
         .get_ref()
         .sync_all()

@@ -43,6 +43,7 @@ impl<'f> StructValue<'f> {
 /// it: to the same GUID and record path, with the [`location`](Self::location) of the instance.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Reference<'f> {
+    pub(crate) record_index: u32,
     pub(crate) guid: Guid,
     pub(crate) record_path: &'f str,
     pub(crate) type_name: &'f str,
@@ -50,6 +51,12 @@ pub struct Reference<'f> {
 }
 
 impl<'f> Reference<'f> {
+    /// Returns the actual target Record position in source definition order.
+    #[must_use]
+    pub const fn record_index(&self) -> u32 {
+        self.record_index
+    }
+
     /// Returns the GUID of the target Record.
     #[must_use]
     pub const fn guid(&self) -> Guid {

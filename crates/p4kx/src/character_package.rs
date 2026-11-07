@@ -11,7 +11,8 @@ use p4kx_assembly::{
     Expressions, ForgeItems, ForgePalettes, Head, LoadoutResolver, Piece, character_animations,
 };
 use p4kx_blender::{
-    CharacterScene, PackageInfo, PackageSummary, check_output, write_character_package,
+    CharacterScene, PackageInfo, PackageSummary, PackageWriteContext, check_output_with_context,
+    write_character_package_with_context,
 };
 use p4kx_channels::channel_name;
 use p4kx_extraction::{Archive, DataForgeEntry, GlbOptions, MaterialMode, is_same_file};
@@ -55,9 +56,12 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
     if is_same_file(&args.out, &args.archive) {
         return Err(GlbOutputIsArchive(args.out.clone()).into());
     }
-    check_output(&args.out)?;
     let chf = args.chf.as_deref().map(read_chf).transpose()?;
     let archive = crate::key::open(&args.archive)?;
+    let cancel = cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let context = PackageWriteContext::new(&protection, cancel.flag());
+    check_output_with_context(&args.out, &context)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = Files::open(ArchiveFiles::new(&archive), args.loadout.as_deref())?;
@@ -93,14 +97,10 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
     let animated = armour.animate(&found.animations, &models);
 
     let name = name_of(args, variant);
-    let chf_name = args
-        .chf
-        .as_deref()
-        .and_then(Path::file_name)
-        .and_then(OsStr::to_str);
+    let chf_name = origin_chf_name(args);
     let scene = CharacterScene::new(&name, &armour, &animated)
         .with_origin(chf_name, args.loadout.as_deref());
-    let summary = store(args, &archive, &models, &scene)?;
+    let summary = store(args, &archive, &models, &scene, &context)?;
 
     let shown = report::Shown {
         archive: archive.path(),
@@ -114,6 +114,13 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
     };
     report::print(&shown, &summary, as_json)?;
     failure(&armour, &args.out).map_or(Ok(()), Err)
+}
+
+fn origin_chf_name(args: &CharacterPackageArgs) -> Option<&str> {
+    args.chf
+        .as_deref()
+        .and_then(Path::file_name)
+        .and_then(OsStr::to_str)
 }
 
 /// Returns the body variant and the pieces to wear: the CHF's head decides the body and takes the
@@ -161,16 +168,16 @@ fn store(
     archive: &Archive,
     models: &ArchiveModels<'_>,
     scene: &CharacterScene<'_>,
+    context: &PackageWriteContext<'_>,
 ) -> Result<PackageSummary> {
     let info = PackageInfo::new(channel_name(archive.path()), build_info(archive));
-    let cancel = cancel_on_interrupt()?;
-    Ok(write_character_package(
+    Ok(write_character_package_with_context(
         scene,
         &models.textures(),
         &glb_options(args),
         &info,
         &args.out,
-        &|| cancel.is_cancelled(),
+        context,
     )?)
 }
 

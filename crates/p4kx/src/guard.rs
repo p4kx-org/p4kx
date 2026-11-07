@@ -7,8 +7,8 @@ use std::sync::{Mutex, Once, PoisonError};
 use std::thread::{self, JoinHandle};
 
 use p4kx_extraction::{
-    ConversionError, ExtractionError, QueryExportError, WriteRefused, game_is_running,
-    protect_archive_folder, protect_libraries, protect_manual,
+    ConversionError, ExtractionError, QueryExportError, WriteProtectionError, WriteRefused,
+    game_is_running, protect_archive_folder, protect_libraries, protect_manual,
 };
 use p4kx_settings::{Settings, default_settings_file};
 
@@ -86,39 +86,85 @@ pub(crate) fn on_archive_open(path: &Path) {
         if running {
             let _ignored = writeln!(
                 io::stderr().lock(),
-                "warning: StarCitizen.exe is running; use this tool with the game closed"
+                "warning: StarCitizen.exe may be running; use this tool with the game closed"
             );
         }
     });
 }
 
-/// Returns whether `error` is a write that was refused because the target lies inside a Star
-/// Citizen installation.
+/// Returns whether a pure source or target refusal ended the write.
 pub(crate) fn is_refusal(error: &anyhow::Error) -> bool {
+    if error.chain().any(retained_output) {
+        return false;
+    }
     error.chain().any(|cause| {
         cause.downcast_ref::<WriteRefused>().is_some()
+            || cause.downcast_ref::<WriteProtectionError>().is_some_and(|error| !error.is_cancelled())
             || matches!(
                 cause.downcast_ref::<ConversionError>(),
-                Some(ConversionError::Installation(_))
+                Some(ConversionError::Installation(error)) if !error.is_cancelled()
             )
             || matches!(
                 cause.downcast_ref::<p4kx_blender::PackageError>(),
-                Some(p4kx_blender::PackageError::Refused(_))
+                Some(p4kx_blender::PackageError::Refused(error)) if !error.is_cancelled()
             )
             || matches!(
                 cause.downcast_ref::<ExtractionError>(),
-                Some(ExtractionError::Installation(_))
+                Some(ExtractionError::Installation(error)) if !error.is_cancelled()
             )
             || matches!(
                 cause.downcast_ref::<QueryExportError>(),
-                Some(QueryExportError::Installation(_))
+                Some(QueryExportError::Installation(error)) if !error.is_cancelled()
             )
             || cause
                 .downcast_ref::<io::Error>()
                 .and_then(io::Error::get_ref)
-                .and_then(|inner| inner.downcast_ref::<WriteRefused>())
-                .is_some()
+                .and_then(|inner| inner.downcast_ref::<WriteProtectionError>())
+                .is_some_and(|error| !error.is_cancelled())
+            || cause.downcast_ref::<io::Error>()
+                .and_then(p4kx_extraction::owned_output_failure)
+                .is_some_and(|error| matches!(error, p4kx_extraction::OwnedOutputError::Protection(error) if !error.is_cancelled()))
     })
+}
+
+fn retained_output(cause: &(dyn std::error::Error + 'static)) -> bool {
+    matches!(
+        cause.downcast_ref::<ConversionError>(),
+        Some(ConversionError::OwnedOutput(_) | ConversionError::CleanupFailed { .. })
+    ) || matches!(
+        cause.downcast_ref::<ExtractionError>(),
+        Some(ExtractionError::OwnedOutput(_) | ExtractionError::CleanupFailed { .. })
+    ) || matches!(
+        cause.downcast_ref::<QueryExportError>(),
+        Some(QueryExportError::OwnedOutput(_) | QueryExportError::CleanupFailed { .. })
+    ) || matches!(
+        cause.downcast_ref::<p4kx_export::CatalogError>(),
+        Some(p4kx_export::CatalogError::CleanupFailed { .. })
+    ) || matches!(
+        cause.downcast_ref::<p4kx_blender::PackageError>(),
+        Some(
+            p4kx_blender::PackageError::Cleanup(_)
+                | p4kx_blender::PackageError::OwnedOutput(_)
+                | p4kx_blender::PackageError::CleanupFailed { .. }
+                | p4kx_blender::PackageError::RetainedOutput { .. }
+                | p4kx_blender::PackageError::RestoreRefused { .. }
+                | p4kx_blender::PackageError::NotRestored { .. }
+        )
+    ) || cause
+        .downcast_ref::<p4kx_extraction::OwnedOutputError>()
+        .is_some_and(terminal_owned_failure)
+        || cause
+            .downcast_ref::<io::Error>()
+            .and_then(p4kx_extraction::owned_output_failure)
+            .is_some_and(terminal_owned_failure)
+}
+
+const fn terminal_owned_failure(error: &p4kx_extraction::OwnedOutputError) -> bool {
+    matches!(
+        error,
+        p4kx_extraction::OwnedOutputError::RetainedCreation { .. }
+            | p4kx_extraction::OwnedOutputError::Cleanup { .. }
+    )
 }
 
 /// Refuses `target`, when there is one, when it lies inside a Star Citizen installation.
@@ -131,3 +177,7 @@ pub(crate) fn ensure_writable(target: &Path) -> io::Result<()> {
     p4kx_extraction::ensure_writable(target)
         .map_err(|refused| io::Error::new(io::ErrorKind::PermissionDenied, refused))
 }
+
+#[cfg(test)]
+#[path = "guard_error_tests.rs"]
+mod error_tests;

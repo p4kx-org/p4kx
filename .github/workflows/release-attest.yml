@@ -1,0 +1,89 @@
+name: Target release attestations
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      target:
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  attest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ inputs.version }}
+      P4KX_TARGET: ${{ inputs.target }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-${{ inputs.target }}
+          path: assets
+      - name: Select exact target package subjects
+        id: subjects
+        run: |
+          . .github/scripts/platform-contract.ps1
+          $row = Get-P4kxPlatform -Target $env:P4KX_TARGET
+          $paths = @(foreach ($package in $row.packages) {
+            $name = Get-P4kxAssetName -Target $row.target -Version $env:VERSION -Package $package
+            (Get-Item -LiteralPath "assets/$name").FullName
+          })
+          "paths<<P4KX_SUBJECTS" >> $env:GITHUB_OUTPUT
+          $paths >> $env:GITHUB_OUTPUT
+          "P4KX_SUBJECTS" >> $env:GITHUB_OUTPUT
+      - name: Build provenance for target packages and metadata
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: assets/*
+      - name: GUI target SBOM attestation
+        id: sbom-gui
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: ${{ steps.subjects.outputs.paths }}
+          sbom-path: assets/P4KX-${{ env.VERSION }}-${{ inputs.target }}-p4kx-gui.cdx.json
+      - name: CLI target SBOM attestation
+        id: sbom-cli
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: ${{ steps.subjects.outputs.paths }}
+          sbom-path: assets/P4KX-${{ env.VERSION }}-${{ inputs.target }}-p4kx.cdx.json
+      - name: MCP target SBOM attestation
+        id: sbom-mcp
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: ${{ steps.subjects.outputs.paths }}
+          sbom-path: assets/P4KX-${{ env.VERSION }}-${{ inputs.target }}-p4kx-mcp.cdx.json
+      - name: Name target-specific attestation bundles
+        env:
+          PROVENANCE: ${{ steps.provenance.outputs.bundle-path }}
+          SBOM_GUI: ${{ steps.sbom-gui.outputs.bundle-path }}
+          SBOM_CLI: ${{ steps.sbom-cli.outputs.bundle-path }}
+          SBOM_MCP: ${{ steps.sbom-mcp.outputs.bundle-path }}
+        run: |
+          New-Item -ItemType Directory bundles | Out-Null
+          $prefix = "bundles/P4KX-$env:VERSION-$env:P4KX_TARGET"
+          Copy-Item -LiteralPath $env:PROVENANCE -Destination "$prefix-provenance.sigstore.json"
+          Copy-Item -LiteralPath $env:SBOM_GUI -Destination "$prefix-p4kx-gui.cdx.json.sigstore.json"
+          Copy-Item -LiteralPath $env:SBOM_CLI -Destination "$prefix-p4kx.cdx.json.sigstore.json"
+          Copy-Item -LiteralPath $env:SBOM_MCP -Destination "$prefix-p4kx-mcp.cdx.json.sigstore.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: attestations-${{ inputs.target }}
+          path: bundles/*.sigstore.json
+          if-no-files-found: error

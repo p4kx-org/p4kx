@@ -6,16 +6,16 @@ use rmcp::handler::server::tool::IntoCallToolResult;
 use rmcp::model::{CallToolResponse, CallToolResult, ContentBlock};
 use serde::Serialize;
 
-use crate::noted::add_notice;
+use crate::noted::Notes;
 
 /// A structured result whose text content keeps the key order of the serialised value.
 ///
 /// The structured content is a sorted `serde_json::Value`, as `rmcp::Json` makes it; the text
 /// content is the serialisation itself, so Record fields and Query columns stay in their order.
-/// The notice of the Archive, if it has one, follows as one more text content block.
+/// The notes of the call follow as more text content blocks.
 pub(crate) struct Ordered<T> {
     pub(crate) value: T,
-    pub(crate) notice: Option<String>,
+    pub(crate) notes: Notes,
 }
 
 impl<T: Serialize + 'static> IntoCallToolResult for Ordered<T> {
@@ -27,7 +27,7 @@ impl<T: Serialize + 'static> IntoCallToolResult for Ordered<T> {
         let value = serde_json::from_str(&text).map_err(fail)?;
         let mut result = CallToolResult::structured(value);
         result.content = vec![ContentBlock::text(text)];
-        add_notice(&mut result, self.notice);
+        self.notes.apply(&mut result);
         Ok(result.into())
     }
 }

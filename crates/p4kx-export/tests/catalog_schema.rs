@@ -8,6 +8,12 @@
 #![recursion_limit = "256"]
 
 mod catalog_schema_support;
+#[path = "catalog_schema/health.rs"]
+mod health;
+#[path = "catalog_schema/mission_values.rs"]
+mod mission_values;
+#[path = "catalog_schema/revision.rs"]
+mod revision;
 
 use std::error::Error;
 use std::path::PathBuf;

@@ -5,8 +5,8 @@
 //! Record and a Filter do, and how odd values read.
 
 use crate::insurance_fixture::{
-    BARE, INSURED, RECOVERY, RECOVERY_PATH, build_from, database, entity, override_group,
-    recovery_record, structures,
+    BARE, INSURED, RECOVERY, RECOVERY_PATH, build_from, database, diagnostic_from, entity,
+    override_group, recovery_record, structures,
 };
 
 use std::error::Error;
@@ -108,7 +108,7 @@ fn broken_forge() -> DataForgeBuilder {
 
 #[test]
 fn an_unreadable_record_is_listed_as_a_failure_and_gives_null() -> TestResult {
-    let (built, catalog) = build_from(&broken_forge(), None)?;
+    let (built, catalog) = diagnostic_from(&broken_forge(), None)?;
     assert_eq!(catalog["itemRecovery"], Value::Null);
     assert_eq!(
         failure_guids(&built),
@@ -164,7 +164,7 @@ fn odd_economy() -> DataForgeBuilder {
 
 #[test]
 fn wrong_typed_and_missing_fields_of_the_economy_read_as_null() -> TestResult {
-    let (_, catalog) = build_from(&odd_economy(), None)?;
+    let (_, catalog) = diagnostic_from(&odd_economy(), None)?;
     let recovery = &catalog["itemRecovery"];
     assert_eq!(recovery["claimCostMultiplier"], Value::Null, "a text");
     assert_eq!(recovery["globalBrickTimer"], Value::Null, "a boolean");

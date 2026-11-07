@@ -24,7 +24,10 @@ fn catalog() -> Result<Value, Box<dyn Error>> {
         item_stats_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let options = CatalogOptions {
+        publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+        ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
+    };
     let built = build_catalog(&archive, &options)?;
     Ok(serde_json::from_slice(built.json())?)
 }

@@ -16,6 +16,7 @@ use crate::LocalizationEntry;
 use crate::entry_path::same_entry_path;
 use crate::output_file::read_error;
 use crate::sound::read_capped;
+use crate::source_protection::SourceProtection;
 use crate::{ConversionError, UnknownEntries};
 
 /// The largest GFx or SWF file read into memory, far above the largest movie of a real Archive.
@@ -33,6 +34,7 @@ pub(crate) enum Origin<'a> {
 /// A GFx or SWF UI movie read from an Entry of an Archive or from a file on disk.
 #[derive(Debug)]
 pub struct UiMovie<'a> {
+    protection: SourceProtection,
     name: String,
     origin: Origin<'a>,
     movie: Movie,
@@ -51,6 +53,7 @@ impl<'a> UiMovie<'a> {
     /// [`ConversionError::UiMovie`] when it is no valid movie, and another [`ConversionError`]
     /// when it cannot be read.
     pub fn from_archive(archive: &'a Archive, path: &str) -> Result<Self, ConversionError> {
+        let protection = SourceProtection::new(Some(archive.path()));
         let entry = archive
             .entries()
             .par_iter()
@@ -65,7 +68,7 @@ impl<'a> UiMovie<'a> {
                     source,
                 }
             })?;
-        Self::parse(name, Origin::Entry(archive), bytes)
+        Self::parse(name, Origin::Entry(archive), bytes, protection)
     }
 
     /// Reads and parses the movie file at `path`; its external images are looked up on disk
@@ -97,6 +100,7 @@ impl<'a> UiMovie<'a> {
             path.display().to_string(),
             Origin::File(path.to_path_buf()),
             bytes,
+            SourceProtection::new(None),
         )
     }
 
@@ -104,6 +108,7 @@ impl<'a> UiMovie<'a> {
         name: String,
         origin: Origin<'a>,
         bytes: Option<Vec<u8>>,
+        protection: SourceProtection,
     ) -> Result<Self, ConversionError> {
         let Some(bytes) = bytes else {
             return Err(ConversionError::UiMovieTooLarge {
@@ -113,6 +118,7 @@ impl<'a> UiMovie<'a> {
         };
         match Movie::parse(bytes) {
             Ok(movie) => Ok(Self {
+                protection,
                 name,
                 origin,
                 movie,
@@ -183,5 +189,11 @@ impl<'a> UiMovie<'a> {
     /// Returns where the movie was read from.
     pub(crate) const fn origin(&self) -> &Origin<'a> {
         &self.origin
+    }
+
+    pub(crate) fn write_protection(
+        &self,
+    ) -> Result<Option<&crate::ArchiveWriteProtection>, ConversionError> {
+        self.protection.context()
     }
 }

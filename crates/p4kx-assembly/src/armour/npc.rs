@@ -93,7 +93,7 @@ impl LoadoutResolver<'_> {
     pub fn npc_head(&mut self, tree: &EntityNode) -> Option<NpcHead> {
         let body = tree.character_body()?;
         let (head, variant) = (body.head(), body.variant());
-        let spec = self.spec(head.guid);
+        let spec = self.spec_of(head)?;
         let spec = spec.as_ref().as_ref().ok()?;
         let wearable = Wearable::from_spec(spec);
         let library = wearable
@@ -131,7 +131,7 @@ impl LoadoutResolver<'_> {
         let Attachment::Entity(item) = port.attachment() else {
             return None;
         };
-        let spec = self.spec(item.guid);
+        let spec = self.spec_of(item)?;
         let spec = match spec.as_ref() {
             Ok(spec) => spec,
             Err(error) => {
@@ -146,11 +146,11 @@ impl LoadoutResolver<'_> {
             .ports()
             .iter()
             .filter_map(|nested| match nested.attachment() {
-                Attachment::Entity(variant) => Some(variant.guid),
+                Attachment::Entity(variant) => Some(variant),
                 _ => None,
             })
-            .filter_map(|guid| {
-                self.spec(guid)
+            .filter_map(|variant| {
+                self.spec_of(variant)?
                     .as_ref()
                     .as_ref()
                     .ok()

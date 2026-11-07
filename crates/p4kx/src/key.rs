@@ -23,6 +23,13 @@ use thiserror::Error;
 use crate::cli::{Cli, Command, KeyAction, KeyArgs};
 use crate::json;
 
+/// How to give the key, after an error or note about a missing key.
+pub(crate) const REQUIRED_HINT: &str = "give the Archive key with --key <hex> or the \
+     P4KX_ARCHIVE_KEY environment variable, or store it once with `p4kx key set`";
+/// What to do about a key that does not fit.
+pub(crate) const WRONG_HINT: &str = "the Archive key does not fit this Archive; correct --key or \
+     P4KX_ARCHIVE_KEY, or replace the stored key with `p4kx key set`";
+
 static KEY: OnceLock<Option<ArchiveKey>> = OnceLock::new();
 static RECOVER: AtomicBool = AtomicBool::new(false);
 
@@ -98,13 +105,15 @@ pub(crate) fn init(cli: &Cli) -> Result<()> {
 }
 
 /// Opens the Archive at `path` with the key of this run, if there is one, and notes on stderr
-/// that it belongs to a test build.
+/// that it belongs to a test build. The encrypted Entries it cannot read are counted for the note
+/// of [`crate::key_note`].
 pub(crate) fn open(path: impl AsRef<Path>) -> Result<Archive, ArchiveError> {
     crate::guard::on_archive_open(path.as_ref());
     let options = OpenOptions::new()
         .key(KEY.get().cloned().flatten())
         .recover(RECOVER.load(Ordering::Relaxed));
     let archive = Archive::open_with(path.as_ref(), options)?;
+    crate::key_note::watch(archive.key_demand());
     crate::issues::warn_archive_wide(&archive);
     crate::test_build::announce(path.as_ref());
     Ok(archive)
@@ -114,15 +123,9 @@ pub(crate) fn open(path: impl AsRef<Path>) -> Result<Archive, ArchiveError> {
 pub(crate) fn hint(error: &anyhow::Error) -> Option<&'static str> {
     let archive_error = archive_error(error)?;
     if archive_error.is_key_required() {
-        Some(
-            "give the Archive key with --key <hex> or the P4KX_ARCHIVE_KEY environment variable, \
-             or store it once with `p4kx key set`",
-        )
+        Some(REQUIRED_HINT)
     } else if archive_error.is_wrong_key() {
-        Some(
-            "the Archive key does not fit this Archive; correct --key or P4KX_ARCHIVE_KEY, or \
-             replace the stored key with `p4kx key set`",
-        )
+        Some(WRONG_HINT)
     } else {
         None
     }
@@ -188,6 +191,7 @@ fn set(store: &KeyStore, text: Option<&str>, archive: Option<&Path>, as_json: bo
     };
     let key = ArchiveKey::from_hex(text).map_err(InvalidKey::Text)?;
     let checked_against = check_against(&key, archive)?;
+    crate::guard::ensure_writable(store.file())?;
     store.save(&key)?;
     if as_json {
         json::print(&StoredJson {
@@ -302,6 +306,7 @@ fn in_use(chosen: &ChosenKey) -> InUseJson {
 }
 
 fn remove(store: &KeyStore, as_json: bool) -> Result<()> {
+    crate::guard::ensure_writable(store.file())?;
     let removed = store.remove()?;
     if as_json {
         json::print(&RemovedJson {

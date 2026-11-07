@@ -9,6 +9,7 @@ use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 
 use crate::contract::every_field_required;
+use crate::definition_reference::DefinitionReference;
 use crate::guid_text::CatalogGuid;
 
 /// The level of a contract that states a property or a prerequisite.
@@ -76,6 +77,8 @@ pub(crate) struct ShipSpawnOption {
     /// The `includeLocationAISpawnTags` flag; `null` when absent.
     #[serde(rename = "includeLocationAISpawnTags")]
     pub(crate) include_location_ai_spawn_tags: Option<bool>,
+    /// The authored `crewInheritsLocationFaction` flag.
+    pub(crate) crew_inherits_location_faction: Option<bool>,
     /// The `tags` the game searches ships and crew by: ship model, role, faction, cargo, spawn
     /// flags.
     pub(crate) tags: TagPaths,
@@ -153,7 +156,7 @@ pub(crate) enum LocationCondition {
     #[serde(rename_all = "camelCase")]
     ExcludeNearbyLocations {
         /// The `exclusionRangeKm`, `null` when absent.
-        range_km: Option<i64>,
+        range_km: Option<f32>,
         /// The `missionVariableName` of the `locationProperty`, `null` when absent.
         location_property: Option<String>,
     },
@@ -161,7 +164,7 @@ pub(crate) enum LocationCondition {
     #[serde(rename_all = "camelCase")]
     ExcludeDistantLocations {
         /// The `exclusionRangeKm`, `null` when absent.
-        range_km: Option<i64>,
+        range_km: Option<f32>,
         /// The `missionVariableName` of the `locationProperty`, `null` when absent.
         location_property: Option<String>,
     },
@@ -196,6 +199,12 @@ pub(crate) enum LocationCondition {
     SpecificItems {
         /// The `MissionItem` Records.
         item_guids: Vec<CatalogGuid>,
+    },
+    /// `DataSetMatchCondition_FactionIdentityDef`.
+    #[serde(rename_all = "camelCase")]
+    FactionIdentity {
+        /// The source faction identity Reference without following its Record.
+        faction_identity: Option<DefinitionReference>,
     },
 }
 

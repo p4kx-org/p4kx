@@ -38,7 +38,8 @@ which are counted as skipped. Version 2 left out the ships with the three ship w
 ```
 
 `source` is the `source` object of the Basetool catalog (Channel, Build, Archive size and time,
-tool version, export time). NDJSON has the ship objects only.
+whether the Archive key was there and how many encrypted Entries stayed unread, tool version,
+export time). NDJSON has the ship objects only.
 
 ## Ship
 
