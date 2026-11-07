@@ -66,5 +66,7 @@ remains a failure and requires a fresh capture before restoration.
 JSON is bounded to 40 MiB before parsing. PATH, WAL, Sequence and Binding slots retain their
 own bounds. Native read metadata and post-read checks do not prove a hard peak-allocation
 bound against concurrent Registry edits. Actual transaction conflicts, raw-byte preservation,
-installer ownership cleanup, crash recovery and notification behavior require disposable
-AMD64 and ARM64 evidence. Fixture restoration is never proof of installer preservation.
+installer ownership cleanup and supported recovery behavior require disposable AMD64 and ARM64
+evidence. The native MSI lifecycle must also execute the production notification path. Fixture
+restoration is never proof of installer preservation; these observations do not establish delivery
+to individual or hung windows. A separate message receiver is optional diagnostic infrastructure.

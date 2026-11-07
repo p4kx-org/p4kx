@@ -99,7 +99,9 @@ contract does not establish native isolation or allocation bounds. The example i
 release payloads; [its evidence contract](../msi-native-fixture.md) requires separate native proof.
 
 Pure memory/codec tests establish state transitions and exact-byte preservation. Native signature
-compilation establishes type compatibility only. Registry transactions, native notification,
-hung receivers and MSI lifecycle behavior require separate disposable AMD64 and ARM64 runner
+compilation establishes type compatibility only. Registry transactions and MSI lifecycle behavior,
+including execution of the production notification path, require disposable AMD64 and ARM64 runner
 proof; local developer machines execute none of those adapters. A release may use the helper only
 after that native package evidence and session-to-receipt transport have been reviewed and passed.
+These checks do not establish delivery to individual windows or hung-recipient behavior. A separate
+message receiver is optional diagnostic infrastructure, not a release requirement.
