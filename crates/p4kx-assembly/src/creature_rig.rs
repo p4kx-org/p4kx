@@ -153,7 +153,9 @@ pub(crate) fn note_loadout(root: &EntityNode, issues: &mut Vec<Issue>) {
         .filter(|issue| {
             !matches!(
                 issue,
-                LoadoutError::AmbiguousClass { .. } | LoadoutError::VehicleImplementation { .. }
+                LoadoutError::AmbiguousClass { .. }
+                    | LoadoutError::VehicleImplementation { .. }
+                    | LoadoutError::MissingVehicleImplementation { .. }
             )
         })
         .map(|issue| Issue {

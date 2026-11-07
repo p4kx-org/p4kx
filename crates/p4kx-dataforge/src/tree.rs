@@ -8,6 +8,7 @@ use crate::{Field, Guid, Location, Step, StructValue, Value, ValueError};
 /// It is the single model every output is made from; text is borrowed from the DataForge.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RecordTree<'f> {
+    pub(crate) record_index: u32,
     pub(crate) guid: Guid,
     pub(crate) record_path: &'f str,
     pub(crate) name: &'f str,
@@ -16,6 +17,12 @@ pub struct RecordTree<'f> {
 }
 
 impl<'f> RecordTree<'f> {
+    /// Returns the owning Record position in source definition order.
+    #[must_use]
+    pub const fn record_index(&self) -> u32 {
+        self.record_index
+    }
+
     /// Returns the name of the Record's struct, e.g. `EntityClassDefinition`.
     #[must_use]
     pub const fn type_name(&self) -> &'f str {

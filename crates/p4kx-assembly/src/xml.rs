@@ -7,8 +7,9 @@ use std::sync::Arc;
 use p4kx_cryxml::{Element, Xml};
 
 use crate::merge::merge_by_port;
+use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
 use crate::spec::{EntrySpec, LoadoutOrigin, LoadoutSpec, TargetSpec};
-use crate::{LoadoutError, LoadoutFiles, MAX_LOADOUT_DEPTH};
+use crate::{LoadoutDocumentKind, LoadoutError, LoadoutFiles, MAX_LOADOUT_DEPTH};
 
 /// The most XML Loadouts one XML Loadout includes through nested `<Loadouts>`.
 pub const MAX_XML_INCLUDE_DEPTH: usize = 8;
@@ -69,8 +70,13 @@ pub(crate) struct XmlEntries {
 /// Reads the XML Loadout at `path` with the Loadouts it includes: the entries of the included
 /// Loadouts in order, each overridden by the later ones and by the file's own entries per port.
 /// An include that cannot be read is an issue; the rest still loads.
-pub(crate) fn load(files: &dyn LoadoutFiles, path: &str) -> Result<XmlEntries, LoadoutError> {
+pub(crate) fn load_observed(
+    files: &dyn LoadoutFiles,
+    path: &str,
+    observation: Option<&Observation>,
+) -> Result<XmlEntries, LoadoutError> {
     let mut loader = Loader {
+        observation,
         files,
         stack: Vec::new(),
         done: HashMap::new(),
@@ -86,6 +92,7 @@ pub(crate) fn load(files: &dyn LoadoutFiles, path: &str) -> Result<XmlEntries, L
 
 /// Reads one XML Loadout with its includes, each file once.
 struct Loader<'l> {
+    observation: Option<&'l Observation>,
     files: &'l dyn LoadoutFiles,
     stack: Vec<String>,
     done: HashMap<String, Result<Vec<EntrySpec>, LoadoutError>>,
@@ -110,17 +117,13 @@ impl Loader<'_> {
             return Err(failed("it includes itself".to_owned()));
         }
         if self.stack.len() >= MAX_XML_INCLUDE_DEPTH {
+            resolver_observation::notify(self.observation, LoadoutReadEvent::InventoryIncomplete)?;
             return Err(failed(format!(
                 "it is included deeper than {MAX_XML_INCLUDE_DEPTH} Loadouts"
             )));
         }
         self.loads = self.loads.saturating_add(1);
-        let loadout = match self
-            .files
-            .read(path)
-            .map_err(|error| failed(error.to_string()))
-            .and_then(|bytes| parse(&bytes, &LoadoutOrigin::File(Arc::from(path))).map_err(failed))
-        {
+        let loadout = match load_file(self.files, path, self.observation) {
             Ok(loadout) => loadout,
             Err(error) => {
                 self.done
@@ -137,6 +140,10 @@ impl Loader<'_> {
                 continue;
             }
             if self.loads >= MAX_XML_INCLUDES && !self.done.contains_key(&key) {
+                resolver_observation::notify(
+                    self.observation,
+                    LoadoutReadEvent::InventoryIncomplete,
+                )?;
                 self.issues.push(LoadoutError::XmlLoadout {
                     path: include.clone(),
                     reason: format!(
@@ -158,6 +165,34 @@ impl Loader<'_> {
     }
 }
 
+fn load_file(
+    files: &dyn LoadoutFiles,
+    path: &str,
+    observation: Option<&Observation>,
+) -> Result<XmlLoadout, LoadoutError> {
+    let failed = |reason| LoadoutError::XmlLoadout {
+        path: path.to_owned(),
+        reason,
+    };
+    let bytes =
+        crate::loadout_file_events::read(files, path, LoadoutDocumentKind::XmlLoadout, observation)
+            .map_err(|error| match error {
+                crate::LoadoutFileError::ObservationStopped => LoadoutError::ObservationStopped,
+                crate::LoadoutFileError::NotFound => LoadoutError::MissingXmlLoadout {
+                    path: path.to_owned(),
+                },
+                error => failed(error.to_string()),
+            })?;
+    let result = parse(&bytes, &LoadoutOrigin::File(Arc::from(path)));
+    crate::loadout_file_events::parsed(
+        files,
+        path,
+        LoadoutDocumentKind::XmlLoadout,
+        result.as_ref().map(|_| ()).map_err(String::as_str),
+        observation,
+    )?;
+    result.map_err(failed)
+}
 /// Replaces the entry of each port `overrides` names, ignoring ASCII case, and appends the rest.
 fn merge_into(entries: &mut Vec<EntrySpec>, overrides: Vec<EntrySpec>) {
     merge_by_port(entries, overrides, |entry| &entry.port);

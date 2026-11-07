@@ -126,7 +126,7 @@ impl<'f> LoadoutResolver<'f> {
     /// order they are laid over each other: for an outfit its base Loadout, then the Loadouts of
     /// its outfits. Empty when the Entity's Loadout is not made of XML files or it has none.
     pub fn loadout_files(&mut self, entity: &p4kx_dataforge::Record<'f>) -> Vec<String> {
-        let spec = self.spec(entity.guid());
+        let spec = self.spec_record(entity);
         let mut paths = Vec::new();
         if let Ok(spec) = spec.as_ref()
             && let Some(loadout) = &spec.loadout
@@ -146,6 +146,7 @@ impl<'f> LoadoutResolver<'f> {
         let loadout = LoadoutSpec::Xml(path.into());
         self.entries(Some(&loadout))?;
         let spec = EntitySpec {
+            record_index: None,
             guid: Guid::default(),
             record_path: path.to_owned(),
             origin: crate::spec::LoadoutOrigin::File(path.into()),
@@ -201,8 +202,9 @@ impl<'f> LoadoutResolver<'f> {
                 Attachment::Entity(node) => {
                     let name = is_worn_type(node.attach_type())
                         .then(|| format!("{}/{}", port.name(), node.class_name()));
-                    if let Some(name) = &name {
-                        let spec = self.spec(node.guid());
+                    if let Some(name) = &name
+                        && let Some(spec) = self.spec_of(node)
+                    {
                         let piece = match spec.as_ref() {
                             Ok(spec) => relevant_issues(node.issues()).fold(
                                 Piece::wearable(Wearable::from_spec(spec)).named(name.clone()),
@@ -244,7 +246,9 @@ fn relevant_issues(issues: &[LoadoutError]) -> impl Iterator<Item = &LoadoutErro
     issues.iter().filter(|issue| {
         !matches!(
             issue,
-            LoadoutError::AmbiguousClass { .. } | LoadoutError::VehicleImplementation { .. }
+            LoadoutError::AmbiguousClass { .. }
+                | LoadoutError::VehicleImplementation { .. }
+                | LoadoutError::MissingVehicleImplementation { .. }
         )
     })
 }
@@ -255,3 +259,7 @@ fn failures<'a>(
 ) -> impl Iterator<Item = Piece> + use<'a> {
     relevant_issues(issues).map(move |issue| Piece::failed(name, issue.to_string()))
 }
+
+#[cfg(test)]
+#[path = "loadout_alias_tests.rs"]
+mod aliases;

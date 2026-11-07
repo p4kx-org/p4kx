@@ -127,8 +127,16 @@ const ATTRIBUTE_BYTES: usize = size_of::<(String, String)>();
 #[derive(Debug, Clone)]
 pub(crate) struct Budget {
     elements: usize,
+    exhausted: bool,
     attributes: usize,
     bytes: usize,
+}
+
+#[derive(Clone, Copy)]
+enum Unit {
+    Elements,
+    Attributes,
+    Bytes,
 }
 
 impl Budget {
@@ -136,6 +144,7 @@ impl Budget {
     pub(crate) fn new(input: usize) -> Self {
         Self {
             elements: MAX_ELEMENTS,
+            exhausted: false,
             attributes: MAX_ATTRIBUTES,
             bytes: input.saturating_mul(INPUT_FACTOR).max(MIN_BYTES),
         }
@@ -148,30 +157,43 @@ impl Budget {
             .saturating_add(input.saturating_mul(INPUT_FACTOR));
     }
 
-    fn take(left: &mut usize, count: usize, what: &str) -> Result<(), String> {
-        *left = left
-            .checked_sub(count)
-            .ok_or_else(|| format!("it needs more {what} than are allowed"))?;
-        Ok(())
+    #[cfg(test)]
+    pub(crate) fn without_elements() -> Self {
+        Self {
+            elements: 0,
+            ..Self::new(0)
+        }
     }
 
+    pub(crate) const fn exhausted(&self) -> bool {
+        self.exhausted
+    }
+
+    fn take(&mut self, unit: Unit, count: usize) -> Result<(), String> {
+        let (left, what) = match unit {
+            Unit::Elements => (&mut self.elements, "elements"),
+            Unit::Attributes => (&mut self.attributes, "attributes"),
+            Unit::Bytes => (&mut self.bytes, "bytes of names and values"),
+        };
+        let Some(remaining) = left.checked_sub(count) else {
+            self.exhausted = true;
+            return Err(format!("it needs more {what} than are allowed"));
+        };
+        *left = remaining;
+        Ok(())
+    }
     fn element(&mut self, name: &str) -> Result<(), String> {
-        Self::take(&mut self.elements, 1, "elements")?;
-        Self::take(
-            &mut self.bytes,
-            name.len().saturating_add(ELEMENT_BYTES),
-            "bytes of names and values",
-        )
+        self.take(Unit::Elements, 1)?;
+        self.take(Unit::Bytes, name.len().saturating_add(ELEMENT_BYTES))
     }
 
     fn attribute(&mut self, name: &str, value: &str) -> Result<(), String> {
-        Self::take(&mut self.attributes, 1, "attributes")?;
-        Self::take(
-            &mut self.bytes,
+        self.take(Unit::Attributes, 1)?;
+        self.take(
+            Unit::Bytes,
             name.len()
                 .saturating_add(value.len())
                 .saturating_add(ATTRIBUTE_BYTES),
-            "bytes of names and values",
         )
     }
 
@@ -208,13 +230,12 @@ impl Budget {
         name: &str,
         value: &str,
     ) -> Result<(), String> {
-        Self::take(&mut self.attributes, attributes.max(1), "attributes")?;
-        Self::take(
-            &mut self.bytes,
+        self.take(Unit::Attributes, attributes.max(1))?;
+        self.take(
+            Unit::Bytes,
             name.len()
                 .saturating_add(value.len())
                 .saturating_add(ATTRIBUTE_BYTES),
-            "bytes of names and values",
         )
     }
 }

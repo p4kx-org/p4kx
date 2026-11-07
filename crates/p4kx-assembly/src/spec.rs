@@ -106,6 +106,7 @@ pub(crate) struct VehicleSpec {
 /// What the Loadout tree needs of one Entity Record.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct EntitySpec {
+    pub(crate) record_index: Option<u32>,
     pub(crate) guid: Guid,
     pub(crate) record_path: String,
     pub(crate) origin: LoadoutOrigin,
@@ -171,6 +172,7 @@ impl EntitySpec {
             object_containers: crate::object_containers::read(&components).into(),
             zones: read_zones(&components),
             animation_database: crate::creature_animation::database_of(&components),
+            record_index: Some(tree.record_index()),
             guid: tree.guid(),
             record_path: tree.record_path().to_owned(),
             origin: LoadoutOrigin::Record(record),

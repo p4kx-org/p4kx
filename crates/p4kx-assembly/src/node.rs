@@ -11,6 +11,7 @@ use crate::node_body::is_head_type;
 use crate::node_notes;
 use crate::port::PortDefinition;
 use crate::resolver::LoadoutResolver;
+use crate::resolver_observation::{self, LoadoutReadEvent};
 use crate::spec::{EntitySpec, EntrySpec, LoadoutOrigin, LoadoutSpec, TargetSpec};
 use crate::vehicle::flags_contain;
 use crate::walk::Walk;
@@ -63,6 +64,15 @@ impl LoadoutResolver<'_> {
                 break;
             }
             if !walk.reserve() {
+                if resolver_observation::notify(
+                    self.observation.as_deref(),
+                    LoadoutReadEvent::InventoryIncomplete,
+                )
+                .is_err()
+                {
+                    issues.push(LoadoutError::ObservationStopped);
+                    break;
+                }
                 issues.push(LoadoutError::TooManyPorts);
                 break;
             }
@@ -202,9 +212,18 @@ impl LoadoutResolver<'_> {
         };
         let guid = record.guid();
         if let Some(error) = walk.limit(guid) {
+            if matches!(error, LoadoutError::TooDeep)
+                && resolver_observation::notify(
+                    self.observation.as_deref(),
+                    LoadoutReadEvent::InventoryIncomplete,
+                )
+                .is_err()
+            {
+                return unresolved(named, LoadoutError::ObservationStopped);
+            }
             return unresolved(named, error);
         }
-        let spec = self.spec(guid);
+        let spec = self.spec_record(&record);
         let spec = match spec.as_ref() {
             Ok(spec) => spec,
             Err(error) => return unresolved(named, error.clone()),
@@ -310,6 +329,7 @@ fn visibility_of(port: &PortNode, vehicle: Option<&VehicleImplementation>) -> Po
 /// Returns the node of `spec` without ports, issues, vehicle implementation and landing gear.
 fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode {
     EntityNode {
+        record_index: spec.record_index,
         guid: spec.guid,
         record_path: spec.record_path.clone(),
         name: spec.name.clone(),

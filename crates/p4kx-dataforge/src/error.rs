@@ -8,6 +8,9 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum DataForgeError {
+    /// A canonical-read observer stopped the operation for its caller-owned reason.
+    #[error("the canonical-read observer stopped the operation")]
+    ObservationStopped,
     /// The header names a version this reader does not know.
     #[error(
         "DataForge version {version} is not supported; this version of P4KX reads versions 6 and 8"

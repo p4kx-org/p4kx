@@ -18,6 +18,7 @@ use crate::{
 /// One Entity in a Loadout tree: its Record and its ports with what they hold.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntityNode {
+    pub(crate) record_index: Option<u32>,
     pub(crate) guid: Guid,
     pub(crate) record_path: String,
     pub(crate) name: String,

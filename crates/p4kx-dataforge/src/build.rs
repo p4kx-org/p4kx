@@ -41,6 +41,7 @@ pub(crate) struct Pending {
 /// layouts; [`Record::tree`] uses a new one each time.
 #[derive(Debug, Default)]
 pub struct TreeBuilder<'f> {
+    read_observer: Option<crate::read_observer::ReadObserver>,
     forge_id: usize,
     pub(crate) layouts: Layouts<'f>,
     pub(crate) owned: HashMap<(u32, u32), Span>,
@@ -53,6 +54,18 @@ pub struct TreeBuilder<'f> {
 }
 
 impl<'f> TreeBuilder<'f> {
+    /// Creates a builder that observes each actual canonical read before returning it.
+    #[must_use]
+    pub fn with_read_observer(observer: Arc<dyn crate::CanonicalReadObserver>) -> Self {
+        let mut builder = Self::new();
+        builder.set_read_observer(Some(observer));
+        builder
+    }
+
+    /// Sets the observer for subsequent reads without changing cached layout state.
+    pub fn set_read_observer(&mut self, observer: Option<Arc<dyn crate::CanonicalReadObserver>>) {
+        self.read_observer = observer.map(crate::read_observer::ReadObserver);
+    }
     /// Creates a builder.
     #[must_use]
     pub fn new() -> Self {
@@ -63,8 +76,19 @@ impl<'f> TreeBuilder<'f> {
     ///
     /// # Errors
     ///
-    /// Returns the [`DataForgeError`] of [`Record::tree`].
+    /// Returns the source error of [`Record::tree`] or [`DataForgeError::ObservationStopped`]
+    /// when the configured observer stops the caller.
     pub fn build(&mut self, record: &Record<'f>) -> Result<RecordTree<'f>, DataForgeError> {
+        let outcome = self.build_tree(record);
+        if let Some(observer) = &self.read_observer
+            && observer.0.observe(record, outcome.as_ref()).is_break()
+        {
+            return Err(DataForgeError::ObservationStopped);
+        }
+        outcome
+    }
+
+    fn build_tree(&mut self, record: &Record<'f>) -> Result<RecordTree<'f>, DataForgeError> {
         let forge = record.forge;
         self.start(forge);
         let def = record.def;
@@ -79,6 +103,7 @@ impl<'f> TreeBuilder<'f> {
         self.claim(def.struct_index, instance)?;
         let fields = self.fields(forge, &layout, bytes, 0)?;
         let mut tree = RecordTree {
+            record_index: record.index(),
             guid: Guid::from_stored(def.guid),
             record_path,
             name,
