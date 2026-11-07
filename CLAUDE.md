@@ -125,9 +125,10 @@ a new test file goes into `tests/it/` and `main.rs` gets its `mod` line.
 - Libraries are synchronous and parallelise with rayon; tokio only in `p4kx-mcp`. The one
   exception is Sound Conversion during Extraction, which runs on plain worker threads (ADR-0022).
 - `thiserror` in libraries, `anyhow` only in binaries; no `unwrap` / `expect` outside tests.
-- `unsafe_code = "forbid"` everywhere except the `cfg(windows)` DWM module in `p4kx-gui`, whose
-  manifest repeats the workspace lints with `unsafe_code = "deny"`; `cargo xtask lints` checks
-  that (ADR-0006).
+- `unsafe_code = "forbid"` except the `cfg(windows)` DWM leaf in `p4kx-gui` and the fixed,
+  bounded Environment-notification leaf in `p4kx-msi-path`. These frontends repeat the workspace
+  lints with only `unsafe_code = "deny"`; the MSI library explicitly forbids unsafe code.
+  `cargo xtask lints` checks the exact boundaries (ADR-0006, ADR-0354).
 - The look follows the P4KX theme strictly: dark only, Lato only (ADR-0006). See "GUI design
   (hard rule)" below.
 - The window opens Direct3D 12 first on Windows and falls back to the default wgpu backends;

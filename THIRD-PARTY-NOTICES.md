@@ -733,6 +733,7 @@ https://crates.io/crates/option-ext/0.2.0 and from https://github.com/soc/option
 | `windows_x86_64_msvc` | 0.52.6 | MIT License | <https://github.com/microsoft/windows-rs> |
 | `winit` | 0.30.13 | Apache License 2.0 | <https://github.com/rust-windowing/winit> |
 | `winnow` | 1.0.4 | MIT License | <https://github.com/winnow-rs/winnow> |
+| `winreg` | 0.56.0 | MIT License | <https://github.com/gentoo90/winreg-rs> |
 | `wl-clipboard-rs` | 0.9.4 | MIT License | <https://github.com/YaLTeR/wl-clipboard-rs> |
 | `writeable` | 0.6.4 | Unicode License v3 | <https://github.com/unicode-org/icu4x> |
 | `x11-dl` | 2.21.0 | MIT License | <https://github.com/AltF02/x11-rs.git> |
@@ -4321,6 +4322,34 @@ Used by:
 
 ```text
 Copyright (c) 2015 Elinor Berger
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+#### MIT License
+
+Used by:
+
+- `winreg` 0.56.0 (<https://github.com/gentoo90/winreg-rs>)
+
+```text
+Copyright (c) 2015 Igor Shaula
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
