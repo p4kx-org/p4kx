@@ -7,6 +7,7 @@ use crate::installer::binding::Binding;
 use crate::installer::claim::Claim;
 use crate::installer::registry_adapter;
 use crate::installer::registry_store::{RawValue, RegistrySnapshot};
+use crate::installer::reservation::Plan;
 use crate::installer::state::{Phase, Snapshot};
 
 use super::FixtureImage;
@@ -23,6 +24,16 @@ pub enum CorePhase {
     Committed,
     /// The operation was compensated.
     RolledBack,
+}
+
+/// Intent state decoded from the active reservation.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum ReservedPhase {
+    /// Only invocation identity is fixed.
+    Neutral,
+    /// The costing-dependent intent is fixed.
+    Sealed,
 }
 
 /// How the durable owner obtained its PATH entry.
@@ -68,6 +79,8 @@ pub enum CoreInspection {
         owner: Option<FixtureOwner>,
         /// Active reserved authority decoded from the WAL.
         reserved_binding: Option<String>,
+        /// Whether an active reservation has a sealed intent.
+        reservation_phase: Option<ReservedPhase>,
         /// Cleanup-only fence decoded from the WAL.
         cancelled_binding: Option<String>,
         /// Journal caller binding with its proven predecessor sequence.
@@ -142,6 +155,12 @@ fn decoded(snapshot: Snapshot) -> CoreInspection {
         sequence: snapshot.sequence,
         phase,
         owner,
+        reservation_phase: snapshot.reservation.as_ref().map(|reservation| {
+            match reservation.plan {
+                Plan::Neutral(_) => ReservedPhase::Neutral,
+                Plan::Sealed(_) => ReservedPhase::Sealed,
+            }
+        }),
         reserved_binding: snapshot
             .reservation
             .map(|reservation| reservation.binding().encode()),

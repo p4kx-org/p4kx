@@ -74,11 +74,11 @@ fn a_new_reservation_atomically_replaces_the_cancel_fence_and_rejects_old_cleanu
     let (mut memory, binding) = tests::reservation::reserved()?;
     reservation::cancel(&mut memory, binding)?;
     assert_eq!(
-        reservation::create(&mut memory, tests::reservation::caller(9)?),
+        tests::reservation::reserve(&mut memory, tests::reservation::caller(9)?),
         Err(Fault::InvalidNonce),
         "the cancelled invocation nonce is not fresh"
     );
-    let fresh = reservation::create(&mut memory, tests::reservation::caller(10)?)?;
+    let fresh = tests::reservation::reserve(&mut memory, tests::reservation::caller(10)?)?;
     let before = memory.state.clone();
     assert!(
         before.cancelled_binding.is_none(),
@@ -110,7 +110,7 @@ fn cancelling_retains_foreign_path_edits_and_still_fences_old_terminal_callbacks
         .as_ref()
         .ok_or("missing old WAL")?
         .clone();
-    let binding = reservation::create(&mut memory, tests::reservation::caller(10)?)?;
+    let binding = tests::reservation::reserve(&mut memory, tests::reservation::caller(10)?)?;
     let foreign = tests::path(
         "foreign;;A;",
         crate::installer::raw_path::StringKind::Expandable,

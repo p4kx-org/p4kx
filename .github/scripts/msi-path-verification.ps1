@@ -84,9 +84,13 @@ function Invoke-P4kxMsiForeignEditProbe {
         Assert-P4kxInstallationOwnershipAbsent $Context.upgrade $Context.folder $Context.shortcut
         $value=@{registry_type=2;bytes_hex=[Convert]::ToHexString([Text.Encoding]::Unicode.GetBytes('C:\P4kxSynthetic\base'+[char]0)).ToLowerInvariant()}
         $before=Set-P4kxRawMsiPath $Fixture (Get-P4kxRawMsiImage $Fixture) $value
-        Invoke-P4kxMsiPathHelper $Context @('reserve','ensure',$Context.metadata.product,$Context.metadata.package,'',($Context.folder.TrimEnd('\')+'\.')) $Fixture
+        Invoke-P4kxMsiPathHelper $Context @('reserve',$Context.metadata.product,$Context.metadata.package) $Fixture
         $reserved=Get-P4kxRawMsiImage $Fixture;$binding=$reserved.core.reserved_binding
         if($reserved.core.status -cne 'valid' -or $binding -cnotmatch '\Av1\|[0-9]+\|[0-9a-f]{32}\|[0-9a-f]{32}\|[0-9a-f]{64}\z'){throw 'Actual reservation binding is missing.'}
+        if($reserved.core.reservation_phase -cne 'neutral'){throw 'Early reservation already contains a costing-dependent goal.'}
+        Invoke-P4kxMsiPathHelper $Context @('seal','ensure',$Context.metadata.product,$Context.metadata.package,$binding,'',($Context.folder.TrimEnd('\')+'\.')) $Fixture
+        $sealed=Get-P4kxRawMsiImage $Fixture
+        if($sealed.core.reserved_binding -cne $binding -or $sealed.core.reservation_phase -cne 'sealed'){throw 'Seal changed binding or did not retain the intent.'}
         foreach($phase in @('prepare','apply')){Invoke-P4kxMsiPathHelper $Context @($phase,$Context.metadata.product,$Context.metadata.package,$binding) $Fixture}
         $applied=Get-P4kxRawMsiImage $Fixture
         Assert-P4kxRawMsiInstalled $before $applied $Context.metadata $Context.folder applied
@@ -105,6 +109,27 @@ function Invoke-P4kxMsiForeignEditProbe {
     }catch{if($null -ne $failure){throw [AggregateException]::new('Native adapter probe and cleanup failed.',[Exception[]]@($failure,$_.Exception))};throw}
     if($null -ne $failure){throw $failure}
     return $result
+}
+
+function Assert-P4kxMsiReservedCleanup {
+    param($Before,$After,$Metadata)
+    Assert-P4kxRawMsiPathEqual $Before $After
+    $prefix='v1|'+$Before.core.sequence+'|'+([guid]$Metadata.product).ToString('N')+'|'+([guid]$Metadata.package).ToString('N')+'|'
+    if($Before.core.status -cne 'valid' -or $After.core.status -cne 'valid' -or
+        $Before.core.sequence -cne $After.core.sequence -or $Before.core.phase -cne $After.core.phase -or
+        $Before.core.journal_binding -cne $After.core.journal_binding -or $null -ne $After.core.reserved_binding -or
+        $null -ne $After.core.reservation_phase -or $After.core.cancelled_binding -isnot [string] -or
+        -not $After.core.cancelled_binding.StartsWith($prefix,[StringComparison]::Ordinal) -or
+        $After.core.cancelled_binding.Substring($prefix.Length) -cnotmatch '\A[0-9a-f]{64}\z'){
+        throw 'Noop or disabled-rollback cleanup did not retain the exact terminal state and cancellation fence.'
+    }
+    if($null -eq $Before.core.owner -or $null -eq $After.core.owner){
+        if($null -ne $Before.core.owner -or $null -ne $After.core.owner){throw 'Reservation cleanup changed owner presence.'}
+    }else{
+        foreach($field in @('product','package','claim')){
+            if($Before.core.owner.$field -cne $After.core.owner.$field){throw 'Reservation cleanup changed the terminal owner.'}
+        }
+    }
 }
 
 function Assert-P4kxMsiPathVerification {
@@ -129,7 +154,7 @@ function Assert-P4kxMsiPathVerification {
         if($case.installed.core.owner.claim -cne 'inserted'){throw 'Synthetic PATH case lacks an actual insertion claim.'}
     }
     Assert-P4kxMsiAdapterEvidence $Report.adapter $Report $context
-    $required=@{install=0;repair=0;rollback=1603;upgrade=0;'downgrade-blocked'=1603;uninstall=0}
+    $required=@{install=0;'feature-noop'=0;'rollback-disabled'=1603;repair=0;rollback=1603;upgrade=0;'downgrade-blocked'=1603;uninstall=0}
     if($Platform.arch -ceq 'arm64'){
         foreach($name in @('amd64-compatibility-install','same-version-native-replacement','same-version-amd64-replacement','replacement-uninstall')){$required[$name]=0}
     }else{$required['wrong-cpu-rejected']=1633}
@@ -138,6 +163,12 @@ function Assert-P4kxMsiPathVerification {
         if($steps.Count -ne 1 -or $steps[0].exit_code -ne $required[$name]){throw 'Required MSI lifecycle action or actual exit code is missing.'}
         Assert-P4kxRawMsiEnvelope $context $steps[0].before
         Assert-P4kxRawMsiEnvelope $context $steps[0].after
+        if($name -cin @('feature-noop','rollback-disabled')){Assert-P4kxMsiReservedCleanup $steps[0].before $steps[0].after $Report.msi_identity}
+        if($name -ceq 'downgrade-blocked'){
+            foreach($slot in @('path','state','sequence','binding')){
+                if(-not (Test-P4kxRawMsiValueEqual $steps[0].before.image[$slot] $steps[0].after.image[$slot])){throw 'Downgrade mutated the invocation store.'}
+            }
+        }
     }
     if($Platform.arch -ceq 'amd64' -and ($Report.legacy.calibration -cne 'success' -or $Report.legacy.upgrade -cne 'success')){throw 'Historical observed-cleanup calibration or migration failed.'}
 }

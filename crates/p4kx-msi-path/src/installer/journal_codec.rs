@@ -11,7 +11,7 @@ use crate::installer::reservation;
 use crate::installer::state::{Ownership, Phase, Snapshot};
 use crate::installer::transaction;
 
-pub(crate) const MAGIC: &[u8] = b"P4KXPATH\x03";
+pub(crate) const MAGIC: &[u8] = b"P4KXPATH\x04";
 pub(crate) const MAX_STATE_BYTES: usize = 16 << 20;
 
 pub(crate) fn encode(snapshot: &Snapshot) -> Result<Vec<u8>, Fault> {

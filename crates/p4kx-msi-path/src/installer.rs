@@ -42,6 +42,8 @@ mod raw_path;
 #[cfg(any(windows, test))]
 mod reservation;
 #[cfg(any(windows, test))]
+mod reservation_identity;
+#[cfg(any(windows, test))]
 mod rollback_receipt;
 #[cfg(any(windows, test))]
 mod sequence;

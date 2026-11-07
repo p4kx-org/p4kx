@@ -61,7 +61,11 @@ pub(crate) fn execute<S: Store>(
 
 fn reserved<S: Store>(store: &mut S, invocation: Invocation) -> Result<PathChange, S::Error> {
     match invocation.stage {
-        Stage::Preflight => Ok(PathChange::Unchanged),
+        Stage::Preflight => {
+            let observed = store.load()?;
+            reservation::matching(&observed.state, invocation.binding)?.caller()?;
+            Ok(PathChange::Unchanged)
+        }
         Stage::Prepare => {
             transaction::begin_reserved(store, invocation.binding)?;
             Ok(PathChange::Unchanged)

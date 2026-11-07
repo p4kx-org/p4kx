@@ -18,14 +18,18 @@ fn words(values: &[&str]) -> Vec<Vec<u16>> {
         .collect()
 }
 
+fn captured() -> String {
+    format!("v1|0|{:032x}|{:032x}|{}", 1, 2, "01".repeat(32))
+}
+
 fn ensure(folder: &str) -> Vec<Vec<u16>> {
-    words(&["reserve", "ensure", PRODUCT, PACKAGE, "", folder])
+    words(&["seal", "ensure", PRODUCT, PACKAGE, &captured(), "", folder])
 }
 
 #[test]
 fn reservations_preserve_spaces_unicode_and_the_exact_own_folder_separator() -> Result<(), Fault> {
     let command = arguments::parse(ensure(r"C:\P4KX 日本語\bin\."))?;
-    let Command::Reserve(declaration) = command else {
+    let Command::Seal { declaration, .. } = command else {
         return Err(Fault::InvalidArguments);
     };
     assert_eq!(
@@ -52,10 +56,10 @@ fn reservations_preserve_spaces_unicode_and_the_exact_own_folder_separator() -> 
 
 #[test]
 fn removal_has_no_authority_to_invent_a_folder_or_predecessor() -> Result<(), Fault> {
-    let result = arguments::parse(words(&["reserve", "remove", PRODUCT, PACKAGE]))?;
+    let result = arguments::parse(words(&["seal", "remove", PRODUCT, PACKAGE, &captured()]))?;
     assert!(
-        matches!(result, Command::Reserve(ref declaration) if declaration.goal == Goal::Remove && declaration.predecessor.is_none()),
-        "removal reserves only its typed product/package"
+        matches!(result, Command::Seal { ref declaration, .. } if declaration.goal == Goal::Remove && declaration.predecessor.is_none()),
+        "removal seals only its typed product/package without a folder"
     );
     let binding = Binding {
         sequence: 12,
@@ -204,5 +208,37 @@ fn bound_callbacks_reject_another_packages_identity_and_missing_transport() -> R
             "AppSearch miss/sentinel cannot authorise a callback"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn early_reserve_accepts_identity_only_and_rejects_the_unsealed_legacy_goal_abi()
+-> Result<(), Fault> {
+    assert_eq!(
+        arguments::parse(words(&["reserve", PRODUCT, PACKAGE]))?,
+        Command::Reserve {
+            product: 1,
+            package: 2
+        },
+        "early reservation has no costing-dependent input"
+    );
+    for values in [
+        words(&["reserve", "remove", PRODUCT, PACKAGE]),
+        words(&["reserve", "ensure", PRODUCT, PACKAGE, "", r"C:\P4KX\."]),
+    ] {
+        assert!(
+            arguments::parse(values).is_err(),
+            "a goal cannot enter the pre-costing command"
+        );
+    }
+    assert_eq!(
+        arguments::parse(words(&["seal", "remove", PACKAGE, PACKAGE, &captured()])),
+        Err(Fault::InvalidIdentity),
+        "seal cannot substitute the captured product"
+    );
+    assert!(
+        arguments::parse(words(&["seal", "remove", PRODUCT, PACKAGE, "unbound"])).is_err(),
+        "a search miss cannot seal"
+    );
     Ok(())
 }

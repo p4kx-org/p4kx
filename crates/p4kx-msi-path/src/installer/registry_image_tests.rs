@@ -10,7 +10,8 @@ use crate::installer::journal_codec;
 use crate::installer::raw_path::RawPath;
 use crate::installer::registry_adapter;
 use crate::installer::registry_store::{RawValue, RegistrySnapshot};
-use crate::installer::reservation::Reservation;
+
+use crate::installer::reservation::{Plan, Reservation};
 use crate::installer::sequence;
 use crate::installer::tests;
 
@@ -26,7 +27,7 @@ fn image() -> Result<RegistrySnapshot, Fault> {
     };
     let reservation = Reservation {
         base_sequence: state.sequence,
-        caller,
+        plan: Plan::Sealed(caller),
     };
     let binding = reservation.binding();
     state.reservation = Some(reservation);

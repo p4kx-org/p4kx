@@ -35,7 +35,7 @@ function Get-P4kxMsiTransportFixture {
         $sequence = if ($action.HasAttribute('OnExit')) { if ($action.OnExit -ceq 'error') {-3} else {-2} } else { [int]$action.Sequence }
         Write-Output -NoEnumerate @($name,[string]$action.Condition,[string]$sequence)
     })
-    foreach ($pair in @(@('InstallValidate',1400),@('InstallInitialize',1500),@('RemoveExistingProducts',1501),@('ProcessComponents',1600),@('MigrateFeatureStates',1200),@('InstallFinalize',6600))) {
+    foreach ($pair in @(@('CostInitialize',800),@('FileCost',900),@('CostFinalize',1000),@('InstallValidate',1400),@('InstallInitialize',1500),@('RemoveExistingProducts',1501),@('ProcessComponents',1600),@('MigrateFeatureStates',1200),@('InstallFinalize',6600))) {
         $execute += ,@($pair[0],'',[string]$pair[1])
     }
     $ui = @(foreach ($action in $xml.Include.InstallUISequence.ChildNodes) {

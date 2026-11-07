@@ -31,8 +31,8 @@ Prepared state changes no PATH; applied state and its proof commit
 together. A committed proof remains available to its matching MSI rollback callback if a later
 commit action fails. Separate invocations cannot claim that terminal proof.
 
-The private binary WAL uses version 3 and rejects incompatible versions, including versions 1
-and 2. Prepared, Applied and
+The private binary WAL uses version 4 and rejects incompatible versions, including versions 1,
+2 and 3. Prepared, Applied and
 Committed bind the entire current owner, including its Borrowed or canonical Inserted claim, to
 their original projection. RolledBack carries its source phase and exact observed PATH. One pure
 compensation projection derives its complete durable owner, including legitimate borrowed or
@@ -40,18 +40,37 @@ reacquired claims. This historical proof does not constrain subsequent foreign P
 
 ## Invocation reservation and transport
 
-Reserve captures the complete immutable caller and base sequence N, generates one fresh nonce,
-and atomically reserves that invocation without changing PATH, ownership or a terminal journal.
-A later bound Prepare consumes only that reservation and builds receipt N+1 from the live PATH;
-foreign PATH edits and predecessor cleanup before Prepare remain observable. Every mutation,
-including terminal callback no-ops, refuses a foreign active reservation or cancellation fence.
+Neutral Reserve captures only the actual ProductCode, actual MSI PackageCode, base sequence N
+and a fresh nonce. It atomically reserves that identity before CostInitialize without guessing a
+component action, resolved installation folder or predecessor. After CostFinalize and InstallValidate,
+Seal fixes exactly one Caller goal, resolved path and fresh predecessor with the same binding.
+Repeated or changed seals are rejected. A later bound Prepare requires Sealed, consumes only that
+reservation and builds receipt N+1 from the then-live PATH; foreign PATH edits and predecessor
+cleanup before Prepare remain observable. Every mutation, including terminal callback no-ops,
+refuses a foreign active reservation or cancellation fence. The phase enum owns either a Neutral
+identity or the Sealed Caller, so validation and encoding borrow the sealed lease.
+
+The execute sequence clears upgrade properties, runs FindRelatedProducts once, then reserves,
+resets the public search property, runs AppSearch, copies its value once into the private captured
+property and clears the public value, all before CostInitialize. UI search is suppressed. No early
+condition reads component action state. After InstallValidate, affected actions reject RollbackDisabled,
+check that a binding was captured and seal Ensure or Remove before InstallInitialize. A component
+noop exactly cancels Neutral at the same N. Older modern-package callbacks are all excluded under
+UPGRADINGPRODUCTCODE; the fresh downgrade-detected gate excludes reserve/search/seal.
+
+A search miss is an error before InstallInitialize. If an error or hard kill occurs between Reserve
+and Capture, there is no captured cleanup authority: PendingReservation remains fail closed for
+explicit reserved-only recovery. OnExit never reads or adopts the latest Registry token and never
+cancels by Product alone. After capture, matching error/cancel cleanup cancels Neutral or Sealed;
+matching receipt rollback remains available after Prepare/Apply/Commit. This pre-transaction gap
+changes no PATH, owner, N or terminal WAL.
 
 The canonical binding is `v1|N|product32lowerhex|package32lowerhex|nonce64lowerhex`, at most
 154 UTF16 words. Its Registry representation has exactly one NUL. The active Binding lives in
 `Software\P4KX-Installer\PathOwnership\Invocation`; separating this small value from the large
 WAL key keeps its 310-byte metadata bound meaningful. State, sequence, binding and PATH still
 participate in one native transaction and full-image compare-and-replace. Torn or orphan fields
-are rejected. Binding is transport, not authority independent of its complete stored caller.
+are rejected. Binding is transport, not authority independent of the stored Neutral or Sealed reservation.
 
 Cancelling an unprepared reservation retains its exact binding as a cleanup-only fence at the
 same N. Only the matching repeated cancel or rollback may become a no-op; Prepare, Apply and
@@ -59,16 +78,16 @@ Commit cannot reactivate it. A new reservation atomically replaces this fence wi
 No missing-state or product-only success is inferred.
 
 Pending reservations fail closed by default. Explicit `recover-reserved` requires the exact
-previous binding and replaces only its nonce through compare-and-replace. Product, Package,
-goal, predecessor, N, owner, terminal journal and live PATH remain unchanged. Recovery cannot
+previous binding and replaces only its nonce through compare-and-replace. Product, Package, phase,
+any sealed goal and predecessor, N, owner, terminal journal and live PATH remain unchanged. Recovery cannot
 reclaim a cancellation fence or Prepared/Applied journal; only active Reserved state is recoverable. If old Prepare wins the race, recovery
 fails; if recovery wins, stale callbacks fail. No timeout or guessed process-liveness authority
 is used.
 
-The private EXE supports Reserve, captured-binding phases, explicit reserved recovery and the
-fixed notification. Standard MSI AppSearch transport, actual SummaryInformation PackageCode
-binding, major-upgrade callback exclusion and native lifecycle evidence must be completed before
-release activation; the pure protocol does not establish those MSI integration facts.
+The private EXE supports identity-only Reserve, captured-binding Seal and phases, explicit reserved
+recovery and the fixed notification. Standard MSI AppSearch transport, actual SummaryInformation PackageCode
+binding and major-upgrade callback exclusion are checked in the compiled MSI tables. Native lifecycle
+evidence must pass before release activation; pure/source checks do not establish those runtime facts.
 
 ## Approved notification exception
 
@@ -105,3 +124,17 @@ proof; local developer machines execute none of those adapters. A release may us
 after that native package evidence and session-to-receipt transport have been reviewed and passed.
 These checks do not establish delivery to individual windows or hung-recipient behavior. A separate
 message receiver is optional diagnostic infrastructure, not a release requirement.
+
+The private commands are `reserve Product Package`,
+`seal ensure Product Package captured predecessor resolvedFolder`,
+`seal remove Product Package captured` and the existing bound phase/recovery forms.
+Only Reserve and explicit recovery request random data. Seal accepts at most seven arguments;
+per-argument, binding and WAL bounds remain enforced. The binding wire stays version 1.
+Incompatible WAL versions fail closed; no receipt or ownership migration is inferred from rejected bytes.
+
+The consumer uses its existing native MSI jobs and raw Registry fixture to check maintenance noops,
+DISABLEROLLBACK refusal before Seal and an untouched store for blocked downgrades, in addition to
+the original raw PATH cases, repair, post-execute rollback, modern upgrades and CPU replacement.
+A noop or disabled-rollback cancellation retains the previous terminal sequence, journal binding,
+owner and exact raw PATH while leaving a fresh cleanup-only fence. These are new native checks,
+not claims that those checks have already passed.

@@ -22,7 +22,7 @@ $mutations = @(
     {param($m) $m.reg_locator[0][3]='StateV1'},
     {param($m) $m.ui+=,@('AppSearch','','50')},
     {param($m) $m.ui+=,@('FindRelatedProducts','','25')},
-    {param($m) $m.ui+=,@('P4kxPathReserveEnsure','','1420')},
+    {param($m) $m.ui+=,@('P4kxPathReserve','','200')},
     {param($m) $m.binary_names=@()},
     {param($m) $m.binary_names+= 'P4kxPathHelper'},
     {param($m) $m.files+='p4kx-msi-path.exe'},
@@ -35,11 +35,19 @@ $mutations = @(
     {param($m) $m.custom_actions+=,@('ForeignDll','1','OtherBinary','Entry')},
     {param($m) $m.custom_actions+=,@('AutoRecover','8194','P4kxPathHelper','recover-reserved')},
     {param($m) ($m.execute | Where-Object { $_[0] -ceq 'RemoveExistingProducts' })[2]='1540'},
-    {param($m) ($m.execute | Where-Object { $_[0] -ceq 'InstallInitialize' })[2]='1465'},
+    {param($m) ($m.execute | Where-Object { $_[0] -ceq 'InstallInitialize' })[2]='1425'},
     {param($m) ($m.execute | Where-Object { $_[0] -ceq 'FindRelatedProducts' })[2]='1300'},
     {param($m) ($m.execute | Where-Object { $_[0] -ceq 'AppSearch' })[2]='1415'},
     {param($m) $m.execute+=,@('AppSearch','','1440')},
-    {param($m) $m.execute+=,@('InstallExecute','','6400')}
+    {param($m) $m.execute+=,@('InstallExecute','','6400')},
+    {param($m) ($m.execute | Where-Object { $_[0] -ceq 'CostInitialize' })[2]='419'},
+    {param($m) ($m.execute | Where-Object { $_[0] -ceq 'CostFinalize' })[2]='1450'},
+    {param($m) ($m.execute | Where-Object { $_[0] -ceq 'P4kxPathReserve' })[1]='NOT UPGRADINGPRODUCTCODE AND $Application = 3'},
+    {param($m) ($m.execute | Where-Object { $_[0] -ceq 'P4kxPathSealEnsure' })[2]='700'},
+    {param($m) ($m.custom_actions | Where-Object { $_[0] -ceq 'P4kxPathReserve' })[3]+=' "[APPLICATIONFOLDER]"'},
+    {param($m) $m.execute=@($m.execute | Where-Object { $_[0] -cne 'P4kxPathCancelNoop' })},
+    {param($m) $m.execute=@($m.execute | Where-Object { $_[0] -cne 'CostFinalize' })}
+
 )
 $count = 0
 foreach ($mutation in $mutations) {

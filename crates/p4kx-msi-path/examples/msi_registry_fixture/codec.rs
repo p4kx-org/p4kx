@@ -5,7 +5,7 @@ use std::io;
 
 use p4kx_msi_path::native_fixture::{
     CoreInspection, CorePhase, FixtureGuard, FixtureImage, FixtureKeys, FixtureValue, KeyPresence,
-    OwnerClaim,
+    OwnerClaim, ReservedPhase,
 };
 use serde::{Deserialize, Serialize};
 
@@ -76,9 +76,17 @@ enum Core {
         phase: Option<Phase>,
         owner: Option<Owner>,
         reserved_binding: Option<String>,
+        reservation_phase: Option<ReservationPhase>,
         cancelled_binding: Option<String>,
         journal_binding: Option<String>,
     },
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum ReservationPhase {
+    Neutral,
+    Sealed,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -224,6 +232,7 @@ impl Core {
                 phase,
                 owner,
                 reserved_binding,
+                reservation_phase,
                 cancelled_binding,
                 journal_binding,
             } => Self::Valid {
@@ -243,6 +252,13 @@ impl Core {
                     })
                     .transpose()?,
                 reserved_binding,
+                reservation_phase: reservation_phase
+                    .map(|phase| match phase {
+                        ReservedPhase::Neutral => Ok(ReservationPhase::Neutral),
+                        ReservedPhase::Sealed => Ok(ReservationPhase::Sealed),
+                        _ => Err(invalid()),
+                    })
+                    .transpose()?,
                 cancelled_binding,
                 journal_binding,
             },

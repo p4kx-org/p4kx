@@ -44,7 +44,10 @@ fn native_command_shape_generates_random_only_once_then_reuses_the_same_captured
     let notifications = Cell::new(0);
     driver::execute(
         &mut memory,
-        Command::Reserve(declaration()?),
+        Command::Reserve {
+            product: 1,
+            package: 101,
+        },
         || {
             random_calls.set(random_calls.get() + 1);
             Ok(generated)
@@ -60,6 +63,15 @@ fn native_command_shape_generates_random_only_once_then_reuses_the_same_captured
         .as_ref()
         .ok_or("missing reservation")?
         .binding();
+    driver::execute(
+        &mut memory,
+        Command::Seal {
+            binding,
+            declaration: declaration()?,
+        },
+        no_random,
+        || Ok(complete()),
+    )?;
     for stage in [
         Stage::Preflight,
         Stage::Prepare,
@@ -77,14 +89,22 @@ fn native_command_shape_generates_random_only_once_then_reuses_the_same_captured
             },
         )?;
     }
+    verify_phase_results(&memory, random_calls.get(), notifications.get(), binding)?;
+    Ok(())
+}
+
+fn verify_phase_results(
+    memory: &tests::Memory,
+    random_calls: u32,
+    notifications: u32,
+    binding: Binding,
+) -> TestResult {
     assert_eq!(
-        random_calls.get(),
-        1,
+        random_calls, 1,
         "the phase callbacks cannot generate unrelated random receipts"
     );
     assert_eq!(
-        notifications.get(),
-        2,
+        notifications, 2,
         "only actual apply and rollback PATH changes notify"
     );
     let record = memory.state.journal.as_ref().ok_or("missing WAL")?;
@@ -97,12 +117,15 @@ fn native_command_shape_generates_random_only_once_then_reuses_the_same_captured
 }
 
 #[test]
-fn random_source_failure_is_typed_and_changes_no_state() -> TestResult {
+fn random_source_failure_is_typed_and_changes_no_state() {
     let mut memory = tests::memory(tests::path("A", StringKind::Plain));
     let before = memory.state.clone();
     let result = driver::execute(
         &mut memory,
-        Command::Reserve(declaration()?),
+        Command::Reserve {
+            product: 1,
+            package: 101,
+        },
         no_random,
         || Ok(complete()),
     );
@@ -114,7 +137,6 @@ fn random_source_failure_is_typed_and_changes_no_state() -> TestResult {
         memory.state, before,
         "no reservation or PATH write follows a random-source refusal"
     );
-    Ok(())
 }
 
 #[test]
@@ -123,7 +145,10 @@ fn explicit_recovery_uses_one_new_nonce_without_replacing_the_authored_goal() ->
     let first_nonce = InvocationNonce::from_bytes([31; 32])?;
     driver::execute(
         &mut memory,
-        Command::Reserve(declaration()?),
+        Command::Reserve {
+            product: 1,
+            package: 101,
+        },
         || Ok(first_nonce),
         || Ok(complete()),
     )?;
@@ -133,6 +158,21 @@ fn explicit_recovery_uses_one_new_nonce_without_replacing_the_authored_goal() ->
         .as_ref()
         .ok_or("missing reservation")?
         .clone();
+    driver::execute(
+        &mut memory,
+        Command::Seal {
+            binding: old.binding(),
+            declaration: declaration()?,
+        },
+        no_random,
+        || Ok(complete()),
+    )?;
+    let old = memory
+        .state
+        .reservation
+        .as_ref()
+        .ok_or("missing sealed reservation")?
+        .clone();
     let new_nonce = InvocationNonce::from_bytes([32; 32])?;
     driver::execute(
         &mut memory,
@@ -141,7 +181,7 @@ fn explicit_recovery_uses_one_new_nonce_without_replacing_the_authored_goal() ->
         || Ok(complete()),
     )?;
     let mut expected = old;
-    expected.caller.nonce = new_nonce;
+    expected.set_nonce(new_nonce);
     assert_eq!(
         memory.state.reservation.as_ref(),
         Some(&expected),

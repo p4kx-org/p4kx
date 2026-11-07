@@ -3,23 +3,64 @@
 
 use crate::installer::binding::Binding;
 use crate::installer::caller::Caller;
+use crate::installer::declaration::Declaration;
 use crate::installer::fault::Fault;
 use crate::installer::invocation_nonce::InvocationNonce;
+use crate::installer::reservation_identity::Identity;
 use crate::installer::state::{Phase, Snapshot, Store};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Reservation {
     pub(crate) base_sequence: u64,
-    pub(crate) caller: Caller,
+    pub(crate) plan: Plan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Plan {
+    Neutral(Identity),
+    Sealed(Caller),
 }
 
 impl Reservation {
+    #[must_use]
+    pub(crate) const fn identity(&self) -> Identity {
+        match &self.plan {
+            Plan::Neutral(identity) => *identity,
+            Plan::Sealed(caller) => Identity {
+                product: caller.product,
+                package: caller.package,
+                nonce: caller.nonce,
+            },
+        }
+    }
+
+    #[must_use]
     pub(crate) const fn binding(&self) -> Binding {
-        Binding::for_caller(self.base_sequence, &self.caller)
+        let identity = self.identity();
+        Binding {
+            sequence: self.base_sequence,
+            product: identity.product,
+            package: identity.package,
+            nonce: identity.nonce,
+        }
+    }
+
+    pub(crate) const fn caller(&self) -> Result<&Caller, Fault> {
+        match &self.plan {
+            Plan::Neutral(_) => Err(Fault::WrongPhase),
+            Plan::Sealed(caller) => Ok(caller),
+        }
+    }
+
+    pub(crate) const fn set_nonce(&mut self, nonce: InvocationNonce) {
+        match &mut self.plan {
+            Plan::Neutral(identity) => identity.nonce = nonce,
+            Plan::Sealed(caller) => caller.nonce = nonce,
+        }
     }
 }
 
-pub(crate) fn create<S: Store>(store: &mut S, caller: Caller) -> Result<Binding, S::Error> {
+pub(crate) fn create<S: Store>(store: &mut S, identity: Identity) -> Result<Binding, S::Error> {
     let observed = store.load()?;
     let before = &observed.state;
     validate(before)?;
@@ -27,15 +68,15 @@ pub(crate) fn create<S: Store>(store: &mut S, caller: Caller) -> Result<Binding,
         return Err(Fault::PendingReservation.into());
     }
     terminal(before)?;
-    caller.request(before.owner.as_ref())?;
-    fresh(before, caller.nonce)?;
+    identity.validate()?;
+    fresh(before, identity.nonce)?;
     before
         .sequence
         .checked_add(1)
         .ok_or(Fault::SequenceExhausted)?;
     let reservation = Reservation {
         base_sequence: before.sequence,
-        caller,
+        plan: Plan::Neutral(identity),
     };
     let binding = reservation.binding();
     let mut after = before.clone();
@@ -45,6 +86,28 @@ pub(crate) fn create<S: Store>(store: &mut S, caller: Caller) -> Result<Binding,
     Ok(binding)
 }
 
+pub(crate) fn seal<S: Store>(
+    store: &mut S,
+    expected: Binding,
+    declaration: Declaration,
+) -> Result<(), S::Error> {
+    let observed = store.load()?;
+    let original = matching(&observed.state, expected)?;
+    if !matches!(original.plan, Plan::Neutral(_)) {
+        return Err(Fault::WrongPhase.into());
+    }
+    if declaration.product != expected.product || declaration.package != expected.package {
+        return Err(Fault::InvalidIdentity.into());
+    }
+    let caller = declaration.bind(expected.nonce)?;
+    caller.request(observed.state.owner.as_ref())?;
+    let mut replacement = original.clone();
+    replacement.plan = Plan::Sealed(caller);
+    let mut after = observed.state.clone();
+    after.reservation = Some(replacement);
+    store.compare_replace(&observed, after)
+}
+
 pub(crate) fn recover<S: Store>(
     store: &mut S,
     expected: Binding,
@@ -52,12 +115,12 @@ pub(crate) fn recover<S: Store>(
 ) -> Result<Binding, S::Error> {
     let observed = store.load()?;
     let original = matching(&observed.state, expected)?;
-    if nonce == original.caller.nonce {
+    if nonce == original.identity().nonce {
         return Err(Fault::InvalidNonce.into());
     }
     fresh(&observed.state, nonce)?;
     let mut replacement = original.clone();
-    replacement.caller.nonce = nonce;
+    replacement.set_nonce(nonce);
     let binding = replacement.binding();
     let mut after = observed.state.clone();
     after.reservation = Some(replacement);
@@ -109,8 +172,11 @@ pub(crate) fn validate(snapshot: &Snapshot) -> Result<(), Fault> {
         return Err(Fault::CorruptState);
     }
     terminal(snapshot)?;
-    reservation.caller.request(snapshot.owner.as_ref())?;
-    fresh(snapshot, reservation.caller.nonce)?;
+    reservation.identity().validate()?;
+    if let Plan::Sealed(caller) = &reservation.plan {
+        caller.request(snapshot.owner.as_ref())?;
+    }
+    fresh(snapshot, reservation.identity().nonce)?;
     snapshot
         .sequence
         .checked_add(1)

@@ -17,7 +17,7 @@ function Copy-TestValue($Value){return $Value | ConvertTo-Json -Depth 12 | Conve
 function New-TestImage($Path){
     return @{schema=1;role='disposable-ci-registry-fixture';revision=$revision;run='12';attempt='3';process_arch='x86_64';root='C:\runner\raw';
         image=@{path=$Path;state=$null;sequence=$null;binding=$null;keys=@{environment=$true;installer=$false;ownership=$false;invocation=$false}};
-        core=@{status='valid';phase='committed';owner=$null;reserved_binding=$null;journal_binding=$null}}
+        core=@{status='valid';sequence='4';phase='committed';owner=$null;reserved_binding=$null;reservation_phase=$null;cancelled_binding=$null;journal_binding=$null}}
 }
 $metadata=@{product='11111111-1111-1111-1111-111111111111';package='22222222-2222-2222-2222-222222222222'}
 $context=@{msi='current.msi';metadata=$metadata;upgrade='upgrade';folder='C:\P4KX';shortcut='shortcut';logs=$PSScriptRoot;helper='helper';helper_calls=0}
@@ -71,10 +71,15 @@ $script:state=Copy-TestValue $original
 function Invoke-P4kxMsiPathHelper($Context,$Arguments){
     switch($Arguments[0]){
         reserve {
-            Assert-Test ($Arguments[5] -ceq 'C:\P4KX\.') 'Helper reserve did not use the exact private folder ABI.'
+            Assert-Test ($Arguments.Count -eq 3) 'Early helper reserve received costing-dependent arguments.'
+            $script:state.core.reservation_phase='neutral'
             $script:state.core.reserved_binding='v1|4|'+('1'*32)+'|'+('2'*32)+'|'+('3'*64)
         }
-        prepare {$script:state.core.journal_binding=$Arguments[3];$script:state.core.reserved_binding=$null;$script:state.core.phase='prepared'}
+        seal {
+            Assert-Test ($Arguments.Count -eq 7 -and $Arguments[4] -ceq $script:state.core.reserved_binding -and $Arguments[6] -ceq 'C:\P4KX\.') 'Seal did not reuse the captured binding and exact resolved folder.'
+            $script:state.core.reservation_phase='sealed'
+        }
+        prepare {$script:state.core.reservation_phase=$null;$script:state.core.journal_binding=$Arguments[3];$script:state.core.reserved_binding=$null;$script:state.core.phase='prepared'}
         apply {Set-TestInstalled;$script:state.core.phase='applied'}
         rollback {
             $script:state.image.path=@{registry_type=2;bytes_hex=[Convert]::ToHexString([Text.Encoding]::Unicode.GetBytes('C:\P4kxSynthetic\external;C:\P4kxSynthetic\base'+[char]0)).ToLowerInvariant()}
@@ -87,9 +92,13 @@ $adapter=Invoke-P4kxMsiForeignEditProbe $context $fixture $original
 Assert-Test ($adapter.outcome -ceq 'success') 'The narrow external-edit/rollback mock failed.'
 $report=@{schema=1;scope='native-synthetic';target='x86_64-pc-windows-msvc';revision=$revision;run='12';attempt='3';raw_root='C:\runner\raw';
     msi_sha256=$msiHash;helper_sha256=('b'*64);fixture_sha256=('c'*64);folder=$context.folder;msi_identity=$metadata;raw_cases=$results;adapter=$adapter;legacy=@{calibration='success';upgrade='success'}}
-$report.lifecycle_steps=@(foreach($pair in @{install=0;repair=0;rollback=1603;upgrade=0;'downgrade-blocked'=1603;uninstall=0;'wrong-cpu-rejected'=1633}.GetEnumerator()){
+$report.lifecycle_steps=@(foreach($pair in @{install=0;'feature-noop'=0;'rollback-disabled'=1603;repair=0;rollback=1603;upgrade=0;'downgrade-blocked'=1603;uninstall=0;'wrong-cpu-rejected'=1633}.GetEnumerator()){
     @{name=$pair.Key;exit_code=$pair.Value;before=$original;after=$original}
 })
+foreach($step in $report.lifecycle_steps | Where-Object name -CIn @('feature-noop','rollback-disabled')){
+    $step.after=Copy-TestValue $original
+    $step.after.core.cancelled_binding='v1|4|'+('1'*32)+'|'+('2'*32)+'|'+('3'*64)
+}
 $platform=@{target=$report.target;arch='amd64'}
 Assert-P4kxMsiPathVerification $report $platform $report.revision $report.msi_sha256
 $checks++
@@ -115,7 +124,7 @@ if($PSCmdlet.ParameterSetName -ceq 'Fixture'){
     if($FixtureTarget -ceq $report.target){return $report}
     return $arm
 }
-foreach($mutation in @('seed','active-type','case-missing','case-duplicate','action-missing','exit-code','revision','adapter','foreign-bytes','cleanup')){
+foreach($mutation in @('seed','active-type','case-missing','case-duplicate','action-missing','exit-code','revision','adapter','foreign-bytes','cleanup','noop-fence','noop-receipt','disabled-owner','downgrade-binding')){
     $bad=Copy-TestValue $report
     switch($mutation){
         seed {$bad.raw_cases[0].before.image.path.bytes_hex='0000'}
@@ -128,6 +137,10 @@ foreach($mutation in @('seed','active-type','case-missing','case-duplicate','act
         adapter {$bad.adapter.outcome='skipped'}
         'foreign-bytes' {$bad.adapter.after.image.path.bytes_hex='0000'}
         cleanup {$bad.raw_cases[0].fixture_reset.fixture_only=$false}
+        'noop-fence' {($bad.lifecycle_steps | Where-Object name -CEQ feature-noop).after.core.cancelled_binding=$null}
+        'noop-receipt' {($bad.lifecycle_steps | Where-Object name -CEQ feature-noop).after.core.sequence='5'}
+        'disabled-owner' {($bad.lifecycle_steps | Where-Object name -CEQ rollback-disabled).after.core.owner=@{product=('1'*32);package=('2'*32);claim='borrowed'}}
+        'downgrade-binding' {($bad.lifecycle_steps | Where-Object name -CEQ downgrade-blocked).after=Copy-TestValue $original;($bad.lifecycle_steps | Where-Object name -CEQ downgrade-blocked).after.image.binding=@{registry_type=1;bytes_hex='0000'}}
     }
     $rejected=$false;try{Assert-P4kxMsiPathVerification $bad $platform $report.revision $report.msi_sha256}catch{$rejected=$true}
     Assert-Test $rejected 'A mutated or incomplete MSI PATH report was accepted.'

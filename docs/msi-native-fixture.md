@@ -78,3 +78,9 @@ PATH values; a separate helper probe verifies foreign-edit retention across a bo
 `installer.json` retains these observations as the mandatory source/MSI-bound `path_contract`.
 Unconfirmed process completion latches the fixture against further helper, seed or restore
 mutations. Read-only capture cannot clear that latch or authorize recovery.
+
+An active WAL4 reservation also reports `core.reservation_phase` as `neutral` or `sealed`;
+otherwise it is null. `reserved_binding` has the same canonical version-1 spelling in both phases.
+Neutral has no receipt or inferred folder. The fixture uses the production WAL4 decoder and
+rejects incompatible WAL3 rather than treating it as a neutral reservation. The opt-in fixture and
+its consumers are source-bound; this additive field is not independent permission to mutate Registry state.

@@ -7,7 +7,7 @@ use crate::installer::claim::Claim;
 use crate::installer::fault::Fault;
 use crate::installer::journal_codec;
 use crate::installer::raw_path::{RawPath, StringKind};
-use crate::installer::reservation::Reservation;
+use crate::installer::reservation::{Plan, Reservation};
 use crate::installer::rollback_receipt::{RollbackReceipt, RollbackSource};
 use crate::installer::state::{Journal, Ownership, Phase, Snapshot};
 
@@ -125,13 +125,27 @@ impl Writer {
         };
         self.put(&[1])?;
         self.put(&reservation.base_sequence.to_le_bytes())?;
-        self.caller(&reservation.caller)
+        let identity = reservation.identity();
+        self.put(&identity.product.to_le_bytes())?;
+        self.put(&identity.package.to_le_bytes())?;
+        self.put(identity.nonce.bytes())?;
+        match &reservation.plan {
+            Plan::Neutral(_) => self.put(&[0]),
+            Plan::Sealed(caller) => {
+                self.put(&[1])?;
+                self.intent(caller)
+            }
+        }
     }
 
     fn caller(&mut self, caller: &Caller) -> Result<(), Fault> {
         self.put(&caller.product.to_le_bytes())?;
         self.put(&caller.package.to_le_bytes())?;
         self.put(caller.nonce.bytes())?;
+        self.intent(caller)
+    }
+
+    fn intent(&mut self, caller: &Caller) -> Result<(), Fault> {
         if let Some(previous) = caller.predecessor {
             self.put(&[1])?;
             self.put(&previous.to_le_bytes())?;

@@ -37,7 +37,7 @@ pub(crate) fn begin_at<S: Store>(
 pub(crate) fn begin_reserved<S: Store>(store: &mut S, binding: Binding) -> Result<u64, S::Error> {
     let observed = store.load()?;
     let caller = reservation::matching(&observed.state, binding)?
-        .caller
+        .caller()?
         .clone();
     let request = caller.request(observed.state.owner.as_ref())?;
     begin_observed(store, &observed, binding.sequence, &caller, request)

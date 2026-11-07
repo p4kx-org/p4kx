@@ -109,6 +109,18 @@ try{
         Assert-InstalledRaw $current
         Test-InstalledPayload 'installed'
         $installed=Get-P4kxRawMsiImage $fixture
+        $noop=Invoke-LifecycleMsi @('/i',$Msi) 'feature-noop'
+        Assert-P4kxMsiReservedCleanup $noop.raw_before $noop.raw_after $current
+        $noopLog=Get-Content (Join-Path $logs 'feature-noop.log') -Raw
+        if($noopLog -notmatch 'Component: Application;[^\r\n]*Action: Null' -or
+            $noopLog -notmatch 'Action ended [^\r\n]*P4kxPathCancelNoop\. Return value 1\.' -or
+            $noopLog -match 'Action start [^\r\n]*P4kxPath(?:SealEnsure|SealRemove|Prepare)\.') {throw 'Maintenance did not execute the genuine no-component-action cancellation path.'}
+        $disabled=Invoke-LifecycleMsi @('/fa',$current.product,'DISABLEROLLBACK=1') 'rollback-disabled' 1603
+        Assert-P4kxMsiReservedCleanup $disabled.raw_before $disabled.raw_after $current
+        $disabledLog=Get-Content (Join-Path $logs 'rollback-disabled.log') -Raw
+        if($disabledLog -notmatch 'Action ended [^\r\n]*P4kxRequireRollback\. Return value 3\.' -or
+            $disabledLog -match 'Action start [^\r\n]*P4kxPath(?:SealEnsure|SealRemove|Prepare)\.') {throw 'Rollback-disabled operation was not refused before sealing and prepare.'}
+        Assert-InstalledRaw $current
         Invoke-LifecycleMsi @('/fa',$current.product) 'repair' | Out-Null
         Assert-InstalledRaw $current
         Assert-P4kxRawMsiPathEqual $installed (Get-P4kxRawMsiImage $fixture)

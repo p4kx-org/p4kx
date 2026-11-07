@@ -130,3 +130,92 @@ fn a_winning_cancel_fences_an_already_observed_prepare_without_consuming_path() 
     );
     Ok(())
 }
+
+#[test]
+fn two_neutral_reserves_cannot_replace_each_other_at_the_same_sequence() -> TestResult {
+    let memory = tests::memory(crate::installer::raw_path::RawPath::Absent);
+    let mut winner = tests::memory(memory.state.path.clone());
+    reservation::create(&mut winner, tests::sealing::identity(9)?)?;
+    let expected = winner.state.clone();
+    let mut race = Race {
+        memory,
+        interleave: Some(expected.clone()),
+    };
+    assert_eq!(
+        reservation::create(&mut race, tests::sealing::identity(10)?),
+        Err(Fault::Conflict),
+        "the full snapshot CAS admits exactly one fresh nonce"
+    );
+    assert_eq!(
+        race.memory.state, expected,
+        "the winning neutral reservation is retained"
+    );
+    Ok(())
+}
+
+#[test]
+fn recovery_and_seal_compete_on_the_same_complete_snapshot() -> TestResult {
+    for recovery_wins in [false, true] {
+        let (memory, binding) = tests::sealing::neutral()?;
+        let mut winner = tests::memory(memory.state.path.clone());
+        winner.state = memory.state.clone();
+        let nonce = InvocationNonce::from_bytes([10; 32])?;
+        if recovery_wins {
+            reservation::recover(&mut winner, binding, nonce)?;
+        } else {
+            reservation::seal(&mut winner, binding, tests::sealing::declaration()?)?;
+        }
+        let expected = winner.state.clone();
+        let mut race = Race {
+            memory,
+            interleave: Some(expected.clone()),
+        };
+        let result = if recovery_wins {
+            reservation::seal(&mut race, binding, tests::sealing::declaration()?)
+        } else {
+            reservation::recover(&mut race, binding, nonce).map(|_| ())
+        };
+        assert_eq!(
+            result,
+            Err(Fault::Conflict),
+            "a stale phase transition cannot overwrite the winner"
+        );
+        assert_eq!(
+            race.memory.state, expected,
+            "phase, nonce and full terminal evidence stay together"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_foreign_path_edit_winning_seal_cas_requires_a_fresh_read_without_losing_authority()
+-> TestResult {
+    let (mut memory, binding) = tests::sealing::neutral()?;
+    let foreign = tests::path(
+        "foreign;;A;",
+        crate::installer::raw_path::StringKind::Expandable,
+    );
+    memory.interleave = Some(foreign.clone());
+    assert_eq!(
+        reservation::seal(&mut memory, binding, tests::sealing::declaration()?),
+        Err(Fault::Conflict),
+        "seal compares the complete observed native image"
+    );
+    assert_eq!(
+        memory.state.path, foreign,
+        "legitimate foreign bytes win unchanged"
+    );
+    reservation::seal(&mut memory, binding, tests::sealing::declaration()?)?;
+    transaction::begin_reserved(&mut memory, binding)?;
+    assert_eq!(
+        memory
+            .state
+            .journal
+            .as_ref()
+            .map(|record| &record.before_path),
+        Some(&foreign),
+        "the later prepare snapshots those actual bytes"
+    );
+    Ok(())
+}

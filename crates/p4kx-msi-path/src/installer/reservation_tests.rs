@@ -5,11 +5,14 @@ use crate::installer::arguments::{Invocation, Stage};
 use crate::installer::binding::Binding;
 use crate::installer::bound_phase;
 use crate::installer::caller::{Caller, Goal};
+use crate::installer::declaration::Declaration;
 use crate::installer::fault::Fault;
 use crate::installer::invocation_nonce::InvocationNonce;
 use crate::installer::journal_codec;
 use crate::installer::raw_path::StringKind;
 use crate::installer::reservation;
+use crate::installer::reservation_identity::Identity;
+use crate::installer::state::Store;
 use crate::installer::state::{Phase, Request};
 use crate::installer::tests::{self, Memory, TestResult};
 use crate::installer::transaction;
@@ -24,9 +27,29 @@ pub(super) fn caller(byte: u8) -> Result<Caller, Fault> {
     })
 }
 
+pub(super) fn reserve<S: Store>(store: &mut S, caller: Caller) -> Result<Binding, S::Error> {
+    let identity = Identity {
+        product: caller.product,
+        package: caller.package,
+        nonce: caller.nonce,
+    };
+    let binding = reservation::create(store, identity)?;
+    reservation::seal(
+        store,
+        binding,
+        Declaration {
+            product: caller.product,
+            package: caller.package,
+            predecessor: caller.predecessor,
+            goal: caller.goal,
+        },
+    )?;
+    Ok(binding)
+}
+
 pub(super) fn reserved() -> Result<(Memory, Binding), Fault> {
     let mut memory = tests::memory(tests::path(";A;;", StringKind::Expandable));
-    let binding = reservation::create(&mut memory, caller(9)?)?;
+    let binding = reserve(&mut memory, caller(9)?)?;
     Ok((memory, binding))
 }
 
@@ -35,7 +58,7 @@ fn reservation_keeps_the_complete_owner_terminal_wal_sequence_and_path_unchanged
     let mut memory = tests::memory(tests::path(";;A;;", StringKind::Expandable));
     memory.state = tests::installed(memory.state.path.clone())?;
     let before = memory.state.clone();
-    let binding = reservation::create(&mut memory, caller(9)?)?;
+    let binding = reserve(&mut memory, caller(9)?)?;
     assert_eq!(
         binding.sequence, before.sequence,
         "reserve does not advance the durable receipt"
@@ -94,7 +117,7 @@ fn default_collision_and_foreign_cancel_never_replace_the_original_reservation()
     let (mut memory, binding) = reserved()?;
     let before = memory.state.clone();
     assert_eq!(
-        reservation::create(&mut memory, caller(10)?),
+        reserve(&mut memory, caller(10)?),
         Err(Fault::PendingReservation),
         "a new invocation must not adopt or overwrite a pending reservation"
     );
@@ -132,8 +155,7 @@ fn explicit_recovery_changes_only_nonce_and_rejects_every_old_callback() -> Test
         .reservation
         .as_mut()
         .ok_or("missing reservation")?
-        .caller
-        .nonce = nonce;
+        .set_nonce(nonce);
     let recovered = reservation::recover(&mut memory, binding, nonce)?;
     assert_eq!(
         memory.state, expected,
@@ -199,7 +221,7 @@ fn every_legacy_mutator_is_blocked_while_another_invocation_is_reserved() -> Tes
     let record = memory.state.journal.as_ref().ok_or("missing journal")?;
     let old = record.caller.clone();
     let id = record.id;
-    reservation::create(&mut memory, caller(99)?)?;
+    reserve(&mut memory, caller(99)?)?;
     let before = memory.state.clone();
     assert_eq!(
         transaction::apply(&mut memory, id, &old),
@@ -264,11 +286,11 @@ fn repeated_nonces_and_invalid_reservation_codec_states_fail_closed() -> TestRes
     );
     let mut old = journal_codec::encode(&before)?;
     *old.get_mut(journal_codec::MAGIC.len() - 1)
-        .ok_or("missing version")? = 2;
+        .ok_or("missing version")? = 3;
     assert_eq!(
         journal_codec::decode(&old),
         Err(Fault::CorruptState),
-        "WAL2 bytes cannot be reinterpreted as WAL3"
+        "WAL3 bytes cannot be reinterpreted as WAL4"
     );
     Ok(())
 }

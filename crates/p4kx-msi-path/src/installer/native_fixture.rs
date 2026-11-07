@@ -16,5 +16,5 @@ mod session;
 
 pub use guard::FixtureGuard;
 pub use image::{FixtureImage, FixtureKeys, FixtureValue, KeyPresence};
-pub use inspection::{CoreInspection, CorePhase, FixtureOwner, OwnerClaim};
+pub use inspection::{CoreInspection, CorePhase, FixtureOwner, OwnerClaim, ReservedPhase};
 pub use session::FixtureSession;

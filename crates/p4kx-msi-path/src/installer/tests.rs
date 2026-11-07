@@ -187,3 +187,6 @@ mod bootstrap;
 
 #[path = "cancellation_tests.rs"]
 mod cancellation;
+
+#[path = "sealing_tests.rs"]
+mod sealing;

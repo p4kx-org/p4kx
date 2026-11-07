@@ -10,7 +10,8 @@ use crate::installer::journal_codec;
 use crate::installer::lease::Lease;
 use crate::installer::path_edit::Insertion;
 use crate::installer::raw_path::{self, RawPath, StringKind};
-use crate::installer::reservation::Reservation;
+use crate::installer::reservation::{Plan, Reservation};
+use crate::installer::reservation_identity::Identity;
 use crate::installer::rollback_receipt::{RollbackReceipt, RollbackSource};
 use crate::installer::state::{Journal, Ownership, Phase, Snapshot};
 
@@ -176,9 +177,20 @@ impl<'a> Reader<'a> {
             1 => {}
             _ => return Err(Fault::CorruptState),
         }
+        let base_sequence = u64::from_le_bytes(self.array()?);
+        let identity = Identity {
+            product: u128::from_le_bytes(self.array()?),
+            package: u128::from_le_bytes(self.array()?),
+            nonce: InvocationNonce::from_bytes(self.array()?)?,
+        };
+        let plan = match self.tag()? {
+            0 => Plan::Neutral(identity),
+            1 => Plan::Sealed(self.intent(identity)?),
+            _ => return Err(Fault::CorruptState),
+        };
         Ok(Some(Reservation {
-            base_sequence: u64::from_le_bytes(self.array()?),
-            caller: self.caller()?,
+            base_sequence,
+            plan,
         }))
     }
 
@@ -186,6 +198,14 @@ impl<'a> Reader<'a> {
         let product = u128::from_le_bytes(self.array()?);
         let package = u128::from_le_bytes(self.array()?);
         let nonce = InvocationNonce::from_bytes(self.array()?)?;
+        self.intent(Identity {
+            product,
+            package,
+            nonce,
+        })
+    }
+
+    fn intent(&mut self, identity: Identity) -> Result<Caller, Fault> {
         let predecessor = match self.tag()? {
             0 => None,
             1 => Some(u128::from_le_bytes(self.array()?)),
@@ -197,9 +217,9 @@ impl<'a> Reader<'a> {
             _ => return Err(Fault::CorruptState),
         };
         let caller = Caller {
-            product,
-            package,
-            nonce,
+            product: identity.product,
+            package: identity.package,
+            nonce: identity.nonce,
             predecessor,
             goal,
         };

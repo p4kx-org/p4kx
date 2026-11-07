@@ -129,7 +129,7 @@ aggregate; only the dependent historical upgrade is skipped. The modern lifecycl
 raw-value cases still run after successful ownership cleanup and fixture reset. Unresolved
 ownership aborts further mutation.
 
-One source-bound native helper probe also reserves, prepares and applies a real insertion, adds
+One source-bound native helper probe also reserves an identity, seals the resolved intent, prepares and applies a real insertion, adds
 a controlled foreign prefix, and rolls back with that exact captured binding. The foreign edit
 must survive. The MSI lifecycle itself must execute the production notifier. A separate C#
 message receiver is optional diagnostic infrastructure; neither individual-window delivery nor
@@ -159,3 +159,10 @@ and metadata and assembles SHA-256/SHA3-512 sums. The Linux owner consumes `linu
 the same prepare job and emits the same `release-<target>` interface. Publishing requires all
 twelve packages, twelve SBOMs and four executed native proofs; a Windows-only run cannot publish
 a partial matrix. PR runs prepare artifacts without publication.
+
+MSI transport keeps its single execute AppSearch before CostInitialize. Early Reserve carries only
+ProductCode, actual PackageCode and a fresh nonce; after costing and InstallValidate, Seal binds
+one immutable goal and resolved path before InstallInitialize. All deferred and cleanup callbacks
+use the same captured token. A genuine maintenance component noop cancels Neutral; disabled rollback
+is refused before Seal. A blocked downgrade does not reserve or mutate helper metadata. The native
+consumer validates those paths as part of the existing per-CPU lifecycle, not through a separate test framework.

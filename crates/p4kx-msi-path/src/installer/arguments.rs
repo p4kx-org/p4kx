@@ -9,7 +9,7 @@ use crate::installer::declaration::Declaration;
 use crate::installer::fault::Fault;
 
 pub(crate) const MAX_ARGUMENT_WORDS: usize = 8192;
-const MAX_ARGUMENTS: usize = 6;
+const MAX_ARGUMENTS: usize = 7;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Stage {
@@ -29,7 +29,14 @@ pub(crate) struct Invocation {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Command {
-    Reserve(Declaration),
+    Reserve {
+        product: u128,
+        package: u128,
+    },
+    Seal {
+        binding: Binding,
+        declaration: Declaration,
+    },
     Recover(Binding),
     Transaction(Invocation),
     Notify,
@@ -45,22 +52,27 @@ pub(crate) fn parse(input: impl IntoIterator<Item = Vec<u16>>) -> Result<Command
     }
     match arguments.as_slice() {
         [head] if word(head, "notify") => Ok(Command::Notify),
-        [head, mode, product, package] if word(head, "reserve") && word(mode, "remove") => {
-            reserve(product, package, None)
+        [head, product, package] if word(head, "reserve") => Ok(Command::Reserve {
+            product: argument_identity::code(product)?,
+            package: argument_identity::code(package)?,
+        }),
+        [head, mode, product, package, captured] if word(head, "seal") && word(mode, "remove") => {
+            seal(product, package, captured, None)
         }
-        [head, mode, product, package, predecessor, folder]
-            if word(head, "reserve") && word(mode, "ensure") =>
+        [head, mode, product, package, captured, predecessor, folder]
+            if word(head, "seal") && word(mode, "ensure") =>
         {
-            reserve(product, package, Some((predecessor, folder)))
+            seal(product, package, captured, Some((predecessor, folder)))
         }
         [head, product, package, captured] => bound(head, product, package, captured),
         _ => Err(Fault::InvalidArguments),
     }
 }
 
-fn reserve(
+fn seal(
     product: &[u16],
     package: &[u16],
+    captured: &[u16],
     ensure: Option<(&[u16], &[u16])>,
 ) -> Result<Command, Fault> {
     let (goal, predecessor) = match ensure {
@@ -81,7 +93,10 @@ fn reserve(
         goal,
     };
     declaration.validate()?;
-    Ok(Command::Reserve(declaration))
+    Ok(Command::Seal {
+        binding: captured_binding(product, package, captured)?,
+        declaration,
+    })
 }
 
 fn bound(
@@ -90,12 +105,7 @@ fn bound(
     package: &[u16],
     captured: &[u16],
 ) -> Result<Command, Fault> {
-    let binding = Binding::parse(captured)?;
-    if binding.product != argument_identity::code(product)?
-        || binding.package != argument_identity::code(package)?
-    {
-        return Err(Fault::InvalidIdentity);
-    }
+    let binding = captured_binding(product, package, captured)?;
     if word(head, "recover-reserved") {
         return Ok(Command::Recover(binding));
     }
@@ -103,6 +113,16 @@ fn bound(
         stage: stage(head)?,
         binding,
     }))
+}
+
+fn captured_binding(product: &[u16], package: &[u16], captured: &[u16]) -> Result<Binding, Fault> {
+    let binding = Binding::parse(captured)?;
+    if binding.product != argument_identity::code(product)?
+        || binding.package != argument_identity::code(package)?
+    {
+        return Err(Fault::InvalidIdentity);
+    }
+    Ok(binding)
 }
 
 fn stage(words: &[u16]) -> Result<Stage, Fault> {

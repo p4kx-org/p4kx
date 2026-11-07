@@ -12,7 +12,6 @@ use crate::installer::invocation_nonce::{InvocationNonce, NonceError};
 use crate::installer::journal_codec;
 use crate::installer::notification::{Failure, FailureKind, Report, Stop};
 use crate::installer::raw_path::StringKind;
-use crate::installer::reservation;
 use crate::installer::state::Phase;
 use crate::installer::tests::{self, Memory, TestResult};
 
@@ -56,7 +55,7 @@ fn run(
         && store.state.sequence == expected
         && store.state.reservation.is_none()
     {
-        reservation::create(store, caller.clone()).map_err(DriverError::Store)?;
+        tests::reservation::reserve(store, caller.clone()).map_err(DriverError::Store)?;
     }
     driver::execute(store, request(stage, expected, caller), no_random, || {
         Ok(complete())
@@ -69,7 +68,7 @@ fn phase_boundary_persists_receipt_before_path_and_notifies_only_changes() -> Te
     let mut store = tests::memory(original.clone());
     let caller = caller(1)?;
     let notifications = Cell::new(0);
-    reservation::create(&mut store, caller.clone())?;
+    tests::reservation::reserve(&mut store, caller.clone())?;
     for stage in [Stage::Preflight, Stage::Prepare, Stage::Prepare] {
         driver::execute(&mut store, request(stage, 0, &caller), no_random, || {
             notifications.set(notifications.get() + 1);

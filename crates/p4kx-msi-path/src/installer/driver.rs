@@ -8,6 +8,7 @@ use crate::installer::bound_phase;
 use crate::installer::invocation_nonce::{InvocationNonce, NonceError};
 use crate::installer::notification::{Failure, Report, Stop};
 use crate::installer::reservation;
+use crate::installer::reservation_identity::Identity;
 use crate::installer::state::{PathChange, Store};
 
 #[derive(Debug)]
@@ -59,11 +60,20 @@ pub(crate) fn execute<S: Store>(
         Command::Transaction(invocation) => {
             bound_phase::execute(store, invocation).map_err(DriverError::Store)?
         }
-        Command::Reserve(declaration) => {
-            let caller = declaration
-                .bind(nonce().map_err(DriverError::Random)?)
-                .map_err(|error| DriverError::Store(error.into()))?;
-            reservation::create(store, caller).map_err(DriverError::Store)?;
+        Command::Reserve { product, package } => {
+            let identity = Identity {
+                product,
+                package,
+                nonce: nonce().map_err(DriverError::Random)?,
+            };
+            reservation::create(store, identity).map_err(DriverError::Store)?;
+            PathChange::Unchanged
+        }
+        Command::Seal {
+            binding,
+            declaration,
+        } => {
+            reservation::seal(store, binding, declaration).map_err(DriverError::Store)?;
             PathChange::Unchanged
         }
         Command::Recover(binding) => {

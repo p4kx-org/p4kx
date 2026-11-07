@@ -1,26 +1,25 @@
 $ErrorActionPreference = 'Stop'
 
 function Get-P4kxMsiTransportActions {
-    $active = 'NOT UPGRADINGPRODUCTCODE AND ($Application = 2 OR $Application = 3)'
-    $captured = 'NOT UPGRADINGPRODUCTCODE AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding <> "unbound"'
-    $arguments = '"[ProductCode]" "[P4kxPathPackageCode]" "[P4kxPathCapturedBinding]"'
     return @(
         @{name='P4kxClearCapturedBinding';type=51;source='P4kxPathCapturedBinding';target='unbound';sequence=1;condition='NOT UPGRADINGPRODUCTCODE'},
         @{name='P4kxClearUpgradeDetected';type=51;source='WIX_UPGRADE_DETECTED';target='';sequence=20;condition='NOT UPGRADINGPRODUCTCODE'},
         @{name='P4kxClearDowngradeDetected';type=51;source='WIX_DOWNGRADE_DETECTED';target='';sequence=21;condition='NOT UPGRADINGPRODUCTCODE'},
-        @{name='P4kxRequireRollback';type=19;source='';target='P4KX PATH ownership requires Windows Installer rollback.';sequence=1410;condition="$active AND RollbackDisabled"},
-        @{name='P4kxPathReserveEnsure';type=8194;source='P4kxPathHelper';target='reserve ensure "[ProductCode]" "[P4kxPathPackageCode]" "[WIX_UPGRADE_DETECTED]" "[APPLICATIONFOLDER]."';sequence=1420;condition='NOT UPGRADINGPRODUCTCODE AND $Application = 3'},
-        @{name='P4kxPathReserveRemove';type=8194;source='P4kxPathHelper';target='reserve remove "[ProductCode]" "[P4kxPathPackageCode]"';sequence=1421;condition='NOT UPGRADINGPRODUCTCODE AND $Application = 2'},
-        @{name='P4kxResetBindingSearch';type=51;source='P4KX_PATH_BINDING';target='unbound';sequence=1430;condition=$active},
-        @{name='P4kxCaptureBinding';type=51;source='P4kxPathCapturedBinding';target='[P4KX_PATH_BINDING]';sequence=1450;condition=$active},
-        @{name='P4kxClearBindingSearch';type=51;source='P4KX_PATH_BINDING';target='unbound';sequence=1460;condition=$active},
-        @{name='P4kxPathPreflight';type=8194;source='P4kxPathHelper';target="preflight $arguments";sequence=1470;condition=$active},
-        @{name='P4kxPathRollback';type=9474;source='P4kxPathHelper';target="rollback $arguments";sequence=1530;condition=$active},
-        @{name='P4kxPathPrepare';type=9218;source='P4kxPathHelper';target="prepare $arguments";sequence=6410;condition=$active},
-        @{name='P4kxPathApply';type=9218;source='P4kxPathHelper';target="apply $arguments";sequence=6420;condition=$active},
-        @{name='P4kxPathCommit';type=9730;source='P4kxPathHelper';target="commit $arguments";sequence=6430;condition=$active},
-        @{name='P4kxPathErrorCleanup';type=8194;source='P4kxPathHelper';target="rollback $arguments";sequence=-3;condition=$captured},
-        @{name='P4kxPathCancelCleanup';type=8194;source='P4kxPathHelper';target="rollback $arguments";sequence=-2;condition=$captured}
+        @{name='P4kxPathReserve';type=8194;source='P4kxPathHelper';target='reserve "[ProductCode]" "[P4kxPathPackageCode]"';sequence=200;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED'},
+        @{name='P4kxResetBindingSearch';type=51;source='P4KX_PATH_BINDING';target='unbound';sequence=300;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED'},
+        @{name='P4kxCaptureBinding';type=51;source='P4kxPathCapturedBinding';target='[P4KX_PATH_BINDING]';sequence=410;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED'},
+        @{name='P4kxClearBindingSearch';type=51;source='P4KX_PATH_BINDING';target='unbound';sequence=420;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED'},
+        @{name='P4kxRequireRollback';type=19;source='';target='P4KX PATH ownership requires Windows Installer rollback.';sequence=1410;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND ($Application = 2 OR $Application = 3) AND RollbackDisabled'},
+        @{name='P4kxPathRequireBinding';type=19;source='';target='P4KX PATH invocation binding was not captured.';sequence=1411;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND (NOT P4kxPathCapturedBinding OR P4kxPathCapturedBinding = "unbound")'},
+        @{name='P4kxPathSealEnsure';type=8194;source='P4kxPathHelper';target='seal ensure "[ProductCode]" "[P4kxPathPackageCode]" "[P4kxPathCapturedBinding]" "[WIX_UPGRADE_DETECTED]" "[APPLICATIONFOLDER]."';sequence=1420;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding <> "unbound" AND $Application = 3'},
+        @{name='P4kxPathSealRemove';type=8194;source='P4kxPathHelper';target='seal remove "[ProductCode]" "[P4kxPathPackageCode]" "[P4kxPathCapturedBinding]"';sequence=1421;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding <> "unbound" AND $Application = 2'},
+        @{name='P4kxPathCancelNoop';type=8194;source='P4kxPathHelper';target='cancel-reserved "[ProductCode]" "[P4kxPathPackageCode]" "[P4kxPathCapturedBinding]"';sequence=1430;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding <> "unbound" AND NOT ($Application = 2 OR $Application = 3)'},
+        @{name='P4kxPathRollback';type=9474;source='P4kxPathHelper';target='rollback "[ProductCode]" "[P4kxPathPackageCode]" "[P4kxPathCapturedBinding]"';sequence=1530;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding <> "unbound" AND ($Application = 2 OR $Application = 3)'},
+        @{name='P4kxPathPrepare';type=9218;source='P4kxPathHelper';target='prepare "[ProductCode]" "[P4kxPathPackageCode]" "[P4kxPathCapturedBinding]"';sequence=6410;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding <> "unbound" AND ($Application = 2 OR $Application = 3)'},
+        @{name='P4kxPathApply';type=9218;source='P4kxPathHelper';target='apply "[ProductCode]" "[P4kxPathPackageCode]" "[P4kxPathCapturedBinding]"';sequence=6420;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding <> "unbound" AND ($Application = 2 OR $Application = 3)'},
+        @{name='P4kxPathCommit';type=9730;source='P4kxPathHelper';target='commit "[ProductCode]" "[P4kxPathPackageCode]" "[P4kxPathCapturedBinding]"';sequence=6430;condition='NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding <> "unbound" AND ($Application = 2 OR $Application = 3)'},
+        @{name='P4kxPathErrorCleanup';type=8194;source='P4kxPathHelper';target='rollback "[ProductCode]" "[P4kxPathPackageCode]" "[P4kxPathCapturedBinding]"';sequence=-3;condition='NOT UPGRADINGPRODUCTCODE AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding <> "unbound"'},
+        @{name='P4kxPathCancelCleanup';type=8194;source='P4kxPathHelper';target='rollback "[ProductCode]" "[P4kxPathPackageCode]" "[P4kxPathCapturedBinding]"';sequence=-2;condition='NOT UPGRADINGPRODUCTCODE AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding <> "unbound"'}
     )
 }
 
@@ -108,17 +107,25 @@ function Assert-P4kxMsiTransport {
         if ($sequence.ContainsKey($row[0])) { throw 'MSI contains a duplicate execute action.' }
         $sequence[$row[0]] = [int]$row[2]
     }
-    $active = 'NOT UPGRADINGPRODUCTCODE AND ($Application = 2 OR $Application = 3)'
+    $eligible = 'NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED'
     $search = @($Metadata.execute | Where-Object { $_[0] -ceq 'AppSearch' })
-    if ($search.Count -ne 1 -or [int]$search[0][2] -ne 1440 -or $search[0][1] -cne $active) { throw 'MSI invocation AppSearch is not execute-only after Reserve.' }
-    foreach ($name in @('FindRelatedProducts','InstallValidate','InstallInitialize','RemoveExistingProducts','ProcessComponents','InstallFinalize')) {
+    if ($search.Count -ne 1 -or [int]$search[0][2] -ne 400 -or $search[0][1] -cne $eligible) { throw 'MSI invocation AppSearch is not the one eligible early execute search.' }
+    foreach ($name in @('FindRelatedProducts','CostInitialize','FileCost','CostFinalize','InstallValidate','InstallInitialize','RemoveExistingProducts','ProcessComponents','InstallFinalize')) {
         if (-not $sequence.ContainsKey($name)) { throw "Missing MSI ordering boundary: $name" }
     }
-    if ($sequence.FindRelatedProducts -ne 25 -or $sequence.InstallValidate -ge 1410 -or
-        1470 -ge $sequence.InstallInitialize -or $sequence.InstallInitialize -ge $sequence.RemoveExistingProducts -or
+    if ($sequence.FindRelatedProducts -ne 25 -or $sequence.FindRelatedProducts -ge $sequence.P4kxPathReserve -or
+        $sequence.P4kxClearBindingSearch -ge $sequence.CostInitialize -or $sequence.CostInitialize -ge $sequence.FileCost -or
+        $sequence.FileCost -ge $sequence.CostFinalize -or $sequence.CostFinalize -ge $sequence.InstallValidate -or
+        $sequence.InstallValidate -ge $sequence.P4kxRequireRollback -or $sequence.P4kxPathCancelNoop -ge $sequence.InstallInitialize -or
+        $sequence.InstallInitialize -ge $sequence.RemoveExistingProducts -or
         $sequence.RemoveExistingProducts -ge 1530 -or 1530 -ge $sequence.ProcessComponents -or
         6430 -ge $sequence.InstallFinalize -or ($sequence.ContainsKey('InstallExecute') -and 6430 -ge $sequence.InstallExecute)) {
-        throw 'MSI helper reservation, transactional removal, rollback or deferred phase order differs.'
+        throw 'MSI neutral search, post-cost seal, transactional removal or deferred phase order differs.'
+    }
+    foreach ($row in $Metadata.execute) {
+        if ([int]$row[2] -gt 0 -and [int]$row[2] -lt $sequence.CostFinalize -and [string]$row[1] -match '[?&$!]Application') {
+            throw 'MSI reads an Application state before costing.'
+        }
     }
     if ($sequence.ContainsKey('MigrateFeatureStates') -and $sequence.FindRelatedProducts -ge $sequence.MigrateFeatureStates) {
         throw 'Fresh related-product detection must precede feature-state migration.'

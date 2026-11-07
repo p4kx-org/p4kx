@@ -86,7 +86,8 @@ function Invoke-P4kxPortalProcess {
     }
     if($Executable -ceq 'helper'){
         switch -CaseSensitive ($phase){
-            reserve {$script:state.core.reserved_binding=$script:binding}
+            reserve {$script:state.core.reserved_binding=$script:binding;$script:state.core.reservation_phase='neutral'}
+            seal {$script:state.core.reservation_phase='sealed'}
             prepare {$script:state.core.reserved_binding=$null;$script:state.core.journal_binding=$script:binding;$script:state.core.phase='prepared'}
             apply {Set-TestInstalled}
             rollback {
@@ -137,7 +138,7 @@ function Assert-UnknownOutcome($Caught,[string]$Label){
         Assert-Test ($script:fixture.interrupted -and $script:after.Count -eq 0) "$Label allowed another mutation after unproven completion."
     }
 }
-foreach($phase in @('reserve','prepare','apply','rollback')){
+foreach($phase in @('reserve','seal','prepare','apply','rollback')){
     Reset-Test helper $phase
     $caught=$null;try{Invoke-P4kxMsiForeignEditProbe $script:context $script:fixture $script:originalImage|Out-Null}catch{$caught=$_.Exception}
     Assert-UnknownOutcome $caught "helper-$phase"
