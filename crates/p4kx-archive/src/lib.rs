@@ -20,10 +20,13 @@ mod decode;
 mod decrypt;
 mod directory_v2;
 mod directory_v2_trailer;
+mod dos_calendar;
+mod dos_timestamp;
 mod effective_encoding;
 mod end_records;
 mod entry;
 mod entry_decoder;
+mod entry_metadata;
 mod entry_reader;
 mod error;
 mod file_source;
@@ -48,8 +51,11 @@ pub use container::{
     MAX_COMPRESSION_RATIO, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN,
 };
 pub use data_error::DataError;
+pub use dos_calendar::DosCalendar;
+pub use dos_timestamp::DosTimestamp;
 pub use effective_encoding::EffectiveEncoding;
 pub use entry::Entry;
+pub use entry_metadata::EntryMetadata;
 pub use entry_reader::EntryReader;
 pub use error::ArchiveError;
 pub use hasher::ChecksumHasher;
