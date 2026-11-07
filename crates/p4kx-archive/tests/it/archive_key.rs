@@ -7,7 +7,7 @@ use std::error::Error;
 use std::io::Read;
 use std::path::Path;
 
-use p4kx_archive::{Archive, ArchiveError, Entry, KeyCheck};
+use p4kx_archive::{Archive, ArchiveError, Entry, KeyCheck, KeyDemandSnapshot};
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry, other_test_key, test_key};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -258,5 +258,87 @@ fn containers_share_the_key_of_their_archive() -> TestResult {
     container.set_key(test_key());
     assert!(archive.has_key(), "the container shares the key slot");
     assert_eq!(container.entries().len(), 1, "container listing");
+    Ok(())
+}
+
+#[test]
+fn the_key_demand_counts_distinct_entries_and_resets_nothing() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let builder =
+        builder().entry(TestEntry::stored("Data\\other.xml", b"<o/>".to_vec()).encrypted());
+    let archive = open(dir.path(), &builder)?;
+    let demand = archive.key_demand();
+    assert_eq!(
+        demand.snapshot(),
+        KeyDemandSnapshot::default(),
+        "nothing yet"
+    );
+
+    assert!(read(&archive, "Data\\plain.xml").is_ok(), "unencrypted");
+    assert!(read(&archive, "Data\\secret.xml").is_err(), "no key");
+    assert!(read(&archive, "Data\\secret.xml").is_err(), "again");
+    assert!(read(&archive, "Data\\other.xml").is_err(), "a second Entry");
+    assert!(archive.take_key_request(), "the one-shot flag is separate");
+
+    let seen = demand.snapshot();
+    assert_eq!(seen.missing, 2, "distinct Entries");
+    assert_eq!(seen.wrong, 0, "no wrong key");
+    assert_eq!(seen.unread(), 2, "total");
+    assert_eq!(
+        seen.first_missing.as_deref(),
+        Some("Data\\secret.xml"),
+        "first asked"
+    );
+    assert_eq!(
+        archive.key_demand().snapshot(),
+        seen,
+        "every handle shares it"
+    );
+
+    archive.set_key(test_key());
+    assert!(read(&archive, "Data\\secret.xml").is_ok(), "right key");
+    assert_eq!(demand.snapshot(), seen, "setting a key resets nothing");
+    Ok(())
+}
+
+#[test]
+fn the_key_demand_counts_entries_a_wrong_key_did_not_open() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = open(dir.path(), &builder())?;
+    archive.set_key(other_test_key());
+
+    assert!(read(&archive, "Data\\secret.xml").is_err(), "wrong key");
+    assert!(
+        read(&archive, "Data\\secret.xml").is_err(),
+        "wrong key again"
+    );
+
+    let seen = archive.key_demand().snapshot();
+    assert_eq!((seen.missing, seen.wrong), (0, 1), "one Entry, wrong key");
+    assert_eq!(
+        seen.first_wrong.as_deref(),
+        Some("Data\\secret.xml"),
+        "its path"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_key_demand_is_shared_with_containers() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let room = TestContainer::new().entry(TestEntry::stored("room.xml", b"<Room/>".to_vec()));
+    let builder = builder().entry(TestEntry::deflated(SOCPAK, room.build()).encrypted());
+    let archive = open(dir.path(), &builder)?;
+
+    assert!(
+        archive.open_container(find(&archive, SOCPAK)?).is_err(),
+        "no key"
+    );
+
+    assert_eq!(
+        archive.key_demand().snapshot().missing,
+        1,
+        "counted on the Archive"
+    );
     Ok(())
 }

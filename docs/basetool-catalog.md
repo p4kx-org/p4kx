@@ -150,6 +150,8 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `source.build.publicPatch` | The public patch version, e.g. `4.7.2`, from the RSI Launcher log line `SC <CHANNEL> <version>-<tag>.<change>` (`<version>`: two or three dot-separated numbers, kept as logged) whose change equals `changeNumber`; `null` when the log has no such line (never guessed from a neighbouring one) |
 | `source.archiveSize` | The size of the Archive file in bytes |
 | `source.archiveModified` | The modification time of the Archive file, UTC in RFC 3339 form |
+| `source.archiveKey` | Whether the Archive key was there for the encrypted Entries the export read: `given`, `missing` (no key was set) or `wrong` (the key did not fit). Without a usable key the file is valid but incomplete: vehicle implementations, XML Loadouts, shop inventories and the like are absent |
+| `source.encryptedEntriesUnread` | How many distinct encrypted Entries the export asked for and could not read because the key was missing or wrong; `0` when none was needed ([ADR-0353](adr/0353-exports-state-whether-the-archive-key-was-there.md)) |
 | `source.toolVersion` | The version of P4KX that wrote the catalog |
 | `source.exportedAt` | When the catalog was written, UTC in RFC 3339 form |
 | `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "…"}` when a Filter selected the Records |

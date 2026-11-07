@@ -406,6 +406,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   mode in the file and CLI status, and still exits with 1 when incomplete. Each invocation must
   request that permission; a healthy Filter-scoped export needs none. A consumer must check
   `exportHealth` and selection scope before treating missing rows as removals.
+  The `source` block states `archiveKey` (`given`, `missing` or `wrong`) and
+  `encryptedEntriesUnread`, the encrypted Entries the export could not read without a usable key.
   `p4kx catalog schema` prints the catalog's JSON Schema.
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship
@@ -680,7 +682,11 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   and the shell history. `p4kx key show` shows the stored key and the one in use with all but
   the last four digits hidden, `p4kx key remove` deletes the stored key. The key never appears in
   logs, error messages or JSON. `--key-file` (or `P4KX_KEY_FILE`) names another file for the stored
-  key, for the command line, the window and the MCP server alike.
+  key, for the command line, the window and the MCP server alike. A command that asked for
+  encrypted Entries it could not read for want of a key, or with a key that does not fit, prints
+  one note on stderr after it ran (the cause, the number of Entries, the first one and how to give
+  the key); its exit code does not change. `catalog` and `ships` also state it in `source`
+  (`archiveKey`, `encryptedEntriesUnread`).
 - `P4KX_FOLDERS_ROOT` selects an absolute root for separate `config`, `cache` and `data`
   application folders on every platform. An explicitly empty or relative root has no profile
   fallback. [Profile folders](profile-folders.md) documents paths and key-file precedence.

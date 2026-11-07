@@ -60,6 +60,7 @@ mod action_map;
 #[cfg(test)]
 mod action_map_tests;
 mod action_map_write;
+mod archive_key_use;
 mod blueprint;
 mod blueprint_category;
 mod broker_entry;
@@ -340,6 +341,7 @@ pub use action_map::{
     parse_action_maps, read_action_maps,
 };
 pub use action_map_write::{ActionMapCounts, ActionMapFormat, write_action_maps};
+pub use archive_key_use::{ArchiveKeyState, ArchiveKeyUse};
 pub use build::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
 pub use catalog_file::CatalogFile;
 pub use catalog_output::{Compression, ZSTD_LEVEL, ZSTD_WINDOW_LOG};

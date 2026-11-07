@@ -298,6 +298,9 @@ fn the_source_names_channel_build_archive_tool_and_export_time() -> TestResult {
         "tool version"
     );
     assert_eq!(source["exportedAt"], "2026-10-14T17:46:40Z", "export time");
+    assert_eq!(source["archiveKey"], "given", "key");
+    assert_eq!(source["encryptedEntriesUnread"], 0, "nothing unread");
+    assert_eq!(built.summary().archive_key().entries_unread(), 0, "summary");
     assert_eq!(
         built.summary().size(),
         u64::try_from(built.json().len())?,

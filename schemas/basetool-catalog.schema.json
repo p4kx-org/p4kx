@@ -187,6 +187,24 @@
       ],
       "type": "object"
     },
+    "ArchiveKeyState": {
+      "description": "Whether the Archive key was there for the encrypted Entries an export asked for.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "A key was set and no encrypted Entry failed because it did not fit.",
+          "value": "given"
+        },
+        {
+          "description": "No key was set; every encrypted Entry that was asked for is missing from the result.",
+          "value": "missing"
+        },
+        {
+          "description": "A key was set and did not fit; the encrypted Entries that were asked for are missing from\nthe result.",
+          "value": "wrong"
+        }
+      ]
+    },
     "AreaModifier": {
       "description": "One modifier of an area.",
       "properties": {
@@ -16201,6 +16219,10 @@
     "Source": {
       "description": "Where a catalog came from.",
       "properties": {
+        "archiveKey": {
+          "$ref": "#/$defs/ArchiveKeyState",
+          "description": "Whether the Archive key was there for the encrypted Entries the export read: `given`,\n`missing` (no key was set) or `wrong` (the key did not fit). Without a usable key the file\nis valid but incomplete: vehicle implementations, XML Loadouts, shop inventories and the\nlike are absent."
+        },
         "archiveModified": {
           "description": "The modification time of the Archive file, UTC in RFC 3339 form, `null` when unknown.",
           "type": [
@@ -16232,6 +16254,12 @@
             "null"
           ]
         },
+        "encryptedEntriesUnread": {
+          "description": "How many distinct encrypted Entries the export asked for and could not read because the key\nwas missing or wrong; `0` when none was needed or all were read.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "exportedAt": {
           "description": "When the catalog was written, UTC in RFC 3339 form.",
           "type": "string"
@@ -16242,10 +16270,12 @@
         }
       },
       "required": [
+        "archiveKey",
         "archiveModified",
         "archiveSize",
         "build",
         "channel",
+        "encryptedEntriesUnread",
         "exportedAt",
         "toolVersion"
       ],

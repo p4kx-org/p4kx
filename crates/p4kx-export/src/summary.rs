@@ -191,6 +191,7 @@ pub struct CatalogSummary {
     pub(crate) warnings: Vec<CraftingWarning>,
     pub(crate) size: u64,
     pub(crate) compressed_size: Option<u64>,
+    pub(crate) archive_key: crate::ArchiveKeyUse,
 }
 
 impl CatalogSummary {

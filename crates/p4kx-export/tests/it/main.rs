@@ -122,6 +122,7 @@ mod scoped_location_links;
 mod scoped_location_variants;
 mod ship_base;
 mod ship_base_fixture;
+mod ship_base_key;
 mod ship_followups;
 mod ship_followups_fixture;
 mod shop_items_fixture;

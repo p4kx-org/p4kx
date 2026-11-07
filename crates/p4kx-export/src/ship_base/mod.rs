@@ -24,6 +24,7 @@ use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Filter, Record};
 use rayon::prelude::*;
 use serde_json::Value;
 
+use crate::ArchiveKeyUse;
 use crate::build::source;
 use crate::guid_text::CatalogGuid;
 use crate::{CatalogFailure, CatalogPhase, CatalogProgress};
@@ -89,6 +90,7 @@ pub struct BuiltShipBase {
     failures: Vec<CatalogFailure>,
     skipped: usize,
     source: Value,
+    pub(crate) archive_key: ArchiveKeyUse,
     filter: Option<String>,
 }
 
@@ -192,13 +194,19 @@ pub fn build_ship_base_from(
     }
     ships.sort_by_key(|ship| CatalogGuid(ship.guid).text());
     failures.sort_by(|a, b| a.record_path.cmp(&b.record_path).then(a.guid.cmp(&b.guid)));
-    let source =
-        serde_json::to_value(source(archive, options.exported_at, options.public_patches))?;
+    let archive_key = ArchiveKeyUse::of(archive);
+    let source = serde_json::to_value(source(
+        archive,
+        options.exported_at,
+        options.public_patches,
+        archive_key,
+    ))?;
     Ok(BuiltShipBase {
         ships,
         failures,
         skipped: selection.skipped,
         source,
+        archive_key,
         filter: options.filter.map(|filter| filter.as_str().to_owned()),
     })
 }

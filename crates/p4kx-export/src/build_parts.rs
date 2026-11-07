@@ -24,6 +24,7 @@ pub(super) struct Parts {
     pub(super) quantizations: crate::QuantizationSummary,
     pub(super) failures: Vec<CatalogFailure>,
     pub(super) warnings: Vec<CraftingWarning>,
+    pub(super) archive_key: crate::ArchiveKeyUse,
 }
 
 impl Parts {
@@ -45,6 +46,7 @@ impl Parts {
             quantizations: self.quantizations,
             failures: self.failures,
             warnings: self.warnings,
+            archive_key: self.archive_key,
             size,
             compressed_size,
         }

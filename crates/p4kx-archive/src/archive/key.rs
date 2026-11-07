@@ -7,7 +7,7 @@ use p4kx_foundation::ArchiveKey;
 
 use super::Archive;
 use crate::key_check::{self, Verdict};
-use crate::{ArchiveError, Entry, KeyCheck, OpenOptions};
+use crate::{ArchiveError, Entry, KeyCheck, KeyDemand, OpenOptions};
 
 impl Archive {
     /// Opens the Archive at `path` like [`Archive::open`] and sets `key`, when given, as the key
@@ -51,6 +51,15 @@ impl Archive {
     #[must_use]
     pub fn take_key_request(&self) -> bool {
         self.key.take_wanted()
+    }
+
+    /// Returns the handle to the record of the encrypted Entries that were asked for without a key,
+    /// or with one that does not fit; unlike [`Archive::take_key_request`] reading it resets nothing.
+    ///
+    /// Opening an Entry or a container records it; [`Archive::check_key`] does not.
+    #[must_use]
+    pub fn key_demand(&self) -> KeyDemand {
+        self.key.demand().clone()
     }
 
     /// Checks the key that is set, which is [`KeyCheck::Unchecked`] when none is.
@@ -109,8 +118,19 @@ impl Archive {
         }
     }
 
-    /// Returns the key to decrypt `entry` with, `None` for an unencrypted Entry.
+    /// Returns the key to decrypt `entry` with, `None` for an unencrypted Entry, and records the
+    /// Entry in the key demand when no key fits.
     pub(super) fn key_for(&self, entry: &Entry) -> Result<Option<ArchiveKey>, ArchiveError> {
+        let key = self.resolve_key(entry);
+        match &key {
+            Err(ArchiveError::KeyRequired { .. }) => self.key.demand().record_missing(&entry.path),
+            Err(ArchiveError::WrongKey { .. }) => self.key.demand().record_wrong(&entry.path),
+            _ => {}
+        }
+        key
+    }
+
+    fn resolve_key(&self, entry: &Entry) -> Result<Option<ArchiveKey>, ArchiveError> {
         if !entry.encrypted {
             return Ok(None);
         }

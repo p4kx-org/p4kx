@@ -1129,12 +1129,17 @@ health and diagnostic lists are omitted. The complete health object is identical
 
 ```json
 {"archive": "Data.p4k", "out": "diagnostic.json.zst", "schema_version": 3,
+ "archive_key": "missing", "encrypted_entries_unread": 412,
  "export_health": {"status": "incomplete", "read": "incomplete",
    "projection": "complete", "publicationMode": "diagnosticPartial"},
  "size": 12345, "compressed_size": 2345,
  "failed": [{"guid": "90000000-0000-4000-8000-000000000009",
    "path": "libs/foundry/records/crafting/blueprints/crafting/broken", "error": "source read failed"}]}
 ```
+
+`archive_key` is `given`, `missing` or `wrong` and `encrypted_entries_unread` counts the distinct
+encrypted Entries the export could not read for want of a usable Archive key, as in the catalog's
+`source`; the same count is printed as a note on stderr, and neither changes the exit code.
 
 `quantizations` counts two facts of the game data that do not affect the exit code: `unused`, the
 quality quantizations of the catalog that no `ResourceType` uses, and `unresolved_links`, the links

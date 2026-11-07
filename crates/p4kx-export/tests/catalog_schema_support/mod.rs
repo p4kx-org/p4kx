@@ -32,6 +32,8 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "build": null,
             "archiveSize": 0,
             "archiveModified": null,
+            "archiveKey": "given",
+            "encryptedEntriesUnread": 0,
             "toolVersion": "0.1.0",
             "exportedAt": "2026-10-18T00:00:00Z"
         },
