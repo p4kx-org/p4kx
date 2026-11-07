@@ -27,11 +27,13 @@ mod dataforge_convert;
 mod dataforge_file;
 mod dataforge_pick;
 mod dataforge_source;
+mod decimal_u64;
 mod dependent;
 mod disk_case;
 mod entry_content;
 mod entry_metadata_info;
 mod entry_path;
+mod entry_record_format_info;
 mod entry_tree;
 mod exclusion;
 mod extract;
@@ -118,6 +120,7 @@ mod watch;
 mod write;
 mod write_compare;
 mod written_paths;
+mod zip_header_info;
 
 pub use animation_listing::AnimationListing;
 pub use animation_set::{
@@ -134,11 +137,13 @@ pub use coverage::{
 pub use dataforge::{DATAFORGE_ENTRIES, DataForgeEntry, DataForgeLoadError, MAX_DATAFORGE_SIZE};
 pub use dataforge_file::is_dataforge_file;
 pub use dataforge_source::DataForgeSource;
+pub use decimal_u64::DecimalU64;
 pub use entry_content::{
     EntryBytes, EntryReadError, EntryText, MIN_TEXT_LEN, TextEncoding, find_entry, read_bytes,
     read_text,
 };
 pub use entry_metadata_info::{DosCalendarInfo, DosTimestampInfo, EntryMetadataInfo};
+pub use entry_record_format_info::EntryRecordFormatInfo;
 pub use entry_tree::{EntryTree, Folder, FolderId};
 pub use exclusion::{Exclusion, LeftOut, MAX_EXCLUSIONS};
 pub use extract::extract;
@@ -167,9 +172,9 @@ pub use owned_output_failure::owned_output_failure;
 pub use p4kx_archive::{
     Archive, ArchiveError, Build, BuildError, Checksum, Compression, DemandScope, DosCalendar,
     DosTimestamp, EffectiveEncoding, Entry, EntryIssue, EntryMetadata, EntryReader,
-    InstallationStatus, KeyCheck, KeyDemand, KeyDemandSnapshot, MAX_COMPRESSION_RATIO,
-    MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN, MAX_RECOVERED_ENTRIES,
-    MAX_RECOVERY_SCAN, OpenOptions, UnreadEntries,
+    EntryRecordFormat, InstallationStatus, KeyCheck, KeyDemand, KeyDemandSnapshot,
+    MAX_COMPRESSION_RATIO, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN,
+    MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN, OpenOptions, UnreadEntries, ZipHeaderMetadata,
 };
 pub use p4kx_audio::{
     ActionTarget, BankError, BankHeader, BankWarning, Container, ContainerKind, EmbeddedWem,
@@ -265,3 +270,4 @@ pub use ui_screen_texts::ScreenTexts;
 pub use ui_svg::UiSvg;
 pub use verify::{VerificationReport, VerifyOptions, verify};
 pub use watch::{ArchiveChanged, ArchiveWatch, DEFAULT_WATCH_INTERVAL, FileStamp};
+pub use zip_header_info::ZipHeaderInfo;

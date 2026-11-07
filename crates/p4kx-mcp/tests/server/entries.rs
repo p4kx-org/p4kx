@@ -6,6 +6,18 @@ use serde_json::{Value, json};
 
 use crate::support::{Install, Server, TestResult};
 
+fn metadata(owner: usize, method: u16) -> Value {
+    json!({
+        "owner_entry_index": owner, "original_directory_ordinal": owner.to_string(),
+        "dos_timestamp": {"raw_date": 0, "raw_time": 0, "calendar": {"state": "invalid"}},
+        "record_format": "zip_central_directory", "raw_compression_method": method,
+        "zip_header": {"raw_version_made_by": 45, "raw_version_needed": 45,
+            "general_purpose_flags": 0, "disk_start": 65535,
+            "internal_attributes": 0, "external_attributes": 0},
+        "raw_v2_encryption_word": null
+    })
+}
+
 fn paths(items: &Value) -> Vec<String> {
     items
         .as_array()
@@ -55,7 +67,8 @@ fn the_top_level_lists_folders_then_entries() -> TestResult {
                     "compression": top["items"][1]["compression"],
                     "encrypted": false,
                     "compressed_size": 5,
-                    "size": 5
+                    "size": 5,
+                    "metadata": metadata(5, 0)
                 }
             ]
         }),
@@ -180,14 +193,16 @@ fn search_follows_the_filter_rules() -> TestResult {
                     "compression": glob["entries"][0]["compression"],
                     "encrypted": false,
                     "compressed_size": 4,
-                    "size": 4
+                    "size": 4,
+                    "metadata": metadata(0, 0)
                 },
                 {
                     "path": "Data/Libs/Config/b.xml",
                     "compression": glob["entries"][1]["compression"],
                     "encrypted": false,
                     "compressed_size": glob["entries"][1]["compressed_size"],
-                    "size": 80
+                    "size": 80,
+                    "metadata": metadata(1, 8)
                 }
             ]
         }),

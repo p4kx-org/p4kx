@@ -16,11 +16,11 @@ pub struct ArchiveProvider;
 
 impl Provider for ArchiveProvider {
     fn capability(&self) -> Capability {
-        Capability { kind: MediaKind::Archive, id: "p4kx.archive.public-metadata".into(), version: "1.1.0".into(),
+        Capability { kind: MediaKind::Archive, id: "p4kx.archive.public-metadata".into(), version: "1.2.0".into(),
             availability: Availability::Available,
             preservation: "exact decoded selected Entry payloads; root Archive layout bytes are not retained".into(),
             field_groups: vec![
-                FieldGroup { name: "public-entry-metadata".into(), projected: true, scope: "physical index, display path, available raw path bytes, sizes, declared checksum, compression, encryption, installed bytes, original DOS words and timezone-free calendar status".into() },
+                FieldGroup { name: "public-entry-metadata".into(), projected: true, scope: "physical index, display path, available raw path bytes, sizes, declared checksum, compression, encryption, installed bytes, original DOS words, timezone-free calendar status, source record format, original directory ordinal and fixed header words".into() },
                 FieldGroup { name: "root-build".into(), projected: true, scope: "adjacent public launcher Build declaration, without inferred values".into() },
                 FieldGroup { name: "raw-archive-layout".into(), projected: false, scope: "directory layout, signatures and unknown root bytes require a separate raw-layout reader".into() },
             ] }

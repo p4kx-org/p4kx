@@ -72,6 +72,15 @@
       ],
       "type": "object"
     },
+    "DecimalU64": {
+      "description": "Canonical unsigned 64-bit decimal text, from 0 through 18446744073709551615.",
+      "maxLength": 20,
+      "not": {
+        "pattern": "[^0-9]"
+      },
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|1844674407370955[0-0][0-9]{3}|18446744073709551[0-5][0-9]{2}|184467440737095516[0-0][0-9]{1}|1844674407370955161[0-4][0-9]{0}|18446744073709551615)$",
+      "type": "string"
+    },
     "Digest": {
       "description": "An explicitly scoped integrity value.",
       "properties": {
@@ -205,25 +214,133 @@
       "type": "object"
     },
     "EntryMetadataInfo": {
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "record_format": {
+                "const": "zip_central_directory"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "raw_v2_encryption_word": {
+                "type": "null"
+              },
+              "zip_header": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "record_format": {
+                "const": "p4k_v2"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "raw_v2_encryption_word": {
+                "type": "integer"
+              },
+              "zip_header": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
       "description": "Shared encoded directory metadata of one physical admitted Entry.",
       "properties": {
         "dos_timestamp": {
           "$ref": "#/$defs/DosTimestampInfo",
           "description": "Exact source words and their separate calendar interpretation."
         },
+        "original_directory_ordinal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original directory position before admission, unavailable for recovery-scanned headers."
+        },
         "owner_entry_index": {
           "description": "Index in the immediately owning Archive, not a grouped texture's aggregate identity.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "raw_compression_method": {
+          "description": "Unmodified unsigned compression-method word.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "raw_v2_encryption_word": {
+          "description": "Raw v2 encryption word, explicitly absent on ZIP records.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "record_format": {
+          "$ref": "#/$defs/EntryRecordFormatInfo",
+          "description": "Physical directory-record format, independent of decoder selection."
+        },
+        "zip_header": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ZipHeaderInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Fixed ZIP words, explicitly absent on v2 records."
         }
       },
       "required": [
         "owner_entry_index",
-        "dos_timestamp"
+        "dos_timestamp",
+        "record_format",
+        "original_directory_ordinal",
+        "raw_compression_method",
+        "zip_header",
+        "raw_v2_encryption_word"
       ],
       "title": "EntryMetadataInfo",
       "type": "object"
+    },
+    "EntryRecordFormatInfo": {
+      "description": "Directory-record format reported by the owning Archive reader.",
+      "oneOf": [
+        {
+          "const": "zip_central_directory",
+          "description": "A ZIP central-directory record, including P4K v1.",
+          "type": "string"
+        },
+        {
+          "const": "p4k_v2",
+          "description": "A fixed P4K v2 directory record.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "A reader format whose interpretation this projection does not know.",
+          "type": "string"
+        }
+      ]
     },
     "Identity": {
       "description": "Identity that remains distinct for duplicate names and nested containers.",
@@ -1521,6 +1638,62 @@
           "type": "string"
         }
       ]
+    },
+    "ZipHeaderInfo": {
+      "description": "Lossless fixed ZIP directory words without interpreting their flags or host system.",
+      "properties": {
+        "disk_start": {
+          "description": "Original disk-start word, including a possible ZIP64 marker.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "external_attributes": {
+          "description": "All external-attribute bits without host-specific decoding.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "general_purpose_flags": {
+          "description": "All source general-purpose flag bits.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "internal_attributes": {
+          "description": "All internal-attribute bits.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "raw_version_made_by": {
+          "description": "Complete version-made-by word, including the host-system byte.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "raw_version_needed": {
+          "description": "Complete version-needed word.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "raw_version_made_by",
+        "raw_version_needed",
+        "general_purpose_flags",
+        "disk_start",
+        "internal_attributes",
+        "external_attributes"
+      ],
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

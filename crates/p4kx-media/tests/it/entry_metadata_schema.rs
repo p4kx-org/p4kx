@@ -51,7 +51,14 @@ fn archive_provider_exports_directory_words_for_each_physical_entry() -> TestRes
             actual,
             &json!({
                 "owner_entry_index": index,
-                "dos_timestamp": {"raw_date": 0, "raw_time": 0, "calendar": {"state": "invalid"}}
+                "dos_timestamp": {"raw_date": 0, "raw_time": 0, "calendar": {"state": "invalid"}},
+                "record_format": "zip_central_directory",
+                "original_directory_ordinal": index.to_string(),
+                "raw_compression_method": if index == 1 { 100 } else { 0 },
+                "zip_header": {"raw_version_made_by": 45, "raw_version_needed": 45,
+                    "general_purpose_flags": 0, "disk_start": 65535,
+                    "internal_attributes": 0, "external_attributes": 0},
+                "raw_v2_encryption_word": null
             }),
             "raw zero timestamp words remain distinct from missing metadata and calendar defaults"
         );
@@ -78,6 +85,12 @@ fn archive_record() -> Result<Value, Box<dyn std::error::Error>> {
 fn valid_metadata(second: u16) -> Value {
     json!({
         "owner_entry_index": 0,
+        "record_format": "zip_central_directory", "original_directory_ordinal": "0",
+        "raw_compression_method": 0,
+        "zip_header": {"raw_version_made_by": 45, "raw_version_needed": 45,
+            "general_purpose_flags": 0, "disk_start": 65535,
+            "internal_attributes": 0, "external_attributes": 0},
+        "raw_v2_encryption_word": null,
         "dos_timestamp": {
             "raw_date": 0x285d_u16,
             "raw_time": 0xbf60_u16 + second / 2,
@@ -118,7 +131,13 @@ fn timestamp_schema_enforces_even_seconds_and_complete_unsigned_source_words() -
     for word in [0_u16, u16::MAX] {
         let invalid_calendar = json!({
             "owner_entry_index": 0,
-            "dos_timestamp": {"raw_date": word, "raw_time": word, "calendar": {"state": "invalid"}}
+            "dos_timestamp": {"raw_date": word, "raw_time": word, "calendar": {"state": "invalid"}},
+            "record_format": "zip_central_directory", "original_directory_ordinal": null,
+            "raw_compression_method": 0,
+            "zip_header": {"raw_version_made_by": 45, "raw_version_needed": 45,
+                "general_purpose_flags": 0, "disk_start": 65535,
+                "internal_attributes": 0, "external_attributes": 0},
+            "raw_v2_encryption_word": null
         });
         assert!(
             validator.is_valid(&invalid_calendar),

@@ -2,12 +2,38 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fs;
+use std::path::Path;
 
 use p4kx_extraction::{Archive, OpenOptions};
-use p4kx_media::{ExportOptions, ExportOutcome};
+use p4kx_media::{ExportOptions, ExportOutcome, Index};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use super::support::TestResult;
+
+fn assert_recovered_metadata(diagnostic: &Path, index: &Index) -> TestResult {
+    let diagnostic_root = diagnostic
+        .parent()
+        .ok_or("diagnostic generation directory")?;
+    let rows = super::support::records(diagnostic_root, index, "archive.jsonl")?;
+    let entry = rows
+        .iter()
+        .find(|row| row.subresource.namespace == "archive-entry")
+        .ok_or("recovered Entry record")?;
+    assert_eq!(
+        entry.data.pointer("/metadata/original_directory_ordinal"),
+        Some(&serde_json::Value::Null),
+        "a recovered admitted index does not invent an original directory position"
+    );
+    assert_eq!(
+        entry
+            .data
+            .pointer("/metadata/owner_entry_index")
+            .and_then(serde_json::Value::as_u64),
+        Some(0),
+        "physical owner remains known"
+    );
+    Ok(())
+}
 
 #[test]
 fn a_recovered_inventory_never_becomes_a_complete_root_manifest() -> TestResult {
@@ -53,6 +79,7 @@ fn a_recovered_inventory_never_becomes_a_complete_root_manifest() -> TestResult 
             .any(|issue| issue.code == "p4kx.archive.recovered-directory")
     );
     assert!(diagnostic.is_file());
+    assert_recovered_metadata(&diagnostic, &index)?;
     assert!(
         !output.join("media-index.json").exists(),
         "recovered inventory has no complete commit point"

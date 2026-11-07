@@ -56,10 +56,12 @@ These facts do not change compression selection, the CIG encryption-block policy
 v2 nonzero-encryption interpretation, Entry issues, checksum verification,
 installation flags or installed-byte progress. Local-header words, signatures,
 ordered extra blocks and complete layout/range metadata are separate field groups.
+
 ## Shared export representation
 
-`p4kx-extraction::EntryMetadataInfo::of(entry)` encodes directory timestamp facts
-for frontends; the additional fixed fields above remain reader APIs.
+`p4kx-extraction::EntryMetadataInfo::of(entry)` encodes the same directory facts
+for frontends. CLI `list`, `search` and `socpak list` attach this object at
+`metadata`; MCP `list_entries` and `search_entries` use the identical object.
 The Archive media provider writes that same object at `data.metadata` on each
 `archive-entry` record in `archive.jsonl`:
 
@@ -70,11 +72,29 @@ The Archive media provider writes that same object at `data.metadata` on each
 | `dos_timestamp.raw_time` | Unmodified unsigned 16-bit directory time word |
 | `dos_timestamp.calendar.state` | `valid` or `invalid`, separately from source-word presence |
 | `dos_timestamp.calendar.year`, `month`, `day`, `hour`, `minute`, `second` | Present for `valid`, without a timezone or epoch interpretation |
+| `record_format` | `zip_central_directory`, `p4k_v2`, or `unknown` for a reader format this projection does not interpret |
+| `original_directory_ordinal` | Canonical unsigned decimal string for the source record position; `null` for recovery-scanned headers |
+| `raw_compression_method` | Unmodified unsigned 16-bit compression method, independent of decoder selection |
+| `zip_header` | Fixed ZIP directory words below; explicitly `null` on v2 |
+| `raw_v2_encryption_word` | Unmodified unsigned 16-bit v2 word, including zero and unknown values; explicitly `null` on ZIP |
+
+`zip_header` contains `raw_version_made_by`, `raw_version_needed`,
+`general_purpose_flags`, `disk_start`, `internal_attributes` and
+`external_attributes`. The first five retain unsigned 16-bit words; external
+attributes retain all 32 bits. A ZIP64 disk marker is not replaced by a guessed
+decoded disk number. These JSON integers are exact throughout their source width.
+
+`DecimalU64` represents new unsigned 64-bit source facts as strings from `"0"`
+through `"18446744073709551615"`. The schema rejects leading signs or zeroes,
+whitespace, numeric JSON values and overflow. Existing owner indices, byte counts
+and other numeric fields retain their types. Source ordinals belong to the
+immediately owning Archive, including the combined v2 base/extension order.
 
 Read the owner index together with the record's complete source/container identity;
 it is not a global identifier or an original directory ordinal before folder removal.
-A grouped texture row must keep the physical base Entry as metadata owner instead
-of implying that one timestamp describes every part.
+A grouped texture row keeps its physical base Entry as metadata owner. Its old
+sizes and `parts` remain group aggregates; metadata is not combined across parts.
+With `--parts`, each physical part instead owns its own metadata object.
 
 Raw words are exact JSON integers in the range 0–65535. All-zero words encode as
 `calendar: {"state":"invalid"}` and remain present; they do not become a missing
@@ -86,9 +106,10 @@ The generic media envelope remains available through `record_schema()`.
 `builtin_record_schema()` also constrains this metadata object only for the built-in
 Archive Entry namespace; other provider namespaces keep their general contract.
 
-This projection covers directory timestamps. CLI/MCP Entry summaries, local-header
+This projection covers directory timestamps and fixed directory words. Local-header
 timestamps and further layout/signature/extra-range metadata remain separate parts
-of the full metadata-export work.
+of the full metadata-export work. Invalid or unknown raw words do not suppress
+the authoritative recovery, installation or integrity status.
 
 The packed field definition follows
 [Microsoft's DOS date/time contract](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-dosdatetimetofiletime).

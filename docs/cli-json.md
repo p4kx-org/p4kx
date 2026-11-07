@@ -43,6 +43,13 @@ The shape of one Entry in `list` and `search`:
 | `compressed_size` | number | Size of the data in the Archive |
 | `size` | number | Size after decompression |
 | `parts` | array of string | Only on the header of a Texture group in `list`: the paths of its parts and Alpha tail; `compressed_size` and `size` are then those of the whole group |
+| `metadata` | object | Shared physical-owner, raw DOS and fixed directory facts described in [Archive Entry metadata](archive-entry-metadata.md) |
+
+`metadata.owner_entry_index` identifies the physical base Entry of a grouped Texture;
+the existing sizes remain group totals. Its `original_directory_ordinal` is a
+canonical unsigned decimal string, or explicit `null` after actual directory
+recovery. ZIP-only words and the v2 encryption word remain explicitly `null` in the
+other layout. `socpak list` and MCP Entry listings use this same metadata object.
 
 ## Build
 

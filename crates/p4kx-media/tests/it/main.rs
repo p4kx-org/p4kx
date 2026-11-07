@@ -6,7 +6,9 @@
 mod archive;
 mod budgets;
 mod capabilities;
+mod entry_metadata_provider;
 mod entry_metadata_schema;
+mod entry_metadata_words;
 mod interruptions;
 #[cfg(windows)]
 mod junctions;
