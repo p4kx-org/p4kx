@@ -90,7 +90,7 @@ jobs:
         run: .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -ArchivePath nextest-archive.tar.zst -MetadataPath nextest-archive.json -ValidateArchive
       - name: Install the native software Vulkan driver
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1 libasound2 libx11-6 libxcursor1 libxi6 libxrandr2 libxkbcommon-x11-0 libegl1 xvfb
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1 libasound2t64 libx11-6 libxcursor1 libxi6 libxrandr2 libxkbcommon-x11-0 libegl1 xvfb
       - name: Tests with nextest, one native process per test
         env:
           P4KX_REQUIRE_SOFTWARE_ADAPTER: '1'
