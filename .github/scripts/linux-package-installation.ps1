@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'linux-package-tools.ps1')
 . (Join-Path $PSScriptRoot 'linux-debian.ps1')
 . (Join-Path $PSScriptRoot 'flatpak-metadata.ps1')
+. (Join-Path $PSScriptRoot 'flatpak-installed-identity.ps1')
 
 function Assert-P4kxDisposableLinuxRunner {
     param($Platform)
@@ -80,14 +81,7 @@ function Install-P4kxFlatpak {
     Invoke-P4kxLinuxTool flatpak @('install', '--user', '--assumeyes', '--noninteractive', "--arch=$($Platform.unix_arch)", 'flathub', $runtime) | Out-Null
     Invoke-P4kxLinuxTool flatpak @('update', '--user', '--assumeyes', '--noninteractive', "--commit=$($Producer.flatpak.runtime_commit)", $runtime) | Out-Null
     Invoke-P4kxLinuxTool flatpak @('install', '--user', '--assumeyes', '--noninteractive', $Asset) | Out-Null
-    $reference = (Invoke-P4kxLinuxTool flatpak @('info', '--user', "--arch=$($Platform.unix_arch)", '--show-ref', $settings.application_id) | Out-String).Trim()
-    $runtimeActual = (Invoke-P4kxLinuxTool flatpak @('info', '--user', "--arch=$($Platform.unix_arch)", '--show-runtime', $settings.application_id) | Out-String).Trim()
-    $appCommit = (Invoke-P4kxLinuxTool flatpak @('info', '--user', "--arch=$($Platform.unix_arch)", '--show-commit', $settings.application_id) | Out-String).Trim()
-    $runtimeCommit = (Invoke-P4kxLinuxTool flatpak @('info', '--user', "--arch=$($Platform.unix_arch)", '--show-commit', $runtime) | Out-String).Trim()
-    if ($reference -cne $Producer.flatpak.app_ref -or $runtimeActual -cne ($runtime -replace '^runtime/', '') -or
-        $appCommit -cne $Producer.flatpak.app_commit -or $runtimeCommit -cne $Producer.flatpak.runtime_commit) {
-        throw 'Installed Flatpak application/runtime ref or OSTree commit differs.'
-    }
+    $identity = Get-P4kxLiveFlatpakIdentity $Platform $Producer
     $location = (Invoke-P4kxLinuxTool flatpak @('info', '--user', "--arch=$($Platform.unix_arch)", '--show-location', $settings.application_id) | Out-String).Trim()
     $metadata = @(Invoke-P4kxLinuxTool flatpak @('info', '--user', "--arch=$($Platform.unix_arch)", '--show-metadata', $settings.application_id))
     $metadata | Set-Content -LiteralPath (Join-Path $CheckDirectory 'flatpak-effective-metadata.log') -Encoding utf8NoBOM
@@ -109,7 +103,7 @@ function Install-P4kxFlatpak {
         $prefix += $settings.application_id
         $launchers[$binary] = @{executable='flatpak'; prefix=$prefix}
     }
-    return @{binaries=(Join-Path $location 'files/bin'); launchers=$launchers; installed_ref=$reference; runtime_ref=$runtimeActual; data_directory=$data}
+    return @{binaries=(Join-Path $location 'files/bin'); launchers=$launchers; installed_ref=$identity.reference; runtime_ref=$identity.runtime; data_directory=$data}
 }
 
 function Remove-P4kxLinuxPackage {

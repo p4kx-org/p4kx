@@ -2,6 +2,7 @@ param([Parameter(Mandatory)][string]$Directory)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'native-test-fixtures.ps1')
+. (Join-Path $PSScriptRoot 'test-documents-evidence-fixture.ps1')
 New-Item -ItemType Directory -Path $Directory -Force | Out-Null
 $contract = Get-P4kxPlatformContract
 $revision = 'a' * 40
@@ -53,7 +54,7 @@ foreach ($row in $contract.targets) {
                     }
                 }
                 if ($package -eq 'flatpak') {
-                    $smoke.documents = @{target=$row.target; revision=$revision; read_only_archive='success'; writable_export='success'; game_alias_refusal='success'; source_unchanged='success'}
+                    $smoke.documents = New-P4kxDocumentsEvidenceFixture $row $revision $smoke.archive_sha256
                 }
             }
             $smoke
@@ -61,7 +62,7 @@ foreach ($row in $contract.targets) {
         $proof | Add-Member -NotePropertyName package_smokes -NotePropertyValue $smokes
     }
     $name = "P4KX-$version-$($row.target)-runtime.json"
-    $proof | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Directory $name) -Encoding utf8NoBOM
+    $proof | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath (Join-Path $Directory $name) -Encoding utf8NoBOM
 }
 
 & $validator -AssetDirectory $Directory -Version $version -Revision $revision

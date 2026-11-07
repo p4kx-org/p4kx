@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'linux-package-contract.ps1')
-. (Join-Path $PSScriptRoot 'package-process.ps1')
+. (Join-Path $PSScriptRoot 'portal-process.ps1')
 
 function Assert-P4kxFlatpakDocumentMount {
     <#
@@ -26,21 +26,38 @@ function Export-P4kxFlatpakDocument {
 }
 
 function Invoke-P4kxFlatpakDocumentCommand {
-    param([string[]]$Prefix, [string[]]$Arguments, [string]$Directory, [string]$Log, [string]$ProtectedFolder, [switch]$Refused)
-    $process = New-P4kxPackageProcess 'flatpak' ($Prefix + $Arguments) $Directory
-    if ($ProtectedFolder) { $process.StartInfo.Environment['P4KX_PROTECT_FOLDERS'] = $ProtectedFolder }
-    try {
-        [void]$process.Start()
-        $stdout = $process.StandardOutput.ReadToEndAsync()
-        $stderr = $process.StandardError.ReadToEndAsync()
-        if (-not $process.WaitForExit(120000)) { $process.Kill($true); $process.WaitForExit(); throw 'Flatpak document operation timed out.' }
-        $text = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
-        $text | Set-Content -LiteralPath $Log -Encoding utf8NoBOM
-        if ($Refused) {
-            if ($process.ExitCode -eq 0 -or $text -cnotmatch 'the tool never writes there') { throw 'Game-folder portal alias was not refused by the installation guard.' }
-        }
-        elseif ($process.ExitCode -ne 0) { throw "Flatpak document operation exited $($process.ExitCode); see $Log" }
-        return $text
+    param([string[]]$Prefix, [string[]]$Arguments, [string]$Directory, [string]$Name,
+        [ValidateSet('None', 'Installation', 'SourceMembership', 'ExistingSource')][string]$Expected = 'None')
+    $result = Invoke-P4kxPortalProcess flatpak ($Prefix + $Arguments) $Directory $Name -Milliseconds 120000 -MaximumBytes 2MB
+    $result['classification'] = Assert-P4kxFlatpakDocumentOutcome $result $Expected
+    return $result
+}
+
+function Assert-P4kxFlatpakDocumentOutcome {
+    <#
+    .SYNOPSIS
+    Separates a proved installation refusal from typed identity uncertainty.
+    #>
+    param($Result, [ValidateSet('None', 'Installation', 'SourceMembership', 'ExistingSource')][string]$Expected)
+    if ($Expected -ceq 'None') {
+        if ($Result.exit_code -ne 0) { throw 'Flatpak document operation did not succeed.' }
+        return 'success'
     }
-    finally { $process.Dispose() }
+    if ($Result.exit_code -ne 2) { throw 'Flatpak protected output did not use the invalid-output status.' }
+    $known = $Result.stderr.Contains('the tool never writes there', [StringComparison]::Ordinal)
+    $codes = @('source-membership', 'source-overwrite', 'target-identity', 'source-identity')
+    $observed = @($codes | Where-Object { $Result.stderr.Contains("[p4kx.write.$_]", [StringComparison]::Ordinal) })
+    if ($Expected -ceq 'Installation' -and $known -and $observed.Count -eq 0) { return 'installation' }
+    if ($known -or $observed.Count -ne 1) { throw 'Protected output has an ambiguous or incorrect refusal category.' }
+    if ($Expected -ceq 'SourceMembership' -and $observed[0] -ceq 'source-membership') { return $observed[0] }
+    if ($Expected -ceq 'ExistingSource' -and $observed[0] -cin @('source-overwrite', 'target-identity')) { return $observed[0] }
+    throw 'Protected output failed for a different typed reason.'
+}
+
+function Get-P4kxFlatpakDocumentPrefix {
+    param($Platform, [string]$DataDirectory)
+    $settings = Get-P4kxLinuxPackaging
+    return @('run', '--user', "--arch=$($Platform.unix_arch)", '--command=p4kx',
+        "--env=P4KX_FOLDERS_ROOT=$DataDirectory/portal-smoke", '--env=P4KX_GAME_CHECK=off',
+        '--env=P4KX_PROTECT_FOLDERS=', $settings.application_id)
 }

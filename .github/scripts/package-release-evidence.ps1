@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'native-evidence.ps1')
 . (Join-Path $PSScriptRoot 'linux-package-evidence.ps1')
+. (Join-Path $PSScriptRoot 'documents-portal-evidence.ps1')
 
 function Assert-P4kxPackageRuntime {
     param($Runtime, $Platform, [string]$AssetDirectory, [string]$Version)
@@ -18,12 +19,7 @@ function Assert-P4kxPackageRuntime {
             Assert-P4kxLinuxPackageProducer $package.producer $Platform $Runtime $AssetDirectory $Version
             Assert-P4kxLinuxPackageExecution $package $package.producer $Platform
             if ($package.package -eq 'flatpak') {
-                if ($package.documents.target -cne $Platform.target -or $package.documents.revision -cne $Runtime.revision) {
-                    throw 'Flatpak document capability evidence has a different target/source.'
-                }
-                foreach ($check in @('read_only_archive', 'writable_export', 'game_alias_refusal', 'source_unchanged')) {
-                    if ($package.documents.$check -cne 'success') { throw "Flatpak document capability '$check' did not execute successfully." }
-                }
+                Assert-P4kxFlatpakDocumentsEvidence $package.documents $Platform $Runtime.revision $hash
             }
         }
         foreach ($binary in $package.binaries) {

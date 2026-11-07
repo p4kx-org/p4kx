@@ -129,7 +129,7 @@ jobs:
     needs: build
     if: ${{ needs.build.result == 'success' }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 120
     permissions:
       contents: read
     strategy:
@@ -161,10 +161,20 @@ jobs:
           nextest: "true"
       - name: Install native desktop and runtime dependencies
         run: .github/scripts/install-linux-package-dependencies.ps1
+      - name: Verify Documents source, session and evidence contracts without services
+        run: |
+          .github/scripts/test-documents-portal-source.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/documents-source')
+          .github/scripts/test-documents-portal-session.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/documents-session')
+          .github/scripts/test-documents-session-controller.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/documents-controller')
+          .github/scripts/test-documents-portal-evidence.ps1
+          python3 -B .github/scripts/test-stop-owned-portals.py
+          if ($LASTEXITCODE -ne 0) { throw 'Owned process cleanup contract failed.' }
+      - name: Build source-pinned official API5 Documents and PermissionStore test services
+        run: .github/scripts/build-documents-portal.ps1 -Target $env:P4KX_TARGET -StagingDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'service-build') -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'services')
       - name: Execute each real package launcher, desktop frames and Documents portal grants
         run: |
           $base = "artifacts/linux-build-$env:P4KX_TARGET"
-          & dbus-run-session -- xvfb-run --auto-servernum pwsh -NoProfile -File .github/scripts/check-linux-packages.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory "$base/package" -FixtureDirectory "$base/fixture" -BuildMetadata "$base/validation/build.json" -AdapterEvidence "$base/validation/adapter.json" -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'package-check')
+          & xvfb-run --auto-servernum pwsh -NoProfile -File .github/scripts/check-linux-packages.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory "$base/package" -FixtureDirectory "$base/fixture" -BuildMetadata "$base/validation/build.json" -AdapterEvidence "$base/validation/adapter.json" -ServiceBuildMetadata (Join-Path $env:P4KX_PACKAGE_TASK 'services/services.json') -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'package-check')
           if ($LASTEXITCODE -ne 0) { throw 'Native installed Linux package execution failed.' }
           Copy-Item "$base/validation/package-tools.json" "$base/package/P4KX-$env:VERSION-$env:P4KX_TARGET-package-tools.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -174,6 +184,11 @@ jobs:
           path: |
             ${{ env.P4KX_PACKAGE_TASK }}/package-check/**/*.log
             ${{ env.P4KX_PACKAGE_TASK }}/package-check/**/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/package-check/**/*.conf
+            ${{ env.P4KX_PACKAGE_TASK }}/package-check/**/*.service
+            ${{ env.P4KX_PACKAGE_TASK }}/service-build/*.log
+            ${{ env.P4KX_PACKAGE_TASK }}/services/services.json
+            ${{ env.P4KX_PACKAGE_TASK }}/services/official-source.tar.xz
           if-no-files-found: ignore
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

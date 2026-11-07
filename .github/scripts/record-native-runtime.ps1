@@ -35,5 +35,5 @@ $metadata | Add-Member -NotePropertyName device_checks -NotePropertyValue ([orde
     hardware_gpu = 'not_checked'
 })
 $metadata | Add-Member -NotePropertyName workflow_run -NotePropertyValue "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-$metadata | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $OutputPath -Encoding utf8NoBOM
+$metadata | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $OutputPath -Encoding utf8NoBOM
 Write-Output "Recorded successful native synthetic runtime checks for $Target; physical device checks remain explicit."
