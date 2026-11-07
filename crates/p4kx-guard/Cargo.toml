@@ -17,6 +17,7 @@ same-file.workspace = true
 thiserror.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
+nix = { workspace = true, features = ["socket"] }
 rustix.workspace = true
 serde.workspace = true
 zbus.workspace = true

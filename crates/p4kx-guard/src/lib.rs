@@ -8,6 +8,7 @@ mod archive_source_identity;
 mod archive_write_protection;
 mod created_output_file;
 mod installation;
+mod namespace_root;
 mod namespace_target;
 mod owned_directory_permit;
 mod owned_file_token;

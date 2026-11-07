@@ -9,15 +9,18 @@ use crate::checkpoint::Checkpoint;
 use crate::error;
 
 pub(crate) fn ensure_directory(path: &Path, checkpoint: &Checkpoint<'_>) -> Result<(), MediaError> {
+    if path
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err(MediaError::Destination(
+            "parent traversal in output path".into(),
+        ));
+    }
     let mut current = PathBuf::new();
     for component in path.components() {
-        if matches!(component, Component::ParentDir) {
-            return Err(MediaError::Destination(
-                "parent traversal in output path".into(),
-            ));
-        }
         current.push(component);
-        checkpoint.writable(&current)?;
+        checkpoint.check()?;
         match inspect(&current)? {
             Some(metadata) if metadata.is_dir() => {}
             Some(_) => return Err(not_plain(&current)),
@@ -30,8 +33,18 @@ pub(crate) fn ensure_directory(path: &Path, checkpoint: &Checkpoint<'_>) -> Resu
             }
         }
     }
+    p4kx_extraction::validated_output_directory(
+        path,
+        Some(checkpoint.protection),
+        checkpoint.cancel.flag(),
+        |_| Ok(()),
+    )?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "output_path_tests.rs"]
+mod tests;
 
 pub(crate) fn file(path: &Path) -> Result<bool, MediaError> {
     match existing(path)? {

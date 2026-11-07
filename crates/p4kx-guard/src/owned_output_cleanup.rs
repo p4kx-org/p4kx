@@ -90,40 +90,49 @@ pub(crate) fn cleanup_checked(
     root: &Path,
     check: &impl Fn(&Path) -> Result<(), WriteProtectionError>,
 ) -> Result<(), OwnedOutputCleanupError> {
-    boundaries(root, check)?;
+    cleanup_with(root, &|| boundaries(root, check), check)
+}
+
+pub(crate) fn cleanup_with(
+    root: &Path,
+    check_boundaries: &impl Fn() -> Result<(), WriteProtectionError>,
+    check_entry: &impl Fn(&Path) -> Result<(), WriteProtectionError>,
+) -> Result<(), OwnedOutputCleanupError> {
+    check_boundaries()?;
     let metadata = match fs::symlink_metadata(root) {
         Ok(metadata) => metadata,
         Err(source) if source.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(source) => return Err(io_error(root, source)),
     };
     if !metadata.is_dir() || redirected(&metadata) {
-        remove_leaf(root, &metadata, check)?;
+        remove_leaf(root, root, &metadata, check_boundaries, check_entry)?;
     } else {
         let mut directories = vec![Directory::open(root.to_path_buf())?];
         while let Some(directory) = directories.last_mut() {
             if let Some(child) = directory.next()? {
-                concrete(&child, check)?;
+                concrete(root, &child, check_boundaries, check_entry)?;
                 let metadata =
                     fs::symlink_metadata(&child).map_err(|source| io_error(&child, source))?;
                 if metadata.is_dir() && !redirected(&metadata) {
                     directories.push(Directory::open(child)?);
                 } else {
-                    remove_leaf(&child, &metadata, check)?;
+                    remove_leaf(root, &child, &metadata, check_boundaries, check_entry)?;
                 }
             } else {
                 let path = directory.path.clone();
                 directories.pop();
-                remove_directory(&path, check)?;
+                remove_directory(root, &path, check_boundaries, check_entry)?;
             }
         }
     }
-    boundaries(root, check)
+    check_boundaries()?;
+    Ok(())
 }
 
 fn boundaries(
     root: &Path,
     check: &impl Fn(&Path) -> Result<(), WriteProtectionError>,
-) -> Result<(), OwnedOutputCleanupError> {
+) -> Result<(), WriteProtectionError> {
     for path in root.ancestors() {
         check(path)?;
     }
@@ -131,21 +140,28 @@ fn boundaries(
 }
 
 fn concrete(
+    root: &Path,
     path: &Path,
-    check: &impl Fn(&Path) -> Result<(), WriteProtectionError>,
+    check_boundaries: &impl Fn() -> Result<(), WriteProtectionError>,
+    check_entry: &impl Fn(&Path) -> Result<(), WriteProtectionError>,
 ) -> Result<(), OwnedOutputCleanupError> {
-    if let Some(parent) = path.parent() {
-        check(parent)?;
+    check_boundaries()?;
+    if path != root
+        && let Some(parent) = path.parent()
+    {
+        check_entry(parent)?;
     }
-    check(path)?;
+    check_entry(path)?;
     Ok(())
 }
 
 fn remove_directory(
+    root: &Path,
     path: &Path,
-    check: &impl Fn(&Path) -> Result<(), WriteProtectionError>,
+    check_boundaries: &impl Fn() -> Result<(), WriteProtectionError>,
+    check_entry: &impl Fn(&Path) -> Result<(), WriteProtectionError>,
 ) -> Result<(), OwnedOutputCleanupError> {
-    concrete(path, check)?;
+    concrete(root, path, check_boundaries, check_entry)?;
     let metadata = fs::symlink_metadata(path).map_err(|source| io_error(path, source))?;
     if !metadata.is_dir() || redirected(&metadata) {
         return Err(OwnedOutputCleanupError::UnexpectedType { path: path.into() });
@@ -154,11 +170,13 @@ fn remove_directory(
 }
 
 fn remove_leaf(
+    root: &Path,
     path: &Path,
     metadata: &Metadata,
-    check: &impl Fn(&Path) -> Result<(), WriteProtectionError>,
+    check_boundaries: &impl Fn() -> Result<(), WriteProtectionError>,
+    check_entry: &impl Fn(&Path) -> Result<(), WriteProtectionError>,
 ) -> Result<(), OwnedOutputCleanupError> {
-    concrete(path, check)?;
+    concrete(root, path, check_boundaries, check_entry)?;
     if !metadata.is_file() && !metadata.file_type().is_symlink() && !redirected(metadata) {
         return Err(OwnedOutputCleanupError::UnexpectedType { path: path.into() });
     }

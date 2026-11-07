@@ -20,6 +20,9 @@ use p4kx_gui::{
 };
 use p4kx_testkit::{ENTITY_INTERIOR_CLASS, entity_interior_entries};
 
+#[path = "entity_package_window/failure.rs"]
+mod failure;
+
 fn start(harness: &mut Harness<'_, Model>, folder: &Path) -> Result<bool, &'static str> {
     harness.state_mut().begin_assembly_export();
     let setup = harness
@@ -350,26 +353,5 @@ fn a_cancelled_export_keeps_the_earlier_package_and_writes_no_folder() -> TestRe
         .filter(|entry| entry.file_name().to_string_lossy().contains(".p4kx-"))
         .count();
     assert_eq!(leftovers, 0, "no temporary folder");
-    Ok(())
-}
-
-#[test]
-fn a_folder_that_cannot_be_created_fails_with_the_reason() -> TestResult {
-    let (dir, mut harness) = opened(Language::BritishEnglish)?;
-    select(&mut harness, "TEST_Ship")?;
-    let blocker = dir.path().join("blocker");
-    std::fs::write(&blocker, b"a file")?;
-
-    assert!(start(&mut harness, &blocker.join("ship"))?);
-    finished(&mut harness)?;
-
-    assert!(matches!(
-        harness
-            .state()
-            .assembly_export()
-            .map(AssemblyExport::status),
-        Some(AssemblyExportStatus::Failed(_))
-    ));
-    assert!(harness.query_by_label("Export failed").is_some());
     Ok(())
 }

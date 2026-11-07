@@ -138,7 +138,10 @@ impl ArchiveWriteProtection {
     }
 
     #[cfg(test)]
-    fn from_alias(source: &Path, alias: crate::PortalAlias) -> Result<Self, WriteProtectionError> {
+    pub(crate) fn from_alias(
+        source: &Path,
+        alias: crate::PortalAlias,
+    ) -> Result<Self, WriteProtectionError> {
         Ok(Self {
             job: Arc::new(()),
             sources: vec![SourceBoundary::from_alias(source, alias)?],

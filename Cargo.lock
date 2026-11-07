@@ -2917,6 +2917,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -3789,6 +3790,7 @@ dependencies = [
 name = "p4kx-guard"
 version = "0.4.2"
 dependencies = [
+ "nix",
  "p4kx-channels",
  "rustix 1.1.5",
  "same-file",

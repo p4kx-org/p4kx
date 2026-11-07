@@ -27,7 +27,7 @@ function Test-P4kxFlatpakPrerequisites {
                 $result = Invoke-P4kxPortalProcess $launcher.executable $command $Directory "$name-$($argument.Substring(2))" -Milliseconds 30000
                 if ($result.exit_code -ne 0 -or -not $result.stdout.Trim()) { throw 'Help or version failed before the runtime prerequisite.' }
             }
-            $arguments = if ($name -ceq 'p4kx') { @('extract', (Join-Path $Fixture 'native-smoke.p4k'), '--out', (Join-Path $Directory 'forbidden-output')) } else { @() }
+            $arguments = if ($name -ceq 'p4kx') { @('extract', (Join-Path $Fixture 'native-smoke.p4k'), '--filter', '*', '--out', (Join-Path $Directory 'forbidden-output')) } else { @() }
             $result = Invoke-P4kxPortalProcess $launcher.executable ($launcher.prefix + $arguments) $Directory "$name-prerequisite" -Milliseconds 30000
             Assert-P4kxFlatpakPrerequisiteOutcome $result
             $proof += @{application=$name; prerequisite='expected-refusal'; help='success'; version='success'}

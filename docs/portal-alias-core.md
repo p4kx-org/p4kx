@@ -40,6 +40,13 @@ owner, and successful replies must carry the expected sender. Error text from re
 services is discarded after typed classification, so it cannot copy private host
 paths into public error chains.
 
+Linux can report peer PID 0 when the peer is outside the caller's PID namespace. The
+kernel credential UID still has to equal the caller's effective UID; PID visibility is
+not authentication authority. The safe nix credential reader preserves PID 0 as a value.
+The zbus client uses EXTERNAL authentication without its separate P2P-server credential
+path. [The upstream rustix report](https://github.com/bytecodealliance/rustix/issues/1698)
+documents why a credential representation requiring a nonzero PID is unsuitable here.
+
 The limits have different scopes:
 
 | Limit | Scope |
@@ -95,6 +102,12 @@ validation between stable root observations. Rename rebinds the same root; clean
 names, authenticated containment and root identity without following links. Unlinking an owned
 namespace entry does not modify the bytes of another hardlink target. No manifest path list,
 `.old` suffix or caller-supplied spelling creates ownership authority.
+
+Directory roots are authenticated directly, including a selected directory-grant root.
+Entry rename/unlink checks then stay within that bound visible and host namespace. Cleanup
+revalidates the root instead of requesting write authority for virtual document-ID parents.
+Existing ancestors remain route/type observations; only missing concrete descendants are
+created through the protected directory factory.
 
 Pure cancellation is distinct from failed cleanup, retained output or failed restoration.
 Ordinary authenticated cleanup can complete after cancellation; portal uncertainty still refuses
