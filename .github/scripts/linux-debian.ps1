@@ -1,6 +1,18 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'linux-package-contract.ps1')
 
+function Install-P4kxDebianLintianOverrides {
+    <#
+    .SYNOPSIS
+    Installs the package-local applicability rule for upstream Debian-format releases.
+    #>
+    param([Parameter(Mandatory)][string]$PackageRoot)
+    $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+    $directory = Join-Path $PackageRoot 'usr/share/lintian/overrides'
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    Copy-Item -LiteralPath (Join-Path $root 'packaging/linux/p4kx.lintian-overrides') -Destination (Join-Path $directory 'p4kx')
+}
+
 function Get-P4kxDebianPackageDependencies {
     <#
     .SYNOPSIS

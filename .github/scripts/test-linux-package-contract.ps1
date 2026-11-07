@@ -73,4 +73,8 @@ if ((Get-P4kxDebianVersion '0.5.0-rc.1+build.2') -cne '0.5.0~rc.1+build.2-1') { 
 $dependencies = Get-P4kxDebianDependencies @('shlibs:Depends=libc6 (>= 2.38), libasound2t64 (>= 1.0), libx11-6 (>= 1.8)')
 if ($dependencies -notmatch 'libc6 \(>= 2\.39\)' -or ([regex]::Matches($dependencies, 'libx11-6')).Count -ne 1 -or
     $dependencies -notmatch 'libasound2t64 \(>= 1\.0\)' -or $dependencies -notmatch 'xdg-desktop-portal') { throw 'Debian native/dlopen dependencies differ.' }
+$package = Join-Path $Directory 'package-layout'
+Install-P4kxDebianLintianOverrides -PackageRoot $package
+$rules = @(Get-Content -LiteralPath (Join-Path $package 'usr/share/lintian/overrides/p4kx') | Where-Object { $_.Trim() -and -not $_.TrimStart().StartsWith('#') })
+if ($rules.Count -ne 1 -or $rules[0] -cne 'p4kx: initial-upload-closes-no-bugs [usr/share/doc/p4kx/changelog.Debian.gz:1]') { throw 'Upstream Debian policy rule is missing or broader than its exact tag/context.' }
 'PASS: Linux target/ELF/glibc contracts, effective Flatpak policy and runtime identity, profile preservation and Debian dependencies. No Linux application executed.'

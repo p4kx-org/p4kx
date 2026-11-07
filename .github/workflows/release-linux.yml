@@ -60,6 +60,7 @@ jobs:
           .github/scripts/test-linux-appdir-root.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/appdir-root')
           .github/scripts/test-linux-package-contract.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/linux-package')
           .github/scripts/test-linux-debian-paths.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/debian-paths')
+          .github/scripts/test-linux-debian-lintian.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/debian-lintian')
           python3 -B packaging/linux/runtime/test_collect_sources.py --directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/runtime-sources')
           if ($LASTEXITCODE -ne 0) { throw 'Native runtime source inventory contract failed.' }
           python3 -B packaging/linux/runtime/test_build_inputs.py --directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/runtime-inputs')

@@ -32,6 +32,7 @@ New-Item -ItemType Directory -Force -Path $documents | Out-Null
 Copy-Item -LiteralPath (Join-Path $payload 'share/licenses/p4kx/THIRD-PARTY-NOTICES.md') -Destination $documents
 Copy-Item -LiteralPath (Join-Path $payload 'share/licenses/p4kx/CHANGELOG.md') -Destination (Join-Path $documents 'changelog')
 Write-P4kxDebianCopyright -OutputDirectory $documents
+Install-P4kxDebianLintianOverrides -PackageRoot $packageRoot
 $epoch = [DateTimeOffset]::FromUnixTimeSeconds([long]$env:SOURCE_DATE_EPOCH)
 $debianVersion = Get-P4kxDebianVersion $Version
 $date = $epoch.UtcDateTime.ToString('ddd, dd MMM yyyy HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture) + ' +0000'

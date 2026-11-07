@@ -45,6 +45,10 @@ Dependency analysis uses the three absolute staged executable paths and the stag
 The Debian version adds packaging revision `-1` and maps an upstream prerelease separator to
 `~`, retaining Debian's prerelease ordering.
 `lintian` warnings and errors fail packaging.
+The package-local rule for `initial-upload-closes-no-bugs` follows the
+[tag's documented non-Debian-archive exception](https://udd.debian.org/lintian-tag.cgi?tag=initial-upload-closes-no-bugs):
+these upstream releases have no Debian ITP bug. It applies only to that package/changelog context.
+Native synthetic-package checks require that this rule is active and unrelated errors still fail.
 
 The Linux window, desktop file, icons and Flatpak use the same reverse-DNS identity
 `io.github.p4kx_org.p4kx`. The existing theme, typefaces and rendering behavior are retained.
