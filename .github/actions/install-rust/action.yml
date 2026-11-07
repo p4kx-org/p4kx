@@ -43,6 +43,8 @@ runs:
       run: .github/scripts/check-build-tools.ps1 -Target $env:NATIVE_TARGET -SelectEnvironment toolchain
     - name: Install cargo-nextest
       if: inputs.nextest == 'true'
+      env:
+        CARGO_BUILD_TARGET: ${{ steps.pins.outputs.target }}
       uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
       with:
         tool: nextest@${{ steps.pins.outputs.nextest-version }}
