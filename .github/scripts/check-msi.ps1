@@ -40,7 +40,8 @@ $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'P4KX.lnk'
 $profileFolder = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'P4KX'
 $logs = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
-$originalPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+$originalPath = Get-P4kxUserPathState
+$originalPath | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $logs 'original-path.json') -Encoding utf8NoBOM
 Assert-P4kxUninstalled $UpgradeCode $folder $shortcut $originalPath
 if (Test-Path -LiteralPath $profileFolder) { throw 'Installer verification requires an absent P4KX profile.' }
 New-Item -ItemType Directory -Path $profileFolder | Out-Null
@@ -138,6 +139,7 @@ finally {
             if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path }
         }
         if ((Get-ChildItem -LiteralPath $profileFolder -Force).Count -eq 0) { Remove-Item -LiteralPath $profileFolder }
+        Write-P4kxPathTransition $originalPath (Get-P4kxUserPathState) (Join-Path $logs 'final-path.json')
     }
     catch {
         if ($null -ne $verificationFailure) {

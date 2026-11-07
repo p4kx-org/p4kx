@@ -1,13 +1,16 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-database.ps1')
 . (Join-Path $PSScriptRoot 'msi-invocation.ps1')
+. (Join-Path $PSScriptRoot 'msi-path.ps1')
 
 function Invoke-P4kxMsiexec {
     param([string[]]$Arguments, [string]$Log, [int]$ExpectedCode = 0)
     $start = New-P4kxMsiexecStartInfo -Arguments $Arguments -Log $Log
+    $pathBefore = Get-P4kxUserPathState
     $process = [Diagnostics.Process]::Start($start)
     try {
         if (-not $process.WaitForExit(300000)) { $process.Kill($true); $process.WaitForExit(); throw "MSI operation timed out: $Log" }
+        Write-P4kxPathTransition $pathBefore (Get-P4kxUserPathState) "$Log.path.json"
         if ($process.ExitCode -ne $ExpectedCode) {
             if (Test-Path -LiteralPath $Log) { Get-Content -LiteralPath $Log -Tail 50 | Write-Host }
             throw "MSI exited $($process.ExitCode), expected $ExpectedCode ($Log)"
@@ -38,9 +41,9 @@ function Assert-P4kxInstalledProduct {
 }
 
 function Assert-P4kxUninstalled {
-    param([string]$UpgradeCode, [string]$Folder, [string]$Shortcut, [string]$OriginalPath)
+    param([string]$UpgradeCode, [string]$Folder, [string]$Shortcut, $OriginalPath)
     if (@(Get-P4kxInstalledProducts $UpgradeCode).Count -ne 0 -or
         (Test-Path -LiteralPath $Folder) -or (Test-Path -LiteralPath $Shortcut) -or
         (Test-Path 'HKCU:\Software\P4KX')) { throw 'MSI left behind installation ownership.' }
-    if ([Environment]::GetEnvironmentVariable('Path', 'User') -cne $OriginalPath) { throw 'MSI did not restore the original user PATH.' }
+    Assert-P4kxPathRestored $OriginalPath (Get-P4kxUserPathState)
 }

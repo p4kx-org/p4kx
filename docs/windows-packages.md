@@ -88,6 +88,14 @@ are enumerated without a synthetic empty product, and a cleanup failure preserve
 verification exception. The invocation regression uses synthetic paths and mocked COM enumeration;
 it never installs software on the development machine.
 
+Installer logs retain `original-path.json`, one `<transaction>.log.path.json` per completed MSI
+operation and `final-path.json` after cleanup. These contain the user PATH's raw registry value
+and kind plus the .NET user-scope result, distinguishing separator changes, variable expansion
+and registry-type changes. Uninstall requires the exact original value and kind; comparison
+never drops empty segments or normalises case, trailing separators or variable references.
+`test-msi-path.ps1` exercises these distinctions without writing the registry or installing a
+package. Actual preservation remains a native hosted-runner gate.
+
 `release-windows.yml` consumes the Windows rows of `.config/platforms.json`. Each native producer
 builds three release applications and a next-version MSI, generates target-filtered CycloneDX
 SBOMs including any Microsoft runtime files, and uploads `windows-build-<target>`. A separate
