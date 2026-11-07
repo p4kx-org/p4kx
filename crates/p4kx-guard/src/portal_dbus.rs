@@ -10,6 +10,8 @@ use zbus::Message;
 use zbus::blocking::Connection;
 use zbus::zvariant::DynamicType;
 
+#[cfg(target_os = "linux")]
+use crate::bound_documents_reply::BoundDocumentsReply;
 use crate::portal_alias::{AliasUncertainty, UnknownAlias};
 use crate::portal_reply;
 use crate::portal_resolution::{DOCUMENTS_INTERFACE_HOST_PATHS, DocumentsReply};
@@ -29,7 +31,7 @@ pub(crate) struct DocumentsClient<'cancel> {
 
 #[cfg(target_os = "linux")]
 impl crate::portal_resolution::DocumentsTransport for DocumentsClient<'_> {
-    fn lookup(&mut self, document_id: &str) -> Result<DocumentsReply, UnknownAlias> {
+    fn lookup(&mut self, document_id: &str) -> Result<BoundDocumentsReply, UnknownAlias> {
         self.query(Some(document_id))
     }
 }
@@ -37,24 +39,10 @@ impl crate::portal_resolution::DocumentsTransport for DocumentsClient<'_> {
 #[cfg(target_os = "linux")]
 impl DocumentsClient<'_> {
     pub(crate) fn probe(&self) -> Result<(), UnknownAlias> {
-        let reply = self.query(None)?;
-        if reply.owner_before != reply.owner_after {
-            return Err(UnknownAlias::new(AliasUncertainty::OwnerChanged));
-        }
-        if !reply.paths.is_empty() {
-            return Err(UnknownAlias::new(AliasUncertainty::MalformedReply));
-        }
-        let point = crate::portal_path::bytestring_path(&reply.mount_point)?;
-        let mounts = crate::portal_native::mount_inventory()?;
-        let mount = crate::portal_mount::covering_mount(&mounts, point)?
-            .ok_or_else(|| UnknownAlias::new(AliasUncertainty::UntrustedMount))?;
-        if !mount.is_documents() || mount.target != point {
-            return Err(UnknownAlias::new(AliasUncertainty::UntrustedMount));
-        }
-        Ok(())
+        self.query(None)?.probe()
     }
 
-    fn query(&self, document_id: Option<&str>) -> Result<DocumentsReply, UnknownAlias> {
+    fn query(&self, document_id: Option<&str>) -> Result<BoundDocumentsReply, UnknownAlias> {
         use std::net::Shutdown;
         use std::time::Instant;
         use zbus::blocking::connection::Builder;
@@ -76,7 +64,13 @@ impl DocumentsClient<'_> {
                     .method_timeout(METHOD_TIMEOUT)
                     .build()
                     .map_err(portal_reply::call_error)?;
-                let result = query_on(&connection, document_id, self.cancel);
+                let result = query_on(&connection, document_id, self.cancel).and_then(|reply| {
+                    BoundDocumentsReply::bind(
+                        reply,
+                        self.cancel,
+                        crate::portal_native::mount_inventory,
+                    )
+                });
                 let closed = connection.close().map_err(portal_reply::call_error);
                 result.and_then(|reply| closed.map(|()| reply))
             },

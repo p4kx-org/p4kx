@@ -5,6 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::bound_documents_reply::BoundDocumentsReply;
+use crate::portal_mount_binding::MountBinding;
 use crate::portal_resolution::{DocumentsReply, DocumentsTransport, MappingOutcome};
 use crate::{
     AliasUncertainty, ArchiveWriteProtection, DocumentGrant, HostAlias, PortalAlias, UnknownAlias,
@@ -144,19 +146,20 @@ impl Fixture {
 struct FixedTransport;
 
 impl DocumentsTransport for FixedTransport {
-    fn lookup(&mut self, document_id: &str) -> Result<DocumentsReply, UnknownAlias> {
+    fn lookup(&mut self, document_id: &str) -> Result<BoundDocumentsReply, UnknownAlias> {
         let mut host = HOST.to_vec();
         host.push(0);
         let mut mount = MOUNT.to_vec();
         mount.push(0);
-        Ok(DocumentsReply {
+        let reply = DocumentsReply {
             owner_before: ":1.20".into(),
             owner_after: ":1.20".into(),
             interface: 5,
             mount_point: mount,
             body_bytes: 128,
             paths: vec![(document_id.into(), host)],
-        })
+        };
+        BoundDocumentsReply::synthetic(reply, MountBinding::synthetic(MOUNT, MOUNTS, MOUNT)?)
     }
 }
 

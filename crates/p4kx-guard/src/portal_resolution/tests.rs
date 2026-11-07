@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::{DocumentsReply, DocumentsTransport, MappingOutcome, PortalMapping};
+use crate::bound_documents_reply::BoundDocumentsReply;
 use crate::portal_alias::{AliasUncertainty, DocumentGrant, HostAlias, PortalAlias, UnknownAlias};
+use crate::portal_mount_binding::MountBinding;
 
 const MOUNT: &[u8] = b"/run/user/1001/doc";
 const MOUNTS: &[u8] = b"21 1 8:1 / / rw - ext4 /dev/root rw\n42 21 0:7 / /run/user/1001/doc rw - fuse.portal portal rw\n";
@@ -39,9 +41,11 @@ impl Transport {
 }
 
 impl DocumentsTransport for Transport {
-    fn lookup(&mut self, document_id: &str) -> Result<DocumentsReply, UnknownAlias> {
+    fn lookup(&mut self, document_id: &str) -> Result<BoundDocumentsReply, UnknownAlias> {
         self.requested.push(document_id.to_owned());
-        self.result.take().expect("one document query")
+        let reply = self.result.take().expect("one document query")?;
+        let binding = MountBinding::synthetic(MOUNT, MOUNTS, MOUNT)?;
+        BoundDocumentsReply::synthetic(reply, binding)
     }
 }
 

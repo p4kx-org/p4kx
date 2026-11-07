@@ -30,6 +30,7 @@ try {
         $images = @(Get-P4kxLinuxApplicationEvidence $state.binaries $platform)
         Assert-P4kxLinuxPackageExecution @{target=$Target; package='flatpak'; binaries=$images} $saved.producer $platform
         $interface = Get-P4kxDocumentsInterfaceEvidence $OutputDirectory 5
+        Save-P4kxSandboxMountEvidence $platform $OutputDirectory
         Save-P4kxDocumentsSessionIdentity $OutputDirectory $build 'initial'
         $preserved = @(New-P4kxProfileSentinels (Join-Path $state.data_directory 'preserved-profile'))
         & (Join-Path $PSScriptRoot 'check-package-runtime.ps1') -Target $Target -BinaryDirectory $state.binaries -FixtureDirectory $FixtureDirectory -OutputDirectory (Join-Path $OutputDirectory 'smoke') -Package flatpak -Launchers $state.launchers -ExpectedVersion $Version

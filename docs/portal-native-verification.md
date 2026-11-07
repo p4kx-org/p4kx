@@ -15,8 +15,10 @@ These negative checks are recorded as expected refusals and never satisfy runtim
 The second session activates the official source-built xdg-desktop-portal 1.22.1 Documents and
 PermissionStore services. Its first service directory takes precedence over standard activation
 directories. An independent abstract Unix listener uses EXTERNAL authentication; the normal
-`XDG_RUNTIME_DIR/doc` FUSE mount is retained. No host-spawn capability or broad filesystem grant
-is added. The same installed Flatpak/OSTree payload runs all six existing CLI/MCP/GUI runtime
+`XDG_RUNTIME_DIR/doc` FUSE mount is retained. The consumer records the authenticated daemon's
+mountpoint bytes separately from the sandbox runtime directory, canonical `doc` path and kernel
+mount inventory. A namespace alias does not require those path spellings to be identical.
+No host-spawn capability or broad filesystem grant is added. The same installed Flatpak/OSTree payload runs all six existing CLI/MCP/GUI runtime
 checks in this session.
 
 The controller starts `dbus-daemon --nofork --print-address=1` directly, with `--session` for the

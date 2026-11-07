@@ -25,20 +25,10 @@ pub(crate) fn covering_mount(
     input: &[u8],
     path: &[u8],
 ) -> Result<Option<PortalMount>, UnknownAlias> {
-    if input.len() > MAX_MOUNT_BYTES {
-        return Err(UnknownAlias::new(AliasUncertainty::Limit));
-    }
     let mut selected: Option<PortalMount> = None;
-    let mut count = 0_usize;
-    let lines = input
-        .split(|byte| *byte == b'\n')
-        .filter(|line| !line.is_empty());
-    for line in lines {
-        count += 1;
-        if count > MAX_MOUNTS {
-            return Err(UnknownAlias::new(AliasUncertainty::Limit));
-        }
-        let mount = parse_mount(line)?;
+    let mounts = parsed_mounts(input)?;
+    for mount in mounts {
+        let mount = mount?;
         if path != mount.target && portal_path::strip_mount(path, &mount.target).is_none() {
             continue;
         }
@@ -54,6 +44,35 @@ pub(crate) fn covering_mount(
         selected = Some(mount);
     }
     Ok(selected)
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn has_documents_ancestor(input: &[u8], path: &[u8]) -> Result<bool, UnknownAlias> {
+    let mut found = false;
+    let mounts = parsed_mounts(input)?;
+    for mount in mounts {
+        let mount = mount?;
+        found |= mount.is_documents()
+            && (path == mount.target || portal_path::strip_mount(path, &mount.target).is_some());
+    }
+    Ok(found)
+}
+
+fn parsed_mounts(
+    input: &[u8],
+) -> Result<impl Iterator<Item = Result<PortalMount, UnknownAlias>> + '_, UnknownAlias> {
+    if input.len() > MAX_MOUNT_BYTES {
+        return Err(UnknownAlias::new(AliasUncertainty::Limit));
+    }
+    let lines = input
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty());
+    Ok(lines.enumerate().map(|(index, line)| {
+        if index >= MAX_MOUNTS {
+            return Err(UnknownAlias::new(AliasUncertainty::Limit));
+        }
+        parse_mount(line)
+    }))
 }
 
 fn parse_mount(line: &[u8]) -> Result<PortalMount, UnknownAlias> {

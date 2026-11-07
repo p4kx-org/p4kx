@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::bound_documents_reply::BoundDocumentsReply;
 use crate::portal_alias::{AliasUncertainty, DocumentGrant, UnknownAlias};
 use crate::{portal_mount, portal_path};
 
@@ -21,7 +22,7 @@ pub(crate) struct DocumentsReply {
 }
 
 pub(crate) trait DocumentsTransport {
-    fn lookup(&mut self, document_id: &str) -> Result<DocumentsReply, UnknownAlias>;
+    fn lookup(&mut self, document_id: &str) -> Result<BoundDocumentsReply, UnknownAlias>;
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -56,8 +57,9 @@ pub(crate) fn resolve_with(
         return Ok(MappingOutcome::NotPortal);
     }
     let document = portal_path::document_path(path, &mount.target)?;
-    let reply = transport.lookup(&document.id)?;
-    validate_reply(&reply, &mount.target)?;
+    let bound = transport.lookup(&document.id)?;
+    bound.check_mount(&mount)?;
+    let reply = bound.reply();
     let host = match reply.paths.as_slice() {
         [] => return Err(UnknownAlias::new(AliasUncertainty::MissingDocument)),
         [(id, path)] if id == &document.id => path,
@@ -71,20 +73,20 @@ pub(crate) fn resolve_with(
     }))
 }
 
-fn validate_reply(reply: &DocumentsReply, mount: &[u8]) -> Result<(), UnknownAlias> {
-    if reply.body_bytes > MAX_REPLY_BYTES {
-        return Err(UnknownAlias::new(AliasUncertainty::Limit));
+impl DocumentsReply {
+    pub(crate) fn validate(&self) -> Result<(), UnknownAlias> {
+        if self.body_bytes > MAX_REPLY_BYTES {
+            return Err(UnknownAlias::new(AliasUncertainty::Limit));
+        }
+        if self.owner_before.is_empty() || self.owner_before != self.owner_after {
+            return Err(UnknownAlias::new(AliasUncertainty::OwnerChanged));
+        }
+        if self.interface < DOCUMENTS_INTERFACE_HOST_PATHS {
+            return Err(UnknownAlias::new(AliasUncertainty::UnsupportedInterface(
+                self.interface,
+            )));
+        }
+        portal_path::bytestring_path(&self.mount_point)?;
+        Ok(())
     }
-    if reply.owner_before.is_empty() || reply.owner_before != reply.owner_after {
-        return Err(UnknownAlias::new(AliasUncertainty::OwnerChanged));
-    }
-    if reply.interface < DOCUMENTS_INTERFACE_HOST_PATHS {
-        return Err(UnknownAlias::new(AliasUncertainty::UnsupportedInterface(
-            reply.interface,
-        )));
-    }
-    if portal_path::bytestring_path(&reply.mount_point)? != mount {
-        return Err(UnknownAlias::new(AliasUncertainty::UntrustedMount));
-    }
-    Ok(())
 }

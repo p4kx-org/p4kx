@@ -6,6 +6,8 @@
 
 mod archive_source_identity;
 mod archive_write_protection;
+#[cfg(any(target_os = "linux", test))]
+mod bound_documents_reply;
 mod created_output_file;
 mod installation;
 mod namespace_root;
@@ -23,6 +25,8 @@ mod portal_deadline;
 mod portal_filesystem;
 #[cfg(any(target_os = "linux", test))]
 mod portal_mount;
+#[cfg(any(target_os = "linux", test))]
+mod portal_mount_binding;
 #[cfg(target_os = "linux")]
 mod portal_native;
 #[cfg(any(target_os = "linux", test))]

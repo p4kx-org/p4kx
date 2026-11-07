@@ -100,11 +100,49 @@ fn portal_target(
     mounts: &[u8],
     expected: &Path,
 ) -> Result<Option<(PathBuf, PortalMount)>, UnknownAlias> {
-    if let Some(mount) = candidate_mount(path, mounts, expected)? {
-        return Ok(Some((path.to_path_buf(), mount)));
+    let bytes = path.as_os_str().as_bytes();
+    let direct = portal_mount::covering_mount(mounts, bytes)?
+        .ok_or_else(|| UnknownAlias::new(AliasUncertainty::MountInventory))?;
+    if direct.is_documents() {
+        return Ok(Some((path.to_path_buf(), direct)));
+    }
+    if direct.filesystem == b"fuse.portal" || portal_mount::has_documents_ancestor(mounts, bytes)? {
+        return Err(UnknownAlias::new(AliasUncertainty::UntrustedMount));
     }
     let resolved = portal_filesystem::existing_ancestor(path)?;
-    Ok(candidate_mount(&resolved, mounts, expected)?.map(|mount| (resolved, mount)))
+    if let Some(mount) = candidate_mount(&resolved, mounts, expected)? {
+        if bytes
+            .split(|byte| *byte == b'/')
+            .skip(1)
+            .any(|component| component.is_empty() || component == b"." || component == b"..")
+        {
+            return Err(UnknownAlias::new(AliasUncertainty::DocumentPath));
+        }
+        let target = preserve_document_suffix(path, &mount.target)?;
+        if candidate_mount(&target, mounts, expected)?.as_ref() != Some(&mount) {
+            return Err(UnknownAlias::new(AliasUncertainty::UntrustedMount));
+        }
+        return Ok(Some((target, mount)));
+    }
+    if path != resolved.as_path() && candidate_mount(path, mounts, expected)?.is_some() {
+        return Err(UnknownAlias::new(AliasUncertainty::UntrustedMount));
+    }
+    Ok(None)
+}
+
+fn preserve_document_suffix(path: &Path, mount: &[u8]) -> Result<PathBuf, UnknownAlias> {
+    let mut prefix = PathBuf::new();
+    let mut components = path.components();
+    while let Some(component) = components.next() {
+        prefix.push(component);
+        let mut resolved = portal_filesystem::existing_ancestor(&prefix)?;
+        let bytes = resolved.as_os_str().as_bytes();
+        if bytes == mount || portal_path::strip_mount(bytes, mount).is_some() {
+            resolved.push(components.as_path());
+            return Ok(resolved);
+        }
+    }
+    Err(UnknownAlias::new(AliasUncertainty::UntrustedMount))
 }
 
 fn candidate_mount(
@@ -121,6 +159,7 @@ fn candidate_mount(
     if mount.filesystem == b"fuse.portal"
         || bytes == expected.as_os_str().as_bytes()
         || portal_path::strip_mount(bytes, expected.as_os_str().as_bytes()).is_some()
+        || portal_mount::has_documents_ancestor(mounts, bytes)?
     {
         return Err(UnknownAlias::new(AliasUncertainty::UntrustedMount));
     }

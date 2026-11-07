@@ -143,9 +143,12 @@ effective-metadata check requires both markers and still rejects unrestricted X1
 retained in the native consumer logs before validation.
 
 Documents-portal checks inspect the kernel mount table with `findmnt`: each granted path must
-belong to the single `fuse.portal` mount with source `portal` at `$XDG_RUNTIME_DIR/doc`.
+belong to the single `fuse.portal` mount with source `portal`. The authenticated
+`GetMountPoint` route may reach its visible sandbox target through a runtime `doc` symlink.
 Generic FUSE filesystem labels from `stat` do not establish portal identity. The native logs
 retain the actual mount metadata and Flatpak/findmnt versions before testing portal operations.
+They separately measure the sandbox runtime directory, canonical document path and mount
+inventory; the host runtime-directory spelling does not substitute for those observations.
 They also record the measured Documents API version, XML introspection and installed portal
 package versions through a bounded probe. The [portal identity core](portal-alias-core.md)
 documents the separate host-mapping and write-policy contracts. Native validation uses two

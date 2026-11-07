@@ -16,15 +16,21 @@ exist yet; it does not create that output or inspect an inaccessible host parent
 
 The resolver reads the kernel's `/proc/self/mountinfo`, selects the deepest covering
 mount by component boundaries, and requires `fuse.portal` from source `portal`. The
-Documents service's `GetMountPoint` must identify that exact mount. Grant object
-device/inode identities and the complete covering mount row must remain equal before
+Documents service's unmodified `GetMountPoint` bytes are bound to that exact visible
+mount through its existing canonical directory. This permits the runtime `doc` symlink
+without treating a lexical path substitution as authentication. The declared route is
+observed twice against fresh inventories; probe and mapping use the same private binding.
+Grant object device/inode identities and the complete covering mount row must remain equal before
 and after the query. The original absolute input route is resolved again against a
 fresh mount inventory and must still select the same target and mount, including
 when an outer symbolic link reaches the document. Existing grant-root/descendant
 symbolic links are uncertain.
 Ordinary filesystem aliases are resolved through their nearest existing ancestor to
-detect a route into the portal. These observations do not eliminate a later check/write
-race or prove identity across another mount namespace.
+detect a route into the portal. The accepted route retains the original grant/suffix
+components after its alias prefix enters the Documents mount, so their symbolic links
+remain visible to the grant checks. Foreign nested mounts remain uncertain. These
+observations do not eliminate a later check/write race or prove identity across another
+mount namespace.
 
 Only the official Documents `GetHostPaths` API is an origin authority. It is available
 from interface version 5. Version 4, a missing method, denied access, timeout, owner
@@ -71,8 +77,12 @@ fake-bus tests exercise safe local Unix sockets and do not prove Linux/FUSE beha
 cross-check of the code is compilation evidence only.
 The disposable native package consumer separately records actual Documents version,
 XML introspection, package versions and mount metadata before exercising real grants.
-The measurement has a 5 s process deadline and a shared 128 KiB UTF-8 stdout/stderr
-budget. Its raw responses remain synthetic-runner artifacts; they are not printed as
+Each measurement has a 5 s process deadline and normally a shared 128 KiB UTF-8
+stdout/stderr budget. Mountpoint and sandbox runtime-path responses are capped at
+16 KiB; the kernel inventory uses a 512 KiB cap with one overflow sentinel byte.
+The consumer records the host Flatpak version, owner-bound `GetMountPoint`, actual
+sandbox `XDG_RUNTIME_DIR`, its canonical `doc` path and sandbox mount inventory.
+Its raw responses remain synthetic-runner artifacts; they are not printed as
 GitHub metadata. Flatpak startup requires interface 5 and a successful authenticated capability
 probe; recording interface 4 is evidence for the required negative session, not acceptance.
 
