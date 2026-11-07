@@ -22,9 +22,9 @@ if ($nextestVersion -cnotmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
 $platform = if ($Target) { Get-P4kxPlatform -Target $Target } else { Get-P4kxCurrentPlatform }
 Assert-P4kxNativeHost -Platform $platform
 $nativeToolchain = "$rustVersion-$($platform.target)"
+$outputs = @("rust-version=$rustVersion", "nextest-version=$nextestVersion", "rust-toolchain=$nativeToolchain", "target=$($platform.target)")
 
 if (-not $Verify) {
-    $outputs = @("rust-version=$rustVersion", "nextest-version=$nextestVersion", "rust-toolchain=$nativeToolchain", "target=$($platform.target)")
     if ($env:GITHUB_OUTPUT) {
         $outputs | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8NoBOM
     }
@@ -50,3 +50,5 @@ if ($Nextest) {
         throw "The test runner does not match the repository pin $nextestVersion."
     }
 }
+
+$outputs

@@ -48,6 +48,7 @@ jobs:
           "SOURCE_DATE_EPOCH=$epoch" >> $env:GITHUB_ENV
       - name: Verify Linux package and ABI contracts
         run: |
+          .github/scripts/test-build-tools-output.ps1 -Directory target/build-tool-output-contract-check
           .github/scripts/test-linux-package-contract.ps1 -Directory target/linux-contract-check
           python3 -B packaging/linux/runtime/test_collect_sources.py --directory target/linux-source-contract-check
           if ($LASTEXITCODE -ne 0) { throw 'Native runtime source inventory contract failed.' }
@@ -73,11 +74,17 @@ jobs:
         run: |
           $binary = "target/$env:P4KX_TARGET/release"
           $output = 'target/linux-release/package'
-          .github/scripts/build-linux-tar.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-tar
-          .github/scripts/build-linux-appimage.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-appimage -ToolsDirectory (Join-Path $env:RUNNER_TEMP 'linux-package-tools') -RuntimeDirectory target/linux-runtime
-          .github/scripts/build-linux-deb.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-deb
-          $env:FLATPAK_USER_DIR = [IO.Path]::GetFullPath('target/linux-flatpak-installation')
-          .github/scripts/build-linux-flatpak.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-flatpak
+          try {
+            .github/scripts/build-linux-tar.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-tar
+            .github/scripts/build-linux-appimage.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-appimage -ToolsDirectory (Join-Path $env:RUNNER_TEMP 'linux-package-tools') -RuntimeDirectory target/linux-runtime
+            .github/scripts/build-linux-deb.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-deb
+            $env:FLATPAK_USER_DIR = [IO.Path]::GetFullPath('target/linux-flatpak-installation')
+            .github/scripts/build-linux-flatpak.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-flatpak
+          }
+          catch {
+            [Console]::Error.WriteLine($_.ScriptStackTrace)
+            throw
+          }
       - name: Target-specific application and bundled runtime SBOMs
         run: |
           .github/scripts/build-target-sbom.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -OutputDirectory target/linux-release/package
