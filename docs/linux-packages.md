@@ -105,6 +105,10 @@ alongside the four Windows packages.
 
 ## Required native checks
 
+Contract fixtures, packaging stages, tools and runtime logs use a fresh `RUNNER_TEMP` task keyed
+by run, attempt, target and producer/consumer role, outside the cached Cargo build directory.
+Consumers require the complete producer matrix to succeed; missing artifacts still fail verification.
+
 [`release-linux.yml`](../.github/workflows/release-linux.yml) builds on the matching Ubuntu 24.04
 native CPU and verifies packages on a fresh matching runner. The consumer validates the source
 SHA, pinned compiler/nextest, baseline, CPU and package hashes before execution. It then runs:

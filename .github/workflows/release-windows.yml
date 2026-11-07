@@ -40,8 +40,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Create a fresh package task outside the Cargo cache
+        run: |
+          . .github/scripts/native-package-task.ps1
+          $task = New-P4kxNativePackageTask -Directory $env:RUNNER_TEMP -RunId $env:GITHUB_RUN_ID -Attempt $env:GITHUB_RUN_ATTEMPT -Target $env:P4KX_TARGET -Role producer
+          "P4KX_PACKAGE_TASK=$task" >> $env:GITHUB_ENV
+          .github/scripts/test-native-package-task.ps1 -Directory (Join-Path $task 'contracts/task-paths')
       - name: Verify CRT resolution and copy contracts with synthetic PE fixtures
-        run: .github/scripts/test-windows-runtime.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'windows-runtime-contract')
+        run: .github/scripts/test-windows-runtime.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/windows-runtime')
       - uses: ./.github/actions/setup-rust
         with:
           target: ${{ matrix.target }}
@@ -54,7 +60,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native release build failed.' }
       - name: Write unencrypted synthetic runtime fixture
         run: |
-          $fixture = [IO.Path]::GetFullPath('target/windows-release/fixture')
+          $fixture = Join-Path $env:P4KX_PACKAGE_TASK 'fixture'
           cargo run --release --locked --target $env:P4KX_TARGET -p p4kx-testkit --example native_fixture -- $fixture
           if ($LASTEXITCODE -ne 0) { throw 'Synthetic fixture generation failed.' }
       - name: Verify native software render execution
@@ -63,46 +69,51 @@ jobs:
           P4KX_REQUIRE_SOFTWARE_ADAPTER: "1"
         run: cargo nextest run --release --locked --target $env:P4KX_TARGET -p p4kx-render --lib --no-capture --no-tests fail -E 'test(the_software_adapter_is_named)'
       - name: Install pinned host packaging and target-analysis tools
-        run: .github/scripts/install-windows-package-tools.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'windows-package-tools')
+        run: .github/scripts/install-windows-package-tools.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'tools')
       - name: Verify both installer schemas and malformed runtime inventories without installation
         if: matrix.arch == 'amd64'
-        run: .github/scripts/test-windows-package-contract.ps1 -Directory target/windows-contract-check -Wix $env:WIX_EXE
+        run: .github/scripts/test-windows-package-contract.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/windows-package') -Wix $env:WIX_EXE
       - name: Architecture-specific portable ZIP and MSI payloads
         run: |
           . .github/scripts/platform-contract.ps1
-          New-Item -ItemType Directory -Force target/windows-release/package, target/windows-release/validation | Out-Null
+          $packages = Join-Path $env:P4KX_PACKAGE_TASK 'package'
+          $validation = Join-Path $env:P4KX_PACKAGE_TASK 'validation'
+          New-Item -ItemType Directory -Force $packages, $validation | Out-Null
           $binary = "target/$env:P4KX_TARGET/release"
           $zipName = Get-P4kxAssetName -Target $env:P4KX_TARGET -Version $env:VERSION -Package portable-zip
           $rootName = $zipName -replace '-portable\.zip$', ''
-          .github/scripts/build-windows-payload.ps1 -Target $env:P4KX_TARGET -BinaryDirectory $binary -OutputDirectory "target/windows-payload/$rootName" -Package portable-zip
-          Compress-Archive -Path "target/windows-payload/$rootName" -DestinationPath "target/windows-release/package/$zipName"
-          .github/scripts/build-windows-payload.ps1 -Target $env:P4KX_TARGET -BinaryDirectory $binary -OutputDirectory target/windows-msi-payload -Package msi
+          $portable = Join-Path $env:P4KX_PACKAGE_TASK "portable/$rootName"
+          $installed = Join-Path $env:P4KX_PACKAGE_TASK 'msi-payload'
+          .github/scripts/build-windows-payload.ps1 -Target $env:P4KX_TARGET -BinaryDirectory $binary -OutputDirectory $portable -Package portable-zip
+          Compress-Archive -Path $portable -DestinationPath (Join-Path $packages $zipName)
+          .github/scripts/build-windows-payload.ps1 -Target $env:P4KX_TARGET -BinaryDirectory $binary -OutputDirectory $installed -Package msi
           $msiName = Get-P4kxAssetName -Target $env:P4KX_TARGET -Version $env:VERSION -Package msi
-          .github/scripts/build-msi.ps1 -Wix $env:WIX_EXE -Target $env:P4KX_TARGET -Version $env:MSI_VERSION -BinaryFolder target/windows-msi-payload -Output "target/windows-release/package/$msiName"
-          .github/scripts/build-msi.ps1 -Wix $env:WIX_EXE -Target $env:P4KX_TARGET -Version $env:NEXT_MSI_VERSION -BinaryFolder target/windows-msi-payload -Output target/windows-release/validation/next.msi
-          .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -ArchivePath "target/windows-release/package/$zipName" -BinaryDirectory $binary -MetadataPath target/windows-release/validation/build.json
+          .github/scripts/build-msi.ps1 -Wix $env:WIX_EXE -Target $env:P4KX_TARGET -Version $env:MSI_VERSION -BinaryFolder $installed -Output (Join-Path $packages $msiName)
+          .github/scripts/build-msi.ps1 -Wix $env:WIX_EXE -Target $env:P4KX_TARGET -Version $env:NEXT_MSI_VERSION -BinaryFolder $installed -Output (Join-Path $validation 'next.msi')
+          .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -ArchivePath (Join-Path $packages $zipName) -BinaryDirectory $binary -MetadataPath (Join-Path $validation 'build.json')
       - name: Per-target and per-binary SBOM including app-local runtime files
-        run: .github/scripts/build-target-sbom.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -OutputDirectory target/windows-release/package -RuntimeInventory target/windows-msi-payload/windows-runtime.json
+        run: .github/scripts/build-target-sbom.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'package') -RuntimeInventory (Join-Path $env:P4KX_PACKAGE_TASK 'msi-payload/windows-runtime.json')
       - name: Record actual adapter outcome and host-tool roles
         env:
           ADAPTER_OUTCOME: ${{ steps.adapter.outcome }}
         run: |
           if ($env:ADAPTER_OUTCOME -cne 'success') { throw 'Native software adapter did not execute successfully.' }
-          @{target=$env:P4KX_TARGET; revision=$env:GITHUB_SHA; outcome=$env:ADAPTER_OUTCOME} | ConvertTo-Json | Set-Content target/windows-release/validation/adapter.json -Encoding utf8NoBOM
-          Copy-Item (Join-Path $env:RUNNER_TEMP 'windows-package-tools/package-tools.json') target/windows-release/validation/package-tools.json
+          @{target=$env:P4KX_TARGET; revision=$env:GITHUB_SHA; outcome=$env:ADAPTER_OUTCOME} | ConvertTo-Json | Set-Content (Join-Path $env:P4KX_PACKAGE_TASK 'validation/adapter.json') -Encoding utf8NoBOM
+          Copy-Item (Join-Path $env:P4KX_PACKAGE_TASK 'tools/package-tools.json') (Join-Path $env:P4KX_PACKAGE_TASK 'validation/package-tools.json')
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-build-${{ matrix.target }}
           path: |
-            target/windows-release/package/*
-            target/windows-release/fixture/*
-            target/windows-release/validation/*.json
-            target/windows-release/validation/next.msi
+            ${{ env.P4KX_PACKAGE_TASK }}/package/*
+            ${{ env.P4KX_PACKAGE_TASK }}/fixture/*
+            ${{ env.P4KX_PACKAGE_TASK }}/validation/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/validation/next.msi
           if-no-files-found: error
 
   verify:
     name: Execute native Windows packages (${{ matrix.target }})
     needs: build
+    if: ${{ needs.build.result == 'success' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     permissions:
@@ -121,6 +132,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Create fresh native package verification folders
+        run: |
+          . .github/scripts/native-package-task.ps1
+          $task = New-P4kxNativePackageTask -Directory $env:RUNNER_TEMP -RunId $env:GITHUB_RUN_ID -Attempt $env:GITHUB_RUN_ATTEMPT -Target $env:P4KX_TARGET -Role consumer
+          "P4KX_PACKAGE_TASK=$task" >> $env:GITHUB_ENV
       - uses: ./.github/actions/install-rust
         with:
           target: ${{ matrix.target }}
@@ -140,14 +156,15 @@ jobs:
           . .github/scripts/platform-contract.ps1
           $base = "artifacts/windows-build-$env:P4KX_TARGET"
           $zipName = Get-P4kxAssetName -Target $env:P4KX_TARGET -Version $env:VERSION -Package portable-zip
-          .github/scripts/check-portable.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -Archive "$base/package/$zipName" -FixtureDirectory "$base/fixture" -OutputDirectory target/portable-check
+          .github/scripts/check-portable.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -Archive "$base/package/$zipName" -FixtureDirectory "$base/fixture" -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'portable-check')
       - name: Exact AMD64 historical predecessor
         if: matrix.arch == 'amd64'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          New-Item -ItemType Directory -Force target/previous | Out-Null
-          gh release download v0.2.0 --repo p4kx-org/p4kx --pattern P4K-Extractor-0.2.0-x86_64.msi --dir target/previous
+          $previous = Join-Path $env:P4KX_PACKAGE_TASK 'previous'
+          New-Item -ItemType Directory -Force $previous | Out-Null
+          gh release download v0.2.0 --repo p4kx-org/p4kx --pattern P4K-Extractor-0.2.0-x86_64.msi --dir $previous
           if ($LASTEXITCODE -ne 0) { throw 'Exact historical AMD64 MSI download failed.' }
       - name: Installer metadata, upgrade, downgrade, rollback, CPU replacement and preservation
         run: |
@@ -157,9 +174,9 @@ jobs:
           $base = "artifacts/windows-build-$env:P4KX_TARGET"
           $msiName = Get-P4kxAssetName -Target $row.target -Version $env:VERSION -Package msi
           $otherName = Get-P4kxAssetName -Target $other.target -Version $env:VERSION -Package msi
-          $previous = if ($row.arch -eq 'amd64') { @{PreviousMsi='target/previous/P4K-Extractor-0.2.0-x86_64.msi'} } else { @{} }
+          $previous = if ($row.arch -eq 'amd64') { @{PreviousMsi=(Join-Path $env:P4KX_PACKAGE_TASK 'previous/P4K-Extractor-0.2.0-x86_64.msi')} } else { @{} }
           $upgradeCode = ([xml](Get-Content crates/p4kx-gui/wix/main.wxs)).Wix.Package.UpgradeCode
-          .github/scripts/check-msi.ps1 -Target $row.target -Msi "$base/package/$msiName" -NextMsi "$base/validation/next.msi" -NextVersion $env:NEXT_MSI_VERSION -UpgradeCode $upgradeCode -OtherArchitectureMsi "artifacts/windows-build-$($other.target)/package/$otherName" -FixtureDirectory "$base/fixture" -OutputDirectory target/installer-check @previous
+          .github/scripts/check-msi.ps1 -Target $row.target -Msi "$base/package/$msiName" -NextMsi "$base/validation/next.msi" -NextVersion $env:NEXT_MSI_VERSION -UpgradeCode $upgradeCode -OtherArchitectureMsi "artifacts/windows-build-$($other.target)/package/$otherName" -FixtureDirectory "$base/fixture" -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check') @previous
       - name: Record executed release payload evidence
         run: |
           $base = "artifacts/windows-build-$env:P4KX_TARGET"
@@ -167,17 +184,17 @@ jobs:
           if ($adapter.target -cne $env:P4KX_TARGET -or $adapter.revision -cne $env:GITHUB_SHA -or $adapter.outcome -cne 'success') { throw 'Native adapter evidence source/CPU/outcome mismatch.' }
           $env:SOFTWARE_ADAPTER_OUTCOME = $adapter.outcome
           $output = "$base/package/P4KX-$env:VERSION-$env:P4KX_TARGET-runtime.json"
-          .github/scripts/record-windows-release-runtime.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory "$base/package" -PortableResult target/portable-check/smoke/runtime.json -InstalledResult target/installer-check/installed/runtime.json -InstallerResult target/installer-check/installer.json -BuildMetadata "$base/validation/build.json" -OutputPath $output
+          .github/scripts/record-windows-release-runtime.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory "$base/package" -PortableResult (Join-Path $env:P4KX_PACKAGE_TASK 'portable-check/smoke/runtime.json') -InstalledResult (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/installed/runtime.json') -InstallerResult (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/installer.json') -BuildMetadata "$base/validation/build.json" -OutputPath $output
           Copy-Item "$base/validation/package-tools.json" "$base/package/P4KX-$env:VERSION-$env:P4KX_TARGET-package-tools.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: windows-package-logs-${{ matrix.target }}
           path: |
-            target/installer-check/**/*.log
-            target/installer-check/**/*.json
-            target/portable-check/**/*.log
-            target/portable-check/smoke/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/**/*.log
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/**/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/portable-check/**/*.log
+            ${{ env.P4KX_PACKAGE_TASK }}/portable-check/smoke/*.json
           if-no-files-found: ignore
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

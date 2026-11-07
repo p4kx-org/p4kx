@@ -34,6 +34,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Create a fresh package task outside the Cargo cache
+        run: |
+          . .github/scripts/native-package-task.ps1
+          $task = New-P4kxNativePackageTask -Directory $env:RUNNER_TEMP -RunId $env:GITHUB_RUN_ID -Attempt $env:GITHUB_RUN_ATTEMPT -Target $env:P4KX_TARGET -Role producer
+          "P4KX_PACKAGE_TASK=$task" >> $env:GITHUB_ENV
+          .github/scripts/test-native-package-task.ps1 -Directory (Join-Path $task 'contracts/task-paths')
       - uses: ./.github/actions/setup-rust
         with:
           target: ${{ matrix.target }}
@@ -49,19 +55,19 @@ jobs:
           "SOURCE_DATE_EPOCH=$epoch" >> $env:GITHUB_ENV
       - name: Verify Linux package and ABI contracts
         run: |
-          .github/scripts/test-build-tools-output.ps1 -Directory target/build-tool-output-contract-check
-          .github/scripts/test-linux-source-tree.ps1 -Directory target/linux-source-tree-contract-check
-          .github/scripts/test-linux-appdir-root.ps1 -Directory target/linux-appdir-root-contract-check
-          .github/scripts/test-linux-package-contract.ps1 -Directory target/linux-contract-check
-          python3 -B packaging/linux/runtime/test_collect_sources.py --directory target/linux-source-contract-check
+          .github/scripts/test-build-tools-output.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/build-tool-output')
+          .github/scripts/test-linux-source-tree.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/source-tree')
+          .github/scripts/test-linux-appdir-root.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/appdir-root')
+          .github/scripts/test-linux-package-contract.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/linux-package')
+          python3 -B packaging/linux/runtime/test_collect_sources.py --directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/runtime-sources')
           if ($LASTEXITCODE -ne 0) { throw 'Native runtime source inventory contract failed.' }
-          python3 -B packaging/linux/runtime/test_build_inputs.py --directory target/linux-build-input-contract-check
+          python3 -B packaging/linux/runtime/test_build_inputs.py --directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/runtime-inputs')
           if ($LASTEXITCODE -ne 0) { throw 'Native runtime compiled-input binding contract failed.' }
       - name: Build all three shipped native release applications
         run: |
           cargo build --release --locked --target $env:P4KX_TARGET -p p4kx -p p4kx-gui -p p4kx-mcp
           if ($LASTEXITCODE -ne 0) { throw 'Native Linux release build failed.' }
-          $fixture = [IO.Path]::GetFullPath('target/linux-release/fixture')
+          $fixture = Join-Path $env:P4KX_PACKAGE_TASK 'fixture'
           cargo run --release --locked --target $env:P4KX_TARGET -p p4kx-testkit --example native_fixture -- $fixture
           if ($LASTEXITCODE -ne 0) { throw 'Native fixture generation failed.' }
       - name: Execute the native Mesa software adapter
@@ -70,19 +76,19 @@ jobs:
       - name: Install pinned native host packaging and SBOM tools
         run: |
           . .github/scripts/linux-package-tools.ps1
-          Install-P4kxLinuxPackageTools -Target $env:P4KX_TARGET -Directory (Join-Path $env:RUNNER_TEMP 'linux-package-tools')
+          Install-P4kxLinuxPackageTools -Target $env:P4KX_TARGET -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'tools')
       - name: Build the native static AppImage runtime and corresponding source
-        run: .github/scripts/build-linux-runtime.ps1 -Target $env:P4KX_TARGET -StagingDirectory target/linux-runtime-build -OutputDirectory target/linux-runtime
+        run: .github/scripts/build-linux-runtime.ps1 -Target $env:P4KX_TARGET -StagingDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'runtime-build') -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'runtime')
       - name: Build native tar.gz, AppImage, deb and Flatpak from the release executables
         run: |
           $binary = "target/$env:P4KX_TARGET/release"
-          $output = 'target/linux-release/package'
+          $output = Join-Path $env:P4KX_PACKAGE_TASK 'package'
           try {
-            .github/scripts/build-linux-tar.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-tar
-            .github/scripts/build-linux-appimage.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-appimage -ToolsDirectory (Join-Path $env:RUNNER_TEMP 'linux-package-tools') -RuntimeDirectory target/linux-runtime
-            .github/scripts/build-linux-deb.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-deb
-            $env:FLATPAK_USER_DIR = [IO.Path]::GetFullPath('target/linux-flatpak-installation')
-            .github/scripts/build-linux-flatpak.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory target/linux-flatpak
+            .github/scripts/build-linux-tar.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'tar')
+            .github/scripts/build-linux-appimage.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'appimage') -ToolsDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'tools') -RuntimeDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'runtime')
+            .github/scripts/build-linux-deb.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'deb')
+            $env:FLATPAK_USER_DIR = Join-Path $env:P4KX_PACKAGE_TASK 'flatpak-installation'
+            .github/scripts/build-linux-flatpak.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'flatpak')
           }
           catch {
             [Console]::Error.WriteLine($_.ScriptStackTrace)
@@ -90,32 +96,33 @@ jobs:
           }
       - name: Target-specific application and bundled runtime SBOMs
         run: |
-          .github/scripts/build-target-sbom.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -OutputDirectory target/linux-release/package
-          .github/scripts/enrich-linux-sbom.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory target/linux-release/package -AppDir target/linux-appimage/AppDir -RuntimeDirectory target/linux-runtime
+          .github/scripts/build-target-sbom.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'package')
+          .github/scripts/enrich-linux-sbom.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'package') -AppDir (Join-Path $env:P4KX_PACKAGE_TASK 'appimage/AppDir') -RuntimeDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'runtime')
       - name: Bind source, native CPU, exact compiler and actual software-adapter execution
         env:
           ADAPTER_OUTCOME: ${{ steps.adapter.outcome }}
         run: |
           . .github/scripts/platform-contract.ps1
           if ($env:ADAPTER_OUTCOME -cne 'success') { throw 'Native software adapter did not execute successfully.' }
-          New-Item -ItemType Directory -Force target/linux-release/validation | Out-Null
+          $validation = Join-Path $env:P4KX_PACKAGE_TASK 'validation'
+          New-Item -ItemType Directory -Force $validation | Out-Null
           $tar = Get-P4kxAssetName -Target $env:P4KX_TARGET -Version $env:VERSION -Package tar-gz
-          .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -ArchivePath "target/linux-release/package/$tar" -BinaryDirectory "target/$env:P4KX_TARGET/release" -MetadataPath target/linux-release/validation/build.json
-          @{target=$env:P4KX_TARGET; revision=$env:GITHUB_SHA; outcome=$env:ADAPTER_OUTCOME} | ConvertTo-Json | Set-Content target/linux-release/validation/adapter.json -Encoding utf8NoBOM
-          Copy-Item (Join-Path $env:RUNNER_TEMP 'linux-package-tools/package-tools.json') target/linux-release/validation/package-tools.json
+          .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -ArchivePath (Join-Path $env:P4KX_PACKAGE_TASK "package/$tar") -BinaryDirectory "target/$env:P4KX_TARGET/release" -MetadataPath (Join-Path $validation 'build.json')
+          @{target=$env:P4KX_TARGET; revision=$env:GITHUB_SHA; outcome=$env:ADAPTER_OUTCOME} | ConvertTo-Json | Set-Content (Join-Path $validation 'adapter.json') -Encoding utf8NoBOM
+          Copy-Item (Join-Path $env:P4KX_PACKAGE_TASK 'tools/package-tools.json') (Join-Path $validation 'package-tools.json')
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-build-${{ matrix.target }}
           path: |
-            target/linux-release/package/*
-            target/linux-release/fixture/*
-            target/linux-release/validation/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/package/*
+            ${{ env.P4KX_PACKAGE_TASK }}/fixture/*
+            ${{ env.P4KX_PACKAGE_TASK }}/validation/*.json
           if-no-files-found: error
 
   verify:
     name: Execute native Linux packages (${{ matrix.target }})
     needs: build
-    if: ${{ !cancelled() && needs.build.result != 'skipped' }}
+    if: ${{ needs.build.result == 'success' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     permissions:
@@ -138,6 +145,11 @@ jobs:
         with:
           name: linux-build-${{ matrix.target }}
           path: artifacts/linux-build-${{ matrix.target }}
+      - name: Create fresh native package verification folders
+        run: |
+          . .github/scripts/native-package-task.ps1
+          $task = New-P4kxNativePackageTask -Directory $env:RUNNER_TEMP -RunId $env:GITHUB_RUN_ID -Attempt $env:GITHUB_RUN_ATTEMPT -Target $env:P4KX_TARGET -Role consumer
+          "P4KX_PACKAGE_TASK=$task" >> $env:GITHUB_ENV
       - uses: ./.github/actions/install-rust
         with:
           target: ${{ matrix.target }}
@@ -147,7 +159,7 @@ jobs:
       - name: Execute each real package launcher, desktop frames and Documents portal grants
         run: |
           $base = "artifacts/linux-build-$env:P4KX_TARGET"
-          & dbus-run-session -- xvfb-run --auto-servernum pwsh -NoProfile -File .github/scripts/check-linux-packages.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory "$base/package" -FixtureDirectory "$base/fixture" -BuildMetadata "$base/validation/build.json" -AdapterEvidence "$base/validation/adapter.json" -OutputDirectory target/linux-package-check
+          & dbus-run-session -- xvfb-run --auto-servernum pwsh -NoProfile -File .github/scripts/check-linux-packages.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory "$base/package" -FixtureDirectory "$base/fixture" -BuildMetadata "$base/validation/build.json" -AdapterEvidence "$base/validation/adapter.json" -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'package-check')
           if ($LASTEXITCODE -ne 0) { throw 'Native installed Linux package execution failed.' }
           Copy-Item "$base/validation/package-tools.json" "$base/package/P4KX-$env:VERSION-$env:P4KX_TARGET-package-tools.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -155,8 +167,8 @@ jobs:
         with:
           name: linux-package-logs-${{ matrix.target }}
           path: |
-            target/linux-package-check/**/*.log
-            target/linux-package-check/**/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/package-check/**/*.log
+            ${{ env.P4KX_PACKAGE_TASK }}/package-check/**/*.json
           if-no-files-found: ignore
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

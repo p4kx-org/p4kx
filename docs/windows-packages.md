@@ -79,6 +79,10 @@ assert those capabilities. Native CI/device run URLs must be retained with the f
 
 ## Release integration
 
+Contract fixtures, packaging stages, tools and runtime logs use a fresh `RUNNER_TEMP` task keyed
+by run, attempt, target and producer/consumer role, outside the cached Cargo build directory.
+Consumers require the complete producer matrix to succeed; missing artifacts still fail verification.
+
 `release-windows.yml` consumes the Windows rows of `.config/platforms.json`. Each native producer
 builds three release applications and a next-version MSI, generates target-filtered CycloneDX
 SBOMs including any Microsoft runtime files, and uploads `windows-build-<target>`. A separate
