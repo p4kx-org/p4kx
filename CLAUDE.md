@@ -20,17 +20,16 @@ the build, architecture, or the rules below change.
 Real p4k files live under `C:\Program Files\Roberts Space Industries\StarCitizen\<channel>\Data.p4k`,
 one folder per channel (`LIVE`, `PTU`, `EPTU`, `HOTFIX`, `TECH-PREVIEW`). They are many gigabytes,
 read-only and game assets: never copy them or anything extracted from them into the repository, and
-never write into the game folders. Extraction output during development goes under
-`D:\Coding\claude-worktrees\p4k-extractor\`.
+never write into the game folders. Extraction output during development goes into the agent's
+task folder under `D:\Coding\Agents\Temp\<agent>\` (see "Rules").
 
 Never read `loginData.json` or other launcher credential files in the game folders. Tests against a
 real Archive are `#[ignore]`d and need `P4KX_DATA_P4K`; CI uses synthetic
-fixtures. Run them with `TMP` and `TEMP` under `D:\Coding\claude-worktrees\p4k-extractor\` so the
-extracted subset lands there; the suite also uses the stored key (`P4KX_ARCHIVE_KEY`, else the
+fixtures. Run them with `TMP` and `TEMP` in that task folder so the extracted subset lands there; the suite also uses the stored key (`P4KX_ARCHIVE_KEY`, else the
 file named by `P4KX_KEY_FILE`, else `p4kx key set`'s file), so none is set by hand:
 
 ```powershell
-$env:TMP = 'D:\Coding\claude-worktrees\p4k-extractor\tmp'; $env:TEMP = $env:TMP
+$env:TMP = 'D:\Coding\Agents\Temp\claude\<task>\tmp'; $env:TEMP = $env:TMP
 $env:P4KX_DATA_P4K = 'C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Data.p4k'
 $env:P4KX_DATA_P4K_B = 'C:\Program Files\Roberts Space Industries\StarCitizen\PTU\Data.p4k'
 cargo test --release --workspace --locked -- --ignored
@@ -175,7 +174,12 @@ a new test file goes into `tests/it/` and `main.rs` gets its `mod` line.
   --release <version>` assembles the fragments at the Release.
 - Shell work uses PowerShell 7 (`pwsh`). Commit messages go through `git commit -s -F <file>`,
   PR and issue bodies through `--body-file <file>`.
-- Worktrees and temporary files only under `D:\Coding\claude-worktrees\p4k-extractor\`.
+- Worktrees and temporary files only under `D:\Coding\Agents`, in each agent's own folder (Claude:
+  `claude`, Codex: `codex`): worktrees in `D:\Coding\Agents\Worktrees\<agent>\p4k-extractor\<name>`,
+  temporary files (scratch scripts, test `TMP`, cargo target dirs, extraction output, commit-message
+  files) in `D:\Coding\Agents\Temp\<agent>\<task>`, one folder per piece of work. Remove the task
+  folder when the work is done and a worktree once its branch is merged or abandoned; never touch
+  another agent's folder.
 
 ## Agent skills
 
