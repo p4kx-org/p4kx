@@ -59,7 +59,8 @@ try {
     $env:P4KX_TEST_DEBIAN_RECEIPT = Join-Path $root 'receipt.txt'
     $env:P4KX_TEST_DEBIAN_FAILURE = '0'
     $env:P4KX_TEST_DEBIAN_SCRIPT = $scanner
-    $env:P4KX_TEST_DEBIAN_PWSH = (Get-Command pwsh -CommandType Application).Source
+    $env:P4KX_TEST_DEBIAN_PWSH = [Environment]::ProcessPath
+    if (-not $env:P4KX_TEST_DEBIAN_PWSH -or -not (Test-Path -LiteralPath $env:P4KX_TEST_DEBIAN_PWSH -PathType Leaf)) { throw 'The current PowerShell executable is unavailable.' }
     if ($IsLinux) { Invoke-P4kxLinuxTool '/usr/bin/chmod' @('0755', $launcher) | Out-Null }
     if ((Get-Command dpkg-shlibdeps).Source -cne $launcher) { throw 'Unqualified dependency scanner did not resolve to the concrete synthetic launcher.' }
     $dependencies = Get-P4kxDebianPackageDependencies -StagingDirectory 'package stage'
