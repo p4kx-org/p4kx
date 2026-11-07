@@ -20,7 +20,7 @@ function New-TestImage($Path){
         core=@{status='valid';phase='committed';owner=$null;reserved_binding=$null;journal_binding=$null}}
 }
 $metadata=@{product='11111111-1111-1111-1111-111111111111';package='22222222-2222-2222-2222-222222222222'}
-$context=@{msi='current.msi';metadata=$metadata;upgrade='upgrade';folder='C:\P4KX';shortcut='shortcut';logs='C:\runner';helper='helper';helper_calls=0}
+$context=@{msi='current.msi';metadata=$metadata;upgrade='upgrade';folder='C:\P4KX';shortcut='shortcut';logs=$PSScriptRoot;helper='helper';helper_calls=0}
 $fixture=@{}
 $original=New-TestImage @{registry_type=2;bytes_hex='41000000'}
 $script:state=Copy-TestValue $original
