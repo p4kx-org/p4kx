@@ -29,6 +29,7 @@ p4kx-export = { path = "crates/p4kx-export" }
 p4kx-gfx = { path = "crates/p4kx-gfx" }
 p4kx-guard = { path = "crates/p4kx-guard" }
 p4kx-localization = { path = "crates/p4kx-localization" }
+p4kx-media = { path = "crates/p4kx-media" }
 p4kx-render = { path = "crates/p4kx-render" }
 p4kx-screens = { path = "crates/p4kx-screens" }
 p4kx-search = { path = "crates/p4kx-search" }

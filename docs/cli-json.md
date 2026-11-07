@@ -14,6 +14,21 @@ Paths of files on disk are strings as the operating system displays them. Entry 
 as stored in the Archive, with `\` as separator. Sizes are byte counts. Snapshots of every shape
 live in [`crates/p4kx/tests/it/snapshots`](../crates/p4kx/tests/it/snapshots).
 
+## `p4kx media export <archive> --out <directory> --json`
+
+The successful response is `{"status":"published","index":{...}}`; `status` is `published`,
+`unchanged`, `skipped` or `incomplete`. The `index` is the exact versioned
+[media index contract](media-export.md), independent of the catalog schema. An incomplete response
+requires explicit `--diagnostic`, has `index.complete: false` and returns exit code 1. Failures
+before publication write no success response and leave the previous complete generation in place.
+A stdout reporting failure does not undo an already committed generation.
+
+`p4kx media schema` prints [media-index.schema.json](../schemas/media-index.schema.json).
+`--record`, `--reference` and `--source` print the corresponding
+[record](../schemas/media-record.schema.json), [reference](../schemas/media-reference.schema.json)
+and [source](../schemas/media-source.schema.json) schemas. These schemas also describe the streamed
+files referenced by `index`; the JSONL streams and binary artifacts stay in the output directory.
+
 ## Entry
 
 The shape of one Entry in `list` and `search`:

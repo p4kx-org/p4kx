@@ -49,6 +49,7 @@ mod cli_hologram;
 mod cli_interior;
 mod cli_key;
 mod cli_loc;
+mod cli_media;
 mod cli_model;
 mod cli_output;
 mod cli_prefab;
@@ -110,6 +111,7 @@ mod key;
 mod layers_json;
 mod list;
 mod loc;
+mod media;
 mod model;
 mod model_animations;
 mod model_bones;
@@ -207,6 +209,7 @@ fn dispatch(command: Command, json: bool, given: &key::Given) -> anyhow::Result<
         Command::Dcb(args) => dcb::run(&args, json),
         Command::Grep(args) => grep::run(&args, json),
         Command::Catalog(args) => catalog::run(&args, json),
+        Command::Media(args) => media::run(&args, json),
         Command::Coverage(args) => coverage::run(&args, json),
         Command::Ships(args) => ships::run(&args, json),
         Command::Entity(args) => entity::run(&args, json),

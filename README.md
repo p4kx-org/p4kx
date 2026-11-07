@@ -40,6 +40,10 @@ Copyright (c) 2026 the P4KX contributors
   names valid on both Linux and Windows. `--convert` turns CryXml into XML, the DataForge into one
   XML file per Record, textures into PNG, DDS or OpenEXR and sounds into Ogg or WAV on the way;
   `p4kx convert` does the same for a folder extracted earlier.
+- **Versioned media inventory.** `media export` streams physical source identities, retained raw
+  payloads, scoped hashes and provider metadata into atomic generations with a shared JSON Schema.
+  The initial provider exports Archive metadata; see [the media contract](docs/media-export.md)
+  for supported kinds, explicit capability refusals and resource bounds.
 - **DataForge and Records.** Reads DataForge versions 6 and 8, from an Archive or from a
   `Game2.dcb` file on disk, as a canonical Record tree, exports it as Record XML, Record JSON,
   NDJSON or flat CSV, and answers Queries, References, tag trees and field statistics over it.
@@ -94,7 +98,7 @@ codes are in `p4kx --help`. Every command takes the path of a `Data.p4k` as `<ar
 |---|---|
 | Archive | `list`, `search`, `grep`, `info`, `verify`, `extract`, `convert`, `channels`, `socpak`, `key` |
 | DataForge | `dcb info`, `dcb export`, `dcb query`, `dcb refs`, `dcb tags`, `dcb fields`, `prefab` |
-| Exports | `catalog`, `ships`, `actionmap export`, `loc`, `coverage` |
+| Exports | `catalog`, `ships`, `media export\|schema`, `actionmap export`, `loc`, `coverage` |
 | Comparison | `compare` (`--entries`, `--records`, `--schema`, `--diff`) |
 | Formats | `cryxml`, `texture`, `audio`, `bnk`, `chunks`, `model`, `ui assets\|extract\|render` |
 | 3D and Blender | `entity loadout\|glb\|package`, `interior glb\|package`, `armour`, `character package`, `chf`, `ui hologram\|screens` |

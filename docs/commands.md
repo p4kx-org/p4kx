@@ -372,6 +372,16 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   joystick. The CSV has one row per action and a cell per device, bindings joined with ` | `; the
   JSON lists every binding with its device, input and activation mode ([ADR-0180](adr/0180-the-action-map-export-lists-every-default-binding-of-the-default-profile.md)).
   A label whose key has no text in `--language` (English by default) stays empty.
+- `p4kx media export <archive> --out <directory> [--kind <kind>] [--filter <filter>]
+  [--exclude <filter>] [--conflict skip|overwrite|if-changed] [--diagnostic]` writes the
+  versioned `p4kx-media` inventory as JSONL streams, exact decoded raw payloads and an atomic
+  `media-index.json`. Repeat `--kind` and `--exclude` for explicit selections. Omission selects
+  all registered providers; the initial provider is `archive`. A known kind without a provider
+  fails explicitly. Incomplete diagnostic generations remain separate from the complete root
+  index. Byte, count, nesting and reference limits are exposed as `--max-*` options; their defaults,
+  scopes, publication rules and provider API are in [media-export.md](media-export.md).
+  `p4kx media schema` prints the index schema; mutually exclusive `--record`, `--reference` and
+  `--source` select the JSONL record, common reference and retained-source schemas.
 - `p4kx catalog <archive> --out <file> [--filter <filter>] [--diagnostic-partial]
   [--exported-at <seconds>]` writes the
   Basetool catalog for the basetool's P4K import ([docs/basetool-catalog.md](basetool-catalog.md)):
@@ -692,6 +702,13 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 | 6 | `compare`: the report or the output cannot be written |
 | 7 | The Archive key is missing or wrong: an Entry is encrypted and no key was given with `--key`, `P4KX_ARCHIVE_KEY` or `p4kx key set`, or the key does not decrypt the Archive |
 | 130 | Interrupted: a second Ctrl+C ended an Extraction at once; temporary `.p4kx-*.part` files may remain |
+
+`media export` returns 0 for published, unchanged or validated skipped generations; 1 for diagnosed
+incompleteness, unsupported providers, resource limits, cancellation or generation failures; 2 for
+invalid bounds, unsafe destinations or protected output; 4 for source changes; and 7 for original
+missing or wrong Archive-key errors, including errors wrapped by source retention. A root Archive
+that cannot be opened uses the existing Archive error codes. Failures before publication keep the previous
+complete index.
 
 `p4kx --help` lists every case of each code.
 

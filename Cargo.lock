@@ -3514,6 +3514,7 @@ dependencies = [
  "p4kx-comparison",
  "p4kx-export",
  "p4kx-extraction",
+ "p4kx-media",
  "p4kx-render",
  "p4kx-screens",
  "p4kx-search",
@@ -3866,6 +3867,22 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
+]
+
+[[package]]
+name = "p4kx-media"
+version = "0.4.2"
+dependencies = [
+ "jsonschema",
+ "p4kx-extraction",
+ "p4kx-testkit",
+ "schemars",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

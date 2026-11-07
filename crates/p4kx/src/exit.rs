@@ -96,7 +96,8 @@ pub(crate) const EXIT_CODES_HELP: &str = "Exit codes:
      without it) or whose expressions it could not make, or a name given to --expression that
      the rig lacks or that moves no vertex (the GLB is written without them); wwise events: the
      Entities cannot be looked up (the triggers are still listed); compare: the Archives or the
-     --diff Entry differ; chf diff: the CHF files differ
+     --diff Entry differ; chf diff: the CHF files differ; media export: diagnosed incompleteness,
+     unavailable providers, exceeded limits, cancellation or generation failures
   2  invalid input: bad arguments, an Entry path the Archive does not contain (for --diff:
      neither Archive contains), a Filter that matches no Entry or Record or whose --exclude
      Filters leave nothing, Filter text that is too long or has too many wildcards, a Channel
@@ -122,7 +123,7 @@ pub(crate) const EXIT_CODES_HELP: &str = "Exit codes:
      actionmap export, a canvas for ui render --screen that no Record, several Records or a
      Record of another type name, or whose side is below 1 or above 16384 pixels, or a prefab
      library or prefab the Archive lacks, or for convert an input that is no folder or an output
-     folder that overlaps the input folder
+     folder that overlaps the input folder, or an unsafe media export destination
   3  the Archive or the input file cannot be read: missing, not an Archive, not CryXml, not a
      chunk or CHF file or UI movie, corrupt, a corrupt model or companion (for entity glb and
      entity package the geometry of the Entity itself, its .chrm or .skinm companion or the
@@ -165,15 +166,24 @@ fn is_filter_refusal(error: &anyhow::Error) -> bool {
         || error.downcast_ref::<FilterError>().is_some()
 }
 
-fn code_for(error: &anyhow::Error) -> u8 {
+fn specialized_code(error: &anyhow::Error) -> Option<u8> {
     if crate::key::is_key_error(error) {
-        return KEY_ERROR;
+        return Some(KEY_ERROR);
     }
-    if let Some(error) = error.downcast_ref::<LineDiffError>() {
-        return match error {
+    if let Some(code) = crate::media::error_code(error) {
+        return Some(code);
+    }
+    error
+        .downcast_ref::<LineDiffError>()
+        .map(|error| match error {
             LineDiffError::UnknownEntry { .. } => INVALID_INPUT,
             _ => ARCHIVE_ERROR,
-        };
+        })
+}
+
+fn code_for(error: &anyhow::Error) -> u8 {
+    if let Some(code) = specialized_code(error) {
+        return code;
     }
     let dataforge = error.downcast_ref::<DataForgeLoadError>();
     if error.downcast_ref::<ArchiveError>().is_some()
