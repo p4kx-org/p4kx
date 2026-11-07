@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'flatpak-document-cases.ps1')
+. (Join-Path $PSScriptRoot 'documents-portal-evidence.ps1')
 
 function Test-P4kxDocumentUnderlyingForgery {
     param($Case, [string]$Source)
@@ -22,11 +23,38 @@ function Get-P4kxDocumentId {
     return $parts[0]
 }
 
+function Invoke-P4kxDocumentHardlinkRefusal {
+    param($Case, [string]$Source, [string]$Output)
+    $arguments = @('extract', $Source, '--filter', 'Data/hello.txt', '--conflict', 'overwrite', '--out', $Output, '--json')
+    $result = Invoke-P4kxPortalProcess flatpak ($Case.prefix + $arguments) $Case.directory 'hardlink-refusal' -Milliseconds 120000 -MaximumBytes 2MB
+    $result | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Case.directory 'hardlink-command.json') -Encoding utf8NoBOM
+    $command = @{exit_code=$result.exit_code; report=($result.stdout | ConvertFrom-Json -Depth 8)}
+    $classification = Assert-P4kxFlatpakEntryRefusal $command
+    return @{command=$command; classification=$classification}
+}
+
+function Assert-P4kxDocumentHardlinkBytes {
+    param($Case, [string]$Directory, [string]$Target, [string]$ForeignHash)
+    $foreign = Join-Path $Directory 'unrelated.txt'
+    $state = @{source_sha256=(Get-FileHash -LiteralPath $Case.archive -Algorithm SHA256).Hash;
+        target_sha256=(Get-FileHash -LiteralPath $Target -Algorithm SHA256).Hash;
+        foreign_sha256=(Get-FileHash -LiteralPath $foreign -Algorithm SHA256).Hash;
+        entries=@(Get-ChildItem -LiteralPath $Directory -Recurse -Force | ForEach-Object { [IO.Path]::GetRelativePath($Directory, $_.FullName).Replace('\', '/') } | Sort-Object)}
+    $state | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $Case.directory 'hardlink-content.json') -Encoding utf8NoBOM
+    if ($state.source_sha256 -cne $Case.source_hash -or $state.target_sha256 -cne $Case.source_hash -or
+        $state.foreign_sha256 -cne $ForeignHash -or ($state.entries -join '|') -cne 'Data|Data/hello.txt|unrelated.txt') {
+        throw 'A hardlink refusal changed source bytes, foreign output or the output inventory.'
+    }
+}
+
 function Test-P4kxDocumentHardlink {
     param($Case, [string]$Source)
     $directory = Join-Path $Case.directory 'hardlink-output'
     New-Item -ItemType Directory -Path (Join-Path $directory 'Data') -Force | Out-Null
     $target = Join-Path $directory 'Data/hello.txt'
+    $foreign = Join-Path $directory 'unrelated.txt'
+    [IO.File]::WriteAllText($foreign, 'unrelated synthetic output', [Text.UTF8Encoding]::new($false))
+    $foreignHash = (Get-FileHash -LiteralPath $foreign -Algorithm SHA256).Hash
     Invoke-P4kxLinuxTool ln @('--', $Case.archive, $target) | Out-Null
     $sourceIdentity = (Invoke-P4kxLinuxTool stat @('--dereference', '--format=%d:%i', $Case.archive) | Out-String).Trim()
     $targetIdentity = (Invoke-P4kxLinuxTool stat @('--dereference', '--format=%d:%i', $target) | Out-String).Trim()
@@ -35,8 +63,11 @@ function Test-P4kxDocumentHardlink {
     if ((Get-P4kxDocumentId $Source) -ceq (Get-P4kxDocumentId $grant)) { throw 'Hardlink fixture did not create distinct document identities.' }
     $proxySource = (Invoke-P4kxLinuxTool stat @('--dereference', '--format=%d:%i', $Source) | Out-String).Trim()
     $proxyTarget = (Invoke-P4kxLinuxTool stat @('--dereference', '--format=%d:%i', (Join-Path $grant 'Data/hello.txt')) | Out-String).Trim()
-    $result = Invoke-P4kxDocumentCaseExtract $Case $Source $grant 'hardlink-refusal' 'ExistingSource'
-    if ((Get-FileHash -LiteralPath $Case.archive -Algorithm SHA256).Hash -cne $Case.source_hash -or
-        (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -cne $Case.source_hash) { throw 'A distinct document hardlink overwrote the Archive source.' }
-    return @{outcome='success'; host_hardlink='proven'; separate_documents=$true; proxy_source=$proxySource; proxy_target=$proxyTarget; classification=$result.classification; source_unchanged='success'}
+    $failures = [Collections.Generic.List[Exception]]::new()
+    $result = $null
+    try { $result = Invoke-P4kxDocumentHardlinkRefusal $Case $Source $grant } catch { $failures.Add($_.Exception) }
+    try { Assert-P4kxDocumentHardlinkBytes $Case $directory $target $foreignHash } catch { $failures.Add($_.Exception) }
+    if ($failures.Count -ne 0) { throw [AggregateException]::new('Hardlink refusal or unchanged-output verification failed.', $failures) }
+    return @{outcome='success'; host_hardlink='proven'; separate_documents=$true; proxy_source=$proxySource; proxy_target=$proxyTarget;
+        classification=$result.classification; command=$result.command; source_unchanged='success'; target_unchanged='success'; foreign_output_unchanged='success'}
 }

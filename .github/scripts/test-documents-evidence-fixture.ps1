@@ -30,7 +30,8 @@ function New-P4kxDocumentsEvidenceFixture {
             final_services=@(@{service='org.freedesktop.portal.Documents'; owner=':1.4'});
             teardown=@{source_session=$stock; processes_exited='success'; mount_gone='success'; controller_processes_exited='success'}};
         api5_session=@{session=$positive; user_uid=1000; auth='EXTERNAL'; configuration_sha256=('d' * 64); initial_services=$observed; teardown=@{source_session=$positive; processes_exited='success'; mount_gone='success'; controller_processes_exited='success'}};
-        hardlink=@{outcome='success'; host_hardlink='proven'; separate_documents=$true; classification='target-identity'; source_unchanged='success'};
+        hardlink=@{outcome='success'; host_hardlink='proven'; separate_documents=$true; classification='target-identity'; source_unchanged='success'; target_unchanged='success'; foreign_output_unchanged='success';
+            command=@{exit_code=1; report=@{target='/synthetic/doc/hardlink'; extracted=0; failed=@(@{path='Data/hello.txt'; error='[p4kx.write.target-identity] synthetic refusal'}); skipped=@(); cancelled=@(); archive_changed=$false}}};
         forged_underlying_xattr=@{outcome='success'; underlying='forged'; fuse_view='portal-synthesized'; product_visible_forgery_proven=$false}}
     foreach ($name in @('read_only_archive', 'writable_export', 'game_alias_refusal', 'source_unchanged', 'source_membership_refusal', 'empty_protection_refusal', 'absent_suffix_refusal', 'ordinary_copy')) { $proof[$name] = 'success' }
     $proof.service_build['tools'] = @(foreach ($name in @('cc', 'meson', 'ninja', 'pkg-config')) { @{name=$name; version='synthetic'} })

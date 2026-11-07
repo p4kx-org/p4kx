@@ -37,6 +37,32 @@ function Assert-P4kxDocumentsBuildInventory {
     }
 }
 
+function Assert-P4kxFlatpakEntryRefusal {
+    <#
+    .SYNOPSIS
+    Requires the selected hardlink Entry to fail without writing any Entry.
+    #>
+    param($Command)
+    $report = $Command.report
+    if (($Command.exit_code -isnot [int] -and $Command.exit_code -isnot [long]) -or $Command.exit_code -ne 1 -or
+        ($report.extracted -isnot [int] -and $report.extracted -isnot [long]) -or $report.extracted -ne 0 -or
+        $report.failed -isnot [Array] -or $report.failed.Count -ne 1 -or
+        $report.skipped -isnot [Array] -or $report.skipped.Count -ne 0 -or
+        $report.cancelled -isnot [Array] -or $report.cancelled.Count -ne 0 -or
+        $report.archive_changed -isnot [bool] -or $report.archive_changed -or $null -ne $report.records) {
+        throw 'Hardlink Entry refusal lacks its actual partial-failure status and exact unwritten report.'
+    }
+    $failure = $report.failed[0]
+    if ($failure.path -cne 'Data/hello.txt' -or $failure.error -isnot [string] -or
+        $failure.error -cnotmatch '\A\[p4kx\.write\.(source-overwrite|target-identity)\]') {
+        throw 'Hardlink Entry did not fail for its exact typed write-protection reason.'
+    }
+    $classification = $Matches[1]
+    $codes = @([regex]::Matches($failure.error, '\[p4kx\.write\.([^\]]+)\]') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+    if ($codes.Count -ne 1 -or $codes[0] -cne $classification) { throw 'Hardlink Entry has conflicting write-protection categories.' }
+    return $classification
+}
+
 function Assert-P4kxFlatpakDocumentsEvidence {
     param($Documents, $Platform, [string]$Revision, [string]$PackageHash)
     if ($Documents.schema -ne 2 -or $Documents.target -cne $Platform.target -or $Documents.revision -cne $Revision -or $Documents.package_sha256 -cne $PackageHash) {
@@ -49,9 +75,11 @@ function Assert-P4kxFlatpakDocumentsEvidence {
     Assert-P4kxDocumentsSessionsEvidence $Documents
     $hardlink = $Documents.hardlink
     if ($hardlink.outcome -cne 'success' -or $hardlink.host_hardlink -cne 'proven' -or $hardlink.separate_documents -ne $true -or
-        $hardlink.classification -cnotin @('source-overwrite', 'target-identity') -or $hardlink.source_unchanged -cne 'success') {
+        $hardlink.classification -cnotin @('source-overwrite', 'target-identity') -or $hardlink.source_unchanged -cne 'success' -or
+        $hardlink.target_unchanged -cne 'success' -or $hardlink.foreign_output_unchanged -cne 'success') {
         throw 'Documents hardlink refusal lacks actual host/link/error evidence.'
     }
+    if ((Assert-P4kxFlatpakEntryRefusal $hardlink.command) -cne $hardlink.classification) { throw 'Hardlink report and evidence classifications differ.' }
     $forgery = $Documents.forged_underlying_xattr
     if ($forgery.outcome -cne 'success' -or $forgery.underlying -cne 'forged' -or $forgery.fuse_view -cnotin @('forwarded', 'portal-synthesized') -or
         $forgery.product_visible_forgery_proven -ne $false) { throw 'Underlying forgery and observed host-FUSE view were conflated.' }

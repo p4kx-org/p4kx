@@ -76,6 +76,11 @@ they are not installed in the host's system service directories or shipped as P4
 The hardlink test compares actual host device/inode identities, records both FUSE proxy identities
 and requires different document IDs. Proxy inequality never proves distinct host files. The test
 uses `--conflict overwrite`, so the default skip policy cannot manufacture a refusal result.
+The concrete leaf check uses the CLI's per-Entry failure status 1 and its JSON report: zero
+extracted files, one typed failure for the selected Entry, no skipped/cancelled work and no
+Archive change. Top-level refusals retain status 2. The case records the actual command exit
+before classification and checks both linked files, an unrelated sentinel and the complete
+output inventory even when classification fails.
 
 The official 1.22.1 implementation synthesizes `user.document-portal.host-path`. Observing that
 masking is not evidence that P4KX saw and ignored a visible forgery. The native report explicitly

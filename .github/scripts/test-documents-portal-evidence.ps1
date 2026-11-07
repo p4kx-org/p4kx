@@ -21,6 +21,18 @@ foreach ($mutation in @(
     { param($value) $value.stock_session.session = $value.api5_session.session }, { param($value) $value.api5_session.auth = 'ANONYMOUS' },
     { param($value) $value.api5_session.initial_services[0].sha256 = 'f' * 64 }, { param($value) $value.game_alias_refusal = 'skipped' },
     { param($value) $value.hardlink.classification = 'proxy-inodes-differ' }, { param($value) $value.hardlink.host_hardlink = 'not-tested' },
+    { param($value) $value.hardlink.command.exit_code = 2 },
+    { param($value) $value.hardlink.command.exit_code = '1' },
+    { param($value) $value.hardlink.command.report.extracted = 1 },
+    { param($value) $value.hardlink.command.report.failed = @() },
+    { param($value) $value.hardlink.command.report.failed += $value.hardlink.command.report.failed[0] },
+    { param($value) $value.hardlink.command.report.failed[0].path = 'Data/other.txt' },
+    { param($value) $value.hardlink.command.report.failed[0].error = '[p4kx.write.source-membership] synthetic refusal' },
+    { param($value) $value.hardlink.command.report.archive_changed = $true },
+    { param($value) $value.hardlink.command.report.cancelled = @('Data/hello.txt') },
+    { param($value) $value.hardlink.command.report.skipped = @('Data/hello.txt') },
+    { param($value) $value.hardlink.target_unchanged = 'skipped' },
+    { param($value) $value.hardlink.foreign_output_unchanged = 'skipped' },
     { param($value) $value.hardlink.separate_documents = $false }, { param($value) $value.forged_underlying_xattr.product_visible_forgery_proven = $true },
     { param($value) $value.service_build.tools = @() }, { param($value) $value.service_build.dependencies[0].version = '' },
     { param($value) $value.service_build.licenses = @() },
@@ -65,6 +77,16 @@ foreach ($text in @('other failure', 'the tool never writes there', '[p4kx.write
     $rejected = $false
     try { Assert-P4kxFlatpakDocumentOutcome @{exit_code=2; stderr=$text} 'SourceMembership' | Out-Null } catch { $rejected = $true }
     if (-not $rejected) { throw 'Another refusal category was promoted to neutral membership.' }
+}
+foreach ($reason in @('source-overwrite', 'target-identity')) {
+    $command = ($original | ConvertFrom-Json).hardlink.command
+    $command.report.failed[0].error = "[p4kx.write.$reason] synthetic refusal"
+    if ((Assert-P4kxFlatpakEntryRefusal $command) -cne $reason) { throw 'An exact unwritten Entry refusal was rejected.' }
+}
+foreach ($expected in @('Installation', 'SourceMembership', 'ExistingSource')) {
+    $rejected = $false
+    try { Assert-P4kxFlatpakDocumentOutcome @{exit_code=1; stderr='[p4kx.write.target-identity] synthetic'} $expected | Out-Null } catch { $rejected = $true }
+    if (-not $rejected) { throw 'A top-level refusal accepted the Entry-only failure status.' }
 }
 Assert-P4kxFlatpakPrerequisiteOutcome @{exit_code=1; stderr='[p4kx.runtime.documents-api5] [p4kx.documents.unsupported-interface:4] synthetic'} | Out-Null
 'PASS: structural contract, provenance/capability/controller/API4 mutations and exact typed refusals; no portal or runtime executed.'
