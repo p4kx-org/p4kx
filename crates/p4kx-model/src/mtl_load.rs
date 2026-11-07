@@ -80,7 +80,8 @@ fn fetch(
 /// Returns `name` with `/` separators and without a leading `Data/` or a `.mtl` extension, or
 /// `None` when it is empty, absolute, names a drive or stream, or has an empty, `.` or `..`
 /// component.
-pub(crate) fn request_path(name: &str) -> Option<String> {
+#[must_use]
+pub fn request_path(name: &str) -> Option<String> {
     let path = name.trim().replace('\\', "/");
     let path = match path.len().checked_sub(4).and_then(|at| path.get(at..)) {
         Some(extension) if extension.eq_ignore_ascii_case(".mtl") => {

@@ -12,6 +12,7 @@ use crate::describe::{describe, layer_shares, library_path};
 use crate::items::Item;
 use crate::manifest::{Issue, IssueOrigin};
 use crate::manifest_materials::MaterialDescription;
+use crate::material_library_sources::MaterialLibrarySources;
 use crate::plan::MeshPlan;
 use crate::roles::{classify_in, has_smoothness};
 use crate::textures::Wanted;
@@ -40,6 +41,7 @@ type MaterialKey = (String, Option<usize>);
 /// texture files they name.
 #[derive(Debug, Default)]
 pub(crate) struct Collected {
+    pub(crate) library_sources: MaterialLibrarySources,
     pub(crate) materials: Vec<Vec<DrawnMaterial>>,
     pub(crate) described: Vec<Vec<Option<usize>>>,
     pub(crate) descriptions: Vec<Described>,
@@ -121,6 +123,7 @@ impl Collected {
         depth: usize,
     ) -> Option<usize> {
         let original = library.materials.get(position)?;
+        let source_library = self.library_sources.capture(library, &mut self.issues);
         let adjusted = original.hair_cap_of_body(&library.path);
         let material = adjusted.as_ref().unwrap_or(original);
         let index = (!library.single).then_some(position);
@@ -132,6 +135,7 @@ impl Collected {
         };
         let key = (identity, index);
         if let Some(&known) = self.keys.get(&key) {
+            self.check_source(known, source_library, &path, &material.name);
             let shallower = self
                 .descriptions
                 .get(known)
@@ -142,13 +146,14 @@ impl Collected {
             return Some(known);
         }
         let at = self.descriptions.len();
-        let description = describe(
+        let mut description = describe(
             id_of(at),
             &path,
             index,
             material,
             library.default_palette.as_deref(),
         );
+        description.source_library = Some(source_library);
         let paths = self.want_textures(material, drawn);
         self.keys.insert(key, at);
         self.descriptions.push(Described {
@@ -156,22 +161,36 @@ impl Collected {
             paths,
             followed_at: None,
         });
-        for cut in &material.truncated {
-            self.issues.push(Issue {
-                origin: IssueOrigin::Material,
-                kind: "material".to_owned(),
-                path: path.clone(),
-                name: material.name.clone(),
-                skipped: false,
-                reason: format!("the material file is cut off: {cut}"),
-            });
-        }
+        self.note_truncation(&path, material);
         if depth < MAX_LAYER_DEPTH {
             self.follow_layers(at, material, models, depth);
         } else if !material.layers.is_empty() {
             self.cut.insert(at, (path, material.name.clone()));
         }
         Some(at)
+    }
+
+    fn note_truncation(&mut self, path: &str, material: &Material) {
+        for cut in &material.truncated {
+            self.issues.push(Issue {
+                origin: IssueOrigin::Material,
+                kind: "material".to_owned(),
+                path: path.to_owned(),
+                name: material.name.clone(),
+                skipped: false,
+                reason: format!("the material file is cut off: {cut}"),
+            });
+        }
+    }
+
+    fn check_source(&mut self, known: usize, actual: usize, path: &str, name: &str) {
+        let previous = self
+            .descriptions
+            .get(known)
+            .and_then(|known| known.description.source_library);
+        if let Some(issue) = self.library_sources.conflict(previous, actual, path, name) {
+            self.issues.push(issue);
+        }
     }
 
     fn follow_layers(

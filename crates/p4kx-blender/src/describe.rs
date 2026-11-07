@@ -23,6 +23,7 @@ pub(crate) fn describe(
     default_palette: Option<&str>,
 ) -> MaterialDescription {
     MaterialDescription {
+        source_library: None,
         id,
         name: material.name.clone(),
         library: library.to_owned(),

@@ -16,7 +16,7 @@ use crate::ArchiveTableDeclaration;
 /// Selected directory plus every original ZIP and ZIP64 end declaration.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[schemars(transform = crate::archive_projection_schema::require_properties)]
+#[schemars(transform = crate::projection_schema::require_properties)]
 #[non_exhaustive]
 pub struct ArchiveZipLayout {
     /// Selected source-relative directory extent.
@@ -54,7 +54,7 @@ impl ArchiveZipLayout {
 /// Original classic ZIP end words without replacing sentinels by selected values.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[schemars(transform = crate::archive_projection_schema::require_properties)]
+#[schemars(transform = crate::projection_schema::require_properties)]
 #[non_exhaustive]
 pub struct ArchiveZipEnd {
     /// Actual fixed end-record extent.
@@ -106,7 +106,7 @@ impl ArchiveZipEnd {
 /// Original ZIP64 words without assuming multi-disk support or extension semantics.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[schemars(transform = crate::archive_projection_schema::require_properties)]
+#[schemars(transform = crate::projection_schema::require_properties)]
 #[non_exhaustive]
 pub struct ArchiveZip64End {
     /// Actual fixed record extent.

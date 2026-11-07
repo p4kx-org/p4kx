@@ -12,6 +12,7 @@ publish.workspace = true
 layer = "service"
 
 [dependencies]
+p4kx-extraction.workspace = true
 p4kx-assembly.workspace = true
 p4kx-gltf.workspace = true
 p4kx-guard.workspace = true
@@ -27,7 +28,6 @@ thiserror.workspace = true
 crc32fast.workspace = true
 jsonschema.workspace = true
 p4kx-chunks.workspace = true
-p4kx-extraction.workspace = true
 p4kx-testkit.workspace = true
 png.workspace = true
 tempfile.workspace = true

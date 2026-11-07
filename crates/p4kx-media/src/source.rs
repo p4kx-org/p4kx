@@ -7,7 +7,7 @@ use p4kx_extraction::{Archive, Entry};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{Algorithm, ByteScope, Verification};
+use crate::{Algorithm, ByteScope, DirectoryLookup, Verification};
 
 /// An explicitly scoped integrity value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -138,6 +138,8 @@ pub struct SourceContext<'a> {
     pub entry: &'a Entry,
     /// Exact retained payload on disk; bounded readers must use their domain limits.
     pub payload: &'a Path,
+    /// Source-bound physical candidate lookup without target reads.
+    pub directory: &'a DirectoryLookup<'a>,
 }
 
 impl ContainerIdentity {

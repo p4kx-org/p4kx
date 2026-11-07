@@ -5,7 +5,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ArchiveProvider, MediaError, MediaKind, MediaWriter, RootSource, ShaderProvider, SourceContext,
+    ArchiveProvider, MaterialProvider, MediaError, MediaKind, MediaWriter, RootSource,
+    ShaderProvider, SourceContext,
 };
 
 /// Whether a registered provider can execute in this build.
@@ -153,6 +154,7 @@ impl Default for ProviderRegistry {
             providers: vec![
                 Box::new(ArchiveProvider),
                 Box::new(ShaderProvider::default()),
+                Box::new(MaterialProvider::default()),
             ],
         }
     }

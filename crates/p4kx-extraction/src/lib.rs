@@ -17,7 +17,6 @@ mod archive_layout_info_tests;
 mod archive_layout_v2;
 mod archive_layout_zip;
 mod archive_metadata_version;
-mod archive_projection_schema;
 mod archive_region_info;
 mod archive_table_declaration;
 mod bank;
@@ -60,6 +59,10 @@ mod hirc_view_build;
 mod loaded_dataforge;
 mod localization;
 mod localization_set;
+mod material_source_info;
+mod material_source_mapping;
+mod material_source_owned;
+mod material_xml_info;
 mod model_companions;
 pub mod model_info;
 mod model_info_animations;
@@ -75,7 +78,11 @@ mod output_file;
 mod owned_output_failure;
 mod part_escape;
 mod path_index;
+mod path_index_build_error;
+mod path_index_error;
+mod path_key_sort;
 mod portable_name;
+mod projection_schema;
 mod query_export;
 mod record_combined;
 mod record_existing;
@@ -177,6 +184,15 @@ pub use folder_source::{
 pub use loaded_dataforge::{DataForgeStopped, LoadedDataForge};
 pub use localization::{LocalizationEntry, LocalizationLoadError};
 pub use localization_set::{LocalizationNote, LocalizationSet};
+pub use material_source_info::{
+    MaterialAuthoredInfo, MaterialEncodingInfo, MaterialEntryDispositionInfo,
+    MaterialLayerSourceInfo, MaterialLibrarySourceInfo, MaterialSourceEntryInfo,
+    MaterialSourceLossInfo, MaterialSourceLossInfoKind, MaterialTextureSourceInfo,
+};
+pub use material_xml_info::{
+    MaterialAttributeInfo, MaterialAttributeKindInfo, MaterialContentInfo, MaterialElementInfo,
+    MaterialElementSyntaxInfo, MaterialParameterInfo,
+};
 pub use model_info::{BoneInfo, ChunkInfo, ChunkJson, LodInfo, MeshInfo, ModelInfo, NodeInfo};
 pub use model_info_animations::{AnimationInfo, UnreadInfo};
 pub use model_info_materials::{LibraryInfo, MaterialInfo};
@@ -240,7 +256,7 @@ pub use p4kx_gltf::{
     AnimationSummary, GlbOptions, GlbSummary, GltfError, LoadedTexture, MAX_TEXTURE_IMAGES,
     MAX_TEXTURE_PIXELS, MaterialMode, TextureFallback, TextureLoadError, TextureLoader,
     TextureRole, base_colour_factor, diffuse_texture_path, draws_layer_diffuse, layered_base_key,
-    layered_base_texture, layered_base_textures,
+    layered_base_texture, layered_base_textures, texture_path,
 };
 pub use p4kx_guard::{
     ArchiveWriteProtection, CreatedOutputFile, Installation, OwnedDirectoryPermit, OwnedFileToken,
@@ -262,6 +278,8 @@ pub use p4kx_texture::{
 };
 pub use part_escape::escape_part;
 pub use path_index::{PathIndex, PathKeys};
+pub use path_index_build_error::PathIndexBuildError;
+pub use path_index_error::PathIndexError;
 pub use portable_name::{
     MAX_PART_BYTES, NameRule, PathLimit, check_part, check_path_length, fold_name,
 };

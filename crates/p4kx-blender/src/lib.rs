@@ -32,6 +32,7 @@ mod manifest;
 mod manifest_light;
 mod manifest_materials;
 mod manifest_rig;
+mod material_library_sources;
 mod mesh_options;
 mod meshes;
 #[cfg(test)]
@@ -62,8 +63,8 @@ pub use manifest::{
 };
 pub use manifest_light::{Light, LightKind};
 pub use manifest_materials::{
-    AlphaMode, Element, MaterialDescription, MaterialLayer, MaterialStencil, MaterialTexture,
-    Palette, PaletteColours, PaletteEntry, Parameter, TextureUse,
+    AlphaMode, Element, MaterialDescription, MaterialLayer, MaterialLibrarySourceDescription,
+    MaterialStencil, MaterialTexture, Palette, PaletteColours, PaletteEntry, Parameter, TextureUse,
 };
 pub use manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
 pub use package_write_context::PackageWriteContext;

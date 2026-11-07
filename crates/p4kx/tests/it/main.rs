@@ -103,6 +103,7 @@ mod loc;
 mod loc_notes;
 mod media;
 mod media_archive_layout;
+mod media_material;
 mod media_shader;
 mod model;
 mod model_animation;

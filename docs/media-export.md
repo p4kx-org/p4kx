@@ -14,8 +14,8 @@ p4kx media schema --source
 
 Repeat `--kind` for an explicit selection. The known names are `archive`, `model`, `material`,
 `texture`, `shader`, `animation`, `animation-definition`, `audio` and `audio-control`. Omission
-selects every registered provider. The built-in providers are the source-preserving `archive`
-provider and the source-preserving `shader` provider. An explicitly requested kind without an
+selects every registered provider. The built-in providers preserve `archive`, `shader`
+and `material` sources. An explicitly requested kind without an
 available provider returns a typed capability
 failure and a non-zero exit status, even if the selection would otherwise be empty.
 
@@ -24,6 +24,11 @@ source ranges and lossless mask strings. Selected `.cfib`, `.cfxb` and `.shcb` c
 with explicitly unsupported semantic decoding. Material-to-definition links are separate work;
 the provider does not compile or execute shaders. [Shader projection](media-shader-backend.md)
 defines its precise typed fields, statuses and counting units.
+
+`--kind material` exports standalone/unused .mtl libraries, original material-set roots,
+ordered authored fields, layer/texture references and existing interpreted surfaces without
+geometry conversion. [Material source metadata](media-material-metadata.md) defines raw
+preservation, physical candidate resolution, bounds and the separate target-readability contract.
 
 The include and exclusion expressions use the existing search Filter syntax. A nested source
 can also be matched through `outer.socpak!inner.pak!path`. Excluding a container excludes its

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::MaterialLibrarySourceInfo;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -202,6 +203,9 @@ impl MaterialStencil {
 /// value as the file has them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct MaterialDescription {
+    /// Source-library ordinal in `Manifest.material_libraries`, independent of renderer identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_library: Option<usize>,
     /// The material's id, e.g. `x0001`.
     pub id: String,
     /// The material's name in its file; empty when the file gives none.
@@ -315,4 +319,14 @@ pub struct Palette {
     /// the palette states none and in a package before 1.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decal: Option<[[f32; 3]; 3]>,
+}
+
+/// One authored library root retained independently of its interpreted child materials.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[non_exhaustive]
+pub struct MaterialLibrarySourceDescription {
+    /// Library path exposed by the model reader, without a unique physical-source claim.
+    pub path: String,
+    /// Bounded source root, namespaces/content and actual projection boundaries.
+    pub authored: MaterialLibrarySourceInfo<'static>,
 }

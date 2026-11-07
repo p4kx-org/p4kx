@@ -36,6 +36,10 @@ importer that ships with Blender must be enabled.
 - Refuses a package with a newer major version and says to update the add-on; warns about a
   newer minor version.
 
+Package 1.9 source-library descriptions remain available as metadata. Supported material
+graphs continue to use their established interpreted inputs; the new source metadata
+does not introduce shader execution or inferred appearance.
+
 ## Build and install
 
 ```powershell

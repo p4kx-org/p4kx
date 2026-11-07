@@ -38,3 +38,16 @@ pub(super) fn records(
         .map(|line| serde_json::from_str(line).map_err(Into::into))
         .collect()
 }
+
+pub(super) fn archive_with(
+    root: &Path,
+    entries: impl IntoIterator<Item = TestEntry>,
+) -> Result<Archive, Box<dyn std::error::Error>> {
+    let path = root.join("Data.p4k");
+    let mut builder = ArchiveBuilder::new();
+    for entry in entries {
+        builder = builder.entry(entry);
+    }
+    builder.write_to(&path)?;
+    Ok(Archive::open(path)?)
+}

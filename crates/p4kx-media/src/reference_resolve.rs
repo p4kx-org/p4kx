@@ -21,6 +21,19 @@ impl MediaWriter<'_> {
         candidates: impl IntoIterator<Item = ReferenceCandidate>,
         inventory: CandidateInventory,
     ) -> Result<Reference, MediaError> {
+        self.try_resolve_reference(original, candidates.into_iter().map(Ok), inventory)
+    }
+
+    /// Classifies a fallible source-bound candidate scan without hiding interrupted inventory.
+    ///
+    /// # Errors
+    /// Returns the original scan error, invalid target provenance or reference-work failure.
+    pub fn try_resolve_reference(
+        &mut self,
+        original: OriginalIdentifier,
+        candidates: impl IntoIterator<Item = Result<ReferenceCandidate, MediaError>>,
+        inventory: CandidateInventory,
+    ) -> Result<Reference, MediaError> {
         self.start_reference()?;
         let mut counter = Counter {
             remaining: self.limits().record_bytes,
@@ -70,7 +83,7 @@ struct Observed {
 
 fn collect(
     writer: &MediaWriter<'_>,
-    candidates: impl IntoIterator<Item = ReferenceCandidate>,
+    candidates: impl IntoIterator<Item = Result<ReferenceCandidate, MediaError>>,
     counter: &mut Counter,
 ) -> Result<Observed, MediaError> {
     let limits = writer.limits();
@@ -80,6 +93,7 @@ fn collect(
         unavailable: None,
     };
     for candidate in candidates {
+        let candidate = candidate?;
         writer.checkpoint()?;
         observed.count += 1;
         if observed.count > u64::from(limits.reference_candidates) {

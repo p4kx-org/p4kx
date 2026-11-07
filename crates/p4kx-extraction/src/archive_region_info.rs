@@ -27,7 +27,7 @@ pub enum ArchiveRegionState {
 /// Source declarations distinguished from their readable prefix.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[schemars(transform = crate::archive_projection_schema::require_properties)]
+#[schemars(transform = crate::projection_schema::require_properties)]
 #[non_exhaustive]
 pub struct ArchiveRegion {
     /// Authored source-relative start.

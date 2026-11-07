@@ -15,8 +15,8 @@ use crate::error;
 use crate::media_record;
 use crate::media_record::Record;
 use crate::{
-    Artifact, Capability, Counts, KindSummary, Limits, MediaError, MediaIssue, Source, Status,
-    Subresource,
+    Artifact, Capability, Counts, KindSummary, Limits, MediaError, MediaIssue, MediaKind, Source,
+    Status, Subresource,
 };
 
 struct KindStream<'a> {
@@ -215,6 +215,12 @@ impl<'a> MediaWriter<'a> {
         self.source = None;
         self.terminal = None;
         self.checkpoint()
+    }
+
+    pub(crate) fn has_kind(&self, kind: MediaKind) -> bool {
+        self.kinds
+            .iter()
+            .any(|stream| stream.capability.kind == kind)
     }
 
     pub(crate) fn reference_root(&self) -> Result<&crate::Digest, MediaError> {

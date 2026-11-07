@@ -190,6 +190,7 @@ mod tests {
             meshes: Vec::new(),
             textures: Vec::new(),
             materials: Vec::new(),
+            material_libraries: Vec::new(),
             palettes: Vec::new(),
             issues: Vec::new(),
         }

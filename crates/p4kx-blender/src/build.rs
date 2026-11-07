@@ -55,6 +55,12 @@ pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
         meshes: meshes(inputs),
         textures: textures(inputs),
         materials: materials(inputs),
+        material_libraries: inputs
+            .collected
+            .library_sources
+            .descriptions()
+            .cloned()
+            .collect(),
         palettes: palettes(inputs),
         issues: issues(inputs),
     }

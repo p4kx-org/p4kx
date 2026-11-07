@@ -3,8 +3,13 @@
 
 use p4kx_cryxml::Element;
 
+use crate::MaterialError;
+use crate::mtl_xml_source::{self, Syntax};
+
 /// The read-only view of an XML element the material reader needs, over text XML and `CryXml`.
 pub(crate) trait XmlElement<'a>: Copy {
+    fn syntax(self) -> Result<Syntax<'a>, MaterialError>;
+
     fn name(self) -> &'a str;
 
     fn attribute(self, name: &str) -> Option<&'a str>;
@@ -15,6 +20,10 @@ pub(crate) trait XmlElement<'a>: Copy {
 }
 
 impl<'a> XmlElement<'a> for Element<'a> {
+    fn syntax(self) -> Result<Syntax<'a>, MaterialError> {
+        Ok(mtl_xml_source::cryxml(self))
+    }
+
     fn name(self) -> &'a str {
         Element::name(self)
     }
@@ -33,6 +42,10 @@ impl<'a> XmlElement<'a> for Element<'a> {
 }
 
 impl<'a> XmlElement<'a> for roxmltree::Node<'a, '_> {
+    fn syntax(self) -> Result<Syntax<'a>, MaterialError> {
+        mtl_xml_source::text(self)
+    }
+
     fn name(self) -> &'a str {
         self.tag_name().name()
     }

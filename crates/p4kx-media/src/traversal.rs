@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cell::Cell;
+
 use p4kx_extraction::{Archive, Entry, Exclusion, Filter};
+
+use crate::directory_index::DirectoryIndex;
+use crate::directory_lookup::DirectoryLookup;
+use crate::source_selection::{EntrySelection, SourceSelection};
 
 use crate::contract::Tally;
 use crate::retained_source;
@@ -15,7 +21,8 @@ pub(crate) struct Traversal<'a> {
     pub(crate) exclude: &'a Exclusion,
     pub(crate) entries: Tally,
     pub(crate) bytes: u64,
-    pub(crate) metadata_work: u64,
+    pub(crate) metadata_work: &'a Cell<u64>,
+    pub(crate) index_keys: &'a Cell<u64>,
 }
 
 impl Traversal<'_> {
@@ -25,16 +32,30 @@ impl Traversal<'_> {
         chain: &mut Vec<ContainerIdentity>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
-        crate::directory_run::run(
-            archive,
+        let index = DirectoryIndex::new(archive, self.index_keys);
+        let lookup = DirectoryLookup::new(
+            &index,
             self.root,
             chain,
+            SourceSelection {
+                include: self.include,
+                exclude: self.exclude,
+            },
+            self.metadata_work,
+            writer
+                .limits
+                .sources
+                .saturating_sub(self.entries.enumerated),
+        );
+        crate::directory_run::run(
+            archive,
+            &lookup,
             self.providers,
             &mut self.bytes,
-            &mut self.metadata_work,
+            self.metadata_work,
             writer,
         )?;
-        for entry in archive.entries() {
+        for (position, entry) in archive.entries().iter().enumerate() {
             writer.checkpoint()?;
             self.entries.enumerated += 1;
             if self.entries.enumerated > writer.limits.sources {
@@ -43,16 +64,21 @@ impl Traversal<'_> {
                     limit: writer.limits.sources,
                 });
             }
-            let qualified = qualified_path(chain, entry.path());
-            let excluded = self.excluded(entry.path()) || self.exclude.matches(&qualified);
-            let selected = !excluded
-                && (self.include.matches(entry.path()) || self.include.matches(&qualified));
-            if selected {
-                self.project(archive, entry, chain, writer)?;
+            let selection = SourceSelection {
+                include: self.include,
+                exclude: self.exclude,
+            }
+            .classify(chain, entry.path());
+            if selection == EntrySelection::Included {
+                let allowance = writer.limits.sources - self.entries.enumerated
+                    + u64::try_from(position)
+                        .map_err(|_| MediaError::Contract("source position exceeds u64".into()))?
+                    + 1;
+                self.project(archive, entry, chain, &index, allowance, writer)?;
             } else {
                 self.entries.skipped += 1;
             }
-            if !excluded && is_container(entry.path()) {
+            if selection != EntrySelection::Excluded && is_container(entry.path()) {
                 self.container(archive, entry, chain, writer)?;
             }
         }
@@ -64,6 +90,8 @@ impl Traversal<'_> {
         archive: &Archive,
         entry: &Entry,
         chain: &[ContainerIdentity],
+        index: &DirectoryIndex<'_>,
+        source_allowance: u64,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
         let mut source = source::entry(self.root, archive, entry, chain)?;
@@ -81,6 +109,17 @@ impl Traversal<'_> {
         writer
             .retained(&source)
             .map_err(|cause| crate::error::at(&source, cause))?;
+        let lookup = DirectoryLookup::new(
+            index,
+            self.root,
+            chain,
+            SourceSelection {
+                include: self.include,
+                exclude: self.exclude,
+            },
+            self.metadata_work,
+            source_allowance,
+        );
         for (index, provider) in self.providers.iter().enumerate() {
             writer.begin(index, source.clone())?;
             let result = provider
@@ -89,6 +128,7 @@ impl Traversal<'_> {
                         source: &source,
                         entry,
                         payload: &payload,
+                        directory: &lookup,
                     },
                     writer,
                 )
@@ -139,31 +179,10 @@ impl Traversal<'_> {
         let _container = chain.pop();
         result
     }
-
-    fn excluded(&self, path: &str) -> bool {
-        if self.exclude.matches(path) {
-            return true;
-        }
-        let lower = path.to_ascii_lowercase();
-        if let Some(end) = lower.find(".dds.") {
-            return self.exclude.matches(path.get(..end + 4).unwrap_or(path));
-        }
-        false
-    }
 }
 
 fn is_container(path: &str) -> bool {
     path.rsplit('.').next().is_some_and(|extension| {
         extension.eq_ignore_ascii_case("pak") || extension.eq_ignore_ascii_case("socpak")
     })
-}
-
-fn qualified_path(chain: &[ContainerIdentity], path: &str) -> String {
-    let mut result = String::new();
-    for container in chain {
-        result.push_str(&container.path);
-        result.push('!');
-    }
-    result.push_str(path);
-    result
 }

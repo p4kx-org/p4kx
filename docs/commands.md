@@ -47,7 +47,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   empty or blank exclusion Filter is refused. Every command that takes a Filter refuses text beyond
   these limits as invalid input (exit 2), and the MCP tools answer with a tool error.
 - `p4kx grep <archive> <text> [--in records,loc,entries] [--filter <filter>] [--exclude <filter>]
-  [--lang <language>,…] [--limit <n>] [--per-item <n>] [--format table|json]` finds a text in the
+  [--lang <language>,Ã¢â‚¬Â¦] [--limit <n>] [--per-item <n>] [--format table|json]` finds a text in the
   contents: in the string, localisation key and enum values of all Records (with the field path),
   in the texts of each language's `global.ini` and in the lines of text and CryXml Entries (CryXml
   converted to XML first). It matches part of a word and ignores case, so `Gladi` finds
@@ -67,10 +67,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   is computed while the data streams past, so a run needs one read and decode of the Archive (timings in [docs/verify.md](verify.md)).
   Exit code 1 when an Entry mismatches or fails. `p4kx extract --verify` does the same for each
   Entry while it is written: a mismatching Entry is not written, and the summary counts it
-  (`mismatched` in `--json`). `p4kx socpak verify <archive> <container…>` and `socpak extract
+  (`mismatched` in `--json`). `p4kx socpak verify <archive> <containerÃ¢â‚¬Â¦>` and `socpak extract
   --verify` check a container with the plain CRC-32 of its directory. Checking is off unless
   asked for.
-- `p4kx extract <archive> <entry paths…> [--out <folder>] [--conflict <policy>] [--convert [--textures <outputs>] [--mip <level>] [--audio <format>]]` writes the
+- `p4kx extract <archive> <entry pathsÃ¢â‚¬Â¦> [--out <folder>] [--conflict <policy>] [--convert [--textures <outputs>] [--mip <level>] [--audio <format>]]` writes the
   given Entries (stored, deflate or zstd, encrypted or not) into a new folder
   `SC-EXPORT-<Channel>-<Build version>-<timestamp>` in the current directory (the Channel is the
   name of the folder holding the Archive, an unknown Build is `UnknownBuild`, the timestamp is
@@ -94,13 +94,13 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   existing file with the converted XML. The summary then also counts the converted Entries.
   `--convert` also writes the DataForge Entry (`Data\Game2.dcb`, falling back to
   `Data\Game.dcb`) as one Record XML file per Record below its folder instead of the `.dcb`,
-  e.g. `Data/libs/foundry/records/…`, each file under `--conflict`; Records with error values are
+  e.g. `Data/libs/foundry/records/Ã¢â‚¬Â¦`, each file under `--conflict`; Records with error values are
   still written, and the summary counts the Records with their error values.
-  `--convert` also converts each texture (`<name>.dds`, its parts `<name>.dds.1` … `.N` and any alpha
-  tail `<name>.dds.a` with `.1a` … `.Na`) once; the PNG carries the tail in its alpha channel, a
+  `--convert` also converts each texture (`<name>.dds`, its parts `<name>.dds.1` Ã¢â‚¬Â¦ `.N` and any alpha
+  tail `<name>.dds.a` with `.1a` Ã¢â‚¬Â¦ `.Na`) once; the PNG carries the tail in its alpha channel, a
   high-range texture (BC6H or floating point) is exported as OpenEXR `<name>.exr` instead, keeping its range, and a
-  cubemap as six faces `<name>_posx` … `<name>_negz`, a texture array as one PNG per element
-  `<name>_layer0` … and a volume as one PNG per slice `<name>_slice0` …:
+  cubemap as six faces `<name>_posx` Ã¢â‚¬Â¦ `<name>_negz`, a texture array as one PNG per element
+  `<name>_layer0` Ã¢â‚¬Â¦ and a volume as one PNG per slice `<name>_slice0` Ã¢â‚¬Â¦:
   `--textures` picks the outputs, by default `merge,png`: `merge` writes one standard DDS under
   the header's path, `png` the mip `--mip <level>` (0, the largest, by default; a texture with
   fewer levels gives its smallest) as `<name>.png`, and `raw` the Entries unchanged as well, with
@@ -128,8 +128,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   exclusion Filter matches is left out with its parts; an excluded part of a texture that stays is
   not written, and with `--convert`, which still reads it to build the texture, a note on stderr
   gives their number. A pair that selects nothing is invalid input (exit 2), and the error says
-  whether the Filter matched none (`no Entry matches …`) or the exclusion left out all it matched
-  (`the exclusion Filters leave out all N Entries that … matches`). A Filter longer than 1024 bytes
+  whether the Filter matched none (`no Entry matches Ã¢â‚¬Â¦`) or the exclusion left out all it matched
+  (`the exclusion Filters leave out all N Entries that Ã¢â‚¬Â¦ matches`). A Filter longer than 1024 bytes
   or with more than 32 `*` and `?`, an empty or blank exclusion Filter and more than 64 of them are invalid
   input too.
   `--threads <n>` limits the worker threads (default one per logical processor); more than about four rarely help on one disk (docs/performance.md).
@@ -158,13 +158,13 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   written; an input that is no folder is too. Progress, Ctrl+C, `--json` and the exit codes are
   those of `extract`; the JSON report of [`p4kx extract`](cli-json.md#p4kx-extract----json) adds
   `not_converted`, the number of files left out, when it is not 0. The window offers **Convert
-  folder…** in the Archive menu with progress and cancel.
+  folderÃ¢â‚¬Â¦** in the Archive menu with progress and cancel.
 - `p4kx info <archive>` prints the Channel, the Build (branch, version, change number, BuildId)
   from the `build_manifest.id` next to the Archive, and the number, encryption and sizes of its
   Entries, and the number of Entry issues (ADR-0025). An Archive without a readable manifest has
   an unknown Build and still opens. A malformed field of one directory record, such as a path
   that is not UTF-8, an encryption value other than 0 or 1 or v2 data outside the file, does not
-  stop an Archive from opening: `info`, `list` and `extract` print up to ten `warning: Entry …`
+  stop an Archive from opening: `info`, `list` and `extract` print up to ten `warning: Entry Ã¢â‚¬Â¦`
   lines to stderr for the Entries concerned.
   JSON output also includes cached source-layout `metadata`, with exact declarations and
   explicit absence as defined in [Archive source layout](media-archive-layout.md).
@@ -184,7 +184,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   structs and enums. DataForge versions 6 and 8 are read; any other version, version 5 and older included, is
   reported as not supported with exit code 5 (ADR-0136), and a DataForge Entry claiming more than 2 GiB is rejected before it is read.
 - `p4kx dcb export <archive> [--format xml|json|ndjson] [--combined] [--filter <filter>]`
-  `[--lang <language> [--archive <Data.p4k>]] [--tags] [--out <folder>] [--conflict …]` writes
+  `[--lang <language> [--archive <Data.p4k>]] [--tags] [--out <folder>] [--conflict Ã¢â‚¬Â¦]` writes
   Records as Record XML
   ([docs/record-xml.md](record-xml.md)) or Record JSON
   ([docs/record-json.md](record-json.md)), one file per Record: `<record path>.xml`, or
@@ -323,7 +323,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   tag, with its bones matched to the skeleton by name. `--loadout <loadout>` takes the pieces from
   a Loadout instead: a file on disk of that name is tried first and read as an XML Loadout,
   otherwise an Entity's default Loadout by class name, GUID or record path, or an XML Loadout
-  (`Scripts/Loadouts/…xml`) by its path in the Archive; its armour and clothing (`Char_Armor_*`,
+  (`Scripts/Loadouts/Ã¢â‚¬Â¦xml`) by its path in the Archive; its armour and clothing (`Char_Armor_*`,
   `Char_Clothing_*`) are worn. A `--piece` then takes the place of the Loadout's pieces of the
   same item type, or is added. An Entity whose default Loadout is an outfit, an NPC such as Miles
   Eckhart, gives its base Loadout and its clothing; its `Char_Head` is worn with its own skins
@@ -346,7 +346,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   variants.
 - `p4kx wwise resolve <archive> <trigger>` lists every sound variant of an audio trigger with
   its soundbank, WEM ID, source and container path, e.g. `Play_QDrive_Spool in SSQD_QDrive.bnk:
-  WEM 98393519 embedded, not located; event 2178236557 > action 98720655 > blend 228967944 > …`;
+  WEM 98393519 embedded, not located; event 2178236557 > action 98720655 > blend 228967944 > Ã¢â‚¬Â¦`;
   broken links are listed with the object where the chain breaks, and `--json` gives the shape in
   [docs/cli-json.md](cli-json.md). A streamed WEM is located as its loose WEM Entry, and
   localised sounds are resolved for `--lang <language>` with `--fallback-lang` (`English(US)` by
@@ -368,7 +368,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `--lang`); a sound that cannot be decoded is reported and written as `.wem`. Names follow the
   portable file-name rule of ADR-0248 (forbidden characters, `#` and a leading space become `%`
   and two hex digits, an empty name becomes `%`, a name taken under the case fold of the rule gets
-  `_2`, `_3`, …), and a sound whose path exceeds its limit is reported as failed while the others
+  `_2`, `_3`, Ã¢â‚¬Â¦), and a sound whose path exceeds its limit is reported as failed while the others
   are written. `--txtp` also writes one vgmstream `<event>.txtp` text file per Wwise event of the
   trigger next to the sounds (ADR-0254); P4KX writes the text only and does not run vgmstream.
   `p4kx entity audio --extract <folder>` does the same for every trigger of an Entity.
@@ -378,7 +378,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   text of a localisation key, with or without the leading `@`, ignoring case, in `--lang` (English
   by default) and otherwise in `--fallback`, with `\n` decoded; a key with no text in either is
   reported as missing and exits with code 2, a placeholder key such as `@LOC_EMPTY` prints
-  nothing and succeeds. `p4kx loc export <archive> [--lang <language>,…] [--format json|csv]
+  nothing and succeeds. `p4kx loc export <archive> [--lang <language>,Ã¢â‚¬Â¦] [--format json|csv]
   [--out <file>]` writes every key with its text per language, sorted by key. A `--lang` is a
   code, a folder name such as `german_(germany)` or a name such as `german` where one language has
   it. UTF-8 with or without a byte order mark and UTF-16 files are read; invalid bytes become
@@ -395,8 +395,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   [--exclude <filter>] [--conflict skip|overwrite|if-changed] [--diagnostic]` writes the
   versioned `p4kx-media` inventory as JSONL streams, exact decoded raw payloads and an atomic
   `media-index.json`. Repeat `--kind` and `--exclude` for explicit selections. Omission selects
-  all registered providers: `archive` and `shader`. The shader stream preserves nested `.ext`
+  all registered providers: `archive`, `shader` and `material`. The shader stream preserves nested `.ext`
   declarations and inventories `.cfib`/`.cfxb`/`.shcb` caches without semantic decoding.
+  The material stream includes standalone/unused .mtl libraries without geometry conversion;
+  [material source metadata](media-material-metadata.md) describes its exact retained fields.
   A known kind without a provider
   fails explicitly. Incomplete diagnostic generations remain separate from the complete root
   index. Byte, count, nesting and reference limits are exposed as `--max-*` options; their defaults,
@@ -455,27 +457,27 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `CRY3SDK`) and both byte orders are read; the XML is indented by two spaces with LF line
   endings, and the same input always gives the same bytes. The output is always well-formed:
   characters a name cannot hold, `:` included, become `_`, a repeated attribute name gets the
-  first free suffix `_2`, `_3`, …, and bytes that are not UTF-8 read as `?`. A file that already
+  first free suffix `_2`, `_3`, Ã¢â‚¬Â¦, and bytes that are not UTF-8 read as `?`. A file that already
   is text XML is written unchanged. A truncated or corrupt file is an error and writes nothing.
 - `p4kx texture info <archive> <entry>` prints the format, size, depth, mip count, array size,
   cubemap faces and number of mip parts of a DDS texture; `p4kx texture merge <archive> <entry>
-  --out <file>` merges the header Entry and its mip parts `<entry>.1` … `<entry>.N` into one
+  --out <file>` merges the header Entry and its mip parts `<entry>.1` Ã¢â‚¬Â¦ `<entry>.N` into one
   standard DDS file that common tools open. Both also take a header file on disk instead of an
   Archive and an Entry, with its parts next to it. Legacy and DX10 headers are read; a missing,
   truncated or oversized part is named in the error and nothing is written. A split cubemap or
   texture array, whose parts hold one mip of every face, merges face by face into a valid
   cubemap or array. `info` also names the alpha or smoothness tail `<entry>.a` with its parts
-  `<entry>.1a` … `<entry>.Na`; `merge <archive> <entry>.a` merges the tail on its own.
+  `<entry>.1a` Ã¢â‚¬Â¦ `<entry>.Na`; `merge <archive> <entry>.a` merges the tail on its own.
 - `p4kx texture png <archive> <entry> --out <file>` decodes the largest mip of a texture and
   writes it as an 8-bit RGBA PNG; `--mip <level>` picks a smaller one, 0 being the largest. It
   takes a header file on disk like `info` and `merge`. BC1 to BC7 and the uncompressed formats in
   use decode with pure-Rust decoders; any other format fails with a message naming it and exit
   code 1. An alpha or smoothness tail is decoded and merged into the alpha channel. A cubemap is
-  written as six face files `<stem>_posx.png` … `<stem>_negz.png` next to `<file>`, or with
+  written as six face files `<stem>_posx.png` Ã¢â‚¬Â¦ `<stem>_negz.png` next to `<file>`, or with
   `--cross` as one horizontal cross in `<file>`. A texture array is written as one file per
-  element `<stem>_layer0.png` …, a cubemap array per element and face `<stem>_layer0_posx.png` …
+  element `<stem>_layer0.png` Ã¢â‚¬Â¦, a cubemap array per element and face `<stem>_layer0_posx.png` Ã¢â‚¬Â¦
   (with `--cross` one cross per element) and a volume as one file per slice of the mip
-  `<stem>_slice0.png` …; the numbers are padded to the width of the last. A high-range BC6H or
+  `<stem>_slice0.png` Ã¢â‚¬Â¦; the numbers are padded to the width of the last. A high-range BC6H or
   floating-point texture is written as OpenEXR
   with 32-bit float RGB instead, with the extension `.exr`, so its range is not clipped;
   `--tone-map` writes an 8-bit PNG instead, Reinhard tone-mapped and sRGB-encoded (ADR-0010). The
@@ -556,11 +558,11 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   (exit code 1). A movie is
   untrusted: placements, paths, conversions, masks, the canvas and the area the fills cover are
   bounded, and what lies beyond a limit is listed instead of drawn.
-- `p4kx ui render … --lang <language>` resolves the localisation keys (`@key`, with `,P=`
+- `p4kx ui render Ã¢â‚¬Â¦ --lang <language>` resolves the localisation keys (`@key`, with `,P=`
   parameters) of text fields in the `global.ini` of that language of the Archive; it needs an ENTRY.
   A key the language does not hold is drawn as it is and listed. The language is also the
   localisation folder in which imported fonts are looked for after the folders of the UI.
-- `p4kx ui render … --svg` writes the frame as an SVG document instead, which scales without loss:
+- `p4kx ui render Ã¢â‚¬Â¦ --svg` writes the frame as an SVG document instead, which scales without loss:
   shapes are written once and placed with their transforms, gradients, strokes, colour transforms
   and masks become SVG elements, and bitmaps are embedded as PNG data. The same input gives the
   same bytes, `--size` and `--background` set the size and the backdrop of the document, and the
@@ -586,8 +588,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   port, the Entity, the canvas Record and its size, the canvases, textures, vector graphics, movies
   and localisation keys it uses, and its widgets by element type with whether they are drawn; the
   UI movies the Entities name are listed after them. `--json` carries the same.
-- `p4kx ui render <archive> --screen <canvas> --out <file.png> [--svg] [--size …] [--background …]
-  [--brand <code>] [--var <name>=<value>]…` renders such a canvas, named by record path or GUID,
+- `p4kx ui render <archive> --screen <canvas> --out <file.png> [--svg] [--size Ã¢â‚¬Â¦] [--background Ã¢â‚¬Â¦]
+  [--brand <code>] [--var <name>=<value>]Ã¢â‚¬Â¦` renders such a canvas, named by record path or GUID,
   as a still through the
   GFx renderer: the layout of its widgets (sizes, margins, padding, flex containers, raw units)
   is computed from the Records and the boxes, circles and polygons are drawn in the colours of
@@ -646,13 +648,13 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   listed and left out of the GLB, which is still written, and the exit code is 1; an item or a
   material the Archive does not have is listed, and a character without face DNA exits with 2. The
   report is described in [docs/cli-json.md](cli-json.md).
-- `p4kx socpak list <archive> <container…>` lists the Entries of a socpak container in the
+- `p4kx socpak list <archive> <containerÃ¢â‚¬Â¦>` lists the Entries of a socpak container in the
   columns of `list`, read from the Archive without extracting the container first; each further
-  path names a container inside the one before. `p4kx socpak extract <archive> <container…>
+  path names a container inside the one before. `p4kx socpak extract <archive> <containerÃ¢â‚¬Â¦>
   [--filter <filter>] [--exclude <filter>] [--out <folder>] [--conflict <policy>] [--convert]`
   writes its Entries, or those the Filter matches, without those `--exclude` matches, with the
   rules of `extract`; `--exclude` alone leaves out of all Entries, and a pair that leaves nothing is
-  invalid input. `p4kx socpak verify <archive> <container…> [--filter <filter>] [--exclude
+  invalid input. `p4kx socpak verify <archive> <containerÃ¢â‚¬Â¦> [--filter <filter>] [--exclude
   <filter>]` selects the same way. `if-changed` compares with the CRC-32 containers store.
   Containers nest at most 8 deep; a container whose Entries overlap, whose stored sizes disagree or
   which declares more than 2048 times its stored size for an Entry is refused, as are compressed

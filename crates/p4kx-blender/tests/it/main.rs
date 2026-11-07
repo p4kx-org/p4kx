@@ -3,6 +3,7 @@
 
 //! Integration tests of `p4kx-blender`, built as one test binary.
 
+mod material_source_metadata;
 mod package_bone_attachment;
 mod package_character;
 mod package_creature;

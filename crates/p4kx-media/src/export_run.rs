@@ -3,6 +3,7 @@
 
 use p4kx_extraction::{Archive, Filter, OwnedDirectoryPermit};
 use std::borrow::Cow;
+use std::cell::Cell;
 
 use crate::archive_provider;
 use crate::checkpoint::Checkpoint;
@@ -81,6 +82,8 @@ fn collect(
             Cow::Owned(Filter::parse("*").map_err(|error| MediaError::Contract(error.to_string()))?)
         }
     };
+    let metadata_work = Cell::new(0);
+    let index_keys = Cell::new(0);
     let mut traversal = Traversal {
         root: &root.digest,
         providers,
@@ -88,7 +91,8 @@ fn collect(
         exclude: &options.exclude,
         entries: Tally::default(),
         bytes: 0,
-        metadata_work: 0,
+        metadata_work: &metadata_work,
+        index_keys: &index_keys,
     };
     traversal.walk(archive, &mut Vec::new(), writer)?;
     Ok(traversal.entries)

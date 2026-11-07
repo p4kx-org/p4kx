@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use p4kx_extraction::{
     ArchiveChanged, ArchiveError, ExtractionError, OwnedOutputCleanupError, OwnedOutputError,
-    WriteProtectionError,
+    PathIndexError, WriteProtectionError,
 };
 
 use crate::MediaKind;
@@ -88,6 +88,9 @@ pub enum MediaError {
         /// Availability explanation.
         detail: String,
     },
+    /// Physical candidate inventory could not be indexed completely.
+    #[error("media reference index failed: {0}")]
+    ReferenceIndex(#[source] PathIndexError),
     /// A declared limit was exhausted.
     #[error("media budget {budget} exceeded its limit {limit}")]
     Limit {

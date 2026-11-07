@@ -42,7 +42,7 @@ pub enum ArchiveDeclarationState {
 /// Shared cached root/nested layout declarations without raw sidecars or additional I/O.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[schemars(transform = crate::archive_projection_schema::require_properties)]
+#[schemars(transform = crate::projection_schema::require_properties)]
 #[non_exhaustive]
 pub struct ArchiveLayoutInfo {
     /// Source-layout payload contract independently of any media envelope.
