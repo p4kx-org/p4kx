@@ -31,7 +31,7 @@ $runtime | Add-Member -NotePropertyName static_packages -NotePropertyValue $lock
 $runtime.PSObject.Properties.Remove('libraries')
 $runtime | ConvertTo-Json -Depth 12 | Set-Content (Join-Path $context 'inputs.json') -Encoding utf8NoBOM
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-foreach ($name in @('Dockerfile', 'collect-sources.py', 'RELINK.md')) {
+foreach ($name in @('Dockerfile', 'collect-sources.py', 'build_inputs.py', 'RELINK.md')) {
     Copy-Item -LiteralPath (Join-Path $root "packaging/linux/runtime/$name") -Destination $context
 }
 $tag = "p4kx-appimage-runtime-$($platform.arch)"

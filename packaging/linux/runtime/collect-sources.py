@@ -1,7 +1,6 @@
 """Collects the corresponding source and original licences of a static AppImage runtime."""
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -11,11 +10,8 @@ import subprocess
 import tarfile
 import urllib.request
 
-
-def digest(path):
-    """Returns a file's SHA-256 digest without loading it into memory."""
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
+import build_inputs
+from build_inputs import digest
 
 
 def download(url, destination, expected=None):
@@ -57,21 +53,6 @@ def copy_licences(source, destination):
     if not copied:
         raise ValueError(f"no original licence notices found in {source}")
     return copied
-
-
-def archive_source(dependency, sources, licences):
-    """Collects a pinned upstream source archive and its original notices."""
-    name = dependency["name"]
-    directory = sources / name
-    directory.mkdir()
-    archive = directory / "source.tar"
-    source_digest = download(dependency["url"], archive, dependency["sha256"])
-    unpacked = directory / "unpacked"
-    unpacked.mkdir()
-    with tarfile.open(archive) as tar:
-        tar.extractall(unpacked, filter="data")
-    notices = copy_licences(unpacked, licences / name)
-    return {**dependency, "source_sha256": source_digest, "licences": notices}
 
 
 def recipe_source(commit, recipes):
@@ -129,19 +110,19 @@ def alpine_source(origin, packages, sources, licences, recipes):
     }
 
 
-def linked_archives(upstream, installed, expected):
+def linked_archives(upstream, installed, expected, built):
     """Checks the native static link closure against the locked sources and APKs."""
     link_map = upstream / "runtime-link.map"
     paths = sorted(set(re.findall(r"(/[^\s()]+\.a)(?:\(|\s)", link_map.read_text())))
     if not paths:
         raise ValueError("the native runtime has no static link map")
-    built = {"libfuse3.a": "libfuse", "libsquashfuse.a": "squashfuse", "libsquashfuse_ll.a": "squashfuse"}
     owners = {f"{entry['P']}-{entry['V']}": entry for entry in installed}
     result = []
     for name in paths:
         path = Path(name).resolve(strict=True)
-        if path.name in built:
-            source = built[path.name]
+        bound = build_inputs.bound_archive(path, built)
+        if bound:
+            source = bound["source"]
         else:
             output = subprocess.run(["apk", "info", "--who-owns", str(path)], check=True, text=True, capture_output=True).stdout.strip()
             owner = output.rsplit(" is owned by ", 1)[-1]
@@ -158,6 +139,7 @@ def main():
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--upstream", required=True, type=Path)
     parser.add_argument("--inputs", required=True, type=Path)
+    parser.add_argument("--dependencies", required=True, type=Path)
     arguments = parser.parse_args()
     arguments.output.mkdir()
     sources = arguments.output / "sources"
@@ -173,7 +155,12 @@ def main():
     shutil.copy2(runtime[0], arguments.output / "runtime")
     copy_licences(sources / "type2-runtime", licences / "type2-runtime")
     packages = installed_packages()
-    dependencies = [archive_source(item, sources, licences) for item in inputs["source_dependencies"]]
+    built = build_inputs.validate(inputs, arguments.dependencies)
+    shutil.copytree(arguments.dependencies, sources / "dependency-build", symlinks=True)
+    dependencies = []
+    for name, source in built["sources"].items():
+        notices = copy_licences(arguments.dependencies / source["directory"], licences / name)
+        dependencies.append({**source, "source_sha256": source["sha256"], "licences": notices})
     locked = inputs["static_packages"]
     expected = {entry["name"]: entry for entry in locked}
     selected = [entry for entry in packages if entry["P"] in expected]
@@ -185,13 +172,16 @@ def main():
             raise ValueError(f"installed static dependency differs from its lock: {entry['P']}")
     origins = sorted({entry["origin"] for entry in locked})
     dependencies += [alpine_source(name, selected, sources, licences, inputs["recipe_archives"]) for name in origins]
-    archives = linked_archives(arguments.upstream, packages, expected)
+    archives = linked_archives(arguments.upstream, packages, expected, built)
     inventory = {
         "runtime_source_commit": inputs["source_commit"],
         "builder_image": inputs["builder_image"],
         "runtime_sha256": digest(arguments.output / "runtime"),
         "dependencies": dependencies,
         "linked_archives": archives,
+        "build_inputs": built,
+        "original_runtime_makefile_sha256": digest(arguments.dependencies / "upstream-runtime-Makefile"),
+        "runtime_makefile_sha256": digest(arguments.upstream / "src/runtime/Makefile"),
     }
     (arguments.output / "runtime-inventory.json").write_text(json.dumps(inventory, indent=2) + "\n")
     shutil.copy2(arguments.inputs, sources / "inputs.json")

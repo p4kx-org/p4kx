@@ -51,6 +51,8 @@ jobs:
           .github/scripts/test-linux-package-contract.ps1 -Directory target/linux-contract-check
           python3 -B packaging/linux/runtime/test_collect_sources.py --directory target/linux-source-contract-check
           if ($LASTEXITCODE -ne 0) { throw 'Native runtime source inventory contract failed.' }
+          python3 -B packaging/linux/runtime/test_build_inputs.py --directory target/linux-build-input-contract-check
+          if ($LASTEXITCODE -ne 0) { throw 'Native runtime compiled-input binding contract failed.' }
       - name: Build all three shipped native release applications
         run: |
           cargo build --release --locked --target $env:P4KX_TARGET -p p4kx -p p4kx-gui -p p4kx-mcp

@@ -26,7 +26,7 @@ function Get-P4kxFileRangeHash {
 }
 
 function Get-P4kxElfTextRange {
-    param([Parameter(Mandatory)][string[]]$SectionHeaders)
+    param([Parameter(Mandatory)][AllowEmptyString()][string[]]$SectionHeaders)
     $matchesFound = @($SectionHeaders | Where-Object { $_ -match '^\s*\[\s*\d+\]\s+\.text\s+PROGBITS\s+[0-9a-f]+\s+[0-9a-f]+\s+[0-9a-f]+\s' })
     if ($matchesFound.Count -ne 1 -or $matchesFound[0] -notmatch '\.text\s+PROGBITS\s+[0-9a-f]+\s+([0-9a-f]+)\s+([0-9a-f]+)\s') {
         throw 'ELF must contain exactly one executable .text section.'

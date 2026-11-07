@@ -13,10 +13,21 @@ The runtime source is MIT-licensed. Each library's original notices are under `l
 libfuse's LGPL terms remain applicable to that library.
 
 To reconstruct the supplied build context, copy `type2-runtime` to a directory named `upstream`
-alongside `Dockerfile`, `collect-sources.py`, `inputs.json` and `packages`. Build with the
+alongside `Dockerfile`, `collect-sources.py`, `build_inputs.py`, `inputs.json` and `packages`.
+Restore `dependency-build/upstream-install-dependencies.sh` as
+`upstream/scripts/common/install-dependencies.sh` and
+`dependency-build/upstream-runtime-Makefile` as `upstream/src/runtime/Makefile` first; the retained
+runtime tree also records the executed workspace/link-map changes. Build with the
 `builder_image` and `source_commit` recorded in `inputs.json` as the `BUILDER_IMAGE` and
 `RUNTIME_COMMIT` Docker build arguments. Use a native CPU matching the supplied package.
 The build scripts and source archives document every installed static library.
+
+`dependency-build` contains the actual verified libfuse/squashfuse input archives, their unpacked
+and patched build trees, static build outputs and the original upstream installer recipe.
+The executed installer keeps the same download/digest checks and build commands while retaining
+its workspace. Its before/after recipe hashes and each exact installed archive path/hash are in
+`build-inputs.json`, recorded before the runtime link and verified afterwards. A matching library
+basename at another path or changed archive bytes cannot establish source provenance.
 
 To use a modified library, unpack its source archive, apply the recorded distribution patches
 when applicable, and follow the supplied build recipe to produce its static archive and headers.

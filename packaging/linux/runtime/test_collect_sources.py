@@ -4,7 +4,6 @@ import hashlib
 import importlib.util
 import io
 from pathlib import Path
-import shutil
 import tarfile
 import unittest
 from unittest.mock import patch
@@ -58,17 +57,17 @@ class SourceInventoryTests(unittest.TestCase):
         installed = [{"P": "gcc", "V": "15.2.0-r2", "o": "gcc"}]
         response = collect_sources.subprocess.CompletedProcess([], 0, f"{library} is owned by gcc-15.2.0-r2\n")
         with patch.object(collect_sources.subprocess, "run", return_value=response):
-            result = collect_sources.linked_archives(self.directory, installed, {"gcc": {}})
+            result = collect_sources.linked_archives(self.directory, installed, {"gcc": {}}, {"archives": []})
             self.assertEqual(result[0]["source"], "gcc")
             self.assertEqual(result[0]["sha256"], hashlib.sha256(library.read_bytes()).hexdigest())
             with self.assertRaisesRegex(ValueError, "unlocked static archive"):
-                collect_sources.linked_archives(self.directory, installed, {})
+                collect_sources.linked_archives(self.directory, installed, {}, {"archives": []})
 
     def test_empty_link_map_cannot_claim_static_coverage(self):
         """A missing static closure is rejected rather than recorded as checked."""
         (self.directory / "runtime-link.map").write_text("no linked archive evidence\n")
         with self.assertRaisesRegex(ValueError, "no static link map"):
-            collect_sources.linked_archives(self.directory, [], {})
+            collect_sources.linked_archives(self.directory, [], {}, {"archives": []})
 
     def test_recipe_archive_requires_the_exact_official_commit_and_digest(self):
         """A recipe cannot change host, source commit, root or digest spelling."""
@@ -123,23 +122,13 @@ class SourceInventoryTests(unittest.TestCase):
                     collect_sources.alpine_source("synthetic", packages, changed_sources, self.directory / "changed-notices", {commit: dict(reference, sha256="0" * 64)})
         abuild.assert_not_called()
 
-    def test_source_archive_rejects_parent_traversal(self):
-        """A source archive cannot escape its corresponding-source directory."""
-        sources = self.directory / "sources"
-        sources.mkdir()
-        malicious = self.directory / "malicious.tar"
-        with tarfile.open(malicious, "w") as archive:
-            entry = tarfile.TarInfo("../../outside")
-            entry.size = 1
-            archive.addfile(entry, io.BytesIO(b"x"))
-        def local_download(url, destination, expected):
-            shutil.copyfile(malicious, destination)
-            return "a" * 64
-        dependency = {"name": "synthetic", "url": "https://example.invalid/source", "sha256": "a" * 64}
-        with patch.object(collect_sources, "download", side_effect=local_download):
-            with self.assertRaises(tarfile.OutsideDestinationError):
-                collect_sources.archive_source(dependency, sources, self.directory / "notices")
-        self.assertFalse((self.directory / "outside").exists())
+    def test_retained_build_input_rejects_parent_traversal(self):
+        """A compiled-input receipt cannot read files outside the retained build root."""
+        owned = self.directory / "owned"
+        owned.mkdir()
+        (self.directory / "outside").write_text("unowned input")
+        with self.assertRaisesRegex(ValueError, "escapes its root"):
+            collect_sources.build_inputs.inside(owned, "../outside")
 
 
 if __name__ == "__main__":

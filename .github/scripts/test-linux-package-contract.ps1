@@ -27,6 +27,7 @@ try { Get-P4kxLinuxPlatform 'x86_64-pc-windows-msvc' | Out-Null } catch { $rejec
 if (-not $rejected) { throw 'Windows target was accepted for Linux packaging.' }
 $section = '  [15] .text PROGBITS 0000000000000040 000040 000003 00 AX 0 0 16'
 $range = Get-P4kxElfTextRange -SectionHeaders @($section)
+if ((Get-P4kxElfTextRange -SectionHeaders @('', $section, '')).offset -ne $range.offset) { throw 'Blank GNU readelf header lines changed executable section selection.' }
 $path = Join-Path $Directory 'section-range.fixture'
 $bytes = [byte[]]::new(68)
 [Text.Encoding]::ASCII.GetBytes('abc').CopyTo($bytes, 64)
