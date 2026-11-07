@@ -3,9 +3,16 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'native-evidence.ps1')
 . (Join-Path $PSScriptRoot 'linux-package-evidence.ps1')
 . (Join-Path $PSScriptRoot 'documents-portal-evidence.ps1')
+. (Join-Path $PSScriptRoot 'msi-path-verification.ps1')
 
 function Assert-P4kxPackageRuntime {
     param($Runtime, $Platform, [string]$AssetDirectory, [string]$Version)
+    if ($Platform.os -ceq 'windows') {
+        $msi = Get-P4kxAssetName -Target $Platform.target -Version $Version -Package msi
+        $hash = (Get-FileHash -LiteralPath (Join-Path $AssetDirectory $msi) -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($Runtime.installer.lifecycle -cne 'success' -or $Runtime.installer.repair -cne 'success' -or $Runtime.installer.rollback -cne 'success') { throw 'MSI lifecycle, repair or rollback failed.' }
+        Assert-P4kxMsiPathVerification $Runtime.installer.path_contract $Platform $Runtime.revision $hash
+    }
     $packages = @($Runtime.package_smokes)
     if ((($packages.package | Sort-Object) -join ',') -cne (($Platform.packages | Sort-Object) -join ',')) {
         throw 'Release evidence does not cover every target package exactly once.'

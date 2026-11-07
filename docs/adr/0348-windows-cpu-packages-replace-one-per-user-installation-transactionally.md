@@ -17,6 +17,9 @@ The CI rollback probe is a separately identified, modified copy of the next MSI 
 its installation script and fails before InstallFinalize. The shipped MSI has no test action.
 The profile and `archive.key` remain outside MSI ownership, and survive upgrades, CPU
 replacement and uninstall. Portable execution uses an extracted folder without installer state.
+The embedded Rust helper owns the exact PATH insertion and transfers its claim during modern
+replacement; old-product removal skips the helper while the replacing invocation remains bound.
+[ADR-0354](0354-msi-path-ownership-and-bounded-environment-notification.md) defines that protocol.
 
 Both target packages are executed on matching native hosted runners, with source commit,
 compiler, nextest, PE machines, payload hashes and package hashes recorded. Shipped release

@@ -13,6 +13,7 @@
         Schedule="afterInstallInitialize"
         DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
+    <?include path-transport.wxi?>
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/p4kx-org/p4kx" />
     <Property Id="ARPNOMODIFY" Value="1" />
     <Icon Id="P4kx.ico" SourceFile="$(var.RepositoryFolder)\crates\p4kx-gui\assets\p4kx.ico" />
@@ -28,6 +29,9 @@
             <File Id="DistributionIdentity" Name="p4kx-distribution.json" Source="$(var.BinaryFolder)\p4kx-distribution.json" />
             <File Id="WindowsRuntimeInventory" Name="windows-runtime.json" Source="$(var.BinaryFolder)\windows-runtime.json" />
             <File Id="MicrosoftRuntimeNotice" Name="MICROSOFT-REDISTRIBUTABLE-NOTICE.txt" Source="$(var.BinaryFolder)\MICROSOFT-REDISTRIBUTABLE-NOTICE.txt" />
+            <File Id="MsiHelperInventory" Name="p4kx-msi-helper.json" Source="$(var.HelperFolder)\p4kx-msi-helper.json" />
+            <File Id="MsiHelperNotice" Name="p4kx-msi-helper-NOTICE.txt" Source="$(var.HelperFolder)\p4kx-msi-helper-NOTICE.txt" />
+            <File Id="MsiHelperSbom" Name="p4kx-msi-helper.cdx.json" Source="$(var.HelperFolder)\p4kx-msi-helper.cdx.json" />
             <File Id="Changelog" Name="CHANGELOG.md" Source="$(var.BinaryFolder)\CHANGELOG.md" />
             <File Id="LicenceMit" Name="LICENSE-MIT" Source="$(var.RepositoryFolder)\LICENSE-MIT" />
             <File Id="LicenceApache" Name="LICENSE-APACHE" Source="$(var.RepositoryFolder)\LICENSE-APACHE" />
@@ -41,14 +45,6 @@
                 Type="integer"
                 Value="1"
                 KeyPath="yes" />
-            <Environment
-                Id="UserPath"
-                Name="PATH"
-                Value="[APPLICATIONFOLDER]"
-                Action="set"
-                Part="$(var.UserPathPart)"
-                Permanent="no"
-                System="no" />
             <RemoveFolder Id="RemoveApplicationFolder" Directory="APPLICATIONFOLDER" On="uninstall" />
             <RemoveFolder Id="RemoveUserPrograms" Directory="UserPrograms" On="uninstall" />
           </Component>

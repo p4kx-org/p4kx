@@ -15,7 +15,7 @@ $platform = Get-P4kxPlatform -Target $Target
 Assert-P4kxNativeHost -Platform $platform
 $installer = Get-Content -LiteralPath $InstallerResult -Raw | ConvertFrom-Json
 if ($installer.target -cne $Target -or $installer.lifecycle -cne 'success' -or
-    $installer.rollback -cne 'success' -or -not $installer.profile_preserved) { throw 'Installer lifecycle verification did not succeed.' }
+    $installer.rollback -cne 'success' -or $installer.repair -cne 'success' -or -not $installer.profile_preserved) { throw 'Installer lifecycle verification did not succeed.' }
 $metadata = Get-Content -LiteralPath $BuildMetadata -Raw | ConvertFrom-Json
 $packages = @(
     (Get-Content -LiteralPath $PortableResult -Raw | ConvertFrom-Json),

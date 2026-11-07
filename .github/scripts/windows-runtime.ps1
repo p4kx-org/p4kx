@@ -8,6 +8,16 @@ function Get-P4kxVisualStudio {
     return $path.Trim()
 }
 
+function Get-P4kxDumpbin {
+    param($Platform, [string]$Studio)
+    $hostCpu = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
+    $tools = Join-Path $Studio 'VC/Tools/MSVC'
+    $version = Get-ChildItem -LiteralPath $tools -Directory | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+    if ($null -eq $version) { throw 'Missing Visual Studio PE analysis tools.' }
+    $dumpbin = Join-Path $version.FullName "bin/Host$hostCpu/$($Platform.msi_arch)/dumpbin.exe"
+    if (-not (Test-Path -LiteralPath $dumpbin -PathType Leaf)) { throw 'Missing host-native target PE analyzer.' }
+    return $dumpbin
+}
 function Get-P4kxPeDependencies {
     param([string]$Dumpbin, [string]$Path)
     $output = & $Dumpbin /nologo /dependents $Path
@@ -60,10 +70,7 @@ function Copy-P4kxWindowsRuntime {
     param([string]$Directory, $Platform)
     $studio = Get-P4kxVisualStudio
     $hostCpu = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
-    $tools = Join-Path $studio 'VC/Tools/MSVC'
-    $version = Get-ChildItem -LiteralPath $tools -Directory | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
-    $dumpbin = Join-Path $version.FullName "bin/Host$hostCpu/$($Platform.msi_arch)/dumpbin.exe"
-    if (-not (Test-Path -LiteralPath $dumpbin)) { throw "Missing host PE analyzer: $dumpbin" }
+    $dumpbin = Get-P4kxDumpbin $Platform $studio
     $redistributables = Join-Path $studio 'VC/Redist/MSVC'
     $crt = Get-P4kxCrtDirectory -Redistributables $redistributables -Architecture $Platform.msi_arch
     $crtSource = [IO.Path]::GetRelativePath($redistributables, $crt.FullName).Replace('\', '/')

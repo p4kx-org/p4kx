@@ -1,4 +1,6 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'msi-package-code.ps1')
+. (Join-Path $PSScriptRoot 'msi-transport-contract.ps1')
 
 function Close-P4kxComObject {
     param($Object)
@@ -35,18 +37,28 @@ function Get-P4kxMsiMetadata {
     $database = Invoke-P4kxComMethod $installer 'OpenDatabase' @((Resolve-Path -LiteralPath $Path).Path, 0)
     $summary = $null
     try {
-        $properties = @{}
-        foreach ($row in Read-P4kxMsiRows $database 'SELECT `Property`, `Value` FROM `Property`' 2) { $properties[$row[0]] = $row[1] }
+        $properties = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
+        foreach ($row in Read-P4kxMsiRows $database 'SELECT `Property`, `Value` FROM `Property`' 2) { $properties.Add($row[0],$row[1]) }
+        $tables = @(Read-P4kxMsiRows $database 'SELECT `Name` FROM `_Tables`' 1 | ForEach-Object { $_[0] })
+        $execute = @(Read-P4kxMsiRows $database 'SELECT `Action`, `Condition`, `Sequence` FROM `InstallExecuteSequence`' 3)
         $summary = Get-P4kxComProperty $database 'SummaryInformation' @(0)
         return [pscustomobject]@{
             product=$properties.ProductCode; upgrade=$properties.UpgradeCode; version=$properties.ProductVersion
             template=(Get-P4kxComProperty $summary 'Property' @(7)); package=(Get-P4kxComProperty $summary 'Property' @(9))
             components=@(Read-P4kxMsiRows $database 'SELECT `ComponentId`, `Attributes` FROM `Component`' 2)
             files=@(Read-P4kxMsiRows $database 'SELECT `FileName` FROM `File`' 1 | ForEach-Object { $_[0] -replace '^.*\|', '' })
-            sequence=@(Read-P4kxMsiRows $database 'SELECT `Action`, `Sequence` FROM `InstallExecuteSequence`' 2)
+            properties=$properties
+            sequence=@(foreach ($row in $execute) { Write-Output -NoEnumerate @($row[0], $row[2]) })
+            execute=$execute
+            ui=@(if ('InstallUISequence' -in $tables) { Read-P4kxMsiRows $database 'SELECT `Action`, `Condition`, `Sequence` FROM `InstallUISequence`' 3 })
+            custom_actions=@(if ('CustomAction' -in $tables) { Read-P4kxMsiRows $database 'SELECT `Action`, `Type`, `Source`, `Target` FROM `CustomAction`' 4 })
+            app_search=@(if ('AppSearch' -in $tables) { Read-P4kxMsiRows $database 'SELECT `Property`, `Signature_` FROM `AppSearch`' 2 })
+            reg_locator=@(if ('RegLocator' -in $tables) { Read-P4kxMsiRows $database 'SELECT `Signature_`, `Root`, `Key`, `Name`, `Type` FROM `RegLocator`' 5 })
+            upgrade_properties=@(Read-P4kxMsiRows $database 'SELECT `ActionProperty` FROM `Upgrade`' 1 | ForEach-Object { $_[0] } | Sort-Object -Unique)
+            binary_names=@(if ('Binary' -in $tables) { Read-P4kxMsiRows $database 'SELECT `Name` FROM `Binary`' 1 | ForEach-Object { $_[0] } })
             directories=@(Read-P4kxMsiRows $database 'SELECT `Directory` FROM `Directory`' 1 | ForEach-Object { $_[0] })
             registry=@(Read-P4kxMsiRows $database 'SELECT `Root`, `Key`, `Name` FROM `Registry`' 3)
-            environment=@(Read-P4kxMsiRows $database 'SELECT `Name`, `Value`, `Component_` FROM `Environment`' 3)
+            environment=@(if ('Environment' -in $tables) { Read-P4kxMsiRows $database 'SELECT `Name`, `Value`, `Component_` FROM `Environment`' 3 })
         }
     }
     finally { Close-P4kxComObject $summary; Close-P4kxComObject $database; Close-P4kxComObject $installer }
@@ -69,10 +81,11 @@ function Assert-P4kxMsiMetadata {
     foreach ($action in $Metadata.sequence) { $sequence[$action[0]] = [int]$action[1] }
     if ($sequence.RemoveExistingProducts -le $sequence.InstallInitialize -or
         $sequence.RemoveExistingProducts -ge $sequence.ProcessComponents) { throw 'MSI upgrade removal is not early and transactional.' }
+    Assert-P4kxMsiTransport $Metadata
 }
 
 function New-P4kxRollbackMsi {
-    param([string]$Source, [string]$Destination)
+    param([string]$Source, [string]$Destination, [ValidateSet('after-execute', 'after-commit')][string]$FailureAt = 'after-execute')
     Copy-Item -LiteralPath $Source -Destination $Destination
     $installer = New-Object -ComObject WindowsInstaller.Installer
     $database = Invoke-P4kxComMethod $installer 'OpenDatabase' @([IO.Path]::GetFullPath($Destination), 1)
@@ -83,9 +96,14 @@ function New-P4kxRollbackMsi {
         if ($actions.Count -eq 0) {
             $queries += 'CREATE TABLE `CustomAction` (`Action` CHAR(72) NOT NULL, `Type` SHORT NOT NULL, `Source` CHAR(72), `Target` CHAR(255) LOCALIZABLE, `ExtendedType` LONG PRIMARY KEY `Action`)'
         }
+        $failureQuery = if ($FailureAt -ceq 'after-commit') {
+            'INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) VALUES (''P4kxRollbackProbe'', 9730, ''P4kxPathHelper'', ''invalid-injected-commit-command'')'
+        } else {
+            'INSERT INTO `CustomAction` (`Action`, `Type`, `Target`) VALUES (''P4kxRollbackProbe'', 19, ''P4KX rollback verification failure'')'
+        }
         $queries += @(
             ('UPDATE `Property` SET `Value` = ''{0}'' WHERE `Property` = ''ProductCode''' -f "{$([guid]::NewGuid())}"),
-            'INSERT INTO `CustomAction` (`Action`, `Type`, `Target`) VALUES (''P4kxRollbackProbe'', 19, ''P4KX rollback verification failure'')',
+            $failureQuery,
             'INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) VALUES (''P4kxRollbackProbe'', ''1'', 6550)'
         )
         $execute = @(Read-P4kxMsiRows $database 'SELECT `Action` FROM `InstallExecuteSequence` WHERE `Action` = ''InstallExecute''' 1)
@@ -98,7 +116,9 @@ function New-P4kxRollbackMsi {
             finally { [void](Invoke-P4kxComMethod $view 'Close' @()); Close-P4kxComObject $view }
         }
         $summary = Get-P4kxComProperty $database 'SummaryInformation' @(1)
-        [void]$summary.GetType().InvokeMember('Property', [Reflection.BindingFlags]::SetProperty, $null, $summary, @(9, "{$([guid]::NewGuid())}"))
+        $package = "{$([guid]::NewGuid())}"
+        [void]$summary.GetType().InvokeMember('Property', [Reflection.BindingFlags]::SetProperty, $null, $summary, @(9, $package))
+        Set-P4kxMsiPrivatePackageCode $database $package
         [void](Invoke-P4kxComMethod $summary 'Persist' @())
         [void](Invoke-P4kxComMethod $database 'Commit' @())
     }

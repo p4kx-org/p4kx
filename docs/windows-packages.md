@@ -30,6 +30,11 @@ native runtime execution; the packaged application checks below remain required.
 
 The MSI installs for the current user without administrator rights in
 `%LOCALAPPDATA%\Programs\P4KX`, with one Start menu shortcut and one user PATH entry.
+A private Rust helper preserves that entry's ownership and the original PATH existence,
+Registry string type and bytes. A unique pre-existing matching entry is borrowed rather
+than removed on uninstall; ambiguous duplicates refuse the change. Foreign PATH edits
+are retained. [ADR-0354](adr/0354-msi-path-ownership-and-bounded-environment-notification.md)
+defines the transaction, invocation binding and bounded Environment notification.
 There is one installed product across CPU choices. Newer versions upgrade it; lower versions
 are rejected. Choosing another CPU package explicitly at the same version replaces the current
 product on Windows ARM64, including when replacing an emulated AMD64 installation with ARM64.
@@ -58,7 +63,7 @@ Each release run must execute the packaged release EXEs from both the portable Z
 - MCP negotiates the protocol, lists tools and reads that synthetic text using a read-only tool.
 - GUI draws three frames and exits within 120 seconds with an isolated process profile.
 - The native renderer names a required software adapter. Device checks remain explicit.
-- MSI lifecycle verifies machine/template/component metadata, install, upgrade, blocked downgrade,
+- MSI lifecycle verifies machine/template/component metadata, install, repair, upgrade, blocked downgrade,
   transactional rollback with restored product/file hashes/PATH, profile/key preservation and uninstall.
 - ARM64 verifies deliberate same-version CPU replacement in both directions. Its AMD64 compatibility
   payload is not counted as native execution. AMD64 verifies rejection of the ARM64 MSI.
@@ -68,8 +73,8 @@ Each release run must execute the packaged release EXEs from both the portable Z
 Installer lifecycle scripts refuse non-disposable local execution and pre-existing P4KX ownership.
 Tests seed synthetic `settings.toml`/`archive.key` markers only on a clean hosted runner. Runtime
 processes use `P4KX_FOLDERS_ROOT`, so no test GUI writes into that marker profile or the user's data.
-The local `test-windows-package-contract.ps1` builds synthetic, non-executable MSI payloads for
-both CPUs and checks database/rollback-probe authoring without installing either MSI.
+The producer's `test-windows-package-contract.ps1` builds synthetic, non-executable MSI payloads
+for both CPUs and checks database/rollback-probe authoring without installing either MSI.
 
 The target runtime artifact includes both package hashes and executed binary hashes. Final
 assembly rejects missing, skipped or mismatched package evidence and requires the complete
@@ -93,24 +98,25 @@ verification exception. The invocation regression uses synthetic paths and mocke
 it never installs software on the development machine.
 
 Installer logs retain `original-path.json`, one `<transaction>.log.path.json` per completed MSI
-operation and `final-path.json` after cleanup. These contain the user PATH's raw registry value
-and kind plus the .NET user-scope result, distinguishing separator changes, variable expansion
-and registry-type changes. Uninstall requires the exact original value and kind; comparison
-never drops empty segments or normalises case, trailing separators or variable references.
-`test-msi-path.ps1` exercises these distinctions without writing the registry or installing a
-package. Actual preservation remains a native hosted-runner gate.
+operation and `final-path.json` after cleanup for managed PATH observations. The raw Registry
+fixture separately records exact value existence, Registry type and bytes, including termination,
+plus the production-decoded ownership and journal state. Managed strings alone cannot prove raw
+preservation. `installer.json` includes a mandatory `path_contract` bound to the source, CPU,
+current MSI hash and helper/fixture hashes. Missing or failed evidence blocks release assembly.
 
-The separate prepend hypothesis uses `build-msi.ps1 -UserPathPart first`. Normal packages retain
-the default `last` operation. Probe MSIs and their `.probe.json` bindings belong only to validation
-artifacts; each binding requires the exact source revision, target, version, operation and MSI
-SHA-256. The probe cannot satisfy release runtime evidence or change the released operation.
+`check-msi.ps1` runs the modern lifecycle against the host's exact original PATH, then eight
+install/uninstall cases: plain, leading, trailing and doubled separators in `ExpandString`;
+a plain `String`; both string kinds explicitly empty; and an absent value. Each case proves
+its seeded baseline, active installed prefix and exact post-uninstall value. The prefix includes
+the helper's actual trailing backslash. Comparisons do not normalise empty segments, case,
+variable references or terminator bytes. Additional raw encodings have pure codec coverage;
+they are not claimed as extra executed native cases.
 
-`check-msi-path-probe.ps1` runs the complete modern lifecycle against the host's exact original
-PATH, plus eight install/uninstall cases: plain, leading, trailing and doubled separators in
-`ExpandString`; a plain `String`; both kinds of explicit empty string; and an absent value. Each
-case retains its own raw baseline and result. Failures do not skip the remaining cases. Ownership
-cleanup must succeed before any separate fixture reset, and reset records do not count as installer
-preservation. The writer is limited to the hosted runner's user `Environment\Path` value.
+Ownership cleanup must succeed before any separate fixture reset. Reset evidence does not count
+as installer preservation. A failure permits later cases only after proved cleanup. Unconfirmed
+process completion stops every further helper, seed and restore mutation; killing an MSI client
+does not prove that the Windows Installer server has stopped its transaction. A completed nonzero
+exit preserves the original failure while permitting the existing ownership-aware cleanup.
 
 AMD64 first calibrates the exact historical 0.2.0 MSI with install/uninstall and records its observed
 cleanup rest. The historical rename-upgrade case compares against that rest. Any difference between
@@ -123,12 +129,18 @@ aggregate; only the dependent historical upgrade is skipped. The modern lifecycl
 raw-value cases still run after successful ownership cleanup and fixture reset. Unresolved
 ownership aborts further mutation.
 
-The invocation contract executes the run-all and cleanup paths with mocked registry/installer
-operations. The packaging contract compiles both append and prepend Environment rows for both
-CPUs, reads the MSI databases and rejects mismatched probe bindings without installing software.
-These checks establish probe correctness; only the native hosted-runner results can confirm or
-disprove the prepend hypothesis. Leading separators, empty values and registry kinds remain exact
-requirements even when they disprove it.
+One source-bound native helper probe also reserves, prepares and applies a real insertion, adds
+a controlled foreign prefix, and rolls back with that exact captured binding. The foreign edit
+must survive. The MSI lifecycle itself must execute the production notifier. A separate C#
+message receiver is optional diagnostic infrastructure; neither individual-window delivery nor
+hung-recipient behavior is inferred from lifecycle success.
+
+Pure tests cover invocation uncertainty, raw observations, cleanup, evidence rejection and helper
+provenance. The compiled package contract inspects the actual MSI action/search/sequence tables,
+real SummaryInformation PackageCode and embedded helper digest. The helper is an embedded Type-2
+EXE with a static CRT, independent of installed applications or DLLs. Its private SBOM, target,
+imports, compiler, lockfile and notice hashes are retained inside the MSI. It adds no application
+to the portable ZIP and no .NET runtime dependency. Native hosted execution remains required.
 
 `release-windows.yml` consumes the Windows rows of `.config/platforms.json`. Each native producer
 builds three release applications and a next-version MSI, generates target-filtered CycloneDX

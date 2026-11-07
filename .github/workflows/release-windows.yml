@@ -72,6 +72,10 @@ jobs:
         run: cargo nextest run --release --locked --target $env:P4KX_TARGET -p p4kx-render --lib --no-capture --no-tests fail -E 'test(the_software_adapter_is_named)'
       - name: Install pinned host packaging and target-analysis tools
         run: .github/scripts/install-windows-package-tools.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'tools')
+      - name: Validate MSI transport contracts without native adapter calls
+        run: .github/scripts/test-msi-transport-contract.ps1 -Repository $env:GITHUB_WORKSPACE
+      - name: Build the independent embedded helper with a static CRT
+        run: .github/scripts/build-msi-helper.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -Revision $env:GITHUB_SHA -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'msi-helper')
       - name: Verify both installer schemas and malformed runtime inventories without installation
         if: matrix.arch == 'amd64'
         run: .github/scripts/test-windows-package-contract.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/windows-package') -Wix $env:WIX_EXE
@@ -90,10 +94,10 @@ jobs:
           Compress-Archive -Path $portable -DestinationPath (Join-Path $packages $zipName)
           .github/scripts/build-windows-payload.ps1 -Target $env:P4KX_TARGET -BinaryDirectory $binary -OutputDirectory $installed -Package msi
           $msiName = Get-P4kxAssetName -Target $env:P4KX_TARGET -Version $env:VERSION -Package msi
-          .github/scripts/build-msi.ps1 -Wix $env:WIX_EXE -Target $env:P4KX_TARGET -Version $env:MSI_VERSION -BinaryFolder $installed -Output (Join-Path $packages $msiName)
-          .github/scripts/build-msi.ps1 -Wix $env:WIX_EXE -Target $env:P4KX_TARGET -Version $env:NEXT_MSI_VERSION -BinaryFolder $installed -Output (Join-Path $validation 'next.msi')
-          .github/scripts/build-msi.ps1 -Wix $env:WIX_EXE -Target $env:P4KX_TARGET -Version $env:MSI_VERSION -BinaryFolder $installed -Output (Join-Path $validation 'prepend-probe.msi') -UserPathPart first
-          .github/scripts/build-msi.ps1 -Wix $env:WIX_EXE -Target $env:P4KX_TARGET -Version $env:NEXT_MSI_VERSION -BinaryFolder $installed -Output (Join-Path $validation 'prepend-next.msi') -UserPathPart first
+          .github/scripts/build-msi.ps1 -Wix $env:WIX_EXE -Target $env:P4KX_TARGET -Version $env:MSI_VERSION -BinaryFolder $installed -Output (Join-Path $packages $msiName) -ApplicationVersion $env:VERSION -Revision $env:GITHUB_SHA -HelperDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'msi-helper/payload')
+          .github/scripts/build-msi.ps1 -Wix $env:WIX_EXE -Target $env:P4KX_TARGET -Version $env:NEXT_MSI_VERSION -BinaryFolder $installed -Output (Join-Path $validation 'next.msi') -ApplicationVersion $env:VERSION -Revision $env:GITHUB_SHA -HelperDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'msi-helper/payload')
+
+
           .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -ArchivePath (Join-Path $packages $zipName) -BinaryDirectory $binary -MetadataPath (Join-Path $validation 'build.json')
       - name: Per-target and per-binary SBOM including app-local runtime files
         run: .github/scripts/build-target-sbom.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'package') -RuntimeInventory (Join-Path $env:P4KX_PACKAGE_TASK 'msi-payload/windows-runtime.json')
@@ -112,7 +116,7 @@ jobs:
             ${{ env.P4KX_PACKAGE_TASK }}/fixture/*
             ${{ env.P4KX_PACKAGE_TASK }}/validation/*.json
             ${{ env.P4KX_PACKAGE_TASK }}/validation/next.msi
-            ${{ env.P4KX_PACKAGE_TASK }}/validation/prepend-*.msi
+            ${{ env.P4KX_PACKAGE_TASK }}/msi-helper/payload/*
           if-no-files-found: error
 
   verify:
@@ -171,15 +175,18 @@ jobs:
           New-Item -ItemType Directory -Force $previous | Out-Null
           gh release download v0.2.0 --repo p4kx-org/p4kx --pattern P4K-Extractor-0.2.0-x86_64.msi --dir $previous
           if ($LASTEXITCODE -ne 0) { throw 'Exact historical AMD64 MSI download failed.' }
-      - name: Probe exact PATH preservation with separately bound prepend MSIs
+      - name: Pure exact-PATH validator and run-all mocks
         run: |
-          . .github/scripts/platform-contract.ps1
-          $row = Get-P4kxPlatform -Target $env:P4KX_TARGET
-          $other = @((Get-P4kxPlatformContract).targets | Where-Object { $_.os -eq 'windows' -and $_.arch -ne $row.arch })[0]
-          $base = "artifacts/windows-build-$env:P4KX_TARGET"
-          $previous = if ($row.arch -eq 'amd64') { @{PreviousMsi=(Join-Path $env:P4KX_PACKAGE_TASK 'previous/P4K-Extractor-0.2.0-x86_64.msi')} } else { @{} }
-          $upgradeCode = ([xml](Get-Content crates/p4kx-gui/wix/main.wxs)).Wix.Package.UpgradeCode
-          .github/scripts/check-msi-path-probe.ps1 -Target $row.target -Msi "$base/validation/prepend-probe.msi" -NextMsi "$base/validation/prepend-next.msi" -NextVersion $env:NEXT_MSI_VERSION -UpgradeCode $upgradeCode -OtherArchitectureMsi "artifacts/windows-build-$($other.target)/validation/prepend-probe.msi" -FixtureDirectory "$base/fixture" -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'path-probe') @previous
+          .github/scripts/test-msi-raw-fixture.ps1
+          .github/scripts/test-msi-path-verification.ps1
+      - name: Compile source-bound opt-in raw Registry fixture
+        run: |
+          $original = $env:P4KX_FIXTURE_SOURCE_REVISION
+          try {
+            $env:P4KX_FIXTURE_SOURCE_REVISION = $env:GITHUB_SHA
+            cargo build --release --locked --target $env:P4KX_TARGET -p p4kx-msi-path --example p4kx-msi-registry-fixture --features native-fixtures
+            if ($LASTEXITCODE -ne 0) { throw 'Opt-in Registry fixture compilation failed.' }
+          } finally { $env:P4KX_FIXTURE_SOURCE_REVISION = $original }
       - name: Installer metadata, upgrade, downgrade, rollback, CPU replacement and preservation
         run: |
           . .github/scripts/platform-contract.ps1
@@ -190,7 +197,9 @@ jobs:
           $otherName = Get-P4kxAssetName -Target $other.target -Version $env:VERSION -Package msi
           $previous = if ($row.arch -eq 'amd64') { @{PreviousMsi=(Join-Path $env:P4KX_PACKAGE_TASK 'previous/P4K-Extractor-0.2.0-x86_64.msi')} } else { @{} }
           $upgradeCode = ([xml](Get-Content crates/p4kx-gui/wix/main.wxs)).Wix.Package.UpgradeCode
-          .github/scripts/check-msi.ps1 -Target $row.target -Msi "$base/package/$msiName" -NextMsi "$base/validation/next.msi" -NextVersion $env:NEXT_MSI_VERSION -UpgradeCode $upgradeCode -OtherArchitectureMsi "artifacts/windows-build-$($other.target)/package/$otherName" -FixtureDirectory "$base/fixture" -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check') @previous
+          $registryFixture = "target/$env:P4KX_TARGET/release/examples/p4kx-msi-registry-fixture.exe"
+          $registryHash = (Get-FileHash -LiteralPath $registryFixture -Algorithm SHA256).Hash.ToLowerInvariant()
+          .github/scripts/check-msi.ps1 -Target $row.target -Msi "$base/package/$msiName" -NextMsi "$base/validation/next.msi" -NextVersion $env:NEXT_MSI_VERSION -UpgradeCode $upgradeCode -OtherArchitectureMsi "artifacts/windows-build-$($other.target)/package/$otherName" -FixtureDirectory "$base/fixture" -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check') -RegistryFixture $registryFixture -RegistryFixtureSha256 $registryHash -HelperExecutable "$base/msi-helper/payload/p4kx-msi-path.exe" @previous
       - name: Record executed release payload evidence
         run: |
           $base = "artifacts/windows-build-$env:P4KX_TARGET"
@@ -205,8 +214,6 @@ jobs:
         with:
           name: windows-package-logs-${{ matrix.target }}
           path: |
-            ${{ env.P4KX_PACKAGE_TASK }}/path-probe/**/*.log
-            ${{ env.P4KX_PACKAGE_TASK }}/path-probe/**/*.json
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/**/*.log
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/**/*.json
             ${{ env.P4KX_PACKAGE_TASK }}/portable-check/**/*.log

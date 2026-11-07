@@ -61,6 +61,17 @@ foreach ($row in $contract.targets) {
         })
         $proof | Add-Member -NotePropertyName package_smokes -NotePropertyValue $smokes
     }
+    if ($row.os -ceq 'windows') {
+        $msi = Get-P4kxAssetName -Target $row.target -Version $version -Package msi
+        $msiHash = (Get-FileHash -LiteralPath (Join-Path $Directory $msi) -Algorithm SHA256).Hash.ToLowerInvariant()
+        $reports = @(& (Join-Path $PSScriptRoot 'test-msi-path-verification.ps1') -FixtureTarget $row.target -FixtureRevision $revision -FixtureMsiSha256 $msiHash)
+        if ($reports.Count -ne 1 -or $reports[0] -isnot [Collections.IDictionary] -or $reports[0].scope -cne 'native-synthetic') {
+            throw 'The pure MSI fixture must return exactly one synthetic report in its own script scope.'
+        }
+        $proof | Add-Member -NotePropertyName installer -NotePropertyValue @{
+            lifecycle='success'; repair='success'; rollback='success'; path_contract=$reports[0]
+        }
+    }
     $name = "P4KX-$version-$($row.target)-runtime.json"
     $proof | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath (Join-Path $Directory $name) -Encoding utf8NoBOM
 }
@@ -70,6 +81,9 @@ $windows = @($contract.targets | Where-Object os -EQ windows)[0]
 $windowsProofPath = Join-Path $Directory "P4KX-$version-$($windows.target)-runtime.json"
 $originalProof = Get-Content -LiteralPath $windowsProofPath -Raw
 foreach ($mutation in @(
+    { param($proof) $proof.PSObject.Properties.Remove('installer') },
+    { param($proof) $proof.installer.repair = 'skipped' },
+    { param($proof) $proof.installer.path_contract.raw_cases = @($proof.installer.path_contract.raw_cases | Select-Object -Skip 1) },
     { param($proof) $proof.package_smokes = @($proof.package_smokes | Select-Object -First 1) },
     { param($proof) $proof.package_smokes[0].archive_sha256 = 'f' * 64 },
     { param($proof) $proof.package_smokes[0].binaries[0].sha256 = 'f' * 64 },

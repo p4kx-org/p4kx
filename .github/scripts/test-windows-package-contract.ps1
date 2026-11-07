@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-database.ps1')
 . (Join-Path $PSScriptRoot 'windows-runtime.ps1')
 . (Join-Path $PSScriptRoot 'test-msi-path-authoring.ps1')
+. (Join-Path $PSScriptRoot 'msi-build.ps1')
 New-Item -ItemType Directory -Force -Path $Directory | Out-Null
 $upgrade = '090C8F25-8543-42F0-B40A-1514653149F9'
 $metadata = @()
@@ -45,11 +46,22 @@ foreach ($row in (Get-P4kxPlatformContract).targets | Where-Object os -EQ window
         if (-not $rejected) { throw 'Wrong target/machine/digest/path runtime inventory was accepted.' }
     }
     $inventory | Set-Content $inventoryPath -Encoding utf8NoBOM
+    $helper = Join-Path $Directory "$($row.target)-helper/payload"
+    New-Item -ItemType Directory -Path $helper | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $helper 'p4kx-msi-path.exe'), $bytes)
+    foreach ($name in @('p4kx-msi-helper.json','p4kx-msi-helper.cdx.json')) {
+        '{"role":"synthetic-authoring-fixture-not-runtime-evidence"}' | Set-Content -LiteralPath (Join-Path $helper $name) -Encoding utf8NoBOM
+    }
+    'Synthetic fixture; no native runtime claim.' | Set-Content -LiteralPath (Join-Path $helper 'p4kx-msi-helper-NOTICE.txt') -Encoding utf8NoBOM
     $msi = Join-Path $folder 'synthetic.msi'
-    & (Join-Path $PSScriptRoot 'build-msi.ps1') -Wix $Wix -Target $row.target -Version '0.5.0' -Output $msi -BinaryFolder $folder
+    Invoke-P4kxWixMsiBuild $Wix $row '0.5.0' $msi $folder $helper ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')))
+    $sidecars = @(Get-ChildItem -LiteralPath $folder -File | Where-Object {
+        $_.Name -like '*.runtime.wxs' -or $_.Extension -ieq '.wixpdb'
+    })
+    if ($sidecars.Count -ne 0) { throw 'WiX source or debug intermediates leaked beside the compiled MSI.' }
     $info = Get-P4kxMsiMetadata $msi
     Assert-P4kxMsiMetadata $info $row '0.5.0' $upgrade
-    Test-P4kxMsiPathAuthoring $Wix $row $folder $upgrade $info
+    Test-P4kxMsiPathAuthoring $info
     if ('vcruntime140.dll' -cnotin $info.files) { throw 'Runtime DLL was not included in the MSI.' }
     $metadata += $info
     $original = $info.template
@@ -61,12 +73,20 @@ foreach ($row in (Get-P4kxPlatformContract).targets | Where-Object os -EQ window
     $probe = Join-Path $folder 'rollback-probe.msi'
     New-P4kxRollbackMsi $msi $probe
     $probeInfo = Get-P4kxMsiMetadata $probe
+    if ($probeInfo.properties.P4kxPathPackageCode -cne $probeInfo.package) { throw 'Rollback probe private PackageCode was not restamped.' }
     if ($probeInfo.product -eq $info.product -or $probeInfo.package -eq $info.package -or
         @($probeInfo.sequence | Where-Object { $_[0] -ceq 'P4kxRollbackProbe' -and $_[1] -eq '6550' }).Count -ne 1) {
         throw 'Rollback probe identity or execution sequence differs.'
     }
+    $commitProbe = Join-Path $folder 'commit-rollback-probe.msi'
+    New-P4kxRollbackMsi $msi $commitProbe -FailureAt after-commit
+    $commitInfo = Get-P4kxMsiMetadata $commitProbe
+    $fault = @($commitInfo.custom_actions | Where-Object { $_[0] -ceq 'P4kxRollbackProbe' })
+    if ($commitInfo.properties.P4kxPathPackageCode -cne $commitInfo.package -or
+        $fault.Count -ne 1 -or [int]$fault[0][1] -ne 9730 -or $fault[0][2] -cne 'P4kxPathHelper' -or
+        $fault[0][3] -cne 'invalid-injected-commit-command') { throw 'Later commit-failure probe transport differs.' }
 }
 foreach ($component in $metadata[0].components) {
     if ($component[0] -in @($metadata[1].components | ForEach-Object { $_[0] })) { throw 'MSI component identities collide across CPUs.' }
 }
-'PASS: both MSI schemas and bundled DLLs; CPU/runtime-inventory rejection; disjoint identities; rollback and exact append/prepend authoring; probe binding rejection. No MSI installed.'
+'PASS: both MSI schemas and bundled DLLs; CPU/runtime-inventory rejection; disjoint identities; actual PackageCode stamping; embedded invocation transport; deferred and later-commit rollback authoring. No MSI installed.'

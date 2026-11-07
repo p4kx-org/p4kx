@@ -70,3 +70,11 @@ installer ownership cleanup and supported recovery behavior require disposable A
 evidence. The native MSI lifecycle must also execute the production notification path. Fixture
 restoration is never proof of installer preservation; these observations do not establish delivery
 to individual or hung windows. A separate message receiver is optional diagnostic infrastructure.
+
+The existing native Windows package consumer compiles this example with its source revision and
+requires its PE machine and executable hash before use. Each actual MSI operation captures raw
+before/after images. Eight install/uninstall cases prove seeded, actively installed and restored
+PATH values; a separate helper probe verifies foreign-edit retention across a bound rollback.
+`installer.json` retains these observations as the mandatory source/MSI-bound `path_contract`.
+Unconfirmed process completion latches the fixture against further helper, seed or restore
+mutations. Read-only capture cannot clear that latch or authorize recovery.
