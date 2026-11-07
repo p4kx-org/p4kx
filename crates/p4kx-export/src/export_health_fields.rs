@@ -20,6 +20,8 @@ pub(crate) struct Fields {
 pub(crate) fn resolve(
     inspections: Vec<FieldInspection>,
     sources: &[SourceObservation],
+    rows: Option<&crate::catalog_row::CatalogRows>,
+    excluded: &[crate::catalog_row::ExcludedCatalogRow],
 ) -> Result<Fields, ExportAccountingError> {
     let mut canonical = BTreeMap::<u32, FieldInspection>::new();
     for mut inspection in inspections {
@@ -65,6 +67,11 @@ pub(crate) fn resolve(
         }
         retain(&inspection, &mut fields);
     }
+    let reference_diagnostics = fields.diagnostics.len();
+    crate::catalog_reference_health::resolve(&canonical, sources, rows, excluded, &mut fields)?;
+    fields.failed.extend(failed_diagnostics(
+        fields.diagnostics.iter().skip(reference_diagnostics),
+    ));
     Ok(fields)
 }
 
@@ -91,9 +98,11 @@ fn retain(inspection: &FieldInspection, fields: &mut Fields) {
 }
 
 /// Retains every available blocking owner identity before aggregate example limits are applied.
-pub(crate) fn failed_diagnostics(diagnostics: &[ExportDiagnostic]) -> Vec<FailedExportRecord> {
+pub(crate) fn failed_diagnostics<'diagnostic>(
+    diagnostics: impl IntoIterator<Item = &'diagnostic ExportDiagnostic>,
+) -> Vec<FailedExportRecord> {
     diagnostics
-        .iter()
+        .into_iter()
         .filter(|diagnostic| diagnostic.severity != ExportDiagnosticSeverity::Information)
         .flat_map(|diagnostic| {
             diagnostic.examples.iter().filter_map(|example| {

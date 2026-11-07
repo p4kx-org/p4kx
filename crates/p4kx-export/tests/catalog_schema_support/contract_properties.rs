@@ -94,7 +94,7 @@ fn the_rest() -> Vec<Value> {
             "variable": "Race_BP",
             "token": null,
             "valueType": "TimeTrialRace",
-            "value": {"type": "timeTrialRace"}
+            "value": {"type": "timeTrialRace", "targetSplits": [null, {"targetSplit": 0.125}]}
         }),
         json!({
             "variable": "Map_BP",

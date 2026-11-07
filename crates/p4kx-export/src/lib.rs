@@ -8,16 +8,12 @@
 //! Record per line in record-path order, and returns a [`RecordExportSummary`]. Record JSON is
 //! defined in `docs/record-json.md` and `schemas/record-json.schema.json`.
 //!
-//! [`build_catalog`] reads the DataForge of an open Archive, selects the Records of every kind by
-//! record-path prefix and type in parallel, leaves out development leftovers, resolves names and
-//! descriptions in English and German from the Archive's `global.ini` files, takes the blueprints
-//! with all tiers, the quality, pool, reward-source and dismantle Records from [`read_crafting`],
-//! reads each item's
-//! [`ItemClass`] from its English description, classifies every ship and item as a
-//! [`Playability`] and writes the
-//! catalog as deterministic UTF-8 JSON. A selected Record that cannot be read is left out and
-//! reported as a [`CatalogFailure`] in the [`CatalogSummary`]. [`catalog_schema`] returns its JSON Schema, generated from
-//! the same types (`docs/basetool-catalog.md`).
+//! [`build_catalog`] selects Records by path and type, excludes development leftovers, resolves
+//! English/German texts, and writes deterministic UTF-8 JSON with crafting, [`ItemClass`] and
+//! [`Playability`] data. Normal publication refuses incomplete source reads or projections.
+//! [`CatalogPublicationMode::DiagnosticPartial`] retains readable results with explicit health
+//! and failure evidence. [`catalog_schema`] generates the schema from the same catalog types
+//! (`docs/basetool-catalog.md`).
 //!
 //! The starmap objects of the catalog take their world positions from the system containers
 //! (`ObjectContainers/PU/system`): the position of every `Child` element is composed with the
@@ -84,11 +80,17 @@ mod catalog_crafting;
 mod catalog_file;
 mod catalog_output;
 mod catalog_recipe;
+mod catalog_reference;
+mod catalog_reference_health;
+mod catalog_row;
+mod catalog_rows;
+mod catalog_target_index;
 mod closed_set;
 mod collected;
 #[cfg(test)]
 mod collected_tests;
 mod commodity;
+mod commodity_resource;
 mod condition_schema;
 mod container_read;
 mod contract;
@@ -139,6 +141,7 @@ mod crafting_sources;
 mod crafting_tier;
 mod crafting_types;
 mod crafting_warning;
+mod definition_reference;
 mod digest;
 mod entity_selection;
 mod entity_spawn_model;
@@ -214,11 +217,24 @@ mod mission_layers;
 mod mission_ledger;
 mod mission_places;
 mod mission_pool_ledger;
+mod mission_property_auto;
+mod mission_property_auto_read;
+mod mission_property_clue;
+mod mission_property_clue_read;
 mod mission_property_fields;
+mod mission_property_investigation;
+mod mission_property_investigation_read;
+mod mission_property_name;
+mod mission_property_name_read;
+mod mission_property_option;
+mod mission_property_option_read;
+mod mission_property_race;
 mod mission_property_set;
 mod mission_property_set_index;
 mod mission_property_set_registry;
+mod mission_property_source;
 mod mission_property_sources;
+mod mission_property_value_read;
 mod mission_results;
 mod mission_shared;
 mod mission_siblings;
@@ -230,12 +246,16 @@ mod ndjson;
 mod npc_spawn_model;
 mod npc_spawn_read;
 mod options;
+mod owned_reference;
+mod owned_reference_read;
 mod paint;
 mod paint_ledger;
 mod paint_port;
 mod picked;
 mod playability;
 mod playability_rules;
+mod quality_curve;
+mod quality_curve_read;
 mod quantization_summary;
 mod record_export;
 mod record_fields;
@@ -243,10 +263,19 @@ mod record_read;
 mod record_summary;
 mod recovery;
 mod reputation;
+mod resource_density_read;
+mod resource_density_source;
 mod resource_group;
+mod resource_group_read;
+mod resource_property_read;
+mod resource_quality_read;
+mod resource_quality_source;
+mod resource_read;
+mod resource_type_contract;
 mod scan;
 mod scan_health;
 mod scan_signature;
+mod schema_fields;
 mod scoped_location;
 mod scoped_location_fields;
 mod scoped_location_link;
@@ -273,6 +302,9 @@ mod shop_soc;
 mod shop_summary;
 mod shops;
 mod soc_preset;
+mod source_fields;
+mod source_pointer;
+mod source_projection_notes;
 mod spawn_error;
 mod spawn_layers;
 mod spawn_model;

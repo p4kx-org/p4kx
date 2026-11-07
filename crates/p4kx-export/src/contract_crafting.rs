@@ -6,6 +6,7 @@ use serde::Serialize;
 
 use crate::contract::{LocalisedText, every_field_required};
 use crate::contract_recipe::{BlueprintDismantle, BlueprintTier};
+use crate::definition_reference::DefinitionReference;
 use crate::guid_text::CatalogGuid;
 
 /// A commodity: an `EntityClassDefinition` Record under `entities/commodities` or a
@@ -15,7 +16,7 @@ use crate::guid_text::CatalogGuid;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct Commodity<'a> {
-    /// The GUID of the Record; for a `ResourceType` entry the GUID of the `ResourceType`.
+    /// The unique row identity: the Entity GUID or the resource-only `ResourceType` GUID.
     pub(crate) guid: CatalogGuid,
     /// The Record name without its type, e.g. `Gold`.
     pub(crate) class_name: &'a str,
@@ -30,9 +31,8 @@ pub(crate) struct Commodity<'a> {
     /// The GUID of the `ResourceTypeGroup` Record that directly lists the `ResourceType`, the
     /// `guid` of a `resourceGroups` entry; `null` without a `ResourceType` or a group.
     pub(crate) type_guid: Option<CatalogGuid>,
-    /// The GUID of the `ResourceType` Record the commodity's default composition holds first,
-    /// `null` without one. The `resourceGuid` of an ingredient equals the
-    /// `subtypeGuid` of exactly one commodity.
+    /// The nullable `ResourceType` link from the first non-null default-composition Reference.
+    /// Several commodities can share it; reverse joins return zero, one or many commodities.
     pub(crate) subtype_guid: Option<CatalogGuid>,
     /// The display type of the purchasable parameters, e.g. `@items_commodities_type_metal`;
     /// without a key for a `ResourceType` entry.
@@ -122,9 +122,21 @@ pub(crate) struct ResourceGroup<'a> {
     /// The name, from `displayName`; a placeholder key leaves `en` and `de` `null`.
     pub(crate) name: LocalisedText<'a>,
     /// The GUID of the group that lists this group in its `groups`, the `guid` of another
-    /// `resourceGroups` entry; `null` for a top-level group. It is the direct parent: the groups
-    /// form a forest of unfixed depth, so follow it with a guard against cycles.
+    /// `resourceGroups` entry; `null` when no selected group lists it. The first selected listing
+    /// wins; raw `groups` retain all memberships, and parent traversal requires a cycle guard.
     pub(crate) parent_guid: Option<CatalogGuid>,
+    /// The localised source description.
+    #[schemars(extend("x-gameText" = true))]
+    pub(crate) description: LocalisedText<'a>,
+    /// The raw source thumbnail path, including an empty string.
+    pub(crate) default_thumbnail_path: Option<&'a str>,
+    /// The raw source SVG thumbnail path, including an empty string.
+    #[serde(rename = "defaultThumbnailPathSVG")]
+    pub(crate) default_thumbnail_path_svg: Option<&'a str>,
+    /// Every authored child-group Reference in stored order, including nulls and repetitions.
+    pub(crate) groups: Option<Vec<Option<DefinitionReference>>>,
+    /// Every authored resource Reference in stored order, including nulls and repetitions.
+    pub(crate) resources: Option<Vec<Option<DefinitionReference>>>,
 }
 
 /// A blueprint category: a `BlueprintCategoryRecord` Record under `crafting/blueprintcategories`,

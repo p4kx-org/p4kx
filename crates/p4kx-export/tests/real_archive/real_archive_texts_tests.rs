@@ -37,7 +37,11 @@ fn one_wrong_translation_fails_despite_other_resolved_texts() {
     verdict(Kind::Items, "de", &coverage, Some(1.0), &mut failures);
     assert_eq!(coverage.resolved, 100, "unrelated keys resolve");
     assert_eq!(coverage.contradictions, 1, "the wrong value is detected");
-    assert_eq!(failures.len(), 1, "a favourable ratio cannot hide a mismatch");
+    assert_eq!(
+        failures.len(),
+        1,
+        "a favourable ratio cannot hide a mismatch"
+    );
 }
 
 #[test]
@@ -49,8 +53,14 @@ fn only_explicit_null_can_represent_a_source_gap() {
     coverage.count(&oracle, "@missing", None);
     coverage.count(&oracle, "@missing", Some(&json!(4)));
     coverage.count(&oracle, "@missing", Some(&json!("invented")));
-    assert_eq!(coverage.fallback, 2, "empty and missing source values stay null");
-    assert_eq!(coverage.contradictions, 3, "malformed or invented texts fail");
+    assert_eq!(
+        coverage.fallback, 2,
+        "empty and missing source values stay null"
+    );
+    assert_eq!(
+        coverage.contradictions, 3,
+        "malformed or invented texts fail"
+    );
 }
 
 #[test]
@@ -61,7 +71,10 @@ fn a_mission_rewrite_still_requires_nonempty_text() {
     coverage.count(&oracle, "@title", Some(&json!("")));
     coverage.count(&oracle, "@title", Some(&Value::Null));
     assert_eq!(coverage.resolved, 1, "the known token rewrite is present");
-    assert_eq!(coverage.contradictions, 2, "empty and missing rewrites fail");
+    assert_eq!(
+        coverage.contradictions, 2,
+        "empty and missing rewrites fail"
+    );
 }
 
 #[test]

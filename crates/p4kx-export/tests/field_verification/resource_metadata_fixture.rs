@@ -11,7 +11,7 @@ fn resource_type() -> TestStruct {
         .field("owned", TestType::Class("OwnedMetadata".to_owned()))
         .array(
             "properties",
-            TestType::StrongPointer("ResourceTypeProperty".to_owned()),
+            TestType::StrongPointer("ResourceTypeProperties".to_owned()),
         )
         .field(
             "link",
@@ -32,10 +32,10 @@ pub(crate) fn database() -> Vec<u8> {
             TestStruct::new("ResourceTypeGroup")
                 .array("members", TestType::ReferenceTo("ResourceType".to_owned())),
         )
-        .structure(TestStruct::new("ResourceTypeProperty").field("minimum", TestType::Single))
+        .structure(TestStruct::new("ResourceTypeProperties").field("minimum", TestType::Single))
         .structure(
             TestStruct::new("ConcreteResourceProperty")
-                .parent("ResourceTypeProperty")
+                .parent("ResourceTypeProperties")
                 .field("details", TestType::Class("PropertyDetails".to_owned())),
         )
         .structure(TestStruct::new("OwnedMetadata").field("flag", TestType::Bool))
@@ -68,7 +68,7 @@ pub(crate) fn database() -> Vec<u8> {
         .record(
             TestRecord::new(
                 0x2222,
-                "ResourceTypeProperty",
+                "ResourceTypeProperties",
                 "NUMERIC_RECORD_SENTINEL",
                 "private/NUMERIC_SENTINEL.xml",
             )

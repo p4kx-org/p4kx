@@ -34,7 +34,8 @@ missing or null strings remain null. An absent/null value pointer gives null for
 template and broker fields retain their documented normalization.
 
 Values use the same complete union as template and broker properties, including
-[`scopedLocation`](scoped-locations.md). An unsupported concrete type is a source failure,
+[`scopedLocation`](scoped-locations.md), [`autoSpawns`, investigation and complete typed
+options](mission-property-values.md). An unsupported concrete type is a source failure,
 never a free-form JSON escape hatch. All six scoped filter families and their weak references
 remain in their original owner even when contract rows inherit the declaration. Spawn and
 location values retain their typed links to the existing canonical spawn/query kinds.
@@ -44,6 +45,17 @@ The set GUID is independent of the payload: it hashes
 Payload edits at the same authored position keep the GUID. Moving an array or changing the
 owning Record changes it. Equal content at different source positions does not share identity.
 Sets are ordered by GUID text; declarations and contract references keep authored order.
+
+Physical Record-table aliases can share a Record GUID and authored position. Identical complete
+set payloads remain idempotent. Incompatible payloads permanently quarantine that canonical set
+for this export; comparison preserves IEEE floating-point bits, including signed zero and NaN
+payloads. Normal publication refuses the result. An explicit diagnostic export omits the
+ambiguous set and every contract link to it, while retaining other compatible sets and contract
+rows. `ambiguousIdentity` health failures preserve both exact physical owner indices, and the
+`ambiguous_mission_property_set` diagnostic identifies the authored positions. Successful
+canonical reads and retained typed source projections stay successful; failed canonical joins
+are separate derived operations. Record-table indices are provenance within this Build, not
+replacement domain identifiers.
 
 These are authored configuration values. The exporter does not merge overrides, evaluate
 filters, choose a runtime result or replace the established derived text/spawn fields.
@@ -56,4 +68,16 @@ stability, empty and null source data, filters, weak-owner boundaries and strict
 The ignored `generator_property_sets_match_raw_sources_and_contract_joins` real-Archive test
 independently traverses raw Generator structs. It compares original scope locations, complete
 scoped filter payloads and reference identities, then verifies ordered joins for every emitted
-contract row. It keeps the Archive and any observed values outside the repository.
+contract row. Every eligible physical Generator is independently decoded before production
+health is considered. An actual independent read failure requires exact source-read evidence;
+production projection failures cannot waive checks of readable authored arrays. Retained field
+failures do not count as whole omitted sources. Synthetic mutations verify these boundaries
+while another Generator's rows and sets remain present.
+
+Set `P4KX_MIN_SCOPED_LOCATION_VALUES=1` for a PTU check that must exercise scoped-location data.
+The default minimum is zero for sources without these values. A run that misses the explicit
+coverage requirement fails. Source values and identities stay in memory: failures contain only
+typed static stage and category discriminants, including array, value, join, health and coverage
+failures. Underlying errors are discarded without formatting or retaining an error chain;
+synthetic sentinel mutations check both Display and Debug. Successful output contains only
+verification counts, and an Archive change prevents a successful result.

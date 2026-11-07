@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use p4kx_extraction::{CancelToken, DataForge, Guid, Record, TagTree, TreeBuilder};
+use p4kx_extraction::{CancelToken, DataForge, Filter, Guid, Record, TagTree, TreeBuilder};
 use rayon::prelude::*;
 
 use crate::contract_hauling::HaulingRequirement;
@@ -68,6 +68,7 @@ enum Piece<'f> {
 /// The Records a contract refers to, read once: templates, mission types, mission
 /// organisations, reputation rewards, mission localities, broker entries, faction reputations
 /// and the tag tree.
+#[derive(Default)]
 pub(crate) struct MissionIndex<'f> {
     templates: HashMap<Guid, Template<'f>>,
     types: HashMap<Guid, MissionTypeName<'f>>,
@@ -83,6 +84,20 @@ pub(crate) struct MissionIndex<'f> {
 }
 
 impl<'f> MissionIndex<'f> {
+    /// Reads the complete dependency index only when selected catalog mission inputs need it.
+    pub(crate) fn read_catalog(
+        forge: &'f DataForge<'f>,
+        filter: Option<&Filter>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Self, CatalogError> {
+        match filter {
+            Some(filter) if !read::catalog_needs_index(forge, filter, cancel)? => {
+                Ok(Self::default())
+            }
+            Some(_) | None => Self::read(forge, cancel),
+        }
+    }
+
     /// Reads the Records of `forge` a contract refers to; a Record that cannot be read is left
     /// out, so what refers to it resolves to nothing.
     ///
@@ -103,17 +118,10 @@ impl<'f> MissionIndex<'f> {
             .filter_map(Result::transpose)
             .collect::<Result<Vec<_>, _>>()?;
         let mut index = Self {
-            templates: HashMap::new(),
-            types: HashMap::new(),
-            organizations: HashMap::new(),
-            rewards: HashMap::new(),
-            localities: HashMap::new(),
-            brokers: HashMap::new(),
-            factions: HashMap::new(),
             tags,
-            pools: SpawnPools::default(),
             failures,
             ledger,
+            ..Self::default()
         };
         for read in pieces {
             index.ledger.merge(read.ledger);

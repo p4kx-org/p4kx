@@ -1,72 +1,46 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Reference, Value, ValueError};
+use p4kx_extraction::Value;
 
-use crate::guid_text::CatalogGuid;
-use crate::scoped_location_link::{PropertyReference, PropertyReferenceStatus, SourcePointer};
+use crate::owned_reference::OwnedReferenceStatus;
+use crate::owned_reference_read;
+use crate::scoped_location_link::{PropertyReference, PropertyReferenceStatus};
 use crate::spawn_read::Reader;
 
-/// Preserves a weak link without resolving outside its original owning Record.
+/// Interprets a source weak link as a mission-property variable in its original owner.
 pub(crate) fn read(
     reader: &Reader<'_, '_>,
     value: &Value<'_>,
 ) -> Result<Option<PropertyReference>, ()> {
-    let mut link = match value {
-        Value::Null => None,
-        Value::Reference(target) => Some(reference(reader, target)),
-        Value::Error(ValueError::OutsideRecord {
-            struct_index,
-            instance_index,
-        }) => Some(unresolved(
-            PropertyReferenceStatus::OutsideOwner,
-            *struct_index,
-            *instance_index,
-        )),
-        Value::Error(ValueError::InvalidPointer {
-            struct_index,
-            instance_index,
-        }) => Some(unresolved(
-            PropertyReferenceStatus::MissingTarget,
-            *struct_index,
-            *instance_index,
-        )),
-        Value::Error(ValueError::DanglingReference { guid }) => {
-            let mut link = empty(PropertyReferenceStatus::MissingTarget);
-            link.record_guid = Some(CatalogGuid(*guid));
-            Some(link)
-        }
-        _ => return Err(()),
+    let Some(target) = owned_reference_read::read(reader, value)? else {
+        return Ok(None);
     };
-    if let (Some(link), Value::Error(error)) = (&mut link, value) {
-        link.source_error = Some(error.to_string());
-    }
-    Ok(link)
-}
-
-fn reference(reader: &Reader<'_, '_>, target: &Reference<'_>) -> PropertyReference {
-    let mut link = empty(PropertyReferenceStatus::OutsideOwner);
-    link.target_record_index = Some(target.record_index());
-    link.record_guid = Some(CatalogGuid(target.guid()));
-    link.record_path = Some(target.record_path().to_owned());
-    link.target_type = Some(target.type_name().to_owned());
-    link.location = target
-        .location()
-        .map(|location| location.as_str().to_owned());
-    if !reader.owns(target) {
-        return link;
-    }
-    let Some(property) = reader.owned_target(target) else {
-        link.status = PropertyReferenceStatus::MissingTarget;
-        return link;
+    let reference = target.reference;
+    let mut link = PropertyReference {
+        target_record_index: reference.target_record_index,
+        record_guid: reference.record_guid,
+        record_path: reference.record_path,
+        target_type: reference.target_type,
+        location: reference.location,
+        variable: None,
+        status: match reference.status {
+            OwnedReferenceStatus::Resolved => PropertyReferenceStatus::Resolved,
+            OwnedReferenceStatus::MissingTarget => PropertyReferenceStatus::MissingTarget,
+            OwnedReferenceStatus::OutsideOwner => PropertyReferenceStatus::OutsideOwner,
+        },
+        source_pointer: reference.source_pointer,
+        source_error: reference.source_error,
+    };
+    let Some(property) = target.target else {
+        return Ok(Some(link));
     };
     if property.type_name() != "MissionProperty" {
         link.status = PropertyReferenceStatus::UnsupportedTargetType;
-        return link;
+        return Ok(Some(link));
     }
     match property.field("missionVariableName") {
         Some(Value::String(variable)) => {
-            link.status = PropertyReferenceStatus::Resolved;
             link.variable = Some((*variable).to_owned());
         }
         Some(Value::Error(error)) => {
@@ -79,32 +53,5 @@ fn reference(reader: &Reader<'_, '_>, target: &Reference<'_>) -> PropertyReferen
         }
         _ => link.status = PropertyReferenceStatus::MissingTarget,
     }
-    link
-}
-
-const fn unresolved(
-    status: PropertyReferenceStatus,
-    struct_index: u32,
-    instance_index: u32,
-) -> PropertyReference {
-    let mut link = empty(status);
-    link.source_pointer = Some(SourcePointer {
-        struct_index,
-        instance_index,
-    });
-    link
-}
-
-const fn empty(status: PropertyReferenceStatus) -> PropertyReference {
-    PropertyReference {
-        target_record_index: None,
-        record_guid: None,
-        record_path: None,
-        target_type: None,
-        location: None,
-        variable: None,
-        status,
-        source_pointer: None,
-        source_error: None,
-    }
+    Ok(Some(link))
 }

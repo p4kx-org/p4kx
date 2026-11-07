@@ -16,6 +16,7 @@ mod loadouts;
 mod loot;
 mod mission_sets;
 mod npc_spawns;
+mod objective_properties;
 mod recovery;
 mod reputation;
 mod slugs;
@@ -41,6 +42,7 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "commodities": {"status": "complete"},
             "blueprints": {"status": "complete"},
             "resourceGroups": {"status": "complete"},
+            "resourceTypes": {"status": "complete"},
             "blueprintCategories": {"status": "partial", "filter": "*/blueprintcategories/*"},
             "gameplayProperties": {"status": "complete"},
             "qualityDistributions": {"status": "complete"},
@@ -188,12 +190,36 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
                 "tierIndex": 0
             }
         }],
+        "resourceTypes": [{
+            "guid": "00000000-0000-0000-0000-000000007001",
+            "className": "FixtureResource",
+            "recordPath": "libs/foundry/records/resourcetypedatabase/fixture_resource",
+            "name": {"key": null, "en": null, "de": null},
+            "description": {"key": null, "en": null, "de": null},
+            "groupGuids": [],
+            "refinedVersion": null,
+            "density": null,
+            "defaultThumbnailPath": null,
+            "defaultThumbnailPathSVG": null,
+            "rttThumbnailEntityClass": null,
+            "validateDefaultCargoBox": false,
+            "defaultCargoContainers": null,
+            "properties": [null, {
+                "sourceType": "ResourceTypeVolatility", "name": "",
+                "payload": {"type": "volatility", "volatility": 0.0, "healthDecayPerSecond": 0.0}
+            }]
+        }],
         "resourceGroups": [{
             "guid": "b1000000-0000-4000-8000-000000000001",
             "className": "Metal",
             "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
             "name": {"key": "@items_commodities_type_metal", "en": "Metal", "de": null},
-            "parentGuid": null
+            "parentGuid": null,
+            "description": {"key": null, "en": null, "de": null},
+            "defaultThumbnailPath": null,
+            "defaultThumbnailPathSVG": null,
+            "groups": [],
+            "resources": [null]
         }],
         "blueprintCategories": [{
             "guid": "d1000000-0000-4000-8000-000000000001",
@@ -216,7 +242,7 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
                 "locationGuid": "e3000000-0000-4000-8000-000000000001",
                 "distribution": {
                     "kind": "CraftingQualityDistributionNormal",
-                    "min": 1.0, "max": 1000.0, "mean": 269.0, "stddev": null
+                    "min": 1, "max": 1000, "mean": 269.0, "stddev": null
                 }
             }]
         }],

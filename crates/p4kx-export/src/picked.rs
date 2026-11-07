@@ -4,11 +4,10 @@
 use p4kx_extraction::{Guid, RecordTree};
 
 use crate::blueprint_category::blueprint_category;
-use crate::commodity::commodity;
 use crate::contract::{
     BlueprintCategory, Commodity, Crafter, HarvestableProviderPreset, Item, Manufacturer,
     MineableComposition, MineableElement, MineableEntity, MiningGlobalParams, RefiningProcess,
-    ResourceGroup, Ship, StarmapObject, SubHarvestableMultiConfig,
+    ResourceGroup, ResourceType, Ship, StarmapObject, SubHarvestableMultiConfig,
 };
 use crate::crafter::crafter;
 use crate::crafting_warning::CraftingWarning;
@@ -21,7 +20,6 @@ use crate::mining::{mineable_composition, mineable_element, refining_process};
 use crate::mining_params::mining_global_params;
 use crate::mission_kinds::MissionPick;
 use crate::paint_port::VehicleFacts;
-use crate::resource_group::{Groups, resource_group};
 use crate::ship_base::ShipRead;
 use crate::texts::Texts;
 use crate::{CatalogFailure, Kind};
@@ -40,6 +38,8 @@ pub(crate) enum Picked<'f> {
     Commodity(Commodity<'f>),
     /// A resource group.
     ResourceGroup(ResourceGroup<'f>),
+    /// A resource definition with its authored source properties.
+    ResourceType(ResourceType<'f>),
     /// A blueprint category.
     BlueprintCategory(BlueprintCategory<'f>),
     /// A starmap object.
@@ -78,24 +78,15 @@ pub(crate) enum Picked<'f> {
 
 impl<'f> Picked<'f> {
     /// Returns the entity of `kind` the Record tree `tree` describes, its texts resolved by
-    /// `texts`; a commodity may take texts from its `ResourceType` Record `resource_type` and its
-    /// type from `groups`. `None` for a kind whose dedicated reader supplies its rows.
-    pub(crate) fn entity(
-        kind: Kind,
-        tree: &RecordTree<'f>,
-        texts: &Texts<'f>,
-        resource_type: Option<&RecordTree<'f>>,
-        groups: &Groups,
-    ) -> Option<Self> {
+    /// `texts`. `None` for a kind whose dedicated reader supplies its rows.
+    pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>, texts: &Texts<'f>) -> Option<Self> {
         Some(match kind {
             Kind::Manufacturers => Self::Manufacturer(manufacturer(tree, texts)),
             Kind::Items => {
                 let (item, line) = item(tree, texts);
                 Self::Item(item, line, carries_ports(tree))
             }
-            Kind::Commodities => Self::Commodity(commodity(tree, texts, resource_type, groups)),
             Kind::Crafters => return crafter(tree).map(Self::Crafter),
-            Kind::ResourceGroups => Self::ResourceGroup(resource_group(tree, texts, groups)),
             Kind::BlueprintCategories => Self::BlueprintCategory(blueprint_category(tree, texts)),
             Kind::MineableElements => Self::Mineable(mineable_element(tree)),
             Kind::RefiningProcesses => Self::Refining(refining_process(tree, texts)),
@@ -119,6 +110,9 @@ impl<'f> Picked<'f> {
                 return LootPick::entity(kind, tree).map(Self::Loot);
             }
             Kind::Ships
+            | Kind::Commodities
+            | Kind::ResourceGroups
+            | Kind::ResourceTypes
             | Kind::Blueprints
             | Kind::GameplayProperties
             | Kind::QualityDistributions

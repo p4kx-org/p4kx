@@ -67,7 +67,7 @@ fn template_of<'f>(
 ) -> Result<Template<'f>, SpawnError> {
     let root = Some(tree.root());
     let display = mission_layers::one(root, "contractDisplayInfo");
-    let reader = Reader::new(tags, tree.root());
+    let reader = Reader::for_record(tags, tree);
     let spawns = Level::read(
         SpawnLevel::Template,
         &reader,

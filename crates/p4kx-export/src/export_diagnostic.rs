@@ -61,6 +61,8 @@ pub enum ExportDiagnosticCode {
     IncompleteInventory,
     /// One exported identity names incompatible physical source payloads.
     AmbiguousIdentity,
+    /// A resolved source Reference has no available target row in this catalog selection.
+    CatalogTargetUnavailable,
     /// A source warning retains its established warning code.
     SourceWarning,
 }

@@ -256,9 +256,8 @@ impl App {
         }
     }
 
-    /// Stores the settings into the file freshly read, so that what another window stored
-    /// meanwhile stays; the saved Queries get this window's edits replayed by name. A file that
-    /// cannot be read is never written over.
+    /// Merges this window's settings and named Query edits into the freshly loaded file.
+    /// An unreadable settings file is never overwritten.
     fn save_settings(&mut self) {
         let Some(file) = &self.settings_file else {
             return;
@@ -378,9 +377,8 @@ impl eframe::App for App {
     }
 }
 
-/// Stores the window geometry, the recent Archives, the manual entries added in the window next
-/// to those already in `settings`, and the language, which stays unset to follow the system until the user chooses
-/// one.
+/// Stores window/export preferences and recent Archives, merging manual entries into settings.
+/// The language follows the system until explicitly chosen.
 fn remember(settings: &mut Settings, model: &Model, chosen: bool, window: Option<WindowGeometry>) {
     if chosen || settings.language.is_some() {
         settings.language = Some(model.texts().language().tag().to_owned());

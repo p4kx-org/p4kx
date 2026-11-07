@@ -24,6 +24,20 @@ pub enum ExportReferenceStatus {
     UnexpectedTargetType,
     /// A strong pointer attempts to own an instance a second time.
     OwnedTwice,
+    /// A present source target is outside the catalog kind's record rule.
+    OutsideCatalogSelection,
+    /// The catalog Filter intentionally excludes the target.
+    ExcludedByFilter,
+    /// The catalog development-leftover policy intentionally excludes the target.
+    ExcludedByPolicy,
+    /// The target's source metadata or canonical tree could not be read.
+    TargetReadFailed,
+    /// The target source could not be projected into its catalog row.
+    TargetProjectionFailed,
+    /// A projected target has no emitted row or exact intentional row exclusion.
+    TargetNotEmitted,
+    /// A persistent catalog identity cannot identify one physical emitted target.
+    AmbiguousIdentity,
 }
 
 /// Available raw source coordinates of an unresolved instance pointer.

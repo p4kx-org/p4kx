@@ -253,3 +253,35 @@ fn the_warning_alert_of_a_catalog_near_the_limit_is_drawn_at_both_sizes() -> Tes
     }
     Ok(())
 }
+
+#[test]
+fn the_resource_kind_is_localized_and_visible_at_both_window_sizes() -> TestResult {
+    for (language, tag) in LANGUAGES {
+        for size in SIZES {
+            let (_dir, mut model, out) = opened(&cataloging::resources())?;
+            model.set_language(language);
+            model.start_catalog(out.join("resources.json.zst"), || {});
+            let Some(mut harness) = window(model, size) else {
+                return Ok(());
+            };
+            wait_for(&mut harness, "the resource catalog to finish", |harness| {
+                harness
+                    .state()
+                    .catalog()
+                    .is_some_and(|run| !run.is_running())
+            })?;
+            let (line, close) = if tag == "en" {
+                ("Resource types: 1 written, 0 skipped, complete", "Close")
+            } else {
+                (
+                    "Ressourcentypen: 1 geschrieben, 0 übersprungen, vollständig",
+                    "Schließen",
+                )
+            };
+            harness.get_by_label(line).scroll_to_me();
+            harness.run_steps(3);
+            shoot(&mut harness, ("resources", tag, size), close)?;
+        }
+    }
+    Ok(())
+}

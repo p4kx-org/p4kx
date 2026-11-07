@@ -3,6 +3,7 @@
 
 use p4kx_extraction::Guid;
 
+use crate::catalog_reference::CatalogReference;
 use crate::export_diagnostic::{ExportDiagnostic, ExportSourceRole};
 use crate::export_reference_issue::ExportUnresolvedReference;
 use crate::selection::Kind;
@@ -19,6 +20,7 @@ pub(crate) struct FieldInspection {
     pub(crate) complete: bool,
     pub(crate) diagnostics: Vec<ExportDiagnostic>,
     pub(crate) unresolved_references: Vec<ExportUnresolvedReference>,
+    pub(crate) catalog_references: Vec<CatalogReference>,
 }
 
 impl FieldInspection {

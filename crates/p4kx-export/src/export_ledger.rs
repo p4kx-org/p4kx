@@ -3,6 +3,7 @@
 
 use p4kx_extraction::{Guid, Record};
 
+use crate::catalog_row::{CatalogRows, ExcludedCatalogRow};
 use crate::export_diagnostic::{ExportDiagnostic, ExportDiagnosticCode, ExportSourceRole};
 use crate::export_field_inspection::FieldInspection;
 use crate::selection::Kind;
@@ -145,6 +146,9 @@ pub(crate) struct ExportLedger {
     pub(crate) field_diagnostics: Vec<ExportDiagnostic>,
     pub(crate) field_inspections: Vec<FieldInspection>,
     pub(crate) skipped_rows: Vec<(Kind, usize)>,
+    pub(crate) catalog_rows: Option<CatalogRows>,
+    pub(crate) conflicting_catalog_rows: bool,
+    pub(crate) excluded_catalog_rows: Vec<ExcludedCatalogRow>,
 }
 
 impl ExportLedger {
@@ -207,6 +211,11 @@ impl ExportLedger {
 
     /// Combines independent production readers without inferring dispositions from their rows.
     pub(crate) fn merge(&mut self, other: Self) {
+        self.conflicting_catalog_rows |= other.conflicting_catalog_rows
+            || (self.catalog_rows.is_some() && other.catalog_rows.is_some());
+        if self.catalog_rows.is_none() {
+            self.catalog_rows = other.catalog_rows;
+        }
         self.archive_inventory_problem = self
             .archive_inventory_problem
             .max(other.archive_inventory_problem);
@@ -219,12 +228,32 @@ impl ExportLedger {
         self.field_diagnostics.extend(other.field_diagnostics);
         self.field_inspections.extend(other.field_inspections);
         self.skipped_rows.extend(other.skipped_rows);
+        self.excluded_catalog_rows
+            .extend(other.excluded_catalog_rows);
     }
 }
 
 /// A contradiction in production accounting prevents publication.
 #[derive(Debug, thiserror::Error)]
 pub enum ExportAccountingError {
+    /// Reference resolution has no final catalog-row evidence.
+    #[error("no final catalog-row evidence for source Reference resolution")]
+    MissingCatalogRows,
+    /// Producer evidence contains multiple final row snapshots for one catalog.
+    #[error("conflicting final catalog-row evidence")]
+    ConflictingCatalogRows,
+    /// An emitted target row cannot be attributed to a successful physical source.
+    #[error("no successful physical source for an emitted {kind} row")]
+    MissingCatalogRowSource {
+        /// The affected catalog target kind.
+        kind: Kind,
+    },
+    /// A canonical Reference identifies no physical Record in its original `DataForge`.
+    #[error("no physical Record at canonical Reference target {index}")]
+    MissingPhysicalReferenceTarget {
+        /// The physical target position in the source Build.
+        index: u32,
+    },
     /// A worker unwound while changing protected production evidence.
     #[error("export health evidence was poisoned by an interrupted worker")]
     PoisonedEvidence,

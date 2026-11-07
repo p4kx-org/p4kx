@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use p4kx_extraction::{Guid, RecordTree};
 
+use crate::catalog_reference::{self, CatalogReference};
 use crate::export_diagnostic::{
     EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT, ExportDiagnostic, ExportDiagnosticCode,
     ExportDiagnosticExample, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
@@ -15,6 +16,9 @@ use crate::export_reference_issue::{
     ExportReferenceStatus, ExportSourcePointer, ExportUnresolvedReference,
 };
 use crate::selection::Kind;
+
+const MAX_CATALOG_REFERENCES: usize = 4096;
+const MAX_CATALOG_REFERENCE_METADATA_BYTES: usize = 1024 * 1024;
 
 type DiagnosticKey = (
     ExportDiagnosticStage,
@@ -40,6 +44,8 @@ pub(crate) struct FieldCollector<'t, 'f> {
     role: ExportSourceRole,
     diagnostics: BTreeMap<DiagnosticKey, ExportDiagnostic>,
     unresolved: Vec<ExportUnresolvedReference>,
+    catalog_references: Vec<CatalogReference>,
+    catalog_reference_bytes: usize,
     complete: bool,
 }
 
@@ -57,6 +63,8 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
             role,
             diagnostics: BTreeMap::new(),
             unresolved: Vec::new(),
+            catalog_references: Vec::new(),
+            catalog_reference_bytes: 0,
             complete: true,
         }
     }
@@ -94,6 +102,52 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
                 target: None,
             },
         );
+    }
+
+    /// Captures only bounded metadata for an already resolved source Reference.
+    pub(crate) fn catalog_reference(
+        &mut self,
+        field: &str,
+        source_type: &str,
+        parent_type: Option<&str>,
+        reference: &p4kx_extraction::Reference<'_>,
+    ) -> bool {
+        let Some(target_kind) =
+            catalog_reference::target_kind(source_type, parent_type, field, reference)
+        else {
+            return true;
+        };
+        let byte_lengths = [
+            field.len(),
+            source_type.len(),
+            reference.record_path().len(),
+            reference.type_name().len(),
+        ];
+        let bytes = byte_lengths
+            .into_iter()
+            .try_fold(size_of::<CatalogReference>(), usize::checked_add);
+        let Some(bytes) = bytes else {
+            self.limited(field, source_type);
+            return false;
+        };
+        if self.catalog_references.len() == MAX_CATALOG_REFERENCES
+            || bytes
+                > MAX_CATALOG_REFERENCE_METADATA_BYTES.saturating_sub(self.catalog_reference_bytes)
+        {
+            self.limited(field, source_type);
+            return false;
+        }
+        self.catalog_reference_bytes += bytes;
+        self.catalog_references.push(CatalogReference {
+            field: field.to_owned(),
+            source_type: source_type.to_owned(),
+            target_record_index: reference.record_index(),
+            target_guid: reference.guid(),
+            target_record_path: reference.record_path().to_owned(),
+            target_type: reference.type_name().to_owned(),
+            target_kind,
+        });
+        true
     }
 
     pub(crate) fn limited(&mut self, field: &str, source_type: &str) {
@@ -224,6 +278,7 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
             complete: self.complete,
             diagnostics: self.diagnostics.into_values().collect(),
             unresolved_references: self.unresolved,
+            catalog_references: self.catalog_references,
         }
     }
 }

@@ -74,7 +74,11 @@ fn read_group<'f>(
                 ExportSourceRole::Dependency,
                 cancel,
             )?);
-            (Some(listing(&tree)), None, SourceDisposition::Projected)
+            (
+                selects_group(record, filter).then(|| listing(&tree)),
+                None,
+                SourceDisposition::Projected,
+            )
         }
         Err(error) => (
             None,
@@ -82,7 +86,7 @@ fn read_group<'f>(
             SourceDisposition::ReadFailed,
         ),
     };
-    for kind in [Kind::ResourceGroups, Kind::Commodities] {
+    for kind in [Kind::ResourceGroups, Kind::Commodities, Kind::ResourceTypes] {
         ledger.observe(SourceObservation::new(
             kind,
             record,

@@ -4,6 +4,10 @@
 //! Helpers of the Basetool catalog tests: a synthetic Archive with manufacturers and their
 //! texts, opened headless.
 
+mod resource_fixture;
+
+pub(crate) use resource_fixture::resources;
+
 use crate::waiting::wait_polling;
 use std::error::Error;
 use std::fs;

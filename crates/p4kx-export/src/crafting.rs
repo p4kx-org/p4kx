@@ -70,18 +70,17 @@ pub fn read_crafting<'f>(
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
 ) -> Result<Crafting<'f>, CatalogError> {
-    read_with_progress(forge, filter, cancel, None).map(|read| read.data)
+    ledger::read(forge, filter, cancel, None).map(|read| read.data)
 }
 
-/// Reads the crafting data like [`read_crafting`] and reports the scan for reward sources to
-/// `progress`.
+/// Reads the selected catalog's crafting inputs and reports its reward-source scan to `progress`.
 pub(crate) fn read_with_progress<'f>(
     forge: &'f DataForge<'_>,
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
     progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
 ) -> Result<ReadCrafting<'f>, CatalogError> {
-    ledger::read(forge, filter, cancel, progress)
+    ledger::read_catalog(forge, filter, cancel, progress)
 }
 
 impl<'f> Crafting<'f> {

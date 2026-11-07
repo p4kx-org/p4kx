@@ -192,6 +192,15 @@ fn assemble<R>(
     collected.ledger.merge(ledger);
     collected.add_failures(failures);
     let kinds = collected.summary(options.filter.is_none());
+    let catalog_rows = crate::catalog_rows::snapshot(&collected, options.filter);
+    if collected
+        .ledger
+        .catalog_rows
+        .replace(catalog_rows)
+        .is_some()
+    {
+        collected.ledger.conflicting_catalog_rows = true;
+    }
     let health = crate::export_health_compile::compile(
         std::mem::take(&mut collected.ledger),
         &kinds,
@@ -223,6 +232,7 @@ fn assemble<R>(
         commodities: collected.commodities,
         blueprints: collected.blueprints,
         resource_groups: collected.resource_groups,
+        resource_types: collected.resource_types,
         blueprint_categories: collected.blueprint_categories,
         gameplay_properties: collected.gameplay_properties,
         quality_distributions: collected.quality_distributions,

@@ -3,7 +3,7 @@
 
 use std::borrow::Cow;
 
-use schemars::{JsonSchema, Schema};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::guid_text::CatalogGuid;
@@ -44,6 +44,8 @@ pub(crate) use crate::entity_spawn_model::EntitySpawnPool;
 pub(crate) use crate::location_template::MissionLocationTemplate;
 pub(crate) use crate::mission_property_set::MissionPropertySet;
 pub(crate) use crate::npc_spawn_model::NpcSpawnPool;
+pub(crate) use crate::resource_type_contract::ResourceType;
+pub(crate) use crate::schema_fields::every_field_required;
 pub(crate) use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 
 /// The version of the catalog shape and its closed payload unions.
@@ -76,6 +78,8 @@ pub(crate) struct Catalog<'a> {
     pub(crate) blueprints: Vec<Blueprint<'a>>,
     /// The resource groups, ordered by GUID.
     pub(crate) resource_groups: Vec<ResourceGroup<'a>>,
+    /// The resource definitions, independently of commodity packaging, ordered by GUID.
+    pub(crate) resource_types: Vec<ResourceType<'a>>,
     /// The blueprint categories, ordered by GUID.
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'a>>,
     /// The gameplay property definitions the quality modifiers refer to, ordered by GUID.
@@ -211,25 +215,6 @@ pub(crate) struct LocalisedText<'a> {
     /// The German text, `null` for no key, a placeholder key, or a key the German `global.ini`
     /// lacks or holds empty.
     pub(crate) de: Option<Cow<'a, str>>,
-}
-
-/// Makes every property of an object schema required: the catalog writes `null`, never omits.
-pub(crate) fn every_field_required(schema: &mut Schema) {
-    let Some(object) = schema.as_object_mut() else {
-        return;
-    };
-    let names: Vec<serde_json::Value> = object
-        .get("properties")
-        .and_then(serde_json::Value::as_object)
-        .map(|properties| {
-            properties
-                .keys()
-                .cloned()
-                .map(serde_json::Value::String)
-                .collect()
-        })
-        .unwrap_or_default();
-    object.insert("required".to_owned(), serde_json::Value::Array(names));
 }
 
 /// Returns the JSON Schema (draft 2020-12) of the Basetool catalog.

@@ -44,6 +44,7 @@ fn observe(ledger: &mut ExportLedger, source: SourceObservation) {
                 complete: true,
                 diagnostics: Vec::new(),
                 unresolved_references: Vec::new(),
+                catalog_references: Vec::new(),
             });
     }
     ledger.observe(source);

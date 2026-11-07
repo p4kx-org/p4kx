@@ -163,7 +163,7 @@ pub(crate) fn read<'f>(
                 .is_ok_and(|path| rule.matches_path(path) && filter.is_none_or(|f| f.matches(path)))
         })
         .collect();
-    let mut index = MissionIndex::read(forge, cancel)?;
+    let mut index = MissionIndex::read_catalog(forge, filter, cancel)?;
     let (pools, failures, ledger) = index.take_template_results();
     let mut missions = Missions {
         ledger,
@@ -338,7 +338,7 @@ fn project<'f>(
     let mut contracts = Vec::new();
     let mut skipped = 0_usize;
     let mut grants = Grants::new();
-    let spawns = RecordSpawns::new(context.index.tags(), tree.root());
+    let spawns = RecordSpawns::new(context.index.tags(), tree);
     let property_sets = MissionPropertySetRegistry::new(
         tree,
         context.index.tags(),

@@ -164,7 +164,7 @@ fn quality_distributions_keep_their_location_overrides() -> TestResult {
         assert_eq!(curve.kind, "CraftingQualityDistributionNormal");
         assert_eq!(
             (curve.min, curve.max, curve.mean, curve.stddev),
-            (Some(1.0), Some(1000.0), Some(269.0), Some(254.0))
+            (Some(1), Some(1000), Some(269.0), Some(254.0))
         );
         assert_eq!(default.overrides, [], "a default Record has no override");
         assert_eq!(over.guid, guid(fixture::OVERRIDE_CURVE));
@@ -175,8 +175,8 @@ fn quality_distributions_keep_their_location_overrides() -> TestResult {
         assert_eq!(entry.location, Some(guid(fixture::PYRO)));
         assert_eq!(
             entry.distribution.as_ref().map(|c| c.stddev),
-            Some(None),
-            "a double beyond f32 is no number"
+            Some(Some(1.0)),
+            "the finite override standard deviation"
         );
         assert_eq!(
             entry.distribution.as_ref().map(|c| c.mean),

@@ -242,19 +242,13 @@ impl CatalogSummary {
         &self.store_slugs
     }
 
-    /// Returns the Records that could not be read and were left out, the selected ones and those
-    /// a rule reads, ordered by GUID.
-    ///
-    /// Their entries are left out of the catalog; a ship whose loadout cannot be resolved stays in
-    /// `ships` without a loadout.
+    /// Returns Record failures ordered by GUID, including failures that retain partial rows.
     #[must_use]
     pub fn failures(&self) -> &[CatalogFailure] {
         &self.failures
     }
 
-    /// Returns what makes the crafting data incomplete or ambiguous although every Record was
-    /// read: a truncated reference index (reward sources missing), Records it could not read,
-    /// several dismantle processes.
+    /// Returns source warnings and incomplete or ambiguous catalog relationships.
     #[must_use]
     pub fn warnings(&self) -> &[CraftingWarning] {
         &self.warnings

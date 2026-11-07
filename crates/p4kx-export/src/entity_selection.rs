@@ -23,12 +23,12 @@ pub(crate) fn select(
     filter: Option<&Filter>,
 ) -> Result<Option<Selected>, DataForgeError> {
     let path = record.record_path()?;
-    let Some(kind) = Kind::by_record(path, record.type_name()?).filter(|kind| owns(*kind)) else {
-        return Ok(None);
-    };
     if filter.is_some_and(|filter| !filter.matches(path)) {
         return Ok(None);
     }
+    let Some(kind) = Kind::by_record(path, record.type_name()?).filter(|kind| owns(*kind)) else {
+        return Ok(None);
+    };
     Ok(Some(if is_kind_leftover(kind, path, record.name()?) {
         Selected::Leftover(kind)
     } else {

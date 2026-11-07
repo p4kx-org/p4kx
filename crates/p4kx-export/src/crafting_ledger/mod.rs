@@ -5,13 +5,14 @@ mod assemble;
 mod fault;
 mod projection;
 mod read;
+mod resource_scope;
 mod selection;
 
 use crate::export_ledger::ExportLedger;
 
 use super::Crafting;
 
-pub(crate) use read::read;
+pub(crate) use read::{read, read_catalog};
 
 /// The public crafting result and actual production-source observations.
 pub(crate) struct ReadCrafting<'f> {

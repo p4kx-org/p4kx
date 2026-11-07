@@ -8,7 +8,14 @@ use serde::Serialize;
 
 use super::error::{self, Error, Kind};
 
-const ROOTS: [&str; 3] = ["ResourceType", "ResourceTypeGroup", "ResourceTypeProperty"];
+#[cfg(test)]
+mod root_bounds_tests;
+
+const ROOTS: [&str; 3] = [
+    "ResourceType",
+    "ResourceTypeGroup",
+    "ResourceTypeProperties",
+];
 const MAX_DEFINITIONS: usize = 1_000_000;
 const MAX_SELECTED: usize = 10_000;
 const MAX_FIELDS: usize = 1_000_000;
@@ -16,12 +23,79 @@ const MAX_CLOSURE_PASSES: usize = 64;
 const MAX_NAME_BYTES: usize = 4_096;
 const MAX_DECLARATION_TEXT: usize = 8 << 20;
 
+#[derive(Clone, Copy)]
+pub(crate) enum Scope {
+    Resources,
+    MissionProperties,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Declarations {
-    roots: Vec<&'static str>,
-    missing_roots: Vec<&'static str>,
+    roots: Vec<String>,
+    missing_roots: Vec<String>,
     types: Vec<TypeDeclaration>,
+}
+
+struct Roots<'f> {
+    names: Vec<String>,
+    wanted: BTreeSet<&'f str>,
+    missing: Vec<String>,
+}
+
+fn roots<'f>(
+    definitions: &BTreeMap<&'f str, Struct<'f>>,
+    scope: Scope,
+    cancelled: &impl Fn() -> bool,
+) -> super::Result<Roots<'f>> {
+    match scope {
+        Scope::Resources => {
+            error::check(cancelled)?;
+            Ok(Roots {
+                names: ROOTS.into_iter().map(str::to_owned).collect(),
+                wanted: ROOTS
+                    .into_iter()
+                    .filter(|root| definitions.contains_key(root))
+                    .collect(),
+                missing: ROOTS
+                    .into_iter()
+                    .filter(|root| !definitions.contains_key(root))
+                    .map(str::to_owned)
+                    .collect(),
+            })
+        }
+        Scope::MissionProperties => mission_roots(definitions, cancelled),
+    }
+}
+
+fn mission_roots<'f>(
+    definitions: &BTreeMap<&'f str, Struct<'f>>,
+    cancelled: &impl Fn() -> bool,
+) -> super::Result<Roots<'f>> {
+    let mut result = Roots {
+        names: Vec::new(),
+        wanted: BTreeSet::new(),
+        missing: Vec::new(),
+    };
+    let mut text_bytes = 0_usize;
+    for &name in definitions.keys() {
+        error::check(cancelled)?;
+        if !name.starts_with("MissionPropertyValue") {
+            continue;
+        }
+        if result.wanted.len() >= MAX_SELECTED {
+            return Err(Error::new(Kind::Bounds, "declaration roots exceed their bound").into());
+        }
+        text_bytes = text_bytes
+            .checked_add(name.len())
+            .ok_or_else(|| Error::new(Kind::Bounds, "root declaration text exceeds its bound"))?;
+        if text_bytes > MAX_DECLARATION_TEXT {
+            return Err(Error::new(Kind::Bounds, "root declaration text exceeds its bound").into());
+        }
+        result.wanted.insert(name);
+        result.names.push(name.to_owned());
+    }
+    Ok(result)
 }
 
 #[derive(Debug, Serialize)]
@@ -174,21 +248,25 @@ pub(crate) fn collect(
     forge: &DataForge<'_>,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<Declarations> {
+    collect_scope(forge, Scope::Resources, cancelled)
+}
+
+pub(crate) fn collect_scope(
+    forge: &DataForge<'_>,
+    scope: Scope,
+    cancelled: &impl Fn() -> bool,
+) -> super::Result<Declarations> {
     let definitions = definitions(forge, cancelled)?;
-    let mut wanted: BTreeSet<_> = ROOTS
-        .into_iter()
-        .filter(|root| definitions.contains_key(root))
-        .collect();
-    let missing_roots = ROOTS
-        .into_iter()
-        .filter(|root| !definitions.contains_key(root))
-        .collect();
+    let Roots {
+        names,
+        mut wanted,
+        missing,
+    } = roots(&definitions, scope, cancelled)?;
     if wanted.is_empty() {
-        return Err(Error::new(
-            Kind::Mapping,
-            "no requested resource declaration root exists",
-        )
-        .into());
+        return Err(Error::new(Kind::Mapping, "no requested declaration root exists").into());
+    }
+    if wanted.len() > MAX_SELECTED {
+        return Err(Error::new(Kind::Bounds, "declaration roots exceed their bound").into());
     }
     let mut polymorphic = wanted.clone();
     let mut complete = false;
@@ -219,8 +297,8 @@ pub(crate) fn collect(
         )?);
     }
     Ok(Declarations {
-        roots: ROOTS.to_vec(),
-        missing_roots,
+        roots: names,
+        missing_roots: missing,
         types,
     })
 }

@@ -6,6 +6,7 @@ use std::path::Path;
 use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry};
 use serde::Serialize;
 
+use super::resource_declarations::Scope;
 use super::{resource_declarations, resource_metadata_output};
 
 #[derive(Serialize)]
@@ -28,6 +29,7 @@ struct Metadata<'a> {
 fn document<'a>(
     archive: &'a Archive,
     forge: &DataForge<'_>,
+    scope: Scope,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<Metadata<'a>> {
     Ok(Metadata {
@@ -38,18 +40,19 @@ fn document<'a>(
             version: build.version(),
             change_number: build.change_number(),
         }),
-        declarations: resource_declarations::collect(forge, cancelled)?,
+        declarations: resource_declarations::collect_scope(forge, scope, cancelled)?,
     })
 }
 
-fn publish(
+pub(crate) fn publish(
     archive: &Archive,
     forge: &DataForge<'_>,
     watch: &ArchiveWatch,
     destination: &resource_metadata_output::Destination,
+    scope: Scope,
 ) -> super::Result<()> {
     watch.check()?;
-    let metadata = document(archive, forge, &|| watch.poll().is_err())?;
+    let metadata = document(archive, forge, scope, &|| watch.poll().is_err())?;
     let bytes = serde_json::to_vec_pretty(&metadata)?;
     watch.check()?;
     destination.write(&bytes)
@@ -58,10 +61,17 @@ fn publish(
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn resource_owned_type_declarations_only() -> super::Result<()> {
+    run(Scope::Resources)
+}
+
+pub(crate) fn run(scope: Scope) -> super::Result<()> {
     let root =
         std::env::var_os("P4KX_METADATA_TASK_ROOT").ok_or("explicit metadata task root absent")?;
-    let output =
-        std::env::var_os("P4KX_RESOURCE_SCHEMA_OUT").ok_or("explicit metadata output absent")?;
+    let output_variable = match scope {
+        Scope::Resources => "P4KX_RESOURCE_SCHEMA_OUT",
+        Scope::MissionProperties => "P4KX_MISSION_PROPERTY_SCHEMA_OUT",
+    };
+    let output = std::env::var_os(output_variable).ok_or("explicit metadata output absent")?;
     let destination =
         resource_metadata_output::Destination::new(Path::new(&root), Path::new(&output))?;
     let archive = Archive::open_with_key(
@@ -73,10 +83,15 @@ fn resource_owned_type_declarations_only() -> super::Result<()> {
     let loaded = DataForgeEntry::read(&archive)?;
     watch.check()?;
     let forge = loaded.open()?;
-    publish(&archive, &forge, &watch, &destination)?;
-    super::report(
-        "resource schema declaration artifact written; no Record values or identities surveyed",
-    );
+    publish(&archive, &forge, &watch, &destination, scope)?;
+    super::report(match scope {
+        Scope::Resources => {
+            "resource schema declaration artifact written; no Record values or identities surveyed"
+        }
+        Scope::MissionProperties => {
+            "mission-property schema declaration artifact written; no Record values or identities surveyed"
+        }
+    });
     Ok(())
 }
 
@@ -106,7 +121,7 @@ fn a_changed_archive_never_publishes_a_metadata_artifact() -> super::Result<()> 
     changed.sync_all()?;
     drop(changed);
     assert!(
-        publish(&archive, &forge, &watch, &destination).is_err(),
+        publish(&archive, &forge, &watch, &destination, Scope::Resources).is_err(),
         "source changes fail before publishing declaration evidence"
     );
     assert!(

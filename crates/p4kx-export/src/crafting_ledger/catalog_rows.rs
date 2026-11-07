@@ -3,6 +3,7 @@
 
 use p4kx_extraction::Filter;
 
+use crate::catalog_row::{CatalogRow, CatalogRowExclusion, ExcludedCatalogRow};
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::selection::{self, Kind};
@@ -26,26 +27,49 @@ impl<'s> Selection<'s> {
         &mut self,
         kind: Kind,
         items: &[T],
-        names: impl Fn(&T) -> (&str, &str),
+        names: impl Fn(&T) -> (&str, &str, CatalogGuid),
         make: impl Fn(&T) -> E,
         guid: impl Fn(&E) -> CatalogGuid,
     ) -> (Vec<E>, usize) {
         let mut built = Vec::with_capacity(items.len());
         let mut skipped = 0_usize;
         for item in items {
-            let (path, name) = names(item);
+            let (path, name, source_guid) = names(item);
             if !self.matches(path) {
+                self.excluded(kind, source_guid, path, CatalogRowExclusion::Filter);
                 continue;
             }
             if selection::is_kind_leftover(kind, path, name) {
                 skipped = skipped.saturating_add(1);
                 self.ledger.skipped_rows(kind, 1);
+                self.excluded(
+                    kind,
+                    source_guid,
+                    path,
+                    CatalogRowExclusion::DevelopmentLeftover,
+                );
             } else {
                 built.push(make(item));
             }
         }
         built.sort_by_cached_key(|entity| guid(entity).text());
         (built, skipped)
+    }
+
+    fn excluded(&mut self, kind: Kind, guid: CatalogGuid, path: &str, reason: CatalogRowExclusion) {
+        if matches!(
+            kind,
+            Kind::QualityDistributions | Kind::QualityQuantizations
+        ) {
+            self.ledger.excluded_catalog_rows.push(ExcludedCatalogRow {
+                row: CatalogRow {
+                    kind,
+                    guid: guid.0,
+                    record_path: path.to_owned(),
+                },
+                reason,
+            });
+        }
     }
 }
 

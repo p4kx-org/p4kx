@@ -12,7 +12,7 @@ use crate::contract::{
     CraftingGlobal, DismantleProcess, GameplayProperty, HarvestableLocation,
     HarvestableProviderPreset, Item, Loadout, LootContainer, Manufacturer, MineableComposition,
     MineableElement, MineableEntity, MiningGlobalParams, Paint, QualityDistribution,
-    QualityQuantization, RefiningProcess, ResourceGroup, Ship, Shop, StarmapObject,
+    QualityQuantization, RefiningProcess, ResourceGroup, ResourceType, Ship, Shop, StarmapObject,
     SubHarvestableMultiConfig,
 };
 use crate::contract_template::ContractTemplate;
@@ -44,6 +44,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) commodities: Vec<Commodity<'f>>,
     pub(crate) blueprints: Vec<Blueprint<'f>>,
     pub(crate) resource_groups: Vec<ResourceGroup<'f>>,
+    pub(crate) resource_types: Vec<ResourceType<'f>>,
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayProperty<'f>>,
     pub(crate) quality_distributions: Vec<QualityDistribution<'f>>,
@@ -99,6 +100,7 @@ impl<'f> Collected<'f> {
             commodities: Vec::new(),
             blueprints: crafting.blueprints,
             resource_groups: Vec::new(),
+            resource_types: Vec::new(),
             blueprint_categories: Vec::new(),
             gameplay_properties: crafting.properties,
             quality_distributions: crafting.distributions,
@@ -174,6 +176,7 @@ impl<'f> Collected<'f> {
             }
             Picked::Commodity(entity) => self.commodities.push(entity),
             Picked::ResourceGroup(entity) => self.resource_groups.push(entity),
+            Picked::ResourceType(entity) => self.resource_types.push(entity),
             Picked::BlueprintCategory(entity) => self.blueprint_categories.push(entity),
             Picked::Starmap(entity) => self.starmap_objects.push(entity),
             Picked::Mineable(entity) => self.mineable_elements.push(entity),
@@ -309,6 +312,7 @@ impl<'f> Collected<'f> {
         sort_by_guid(&mut self.ships, |entity| entity.guid);
         sort_by_guid(&mut self.commodities, |entity| entity.guid);
         sort_by_guid(&mut self.resource_groups, |entity| entity.guid);
+        sort_by_guid(&mut self.resource_types, |entity| entity.guid);
         sort_by_guid(&mut self.blueprint_categories, |entity| entity.guid);
         sort_by_guid(&mut self.starmap_objects, |entity| entity.guid);
         sort_by_guid(&mut self.mineable_elements, |entity| entity.guid);
@@ -338,6 +342,7 @@ impl<'f> Collected<'f> {
                     Kind::Commodities => self.commodities.len(),
                     Kind::Blueprints => self.blueprints.len(),
                     Kind::ResourceGroups => self.resource_groups.len(),
+                    Kind::ResourceTypes => self.resource_types.len(),
                     Kind::BlueprintCategories => self.blueprint_categories.len(),
                     Kind::GameplayProperties => self.gameplay_properties.len(),
                     Kind::QualityDistributions => self.quality_distributions.len(),

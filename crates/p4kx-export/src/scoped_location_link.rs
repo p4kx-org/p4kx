@@ -7,33 +7,8 @@ use serde::Serialize;
 use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
 
-/// The source identity and availability of a location-vocabulary Record.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct DefinitionReference {
-    /// The resolved target position in this Build, null when no physical target is known.
-    pub(crate) target_record_index: Option<u32>,
-    /// The target GUID, retained when its Record is missing.
-    pub(crate) guid: CatalogGuid,
-    /// The target Record path when its source identity is available.
-    pub(crate) record_path: Option<String>,
-    /// The source target struct name when available.
-    pub(crate) target_type: Option<String>,
-    /// Whether the target Record is present in the source `DataForge`.
-    pub(crate) status: DefinitionStatus,
-}
-
-/// Source availability of a definition Reference.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
-pub(crate) enum DefinitionStatus {
-    /// The `DataForge` identifies the target Record.
-    Present,
-    /// The declared target GUID has no Record.
-    Dangling,
-}
+pub(crate) use crate::definition_reference::{DefinitionReference, DefinitionStatus};
+pub(crate) use crate::source_pointer::SourcePointer;
 
 /// A source weak pointer and its resolution within its original owning Record.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -58,17 +33,6 @@ pub(crate) struct PropertyReference {
     pub(crate) source_pointer: Option<SourcePointer>,
     /// The source read error when available, without a fabricated target value.
     pub(crate) source_error: Option<String>,
-}
-
-/// An unresolved weak pointer's stored struct and instance coordinates.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct SourcePointer {
-    /// The stored struct index.
-    pub(crate) struct_index: u32,
-    /// The stored instance index.
-    pub(crate) instance_index: u32,
 }
 
 /// The result of resolving a weak link within its original owner.

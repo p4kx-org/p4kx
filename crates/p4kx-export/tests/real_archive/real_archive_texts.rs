@@ -90,8 +90,7 @@ impl Coverage {
     fn count(&mut self, oracle: &Oracle, key: &str, shown: Option<&Value>) {
         match (oracle.text(key), shown) {
             (Some(expected), Some(Value::String(shown)))
-                if expected == shown
-                    || (!shown.is_empty() && expected.contains(MISSION_TOKEN)) =>
+                if expected == shown || (!shown.is_empty() && expected.contains(MISSION_TOKEN)) =>
             {
                 self.resolved += 1;
             }

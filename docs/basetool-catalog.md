@@ -158,6 +158,7 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `items` | The items, ordered by GUID |
 | `ships` | The ships and ground vehicles, ordered by GUID |
 | `commodities` | The commodities, ordered by GUID |
+| `resourceTypes` | Independently selected resource definitions, with density, packaging, authored properties and quality sources, ordered by GUID ([contract](catalog-resource-types.md)) |
 | `blueprints` | The crafting blueprints with their ingredients, all tiers, default availability and dismantle link, ordered by GUID |
 | `resourceGroups` | The groups of resource types, the targets of `typeGuid`, ordered by GUID |
 | `blueprintCategories` | The blueprint categories, the targets of `categoryGuid`, ordered by GUID |
@@ -682,8 +683,8 @@ from the entity:
 |-------|--------|
 | `name` | `SCItemPurchasableParams.displayName` |
 | `description` | `EntityUIDisplayParams.displayDescription` in `StaticEntityClassData` |
-| `typeGuid` | The GUID of the `ResourceTypeGroup` Record that directly lists the `ResourceType` in its `resources` (19 groups on LIVE: Metal, Mineral, Gas, …), the `guid` of a `resourceGroups` entry; `null` without a `ResourceType` or a group |
-| `subtypeGuid` | The GUID of the `ResourceType` Record that the first entry of `ResourceContainer.defaultComposition` links to; `null` without one, e.g. `Special_HolidayLetter` |
+| `typeGuid` | The first selected, readable, non-leftover `ResourceTypeGroup` in source Record order that directly lists this ResourceType; `null` without one. All direct memberships are in `resourceTypes[].groupGuids` |
+| `subtypeGuid` | The ResourceType GUID of the first non-null `entry` of the first `ResourceContainer.defaultComposition`; nullable and non-unique. A configured dangling first GUID is retained rather than replaced by a later link |
 | `displayType` | A text: `SCItemPurchasableParams.displayType`, e.g. `@items_commodities_type_metal` |
 | `densityGramsPerCubicCentimetre` | The number `densityType.densityUnit.gramsPerCubicCentimeter` of the `ResourceType` holds (a fact, no game text); `null` without a `ResourceType`, a density or a density in another unit |
 | `refinedSubtypeGuid` | The GUID `refinedVersion` of the `ResourceType` links to; `null` without a `ResourceType` or a `refinedVersion`. It equals the `subtypeGuid` of the refined commodity only when the catalog has that commodity |
@@ -709,10 +710,12 @@ and `description` are those of the `ResourceType`, `typeGuid` is its group, `sub
 GUID and `displayType` has no key. With a `--filter`, such an entry is listed only when its record
 path matches.
 
-The join from an ingredient to its commodity is `resourceGuid` = `subtypeGuid`. A `ResourceType`
-that a commodity Record carries yields no second entry, so every `resourceGuid` of the catalog
-matches exactly one commodity (checked against LIVE). A `ResourceType` that several commodity
-Records share (on LIVE the Slam variants and the med pens) matches several; no recipe uses one.
+`commodities[].guid` is the commodity identity. Several commodities can share one nullable
+`subtypeGuid`; a ResourceType can also have no commodity. Join an ingredient's `resourceGuid` to
+`resourceTypes[].guid` for resource facts and to every matching `commodities[].subtypeGuid` for
+commodity alternatives. Never index commodities uniquely by `subtypeGuid`. The independent
+[`resourceTypes` contract](catalog-resource-types.md) retains every selected resource even when
+the existing commodity fallback does not apply.
 
 A blueprint (`CraftingBlueprintRecord`) takes its fields from `blueprint`:
 
@@ -756,20 +759,23 @@ takes its fields from the Record:
 |-------|--------|
 | `className` | The Record name without its type, e.g. `Metal` |
 | `name` | `displayName`, e.g. `@items_commodities_type_metal`; a placeholder key (`@LOC_PLACEHOLDER`, 7 groups on LIVE) leaves `en` and `de` `null`, and the Basetool falls back to `className` |
+| `description` | `description` as LocalisedText, marked as game text (`x-gameText`) |
+| `defaultThumbnailPath`, `defaultThumbnailPathSVG` | Raw source asset-path strings, preserving an empty string |
+| `resources`, `groups` | Nullable ordered source Record-reference lists, retaining repeated links and null positions |
 | `parentGuid` | The GUID of the group that lists this group in its `groups`, the `guid` of another `resourceGroups` entry; `null` for a top-level group; the first group in Record order wins when several list it. Only the groups of the kind list: a group left out as a development leftover or unreadable names no parent and no `ResourceType` |
 
-The groups form a forest, and `parentGuid` is the direct parent only. The import must not assume
-a fixed depth and must guard against a cycle: the catalog exports the lists as the game stores
-them, so a group that lists itself has no parent and two groups that list each other (A lists B, B
-lists A) are each other's parent, with no root.
+`parentGuid` retains the first direct parent among selected groups. Importers must guard against
+cycles and must not assume a fixed depth or a forest. The source lists preserve repeated parents,
+self-links and cycles; the legacy singular `parentGuid` excludes a group's own self-link.
 
 Groups nest one level on LIVE: Metal lists Alloy and UnrefinedOres, Mineral lists Raw_Minerals,
 Nonmetal lists Halogen, Organic lists Food, ProcessedGoods lists SyntheticMaterials, Vice and
 Bulk_Supplies. A commodity points at the group that lists its `ResourceType` directly, so a
-commodity of Alloy has the child as `typeGuid`, not Metal. `description`, the thumbnail paths and
-the lists `resources` and `groups` are not exported: the descriptions are game texts, the paths are
-media, and the membership is `typeGuid` of the commodities. All groups share one `recordPath`, the
-Record file `resourcetypedatabase`; `className` and `guid` tell them apart.
+commodity of Alloy has the child as `typeGuid`, not Metal. `resources` and `groups` preserve the
+authored lists independently of these singular convenience fields. `resourceTypes[].groupGuids`
+contains all distinct selected direct memberships, sorted by GUID. The descriptions and raw
+thumbnail paths are exported as source facts; cataloging does not extract the media. The source
+Record path is retained, and `className` and `guid` distinguish Records that share one file.
 
 A blueprint category (`BlueprintCategoryRecord`, 21 on LIVE) is the target of the `categoryGuid` of
 a blueprint. The Record holds no field at all, so the category has `guid`, `className` (e.g.
@@ -784,7 +790,8 @@ Every `typeGuid` of a commodity and every `categoryGuid` of a blueprint resolves
 `resourceGroups` or `blueprintCategories` (checked against LIVE; a commodity without a
 `ResourceType` or group, 1 on LIVE, and a blueprint without a category or whose category is a
 left-out leftover or unreadable have `null`; a commodity whose `ResourceType` only a leftover or
-unreadable group lists has a `null` `typeGuid`). The groups are found whatever the `--filter`; a
+unreadable group lists has a `null` `typeGuid`). Only selected groups affect group and commodity
+membership fields; an additional diagnostic read of an unselected group does not affect them. A
 category is only found missing when the `--filter` selects it, so under a `--filter` a
 `categoryGuid` may still name a leftover category outside it. With a
 `--filter`, a kind is partial and the references need not resolve.
@@ -838,7 +845,7 @@ the record path and marks the kind partial).
 | Kind | Fields |
 |------|--------|
 | `gameplayProperties` | `name`: the localisation key `propertyName` and its texts; a placeholder key stays as `key` and leaves `en` and `de` `null`, as for `items` and `blueprints`. The target of a modifier's `propertyGuid` |
-| `qualityDistributions` | `distribution`: a normal distribution `kind`, `min`, `max`, `mean`, `stddev` (`null` for an override Record or a value beyond a 32-bit float), and `overrides`: per location a `locationGuid` and its `distribution` (empty for a default Record). Both Record types of `crafting/qualitydistribution` are listed |
+| `qualityDistributions` | `distribution`: shared QualityCurve with `kind`, exact nullable Int32 `min`/`max` and nullable finite f32 `mean`/`stddev`; `null` for an override Record. `overrides`: per-location `locationGuid` and its distribution, empty for a default Record. Both Record types of `crafting/qualitydistribution` are listed |
 | `qualityQuantizations` | `bands` and `resourceTypeGuids`, described under "Quality quantizations" below |
 | `blueprintPools` | `entries`: per entry `blueprintGuid` and `weight`; `totalWeight`, the sum of the positive weights; `rewardSources`: every struct of any Record with a Reference to the pool (on LIVE the `BlueprintRewards` result of a contract) with `recordGuid`, `recordPath`, `contractId`, `contractName` (both from the nearest enclosing struct that has an `id`) and `chance`, ordered by `recordGuid` and then in stored order. A `blueprintGuid` may point at a blueprint that is left out of `blueprints` as a failure |
 | `dismantleProcesses` | `efficiency` (0.5 on LIVE) and `timeSeconds` (15 on LIVE) of the `GenericCraftingProcess_Dismantle` |
@@ -846,7 +853,13 @@ the record path and marks the kind partial).
 A blueprint's chance from a source is `chance` x the entry's `weight` / `totalWeight`; a source
 without a chance or with one outside 0 to 1, a pool without a positive weight and an entry with a
 weight of zero or less give none. The quality distributions carry no link to a blueprint or source:
-the Records do not hold one, so the catalog lists them as they are.
+the Records do not hold one, so the catalog lists them as they are. Resource-owned inline and
+linked forms preserve their source ownership in
+[`resourceTypes[].properties`](catalog-resource-types.md#quality-source-wrappers-and-exact-curves).
+Wrong numeric source types, nonfinite parameters and values outside finite f32 representation
+produce explicit projection failures; they do not silently become null. Known fieldless curve
+bases retain their `kind` with null numeric fields. The public Rust QualityCurve shares exact
+`Option<i32>` bounds through both existing reexport paths.
 
 #### Quality quantizations
 
@@ -860,8 +873,11 @@ and
 | `bands` | `qualityQuantization.bands` in stored order: per band `start`, `end` (inclusive) and `mappedValue`, whole numbers. Every quality from `start` to `end` counts as `mappedValue`. LIVE has 8 bands per Record with the same ranges (0-399, 400-599, 600-699, 700-799, 800-899, 900-949, 950-998, 999-1000) that together cover the qualities 0 to 1000; only the `mappedValue`s differ per resource |
 | `resourceTypeGuids` | The GUIDs of the `ResourceType` Records whose crafting data link to the Record, without repeats and ordered by GUID. The link goes from the `ResourceType` (`properties[].qualityQuantization.qualityQuantizationRecord`); the quantization Record holds none. On LIVE 43 links reach 42 Records (`Carinite` and `CarinitePure` share one); every linked `ResourceType` is the `subtypeGuid` of a commodity of the catalog, because a `ResourceType` a kept quantization links to is backfilled as a commodity (ADR-0184); with a `--filter`, only those whose record path matches |
 
-The links are read from every `ResourceType` Record whatever the Filter, except those that are
-development leftovers: such a `ResourceType` neither links nor counts. A Record no `ResourceType`
+When a catalog has a selected non-leftover quantization target, or its target metadata is
+uncertain, its reverse links are read from every non-leftover ResourceType, including sources
+outside the Filter. Without such a target, only selected ResourceType inputs contribute link
+evidence and the existing catalog counter. The public `read_crafting` API retains its unfiltered
+ResourceType-link contract. A development-leftover ResourceType neither links nor counts. A Record no `ResourceType`
 uses is ordinary game data and stays in the kind with an empty `resourceTypeGuids` (20 on LIVE);
 `CatalogSummary::quantizations().unused` and `quantizations.unused` of `p4kx catalog --json` count
 them, with no effect on the exit code. The same summary counts `unresolved_links`, the links to a
@@ -1579,9 +1595,11 @@ referenced property the `missionVariableName` of the property of the template it
 `value` (for an output, embedded or input property) and `linkedOutput` (for an input: the
 `objectiveId` of the objective that holds the output and its `variable`). The `value` is tagged by
 `type`: `object` and `deliveryOrder` (no fields), `boolean` (`value`), `stringHash` (`options`, each
-`displayName`, a game text, `value`, `weighting` and `dependentProperties`, the variables of the
-properties the option makes dependent), `integer` and `float` (`options`, each `displayName`,
-`value`, `variation`, `weighting` and `dependentProperties`), `tags` (`tags` and `negativeTags`),
+`displayName`, a game text, `value`, fractional `weighting`, `debugForceChooseThisOption` and
+structured `dependentProperties` with the property and selected option links), `integer` and
+`float` (`options`, each with the same metadata and `value`/`variation`; integer fields retain
+exact `Int32` values), `tags` (`tags`, `negativeTags`, raw `sourceTags`/`sourceNegativeTags` and
+complete `options`),
 `shipSpawnDescriptions` (`poolGuid`, an entry of `contractShipSpawns`, `null` for a description
 without a group), `location` (`queryGuid`, an entry of `contractLocationQueries`),
 `npcSpawnDescriptions` and `entitySpawnDescriptions` (`poolGuid`, an entry of `contractNpcSpawns` or
@@ -1594,11 +1612,14 @@ and `maxItemsToFind`), `aiName` (the fields of an embedded NPC name, see "NPC an
 `randomName`, `randomLastName`, `randomNickName`, `givenName`, `givenLastName`, `givenNickName`,
 `chanceOfNickName` and `nameDataGuid`), `combinedDataSetEntries` (`entryProperties`, the variables
 of the `dataSetEntryProperties`), `haulingOrders` (`requirements` as in "Hauling orders"), `reward`
-(`reward`, the `rewardDef` as the `reward` of a broker entry, `null` without one), and `timeTrialRace`
-and `starMapLocation` (no fields). The spawn descriptions and location queries are read as for the
-contracts and added to their kinds. A value of any other struct fails the Record (on LIVE the
-values of all properties are of the types above); so does an organisation or a mission item whose
-condition is of a struct the catalog does not know.
+(`reward`, the `rewardDef` as the `reward` of a broker entry, `null` without one), `timeTrialRace`
+(`targetSplits`, ordered structures with `targetSplit`) and `starMapLocation` (no fields).
+`autoSpawns` retains its definition Reference and concrete closet-search options; `investigation`
+retains journal entries, suspects, locations and every clue/item subtype. Their complete fields,
+null conventions and owner-local weak references are described in
+[Typed mission property values](mission-property-values.md). The spawn descriptions and location
+queries are read as for contracts and added to their kinds. An unsupported value or data-set
+condition fails its owning Record instead of being represented as absent data.
 
 **Scoped location properties (schema 3).** `scopedLocation` retains all six optional source
 filters: `factionFilter`, `locationClassFilter`, `locationSizeFilter`, `locationFunctionFilter`,

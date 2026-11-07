@@ -145,8 +145,12 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             ledger.merge(checked.ledger);
         }
         picked.extend(failures.into_iter().map(Picked::Failed));
-        let resources =
-            self.resource_commodities(&picked, &crafting.blueprints, &crafting.quantizations)?;
+        let resources = self.resource_commodities(
+            &picked,
+            &crafting.blueprints,
+            &crafting.quantizations,
+            &ledger.sources,
+        )?;
         picked.extend(resources.picked);
         ledger.merge(resources.ledger);
         picked.extend(self.links.warning().map(Picked::Warned));

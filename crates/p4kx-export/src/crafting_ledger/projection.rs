@@ -11,8 +11,8 @@ use crate::crafting_types::{
     BlueprintPool, BlueprintTiers, DismantleProcess, GameplayProperty, GlobalParams,
     QualityDistribution, QualityQuantization,
 };
-use crate::export_diagnostic::ExportDiagnosticCode;
-use crate::export_ledger::SourceDiagnosis;
+use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
+use crate::export_ledger::{ExportLedger, SourceDiagnosis};
 
 use super::selection::Action;
 
@@ -38,11 +38,14 @@ pub(super) enum ProjectionError {
     Blueprint(#[from] TooDeep),
     #[error(transparent)]
     Quantization(#[from] Malformed),
+    #[error(transparent)]
+    Quality(#[from] crate::source_fields::FieldError),
 }
 
 impl ProjectionError {
     pub(super) fn diagnosis(&self) -> SourceDiagnosis {
         let (code, field, source_type) = match self {
+            Self::Quality(error) => return crate::export_source_failure::diagnosis(error),
             Self::Blueprint(_) => (
                 ExportDiagnosticCode::ProjectionFailure,
                 "blueprint.tiers".to_owned(),
@@ -82,11 +85,23 @@ impl ProjectionError {
 pub(super) fn project<'f>(
     action: Action,
     tree: &RecordTree<'f>,
+    role: ExportSourceRole,
+    ledger: &mut ExportLedger,
 ) -> Result<Option<Piece<'f>>, ProjectionError> {
     let piece = match action {
         Action::Blueprint => Some(Piece::Blueprint(crafting_records::blueprint(tree)?)),
         Action::Property => Some(Piece::Property(crafting_records::property(tree))),
-        Action::Distribution => Some(Piece::Distribution(crafting_records::distribution(tree))),
+        Action::Distribution => {
+            let read = crafting_records::distribution(tree)?;
+            crate::source_projection_notes::record(
+                crate::Kind::QualityDistributions,
+                role,
+                tree,
+                read.notes,
+                ledger,
+            );
+            Some(Piece::Distribution(read.value))
+        }
         Action::Quantization => Some(Piece::Quantization(crafting_quantization::quantization(
             tree,
         )?)),

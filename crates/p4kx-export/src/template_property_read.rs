@@ -7,21 +7,19 @@ use p4kx_extraction::{StructValue, Value};
 
 use crate::blueprint::as_struct;
 use crate::broker_terms::mission_reward;
-use crate::contract::LocalisedText;
 use crate::contract_template::TemplateProperty;
 use crate::mission_hauling::value_requirements;
-use crate::mission_layers::{items, key, one};
+use crate::mission_layers::{items, one};
 use crate::mission_property_fields as source_fields;
 use crate::mission_property_set::MissionPropertyDeclaration;
+use crate::mission_property_value_read;
 use crate::npc_spawn_read::ai_name;
-use crate::record_fields::{boolean, integer, number, reference, structs, text};
+use crate::record_fields::{boolean, integer, reference, structs, text};
 use crate::record_read::ReadError;
 use crate::spawn_pools::{Registered, SpawnPools, Target};
 use crate::spawn_read::Reader;
 use crate::template_issues::{TemplateError, Unknowns};
-use crate::template_property::{
-    LinkedOutput, NumberOption, ObjectiveProperty, PropertyKind, PropertyValue, StringOption,
-};
+use crate::template_property::{LinkedOutput, ObjectiveProperty, PropertyKind, PropertyValue};
 use crate::texts::Texts;
 
 const VALUE_PREFIX: &str = "MissionPropertyValue_";
@@ -161,6 +159,9 @@ impl<'f> PropertyReader<'_, '_, 'f> {
     }
 
     fn value(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, ReadError> {
+        if let Some(value) = mission_property_value_read::read(self.reader, value, self.texts)? {
+            return Ok(value);
+        }
         let parent = Some(value);
         Ok(match value_type(value) {
             "ScopedLocation" => PropertyValue::ScopedLocation(Box::new(
@@ -170,26 +171,6 @@ impl<'f> PropertyReader<'_, '_, 'f> {
             "DeliveryOrder" => PropertyValue::DeliveryOrder,
             "Boolean" => PropertyValue::Boolean {
                 value: boolean(parent, "value"),
-            },
-            "StringHash" => PropertyValue::StringHash {
-                options: Self::options(value, |option| StringOption {
-                    display_name: self.text(option),
-                    value: text(Some(option), "value").map(str::to_owned),
-                    weighting: integer(Some(option), "weighting"),
-                    dependent_properties: self
-                        .reader
-                        .property_variables(Some(option), "dependentProperties"),
-                }),
-            },
-            "Integer" => PropertyValue::Integer {
-                options: Self::options(value, |option| self.number_option(option)),
-            },
-            "Float" => PropertyValue::Float {
-                options: Self::options(value, |option| self.number_option(option)),
-            },
-            "Tags" => PropertyValue::Tags {
-                tags: self.reader.tag_list(parent, "tags"),
-                negative_tags: self.reader.tag_list(parent, "negativeTags"),
             },
             "Organization" => PropertyValue::Organization {
                 conditions: self.reader.conditions(parent, "organization condition")?,
@@ -217,7 +198,6 @@ impl<'f> PropertyReader<'_, '_, 'f> {
             "Reward" => PropertyValue::Reward {
                 reward: one(parent, "rewardDef").map(mission_reward),
             },
-            "TimeTrialRace" => PropertyValue::TimeTrialRace,
             "StarMapLocation" => PropertyValue::StarMapLocation,
             _ => return self.spawn(value),
         })
@@ -246,32 +226,5 @@ impl<'f> PropertyReader<'_, '_, 'f> {
             },
             Target::Location(guid) => PropertyValue::Location { query_guid: guid },
         })
-    }
-
-    fn options<'v, T>(
-        value: &'v StructValue<'f>,
-        read: impl Fn(&'v StructValue<'f>) -> T,
-    ) -> Vec<T> {
-        items(Some(value), "options")
-            .iter()
-            .filter_map(as_struct)
-            .map(read)
-            .collect()
-    }
-
-    fn number_option(&self, option: &StructValue<'f>) -> NumberOption<'f> {
-        NumberOption {
-            display_name: self.text(option),
-            value: number(Some(option), "value"),
-            variation: number(Some(option), "variation"),
-            weighting: integer(Some(option), "weighting"),
-            dependent_properties: self
-                .reader
-                .property_variables(Some(option), "dependentProperties"),
-        }
-    }
-
-    fn text(&self, option: &StructValue<'f>) -> LocalisedText<'f> {
-        self.texts.localised(key(Some(option), "textId"))
     }
 }

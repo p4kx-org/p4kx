@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    CancelToken, MAX_NESTING_DEPTH, MAX_RECORD_VALUES, Record, RecordTree, StructValue, Value,
+    CancelToken, MAX_NESTING_DEPTH, MAX_RECORD_VALUES, Record, RecordTree, Reference, StructValue,
+    Value,
 };
 
 use crate::CatalogError;
@@ -30,7 +31,7 @@ pub(crate) fn inspect(
         visited: 0,
         cancel,
     };
-    walker.structure(tree.root(), &mut String::new(), 0)?;
+    walker.structure(tree.root(), &mut String::new(), 0, None)?;
     let mut ledger = ExportLedger::default();
     ledger.field_inspections.push(walker.collector.finish());
     Ok(ledger)
@@ -48,6 +49,7 @@ impl Walker<'_, '_, '_> {
         structure: &StructValue<'_>,
         path: &mut String,
         depth: usize,
+        parent_type: Option<&str>,
     ) -> Result<bool, CatalogError> {
         if depth > MAX_NESTING_DEPTH {
             self.collector.limited(path, structure.type_name());
@@ -59,7 +61,13 @@ impl Walker<'_, '_, '_> {
                 path.push('.');
             }
             path.push_str(field.name());
-            let complete = self.value(field.value(), path, structure.type_name(), depth)?;
+            let complete = self.value(
+                field.value(),
+                path,
+                structure.type_name(),
+                depth,
+                parent_type,
+            )?;
             path.truncate(length);
             if !complete {
                 return Ok(false);
@@ -74,6 +82,7 @@ impl Walker<'_, '_, '_> {
         path: &mut String,
         source_type: &str,
         depth: usize,
+        parent_type: Option<&str>,
     ) -> Result<bool, CatalogError> {
         if self.cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
@@ -84,8 +93,12 @@ impl Walker<'_, '_, '_> {
         }
         self.visited += 1;
         match value {
-            Value::Struct(structure) => return self.structure(structure, path, depth + 1),
-            Value::Array(values) => return self.array(values, path, source_type, depth),
+            Value::Struct(structure) => {
+                return self.structure(structure, path, depth + 1, Some(source_type));
+            }
+            Value::Array(values) => {
+                return self.array(values, path, source_type, depth, parent_type);
+            }
             Value::Null => self.collector.note(
                 path,
                 source_type,
@@ -118,22 +131,37 @@ impl Walker<'_, '_, '_> {
             Value::Error(error) => {
                 crate::export_field_error::record(&mut self.collector, path, source_type, *error);
             }
-            Value::Reference(reference)
-                if reference.record_index() != self.collector.owner_index()
-                    && reference.location().is_some() =>
-            {
-                self.collector.note(
-                    path,
-                    source_type,
-                    ExportDiagnosticCode::OutsideOwner,
-                    ExportDiagnosticSeverity::Information,
-                    Some(reference.guid()),
-                );
-                self.collector.foreign(path, source_type, reference);
+            Value::Reference(reference) => {
+                return Ok(self.reference(reference, path, source_type, parent_type));
             }
             _ => {}
         }
         Ok(true)
+    }
+
+    fn reference(
+        &mut self,
+        reference: &Reference<'_>,
+        path: &str,
+        source_type: &str,
+        parent_type: Option<&str>,
+    ) -> bool {
+        if reference.record_index() != self.collector.owner_index()
+            && reference.location().is_some()
+        {
+            self.collector.note(
+                path,
+                source_type,
+                ExportDiagnosticCode::OutsideOwner,
+                ExportDiagnosticSeverity::Information,
+                Some(reference.guid()),
+            );
+            self.collector.foreign(path, source_type, reference);
+            true
+        } else {
+            self.collector
+                .catalog_reference(path, source_type, parent_type, reference)
+        }
     }
 
     fn array(
@@ -142,6 +170,7 @@ impl Walker<'_, '_, '_> {
         path: &mut String,
         source_type: &str,
         depth: usize,
+        parent_type: Option<&str>,
     ) -> Result<bool, CatalogError> {
         use std::fmt::Write as _;
 
@@ -160,7 +189,7 @@ impl Walker<'_, '_, '_> {
             write!(path, "[{index}]").map_err(|error| {
                 CatalogError::Accounting(ExportAccountingError::FieldPath(error))
             })?;
-            let complete = self.value(value, path, source_type, depth)?;
+            let complete = self.value(value, path, source_type, depth, parent_type)?;
             path.truncate(length);
             if !complete {
                 return Ok(false);

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
-use p4kx_extraction::{CancelToken, Record, TreeBuilder};
+use p4kx_extraction::{CancelToken, Guid, Record, TreeBuilder};
 
 use super::{RESOURCE_TYPE, Scan, resources_of};
 use crate::commodity::resource_commodity;
 use crate::contract::{Blueprint, QualityQuantization};
 use crate::export_diagnostic::ExportSourceRole;
-use crate::export_ledger::ExportLedger;
+use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
 use crate::picked::Picked;
 use crate::scan_health::{ScanError, ScanRead, SourceTrace};
 use crate::{CatalogError, Kind};
@@ -21,39 +21,36 @@ impl<'f> Scan<'_, '_, 'f> {
         picked: &[Picked<'f>],
         blueprints: &[Blueprint<'f>],
         quantizations: &[QualityQuantization<'f>],
+        sources: &[SourceObservation],
     ) -> Result<ScanRead<'f>, CatalogError> {
-        let mut carried = HashSet::new();
-        for pick in picked {
-            if let Picked::Commodity(commodity) = pick {
-                carried.extend(commodity.subtype_guid.map(|guid| guid.0));
-            }
-        }
-        let mut used = Vec::new();
-        for tier in blueprints.iter().flat_map(|blueprint| &blueprint.tiers) {
-            for line in tier.mandatory.iter().chain(&tier.optional) {
-                resources_of(line, &mut used);
-            }
-        }
-        used.extend(
-            quantizations
-                .iter()
-                .flat_map(|quantization| &quantization.resource_type_guids)
-                .map(|guid| guid.0),
-        );
-        used.sort_unstable();
-        used.dedup();
+        let used = unrepresented_resources(picked, blueprints, quantizations);
+        let physical: BTreeSet<_> = sources
+            .iter()
+            .filter(|source| {
+                source.kind == Some(Kind::ResourceTypes)
+                    && used.contains(&source.guid)
+                    && (source.role == ExportSourceRole::SelectionCandidate
+                        || (source.role == ExportSourceRole::Selected
+                            && !matches!(
+                                source.disposition,
+                                SourceDisposition::SkippedBeforeRead
+                                    | SourceDisposition::SkippedAfterRead
+                            )))
+            })
+            .map(|source| source.record_index)
+            .collect();
         let mut trees = TreeBuilder::new();
         let mut read = ScanRead {
             picked: Vec::new(),
             ledger: ExportLedger::default(),
         };
-        for guid in used.into_iter().filter(|guid| !carried.contains(guid)) {
+        for index in physical {
             if self.options.cancel.is_some_and(CancelToken::is_cancelled) {
                 return Err(CatalogError::Cancelled);
             }
-            let Some(record) = self.forge.record_by_guid(guid) else {
-                continue;
-            };
+            let record = self.forge.record(index).ok_or(CatalogError::Accounting(
+                crate::ExportAccountingError::MissingPhysicalReferenceTarget { index },
+            ))?;
             let mut trace = SourceTrace::new(&record);
             trace.candidate(Kind::Commodities);
             let mut ledger = ExportLedger::default();
@@ -84,6 +81,9 @@ impl<'f> Scan<'_, '_, 'f> {
         {
             return Ok(None);
         }
+        if crate::selection::is_kind_leftover(Kind::ResourceTypes, path, record.name()?) {
+            return Ok(None);
+        }
         trace.selected(Kind::Commodities);
         let tree = trees.build(record)?;
         trace.projecting();
@@ -100,4 +100,32 @@ impl<'f> Scan<'_, '_, 'f> {
             &self.groups,
         ))))
     }
+}
+
+fn unrepresented_resources(
+    picked: &[Picked<'_>],
+    blueprints: &[Blueprint<'_>],
+    quantizations: &[QualityQuantization<'_>],
+) -> HashSet<Guid> {
+    let mut carried = HashSet::new();
+    for pick in picked {
+        if let Picked::Commodity(commodity) = pick {
+            carried.extend(commodity.subtype_guid.map(|guid| guid.0));
+        }
+    }
+    let mut used = Vec::new();
+    for tier in blueprints.iter().flat_map(|blueprint| &blueprint.tiers) {
+        for line in tier.mandatory.iter().chain(&tier.optional) {
+            resources_of(line, &mut used);
+        }
+    }
+    used.extend(
+        quantizations
+            .iter()
+            .flat_map(|quantization| &quantization.resource_type_guids)
+            .map(|guid| guid.0),
+    );
+    used.into_iter()
+        .filter(|guid| !carried.contains(guid))
+        .collect()
 }

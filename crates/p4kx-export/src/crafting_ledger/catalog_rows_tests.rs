@@ -22,7 +22,7 @@ fn only_actual_post_projection_row_exclusions_count_as_skipped_rows() {
     let (rows, skipped) = selection.entities(
         Kind::GameplayProperties,
         &items,
-        |item| *item,
+        |item| (item.0, item.1, CatalogGuid(Guid::default())),
         |_| CatalogGuid(Guid::default()),
         |guid| *guid,
     );

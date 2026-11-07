@@ -334,3 +334,48 @@ fn a_catalog_near_the_upload_limit_is_flagged() -> TestResult {
 fn the_suggested_catalog_file_is_the_compressed_one() {
     assert_eq!(CATALOG_FILE, "basetool-catalog.json.zst", "the upload form");
 }
+
+#[test]
+fn an_independent_resource_has_its_own_written_kind_and_source_health() -> TestResult {
+    let (_dir, mut model, out) = opened(&cataloging::resources())?;
+    let file = out.join("resources.json");
+    model.start_catalog(file.clone(), || {});
+    let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
+        return Err("the resource catalog did not finish".into());
+    };
+    let summary = outcome.summary();
+    let resources = summary
+        .kind(Kind::ResourceTypes)
+        .ok_or("no resource kind")?;
+    assert_eq!(
+        (resources.count, resources.skipped, resources.complete),
+        (1, 0, true),
+        "the selected resource is independently written"
+    );
+    let health = summary
+        .export_health()
+        .kind(Kind::ResourceTypes)
+        .ok_or("no resource health")?;
+    assert_eq!(
+        health.source_records.selected, 1,
+        "one physical resource source"
+    );
+    assert!(
+        summary.export_health().is_complete(),
+        "the source and projection completed"
+    );
+    let document: serde_json::Value = serde_json::from_slice(&fs::read(file)?)?;
+    let rows = document
+        .get("resourceTypes")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("no resource rows")?;
+    assert_eq!(rows.len(), resources.count, "file and GUI summary agree");
+    assert_eq!(
+        rows.first()
+            .and_then(|row| row.get("validateDefaultCargoBox"))
+            .and_then(serde_json::Value::as_bool),
+        Some(false),
+        "false remains authored data"
+    );
+    Ok(())
+}

@@ -318,7 +318,7 @@ pub(crate) fn ambiguous_database() -> DataForgeBuilder {
 /// Returns the DataForge of the fixture.
 pub(crate) fn database() -> DataForgeBuilder {
     let builder = structures::structures(DataForgeBuilder::new().version(8));
-    let builder = [IRON, GOLD, PRODUCT_A, PRODUCT_B, BLACKLISTED, PYRO]
+    let builder = [IRON, GOLD, PRODUCT_A, PRODUCT_B, BLACKLISTED]
         .into_iter()
         .zip(1_u32..)
         .fold(builder, |builder, (guid, number)| {
@@ -329,5 +329,11 @@ pub(crate) fn database() -> DataForgeBuilder {
                 format!("libs/foundry/records/stubs/stub{number}.xml"),
             ))
         });
+    let builder = builder.record(TestRecord::new(
+        PYRO,
+        "StarMapObject",
+        "StarMapObject.FixtureLocation",
+        "libs/foundry/records/stubs/fixture_location.xml",
+    ));
     records::dismantle_and_global(records::quality(records::rewards(blueprints(builder))))
 }

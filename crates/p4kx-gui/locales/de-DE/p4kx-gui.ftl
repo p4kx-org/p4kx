@@ -499,6 +499,8 @@ catalog-summary-kind = { $kind ->
     [commodities] Waren
     [blueprints] Blaupausen
     [resourceGroups] Ressourcengruppen
+    [resourceTypes] Ressourcentypen
+    [missionPropertySets] Eigenschaftssätze für Missionen
     [blueprintCategories] Blaupausenkategorien
     [paints] Lackierungen
     [loadouts] Loadouts

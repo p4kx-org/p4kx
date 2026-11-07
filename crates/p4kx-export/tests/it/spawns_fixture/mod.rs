@@ -113,6 +113,7 @@ fn ship_option(weight: i32) -> TestValue {
         TestInstance::new("SpawnDescription_Ship")
             .value("concurrentAmount", TestValue::Int32(2))
             .value("includeLocationAISpawnTags", TestValue::Bool(false))
+            .value("crewInheritsLocationFaction", TestValue::Bool(weight == 3))
             .value("weight", TestValue::Int32(weight))
             .value("tags", tag_list(&[TAG_SHIP]))
             .value("negativeTags", tag_list(&[]))

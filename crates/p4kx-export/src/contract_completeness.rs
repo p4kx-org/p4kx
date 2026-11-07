@@ -23,6 +23,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) blueprints: KindCompleteness<'a>,
     /// The completeness of `resourceGroups`.
     pub(crate) resource_groups: KindCompleteness<'a>,
+    /// The completeness of `resourceTypes`.
+    pub(crate) resource_types: KindCompleteness<'a>,
     /// The completeness of `blueprintCategories`.
     pub(crate) blueprint_categories: KindCompleteness<'a>,
     /// The completeness of `gameplayProperties`.
@@ -121,6 +123,7 @@ impl<'a> Completeness<'a> {
             commodities: completeness,
             blueprints: completeness,
             resource_groups: completeness,
+            resource_types: completeness,
             blueprint_categories: completeness,
             gameplay_properties: completeness,
             quality_distributions: completeness,

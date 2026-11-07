@@ -3,6 +3,8 @@
 
 use p4kx_extraction::Guid;
 
+pub use crate::quality_curve::QualityCurve;
+
 /// How the quality range of a gameplay-property modifier changes the property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -156,21 +158,6 @@ pub struct GameplayProperty<'f> {
     pub record_path: &'f str,
     /// The localisation key of the property name, `None` for none or a placeholder.
     pub name_key: Option<&'f str>,
-}
-
-/// A normal distribution of quality.
-#[derive(Debug, Clone, PartialEq)]
-pub struct QualityCurve<'f> {
-    /// The struct of the distribution, e.g. `CraftingQualityDistributionNormal`.
-    pub kind: &'f str,
-    /// The lowest quality.
-    pub min: Option<f32>,
-    /// The highest quality.
-    pub max: Option<f32>,
-    /// The mean.
-    pub mean: Option<f32>,
-    /// The standard deviation.
-    pub stddev: Option<f32>,
 }
 
 /// A distribution that replaces the default one at a location.

@@ -39,6 +39,10 @@ impl Kind {
                 prefixes: &["libs/foundry/records/resourcetypedatabase/"],
                 type_name: "ResourceTypeGroup",
             },
+            Self::ResourceTypes => KindRule {
+                prefixes: &["libs/foundry/records/resourcetypedatabase/"],
+                type_name: "ResourceType",
+            },
             Self::BlueprintCategories => KindRule {
                 prefixes: &["libs/foundry/records/crafting/blueprintcategories/"],
                 type_name: "BlueprintCategoryRecord",

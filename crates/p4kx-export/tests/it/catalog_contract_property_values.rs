@@ -142,7 +142,7 @@ fn combined_entries_a_reward_and_a_race_state_their_fields() -> TestResult {
     );
     assert_eq!(
         value(&catalog, "Race_BP")?,
-        &json!({"type": "timeTrialRace"})
+        &json!({"type": "timeTrialRace", "targetSplits": []})
     );
     assert_eq!(
         value(&catalog, "Map_BP")?,

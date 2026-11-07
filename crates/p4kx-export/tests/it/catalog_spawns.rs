@@ -93,8 +93,29 @@ fn equal_ship_spawn_descriptions_share_one_entry() -> TestResult {
     );
     let option = &pools[0]["groups"][0]["slots"][0]["options"][0];
     assert_eq!(option["concurrentAmount"], 2);
+    assert_eq!(
+        option["crewInheritsLocationFaction"], false,
+        "the authored false crew-faction flag survives"
+    );
     assert_eq!(option["tags"], serde_json::json!(["ShipModel"]));
     assert_eq!(pools[0]["groups"][0]["name"], "Wave");
+    Ok(())
+}
+
+#[test]
+fn ship_options_keep_the_crew_faction_flag_for_each_authored_alternative() -> TestResult {
+    let catalog = build()?;
+    let pools = catalog["contractShipSpawns"].as_array().ok_or("pools")?;
+    for pool in pools {
+        let option = pool
+            .pointer("/groups/0/slots/0/options/0")
+            .ok_or("option")?;
+        assert_eq!(
+            option["crewInheritsLocationFaction"],
+            option["weight"] == 3.0,
+            "the flag follows its source option independently of shared pool links"
+        );
+    }
     Ok(())
 }
 

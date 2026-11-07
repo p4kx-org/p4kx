@@ -5,10 +5,8 @@ use std::collections::HashMap;
 
 use p4kx_extraction::{Guid, RecordTree, Value};
 
-use crate::contract::ResourceGroup;
 use crate::guid_text::CatalogGuid;
-use crate::record_fields::{class_name, elements, locale_key};
-use crate::texts::Texts;
+use crate::record_fields::elements;
 
 /// What the `ResourceTypeGroup` Records of the `resourceGroups` kind list: the group of each
 /// `ResourceType` and the direct parent of each group.
@@ -19,6 +17,7 @@ use crate::texts::Texts;
 #[derive(Debug, Default)]
 pub(crate) struct Groups {
     by_resource: HashMap<Guid, CatalogGuid>,
+    all_by_resource: HashMap<Guid, Vec<CatalogGuid>>,
     parents: HashMap<Guid, CatalogGuid>,
 }
 
@@ -28,6 +27,10 @@ impl Groups {
         let group = CatalogGuid(listing.group);
         for resource in listing.resources {
             self.by_resource.entry(resource).or_insert(group);
+            let memberships = self.all_by_resource.entry(resource).or_default();
+            if !memberships.contains(&group) {
+                memberships.push(group);
+            }
         }
         for child in listing.children {
             if child != listing.group {
@@ -39,6 +42,17 @@ impl Groups {
     /// Returns the group that directly lists the `ResourceType` `resource`.
     pub(crate) fn of_resource(&self, resource: &Guid) -> Option<CatalogGuid> {
         self.by_resource.get(resource).copied()
+    }
+
+    /// Returns every selected group that directly lists the resource, distinct and GUID-ordered.
+    pub(crate) fn all_of_resource(&self, resource: &Guid) -> Vec<CatalogGuid> {
+        let mut groups = self
+            .all_by_resource
+            .get(resource)
+            .cloned()
+            .unwrap_or_default();
+        groups.sort_by_cached_key(|group| group.text());
+        groups
     }
 
     /// Returns the group that lists the group `group`.
@@ -72,20 +86,4 @@ fn listed(tree: &RecordTree<'_>, field: &str) -> Vec<Guid> {
             _ => None,
         })
         .collect()
-}
-
-/// Returns the resource group the `ResourceTypeGroup` tree `tree` describes, its name resolved by
-/// `texts` and its parent taken from `groups`.
-pub(crate) fn resource_group<'f>(
-    tree: &RecordTree<'f>,
-    texts: &Texts<'f>,
-    groups: &Groups,
-) -> ResourceGroup<'f> {
-    ResourceGroup {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        name: texts.localised(locale_key(Some(tree.root()), "displayName")),
-        parent_guid: groups.parent_of(&tree.guid()),
-    }
 }

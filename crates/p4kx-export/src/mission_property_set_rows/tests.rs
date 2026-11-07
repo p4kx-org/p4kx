@@ -4,10 +4,11 @@
 use p4kx_extraction::Guid;
 
 use crate::guid_text::CatalogGuid;
+use crate::mission_property_option::{FloatOption, OptionMetadata};
 use crate::mission_property_set::{
     MissionPropertyDeclaration, MissionPropertyLevel, MissionPropertySet,
 };
-use crate::template_property::{NumberOption, PropertyValue};
+use crate::template_property::PropertyValue;
 
 use super::MissionPropertySets;
 
@@ -38,13 +39,11 @@ fn float(value: f32) -> MissionPropertySet<'static> {
     set(
         1,
         PropertyValue::Float {
-            options: vec![NumberOption {
-                display_name: crate::contract::LocalisedText::default(),
+            options: Some(vec![Some(FloatOption {
+                metadata: OptionMetadata::default(),
                 value: Some(value),
                 variation: None,
-                weighting: None,
-                dependent_properties: Vec::new(),
-            }],
+            })]),
         },
     )
 }

@@ -126,6 +126,8 @@ fn the_summary_shows_the_kinds_the_texts_the_size_and_the_file() -> TestResult {
     harness
         .get_by_label("Export health: all selected sources were read and projected successfully.");
     harness.get_by_label("Manufacturers: 2 written, 1 skipped, complete");
+    harness.get_by_label("Resource types: 0 written, 0 skipped, complete");
+    harness.get_by_label("Mission property sets: 0 written, 0 skipped, complete");
     harness.get_by_label("Records skipped as development leftovers: 1");
     harness.get_by_label("Playability");
     harness.get_by_label("Items: 0 player, 0 AI, 0 mission, 0 special, 0 unclassified");

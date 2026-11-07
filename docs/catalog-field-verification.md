@@ -65,14 +65,19 @@ independence cannot be established. Source reads, coverage regressions and numer
 remain failures. Physical Records sharing a mapped GUID, including aliases outside the mapped
 selection, fail with both table indices instead of merging observations or masking selected data.
 
-## Metadata-only resource declaration survey
+## Metadata-only declaration surveys
 
 The ignored `resource_metadata::resource_owned_type_declarations_only` test writes only DataForge
-schema declarations for `ResourceType`, `ResourceTypeGroup`, `ResourceTypeProperty`, their relevant
+schema declarations for `ResourceType`, `ResourceTypeGroup`, `ResourceTypeProperties`, their relevant
 descendants, parents and owned Class/StrongPointer types. Reference and WeakPointer fields retain
 their declared target type names without following those target declarations. Enum fields retain
 the enum type name without options. Missing requested roots are explicit; an entirely absent scope
 fails.
+
+The ignored `mission_property_metadata::mission_property_owned_type_declarations_only` test uses
+the same collector for every struct name beginning with `MissionPropertyValue`, including types
+with no Records. It adds their parents and owned Class/StrongPointer closure under the same
+bounds. It shares the output and Archive-change guards with the resource survey.
 
 The artifact contains type names, parents, declared field names, data types, array flags and target
 type names, plus the DataForge format version and optional source Build branch/version/change.
@@ -95,6 +100,18 @@ Use existing private Archive/key configuration and task-local `TMP`/`TEMP`. For 
 select its Archive explicitly and choose a new output filename. Synthetic tests verify that Record
 values/identities and enum options do not reach the artifact, owned declarations remain visible,
 linked target declarations stay outside scope, and output paths cannot escape or overwrite.
+
+For the mission-property declaration scope, use a new explicit task root and output filename:
+
+~~~powershell
+$env:P4KX_METADATA_TASK_ROOT = 'D:\Coding\Agents\Temp\codex\p4kx-050-implementation\guard\mission-declarations'
+$env:P4KX_MISSION_PROPERTY_SCHEMA_OUT = Join-Path $env:P4KX_METADATA_TASK_ROOT 'mission-property-schema-PTU.json'
+cargo test --release -p p4kx-export --test field_verification --locked --offline -- mission_property_metadata::mission_property_owned_type_declarations_only --ignored --exact --nocapture
+~~~
+
+Select the private Archive and task-local `TMP`/`TEMP` explicitly, and review the collector and
+exact invocation before execution. Declaration names and field shapes explain schema support;
+they do not establish which values are populated or exported.
 
 ## Offline published reference
 

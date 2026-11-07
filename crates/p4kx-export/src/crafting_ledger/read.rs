@@ -13,6 +13,7 @@ use crate::{CatalogError, CatalogFailure, CatalogProgress, Kind};
 use super::ReadCrafting;
 use super::fault::Fault;
 use super::projection::{self, Piece};
+use super::resource_scope::ResourceLinkScope;
 use super::selection::{self, ReadPolicy, Selection};
 
 pub(super) struct Tracked<'f> {
@@ -85,7 +86,11 @@ fn one<'f>(
     record: &Record<'f>,
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
+    scope: ResourceLinkScope,
 ) -> Result<Option<Tracked<'f>>, CatalogError> {
+    if !scope.includes(record, filter) {
+        return Ok(None);
+    }
     let selected = match selection::choose(record, filter) {
         Ok(Some(selected)) => selected,
         Ok(None) => return Ok(None),
@@ -118,7 +123,7 @@ fn one<'f>(
         selected.role,
         cancel,
     )?;
-    let piece = match projection::project(selected.action, &tree) {
+    let piece = match projection::project(selected.action, &tree, selected.role, &mut ledger) {
         Ok(piece) => piece,
         Err(error) => {
             return Ok(Some(failure(
@@ -154,20 +159,47 @@ pub(crate) fn read<'f>(
     progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
 ) -> Result<ReadCrafting<'f>, CatalogError> {
     let records: Vec<_> = forge.records().collect();
+    read_scoped(
+        &records,
+        filter,
+        cancel,
+        progress,
+        ResourceLinkScope::AllResources,
+    )
+}
+
+pub(crate) fn read_catalog<'f>(
+    forge: &'f DataForge<'f>,
+    filter: Option<&Filter>,
+    cancel: Option<&CancelToken>,
+    progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
+) -> Result<ReadCrafting<'f>, CatalogError> {
+    let records: Vec<_> = forge.records().collect();
+    let scope = ResourceLinkScope::catalog(&records, filter, cancel)?;
+    read_scoped(&records, filter, cancel, progress, scope)
+}
+
+fn read_scoped<'f>(
+    records: &[Record<'f>],
+    filter: Option<&Filter>,
+    cancel: Option<&CancelToken>,
+    progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
+    scope: ResourceLinkScope,
+) -> Result<ReadCrafting<'f>, CatalogError> {
     let tracked = records
         .par_iter()
         .map_init(TreeBuilder::new, |trees, record| {
             if cancel.is_some_and(CancelToken::is_cancelled) {
                 return Err(CatalogError::Cancelled);
             }
-            one(trees, record, filter, cancel)
+            one(trees, record, filter, cancel, scope)
         })
         .filter_map(Result::transpose)
         .collect::<Result<Vec<_>, _>>()?;
     let mut result = super::assemble::assemble(tracked);
     inventories(&mut result.ledger);
     if !result.data.pools.is_empty() {
-        let found = crafting_scan::reward_sources(&records, &result.data.pools, cancel, progress)?;
+        let found = crafting_scan::reward_sources(records, &result.data.pools, cancel, progress)?;
         result.data.reward_sources = found.sources;
         result.ledger.merge(found.ledger);
         if found.unreadable > 0 {

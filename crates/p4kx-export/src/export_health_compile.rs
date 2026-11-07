@@ -48,6 +48,9 @@ impl Evidence {
         failures: &[CatalogFailure],
         warnings: &[CraftingWarning],
     ) -> Result<Self, ExportAccountingError> {
+        if ledger.conflicting_catalog_rows {
+            return Err(ExportAccountingError::ConflictingCatalogRows);
+        }
         let inventories = ledger.inventories.iter().map(|kind| kind.index()).collect();
         let incomplete_inventories: BTreeSet<_> = ledger
             .incomplete_inventories
@@ -55,7 +58,12 @@ impl Evidence {
             .map(Kind::index)
             .collect();
         let sources = crate::export_health_records::sources(ledger.sources)?;
-        let fields = crate::export_health_fields::resolve(ledger.field_inspections, &sources)?;
+        let fields = crate::export_health_fields::resolve(
+            ledger.field_inspections,
+            &sources,
+            ledger.catalog_rows.as_ref(),
+            &ledger.excluded_catalog_rows,
+        )?;
         let entries = crate::export_health_entries::compile(ledger.entries)?;
         let (mut failed, mut diagnostics) = crate::export_health_records::failures(&sources);
         let derived = crate::export_health_derived::failures(ledger.derived_failures);

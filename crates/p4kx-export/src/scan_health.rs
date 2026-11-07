@@ -27,6 +27,8 @@ pub(crate) enum ScanError {
     Source(#[from] p4kx_extraction::DataForgeError),
     #[error(transparent)]
     Fatal(#[from] crate::CatalogError),
+    #[error(transparent)]
+    Projection(#[from] crate::source_fields::FieldError),
 }
 
 /// Completes the production evidence captured by a Record worker.
@@ -46,6 +48,10 @@ pub(crate) fn finish<'f>(
             Some(Picked::Failed(crate::CatalogFailure::of(record, &error)))
         }
         Err(ScanError::Fatal(error)) => return Err(error),
+        Err(ScanError::Projection(error)) => {
+            trace.failed(record, &error, &mut ledger);
+            Some(Picked::Failed(crate::CatalogFailure::of(record, &error)))
+        }
     };
     Ok(
         (picked.is_some() || !ledger.sources.is_empty() || !ledger.field_inspections.is_empty())
@@ -72,7 +78,12 @@ impl SourceTrace {
     /// Creates a selection candidate without claiming that it is a selected source.
     pub(crate) fn new(record: &Record<'_>) -> Self {
         Self {
-            kind: record.record_path().ok().and_then(Kind::by_path),
+            kind: record.record_path().ok().and_then(|path| {
+                record
+                    .type_name()
+                    .ok()
+                    .and_then(|type_name| Kind::by_record(path, type_name))
+            }),
             stage: Stage::Selection,
             selected: false,
         }

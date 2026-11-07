@@ -41,7 +41,9 @@ pub(super) fn structs() -> Vec<TestStruct> {
             .field("max", TestType::Int32)
             .field("plusBonuses", TestType::Bool)
             .field("reputationBonus", TestType::Reference),
-        value("MissionPropertyValue_TimeTrialRace"),
+        value("MissionPropertyValue_TimeTrialRace")
+            .array("targetSplits", TestType::Class("TimeTrialSplit".to_owned())),
+        TestStruct::new("TimeTrialSplit").field("targetSplit", TestType::Single),
         value("MissionPropertyValue_StarMapLocation"),
     ]
 }

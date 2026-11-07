@@ -7,6 +7,8 @@ use serde::Serialize;
 use crate::contract::{LocalisedText, every_field_required};
 use crate::guid_text::CatalogGuid;
 
+pub(crate) use crate::quality_curve::QualityCurve;
+
 /// A gameplay property definition: a `CraftingGameplayPropertyDef` Record under
 /// `crafting/craftedproperties`, the target of the `propertyGuid` of a modifier.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -21,24 +23,6 @@ pub(crate) struct GameplayProperty<'a> {
     pub(crate) record_path: &'a str,
     /// The name of the property; a placeholder key leaves `en` and `de` `null`.
     pub(crate) name: LocalisedText<'a>,
-}
-
-/// A normal distribution of quality.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct QualityCurve<'a> {
-    /// The struct of the distribution, e.g. `CraftingQualityDistributionNormal`. A closed set the
-    /// game may extend.
-    pub(crate) kind: &'a str,
-    /// The lowest quality.
-    pub(crate) min: Option<f32>,
-    /// The highest quality.
-    pub(crate) max: Option<f32>,
-    /// The mean.
-    pub(crate) mean: Option<f32>,
-    /// The standard deviation.
-    pub(crate) stddev: Option<f32>,
 }
 
 /// A distribution that replaces the default one at a location.

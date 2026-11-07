@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+mod catalog_scope;
 mod projection;
 mod selection;
 
@@ -13,6 +14,7 @@ use crate::{CatalogError, CatalogFailure, Kind};
 use super::Piece;
 use selection::Action;
 
+pub(super) use catalog_scope::needed as catalog_needs_index;
 pub(crate) use projection::title_key;
 
 /// A mission dependency's actual read and typed projection.

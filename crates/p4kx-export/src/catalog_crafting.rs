@@ -12,7 +12,7 @@ use crate::contract::{
 };
 use crate::contract_quantization::QuantizationBand;
 use crate::contract_recipe::BlueprintDismantle;
-use crate::contract_rewards::{LocationOverride, PoolEntry, QualityCurve, RewardSource};
+use crate::contract_rewards::{LocationOverride, PoolEntry, RewardSource};
 use crate::crafting::{Crafting, ReadCrafting};
 use crate::crafting_types as library;
 use crate::crafting_warning::CraftingWarning;
@@ -61,7 +61,7 @@ pub(crate) fn kinds<'f>(
     let (distributions, distributions_skipped) = selected.entities(
         Kind::QualityDistributions,
         &crafting.quality_distributions,
-        |item| (item.record_path, item.class_name),
+        |item| (item.record_path, item.class_name, CatalogGuid(item.guid)),
         distribution,
         |entity| entity.guid,
     );
@@ -71,7 +71,7 @@ pub(crate) fn kinds<'f>(
     let (pools, pools_skipped) = selected.entities(
         Kind::BlueprintPools,
         &crafting.pools,
-        |item| (item.record_path, item.class_name),
+        |item| (item.record_path, item.class_name, CatalogGuid(item.guid)),
         |source| pool(source, &sources),
         |entity| entity.guid,
     );
@@ -108,7 +108,7 @@ fn properties<'f>(
     selected.entities(
         Kind::GameplayProperties,
         &crafting.properties,
-        |item| (item.record_path, item.class_name),
+        |item| (item.record_path, item.class_name, CatalogGuid(item.guid)),
         |source| GameplayProperty {
             guid: CatalogGuid(source.guid),
             class_name: source.class_name,
@@ -126,7 +126,7 @@ fn dismantle<'f>(
     selected.entities(
         Kind::DismantleProcesses,
         &crafting.dismantle,
-        |item| (item.record_path, item.class_name),
+        |item| (item.record_path, item.class_name, CatalogGuid(item.guid)),
         |source| DismantleProcess {
             guid: CatalogGuid(source.guid),
             class_name: source.class_name,
@@ -147,7 +147,7 @@ fn quantizations<'f>(
     let (kept, skipped) = selected.entities(
         Kind::QualityQuantizations,
         &crafting.quality_quantizations,
-        |item| (item.record_path, item.class_name),
+        |item| (item.record_path, item.class_name, CatalogGuid(item.guid)),
         quantization,
         |entity| entity.guid,
     );
@@ -261,13 +261,13 @@ fn distribution<'f>(source: &library::QualityDistribution<'f>) -> QualityDistrib
         guid: CatalogGuid(source.guid),
         class_name: source.class_name,
         record_path: source.record_path,
-        distribution: source.distribution.as_ref().map(curve),
+        distribution: source.distribution,
         overrides: source
             .overrides
             .iter()
             .map(|over| LocationOverride {
                 location_guid: over.location.map(CatalogGuid),
-                distribution: over.distribution.as_ref().map(curve),
+                distribution: over.distribution,
             })
             .collect(),
     }
@@ -295,15 +295,5 @@ fn quantization<'f>(source: &library::QualityQuantization<'f>) -> QualityQuantiz
             })
             .collect(),
         resource_type_guids,
-    }
-}
-
-const fn curve<'f>(source: &library::QualityCurve<'f>) -> QualityCurve<'f> {
-    QualityCurve {
-        kind: source.kind,
-        min: source.min,
-        max: source.max,
-        mean: source.mean,
-        stddev: source.stddev,
     }
 }

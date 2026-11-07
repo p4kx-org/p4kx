@@ -62,6 +62,7 @@ fn a_tagged_union_extension_is_not_an_additive_property() -> TestResult {
     let validator = jsonschema::validator_for(&released)?;
     let mut catalog = minimal_catalog();
     catalog["schemaVersion"] = json!(2);
+    catalog["contractTemplates"][0]["objectives"][0]["objectiveProperties"] = json!([]);
     assert!(validator.is_valid(&catalog), "unchanged v2 fields validate");
 
     catalog["resourceTypes"] = json!([]);

@@ -34,7 +34,7 @@ fn declarations_include_owned_types_without_surveying_values_links_or_enum_optio
         "ResourceType",
         "ResourceTypeGroup",
         "DeclarationParent",
-        "ResourceTypeProperty",
+        "ResourceTypeProperties",
         "ConcreteResourceProperty",
         "OwnedMetadata",
         "PropertyDetails",
@@ -52,7 +52,7 @@ fn declarations_include_owned_types_without_surveying_values_links_or_enum_optio
     assert!(
         fields.iter().any(|field| field["name"] == "properties"
             && field["array"] == true
-            && field["targetType"] == "ResourceTypeProperty"),
+            && field["targetType"] == "ResourceTypeProperties"),
         "array/target declaration metadata is retained"
     );
     assert!(

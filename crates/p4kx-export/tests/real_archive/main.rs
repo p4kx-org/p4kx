@@ -35,6 +35,7 @@ mod real_archive_mining_stats;
 mod real_archive_npc_spawns;
 mod real_archive_paints;
 mod real_archive_playability;
+mod real_archive_property_sets;
 mod real_archive_quantization;
 mod real_archive_records;
 mod real_archive_reputation;
