@@ -46,6 +46,8 @@ jobs:
           $task = New-P4kxNativePackageTask -Directory $env:RUNNER_TEMP -RunId $env:GITHUB_RUN_ID -Attempt $env:GITHUB_RUN_ATTEMPT -Target $env:P4KX_TARGET -Role producer
           "P4KX_PACKAGE_TASK=$task" >> $env:GITHUB_ENV
           .github/scripts/test-native-package-task.ps1 -Directory (Join-Path $task 'contracts/task-paths')
+      - name: Verify MSI invocation without installing
+        run: .github/scripts/test-msi-invocation.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-invocation')
       - name: Verify CRT resolution and copy contracts with synthetic PE fixtures
         run: .github/scripts/test-windows-runtime.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/windows-runtime')
       - uses: ./.github/actions/setup-rust

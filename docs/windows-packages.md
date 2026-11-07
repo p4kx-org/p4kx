@@ -83,6 +83,11 @@ Contract fixtures, packaging stages, tools and runtime logs use a fresh `RUNNER_
 by run, attempt, target and producer/consumer role, outside the cached Cargo build directory.
 Consumers require the complete producer matrix to succeed; missing artifacts still fail verification.
 
+MSI inputs resolve to native absolute paths before metadata and lifecycle checks. Related products
+are enumerated without a synthetic empty product, and a cleanup failure preserves any original
+verification exception. The invocation regression uses synthetic paths and mocked COM enumeration;
+it never installs software on the development machine.
+
 `release-windows.yml` consumes the Windows rows of `.config/platforms.json`. Each native producer
 builds three release applications and a next-version MSI, generates target-filtered CycloneDX
 SBOMs including any Microsoft runtime files, and uploads `windows-build-<target>`. A separate

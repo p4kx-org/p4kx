@@ -1,13 +1,10 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-database.ps1')
+. (Join-Path $PSScriptRoot 'msi-invocation.ps1')
 
 function Invoke-P4kxMsiexec {
     param([string[]]$Arguments, [string]$Log, [int]$ExpectedCode = 0)
-    $start = [Diagnostics.ProcessStartInfo]::new('msiexec.exe')
-    $start.UseShellExecute = $false
-    $start.CreateNoWindow = $true
-    $start.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
-    foreach ($argument in $Arguments + @('/qn', '/norestart', '/l*v', $Log)) { $start.ArgumentList.Add($argument) }
+    $start = New-P4kxMsiexecStartInfo -Arguments $Arguments -Log $Log
     $process = [Diagnostics.Process]::Start($start)
     try {
         if (-not $process.WaitForExit(300000)) { $process.Kill($true); $process.WaitForExit(); throw "MSI operation timed out: $Log" }
@@ -24,12 +21,12 @@ function Get-P4kxInstalledProducts {
     $installer = New-Object -ComObject WindowsInstaller.Installer
     $related = Get-P4kxComProperty $installer 'RelatedProducts' @("{$($UpgradeCode.Trim('{}'))}")
     $count = Get-P4kxComProperty $related 'Count' @()
-    return ,@(for ($index = 0; $index -lt $count; $index++) { Get-P4kxComProperty $related 'Item' @($index) })
+    return @(for ($index = 0; $index -lt $count; $index++) { Get-P4kxComProperty $related 'Item' @($index) })
 }
 
 function Assert-P4kxInstalledProduct {
     param($Metadata, [string]$Folder, [string]$Shortcut)
-    $products = Get-P4kxInstalledProducts $Metadata.upgrade
+    $products = @(Get-P4kxInstalledProducts $Metadata.upgrade)
     if ($products.Count -ne 1 -or $products[0] -ine $Metadata.product) { throw 'MSI registration is not the expected single installation.' }
     $installer = New-Object -ComObject WindowsInstaller.Installer
     $version = Get-P4kxComProperty $installer 'ProductInfo' @($products[0], 'VersionString')
@@ -42,7 +39,7 @@ function Assert-P4kxInstalledProduct {
 
 function Assert-P4kxUninstalled {
     param([string]$UpgradeCode, [string]$Folder, [string]$Shortcut, [string]$OriginalPath)
-    if ((Get-P4kxInstalledProducts $UpgradeCode).Count -ne 0 -or
+    if (@(Get-P4kxInstalledProducts $UpgradeCode).Count -ne 0 -or
         (Test-Path -LiteralPath $Folder) -or (Test-Path -LiteralPath $Shortcut) -or
         (Test-Path 'HKCU:\Software\P4KX')) { throw 'MSI left behind installation ownership.' }
     if ([Environment]::GetEnvironmentVariable('Path', 'User') -cne $OriginalPath) { throw 'MSI did not restore the original user PATH.' }

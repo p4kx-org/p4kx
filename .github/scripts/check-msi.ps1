@@ -19,6 +19,10 @@ Assert-P4kxNativeHost -Platform $row
 if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted') {
     throw 'Installer verification requires a disposable GitHub-hosted native Windows runner.'
 }
+$Msi = Resolve-P4kxMsiInput $Msi
+$NextMsi = Resolve-P4kxMsiInput $NextMsi
+$OtherArchitectureMsi = Resolve-P4kxMsiInput $OtherArchitectureMsi
+if ($PreviousMsi) { $PreviousMsi = Resolve-P4kxMsiInput $PreviousMsi }
 $current = Get-P4kxMsiMetadata $Msi
 $next = Get-P4kxMsiMetadata $NextMsi
 $opposite = @((Get-P4kxPlatformContract).targets | Where-Object { $_.os -eq 'windows' -and $_.arch -ne $row.arch })[0]
@@ -58,14 +62,14 @@ function Test-InstalledPayload([string]$Name) {
     Assert-ProfilePreserved
 }
 
+$verificationFailure = $null
 try {
     if ($PreviousMsi) {
         if ($row.arch -cne 'amd64') { throw 'Historical AMD64 MSI is not an ARM64 upgrade predecessor.' }
         $previous = Get-P4kxMsiMetadata $PreviousMsi
         if ($previous.template -cne 'x64;1033' -or $previous.version -cne '0.2.0' -or
             $previous.upgrade -ine $current.upgrade) { throw 'Historical MSI CPU/version/upgrade identity differs.' }
-        $oldKeys = @($previous.registry | Where-Object { $_[0] -eq '1' -and $_[1] -match '^Software\\P4K-Extractor(?:\\|$)' } | ForEach-Object { $_[1] } | Select-Object -Unique)
-        if ($oldKeys.Count -eq 0) { throw 'Historical MSI has no expected per-user installer identity.' }
+        $oldKeys = @(Get-P4kxPredecessorRegistryKeys $previous)
         Invoke-P4kxMsiexec @('/i', $PreviousMsi) (Join-Path $logs 'previous-install.log')
         Invoke-P4kxMsiexec @('/i', $Msi) (Join-Path $logs 'rename-upgrade.log')
         $oldFolder = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs/P4K-Extractor'
@@ -122,11 +126,23 @@ try {
         cross_cpu=$(if ($row.arch -eq 'arm64') { 'explicit replacement both ways; AMD64 compatibility is not native evidence' } else { 'ARM64 package rejected' })
     } | ConvertTo-Json | Set-Content (Join-Path $logs 'installer.json') -Encoding utf8NoBOM
 }
+catch {
+    $verificationFailure = $_
+    throw
+}
 finally {
-    foreach ($product in Get-P4kxInstalledProducts $UpgradeCode) { Invoke-P4kxMsiexec @('/x', $product) (Join-Path $logs 'cleanup-uninstall.log') }
-    foreach ($marker in $markers) {
-        $path = Join-Path $profileFolder $marker
-        if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path }
+    try {
+        foreach ($product in @(Get-P4kxInstalledProducts $UpgradeCode)) { Invoke-P4kxMsiexec @('/x', $product) (Join-Path $logs 'cleanup-uninstall.log') }
+        foreach ($marker in $markers) {
+            $path = Join-Path $profileFolder $marker
+            if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path }
+        }
+        if ((Get-ChildItem -LiteralPath $profileFolder -Force).Count -eq 0) { Remove-Item -LiteralPath $profileFolder }
     }
-    if ((Get-ChildItem -LiteralPath $profileFolder -Force).Count -eq 0) { Remove-Item -LiteralPath $profileFolder }
+    catch {
+        if ($null -ne $verificationFailure) {
+            throw [AggregateException]::new('Installer verification and cleanup both failed.', [Exception[]]@($verificationFailure.Exception, $_.Exception))
+        }
+        throw
+    }
 }

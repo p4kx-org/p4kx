@@ -103,3 +103,14 @@ function New-P4kxRollbackMsi {
     }
     finally { Close-P4kxComObject $summary; Close-P4kxComObject $database; Close-P4kxComObject $installer }
 }
+
+<#
+.SYNOPSIS
+Returns the installer-owned per-user registry keys of the supported predecessor MSI.
+#>
+function Get-P4kxPredecessorRegistryKeys {
+    param([Parameter(Mandatory)]$Metadata)
+    $keys = @($Metadata.registry | Where-Object { $_[0] -eq '1' -and $_[1] -match '^Software\\KRT\\P4K-Extractor(?:\\|$)' } | ForEach-Object { $_[1] } | Select-Object -Unique)
+    if ($keys.Count -eq 0) { throw 'Historical MSI has no expected per-user installer identity.' }
+    return $keys
+}
