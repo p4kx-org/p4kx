@@ -87,3 +87,5 @@ if (@($transportProof.applications | Where-Object prerequisite -CEQ 'failure').C
     throw 'Valid CLI API4 refusal and failed MCP/GUI transport were not recorded separately.'
 }
 'PASS: 18 mocked calls; valid CLI; early paths; typed refusal/no output; two MCP/GUI transport failures fail the aggregate; 3 malformed outcomes rejected.'
+
+& (Join-Path $PSScriptRoot 'test-flatpak-launchers.ps1')

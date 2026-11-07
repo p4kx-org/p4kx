@@ -33,7 +33,9 @@ try {
         Save-P4kxSandboxMountEvidence $platform $OutputDirectory
         Save-P4kxDocumentsSessionIdentity $OutputDirectory $build 'initial'
         $preserved = @(New-P4kxProfileSentinels (Join-Path $state.data_directory 'preserved-profile'))
-        & (Join-Path $PSScriptRoot 'check-package-runtime.ps1') -Target $Target -BinaryDirectory $state.binaries -FixtureDirectory $FixtureDirectory -OutputDirectory (Join-Path $OutputDirectory 'smoke') -Package flatpak -Launchers $state.launchers -ExpectedVersion $Version
+        $smoke = Join-Path $OutputDirectory 'smoke'
+        $launchers = Get-P4kxFlatpakLaunchers $platform $FixtureDirectory $smoke $state.data_directory
+        & (Join-Path $PSScriptRoot 'check-package-runtime.ps1') -Target $Target -BinaryDirectory $state.binaries -FixtureDirectory $FixtureDirectory -OutputDirectory $smoke -Package flatpak -Launchers $launchers -ExpectedVersion $Version
         $result = Get-Content -LiteralPath (Join-Path $OutputDirectory 'smoke/runtime.json') -Raw | ConvertFrom-Json
         Assert-P4kxLinuxPackageExecution $result $saved.producer $platform
         & (Join-Path $PSScriptRoot 'check-flatpak-documents.ps1') -Target $Target -FixtureDirectory $FixtureDirectory -DataDirectory $state.data_directory -OutputDirectory (Join-Path $OutputDirectory 'documents')

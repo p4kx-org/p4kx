@@ -154,7 +154,9 @@ package versions through a bounded probe. The [portal identity core](portal-alia
 documents the separate host-mapping and write-policy contracts. Native validation uses two
 isolated sessions: the stock API-4 session must reject normal Flatpak startup while preserving
 help/version, and a source-pinned API-5 session must pass the original packaged runtime checks
-and actual grants. The additional service binaries are disposable CI inputs, not package
+and actual grants. Package-smoke launchers bind their temporary writable permission to each
+session's actual output directory so the host can hash the extracted bytes. The additional
+service binaries are disposable CI inputs, not package
 payloads. Compilation, synthetic evidence tests and a recorded interface number do not by
 themselves establish real FUSE or package acceptance.
 

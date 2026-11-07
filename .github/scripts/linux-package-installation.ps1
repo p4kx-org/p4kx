@@ -68,6 +68,32 @@ function Install-P4kxDeb {
     return @{binaries='/usr/lib/p4kx'; launchers=$launchers}
 }
 
+<#
+.SYNOPSIS
+Builds temporary package-smoke launchers for one explicit host output directory.
+#>
+function Get-P4kxFlatpakLaunchers {
+    param($Platform, [string]$FixtureDirectory, [string]$CheckDirectory, [string]$DataDirectory)
+    $settings = Get-P4kxLinuxPackaging
+    $data = $DataDirectory
+    $drivers = @(Invoke-P4kxLinuxTool flatpak @('run', '--user', "--arch=$($Platform.unix_arch)", '--command=find', $settings.application_id, '/usr/lib', '-name', 'lvp_icd*.json', '-type', 'f'))
+    if ($drivers.Count -ne 1 -or -not [IO.Path]::IsPathFullyQualified($drivers[0]) -or $drivers[0] -match '[\r\n\0]') {
+        throw 'Flatpak native Mesa software driver is unavailable or ambiguous.'
+    }
+    $launchers = @{}
+    foreach ($binary in @('p4kx', 'p4kx-gui', 'p4kx-mcp')) {
+        $prefix = @(
+            'run', '--user', "--arch=$($Platform.unix_arch)", "--command=$binary",
+            "--env=P4KX_FOLDERS_ROOT=$data/native-package-smoke", '--env=P4KX_GAME_CHECK=off',
+            "--filesystem=$($FixtureDirectory):ro", "--filesystem=$($CheckDirectory):rw"
+        )
+        if ($binary -eq 'p4kx-gui') { $prefix += @('--env=P4KX_SMOKE_FRAMES=3', "--env=VK_DRIVER_FILES=$($drivers[0])", '--env=LIBGL_ALWAYS_SOFTWARE=1') }
+        $prefix += $settings.application_id
+        $launchers[$binary] = @{executable='flatpak'; prefix=$prefix}
+    }
+    return $launchers
+}
+
 function Install-P4kxFlatpak {
     param([string]$Asset, $Producer, $Platform, [string]$FixtureDirectory, [string]$CheckDirectory)
     Assert-P4kxDisposableLinuxRunner $Platform
@@ -88,21 +114,7 @@ function Install-P4kxFlatpak {
     Assert-P4kxFlatpakMetadata $metadata $Platform
     $data = (Invoke-P4kxLinuxTool flatpak @('run', '--user', "--arch=$($Platform.unix_arch)", '--command=printenv', $settings.application_id, 'XDG_DATA_HOME') | Out-String).Trim()
     if (-not [IO.Path]::IsPathFullyQualified($data)) { throw 'Flatpak did not provide an absolute writable application data directory.' }
-    $drivers = @(Invoke-P4kxLinuxTool flatpak @('run', '--user', "--arch=$($Platform.unix_arch)", '--command=find', $settings.application_id, '/usr/lib', '-name', 'lvp_icd*.json', '-type', 'f'))
-    if ($drivers.Count -ne 1 -or -not [IO.Path]::IsPathFullyQualified($drivers[0]) -or $drivers[0] -match '[\r\n\0]') {
-        throw 'Flatpak native Mesa software driver is unavailable or ambiguous.'
-    }
-    $launchers = @{}
-    foreach ($binary in @('p4kx', 'p4kx-gui', 'p4kx-mcp')) {
-        $prefix = @(
-            'run', '--user', "--arch=$($Platform.unix_arch)", "--command=$binary",
-            "--env=P4KX_FOLDERS_ROOT=$data/native-package-smoke", '--env=P4KX_GAME_CHECK=off',
-            "--filesystem=$($FixtureDirectory):ro", "--filesystem=$($CheckDirectory):rw"
-        )
-        if ($binary -eq 'p4kx-gui') { $prefix += @('--env=P4KX_SMOKE_FRAMES=3', "--env=VK_DRIVER_FILES=$($drivers[0])", '--env=LIBGL_ALWAYS_SOFTWARE=1') }
-        $prefix += $settings.application_id
-        $launchers[$binary] = @{executable='flatpak'; prefix=$prefix}
-    }
+    $launchers = Get-P4kxFlatpakLaunchers $Platform $FixtureDirectory $CheckDirectory $data
     return @{binaries=(Join-Path $location 'files/bin'); launchers=$launchers; installed_ref=$identity.reference; runtime_ref=$identity.runtime; data_directory=$data}
 }
 

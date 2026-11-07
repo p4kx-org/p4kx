@@ -21,6 +21,11 @@ mount inventory. A namespace alias does not require those path spellings to be i
 No host-spawn capability or broad filesystem grant is added. The same installed Flatpak/OSTree payload runs all six existing CLI/MCP/GUI runtime
 checks in this session.
 
+Each session builds package-smoke launchers with its actual host output directory. The fixture
+grant is read-only; the temporary writable grant covers that session's smoke directory, which
+exists before the first application starts. Stock and API5 use the same launcher builder with
+their respective output scopes. Host-side extracted-byte hashes remain required evidence.
+
 The controller starts `dbus-daemon --nofork --print-address=1` directly, with `--session` for the
 stock bus and the owned configuration for API5. It holds that exact process object and a separately
 started PowerShell worker. Both inherit the same isolated XDG and Flatpak directories. The worker
