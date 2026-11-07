@@ -15,6 +15,7 @@ const UNSAFE_MODULES: &[&str] = &[
     "crates/p4kx-msi-path/src/notification_windows.rs",
 ];
 const SAFE_MSI_LIBRARY: &str = "crates/p4kx-msi-path/src/lib.rs";
+const SAFE_MSI_FIXTURE: &str = "crates/p4kx-msi-path/examples/msi_registry_fixture.rs";
 
 /// Checks lint inheritance, approved unsafe leaves and unwinding profiles.
 pub(crate) fn check(root: &Path) -> Result<Vec<String>> {
@@ -120,7 +121,10 @@ fn names_unsafe_code(relative: &Path, text: &str) -> bool {
     {
         return false;
     }
-    if relative == Path::new(SAFE_MSI_LIBRARY) {
+    if [SAFE_MSI_LIBRARY, SAFE_MSI_FIXTURE]
+        .iter()
+        .any(|root| relative == Path::new(root))
+    {
         let Some((before, after)) = text.split_once("#![forbid(unsafe_code)]") else {
             return text.contains("unsafe_code");
         };
@@ -132,10 +136,11 @@ fn names_unsafe_code(relative: &Path, text: &str) -> bool {
 fn msi_source_contract(root: &Path) -> Result<Vec<String>> {
     let main = fs::read_to_string(root.join("crates/p4kx-msi-path/src/main.rs"))?;
     let library = fs::read_to_string(root.join(SAFE_MSI_LIBRARY))?;
-    Ok(msi_contract(&main, &library))
+    let fixture = fs::read_to_string(root.join(SAFE_MSI_FIXTURE))?;
+    Ok(msi_contract(&main, &library, &fixture))
 }
 
-fn msi_contract(main: &str, library: &str) -> Vec<String> {
+fn msi_contract(main: &str, library: &str, fixture: &str) -> Vec<String> {
     let mut violations = Vec::new();
     if !main
         .replace("\r\n", "\n")
@@ -143,11 +148,13 @@ fn msi_contract(main: &str, library: &str) -> Vec<String> {
     {
         violations.push("lints: the MSI notification leaf must be cfg(windows)".to_owned());
     }
-    if !library
-        .lines()
-        .any(|line| line.trim() == "#![forbid(unsafe_code)]")
-    {
-        violations.push("lints: the MSI library must forbid unsafe code".to_owned());
+    for (name, source) in [("library", library), ("native fixture", fixture)] {
+        if !source
+            .lines()
+            .any(|line| line.trim() == "#![forbid(unsafe_code)]")
+        {
+            violations.push(format!("lints: the MSI {name} must forbid unsafe code"));
+        }
     }
     violations
 }
@@ -303,20 +310,22 @@ mod tests {
     }
 
     #[test]
-    fn the_msi_library_can_only_strengthen_its_inherited_unsafe_lint() {
-        let path = Path::new(lints::SAFE_MSI_LIBRARY);
-        assert!(
-            !lints::names_unsafe_code(path, "#![forbid(unsafe_code)]"),
-            "the safe library explicitly forbids unsafe descendants"
-        );
-        assert!(
-            lints::names_unsafe_code(path, "#![forbid(unsafe_code)]\n#![expect(unsafe_code)]"),
-            "a second annotation cannot weaken the safe library"
-        );
-        assert!(
-            lints::names_unsafe_code(path, "#![expect(unsafe_code)]"),
-            "the library is not an approved native leaf"
-        );
+    fn the_msi_safe_roots_can_only_strengthen_their_inherited_unsafe_lint() {
+        for root in [lints::SAFE_MSI_LIBRARY, lints::SAFE_MSI_FIXTURE] {
+            let path = Path::new(root);
+            assert!(
+                !lints::names_unsafe_code(path, "#![forbid(unsafe_code)]"),
+                "the safe root explicitly forbids unsafe descendants"
+            );
+            assert!(
+                lints::names_unsafe_code(path, "#![forbid(unsafe_code)]\n#![expect(unsafe_code)]"),
+                "a second annotation cannot weaken the safe root"
+            );
+            assert!(
+                lints::names_unsafe_code(path, "#![expect(unsafe_code)]"),
+                "the safe root is not an approved native leaf"
+            );
+        }
     }
 
     #[test]
@@ -324,18 +333,23 @@ mod tests {
         let main = "#[cfg(windows)]\nmod notification_windows;";
         let library = "#![forbid(unsafe_code)]";
         assert!(
-            lints::msi_contract(main, library).is_empty(),
+            lints::msi_contract(main, library, library).is_empty(),
             "the exact Windows-only leaf leaves the library safe"
         );
         assert_eq!(
-            lints::msi_contract("mod notification_windows;", library).len(),
+            lints::msi_contract("mod notification_windows;", library, library).len(),
             1,
             "unconditional native registration is refused"
         );
         assert_eq!(
-            lints::msi_contract(main, "// #![forbid(unsafe_code)]").len(),
+            lints::msi_contract(main, "// #![forbid(unsafe_code)]", library).len(),
             1,
             "a commented-out lint cannot satisfy the contract"
+        );
+        assert_eq!(
+            lints::msi_contract(main, library, "// #![forbid(unsafe_code)]").len(),
+            1,
+            "the test example must independently forbid unsafe code"
         );
     }
 }

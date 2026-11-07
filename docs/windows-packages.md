@@ -79,6 +79,10 @@ assert those capabilities. Native CI/device run URLs must be retained with the f
 
 ## Release integration
 
+The private [raw Registry fixture](msi-native-fixture.md) is an opt-in verification example,
+separate from all application and installer payloads. Its raw observations and fixture resets
+cannot satisfy installer-preservation evidence by themselves.
+
 Contract fixtures, packaging stages, tools and runtime logs use a fresh `RUNNER_TEMP` task keyed
 by run, attempt, target and producer/consumer role, outside the cached Cargo build directory.
 Consumers require the complete producer matrix to succeed; missing artifacts still fail verification.

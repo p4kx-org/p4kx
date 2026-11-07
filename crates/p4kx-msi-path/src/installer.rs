@@ -55,6 +55,9 @@ mod registry_adapter;
 #[cfg(windows)]
 mod registry_store;
 
+#[cfg(all(windows, feature = "native-fixtures"))]
+pub use registry_store::native_fixture;
+
 #[cfg(test)]
 mod store_tests;
 #[cfg(test)]

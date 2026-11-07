@@ -7,6 +7,9 @@
 
 mod installer;
 
+#[cfg(all(windows, feature = "native-fixtures"))]
+pub use installer::native_fixture;
+
 pub use installer::api::{Error, execute};
 #[cfg(any(windows, test))]
 pub use installer::invocation_nonce::{InvocationNonce, NonceError};

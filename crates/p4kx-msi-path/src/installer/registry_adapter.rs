@@ -99,7 +99,7 @@ impl Store for Registry {
     }
 }
 
-fn stored(revision: &RegistrySnapshot) -> Result<Snapshot, Fault> {
+pub(super) fn stored(revision: &RegistrySnapshot) -> Result<Snapshot, Fault> {
     let state = match (&revision.state, &revision.sequence) {
         (None, None) => Snapshot {
             path: RawPath::Absent,

@@ -11,6 +11,14 @@ publish.workspace = true
 [package.metadata.p4kx]
 layer = "frontend"
 
+[features]
+native-fixtures = []
+
+[[example]]
+name = "p4kx-msi-registry-fixture"
+path = "examples/msi_registry_fixture.rs"
+required-features = ["native-fixtures"]
+
 [[bin]]
 name = "p4kx-msi-path"
 path = "src/main.rs"
@@ -23,6 +31,7 @@ winreg = { workspace = true, features = ["transactions"] }
 windows-sys = { workspace = true, features = ["Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
 
 [dev-dependencies]
+serde.workspace = true
 serde_json.workspace = true
 [lints.rust]
 missing_docs = "deny"

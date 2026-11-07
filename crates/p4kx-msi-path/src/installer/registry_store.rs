@@ -10,6 +10,10 @@ use winreg::{RegKey, RegValue};
 use crate::installer::binding;
 use crate::installer::sequence;
 
+#[cfg(feature = "native-fixtures")]
+#[path = "native_fixture.rs"]
+pub mod native_fixture;
+
 const ENVIRONMENT: &str = "Environment";
 const PATH_VALUE: &str = "Path";
 const STATE_KEY: &str = r"Software\P4KX-Installer\PathOwnership";

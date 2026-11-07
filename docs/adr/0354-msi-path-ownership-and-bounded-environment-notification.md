@@ -90,6 +90,14 @@ collection for the duration of `EnumWindows`.
 
 ## Integration evidence
 
+The default-off `native-fixtures` feature exposes a fixed-scope raw Registry test seam and the
+separately built `p4kx-msi-registry-fixture` Cargo example. It retains exact key/value existence,
+types and bytes, uses the production WAL decoder and requires acknowledged source-bound hosted
+runner context at capture and mutation boundaries. Both library and example roots must forbid
+unsafe code; the lint gate rejects weaker annotations in either. Its transactional compare/read-back
+contract does not establish native isolation or allocation bounds. The example is excluded from
+release payloads; [its evidence contract](../msi-native-fixture.md) requires separate native proof.
+
 Pure memory/codec tests establish state transitions and exact-byte preservation. Native signature
 compilation establishes type compatibility only. Registry transactions, native notification,
 hung receivers and MSI lifecycle behavior require separate disposable AMD64 and ARM64 runner
