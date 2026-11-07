@@ -57,6 +57,11 @@ v2 nonzero-encryption interpretation, Entry issues, checksum verification,
 installation flags or installed-byte progress. Local-header words, signatures,
 ordered extra blocks and complete layout/range metadata are separate field groups.
 
+`record_range()` retains the checked original record offset and length in the immediately
+owning source. Read its bytes through that Archive's bound metadata view, as described in
+[Archive source metadata](archive-source-metadata.md). These coordinates do not imply that
+the record was copied into an export artifact.
+
 ## Shared export representation
 
 `p4kx-extraction::EntryMetadataInfo::of(entry)` encodes the same directory facts

@@ -8,6 +8,7 @@ use std::time::SystemTime;
 
 use p4kx_foundation::ArchiveKey;
 
+use crate::archive_metadata::ArchiveMetadata;
 use crate::container::{self, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN};
 use crate::entry_identity::ContainerChain;
 use crate::format_error::FormatError;
@@ -20,6 +21,7 @@ use crate::{
 };
 
 mod key;
+mod metadata;
 
 /// The most decoded bytes [`Archive::open_entry_at`] skips in a compressed Entry to reach an offset.
 pub const MAX_DECODED_SKIP: u64 = 1 << 30;
@@ -38,6 +40,7 @@ pub struct Archive {
     entries: Vec<Entry>,
     log: IssueLog,
     installation_flags: Option<u8>,
+    metadata: ArchiveMetadata,
     build: Option<Build>,
     key: KeySlot,
 }
@@ -89,6 +92,7 @@ impl Archive {
             entries,
             log,
             installation_flags,
+            metadata,
         } = directory.map_err(|error| error.at(path))?;
         let build = path
             .parent()
@@ -105,6 +109,7 @@ impl Archive {
             entries,
             log,
             installation_flags,
+            metadata,
             build,
             key: KeySlot::with(options.key),
         })
@@ -139,6 +144,7 @@ impl Archive {
                     entries,
                     log,
                     installation_flags,
+                    metadata,
                 },
             )) => Ok(Self {
                 path: self.path.clone(),
@@ -152,6 +158,7 @@ impl Archive {
                 entries,
                 log,
                 installation_flags,
+                metadata,
                 build: self.build.clone(),
                 key: self.key.clone(),
             }),

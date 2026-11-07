@@ -3,15 +3,18 @@
 
 use p4kx_foundation::{ByteReader, ParseError};
 
+use crate::archive_metadata::ArchiveMetadata;
 use crate::entry::stated_sha256;
+use crate::extra_block_header::ExtraBlockHeader;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog, decode_path};
+use crate::metadata_range::MetadataRange;
 use crate::{
     Checksum, Compression, DosTimestamp, Entry, EntryIssue, EntryMetadata, ZipHeaderMetadata,
 };
 
 const CENTRAL_HEADER_SIGNATURE: u32 = 0x0201_4B50;
-const CENTRAL_HEADER_LEN: usize = 46;
+pub(crate) const CENTRAL_HEADER_LEN: usize = 46;
 const ZIP64_MARKER_32: u32 = 0xFFFF_FFFF;
 const BLOCK_ZIP64: u16 = 0x0001;
 const BLOCK_CIG_ENCRYPTION: u16 = 0x5002;
@@ -37,6 +40,7 @@ struct FixedFields {
 struct RecordPosition {
     index: usize,
     original_directory_ordinal: Option<u64>,
+    source_len: u64,
 }
 
 struct ExtraFields {
@@ -49,7 +53,12 @@ struct ExtraFields {
 }
 
 /// Parses `count` Entries from the central directory bytes, which start at file offset `base`.
-pub(crate) fn parse_entries(bytes: &[u8], base: u64, count: u64) -> Result<Directory, FormatError> {
+pub(crate) fn parse_entries(
+    bytes: &[u8],
+    base: u64,
+    count: u64,
+    metadata: ArchiveMetadata,
+) -> Result<Directory, FormatError> {
     let mut reader = ByteReader::with_base(bytes, base);
     let capacity = usize::try_from(count)
         .unwrap_or(0)
@@ -60,6 +69,7 @@ pub(crate) fn parse_entries(bytes: &[u8], base: u64, count: u64) -> Result<Direc
         let position = RecordPosition {
             index: entries.len(),
             original_directory_ordinal: Some(ordinal),
+            source_len: metadata.source_len(),
         };
         let entry = parse_entry(&mut reader, position, &mut log)?;
         entries.push(entry);
@@ -68,6 +78,7 @@ pub(crate) fn parse_entries(bytes: &[u8], base: u64, count: u64) -> Result<Direc
         entries,
         log,
         installation_flags: None,
+        metadata,
     })
 }
 
@@ -85,11 +96,13 @@ pub(crate) fn parse_header<'a>(
     base: u64,
     index: usize,
     log: &mut IssueLog,
+    source_len: u64,
 ) -> Result<ParsedHeader<'a>, FormatError> {
     let mut reader = ByteReader::with_base(bytes, base);
     let position = RecordPosition {
         index,
         original_directory_ordinal: None,
+        source_len,
     };
     let (entry, name, zip64_block) = parse_entry_parts(&mut reader, position, log)?;
     let len = bytes.len() - reader.remaining();
@@ -117,6 +130,7 @@ fn parse_entry_parts<'a>(
     let RecordPosition {
         index,
         original_directory_ordinal,
+        source_len,
     } = position;
     let offset = reader.offset();
     let fixed = read_fixed_fields(reader, offset)?;
@@ -126,6 +140,11 @@ fn parse_entry_parts<'a>(
     let extra = reader.read_bytes(fixed.extra_len)?;
     reader.skip(fixed.comment_len)?;
     let extra = parse_extra(extra, extra_offset, &fixed, index, log)?;
+    let record_len = reader
+        .offset()
+        .checked_sub(offset)
+        .ok_or_else(|| FormatError::corrupt(offset, "directory-record range underflows"))?;
+    let record = MetadataRange::checked(offset, record_len, source_len)?;
     let zip64_block = extra.zip64_block;
     let entry = Entry {
         metadata: EntryMetadata::from_zip(
@@ -133,6 +152,7 @@ fn parse_entry_parts<'a>(
             fixed.method,
             original_directory_ordinal,
             fixed.header,
+            record,
         ),
         path,
         compressed_size: extra.compressed_size,
@@ -194,6 +214,21 @@ fn read_fixed_fields(reader: &mut ByteReader<'_>, offset: u64) -> Result<FixedFi
     })
 }
 
+pub(crate) struct RecordLengths {
+    pub(crate) name: usize,
+    pub(crate) extra: usize,
+    pub(crate) comment: usize,
+}
+
+pub(crate) fn record_lengths(bytes: &[u8], offset: u64) -> Result<RecordLengths, FormatError> {
+    let fixed = read_fixed_fields(&mut ByteReader::with_base(bytes, offset), offset)?;
+    Ok(RecordLengths {
+        name: fixed.name_len,
+        extra: fixed.extra_len,
+        comment: fixed.comment_len,
+    })
+}
+
 fn parse_extra(
     extra: &[u8],
     base: u64,
@@ -212,10 +247,10 @@ fn parse_extra(
     let mut reader = ByteReader::with_base(extra, base);
     while reader.remaining() >= BLOCK_HEADER_LEN {
         let block_offset = reader.offset();
-        let id = reader.read_u16()?;
-        let stored_len = reader.read_u16()?;
-        let len = usize::from(stored_len);
-        let data_len = len.checked_sub(BLOCK_HEADER_LEN).ok_or_else(|| {
+        let header = ExtraBlockHeader::read(&mut reader)?;
+        let id = header.id();
+        let stored_len = header.declared_len();
+        let data_len = header.body_len().ok_or_else(|| {
             FormatError::corrupt(
                 block_offset,
                 format!("extra block 0x{id:04X} is shorter than its header"),

@@ -4,6 +4,7 @@
 //! Integration tests of `p4kx-archive`, built as one test binary.
 
 mod archive_key;
+mod archive_metadata;
 mod build;
 mod container_limits;
 mod containers;

@@ -3,10 +3,12 @@
 
 use p4kx_foundation::ByteReader;
 
+use crate::archive_metadata::ArchiveMetadata;
 use crate::directory_v2_trailer::{RECORD_LEN, TRAILER_LEN, Trailer};
 use crate::entry::stated_sha256;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog, decode_path};
+use crate::metadata_range::MetadataRange;
 use crate::source::Source;
 use crate::{Checksum, Compression, DosTimestamp, Entry, EntryIssue, EntryMetadata};
 
@@ -51,6 +53,7 @@ pub(crate) fn read_entries(
             &names,
             (entries.len(), data_limit),
             &mut log,
+            source.len(),
         )?;
         let installed_bytes = installed.read_u64()?;
         if installed_bytes > entry.compressed_size {
@@ -67,6 +70,7 @@ pub(crate) fn read_entries(
         entries,
         log,
         installation_flags: Some(trailer.flags),
+        metadata: ArchiveMetadata::v2(source.len(), trailer),
     })
 }
 
@@ -99,6 +103,7 @@ fn parse_record(
     names: &[u8],
     at: (usize, u64),
     log: &mut IssueLog,
+    source_len: u64,
 ) -> Result<Entry, FormatError> {
     let (index, data_limit) = at;
     let mut reader = ByteReader::with_base(record, offset);
@@ -133,6 +138,7 @@ fn parse_record(
             method,
             ordinal,
             encryption,
+            MetadataRange::checked(offset, RECORD_LEN as u64, source_len)?,
         ),
         path: read_name(names, name_offset, offset, index, log)?,
         compressed_size,

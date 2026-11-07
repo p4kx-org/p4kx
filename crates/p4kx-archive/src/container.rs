@@ -62,6 +62,7 @@ pub(crate) fn admit(directory: Directory, source: &Source) -> Result<Directory, 
         entries,
         log,
         installation_flags,
+        metadata,
     } = directory;
     let mut admitted = Vec::with_capacity(entries.len());
     let mut kept = IssueLog::default();
@@ -99,6 +100,7 @@ pub(crate) fn admit(directory: Directory, source: &Source) -> Result<Directory, 
         entries: admitted,
         log: kept,
         installation_flags,
+        metadata,
     })
 }
 

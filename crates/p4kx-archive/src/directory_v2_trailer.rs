@@ -5,29 +5,17 @@ use p4kx_foundation::ByteReader;
 
 use crate::format_error::FormatError;
 use crate::layout;
+use crate::metadata_range::MetadataRange;
+use crate::metadata_tables::{FREE_RECORD_BYTES, V2_PROGRESS_BYTES};
 use crate::source::Source;
+
+pub(crate) use crate::v2_directory_metadata::V2DirectoryMetadata as Trailer;
 
 pub(crate) const TRAILER_LEN: usize = 175;
 pub(crate) const RECORD_LEN: usize = 204;
-const PROGRESS_BYTES: u64 = 8;
-const FREELIST_BYTES: u64 = 16;
-const CACHE_AND_SECTOR_BYTES: usize = 24;
+const PROGRESS_BYTES: u64 = V2_PROGRESS_BYTES as u64;
+const FREELIST_BYTES: u64 = FREE_RECORD_BYTES as u64;
 const INCOMPLETE_FLAG: u8 = 1;
-
-/// The separate base and extension declarations of a v2 directory.
-pub(crate) struct Trailer {
-    base_count: u64,
-    extension_count: u64,
-    pub(crate) directory_offset: u64,
-    base_directory_size: u64,
-    extension_directory_size: u64,
-    pub(crate) names_offset: u64,
-    base_names_size: u64,
-    extension_names_size: u64,
-    pub(crate) payload_end: u64,
-    freelist_count: u64,
-    pub(crate) flags: u8,
-}
 
 impl Trailer {
     /// Reads and validates all directory ranges before their contents are allocated.
@@ -38,24 +26,31 @@ impl Trailer {
     ) -> Result<Self, FormatError> {
         let bytes = source.read_at(offset, TRAILER_LEN)?;
         let mut reader = ByteReader::with_base(&bytes, offset);
-        let trailer = Self {
-            base_count: reader.read_u64()?,
-            extension_count: reader.read_u64()?,
-            directory_offset: reader.read_u64()?,
-            base_directory_size: reader.read_u64()?,
-            extension_directory_size: reader.read_u64()?,
-            names_offset: reader.read_u64()?,
-            base_names_size: reader.read_u64()?,
-            extension_names_size: reader.read_u64()?,
-            payload_end: reader.read_u64()?,
-            freelist_count: reader.read_u64()?,
-            flags: {
-                reader.skip(CACHE_AND_SECTOR_BYTES)?;
-                reader.read_bytes(1)?.first().copied().ok_or_else(|| {
+        let trailer =
+            Self {
+                base_count: reader.read_u64()?,
+                extension_count: reader.read_u64()?,
+                directory_offset: reader.read_u64()?,
+                base_directory_size: reader.read_u64()?,
+                extension_directory_size: reader.read_u64()?,
+                names_offset: reader.read_u64()?,
+                base_names_size: reader.read_u64()?,
+                extension_names_size: reader.read_u64()?,
+                payload_end: reader.read_u64()?,
+                freelist_count: reader.read_u64()?,
+                trie_offset: reader.read_u64()?,
+                trie_size: reader.read_u64()?,
+                sector_size: reader.read_u64()?,
+                flags: reader.read_bytes(1)?.first().copied().ok_or_else(|| {
                     FormatError::corrupt(offset, "v2 installation status is cut off")
-                })?
-            },
-        };
+                })?,
+                layout_version: {
+                    reader.skip(64)?;
+                    reader.read_u16()?
+                },
+                magic: reader.read_u32()?,
+                trailer: MetadataRange::checked(offset, TRAILER_LEN as u64, source.len())?,
+            };
         trailer.validate(offset, max_entries)?;
         Ok(trailer)
     }

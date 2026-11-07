@@ -3,6 +3,7 @@
 
 use crate::dos_timestamp::DosTimestamp;
 use crate::entry_record_format::EntryRecordFormat;
+use crate::metadata_range::MetadataRange;
 use crate::zip_header_metadata::ZipHeaderMetadata;
 
 /// Read-only source metadata from the Entry's directory record.
@@ -12,6 +13,7 @@ pub struct EntryMetadata {
     original_directory_ordinal: Option<u64>,
     raw_compression_method: u16,
     header: RecordHeader,
+    record: MetadataRange,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,12 +28,14 @@ impl EntryMetadata {
         raw_compression_method: u16,
         original_directory_ordinal: Option<u64>,
         header: ZipHeaderMetadata,
+        record: MetadataRange,
     ) -> Self {
         Self {
             dos_timestamp,
             original_directory_ordinal,
             raw_compression_method,
             header: RecordHeader::ZipCentralDirectory(header),
+            record,
         }
     }
 
@@ -40,12 +44,14 @@ impl EntryMetadata {
         raw_compression_method: u16,
         original_directory_ordinal: u64,
         encryption: u16,
+        record: MetadataRange,
     ) -> Self {
         Self {
             dos_timestamp,
             original_directory_ordinal: Some(original_directory_ordinal),
             raw_compression_method,
             header: RecordHeader::P4kV2 { encryption },
+            record,
         }
     }
 
@@ -53,6 +59,12 @@ impl EntryMetadata {
     #[must_use]
     pub const fn dos_timestamp(&self) -> DosTimestamp {
         self.dos_timestamp
+    }
+
+    /// Returns original directory-record coordinates, without a raw-retention claim.
+    #[must_use]
+    pub const fn record_range(&self) -> MetadataRange {
+        self.record
     }
 
     /// Returns the physical directory-record format supplying these facts.
