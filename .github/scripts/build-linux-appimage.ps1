@@ -11,6 +11,7 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'linux-payload.ps1')
 . (Join-Path $PSScriptRoot 'linux-shared-libraries.ps1')
+. (Join-Path $PSScriptRoot 'linux-source-tree.ps1')
 $platform = Get-P4kxLinuxPlatform -Target $Target
 $settings = Get-P4kxLinuxPackaging
 $name = Get-P4kxAssetName -Target $Target -Version $Version -Package app-image
@@ -37,7 +38,7 @@ foreach ($library in @(
 Invoke-P4kxLinuxTool (Join-Path $ToolsDirectory "linuxdeploy-$($platform.unix_arch).AppImage") $deploy.ToArray() | Out-Null
 $sourceRoot = Join-Path $StagingDirectory 'corresponding-source'
 New-Item -ItemType Directory -Force -Path $sourceRoot | Out-Null
-Copy-Item -LiteralPath (Join-Path $RuntimeDirectory 'sources') -Destination (Join-Path $sourceRoot 'runtime') -Recurse
+Copy-P4kxLinuxSourceTree -Source (Join-Path $RuntimeDirectory 'sources') -Destination (Join-Path $sourceRoot 'runtime')
 Copy-Item -LiteralPath (Join-Path $RuntimeDirectory 'runtime-inventory.json') -Destination $sourceRoot
 Copy-Item -LiteralPath (Join-Path $RuntimeDirectory 'licences') -Destination (Join-Path $sourceRoot 'licences') -Recurse
 Copy-Item -LiteralPath (Join-Path $RuntimeDirectory 'licences') -Destination (Join-Path $appDir 'usr/share/licenses/appimage-runtime') -Recurse

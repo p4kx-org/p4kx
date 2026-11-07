@@ -50,6 +50,7 @@ jobs:
       - name: Verify Linux package and ABI contracts
         run: |
           .github/scripts/test-build-tools-output.ps1 -Directory target/build-tool-output-contract-check
+          .github/scripts/test-linux-source-tree.ps1 -Directory target/linux-source-tree-contract-check
           .github/scripts/test-linux-package-contract.ps1 -Directory target/linux-contract-check
           python3 -B packaging/linux/runtime/test_collect_sources.py --directory target/linux-source-contract-check
           if ($LASTEXITCODE -ne 0) { throw 'Native runtime source inventory contract failed.' }

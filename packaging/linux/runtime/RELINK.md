@@ -22,6 +22,12 @@ runtime tree also records the executed workspace/link-map changes. Build with th
 `RUNTIME_COMMIT` Docker build arguments. Use a native CPU matching the supplied package.
 The build scripts and source archives document every installed static library.
 
+Retained build trees preserve symbolic links as links, including absolute paths into the original
+container workspace and links whose targets are absent outside it. Source packaging does not follow
+those links or collect external files. The verified source archives, original patches and build
+recipes are regular retained inputs; reconstruct the recorded container context to regenerate its
+workspace links before rebuilding, rather than dereferencing a host-extracted build tree.
+
 `dependency-build` contains the actual verified libfuse/squashfuse input archives, their unpacked
 and patched build trees, static build outputs and the original upstream installer recipe.
 The executed installer keeps the same download/digest checks and build commands while retaining
