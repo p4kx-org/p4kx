@@ -150,6 +150,12 @@ impl EntryFailure {
         &self.error
     }
 
+    /// Returns the original typed failure without copying or decoding the source again.
+    #[must_use]
+    pub fn into_error(self) -> ExtractionError {
+        self.error
+    }
+
     /// Returns the stored and the computed checksum when the Entry failed because its data does
     /// not match the checksum of the directory.
     #[must_use]
@@ -202,6 +208,12 @@ impl ExtractionReport {
     #[must_use]
     pub fn failures(&self) -> &[EntryFailure] {
         &self.failures
+    }
+
+    /// Returns the owned Entry failures, preserving their original typed causes.
+    #[must_use]
+    pub fn into_failures(self) -> Vec<EntryFailure> {
+        self.failures
     }
 
     /// Returns the Entries among the [`failures`](Self::failures) whose data did not match the
