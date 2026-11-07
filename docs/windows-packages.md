@@ -96,6 +96,36 @@ never drops empty segments or normalises case, trailing separators or variable r
 `test-msi-path.ps1` exercises these distinctions without writing the registry or installing a
 package. Actual preservation remains a native hosted-runner gate.
 
+The separate prepend hypothesis uses `build-msi.ps1 -UserPathPart first`. Normal packages retain
+the default `last` operation. Probe MSIs and their `.probe.json` bindings belong only to validation
+artifacts; each binding requires the exact source revision, target, version, operation and MSI
+SHA-256. The probe cannot satisfy release runtime evidence or change the released operation.
+
+`check-msi-path-probe.ps1` runs the complete modern lifecycle against the host's exact original
+PATH, plus eight install/uninstall cases: plain, leading, trailing and doubled separators in
+`ExpandString`; a plain `String`; both kinds of explicit empty string; and an absent value. Each
+case retains its own raw baseline and result. Failures do not skip the remaining cases. Ownership
+cleanup must succeed before any separate fixture reset, and reset records do not count as installer
+preservation. The writer is limited to the hosted runner's user `Environment\Path` value.
+
+AMD64 first calibrates the exact historical 0.2.0 MSI with install/uninstall and records its observed
+cleanup rest. The historical rename-upgrade case compares against that rest. Any difference between
+the pre-legacy original and the calibration rest is separately reported as a legacy prior mutation;
+it is never relabelled as preservation by the current MSI. The modern lifecycle still compares with
+its own exact original baseline. Restoring a closed fixture between scenarios is a separately logged
+test action, after all current and historical ownership has gone.
+If calibration is unavailable or fails, its original failure remains in the report and final
+aggregate; only the dependent historical upgrade is skipped. The modern lifecycle and all eight
+raw-value cases still run after successful ownership cleanup and fixture reset. Unresolved
+ownership aborts further mutation.
+
+The invocation contract executes the run-all and cleanup paths with mocked registry/installer
+operations. The packaging contract compiles both append and prepend Environment rows for both
+CPUs, reads the MSI databases and rejects mismatched probe bindings without installing software.
+These checks establish probe correctness; only the native hosted-runner results can confirm or
+disprove the prepend hypothesis. Leading separators, empty values and registry kinds remain exact
+requirements even when they disprove it.
+
 `release-windows.yml` consumes the Windows rows of `.config/platforms.json`. Each native producer
 builds three release applications and a next-version MSI, generates target-filtered CycloneDX
 SBOMs including any Microsoft runtime files, and uploads `windows-build-<target>`. A separate

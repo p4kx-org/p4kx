@@ -46,6 +46,7 @@ function Get-P4kxMsiMetadata {
             sequence=@(Read-P4kxMsiRows $database 'SELECT `Action`, `Sequence` FROM `InstallExecuteSequence`' 2)
             directories=@(Read-P4kxMsiRows $database 'SELECT `Directory` FROM `Directory`' 1 | ForEach-Object { $_[0] })
             registry=@(Read-P4kxMsiRows $database 'SELECT `Root`, `Key`, `Name` FROM `Registry`' 3)
+            environment=@(Read-P4kxMsiRows $database 'SELECT `Name`, `Value`, `Component_` FROM `Environment`' 3)
         }
     }
     finally { Close-P4kxComObject $summary; Close-P4kxComObject $database; Close-P4kxComObject $installer }

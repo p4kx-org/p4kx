@@ -42,8 +42,13 @@ function Assert-P4kxInstalledProduct {
 
 function Assert-P4kxUninstalled {
     param([string]$UpgradeCode, [string]$Folder, [string]$Shortcut, $OriginalPath)
+    Assert-P4kxInstallationOwnershipAbsent $UpgradeCode $Folder $Shortcut
+    Assert-P4kxPathRestored $OriginalPath (Get-P4kxUserPathState)
+}
+
+function Assert-P4kxInstallationOwnershipAbsent {
+    param([string]$UpgradeCode, [string]$Folder, [string]$Shortcut)
     if (@(Get-P4kxInstalledProducts $UpgradeCode).Count -ne 0 -or
         (Test-Path -LiteralPath $Folder) -or (Test-Path -LiteralPath $Shortcut) -or
         (Test-Path 'HKCU:\Software\P4KX')) { throw 'MSI left behind installation ownership.' }
-    Assert-P4kxPathRestored $OriginalPath (Get-P4kxUserPathState)
 }

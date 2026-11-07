@@ -16,16 +16,21 @@ The MSI to write.
 
 .PARAMETER BinaryFolder
 The prepared native MSI payload, including its distribution identity and runtime inventory.
+
+.PARAMETER UserPathPart
+The Environment operation; first builds an explicitly bound diagnostic probe.
 #>
 param(
     [Parameter(Mandatory)] [string] $Wix,
     [Parameter(Mandatory)] [string] $Target,
     [Parameter(Mandatory)] [string] $Version,
     [Parameter(Mandatory)] [string] $Output,
-    [Parameter(Mandatory)] [string] $BinaryFolder
+    [Parameter(Mandatory)] [string] $BinaryFolder,
+    [ValidateSet('last', 'first')] [string] $UserPathPart = 'last'
 )
 
 $ErrorActionPreference = 'Stop'
+$UserPathPart = $UserPathPart.ToLowerInvariant()
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'binary-machine.ps1')
 . (Join-Path $PSScriptRoot 'windows-runtime.ps1')
@@ -65,6 +70,7 @@ $files = @(for ($index = 0; $index -lt $runtimeFiles.Count; $index++) {
     -d "Version=$Version" `
     -d "ApplicationGuid=$($guids[0])" `
     -d "ShortcutGuid=$($guids[1])" `
+    -d "UserPathPart=$UserPathPart" `
     -d "BinaryFolder=$(Resolve-Path $BinaryFolder)" `
     -d "RepositoryFolder=$repository" `
     -o $Output
@@ -72,3 +78,11 @@ if ($LASTEXITCODE -ne 0) { throw "wix build failed with exit code $LASTEXITCODE"
 
 & $Wix msi validate -acceptEula wix7 $Output
 if ($LASTEXITCODE -ne 0) { throw "wix msi validate failed with exit code $LASTEXITCODE" }
+
+if ($UserPathPart -ceq 'first') {
+    [ordered]@{
+        schema_version=1; role='prepend_hypothesis'; target=$Target; version=$Version
+        path_part=$UserPathPart; revision=$env:GITHUB_SHA
+        msi_sha256=(Get-FileHash -LiteralPath $Output -Algorithm SHA256).Hash.ToLowerInvariant()
+    } | ConvertTo-Json | Set-Content -LiteralPath "$Output.probe.json" -Encoding utf8NoBOM
+}

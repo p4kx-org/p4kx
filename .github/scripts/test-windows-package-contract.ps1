@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'msi-database.ps1')
 . (Join-Path $PSScriptRoot 'windows-runtime.ps1')
+. (Join-Path $PSScriptRoot 'test-msi-path-authoring.ps1')
 New-Item -ItemType Directory -Force -Path $Directory | Out-Null
 $upgrade = '090C8F25-8543-42F0-B40A-1514653149F9'
 $metadata = @()
@@ -48,6 +49,7 @@ foreach ($row in (Get-P4kxPlatformContract).targets | Where-Object os -EQ window
     & (Join-Path $PSScriptRoot 'build-msi.ps1') -Wix $Wix -Target $row.target -Version '0.5.0' -Output $msi -BinaryFolder $folder
     $info = Get-P4kxMsiMetadata $msi
     Assert-P4kxMsiMetadata $info $row '0.5.0' $upgrade
+    Test-P4kxMsiPathAuthoring $Wix $row $folder $upgrade $info
     if ('vcruntime140.dll' -cnotin $info.files) { throw 'Runtime DLL was not included in the MSI.' }
     $metadata += $info
     $original = $info.template
@@ -67,4 +69,4 @@ foreach ($row in (Get-P4kxPlatformContract).targets | Where-Object os -EQ window
 foreach ($component in $metadata[0].components) {
     if ($component[0] -in @($metadata[1].components | ForEach-Object { $_[0] })) { throw 'MSI component identities collide across CPUs.' }
 }
-'PASS: both MSI schemas and bundled DLLs; CPU/runtime-inventory rejection; disjoint component identities; rollback probe construction. No MSI installed.'
+'PASS: both MSI schemas and bundled DLLs; CPU/runtime-inventory rejection; disjoint identities; rollback and exact append/prepend authoring; probe binding rejection. No MSI installed.'

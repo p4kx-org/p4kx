@@ -6,6 +6,7 @@ $root = [IO.Path]::GetFullPath($Directory)
 if (Test-Path -LiteralPath $root) { throw 'MSI invocation test directory must be new.' }
 New-Item -ItemType Directory -Path $root | Out-Null
 & (Join-Path $PSScriptRoot 'test-msi-path.ps1') -Directory (Join-Path $root 'path-contract')
+& (Join-Path $PSScriptRoot 'test-msi-path-probe.ps1') -Directory (Join-Path $root 'path-probe-contract')
 $payload = Join-Path $root 'payload with spaces/Ü雪/package.msi'
 New-Item -ItemType Directory -Path (Split-Path -Parent $payload) -Force | Out-Null
 [IO.File]::WriteAllText($payload, 'synthetic MSI path fixture, never installed')
