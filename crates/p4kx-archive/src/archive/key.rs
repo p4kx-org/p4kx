@@ -131,8 +131,14 @@ impl Archive {
     pub(super) fn key_for(&self, entry: &Entry) -> Result<Option<ArchiveKey>, ArchiveError> {
         let key = self.resolve_key(entry);
         match &key {
-            Err(ArchiveError::KeyRequired { .. }) => self.key.demand().record_missing(&entry.path),
-            Err(ArchiveError::WrongKey { .. }) => self.key.demand().record_wrong(&entry.path),
+            Err(ArchiveError::KeyRequired { .. }) => self
+                .key
+                .demand()
+                .record_missing(&self.container_chain.entry(entry.index), &entry.path),
+            Err(ArchiveError::WrongKey { .. }) => self
+                .key
+                .demand()
+                .record_wrong(&self.container_chain.entry(entry.index), &entry.path),
             _ => {}
         }
         key

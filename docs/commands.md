@@ -797,6 +797,9 @@ that says how to give it. A tool that works around the gap and returns a result 
 Entries it could not read adds a text block that says how many and how to give the key, and sets
 `_meta.archive_key` (`missing` or `wrong`) and `_meta.encrypted_entries_unread` on the result. With
 a key set, a result of a tool that read an Archive carries `_meta.archive_key` `given` and no text.
+Physical Entries are identified by their directory position and complete containing Entry chain.
+Identical paths at different positions count separately; one Entry encountered under both a missing
+and a wrong key contributes once to the distinct total.
 The count is of the distinct Entries asked for while that call ran, so it does not repeat an
 earlier call's; a call running at the same time on the same Archive counts into it too. A result
 the server keeps across calls (the audio index, the Loadout trees) remembers how the key served

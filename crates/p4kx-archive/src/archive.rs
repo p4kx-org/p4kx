@@ -9,6 +9,7 @@ use std::time::SystemTime;
 use p4kx_foundation::ArchiveKey;
 
 use crate::container::{self, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN};
+use crate::entry_identity::ContainerChain;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog};
 use crate::key_slot::KeySlot;
@@ -28,6 +29,7 @@ pub const MAX_DECODED_SKIP: u64 = 1 << 30;
 pub struct Archive {
     path: PathBuf,
     location: PathBuf,
+    container_chain: ContainerChain,
     file_len: u64,
     file_modified: Option<SystemTime>,
     depth: usize,
@@ -94,6 +96,7 @@ impl Archive {
         Ok(Self {
             path: path.to_path_buf(),
             location: path.to_path_buf(),
+            container_chain: ContainerChain::default(),
             file_len: source.len(),
             file_modified: source.modified(),
             depth: 0,
@@ -140,6 +143,7 @@ impl Archive {
             )) => Ok(Self {
                 path: self.path.clone(),
                 location,
+                container_chain: self.container_chain.child(entry.index),
                 file_len: self.file_len,
                 file_modified: self.file_modified,
                 depth: self.depth + 1,

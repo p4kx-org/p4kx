@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError};
+
+use crate::entry_identity::PhysicalEntryId;
+use crate::key_demand_counts::{KeyDemandCounts, KeyFailure, UnreadEntries};
 
 /// The encrypted Entries of an Archive that were asked for while no key was set or the one set did
 /// not fit.
 ///
 /// A handle shares its record with the [`Archive`](crate::Archive) it came from and with the
 /// containers opened from it; clones share it too. The record is never reset, neither by reading
-/// nor by setting or clearing the key: it counts every distinct Entry since the Archive was opened.
+/// nor by setting or clearing the key: it counts every distinct physical Entry since opening.
 /// A [`DemandScope`] counts the same events from the moment it is opened.
 #[derive(Debug, Clone, Default)]
 pub struct KeyDemand {
@@ -18,78 +20,14 @@ pub struct KeyDemand {
 
 #[derive(Debug, Default)]
 struct Record {
-    total: Counts,
+    total: KeyDemandCounts,
     next_scope: u64,
-    scopes: Vec<(u64, Counts)>,
-}
-
-#[derive(Debug, Default)]
-struct Counts {
-    missing: Unread,
-    wrong: Unread,
-}
-
-impl Counts {
-    fn snapshot(&self) -> KeyDemandSnapshot {
-        KeyDemandSnapshot {
-            missing: self.missing.paths.len(),
-            wrong: self.wrong.paths.len(),
-            first_missing: self.missing.first.clone(),
-            first_wrong: self.wrong.first.clone(),
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-struct Unread {
-    paths: HashSet<String>,
-    first: Option<String>,
-}
-
-impl Unread {
-    fn add(&mut self, path: &str) {
-        if self.paths.insert(path.to_owned()) && self.first.is_none() {
-            self.first = Some(path.to_owned());
-        }
-    }
-}
-
-/// The distinct encrypted Entries a [`DemandScope`] saw asked for without a usable key, by path,
-/// for counting the Entries of several records once.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct UnreadEntries {
-    missing: HashSet<String>,
-    wrong: HashSet<String>,
-}
-
-impl UnreadEntries {
-    /// Adds the Entries of `other`.
-    pub fn union(&mut self, other: &Self) {
-        self.missing.extend(other.missing.iter().cloned());
-        self.wrong.extend(other.wrong.iter().cloned());
-    }
-
-    /// Returns how many distinct Entries were asked for while no key was set.
-    #[must_use]
-    pub fn missing(&self) -> usize {
-        self.missing.len()
-    }
-
-    /// Returns how many distinct Entries were asked for with a key that does not fit.
-    #[must_use]
-    pub fn wrong(&self) -> usize {
-        self.wrong.len()
-    }
-
-    /// Returns how many distinct Entries could not be read, for either reason.
-    #[must_use]
-    pub fn unread(&self) -> usize {
-        self.missing().saturating_add(self.wrong())
-    }
+    scopes: Vec<(u64, KeyDemandCounts)>,
 }
 
 /// What a [`KeyDemand`] recorded at one moment.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct KeyDemandSnapshot {
     /// The distinct encrypted Entries that were asked for while no key was set.
     pub missing: usize,
@@ -99,31 +37,32 @@ pub struct KeyDemandSnapshot {
     pub first_missing: Option<String>,
     /// The path of the first Entry counted in `wrong`.
     pub first_wrong: Option<String>,
+    pub(crate) distinct_unread: usize,
 }
 
 impl KeyDemandSnapshot {
     /// Returns how many distinct encrypted Entries could not be read, for either reason.
+    /// An Entry encountered under both causes counts once.
     #[must_use]
     pub const fn unread(&self) -> usize {
-        self.missing.saturating_add(self.wrong)
+        self.distinct_unread
     }
 }
 
 impl KeyDemand {
-    pub(crate) fn record_missing(&self, path: &str) {
-        self.record(path, |counts| &mut counts.missing);
+    pub(crate) fn record_missing(&self, entry: &PhysicalEntryId, path: &str) {
+        self.record(entry, path, KeyFailure::Missing);
     }
 
-    pub(crate) fn record_wrong(&self, path: &str) {
-        self.record(path, |counts| &mut counts.wrong);
+    pub(crate) fn record_wrong(&self, entry: &PhysicalEntryId, path: &str) {
+        self.record(entry, path, KeyFailure::Wrong);
     }
 
-    /// Adds `path` to the total and to every open scope, in the set `select` picks.
-    fn record(&self, path: &str, select: impl Fn(&mut Counts) -> &mut Unread) {
+    fn record(&self, entry: &PhysicalEntryId, path: &str, cause: KeyFailure) {
         self.lock(|record| {
-            select(&mut record.total).add(path);
+            record.total.add(entry, path, cause);
             for (_, counts) in &mut record.scopes {
-                select(counts).add(path);
+                counts.add(entry, path, cause);
             }
         });
     }
@@ -145,7 +84,9 @@ impl KeyDemand {
     pub fn scope(&self) -> DemandScope {
         let id = self.lock(|record| {
             record.next_scope = record.next_scope.saturating_add(1);
-            record.scopes.push((record.next_scope, Counts::default()));
+            record
+                .scopes
+                .push((record.next_scope, KeyDemandCounts::default()));
             record.next_scope
         });
         DemandScope {
@@ -171,30 +112,22 @@ impl DemandScope {
     /// Returns what has been recorded since the scope was opened.
     #[must_use]
     pub fn snapshot(&self) -> KeyDemandSnapshot {
-        self.demand.lock(|record| {
-            record
-                .scopes
-                .iter()
-                .find(|(id, _)| *id == self.id)
-                .map(|(_, counts)| counts.snapshot())
-                .unwrap_or_default()
-        })
+        self.with_counts(KeyDemandCounts::snapshot)
     }
-}
 
-impl DemandScope {
-    /// Returns the distinct Entries recorded since the scope was opened, by path.
+    /// Returns the distinct physical Entries recorded since the scope was opened.
     #[must_use]
     pub fn unread(&self) -> UnreadEntries {
+        self.with_counts(KeyDemandCounts::unread_entries)
+    }
+
+    fn with_counts<T: Default>(&self, read: impl FnOnce(&KeyDemandCounts) -> T) -> T {
         self.demand.lock(|record| {
             record
                 .scopes
                 .iter()
                 .find(|(id, _)| *id == self.id)
-                .map(|(_, counts)| UnreadEntries {
-                    missing: counts.missing.paths.clone(),
-                    wrong: counts.wrong.paths.clone(),
-                })
+                .map(|(_, counts)| read(counts))
                 .unwrap_or_default()
         })
     }
