@@ -8,15 +8,15 @@ mod installation;
 #[cfg(any(target_os = "linux", test))]
 mod portal_alias;
 #[cfg(any(target_os = "linux", test))]
-mod portal_deadline;
-#[cfg(any(target_os = "linux", test))]
 mod portal_dbus;
+#[cfg(any(target_os = "linux", test))]
+mod portal_deadline;
+#[cfg(target_os = "linux")]
+mod portal_filesystem;
 #[cfg(any(target_os = "linux", test))]
 mod portal_mount;
 #[cfg(target_os = "linux")]
 mod portal_native;
-#[cfg(target_os = "linux")]
-mod portal_filesystem;
 #[cfg(any(target_os = "linux", test))]
 mod portal_path;
 #[cfg(any(target_os = "linux", test))]
