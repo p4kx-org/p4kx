@@ -736,7 +736,7 @@
     "summary": "non-modal modal frame, width 600: cancel note in color-warning, counts and target in color-gray-1, failed Records as collapsibleSection rows with the reason in color-danger-text; Close buttonCta alone in the foot; no target line when none was created"
   },
   "basetoolCatalog": {
-    "menu": "Two Export menu dropdownItems below Record export: normal Basetool catalog and explicit diagnostic Basetool catalog; disabled without a DataForge and while a catalog is created; system save dialog defaults to basetool-catalog.json.zst or basetool-catalog.diagnostic.json.zst; diagnostic permission applies to one job and is never persisted",
+    "menu": "Two Export menu dropdownItems below Record export: normal Basetool catalog and explicit diagnostic Basetool catalog; disabled without a DataForge and while a catalog is created; outside Flatpak the system save dialog defaults to basetool-catalog.json.zst or basetool-catalog.diagnostic.json.zst, under Flatpak the shared parent/name selection uses those names; diagnostic permission applies to one job and is never persisted",
     "progress": "non-modal modal frame, width 440: title explicitly names a diagnostic job; spinner while DataForge is read and while the file is written, progressBar with Records checked of total between; Cancel buttonGhost alone in the foot",
     "summary": "non-modal modal frame, width 600: diagnostic title and color-warning notice for an explicit diagnostic export; source/projection health in color-gray-1 when complete or color-warning when incomplete; alertWarning near the upload limit or alertDanger over it; group labels Kinds (selection scope) and Texts with one color-gray-1 line per kind and language, then size in decimal units with the upload limit of 64 MB and the file; Close buttonCta alone in the foot",
     "cancelled": "non-modal modal frame: note in color-warning, no file written",
@@ -1036,7 +1036,7 @@
     "decision": "D.50",
     "entitiesButton": "btn-cta Export… in the Entities toolbar opens the export setup of the Entity",
     "output": "the group Output (GLB file, Blender package) as a segmented--sm control in one row with the level of detail, MODAL_GROUP_GAP between; with the package chosen the hint in color-gray-2-text FS_XS under the row, the Materials group is hidden and the group File becomes Package folder",
-    "folder": "the chosen folder is the package; new, empty or an earlier package of P4KX; an earlier package is named in color-warning and replaced as a whole once the new one is complete; anything else, a path without a folder name and an installation are a danger-alert and disable Export",
+    "folder": "outside Flatpak the chosen folder is the package; under Flatpak the system chooser selects its parent and the shared selection adds one package name; the final package path is new, empty or an earlier package of P4KX; an earlier package is named in color-warning and replaced as a whole once the new one is complete; anything else, a path without a folder name and an installation are a danger-alert and disable Export",
     "progress": "stage Writing shows the text without a byte count and Cancel; the summary Blender package written lists folder, counts, Interior, textures not written and the issues",
     "scope": "an Entity, an Interior container on its own (D.54) and the Character of the Characters tab (D.54)",
     "character": "D.54: btn-cta Export… in the Characters toolbar opens the modal Export Character with the group Output, the hint in color-gray-2-text FS_XS beside the group Animations (None, All; All by default; no picker of named clips, no --anim-from), starting on the GLB file whatever the Entity export chose, the group File or Package folder, the notices of the Entity and the foot Export and Close; detail and materials stay in the toolbar",
@@ -1186,5 +1186,19 @@
     "glow-primary-lg": {"x": 0, "y": 0, "blur": 20, "spread": 0, "color": "rgba(231,126,35,0.2)"},
     "glow-danger-lg": {"x": 0, "y": 0, "blur": 20, "spread": 0, "color": "rgba(163,0,10,0.2)"},
     "shadow-dropdown": {"x": 0, "y": 8, "blur": 16, "spread": 0, "color": "rgba(0,0,0,0.8)"}
+  },
+  "flatpakOutputSelection": {
+    "decision": "D.20, D.50",
+    "scope": "File exports and Blender packages only; existing folder-output choosers stay unchanged",
+    "presentation": "modal--wide; existing Lato/dark field, ghost, CTA, danger and warning widgets; no new tokens",
+    "fields": [
+      "parent Directory chooser",
+      "single native file/package name",
+      "resolved full destination"
+    ],
+    "lifecycle": "Exact source and setup/result owner; cancel/owner change discards; late parent replies ignored; take before one dispatch",
+    "diagnosticConsent": "DiagnosticCatalogFile only; current selection/job; never persisted or inherited",
+    "native": "Outside Flatpak all existing native save-file and package-folder chooser routes remain",
+    "protection": "Presentation only; no inferred file-grant sibling mapping and no source/host identity exception"
   }
 }

@@ -18,6 +18,7 @@ mod checks;
 mod comparison;
 mod containers;
 mod content_search;
+mod dialog;
 #[cfg(windows)]
 pub mod dwm;
 mod entities;
@@ -37,6 +38,7 @@ mod mismatch;
 mod model;
 mod model_export;
 mod model_info;
+mod output_target;
 mod prerequisite_notice;
 mod preview;
 mod public_patches;
@@ -164,9 +166,10 @@ pub use texts::{
     AboutText, ArchiveKeyText, AssemblyExportText, AudioText, CatalogText, ChangeExtractionText,
     CharacterText, ComparisonText, ContainerText, ContentSearchText, DataForgeText, DiffText,
     EntityText, ExtractionText, FolderConversionText, GroupText, ImageText, IncomingText,
-    LocalizationText, ModelExportText, ModelInfoText, ModelText, ProtectionText, QueryText,
-    RecordChangeText, RecordExportText, RecordLanguageText, RecordSearchText, RecordText,
-    RenameText, SchemaText, ScrollText, SoundsText, TagsText, Text, Texts, UiText, XmlText,
+    LocalizationText, ModelExportText, ModelInfoText, ModelText, OutputTargetText, ProtectionText,
+    QueryText, RecordChangeText, RecordExportText, RecordLanguageText, RecordSearchText,
+    RecordText, RenameText, SchemaText, ScrollText, SoundsText, TagsText, Text, Texts, UiText,
+    XmlText,
 };
 pub use ui_tab::{
     ContentRow, Fact, FileList, MAX_CONTENT_ROWS, Note, ReportLine, RowDetail, ShipList, ShipPick,

@@ -44,6 +44,10 @@ pub struct ComparisonView {
 }
 
 impl ComparisonView {
+    pub(crate) fn output_owner(&self) -> crate::output_target::Witness {
+        crate::output_target::Witness::of(&self.comparison).at(self.generation, self.revision)
+    }
+
     /// Prepares `comparison` and its Record changes `records` for display, or returns `None`
     /// once `cancel` is set; this sorts every change several times and belongs on a background
     /// thread.

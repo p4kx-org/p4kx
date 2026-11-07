@@ -34,6 +34,7 @@ pub enum PackageProblem {
 /// it with what the dialog tells about it.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Output {
+    owner: crate::output_target::OwnerLease,
     form: AssemblyExportForm,
     file: Option<PathBuf>,
     refusal: Option<WriteProtectionError>,
@@ -41,6 +42,10 @@ pub(crate) struct Output {
 }
 
 impl Output {
+    pub(crate) fn owner(&self) -> crate::output_target::Witness {
+        self.owner.witness()
+    }
+
     pub(crate) fn new(package: bool) -> Self {
         Self {
             form: if package {

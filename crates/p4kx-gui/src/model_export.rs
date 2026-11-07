@@ -30,6 +30,7 @@ pub const MODEL_TEXTURE_MIPS: [u32; 4] = [0, 1, 2, 3];
 /// animations and the file.
 #[derive(Debug, Clone)]
 pub struct ModelExportSetup {
+    owner: crate::output_target::OwnerLease,
     entry: u32,
     entry_path: String,
     name: String,
@@ -46,6 +47,10 @@ pub struct ModelExportSetup {
 }
 
 impl ModelExportSetup {
+    pub(crate) fn output_owner(&self) -> crate::output_target::Witness {
+        self.owner.witness()
+    }
+
     pub(crate) fn new(
         (entry, entry_path): (u32, &str),
         info: &ModelInfo,
@@ -58,6 +63,7 @@ impl ModelExportSetup {
             lods.first().map_or(0, |lod| lod.level)
         };
         Self {
+            owner: crate::output_target::OwnerLease::default(),
             entry,
             entry_path: entry_path.to_owned(),
             name: info.name.clone(),

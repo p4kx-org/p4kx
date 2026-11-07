@@ -48,6 +48,10 @@ pub struct AssemblyExportSetup {
 }
 
 impl AssemblyExportSetup {
+    pub(crate) fn output_owner(&self) -> crate::output_target::Witness {
+        self.output.owner()
+    }
+
     pub(crate) fn new(
         (guid, name): (Guid, &str),
         (changes, has_interior): (&LoadoutChanges, bool),

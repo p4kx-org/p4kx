@@ -83,6 +83,11 @@ source is an ordinary copy. If installation membership or existing-target identi
 established, the write is refused with an uncertainty explanation. A separate write grant does
 not override source protection.
 
+The Flatpak window asks for a parent folder and one file or package-folder name for these
+exports. The system chooser selects the parent; the displayed full path is the actual output.
+For a Blender package, its name creates a child of that selected parent. Selecting a folder
+does not bypass the installation or source checks.
+
 All three Flatpak applications check the Documents prerequisite before opening a profile,
 loading a stored key or starting normal work. CLI/MCP startup failure uses exit 1 and the
 `[p4kx.runtime.documents-api5]` diagnostic; the GUI shows a prerequisite notice. `--help` and

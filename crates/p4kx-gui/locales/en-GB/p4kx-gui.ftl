@@ -1487,3 +1487,25 @@ gui-command-help =
     -h, --help: Show this help
     -V, --version: Show the version
     Flatpak requires Documents portal API 5 or later with authenticated host path lookup.
+
+output-target-title = Choose export destination
+output-target-parent = Parent folder
+output-target-choose-parent = Choose folder…
+output-target-no-parent = No parent folder chosen
+output-target-file-name = File name
+output-target-package-name = Package folder name
+output-target-destination = Destination
+output-target-no-destination = Choose a parent folder and enter a name.
+output-target-parent-hint = Choose the parent folder. The output will have the name entered below inside that folder.
+output-target-file-hint = The file will be saved in the chosen folder.
+output-target-package-hint = The package is a subfolder of the selected parent. An existing P4KX package is replaced only after its replacement is complete.
+output-target-diagnostic-hint = This diagnostic permission applies only to this export. It is cancelled when this selection is closed.
+output-target-confirm = Use destination
+output-target-start-export = Start export
+output-target-cancel = Cancel
+output-target-empty = Enter a name.
+output-target-component = Enter one name without a parent path, an absolute path, ‘.’ or ‘..’.
+output-target-control = The name cannot contain control characters.
+output-target-picker-failed = The folder chooser could not be opened: { $reason }
+output-target-picker-disconnected = The folder chooser closed without a reply. Choose the parent folder again.
+output-target-picker-relative = The folder chooser returned no absolute parent path. The previous choice has been kept.

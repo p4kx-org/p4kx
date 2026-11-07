@@ -1487,3 +1487,25 @@ gui-command-help =
     -h, --help: Diese Hilfe anzeigen
     -V, --version: Die Version anzeigen
     Flatpak benötigt das Documents-Portal mit API 5 oder neuer und authentifizierter Hostpfadabfrage.
+
+output-target-title = Exportziel wählen
+output-target-parent = Übergeordneter Ordner
+output-target-choose-parent = Ordner wählen …
+output-target-no-parent = Kein übergeordneter Ordner gewählt
+output-target-file-name = Dateiname
+output-target-package-name = Name des Paketordners
+output-target-destination = Ziel
+output-target-no-destination = Wähle einen übergeordneten Ordner und gib einen Namen ein.
+output-target-parent-hint = Wähle den übergeordneten Ordner. Darin erhält die Ausgabe den unten eingegebenen Namen.
+output-target-file-hint = Die Datei wird im gewählten Ordner gespeichert.
+output-target-package-hint = Das Paket ist ein Unterordner des gewählten Ordners. Ein vorhandenes P4KX-Paket wird erst ersetzt, wenn das neue vollständig ist.
+output-target-diagnostic-hint = Diese Diagnosefreigabe gilt nur für diesen Export. Beim Schließen dieser Auswahl verfällt sie.
+output-target-confirm = Ziel übernehmen
+output-target-start-export = Export starten
+output-target-cancel = Abbrechen
+output-target-empty = Gib einen Namen ein.
+output-target-component = Gib einen einzelnen Namen ohne übergeordneten oder absoluten Pfad ein; . und .. sind nicht zulässig.
+output-target-control = Der Name darf keine Steuerzeichen enthalten.
+output-target-picker-failed = Der Ordnerdialog konnte nicht geöffnet werden: { $reason }
+output-target-picker-disconnected = Der Ordnerdialog wurde ohne Antwort beendet. Wähle den übergeordneten Ordner erneut.
+output-target-picker-relative = Der Ordnerdialog hat keinen absoluten Elternpfad zurückgegeben. Die bisherige Auswahl bleibt erhalten.

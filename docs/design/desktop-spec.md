@@ -303,6 +303,22 @@ lässt eine vorhandene unverändert; der Hinweis darauf steht in `color-warning`
 Datei das offene Archiv, startet nichts, und das Gefahrenfenster sagt es in `color-danger-text`.
 Der Katalog liest DataForge aus dem einen Cache des offenen Archivs (D.22), also nur einmal.
 
+Unter Flatpak ersetzt eine gemeinsame Zielauswahl den Speichern-Dialog für Dateiexporte und
+die Zielordnerwahl für Blender-Pakete: Sie zeigt den übergeordneten Ordner, einen einzelnen
+Datei- oder Paketordnernamen und den vollständigen Zielpfad. „Ordner wählen …“ öffnet den
+Ordnerdialog des Systems für den übergeordneten Ordner; dessen Rückgabepfad bleibt erhalten.
+„Export starten“ bestätigt Katalog, Diagnosekatalog, Query, Vergleichsbericht oder UI-Bild und
+startet genau diesen Auftrag. Bei Modell-, Entity- und Charakter-Setups übernimmt „Ziel übernehmen“
+nur das Ziel in den bestehenden Exportdialog. Ohne gewählten Elternordner oder mit leerem Namen,
+Steuerzeichen, absolutem Pfad, Pfadtrennern oder den Komponenten `.` / `..` bleibt die Bestätigung
+gesperrt. Die Anzeige enthält dieselbe GLB- und Katalognamensnormalisierung wie der Schreiber.
+Die Diagnosefreigabe gilt weiterhin nur für diesen Auftrag; Abbrechen und Besitzerwechsel
+verwerfen sie. Verspätete Ordnerantworten einer verworfenen Auswahl werden ignoriert.
+Außerhalb Flatpaks bleibt der bisherige Systemdialog bestehen. Die gemeinsame Auswahl verwendet
+`modal--wide`, bestehende Feld-, Ghost- und CTA-Widgets, Lato und die vorhandenen Dark-Tokens;
+es entstehen keine neuen Maße. Eine Ordnerwahl ersetzt keine Schutz- oder Identitätsprüfung.
+
+
 Entscheidungen ab **D.22** (Record-Vorschau, Texturgruppen, Scrollflächen, Lokalisierung, Sprache der Record-Texte,
 Abfrage-Vervollständigung, Container als Ordner, Tonformat der Extraktion, 3D-Ansicht des Modells, Tags) stehen in
 [desktop-spec-decisions-2.md](desktop-spec-decisions-2.md).

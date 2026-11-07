@@ -5,9 +5,9 @@ use super::{
     AboutText, ArchiveKeyText, AssemblyExportText, AudioText, CatalogText, ChangeExtractionText,
     CharacterText, ComparisonText, ContainerText, ContentSearchText, DataForgeText, DiffText,
     EntityText, ExtractionText, FolderConversionText, GroupText, ImageText, IncomingText,
-    LocalizationText, ModelExportText, ModelInfoText, ModelText, ProtectionText, QueryText,
-    RecordChangeText, RecordExportText, RecordLanguageText, RecordText, RenameText, SchemaText,
-    ScrollText, SoundsText, TagsText, Text, UiText, XmlText,
+    LocalizationText, ModelExportText, ModelInfoText, ModelText, OutputTargetText, ProtectionText,
+    QueryText, RecordChangeText, RecordExportText, RecordLanguageText, RecordText, RenameText,
+    SchemaText, ScrollText, SoundsText, TagsText, Text, UiText, XmlText,
 };
 use crate::Language;
 
@@ -95,6 +95,7 @@ impl Text {
             .into_iter()
             .chain(ExtractionText::ALL.map(Self::Extraction))
             .chain(ProtectionText::ALL.map(Self::Protection))
+            .chain(OutputTargetText::ALL.map(Self::OutputTarget))
             .chain(ComparisonText::ALL.map(Self::Comparison))
             .chain(DataForgeText::ALL.map(Self::DataForge))
             .chain(ChangeExtractionText::ALL.map(Self::ChangeExtraction))
@@ -210,6 +211,7 @@ impl Text {
             Self::PreviewKeyRejected => "preview-key-rejected",
             Self::Extraction(text) => text.id(),
             Self::Protection(text) => text.id(),
+            Self::OutputTarget(text) => text.id(),
             Self::Comparison(text) => text.id(),
             Self::DataForge(text) => text.id(),
             Self::ChangeExtraction(text) => text.id(),

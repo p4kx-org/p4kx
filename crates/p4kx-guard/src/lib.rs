@@ -68,7 +68,10 @@ pub use process::{
 pub use registry::{
     ensure_writable, protect, protect_archive_folder, protect_libraries, protect_manual,
 };
-pub use runtime_prerequisite::{RuntimePrerequisiteError, check_runtime_prerequisites};
+pub use runtime_prerequisite::{
+    RuntimeEnvironment, RuntimePrerequisiteError, check_runtime_environment,
+    check_runtime_prerequisites,
+};
 pub use write_protection_error::WriteProtectionError;
 
 /// A write that was refused because its target lies inside a Star Citizen installation.

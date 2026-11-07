@@ -21,6 +21,10 @@ pub struct CharacterExportSetup {
 }
 
 impl CharacterExportSetup {
+    pub(crate) fn output_owner(&self) -> crate::output_target::Witness {
+        self.output.owner()
+    }
+
     pub(super) fn new(
         name: String,
         folder: Option<PathBuf>,

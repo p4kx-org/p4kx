@@ -9,6 +9,13 @@ The Flatpak window requires host Documents-portal API 5 with authenticated host-
 When that prerequisite is missing, a notice explains it before the normal window or profile
 opens. See [Linux packages](linux-packages.md) for the separate host requirement and grants.
 
+For file exports and Blender packages, **Choose export destination** asks for a parent folder
+and a file or package-folder name. **Choose folder…** selects the parent; the full destination
+is shown below the name. **Use destination** returns a model, Entity or Character destination
+to its export setup. **Start export** starts the catalog, Query, report or picture export.
+Cancelling discards this choice, including permission for a diagnostic catalog. The dialog
+scrolls in a small window while its action buttons stay visible.
+
 An export refusal distinguishes a known Star Citizen installation from a source or destination
 whose identity cannot be verified. A file chooser grant can hide the Archive's host parent; a
 write grant does not establish that writing there is safe. Choose a source and destination with

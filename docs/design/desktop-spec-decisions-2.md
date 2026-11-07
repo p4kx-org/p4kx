@@ -526,7 +526,11 @@ Dessen Gruppe „Ausgabe" steht mit der Segmentgruppe „Detailstufe" in einer Z
 „Blender-Paket". Bei „Blender-Paket" steht darunter der Hinweis in `color-gray-2-text` (Größe `FS_XS`), entfallen
 die Materialien (ein Paket enthält immer die Texturen), bleiben Texturgröße, Vertex-Farben und Interior,
 und die Gruppe „Datei" wird zur Gruppe „Paketordner" mit demselben Pfadfeld und „Ordner wählen …"
-(Ordnerdialog des Systems). Der gewählte Ordner ist das Paket selbst. Er darf neu, leer oder ein früheres
+(Ordnerdialog des Systems). Außerhalb Flatpaks ist der gewählte Ordner das Paket selbst.
+Unter Flatpak führt diese Aktion zur gemeinsamen Zielauswahl aus D.20: Der Systemdialog wählt
+den übergeordneten Ordner; ein einzelner Paketname bestimmt darin den Paketordner. Dadurch liegen
+Paket und die Geschwister für Aufbau und Austausch im gewählten Elternordner. Die Anzeige des
+vollständigen Paketpfads verhindert eine Verwechslung von Eltern- und Paketordner. Er darf neu, leer oder ein früheres
 Paket von P4KX sein; ein früheres Paket meldet der Dialog in `color-warning` („wird ersetzt, sobald das neue
 vollständig ist"), und es bleibt bis dahin und bei Abbruch oder Fehler unberührt. Ein Ordner mit anderem
 Inhalt und ein Pfad ohne Ordnernamen sind eine Gefahrenmeldung (`danger-alert`, `color-gray-1`) und sperren

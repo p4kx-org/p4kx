@@ -81,6 +81,7 @@ mod model_playback;
 mod model_preview;
 mod model_view;
 mod moved_path;
+mod output_target;
 mod preview;
 mod preview_bar;
 mod preview_tab;
@@ -103,6 +104,7 @@ mod record_tree;
 mod record_value;
 mod regions;
 mod search;
+mod setup_windows;
 mod shortcuts;
 mod sidebar;
 #[cfg(test)]
@@ -145,6 +147,7 @@ use crate::theme::desktop::{HEADER_HEIGHT, STATUS_HEIGHT};
 use crate::widgets::{frames, tab};
 
 pub use dialog::Dialog;
+pub(crate) use output_target::show as output_target;
 pub use regions::{Regions, regions};
 
 const RESIZE_GAP: i8 = 6;
@@ -166,6 +169,14 @@ pub struct Requests {
 
 /// Draws the whole window for `model` and applies what the user did to it.
 pub fn show(ui: &mut Ui, model: &mut Model) -> Requests {
+    show_with_output_target(ui, model, false)
+}
+
+pub(crate) fn show_with_output_target(
+    ui: &mut Ui,
+    model: &mut Model,
+    target_open: bool,
+) -> Requests {
     regions::reset(ui.ctx());
     let mut requests = Requests {
         settings_changed: model.poll() && model.browser().is_some() && model.failure().is_none(),
@@ -208,23 +219,9 @@ pub fn show(ui: &mut Ui, model: &mut Model) -> Requests {
         .frame(frames::canvas())
         .show(ui, |ui| work_surface(ui, model, &mut requests));
     wrapped_actions::settle(ui.ctx());
-    extraction::setup(ui, model, &mut requests);
-    extraction_outcome::show(ui, model);
-    record_export::setup(ui, model, &mut requests);
-    record_export_outcome::show(ui, model);
-    model_export::setup(ui, model, &mut requests);
-    model_export_outcome::show(ui, model);
-    assembly_export::setup(ui, model, &mut requests);
-    assembly_export_outcome::show(ui, model);
-    character_export_setup::setup(ui, model, &mut requests);
-    character_export::show(ui, model);
-    catalog_outcome::show(ui, model);
-    sounds_export::setup(ui, model, &mut requests);
-    sounds_outcome::show(ui, model);
-    licence::show(ui, model);
-    about::show(ui, model);
-    archive_key::show(ui, model);
-    query::saved_dialog(ui, model, &mut requests);
+    if !target_open {
+        setup_windows::show(ui, model, &mut requests);
+    }
     requests
 }
 
