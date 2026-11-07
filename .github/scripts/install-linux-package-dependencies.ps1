@@ -21,7 +21,7 @@ if ($Build) {
     $temporary = Join-Path $env:RUNNER_TEMP 'p4kx-ubuntu.sources'
     $sources | Set-Content -LiteralPath $temporary -Encoding utf8NoBOM
     Invoke-P4kxLinuxTool sudo @('install', '--mode=0644', $temporary, '/etc/apt/sources.list.d/ubuntu.sources') | Out-Null
-    $packages += @('appstream', 'desktop-file-utils', 'dpkg-dev', 'flatpak-builder', 'gzip', 'libasound2-dev', 'lintian', 'patchelf', 'zstd')
+    $packages += @('appstream', 'desktop-file-utils', 'dpkg-dev', 'flatpak-builder', 'gzip', 'libasound2-dev', 'librsvg2-common', 'lintian', 'patchelf', 'zstd')
 }
 Invoke-P4kxLinuxTool sudo @('apt-get', 'update') | Out-Null
 Invoke-P4kxLinuxTool sudo (@('apt-get', 'install', '--yes', '--no-install-recommends') + $packages) | Out-Null

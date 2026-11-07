@@ -114,6 +114,11 @@ Contract fixtures, packaging stages, tools and runtime logs use a fresh `RUNNER_
 by run, attempt, target and producer/consumer role, outside the cached Cargo build directory.
 Consumers require the complete producer matrix to succeed; missing artifacts still fail verification.
 
+Build dependencies explicitly include Ubuntu's `librsvg2-common` GdkPixbuf SVG loader. Before
+compiling applications, native checks compose the shipped desktop assets, compose an SVG-only
+copy and require a corrupt SVG to fail with a detailed filename/decoder report. This verifies
+AppStream image decoding independently of optional packages preinstalled on the runner image.
+
 [`release-linux.yml`](../.github/workflows/release-linux.yml) builds on the matching Ubuntu 24.04
 native CPU and verifies packages on a fresh matching runner. The consumer validates the source
 SHA, pinned compiler/nextest, baseline, CPU and package hashes before execution. It then runs:
