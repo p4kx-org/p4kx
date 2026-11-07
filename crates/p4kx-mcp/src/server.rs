@@ -16,9 +16,10 @@ use crate::entries;
 use crate::error::{ToolError, capped};
 use crate::forge_file::ForgeSource;
 use crate::gate::Gate;
+use crate::key_report;
 use crate::keys::KeyChoice;
 use crate::locate::{Accepts, Locations};
-use crate::noted::{self, Noted};
+use crate::noted::{self, Noted, Notes};
 use crate::ordered::Ordered;
 use crate::page::Page;
 use crate::params::{ArchiveParams, ChannelsParams, ListParams, MAX_PATH_LEN, SearchParams};
@@ -125,7 +126,7 @@ impl Server {
     {
         self.run_plain(work)
             .await
-            .map(|(value, notice)| Noted { value, notice })
+            .map(|(value, notes)| Noted { value, notes })
     }
 
     /// Like [`Server::run`], with the key order of the result kept in its text content.
@@ -136,10 +137,10 @@ impl Server {
     {
         self.run_plain(work)
             .await
-            .map(|(value, notice)| Ordered { value, notice })
+            .map(|(value, notes)| Ordered { value, notes })
     }
 
-    async fn run_plain<T, F>(&self, work: F) -> Result<(T, Option<String>), String>
+    async fn run_plain<T, F>(&self, work: F) -> Result<(T, Notes), String>
     where
         T: Send + 'static,
         F: FnOnce(&State) -> Result<T, ToolError> + Send + 'static,
@@ -151,9 +152,9 @@ impl Server {
         let outcome = tokio::task::spawn_blocking(move || {
             noted::clear();
             let result = work(&state);
-            let notice = noted::take();
+            let notes = noted::take();
             drop(permit);
-            result.map(|value| (value, notice))
+            result.map(|value| (value, notes))
         })
         .await;
         match outcome {
@@ -177,6 +178,7 @@ impl State {
         let path = self.path(archive, Accepts::Archive)?;
         let opened = self.archives.get(&path)?;
         noted::remember(opened.notice());
+        key_report::watch(&opened);
         Ok(opened)
     }
 
@@ -187,6 +189,7 @@ impl State {
         let source = self.archives.forge(&path)?;
         if let ForgeSource::Archive(opened) = &source {
             noted::remember(opened.notice());
+            key_report::watch(opened);
         }
         Ok(source)
     }

@@ -63,6 +63,6 @@ pub use hasher::ChecksumHasher;
 pub use installation::InstallationStatus;
 pub use issue::{EntryIssue, MAX_ENTRY_ISSUES};
 pub use key_check::KeyCheck;
-pub use key_demand::{KeyDemand, KeyDemandSnapshot};
+pub use key_demand::{DemandScope, KeyDemand, KeyDemandSnapshot};
 pub use open_options::OpenOptions;
 pub use recovery::{MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN};

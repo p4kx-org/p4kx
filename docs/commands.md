@@ -415,7 +415,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   vehicle implementation XML with its Modification applied, the cargo capacity of the cargo grids
   of the default Loadout, `AttachDef.Size` and the Loadout as class names per port path, each
   value with the file and field it was read from. Docked vehicles are marked and not counted. A
-  ship that cannot be read is listed on stderr and the exit code is 1.
+  ship that cannot be read is listed on stderr and the exit code is 1. The `source` block of the
+  file and the `--json` summary state `archiveKey` and `encryptedEntriesUnread`
+  (`archive_key`, `encrypted_entries_unread`) as `catalog` does.
 - `p4kx coverage <archive> [--format table|json]` checks the game data a companion app reads
   ([docs/coverage.md](coverage.md)) against the Archive: whether each listed Record type,
   `EntityClassDefinition` component and vehicle folder exists, how many it has and whether it
@@ -791,7 +793,13 @@ The server reads encrypted Entries with the Archive key from its `--key <hex>` o
 `P4KX_ARCHIVE_KEY` variable of its configuration or the key stored with `p4kx key set` or in the
 window, in that order; the stored key is read on each call, so one stored while the server runs
 applies to the next call. A tool that reads an encrypted Entry without a key fails with an error
-that says how to give it. `--key-file` (or `P4KX_KEY_FILE`) names another file for the stored key.
+that says how to give it. A tool that works around the gap and returns a result without the
+Entries it could not read adds a text block that says how many and how to give the key, and sets
+`_meta.archive_key` (`missing` or `wrong`) and `_meta.encrypted_entries_unread` on the result. With
+a key set, a result of a tool that read an Archive carries `_meta.archive_key` `given` and no text.
+The count is of the distinct Entries asked for while that call ran, so it does not repeat an
+earlier call's; a call running at the same time on the same Archive counts into it too, and a
+result the server kept from an earlier call is not counted again. `--key-file` (or `P4KX_KEY_FILE`) names another file for the stored key.
 
 The MSI installs `p4kx-mcp.exe` next to `p4kx.exe` in
 `%LOCALAPPDATA%\Programs\P4KX`, and the portable ZIP holds it too. Add it to the AI

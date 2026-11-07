@@ -342,3 +342,30 @@ fn the_key_demand_is_shared_with_containers() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn a_demand_scope_counts_from_its_opening_until_it_is_dropped() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = open(dir.path(), &builder())?;
+    let demand = archive.key_demand();
+    assert!(read(&archive, "Data\\secret.xml").is_err(), "before");
+
+    let scope = demand.scope();
+    assert_eq!(
+        scope.snapshot(),
+        KeyDemandSnapshot::default(),
+        "starts empty"
+    );
+    assert!(read(&archive, "Data\\secret.xml").is_err(), "asked again");
+    assert_eq!(
+        scope.snapshot().missing,
+        1,
+        "an Entry asked for before the scope counts again in it"
+    );
+    assert_eq!(demand.snapshot().missing, 1, "the total stays distinct");
+
+    let later = demand.scope();
+    drop(scope);
+    assert_eq!(later.snapshot(), KeyDemandSnapshot::default(), "its own");
+    Ok(())
+}

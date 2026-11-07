@@ -14,6 +14,7 @@ layer = "frontend"
 [dependencies]
 p4kx-assembly.workspace = true
 p4kx-channels.workspace = true
+p4kx-export.workspace = true
 p4kx-extraction.workspace = true
 p4kx-settings.workspace = true
 anyhow.workspace = true

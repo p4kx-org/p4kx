@@ -22,6 +22,13 @@ key error and printed that hint, and never for a command that asked for no encry
 
 A missing key does not change the exit code of a command; whatever decides it today still does.
 
+The MCP server counts per call: a `DemandScope` of the Archive's demand is opened when a tool call
+takes the Archive and read when the call has run, in `noted::take`, for every tool at once. A
+result whose call left encrypted Entries unread carries a text block with the hint of
+`keys.rs` and `_meta.archive_key` and `_meta.encrypted_entries_unread`; with a key set the `_meta`
+says `given`. The scope counts every distinct Entry asked for while it is open, whoever asked, so
+a call running at the same time on the same Archive counts into it.
+
 ## Consequences
 
 The catalog stays version 3 under ADR-0339: the two fields are additive in the unreleased version
