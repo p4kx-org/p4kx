@@ -72,3 +72,66 @@ record the importer/source and package hashes, hierarchy, bounds, rig, images an
 assignments, plus fixed-camera renders for changed visible behaviour. Import success alone does
 not establish original-source completeness or in-game equivalence. The offered interactive
 Blender session remains unchanged.
+
+## Rust-exported synthetic packages in Blender
+
+`p4kx-testkit` can write two synthetic source Archives for an end-to-end exporter/importer check.
+Build the CLI from the same checkout as the importer. In a dedicated PowerShell session, choose
+an absolute scratch root outside the repository and the game installation:
+
+```powershell
+$verificationRoot = 'D:\Coding\Agents\Temp\codex\p4kx-blender-verification'
+$fixtures = Join-Path $verificationRoot 'fixtures'
+$packages = Join-Path $verificationRoot 'packages'
+$env:CARGO_TARGET_DIR = Join-Path $verificationRoot 'build'
+$env:TMP = Join-Path $verificationRoot 'tmp'
+$env:TEMP = $env:TMP
+$env:P4KX_FOLDERS_ROOT = Join-Path $verificationRoot 'profile'
+$env:P4KX_LAUNCHER_DIR = Join-Path $verificationRoot 'launcher'
+$env:P4KX_GAME_CHECK = 'off'
+Remove-Item Env:P4KX_ARCHIVE_KEY -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $env:TMP, $env:P4KX_LAUNCHER_DIR, $packages | Out-Null
+cargo run --locked -p p4kx-testkit --example blender_consumer_fixture -- $fixtures
+cargo build --locked -p p4kx --bin p4kx
+$p4kx = Join-Path $env:CARGO_TARGET_DIR 'debug/p4kx.exe'
+& $p4kx --json --key-file "$fixtures/synthetic.key" entity package "$fixtures/assembly.p4k" TEST_Ship --out "$packages/assembly"
+& $p4kx --json --key-file "$fixtures/synthetic.key" entity package "$fixtures/livery.p4k" TEST_Livery --texture-mip 2 --out "$packages/livery"
+```
+
+Use `debug/p4kx` on Linux. Check each command's exit status before continuing. The fixture directory
+must be new. The generated key is exclusively `p4kx_testkit::test_key`, not a game Archive key.
+The source fixtures intentionally include unresolved attachments and unsupported palette input;
+the CLI reports these separately from importer warnings.
+
+Run the consumer with the installed Blender 5.2 executable in a separate background process:
+
+```powershell
+$env:BLENDER_USER_CONFIG = Join-Path $verificationRoot 'blender-config'
+$env:BLENDER_USER_SCRIPTS = Join-Path $verificationRoot 'blender-scripts'
+$env:BLENDER_USER_DATAFILES = Join-Path $verificationRoot 'blender-data'
+$env:PYTHONDONTWRITEBYTECODE = '1'
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 1 --python blender_addon/tests/verify_exported_package.py -- $packages
+```
+
+Give the process a 180-second watchdog and capture stdout/stderr separately. Do not reuse an
+interactive Blender process or its configuration. The consumer resets its own scene between
+cases and checks these independent authored fixture expectations:
+
+| Case | Scene nodes / drawing instances / mesh assets | Additional checks |
+| --- | --- | --- |
+| Assembly | 6 / 4 / 3 | Z-up attachment positions, nested parent, quarter-turn, material assignments |
+| Livery | 7 / 7 / 4 | Shared collection instances, one shared 2x2 mip texture, connected primary/secondary palette constants |
+
+Both cases require twelve triangles per cube, finite vertices, authored evaluated world bounds
+and no additional importer warnings. Scene-node lookup uses only the imported root's direct
+objects, because Blender can give mesh-template objects the same authored name first. Bounds
+include the fixture cube's ten-metre mesh-node offset where present.
+
+The consumer writes `consumer-report.json` and two fixed-camera 320x240 CPU renders beside the
+package folders. Inspect both renders and retain source/importer, exporter executable, Blender
+executable and package-file hashes with the process result. The report counts file-backed images
+and excludes rendering-only datablocks. Palette checks inspect connected
+shader inputs; rendered pixel colour is not a source-fidelity assertion.
+
+This check covers synthetic unrigged geometry, materials and one texture path. It does not prove
+installed LIVE/PTU coverage, Character rigs, animation, audio, other CPUs or in-game appearance.
