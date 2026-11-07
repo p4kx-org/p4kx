@@ -27,6 +27,10 @@ cargo nextest run --locked -p p4kx-msi-path --lib --features native-fixtures
 cargo test --locked -p p4kx-msi-path --example p4kx-msi-registry-fixture --features native-fixtures
 ```
 
+Native CI checks the opt-in feature with Clippy on all four targets and runs these pure tests
+on both Windows CPUs after verifying application machine types. These steps never call the
+Registry fixture commands and do not establish native transaction or installer behavior.
+
 ## Commands and evidence
 
 Arguments are separate command-line values. Every evidence argument is one canonical lowercase

@@ -72,6 +72,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Formatting failed for $($package.name)." }
           }
       - run: cargo clippy --workspace --all-targets --target $env:P4KX_TARGET --locked -- -D warnings
+      - name: Check the opt-in MSI fixture on the native target
+        run: cargo clippy -p p4kx-msi-path --all-targets --features native-fixtures --target $env:P4KX_TARGET --locked -- -D warnings
       - run: cargo xtask
       - name: Install cargo-about
         if: runner.os == 'Linux'

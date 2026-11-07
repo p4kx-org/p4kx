@@ -52,6 +52,14 @@ jobs:
       - name: Inspect application machine types and identify the test archive
         shell: pwsh
         run: .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -BinaryDirectory "target/$env:P4KX_TARGET/debug" -ArchivePath nextest-archive.tar.zst -MetadataPath nextest-archive.json
+      - name: Test the opt-in MSI fixture without Registry access
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo nextest run --locked --target $env:P4KX_TARGET -p p4kx-msi-path --lib --features native-fixtures
+          if ($LASTEXITCODE -ne 0) { throw 'Pure MSI fixture library tests failed.' }
+          cargo test --locked --target $env:P4KX_TARGET -p p4kx-msi-path --example p4kx-msi-registry-fixture --features native-fixtures
+          if ($LASTEXITCODE -ne 0) { throw 'Pure MSI fixture codec tests failed.' }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nextest-archive-${{ inputs.target }}-${{ github.sha }}
