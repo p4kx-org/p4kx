@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::error::Error;
-use std::sync::Arc;
+use std::io;
 
 use egui_kittest::kittest::Queryable;
 use p4kx_extraction::WriteProtectionError;
@@ -44,9 +44,9 @@ fn a_folder_that_cannot_be_created_fails_with_the_reason() -> TestResult {
         assert!(
             cause
                 .source()
-                .and_then(|source| source.downcast_ref::<Arc<dyn Error + Send + Sync>>())
-                .and_then(|source| source.as_ref().downcast_ref::<std::io::Error>())
-                .is_some_and(|source| source.kind() == std::io::ErrorKind::NotADirectory)
+                .and_then(|source| source.downcast_ref::<io::Error>())
+                .is_some_and(|source| source.kind() == io::ErrorKind::NotADirectory),
+            "the original invalid-parent I/O error remains inspectable"
         );
         harness.run_steps(3);
         let notice = harness.state().texts().get(ProtectionText::TargetIdentity);

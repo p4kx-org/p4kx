@@ -4,7 +4,9 @@ The Linux Guard exposes `resolve_portal_alias(path, cancel)` as a synchronous id
 query. `NotPortal` means the observed path is outside the Documents mount. `Resolved`
 contains an authenticated host spelling, document ID and file/directory grant kind.
 `Unknown` retains a typed reason and local error source where available. None of these
-results classifies a game installation or authorises a write. The installation/write
+results classifies a game installation or authorises a write. A retained local cause is
+the original concrete error in the standard error chain, including after cloning a failure.
+The installation/write
 policy is separate. `ensure_writable` authenticates target routes, and Archive-derived writers
 retain an `ArchiveWriteProtection` context for their actual source Archives.
 

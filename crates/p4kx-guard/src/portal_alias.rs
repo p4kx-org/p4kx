@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::error::Error;
+use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -177,12 +178,28 @@ mod prerequisite_marker_tests {
 }
 
 /// An uncertainty result preserving local failures without copying remote error text.
-#[derive(Debug, Clone, thiserror::Error)]
-#[error("cannot establish the portal alias: {reason}")]
+#[derive(Debug, Clone)]
 pub struct UnknownAlias {
     reason: AliasUncertainty,
-    #[source]
     source: Option<Arc<dyn Error + Send + Sync>>,
+}
+
+impl Display for UnknownAlias {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "cannot establish the portal alias: {}",
+            self.reason
+        )
+    }
+}
+
+impl Error for UnknownAlias {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.source
+            .as_deref()
+            .map(|source| source as &(dyn Error + 'static))
+    }
 }
 
 impl UnknownAlias {
@@ -207,5 +224,53 @@ impl UnknownAlias {
     #[must_use]
     pub const fn reason(&self) -> AliasUncertainty {
         self.reason
+    }
+}
+
+#[cfg(test)]
+mod source_tests {
+    use std::error::Error;
+    use std::io;
+
+    use super::{AliasUncertainty, UnknownAlias};
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("synthetic filesystem cause")]
+    struct Marker;
+
+    #[test]
+    fn shared_local_failures_expose_the_original_io_error_and_payload() {
+        let failure = UnknownAlias::with_source(
+            AliasUncertainty::MountInventory,
+            io::Error::new(io::ErrorKind::PermissionDenied, Marker),
+        );
+        for observed in [failure.clone(), failure] {
+            let source = observed.source().expect("a local cause is retained");
+            let original = source
+                .downcast_ref::<io::Error>()
+                .expect("the standard error chain exposes the actual I/O error");
+            assert_eq!(original.kind(), io::ErrorKind::PermissionDenied);
+            assert!(
+                original
+                    .get_ref()
+                    .is_some_and(<dyn Error + Send + Sync>::is::<Marker>),
+                "the original typed payload is retained without text conversion"
+            );
+        }
+    }
+
+    #[test]
+    fn generic_local_causes_and_absent_causes_keep_their_contract() {
+        let failure = UnknownAlias::with_source(AliasUncertainty::Filesystem, Marker);
+        assert!(
+            failure.source().is_some_and(<dyn Error>::is::<Marker>),
+            "the source is the original concrete error"
+        );
+        assert!(
+            UnknownAlias::new(AliasUncertainty::Cancelled)
+                .source()
+                .is_none(),
+            "a typed refusal does not invent a local cause"
+        );
     }
 }
