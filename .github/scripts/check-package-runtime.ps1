@@ -42,11 +42,11 @@ $null = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli
 $list = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli @('list', $archive)) $directory (Join-Path $directory 'cli-list.log')
 if ($list -cnotmatch 'Data/hello\.txt' -or $list -cnotmatch 'Data/smoke\.xml') { throw 'CLI omitted synthetic Entries.' }
 $extract = Join-Path $directory 'extract'
-$null = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli @('extract', $archive, '--out', $extract)) $directory (Join-Path $directory 'cli-extract.log')
+$null = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli @('extract', $archive, '--filter', '*', '--out', $extract)) $directory (Join-Path $directory 'cli-extract.log')
 if ((Get-FileHash (Join-Path $extract 'Data/hello.txt')).Hash -cne
     (Get-FileHash (Join-Path $FixtureDirectory 'hello.txt')).Hash) { throw 'CLI extracted different bytes.' }
 $convert = Join-Path $directory 'convert'
-$null = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli @('extract', $archive, '--out', $convert, '--convert')) $directory (Join-Path $directory 'cli-convert.log')
+$null = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli @('extract', $archive, '--filter', '*', '--out', $convert, '--convert')) $directory (Join-Path $directory 'cli-convert.log')
 $xml = [xml](Get-Content (Join-Path $convert 'Data/smoke.xml') -Raw)
 if ($xml.NativeSmoke.value -cne 'synthetic') { throw 'CLI CryXml conversion differs.' }
 $mcp = $commands['p4kx-mcp']
