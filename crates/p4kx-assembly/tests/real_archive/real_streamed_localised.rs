@@ -3,13 +3,14 @@
 
 //! Streamed and localised sounds of a real Archive, resolved to loose WEM Entries.
 
+mod canary;
+
 use std::error::Error;
 
-use p4kx_assembly::Entities;
 use p4kx_assembly::audio::{
     ArchiveAudio, DEFAULT_LANGUAGE, LanguageChoice, SoundVariant, SourceKind, TriggerSounds,
 };
-use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_extraction::Archive;
 use p4kx_testkit::real_archive_path;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -58,45 +59,9 @@ impl Tally {
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn the_streamed_sounds_of_documented_ships_are_located_as_loose_entries() -> TestResult {
-    let archive = Archive::open_with_key(
-        real_archive_path()?,
-        Some(p4kx_testkit::real_archive_key()?),
-    )?;
-    let entry = DataForgeEntry::read(&archive)?;
-    let forge = entry.open()?;
-    let entities = Entities::new(&forge);
-    let audio = ArchiveAudio::new(&archive);
-    let index = audio.index();
-    let language = index
-        .language(DEFAULT_LANGUAGE)
-        .ok_or("the Archive holds the default language folder")?;
-    let choice = LanguageChoice::new(Some(language), None);
-    let mut tally = Tally::default();
-    for name in [
-        "ORIG_890Jump",
-        "AEGS_Gladius",
-        "ANVL_Hornet_F7C",
-        "RSI_Constellation_Andromeda",
-        "TMBL_Cyclone",
-    ] {
-        let triggers = index.entity_audio(&entities.find(name)?)?;
-        for trigger in triggers
-            .triggers()
-            .iter()
-            .filter(|trigger| trigger.unmatched().is_none())
-        {
-            let sounds = audio
-                .resolve_trigger_in(trigger.name(), &choice)
-                .ok_or("a matched trigger has a definition")?;
-            tally.add(&sounds, language);
-        }
-    }
-    assert!(tally.streamed > 100, "{tally:?}");
-    assert_eq!(tally.streamed_located, tally.streamed, "{tally:?}");
-    Ok(())
+fn the_streamed_sounds_of_documented_ships_are_located_as_loose_entries() {
+    crate::media_fixtures::run(canary::verify);
 }
-
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_localised_sounds_are_located_in_the_chosen_language() -> TestResult {

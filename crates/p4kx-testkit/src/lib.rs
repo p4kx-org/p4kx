@@ -84,6 +84,7 @@ mod interior_lit;
 mod interior_sample;
 mod layout_v1;
 mod layout_v2;
+pub mod media_fixture;
 mod mesh_streams;
 mod model;
 mod model_crch;

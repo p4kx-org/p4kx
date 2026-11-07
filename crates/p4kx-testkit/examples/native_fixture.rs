@@ -22,7 +22,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .attribute("value", "synthetic")
         .to_cryxml(CryXmlSignature::CryXmlB, CryXmlByteOrder::Little);
     ArchiveBuilder::new()
-        .entry(TestEntry::stored("Data/hello.txt", text.as_bytes().to_vec()))
+        .entry(TestEntry::stored(
+            "Data/hello.txt",
+            text.as_bytes().to_vec(),
+        ))
         .entry(TestEntry::stored("Data/empty.txt", Vec::new()))
         .entry(TestEntry::zstd("Data/smoke.xml", xml))
         .write_to(directory.join("native-smoke.p4k"))?;
