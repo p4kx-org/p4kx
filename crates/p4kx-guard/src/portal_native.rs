@@ -25,6 +25,27 @@ pub fn resolve_portal_alias(path: &Path, cancel: &AtomicBool) -> PortalAlias {
     }
 }
 
+pub(crate) fn ordinary_target_for_cleanup(path: &Path) -> Result<Option<PathBuf>, UnknownAlias> {
+    let expected = expected_mount()?;
+    let absolute = portal_filesystem::absolute(path)?;
+    let mounts = mount_inventory()?;
+    if portal_target(&absolute, &mounts, &expected)?.is_some() {
+        return Ok(None);
+    }
+    let resolved = portal_filesystem::existing_ancestor(&absolute)?;
+    let before = candidate_mount(&resolved, &mounts, &expected)?;
+    let fresh = mount_inventory()?;
+    if portal_target(&absolute, &fresh, &expected)?.is_some()
+        || portal_filesystem::existing_ancestor(&absolute)? != resolved
+        || candidate_mount(&resolved, &fresh, &expected)? != before
+        || portal_mount::covering_mount(&mounts, resolved.as_os_str().as_bytes())?
+            != portal_mount::covering_mount(&fresh, resolved.as_os_str().as_bytes())?
+    {
+        return Err(UnknownAlias::new(AliasUncertainty::UntrustedMount));
+    }
+    Ok(Some(resolved))
+}
+
 fn resolve(path: &Path, cancel: &AtomicBool) -> Result<Option<HostAlias>, UnknownAlias> {
     check_cancel(cancel)?;
     let expected = expected_mount()?;
@@ -117,7 +138,7 @@ fn expected_mount() -> Result<PathBuf, UnknownAlias> {
     Ok(runtime.join("doc"))
 }
 
-fn mount_inventory() -> Result<Vec<u8>, UnknownAlias> {
+pub(crate) fn mount_inventory() -> Result<Vec<u8>, UnknownAlias> {
     let file = File::open("/proc/self/mountinfo")
         .map_err(|error| UnknownAlias::with_source(AliasUncertainty::MountInventory, error))?;
     read_mounts(file)

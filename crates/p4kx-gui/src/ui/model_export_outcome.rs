@@ -112,13 +112,7 @@ fn failed(
             Tone::Normal,
         ),
         ModelExportFailure::Refused(refused) => (
-            texts.format(
-                ExtractionText::TargetInInstallation,
-                &[(
-                    "installation",
-                    refused.installation.display().to_string().into(),
-                )],
-            ),
+            crate::installation::message(texts, refused),
             palette::DANGER_TEXT,
             Tone::Danger,
         ),

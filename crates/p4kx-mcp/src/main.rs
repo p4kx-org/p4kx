@@ -105,6 +105,7 @@ struct Args {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    p4kx_extraction::check_runtime_prerequisites()?;
     let settings_file = args
         .config_dir
         .as_ref()

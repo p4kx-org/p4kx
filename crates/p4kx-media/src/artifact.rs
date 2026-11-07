@@ -5,36 +5,55 @@ use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
+use p4kx_extraction::OwnedFileToken;
 use sha2::{Digest as _, Sha256};
 
+use crate::checkpoint::Checkpoint;
 use crate::error;
 use crate::hashing;
 use crate::output_path;
 use crate::{Algorithm, Artifact, ByteScope, Digest, MediaError};
 
-pub(crate) struct Stream {
+pub(crate) struct Stream<'a> {
     path: PathBuf,
     relative: String,
     file: BufWriter<File>,
     hash: Sha256,
     size: u64,
+    token: OwnedFileToken,
+    checkpoint: Checkpoint<'a>,
 }
 
-impl Stream {
-    pub(crate) fn create(root: &Path, relative: String) -> Result<Self, MediaError> {
+impl<'a> Stream<'a> {
+    pub(crate) fn create(
+        root: &Path,
+        relative: String,
+        checkpoint: &Checkpoint<'a>,
+    ) -> Result<Self, MediaError> {
         let path = root.join(&relative);
+        checkpoint.check()?;
         output_path::file(&path)?;
-        let file = File::create_new(&path).map_err(|source| error::io(&path, source))?;
+        let (file, token) = p4kx_extraction::create_output_file(
+            &path,
+            Some(checkpoint.protection),
+            checkpoint.cancel.flag(),
+        )?
+        .into_parts();
         Ok(Self {
             path,
             relative,
             file: BufWriter::new(file),
             hash: Sha256::new(),
             size: 0,
+            token,
+            checkpoint: *checkpoint,
         })
     }
 
     pub(crate) fn finish(mut self) -> Result<Artifact, MediaError> {
+        self.checkpoint.check()?;
+        self.token
+            .ensure_writable(&self.path, self.checkpoint.cancel.flag())?;
         self.file
             .flush()
             .map_err(|source| error::io(&self.path, source))?;
@@ -54,7 +73,7 @@ impl Stream {
     }
 }
 
-impl Write for Stream {
+impl Write for Stream<'_> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let written = self.file.write(bytes)?;
         self.hash.update(

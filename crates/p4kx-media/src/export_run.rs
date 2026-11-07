@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{Archive, Filter, OwnedDirectoryPermit};
 use std::borrow::Cow;
-use std::path::Path;
-
-use p4kx_extraction::{Archive, Filter};
 
 use crate::archive_provider;
 use crate::checkpoint::Checkpoint;
@@ -17,7 +15,7 @@ use crate::{
 
 pub(crate) fn build(
     archive: &Archive,
-    stage: &Path,
+    stage: &OwnedDirectoryPermit,
     options: &ExportOptions,
     providers: &[&dyn Provider],
     checkpoint: Checkpoint<'_>,

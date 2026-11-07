@@ -9,7 +9,7 @@ use p4kx_cryxml::{self as cryxml, Format};
 use crate::ExtractionError;
 use crate::buffers::Buffers;
 use crate::source::SourceEntry;
-use crate::write::{Chunk, Destination, EntryWriter, Outcome, create_temporary, write_error};
+use crate::write::{Chunk, Destination, EntryWriter, Outcome, write_error};
 
 /// The number of bytes read from the start of an Entry to recognise `CryXml`.
 pub(crate) const PEEK_LEN: usize = 16;
@@ -93,13 +93,19 @@ impl EntryWriter<'_> {
         if self.tracker.should_stop() {
             return Ok(Outcome::Cancelled);
         }
-        let (temporary, mut file) = create_temporary(&destination.folder)?;
+        let (temporary, mut file, ownership) = self.temporary(&destination.folder)?;
         let copied = file
             .write_all(xml)
             .map(|()| Chunk::End)
             .map_err(|source| write_error(destination.file.clone(), source));
         drop(file);
-        self.put_in_place(&temporary, &destination.file, copied, Outcome::Converted)
+        self.put_in_place(
+            &temporary,
+            &ownership,
+            &destination.file,
+            copied,
+            Outcome::Converted,
+        )
     }
 
     /// Appends the Entry data after what `data` holds until the end, reading straight into

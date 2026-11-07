@@ -5,6 +5,20 @@ Every command, option and exit code of `p4kx`, and the tools of the MCP server `
 authority on the exact options of the installed version. Terms follow [CONTEXT.md](../CONTEXT.md);
 the JSON shapes are in [cli-json.md](cli-json.md).
 
+## Flatpak prerequisite and write refusals
+
+Flatpak execution requires host Documents-portal API 5 or later with authenticated
+`GetHostPaths`. CLI and MCP check this before profiles, stored keys or normal work. A missing
+capability reports `[p4kx.runtime.documents-api5]` and exits 1; help/version remain available.
+The native package and Flatpak host requirements are described in [Linux packages](linux-packages.md).
+
+Archive-derived writes retain their actual source Archive context. A known installation is
+reported as an installation refusal. Unavailable source identity, target identity or source
+installation membership is reported separately with `[p4kx.write.source-identity]`,
+`[p4kx.write.target-identity]` or `[p4kx.write.source-membership]`; an attempt to replace the
+source itself uses `[p4kx.write.source-overwrite]`. Different Documents paths or grant IDs
+alone do not prove that an existing target is a different host file.
+
 ## Commands
 
 The first argument of nearly every command is the path of a `Data.p4k` Archive, written

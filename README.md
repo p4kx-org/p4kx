@@ -143,7 +143,8 @@ evidence, runtime DLLs and installer verification.
 
 Linux v0.5.0 packages cover AMD64 and ARM64 as tar.gz, AppImage, deb and Flatpak, each containing
 the GUI, CLI and MCP server. Native tar.gz/AppImage/deb require Ubuntu 24.04 / glibc 2.39;
-Flatpak uses Freedesktop Platform 25.08. See [Linux packages](docs/linux-packages.md) for
+Flatpak uses Freedesktop Platform 25.08 and additionally requires host Documents-portal API 5
+with authenticated host-path lookup. See [Linux packages](docs/linux-packages.md) for
 installation, AppImage CLI/MCP dispatch, sandbox grants, source notices and native verification.
 
 ## First run: the Archive key

@@ -98,7 +98,12 @@ fn code(error: &MediaError) -> Option<u8> {
             code(cause)
         }
         MediaError::Changed(_) => Some(exit::ARCHIVE_CHANGED),
-        MediaError::Protected(_) | MediaError::Destination(_) => Some(exit::INVALID_INPUT),
+        MediaError::Protected(cause) => Some(if cause.is_cancelled() {
+            exit::PARTIAL_FAILURE
+        } else {
+            exit::INVALID_INPUT
+        }),
+        MediaError::Destination(_) => Some(exit::INVALID_INPUT),
         MediaError::Cancelled
         | MediaError::Unsupported { .. }
         | MediaError::Limit { .. }
@@ -108,6 +113,10 @@ fn code(error: &MediaError) -> Option<u8> {
         | MediaError::IncompleteInventory { .. }
         | MediaError::ProjectionLoss { .. }
         | MediaError::Io { .. }
+        | MediaError::Cleanup(_)
+        | MediaError::OwnedOutput(_)
+        | MediaError::CleanupFailed { .. }
+        | MediaError::RetainedOutput { .. }
         | MediaError::Json(_) => Some(exit::PARTIAL_FAILURE),
         _ => None,
     }

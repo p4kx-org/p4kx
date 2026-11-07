@@ -9,7 +9,7 @@ use p4kx_gfx::{
 };
 use p4kx_localization::decode_line_breaks;
 
-use crate::output_file::{write_error, write_replacing};
+use crate::output_file::{write_error, write_replacing_protected};
 use crate::texture_parts::is_same_file;
 use crate::ui_imports::{ImportReport, ImportedFonts, resolve_fonts};
 use crate::ui_movie::Origin;
@@ -174,7 +174,7 @@ impl UiMovie<'_> {
     ) -> Result<UiRender, ConversionError> {
         self.check_output(out)?;
         let render = self.render(options)?;
-        write_replacing(out, |writer| {
+        write_replacing_protected(out, self.write_protection()?, None, |writer| {
             render
                 .image
                 .write_png(writer)

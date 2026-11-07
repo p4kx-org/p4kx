@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
 use p4kx_assembly::{Interior, ModelProvider};
 use p4kx_gltf::{GlbOptions, TextureLoader};
@@ -60,6 +61,31 @@ pub fn write_interior_package(
     out: &Path,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> PackageResult<PackageSummary> {
+    let observed = AtomicBool::new(false);
+    write_interior_package_with_context(
+        scene,
+        models,
+        textures,
+        options,
+        info,
+        out,
+        &crate::PackageWriteContext::standalone(cancelled, &observed),
+    )
+}
+
+/// Writes an Interior package with source protection at every output boundary.
+///
+/// # Errors
+/// Returns protection, cancellation, package validation, mesh or file failures.
+pub fn write_interior_package_with_context(
+    scene: &InteriorScene<'_>,
+    models: &dyn ModelProvider,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    info: &PackageInfo,
+    out: &Path,
+    context: &crate::PackageWriteContext<'_>,
+) -> PackageResult<PackageSummary> {
     let scene = Scene {
         entity: EntityRef {
             class_name: scene.name.to_owned(),
@@ -68,5 +94,5 @@ pub fn write_interior_package(
         items: interior_items(scene.interior),
         issues: scene.interior.issues(),
     };
-    write_scene(&scene, models, textures, options, info, out, cancelled)
+    write_scene(&scene, models, textures, options, info, out, context)
 }

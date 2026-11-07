@@ -173,3 +173,5 @@ mod window;
 mod xml_preview;
 mod xml_preview_limits;
 mod xml_previewing;
+
+mod prerequisite_notice;

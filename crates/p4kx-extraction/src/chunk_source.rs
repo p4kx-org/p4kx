@@ -10,9 +10,10 @@ use p4kx_chunks::{Chunk, ChunkFile, crch};
 use p4kx_cryxml as cryxml;
 
 use crate::entry_content::find_entry;
-use crate::output_file::{read_error, write_error, write_replacing};
+use crate::output_file::{read_error, write_error, write_replacing_protected};
 use crate::path_index::PathIndex;
 use crate::sound::read_capped;
+use crate::source_protection::SourceProtection;
 use crate::texture_parts::is_same_file;
 use crate::{ConversionError, UnknownEntries};
 
@@ -22,6 +23,7 @@ pub const MAX_CHUNK_FILE_LEN: u64 = 1 << 30;
 /// A `CryEngine` chunk file read from an Entry of an Archive or from a file on disk.
 #[derive(Debug)]
 pub struct ChunkSource {
+    protection: SourceProtection,
     name: String,
     path: Option<PathBuf>,
     file: ChunkFile<Vec<u8>>,
@@ -69,6 +71,7 @@ impl ChunkSource {
     }
 
     fn from_entry(archive: &Archive, entry: &Entry, limit: u64) -> Result<Self, ConversionError> {
+        let protection = SourceProtection::new(Some(archive.path()));
         let name = entry.path().to_owned();
         let reader = archive.open_entry(entry)?;
         let bytes = read_capped(reader, entry.uncompressed_size(), limit).map_err(|source| {
@@ -77,7 +80,7 @@ impl ChunkSource {
                 source,
             }
         })?;
-        Self::parse(name, None, bytes, limit)
+        Self::parse(name, None, bytes, limit, protection)
     }
 
     /// Reads the chunk file at `path`.
@@ -109,6 +112,7 @@ impl ChunkSource {
             Some(path.to_path_buf()),
             bytes,
             MAX_CHUNK_FILE_LEN,
+            SourceProtection::new(None),
         )
     }
 
@@ -117,12 +121,18 @@ impl ChunkSource {
         path: Option<PathBuf>,
         bytes: Option<Vec<u8>>,
         limit: u64,
+        protection: SourceProtection,
     ) -> Result<Self, ConversionError> {
         let Some(bytes) = bytes else {
             return Err(ConversionError::ChunkFileTooLarge { file: name, limit });
         };
         match ChunkFile::parse(bytes) {
-            Ok(file) => Ok(Self { name, path, file }),
+            Ok(file) => Ok(Self {
+                protection,
+                name,
+                path,
+                file,
+            }),
             Err(source) => Err(ConversionError::ChunkFile { file: name, source }),
         }
     }
@@ -137,6 +147,10 @@ impl ChunkSource {
     #[must_use]
     pub const fn file(&self) -> &ChunkFile<Vec<u8>> {
         &self.file
+    }
+
+    pub(crate) fn into_protection(self) -> SourceProtection {
+        self.protection
     }
 
     fn chunk_and_data(&self, index: usize, out: &Path) -> Result<(&Chunk, &[u8]), ConversionError> {
@@ -170,7 +184,7 @@ impl ChunkSource {
     /// [`ConversionError::Write`] when the file cannot be written.
     pub fn write_chunk_to_file(&self, index: usize, out: &Path) -> Result<Chunk, ConversionError> {
         let (chunk, data) = self.chunk_and_data(index, out)?;
-        write_replacing(out, |writer| {
+        write_replacing_protected(out, self.protection.context()?, None, |writer| {
             writer
                 .write_all(data)
                 .map_err(|source| write_error(out, source))?;
@@ -219,7 +233,7 @@ impl ChunkSource {
                 chunk_type: kind.to_string(),
             });
         };
-        write_replacing(out, |writer| {
+        write_replacing_protected(out, self.protection.context()?, None, |writer| {
             match text {
                 ChunkText::Xml(xml) => xml.write_to(&mut *writer),
                 ChunkText::Utf8(text) => writer.write_all(text.as_bytes()),

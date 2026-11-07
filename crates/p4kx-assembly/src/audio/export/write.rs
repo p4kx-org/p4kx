@@ -9,7 +9,8 @@ use std::path::{Path, PathBuf};
 
 use p4kx_audio::{AudioError, Codec, Loop, Soundbank, Wem};
 use p4kx_extraction::{
-    ConflictPolicy, ConversionError, MAX_SOUND_LEN, check_path_length, write_replacing_counted,
+    ArchiveWriteProtection, ConflictPolicy, ConversionError, MAX_SOUND_LEN, check_path_length,
+    write_replacing_counted_protected,
 };
 use rayon::prelude::*;
 
@@ -27,6 +28,8 @@ pub(super) struct Target<'a> {
     pub(super) folder: &'a Path,
     /// The absolute path of the folder, on which the path limit of ADR-0248 is measured.
     pub(super) absolute: &'a Path,
+    /// Immutable source evidence retained by this Archive job.
+    pub(super) protection: &'a ArchiveWriteProtection,
 }
 
 impl Target<'_> {
@@ -193,13 +196,7 @@ fn write_sound(
         bytes,
         options.format == SoundFormat::Raw && !prefetch,
     );
-    let chain: &[SoundFormat] = match (&wem, options.format) {
-        (None, _) => &[SoundFormat::Raw],
-        (Some(wem), SoundFormat::Ogg) if matches!(wem.codec(), Codec::Vorbis | Codec::Opus) => {
-            &[SoundFormat::Ogg, SoundFormat::Wav, SoundFormat::Raw]
-        }
-        (Some(_), _) => &[SoundFormat::Wav, SoundFormat::Raw],
-    };
+    let chain = formats(wem.as_ref(), options.format);
     for &format in chain {
         let path = match target.file(job, format) {
             Ok(path) => path,
@@ -226,8 +223,20 @@ fn write_sound(
             };
             return Some(Ok(sound(emitted, note)));
         }
-        match emit(format, wem.as_ref(), bytes, &path, (job, options, watch)) {
+        match emit(
+            format,
+            wem.as_ref(),
+            bytes,
+            &path,
+            Some(target.protection),
+            (job, options, watch),
+        ) {
             Ok(emitted) => return Some(Ok(sound(emitted, note))),
+            Err(
+                error @ (ConversionError::OwnedOutput(_) | ConversionError::CleanupFailed { .. }),
+            ) => {
+                return Some(Err(failure(job, chain_text(&error))));
+            }
             Err(_) if watch.is_cancelled() => return None,
             Err(ConversionError::Audio { source, .. }) if format != SoundFormat::Raw => {
                 note = Some(source.to_string());
@@ -236,6 +245,16 @@ fn write_sound(
         }
     }
     Some(Err(failure(job, "no form could be written".to_owned())))
+}
+
+const fn formats(wem: Option<&Wem<&[u8]>>, requested: SoundFormat) -> &'static [SoundFormat] {
+    match (wem, requested) {
+        (None, _) => &[SoundFormat::Raw],
+        (Some(wem), SoundFormat::Ogg) if matches!(wem.codec(), Codec::Vorbis | Codec::Opus) => {
+            &[SoundFormat::Ogg, SoundFormat::Wav, SoundFormat::Raw]
+        }
+        (Some(_), _) => &[SoundFormat::Wav, SoundFormat::Raw],
+    }
 }
 
 /// Fails a write once the export is cancelled, so the file being written is dropped.
@@ -262,6 +281,7 @@ fn emit(
     wem: Option<&Wem<&[u8]>>,
     bytes: &[u8],
     path: &Path,
+    protection: Option<&ArchiveWriteProtection>,
     (job, options, watch): (&Job, ExportOptions, &ExportWatch),
 ) -> Result<Emitted, ConversionError> {
     let convert = |source: AudioError, path: &Path| match source {
@@ -274,8 +294,12 @@ fn emit(
             source,
         },
     };
-    let replaced =
-        write_replacing_counted(path, options.policy == ConflictPolicy::IfChanged, |out| {
+    let replaced = write_replacing_counted_protected(
+        path,
+        options.policy == ConflictPolicy::IfChanged,
+        protection,
+        Some(&watch.token),
+        |out| {
             let mut guarded = Guarded { inner: out, watch };
             match (format, wem) {
                 (SoundFormat::Ogg, Some(wem)) => wem.write_ogg(&mut guarded).map(drop),
@@ -283,7 +307,8 @@ fn emit(
                 _ => guarded.write_all(bytes).map_err(AudioError::Write),
             }
             .map_err(|source| convert(source, path))
-        })?;
+        },
+    )?;
     Ok(Emitted {
         size: replaced.len,
         state: if replaced.changed {
@@ -306,77 +331,5 @@ fn chain_text(error: &ConversionError) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::fs;
-
-    use p4kx_extraction::ConflictPolicy;
-
-    use super::super::plan::{Job, Origin};
-    use super::super::{ExportOptions, ExportWatch, SoundFormat};
-    use super::{ExportState, emit};
-
-    fn job() -> Job {
-        Job {
-            trigger: "Play".to_owned(),
-            stem: "Play".to_owned(),
-            wem_id: 1,
-            origin: Origin::Loose(0),
-        }
-    }
-
-    #[test]
-    fn a_write_after_cancel_fails_and_leaves_no_file_behind() {
-        let dir = tempfile::tempdir().expect("folder");
-        let watch = ExportWatch::default();
-        watch.cancel();
-        let options = ExportOptions {
-            format: SoundFormat::Raw,
-            policy: ConflictPolicy::Overwrite,
-        };
-
-        let emitted = emit(
-            SoundFormat::Raw,
-            None,
-            &[7; 64],
-            &dir.path().join("Play.wem"),
-            (&job(), options, &watch),
-        );
-
-        assert!(emitted.is_err(), "the write stops");
-        assert_eq!(fs::read_dir(dir.path()).expect("read").count(), 0);
-    }
-
-    #[test]
-    fn an_uncancelled_write_reports_the_bytes_it_wrote() {
-        let dir = tempfile::tempdir().expect("folder");
-        let options = ExportOptions {
-            format: SoundFormat::Raw,
-            policy: ConflictPolicy::IfChanged,
-        };
-        let path = dir.path().join("Play.wem");
-        let watch = ExportWatch::default();
-
-        let first = emit(
-            SoundFormat::Raw,
-            None,
-            &[7; 64],
-            &path,
-            (&job(), options, &watch),
-        )
-        .expect("first");
-        let second = emit(
-            SoundFormat::Raw,
-            None,
-            &[7; 64],
-            &path,
-            (&job(), options, &watch),
-        )
-        .expect("second");
-
-        assert_eq!((first.size, second.size), (64, 64));
-        assert_eq!(
-            (first.state, second.state),
-            (ExportState::Written, ExportState::Kept)
-        );
-    }
-}
+#[path = "write_tests.rs"]
+mod tests;

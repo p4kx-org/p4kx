@@ -88,6 +88,23 @@ impl Installation {
             })
             .map_or(Ok(()), |folder| Err(refused(folder)))
     }
+
+    pub(crate) fn check_namespace(&self, target: &Path) -> Result<(), WriteRefused> {
+        let Some(parent) = target.parent() else {
+            return self.check(target);
+        };
+        self.check(parent)?;
+        let target_key = key(target);
+        self.folders
+            .iter()
+            .find(|folder| target_key.starts_with(&folder.key))
+            .map_or(Ok(()), |folder| {
+                Err(WriteRefused {
+                    target: target.to_path_buf(),
+                    installation: without_verbatim_prefix(&folder.shown),
+                })
+            })
+    }
 }
 
 /// Returns `path` spelled the way a person writes it: `\\?\C:\x` as `C:\x` and `\\?\UNC\s\x` as
@@ -105,7 +122,7 @@ pub fn without_verbatim_prefix(path: &Path) -> PathBuf {
 }
 
 /// Makes `path` absolute and resolves `.`, `..` and every link that exists.
-fn resolve(path: &Path) -> PathBuf {
+pub(crate) fn resolve(path: &Path) -> PathBuf {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     let mut resolved = PathBuf::new();
     for component in absolute.components() {

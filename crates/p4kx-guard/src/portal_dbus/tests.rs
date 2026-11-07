@@ -5,9 +5,8 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::io::Read;
 use std::net::Shutdown;
-#[cfg(not(unix))]
-use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::sync::atomic::AtomicBool;
+use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -25,6 +24,7 @@ type TestResult = Result<(), TestError>;
 
 #[derive(Clone, Copy)]
 enum Scenario {
+    Probe,
     VersionFive,
     VersionFour,
     Denied,
@@ -34,34 +34,28 @@ enum Scenario {
 
 #[cfg(unix)]
 type TestSocket = std::os::unix::net::UnixStream;
-#[cfg(not(unix))]
-type TestSocket = TcpStream;
+#[cfg(windows)]
+type TestSocket = uds_windows::UnixStream;
 
 #[cfg(unix)]
 fn sockets() -> std::io::Result<(TestSocket, TestSocket)> {
     TestSocket::pair()
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
 fn sockets() -> std::io::Result<(TestSocket, TestSocket)> {
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
-    let client = TcpStream::connect(listener.local_addr()?)?;
-    let (server, _) = listener.accept()?;
-    Ok((client, server))
+    TestSocket::pair()
 }
 
 fn builder(stream: TestSocket) -> Builder<'static> {
-    #[cfg(unix)]
-    {
-        Builder::async_io_unix_stream(stream)
-    }
-    #[cfg(not(unix))]
-    {
-        Builder::async_io_tcp_stream(stream)
-    }
+    Builder::async_io_unix_stream(stream)
 }
 
-fn serve(stream: TestSocket, scenario: Scenario) -> Result<usize, TestError> {
+fn serve(
+    stream: TestSocket,
+    scenario: Scenario,
+    finished: &Receiver<()>,
+) -> Result<usize, TestError> {
     let stop = stream.try_clone()?;
     let result = portal_deadline::with_socket_deadline(
         Instant::now() + Duration::from_secs(3),
@@ -77,14 +71,16 @@ fn serve(stream: TestSocket, scenario: Scenario) -> Result<usize, TestError> {
                 .build()
                 .map_err(portal_reply::call_error)?;
             let mut incoming = MessageIterator::from(&connection);
+            let mut calls = 0;
             for index in 0..5 {
                 let request = incoming
                     .next()
                     .ok_or_else(|| UnknownAlias::new(AliasUncertainty::SessionBus))?
                     .map_err(portal_reply::call_error)?;
+                calls = index + 1;
                 if matches!(scenario, Scenario::SilentCall) {
                     thread::sleep(Duration::from_millis(350));
-                    return Ok(index + 1);
+                    break;
                 }
                 let response =
                     response(&request, scenario, index).map_err(portal_reply::call_error)?;
@@ -94,10 +90,15 @@ fn serve(stream: TestSocket, scenario: Scenario) -> Result<usize, TestError> {
                 if matches!(scenario, Scenario::VersionFour) && index == 1
                     || matches!(scenario, Scenario::Denied) && index == 3
                 {
-                    return Ok(index + 1);
+                    break;
                 }
             }
-            Ok(5)
+            finished
+                .recv_timeout(Duration::from_secs(2))
+                .map_err(|error| UnknownAlias::with_source(AliasUncertainty::Timeout, error))?;
+            drop(incoming);
+            connection.close().map_err(portal_reply::call_error)?;
+            Ok(calls)
         },
     );
     Ok(result?)
@@ -120,25 +121,38 @@ fn response(request: &Message, scenario: Scenario, index: usize) -> zbus::Result
         } else {
             ":1.7"
         }),
-        Some("Get") => reply.build(&OwnedValue::from(
-            if matches!(scenario, Scenario::VersionFour) {
-                4_u32
-            } else {
-                5
-            },
-        )),
+        Some("Get") => {
+            assert_eq!(
+                header.destination().map(zbus::names::BusName::as_str),
+                Some(super::DOCUMENTS),
+                "the first property call permits standard bus autostart"
+            );
+            reply.build(&OwnedValue::from(
+                if matches!(scenario, Scenario::VersionFour) {
+                    4_u32
+                } else {
+                    5
+                },
+            ))
+        }
         Some("GetMountPoint") => reply.build(&b"/run/user/1001/doc\0".to_vec()),
         Some("GetHostPaths") => {
             let requested: Vec<String> = request.body().deserialize()?;
+            let expected = if matches!(scenario, Scenario::Probe) {
+                Vec::new()
+            } else {
+                vec!["aabbccdd"]
+            };
             assert_eq!(
-                requested,
-                ["aabbccdd"],
-                "the real encoded request contains only the selected document"
+                requested, expected,
+                "the actual encoded query has its bounded document selection"
             );
             if matches!(scenario, Scenario::Denied) {
                 Message::error(&header, "org.freedesktop.DBus.Error.AccessDenied")?
                     .sender(sender)?
                     .build(&"private /home/not-a-real-user/document")
+            } else if matches!(scenario, Scenario::Probe) {
+                reply.build(&BTreeMap::<String, Vec<u8>>::new())
             } else {
                 reply.build(&BTreeMap::from([(
                     "aabbccdd",
@@ -155,7 +169,8 @@ fn query(
 ) -> Result<(Result<super::DocumentsReply, UnknownAlias>, usize), TestError> {
     let (client, server) = sockets()?;
     let peer_lifetime = (client.try_clone()?, server.try_clone()?);
-    let service = thread::spawn(move || serve(server, scenario));
+    let (finished, observed) = mpsc::channel();
+    let service = thread::spawn(move || serve(server, scenario, &observed));
     let shutdown = client.try_clone()?;
     let result = portal_deadline::with_socket_deadline(
         Instant::now() + Duration::from_secs(2),
@@ -169,12 +184,28 @@ fn query(
                 .method_timeout(Duration::from_millis(200))
                 .build()
                 .map_err(portal_reply::call_error)?;
-            super::lookup_on(&connection, "aabbccdd", &AtomicBool::new(false))
+            let document = (!matches!(scenario, Scenario::Probe)).then_some("aabbccdd");
+            let result = super::query_on(&connection, document, &AtomicBool::new(false));
+            finished
+                .send(())
+                .map_err(|error| UnknownAlias::with_source(AliasUncertainty::SessionBus, error))?;
+            let closed = connection.close().map_err(portal_reply::call_error);
+            result.and_then(|reply| closed.map(|()| reply))
         },
     );
     let calls = service.join().map_err(|_| "fake service failed")??;
     drop(peer_lifetime);
     Ok((result, calls))
+}
+
+#[test]
+fn an_actual_empty_host_path_call_probes_capability_without_a_document() -> TestResult {
+    let (reply, calls) = query(Scenario::Probe)?;
+    let reply = reply?;
+    assert_eq!(calls, 5);
+    assert_eq!(reply.paths, Vec::<(String, Vec<u8>)>::new());
+    assert_eq!(reply.owner_before, reply.owner_after);
+    Ok(())
 }
 
 #[test]

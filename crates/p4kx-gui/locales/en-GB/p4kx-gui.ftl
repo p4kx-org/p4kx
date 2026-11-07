@@ -1473,3 +1473,17 @@ folder-conversion-summary-input = Input folder: { $path }
 folder-conversion-failed-title = Conversion failed
 folder-conversion-failed = Cannot convert { $path }: { $reason }
 folder-conversion-stopped = The conversion of { $path } stopped without a result.
+
+protection-target-identity = The destination's host path could not be verified. Writing here is blocked. Choose another folder or check access to its host path.
+protection-source-identity = The archive's host path could not be verified. Writing data from this archive is blocked. Grant access to the archive again.
+protection-source-membership = It could not be determined whether the archive's parent folder { $parent } belongs to a game installation. Choose an export folder outside that folder, or grant access to the source folder.
+protection-identity-unavailable = The output path could not be identified safely. Writing here is blocked.
+protection-prerequisite-title = Flatpak prerequisite unavailable
+protection-prerequisite = This Flatpak needs a Documents portal with API 5 or later and working host path lookup. Update your desktop portal, or use the tar.gz, AppImage or deb package.
+protection-source-overwrite = This output would replace an input archive. Choose a different file or folder.
+gui-command-help =
+    P4KX desktop
+    Usage: p4kx-gui [ARCHIVE]
+    -h, --help: Show this help
+    -V, --version: Show the version
+    Flatpak requires Documents portal API 5 or later with authenticated host path lookup.

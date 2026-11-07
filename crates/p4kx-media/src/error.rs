@@ -4,7 +4,10 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::{ArchiveChanged, ArchiveError, ExtractionError, WriteRefused};
+use p4kx_extraction::{
+    ArchiveChanged, ArchiveError, ExtractionError, OwnedOutputCleanupError, OwnedOutputError,
+    WriteProtectionError,
+};
 
 use crate::MediaKind;
 
@@ -96,9 +99,33 @@ pub enum MediaError {
     /// The source changed during the generation.
     #[error(transparent)]
     Changed(#[from] ArchiveChanged),
-    /// The output is in a protected installation.
+    /// Installation protection or source/target identity prevents writing.
     #[error(transparent)]
-    Protected(#[from] WriteRefused),
+    Protected(WriteProtectionError),
+    /// Cleanup stopped at an uncertain or inaccessible owned output.
+    #[error(transparent)]
+    Cleanup(OwnedOutputCleanupError),
+    /// An exclusively created output or its cleanup retained a typed failure.
+    #[error(transparent)]
+    OwnedOutput(OwnedOutputError),
+    /// Both the primary operation and its explicit cleanup failed.
+    #[error("media operation failed: {primary}; cleanup also failed: {cleanup}")]
+    CleanupFailed {
+        /// The original operation failure.
+        #[source]
+        primary: Box<Self>,
+        /// The failure that prevented complete cleanup.
+        cleanup: Box<Self>,
+    },
+    /// A successful rename could not authenticate its new output spelling.
+    #[error("media output {} was retained: {cause}", path.display())]
+    RetainedOutput {
+        /// The renamed output kept for recovery.
+        path: PathBuf,
+        /// The original post-rename failure.
+        #[source]
+        cause: Box<Self>,
+    },
     /// A file operation failed.
     #[error("media I/O at {}: {source}", path.display())]
     Io {
@@ -117,6 +144,57 @@ pub enum MediaError {
     /// Serialisation failed before an artifact could be committed.
     #[error("media JSON error: {0}")]
     Json(#[from] serde_json::Error),
+}
+
+impl From<WriteProtectionError> for MediaError {
+    fn from(cause: WriteProtectionError) -> Self {
+        if cause.is_cancelled() {
+            Self::Cancelled
+        } else {
+            Self::Protected(cause)
+        }
+    }
+}
+
+impl From<OwnedOutputCleanupError> for MediaError {
+    fn from(cause: OwnedOutputCleanupError) -> Self {
+        Self::Cleanup(cause)
+    }
+}
+
+impl From<OwnedOutputError> for MediaError {
+    fn from(cause: OwnedOutputError) -> Self {
+        match cause {
+            OwnedOutputError::Protection(cause) => cause.into(),
+            OwnedOutputError::Io { path, source } => match source.downcast::<Self>() {
+                Ok(cause) => cause,
+                Err(source) => Self::Io { path, source },
+            },
+            cause => Self::OwnedOutput(cause),
+        }
+    }
+}
+
+pub(crate) fn creation(path: &Path, source: io::Error) -> MediaError {
+    if p4kx_extraction::owned_output_failure(&source).is_some_and(OwnedOutputError::is_cancelled) {
+        MediaError::Cancelled
+    } else {
+        io(path, source)
+    }
+}
+
+pub(crate) fn finish<T>(
+    result: Result<T, MediaError>,
+    cleanup: Result<(), MediaError>,
+) -> Result<T, MediaError> {
+    match (result, cleanup) {
+        (result, Ok(())) => result,
+        (Ok(_), Err(cleanup)) => Err(cleanup),
+        (Err(primary), Err(cleanup)) => Err(MediaError::CleanupFailed {
+            primary: Box::new(primary),
+            cleanup: Box::new(cleanup),
+        }),
+    }
 }
 
 pub(crate) fn io(path: &Path, source: io::Error) -> MediaError {

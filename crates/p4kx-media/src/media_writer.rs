@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+
+use p4kx_extraction::OwnedDirectoryPermit;
 
 use serde::Serialize;
 
@@ -17,10 +19,10 @@ use crate::{
     Subresource,
 };
 
-struct KindStream {
+struct KindStream<'a> {
     capability: Capability,
     counts: Counts,
-    stream: Stream,
+    stream: Stream<'a>,
 }
 
 pub(crate) struct Finished {
@@ -33,10 +35,11 @@ pub(crate) struct Finished {
 pub struct MediaWriter<'a> {
     pub(crate) root: PathBuf,
     pub(crate) checkpoint: Checkpoint<'a>,
+    pub(crate) namespace: &'a OwnedDirectoryPermit,
     pub(crate) limits: Limits,
-    kinds: Vec<KindStream>,
-    manifest: Stream,
-    sources: Stream,
+    kinds: Vec<KindStream<'a>>,
+    manifest: Stream<'a>,
+    sources: Stream<'a>,
     active: Option<usize>,
     source: Option<Source>,
     terminal: Option<Status>,
@@ -49,15 +52,16 @@ pub struct MediaWriter<'a> {
 
 impl<'a> MediaWriter<'a> {
     pub(crate) fn new(
-        root: &Path,
+        namespace: &'a OwnedDirectoryPermit,
         capabilities: Vec<Capability>,
         limits: Limits,
         checkpoint: Checkpoint<'a>,
         diagnostic: bool,
     ) -> Result<Self, MediaError> {
+        let root = namespace.path();
         let mut kinds = Vec::new();
         for capability in capabilities {
-            let stream = Stream::create(root, format!("{}.jsonl", capability.kind))?;
+            let stream = Stream::create(root, format!("{}.jsonl", capability.kind), &checkpoint)?;
             kinds.push(KindStream {
                 capability,
                 counts: Counts::default(),
@@ -67,10 +71,11 @@ impl<'a> MediaWriter<'a> {
         Ok(Self {
             root: root.into(),
             checkpoint,
+            namespace,
             limits,
             kinds,
-            manifest: Stream::create(root, "artifacts.jsonl".into())?,
-            sources: Stream::create(root, "sources.jsonl".into())?,
+            manifest: Stream::create(root, "artifacts.jsonl".into(), &checkpoint)?,
+            sources: Stream::create(root, "sources.jsonl".into(), &checkpoint)?,
             active: None,
             source: None,
             terminal: None,

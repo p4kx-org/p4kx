@@ -93,7 +93,7 @@ pub(crate) fn run(args: &DcbQueryArgs, as_json: bool) -> Result<ExitCode> {
     match &args.out {
         None => output.to_stdout(&mut counts)?,
         Some(out) => {
-            counts = output.to_file(out, &args.archive)?;
+            counts = output.to_file(out, input.path())?;
             print_summary(args, out, format, counts, as_json)?;
         }
     }
@@ -119,8 +119,16 @@ impl Output<'_, '_, '_> {
         let format = match self.format {
             QueryFormat::Table => {
                 let mut counts = Counts::default();
-                query_file::write_replacing(out, |file| self.write(file, false, &mut counts))
-                    .with_context(|| format!("cannot write {}", out.display()))?;
+                let cancel = p4kx_extraction::CancelToken::new();
+                let protection =
+                    p4kx_extraction::ArchiveWriteProtection::new(archive, cancel.flag())?;
+                query_file::write_replacing_protected(
+                    out,
+                    Some(&protection),
+                    Some(&cancel),
+                    |file| self.write(file, false, &mut counts),
+                )
+                .with_context(|| format!("cannot write {}", out.display()))?;
                 return Ok(counts);
             }
             QueryFormat::Csv => self.csv_format(),

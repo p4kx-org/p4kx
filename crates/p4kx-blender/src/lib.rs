@@ -34,6 +34,12 @@ mod manifest_materials;
 mod manifest_rig;
 mod mesh_options;
 mod meshes;
+#[cfg(test)]
+mod owned_output_tests;
+mod package_destination;
+mod package_paths;
+mod package_replacement;
+mod package_write_context;
 mod plan;
 mod rename;
 mod rig_package;
@@ -43,9 +49,11 @@ mod stage;
 mod textures;
 mod write;
 
-pub use character::{CharacterScene, write_character_package};
+pub use character::{
+    CharacterScene, write_character_package, write_character_package_with_context,
+};
 pub use error::PackageError;
-pub use interior::{InteriorScene, write_interior_package};
+pub use interior::{InteriorScene, write_interior_package, write_interior_package_with_context};
 pub use manifest::{
     AlphaMeaning, Basis, BuildInfo, CharacterSource, ColourSpace, Coordinates, EntityRef, FORMAT,
     FORMAT_VERSION, Format, Generator, Issue, IssueOrigin, MANIFEST_FILE, MESHES_FOLDER, Manifest,
@@ -58,25 +66,9 @@ pub use manifest_materials::{
     Palette, PaletteColours, PaletteEntry, Parameter, TextureUse,
 };
 pub use manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
+pub use package_write_context::PackageWriteContext;
 pub use schema::manifest_schema;
-pub use stage::check_output;
-pub use write::{PackageInfo, PackageSummary, write_package};
+pub use stage::{check_output, check_output_with_context};
+pub use write::{PackageInfo, PackageSummary, write_package, write_package_with_context};
 
 pub(crate) type PackageResult<T> = Result<T, PackageError>;
-
-/// Asks the caller whether to stop.
-pub(crate) struct Cancelled<'a>(&'a (dyn Fn() -> bool + Sync));
-
-impl<'a> Cancelled<'a> {
-    pub(crate) const fn new(check: &'a (dyn Fn() -> bool + Sync)) -> Self {
-        Self(check)
-    }
-
-    pub(crate) fn check(&self) -> PackageResult<()> {
-        if (self.0)() {
-            Err(PackageError::Cancelled)
-        } else {
-            Ok(())
-        }
-    }
-}

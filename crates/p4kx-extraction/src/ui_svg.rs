@@ -5,7 +5,7 @@ use std::path::Path;
 
 use p4kx_gfx::{GfxError, RasterOptions, Skipped, SvgReport, TagFailure};
 
-use crate::output_file::{write_error, write_replacing};
+use crate::output_file::{write_error, write_replacing_protected};
 use crate::ui_imports::ImportReport;
 use crate::{ConversionError, UiBitmapFailure, UiMovie};
 
@@ -54,15 +54,16 @@ impl UiMovie<'_> {
     ) -> Result<UiSvg, ConversionError> {
         self.check_output(out)?;
         let frame = self.compose_frame(options)?;
-        let report: SvgReport = write_replacing(out, |writer| {
-            frame
-                .scene
-                .write_svg(&frame.bitmaps.images, options, Some(&self.title()), writer)
-                .map_err(|source| match source {
-                    GfxError::Write(source) => write_error(out, source),
-                    source => self.frame_error(source),
-                })
-        })?;
+        let report: SvgReport =
+            write_replacing_protected(out, self.write_protection()?, None, |writer| {
+                frame
+                    .scene
+                    .write_svg(&frame.bitmaps.images, options, Some(&self.title()), writer)
+                    .map_err(|source| match source {
+                        GfxError::Write(source) => write_error(out, source),
+                        source => self.frame_error(source),
+                    })
+            })?;
         Ok(UiSvg {
             width: report.width,
             height: report.height,

@@ -26,6 +26,7 @@ mod localization_text;
 mod model_export_text;
 mod model_info_text;
 mod model_text;
+mod protection_text;
 mod query_text;
 mod record_change_text;
 mod record_export_text;
@@ -63,6 +64,7 @@ pub(crate) use localization_text::language_name;
 pub use model_export_text::ModelExportText;
 pub use model_info_text::ModelInfoText;
 pub use model_text::ModelText;
+pub use protection_text::ProtectionText;
 pub use query_text::QueryText;
 pub use record_change_text::RecordChangeText;
 pub use record_export_text::RecordExportText;
@@ -234,6 +236,8 @@ pub enum Text {
     PreviewKeyRejected,
     /// A text of the Extraction windows.
     Extraction(ExtractionText),
+    /// A text of output protection and operational prerequisites.
+    Protection(ProtectionText),
     /// A text of the Comparison tab.
     Comparison(ComparisonText),
     /// A text of the DataForge node and tab.

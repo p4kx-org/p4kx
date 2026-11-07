@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use std::io::{self, Write};
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
 use p4kx_channels::PublicPatches;
+use p4kx_extraction::{
+    ArchiveWriteProtection, CancelToken, ConversionError, write_replacing_protected,
+};
 use serde::{Serialize, Serializer};
 
 use crate::entry_change::{count, count_by_directory};
@@ -151,24 +154,54 @@ impl<'a> Comparison<'a> {
         to_report(self)
     }
 
-    /// Writes the JSON report to the file at `path` as pretty JSON with a final newline and
-    /// flushes it to disk.
+    /// Atomically writes the JSON report as pretty JSON with a final newline.
     ///
     /// # Errors
-    ///
-    /// Returns the error of creating, writing or syncing the file, or a
-    /// [`PermissionDenied`](io::ErrorKind::PermissionDenied) error holding the
-    /// [`WriteRefused`](p4kx_extraction::WriteRefused) when `path` lies inside a Star Citizen
-    /// installation.
+    /// Returns an I/O error or a permission error retaining the source/target protection refusal.
     pub fn save_report(&self, path: &Path) -> io::Result<()> {
-        p4kx_extraction::ensure_writable(path)
-            .map_err(|refused| io::Error::new(io::ErrorKind::PermissionDenied, refused))?;
-        let mut out = BufWriter::new(File::create(path)?);
-        serde_json::to_writer_pretty(&mut out, self)?;
-        writeln!(out)?;
-        out.into_inner()
-            .map_err(io::IntoInnerError::into_error)?
-            .sync_all()
+        self.save_report_with_cancel(path, None)
+    }
+
+    /// Atomically writes the report, keeping the target unchanged when cancelled.
+    ///
+    /// # Errors
+    /// Returns an I/O or protection error, or `Interrupted` when cancelled.
+    pub fn save_report_with_cancel(
+        &self,
+        path: &Path,
+        cancel: Option<&CancelToken>,
+    ) -> io::Result<()> {
+        static NEVER_CANCELLED: AtomicBool = AtomicBool::new(false);
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(io::Error::from(io::ErrorKind::Interrupted));
+        }
+        let flag = cancel.map_or(&NEVER_CANCELLED, CancelToken::flag);
+        let protection = ArchiveWriteProtection::for_sources(
+            &[self.old_side().archive(), self.new_side().archive()],
+            flag,
+        )
+        .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
+        write_replacing_protected(path, Some(&protection), cancel, |writer| {
+            serde_json::to_writer_pretty(&mut *writer, self)
+                .map_err(io::Error::other)
+                .and_then(|()| writeln!(writer))
+                .map_err(|source| ConversionError::Write {
+                    path: path.to_path_buf(),
+                    source,
+                })?;
+            if cancel.is_some_and(CancelToken::is_cancelled) {
+                return Err(ConversionError::Cancelled);
+            }
+            Ok(())
+        })
+        .map_err(|error| match error {
+            ConversionError::Installation(error) => {
+                io::Error::new(io::ErrorKind::PermissionDenied, error)
+            }
+            ConversionError::Cancelled => io::Error::from(io::ErrorKind::Interrupted),
+            ConversionError::Write { source, .. } => source,
+            error => io::Error::other(error),
+        })
     }
 }
 

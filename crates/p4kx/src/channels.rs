@@ -136,6 +136,7 @@ fn add(path: &Path, settings_file: &Path, as_json: bool) -> Result<()> {
         settings.channels.add_folder(path.clone())
     };
     if added {
+        crate::guard::ensure_writable(settings_file)?;
         settings.save(settings_file)?;
     }
     if as_json {
@@ -166,6 +167,7 @@ fn remove(path: &Path, settings_file: &Path, as_json: bool) -> Result<()> {
     if !settings.channels.remove(&absolute) {
         return Err(InvalidPath::NotAdded(absolute).into());
     }
+    crate::guard::ensure_writable(settings_file)?;
     settings.save(settings_file)?;
     if as_json {
         json::print(&ChangeJson {

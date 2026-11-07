@@ -10,7 +10,7 @@ use anyhow::{Context, Result};
 use p4kx_channels::PublicPatches;
 use p4kx_export::{
     CatalogError, CatalogFailure, CatalogFile, CatalogOptions, CatalogPublicationMode,
-    CatalogSummary, Compression, CraftingWarning, Filter, catalog_schema, write_catalog,
+    CatalogSummary, Compression, CraftingWarning, Filter, catalog_schema, write_catalog_file,
 };
 use p4kx_extraction::Archive;
 
@@ -107,13 +107,11 @@ fn write_file(
     options: &CatalogOptions<'_>,
     out: &Path,
 ) -> Result<CatalogSummary> {
-    let written = write_catalog(archive, options, Compression::for_path(out), || {
-        CatalogFile::create(out).map_err(|error| {
-            io::Error::new(
-                error.kind(),
-                format!("cannot write {}: {error}", out.display()),
-            )
-        })
+    let uncancelled = p4kx_extraction::CancelToken::new();
+    let cancel = options.cancel.unwrap_or(&uncancelled);
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let written = write_catalog_file(archive, options, Compression::for_path(out), || {
+        CatalogFile::create_protected(out, &protection, cancel)
     });
     let (summary, file) = written.map_err(into_anyhow)?;
     file.commit()

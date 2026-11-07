@@ -3,6 +3,7 @@
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// The host identity established for a Documents-portal path.
 #[derive(Debug)]
@@ -26,6 +27,7 @@ pub struct HostAlias {
 }
 
 impl HostAlias {
+    #[cfg(any(target_os = "linux", test))]
     pub(crate) const fn new(path: PathBuf, document_id: String, grant: DocumentGrant) -> Self {
         Self {
             path,
@@ -88,6 +90,12 @@ pub enum AliasUncertainty {
     /// Required filesystem identity cannot be observed.
     #[error("document filesystem identity unavailable")]
     Filesystem,
+    /// Portal proxy identities cannot prove distinct host files for an existing output.
+    #[error("host file identity unavailable")]
+    HostFileIdentity,
+    /// An output no longer matches its exclusively created descriptor or namespace.
+    #[error("owned output identity changed")]
+    OwnedOutputIdentity,
     /// A local authenticated session connection is unavailable.
     #[error("session bus unavailable")]
     SessionBus,
@@ -121,12 +129,12 @@ pub enum AliasUncertainty {
 }
 
 /// An uncertainty result preserving local failures without copying remote error text.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 #[error("cannot establish the portal alias: {reason}")]
 pub struct UnknownAlias {
     reason: AliasUncertainty,
     #[source]
-    source: Option<Box<dyn Error + Send + Sync>>,
+    source: Option<Arc<dyn Error + Send + Sync>>,
 }
 
 impl UnknownAlias {
@@ -143,7 +151,7 @@ impl UnknownAlias {
     ) -> Self {
         Self {
             reason,
-            source: Some(Box::new(source)),
+            source: Some(Arc::new(source)),
         }
     }
 

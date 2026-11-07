@@ -191,6 +191,7 @@ fn set(store: &KeyStore, text: Option<&str>, archive: Option<&Path>, as_json: bo
     };
     let key = ArchiveKey::from_hex(text).map_err(InvalidKey::Text)?;
     let checked_against = check_against(&key, archive)?;
+    crate::guard::ensure_writable(store.file())?;
     store.save(&key)?;
     if as_json {
         json::print(&StoredJson {
@@ -305,6 +306,7 @@ fn in_use(chosen: &ChosenKey) -> InUseJson {
 }
 
 fn remove(store: &KeyStore, as_json: bool) -> Result<()> {
+    crate::guard::ensure_writable(store.file())?;
     let removed = store.remove()?;
     if as_json {
         json::print(&RemovedJson {

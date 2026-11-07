@@ -13,7 +13,7 @@ use crate::items::entity_ref;
 use crate::manifest::{Issue, IssueOrigin, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigPart, RigPartOrigin};
 use crate::rig_package::{RigScene, rig_manifest, write_rig_package};
-use crate::{PackageInfo, PackageResult, PackageSummary};
+use crate::{PackageInfo, PackageResult, PackageSummary, PackageWriteContext};
 
 /// Writes the creature `assembly` as a package: `meshes/m0001.glb` is the Assembly as
 /// [`Assembly::write_glb_with`] writes it, its skeleton as bone nodes with the skins bound to it,
@@ -27,7 +27,7 @@ pub(crate) fn write_creature_package(
     options: &GlbOptions,
     info: &PackageInfo,
     out: &Path,
-    cancelled: &(dyn Fn() -> bool + Sync),
+    context: &PackageWriteContext<'_>,
 ) -> PackageResult<PackageSummary> {
     let options = options.with_materials(MaterialMode::Textures);
     let name = assembly.root().map_or("", Part::class_name);
@@ -43,7 +43,7 @@ pub(crate) fn write_creature_package(
         out,
         name,
         &options,
-        cancelled,
+        context,
         |options, writer| assembly.write_glb_with(options, textures, writer),
         |written| manifest(assembly, interior_left_out, info, &options, written),
     )

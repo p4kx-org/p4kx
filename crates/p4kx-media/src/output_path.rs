@@ -5,9 +5,10 @@ use std::fs::{self, Metadata};
 use std::path::{Component, Path, PathBuf};
 
 use crate::MediaError;
+use crate::checkpoint::Checkpoint;
 use crate::error;
 
-pub(crate) fn ensure_directory(path: &Path) -> Result<(), MediaError> {
+pub(crate) fn ensure_directory(path: &Path, checkpoint: &Checkpoint<'_>) -> Result<(), MediaError> {
     let mut current = PathBuf::new();
     for component in path.components() {
         if matches!(component, Component::ParentDir) {
@@ -16,11 +17,17 @@ pub(crate) fn ensure_directory(path: &Path) -> Result<(), MediaError> {
             ));
         }
         current.push(component);
-        p4kx_extraction::ensure_writable(&current)?;
+        checkpoint.writable(&current)?;
         match inspect(&current)? {
             Some(metadata) if metadata.is_dir() => {}
             Some(_) => return Err(not_plain(&current)),
-            None => fs::create_dir(&current).map_err(|source| error::io(&current, source))?,
+            None => {
+                p4kx_extraction::create_output_directory(
+                    &current,
+                    Some(checkpoint.protection),
+                    checkpoint.cancel.flag(),
+                )?;
+            }
         }
     }
     Ok(())

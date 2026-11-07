@@ -5,7 +5,8 @@ query. `NotPortal` means the observed path is outside the Documents mount. `Reso
 contains an authenticated host spelling, document ID and file/directory grant kind.
 `Unknown` retains a typed reason and local error source where available. None of these
 results classifies a game installation or authorises a write. The installation/write
-policy is separate; this core is not wired into `ensure_writable`.
+policy is separate. `ensure_writable` authenticates target routes, and Archive-derived writers
+retain an `ArchiveWriteProtection` context for their actual source Archives.
 
 A file-only `Data.p4k` grant can hide `Bin64` and its entire host parent. A successful
 mapping does not establish sibling visibility, installation membership or a complete
@@ -59,13 +60,64 @@ is joined on success, error and timeout; no detached timeout thread remains.
 
 Unit tests use safe zbus message builders and actual local sockets, without a global
 service. Linux-specific blocked-read and fake-bus tests use Unix streams. Windows
-fake-bus tests exercise the established client over loopback TCP and do not prove
-Linux/FUSE behaviour. A Linux cross-check of the code is compilation evidence only.
+fake-bus tests exercise safe local Unix sockets and do not prove Linux/FUSE behaviour. A Linux
+cross-check of the code is compilation evidence only.
 The disposable native package consumer separately records actual Documents version,
 XML introspection, package versions and mount metadata before exercising real grants.
 The measurement has a 5 s process deadline and a shared 128 KiB UTF-8 stdout/stderr
 budget. Its raw responses remain synthetic-runner artifacts; they are not printed as
-GitHub metadata. Recording interface 4 does not itself change release policy.
+GitHub metadata. Flatpak startup requires interface 5 and a successful authenticated capability
+probe; recording interface 4 is evidence for the required negative session, not acceptance.
+
+## Source-bound write policy
+
+Each Archive job retains the actual source identity and observes installation membership;
+comparison reports retain both Archives. Read-only previews can retain write uncertainty for a
+later write decision once runtime prerequisites have passed. A file-only grant with an invisible
+parent cannot establish the absence of `Bin64`. Source membership uncertainty is distinct from a
+known installation. An empty discovered protection set grants no authority.
+
+Authenticated host spellings identify namespaces. Different FUSE proxy device/inode pairs do not
+prove different host files. Existing unowned targets whose host identity cannot be excluded remain
+refused, including a second grant containing a hardlink to the Archive. Ordinary non-portal
+sources additionally use stable native handles and canonical source routes.
+
+`create_output_file` checks the job before exclusive `create_new` and retains the original file
+descriptor in a sealed `OwnedFileToken`. The token binds content writes to that actual file,
+authenticated host spelling and the same private job identity. It does not waive source membership,
+original-source-name or known-installation checks. Writer-handle duplication failure uses verified
+cleanup. If initial descriptor identity cannot be acquired, `RetainedCreation` identifies the
+retained filename and original failure; it does not silently retry or delete an unverified file.
+
+`OwnedDirectoryPermit` grants only namespace operations on an exclusively created staging root.
+`ensure_namespace_writable` does not authorise content writes. Replacement roots require domain
+validation between stable root observations. Rename rebinds the same root; cleanup checks source
+names, authenticated containment and root identity without following links. Unlinking an owned
+namespace entry does not modify the bytes of another hardlink target. No manifest path list,
+`.old` suffix or caller-supplied spelling creates ownership authority.
+
+Pure cancellation is distinct from failed cleanup, retained output or failed restoration.
+Ordinary authenticated cleanup can complete after cancellation; portal uncertainty still refuses
+cleanup. These checks do not eliminate every later filesystem race or establish identity across
+arbitrary mount namespaces. Native real-FUSE verification remains a separate release gate.
+
+Raw Extraction, converted textures/audio, Record files, Query results, atomic output helpers and
+single-file Record exports retain their active descriptor tokens through publication or explicit
+cleanup. `owned_output_failure` recovers typed creation failures through factory I/O wrappers;
+retained creation is terminal even when its original cause has `AlreadyExists` kind. Cancellation
+does not suppress a separate retained-output or cleanup failure, and unpublished Record rows are
+not counted as written.
+
+Catalog-file callers use `write_catalog_file` or `write_catalog_file_from`. Their factory remains
+lazy until publication health is accepted. The concrete file remains available on serializer failure
+for explicit cleanup; a failed cleanup carries both the original catalog error and its independent
+cause. Callers cancelling or rejecting an Archive watch after successful serialization explicitly
+call `CatalogFile::discard` before returning. `Drop` is an emergency cleanup attempt, not the regular
+error-reporting path.
+
+The [native verification guide](portal-native-verification.md) describes the disposable API4/API5
+sessions, actual FUSE grants and remaining evidence requirements. Windows synthetic descriptor tests
+and Linux cross compilation do not replace that runtime evidence.
 
 Primary contracts: [Documents API](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Documents.html),
 [mountinfo](https://man7.org/linux/man-pages/man5/proc_pid_mountinfo.5.html),

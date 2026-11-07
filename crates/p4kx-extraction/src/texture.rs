@@ -11,8 +11,9 @@ use p4kx_texture::{
     read_mip,
 };
 
-use crate::output_file::{read_error, write_replacing};
+use crate::output_file::{read_error, write_replacing_protected};
 use crate::path_index::PathIndex;
+use crate::source_protection::SourceProtection;
 use crate::texture_parts::{Found, PartReader, Parts, is_same_file};
 use crate::{ConversionError, ExtractionError, UnknownEntries};
 
@@ -20,6 +21,7 @@ use crate::{ConversionError, ExtractionError, UnknownEntries};
 /// `.1` … `.N` and any alpha tail `.a` with its parts `.1a` … `.Na` next to it.
 #[derive(Debug)]
 pub struct Texture<'a> {
+    protection: SourceProtection,
     name: String,
     header_size: u64,
     header: DdsHeader,
@@ -63,6 +65,10 @@ impl<'a> Texture<'a> {
         parts: Parts<'a>,
         alpha: Option<Parts<'a>>,
     ) -> Result<Self, ConversionError> {
+        let protection = SourceProtection::new(match &parts {
+            Parts::Source { header, .. } => header.archive_path(),
+            Parts::Files { .. } => None,
+        });
         let (name, header_size, header) = match &parts {
             Parts::Source { header, .. } => {
                 let name = header.path().to_owned();
@@ -83,6 +89,7 @@ impl<'a> Texture<'a> {
             }
         };
         Ok(Self {
+            protection,
             name,
             header_size,
             header,
@@ -118,9 +125,12 @@ impl<'a> Texture<'a> {
     /// no DDS header; the texture itself stays usable.
     #[must_use]
     pub fn alpha_tail(&self) -> Option<Result<Self, ConversionError>> {
-        self.alpha
-            .clone()
-            .map(|parts| Self::from_parts(parts, None))
+        self.alpha.clone().map(|parts| {
+            Self::from_parts(parts, None).map(|mut texture| {
+                texture.protection = self.protection.clone();
+                texture
+            })
+        })
     }
 
     /// Returns the number of sibling parts the header needs.
@@ -155,7 +165,15 @@ impl<'a> Texture<'a> {
     /// [`Texture::merge_into`].
     pub fn merge_to_file(&self, out: &Path) -> Result<MergeReport, ConversionError> {
         self.refuse_input(out)?;
-        write_replacing(out, |writer| self.merge_into(writer))
+        write_replacing_protected(out, self.protection.context()?, None, |writer| {
+            self.merge_into(writer)
+        })
+    }
+
+    pub(crate) fn write_protection(
+        &self,
+    ) -> Result<Option<&crate::ArchiveWriteProtection>, ConversionError> {
+        self.protection.context()
     }
 
     /// Reads mip `level`, 0 being the largest, from its part or from the header.

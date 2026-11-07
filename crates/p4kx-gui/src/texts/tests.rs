@@ -36,6 +36,7 @@ fn sample_args() -> Vec<(&'static str, FluentValue<'static>)> {
         ("role", "diffuse".into()),
         ("method", "1".into()),
         ("path", "Data.p4k".into()),
+        ("parent", "ordinary-copy-source".into()),
         ("reason", "no Archive".into()),
         ("settings", "bad, =2".into()),
         ("count", 3.into()),

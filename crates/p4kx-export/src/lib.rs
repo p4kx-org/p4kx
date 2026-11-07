@@ -79,6 +79,7 @@ mod build_starmap;
 mod cargo_manifest;
 mod catalog_crafting;
 mod catalog_file;
+mod catalog_file_write;
 mod catalog_output;
 mod catalog_recipe;
 mod catalog_reference;
@@ -160,6 +161,7 @@ mod export_field_error;
 mod export_field_inspection;
 mod export_field_walk;
 mod export_health;
+mod export_health_api;
 mod export_health_compile;
 mod export_health_derived;
 mod export_health_entries;
@@ -244,6 +246,7 @@ mod mission_title;
 mod mission_titles;
 mod missions;
 mod ndjson;
+mod ndjson_output;
 mod npc_spawn_model;
 mod npc_spawn_read;
 mod options;
@@ -344,6 +347,7 @@ pub use action_map_write::{ActionMapCounts, ActionMapFormat, write_action_maps};
 pub use archive_key_use::{ArchiveKeyState, ArchiveKeyUse};
 pub use build::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
 pub use catalog_file::CatalogFile;
+pub use catalog_file_write::{write_catalog_file, write_catalog_file_from};
 pub use catalog_output::{Compression, ZSTD_LEVEL, ZSTD_WINDOW_LOG};
 pub use contract::{SCHEMA_VERSION, catalog_schema};
 pub use crafting::{Crafting, read_crafting};
@@ -355,21 +359,7 @@ pub use crafting_types::{
 };
 pub use crafting_warning::CraftingWarning;
 pub use error::CatalogError;
-pub use export_diagnostic::{
-    EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT, ExportDiagnostic, ExportDiagnosticCode,
-    ExportDiagnosticExample, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
-    ExportSourceRole, FailedExportRecord,
-};
-pub use export_entry_counts::ExportEntryCounts;
-pub use export_entry_ledger::{EntryOperation, FailedExportEntry};
-pub use export_health::{
-    CatalogPublicationMode, ExportHealth, ExportHealthStatus, ExportSourceCounts, ExportSourceMode,
-    ExportStageStatus, KindExportHealth,
-};
-pub use export_ledger::ExportAccountingError;
-pub use export_reference_issue::{
-    ExportReferenceStatus, ExportSourcePointer, ExportUnresolvedReference,
-};
+pub use export_health_api::*;
 pub use failure::CatalogFailure;
 pub use form::{FLAT_CSV_FILE, FLAT_NDJSON_FILE, NDJSON_FILE, RecordForm};
 pub use item_class::{ItemClass, ItemClassSummary};

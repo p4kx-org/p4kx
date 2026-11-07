@@ -4,6 +4,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use p4kx_extraction::OwnedDirectoryPermit;
+
 use crate::error;
 use crate::hashing;
 use crate::output_path;
@@ -11,6 +13,7 @@ use crate::{Artifact, ByteScope, Digest, MediaError, MediaWriter, RawReference};
 
 pub(crate) fn place(
     payload: &Path,
+    source_namespace: &OwnedDirectoryPermit,
     digest: Digest,
     size: u64,
     writer: &mut MediaWriter<'_>,
@@ -22,6 +25,9 @@ pub(crate) fn place(
     }
     let relative = format!("raw/{}", digest.hex);
     let retained = writer.root.join(&relative);
+    writer
+        .namespace
+        .ensure_namespace_writable(&retained, writer.checkpoint.cancel.flag())?;
     if output_path::file(&retained)? {
         let (existing, length) = hashing::file(
             &retained,
@@ -35,12 +41,15 @@ pub(crate) fn place(
             ));
         }
     } else {
+        source_namespace.ensure_namespace_writable(payload, writer.checkpoint.cancel.flag())?;
         fs::rename(payload, &retained).map_err(|source| error::io(&retained, source))?;
-        fs::OpenOptions::new()
-            .write(true)
-            .open(&retained)
-            .and_then(|file| file.sync_all())
-            .map_err(|source| error::io(&retained, source))?;
+        writer
+            .namespace
+            .ensure_namespace_writable(&retained, writer.checkpoint.cancel.flag())
+            .map_err(|cause| MediaError::RetainedOutput {
+                path: retained.clone(),
+                cause: Box::new(cause.into()),
+            })?;
     }
     writer.artifact(&Artifact {
         path: relative.clone(),

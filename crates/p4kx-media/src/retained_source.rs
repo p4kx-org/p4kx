@@ -10,6 +10,7 @@ use crate::error;
 use crate::hashing;
 use crate::output_path;
 use crate::raw_output;
+use crate::staged_directory::StagedDirectory;
 use crate::{ByteScope, ExtractionCounts, MediaError, MediaWriter, RawReference};
 
 #[cfg(test)]
@@ -30,33 +31,32 @@ pub(crate) fn retain(
         });
     }
     writer.reserve_output(size)?;
+    writer
+        .namespace
+        .ensure_namespace_writable(&writer.root, writer.checkpoint.cancel.flag())?;
     if !output_path::directory(&writer.root)? {
         return Err(MediaError::Destination(
             "source staging directory is missing".into(),
         ));
     }
-    let temporary = tempfile::Builder::new()
-        .prefix(".entry-")
-        .tempdir_in(&writer.root)
-        .map_err(|source| error::io(&writer.root, source))?;
-    extract_one(archive, entry, temporary.path(), writer)?;
-    let payload = only_payload(temporary.path())?;
-    let (digest, actual) = hashing::file(
-        &payload,
-        ByteScope::DecodedEntryPayload,
-        size,
-        &writer.checkpoint,
-    )?;
-    if actual != size {
-        return Err(MediaError::Contract(
-            "decoded source length disagrees with its Entry".into(),
-        ));
-    }
-    let retained = raw_output::place(&payload, digest, size, writer)?;
-    temporary
-        .close()
-        .map_err(|source| error::io(&writer.root, source))?;
-    Ok(retained)
+    let temporary = StagedDirectory::create(&writer.root, ".entry-", writer.checkpoint)?;
+    let result = (|| {
+        extract_one(archive, entry, temporary.path(), writer)?;
+        let payload = only_payload(temporary.path())?;
+        let (digest, actual) = hashing::file(
+            &payload,
+            ByteScope::DecodedEntryPayload,
+            size,
+            &writer.checkpoint,
+        )?;
+        if actual != size {
+            return Err(MediaError::Contract(
+                "decoded source length disagrees with its Entry".into(),
+            ));
+        }
+        raw_output::place(&payload, temporary.permit(), digest, size, writer)
+    })();
+    temporary.finish(result)
 }
 
 fn extract_one(
@@ -70,6 +70,7 @@ fn extract_one(
         verify: true,
         cancel: Some(writer.checkpoint.cancel),
         watch: Some(writer.checkpoint.watch),
+        protection: Some(writer.checkpoint.protection),
         ..ExtractOptions::default()
     };
     let report = p4kx_extraction::extract(archive, &[entry], destination, &options);

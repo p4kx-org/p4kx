@@ -99,10 +99,7 @@ impl EntryWriter<'_> {
             Ok(bank) => {
                 if bank.wems().next().is_some() {
                     let existed = self.target.join(&wem_folder).symlink_metadata().is_ok();
-                    let folder = self
-                        .tracker
-                        .folders
-                        .folder(self.target, Some(&wem_folder))?;
+                    let folder = self.folder(Some(&wem_folder))?;
                     self.unpack(
                         entry,
                         &bank,

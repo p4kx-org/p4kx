@@ -6,7 +6,9 @@ in tar.gz, AppImage, deb and Flatpak distributions. Target rows and asset suffix
 define the application identity, baseline and sandbox capabilities.
 
 The minimum host baseline for tar.gz, AppImage and deb is **Ubuntu 24.04 / glibc 2.39**.
-Flatpak uses **Freedesktop Platform 25.08**, with its separate runtime ABI. These are release
+Flatpak uses **Freedesktop Platform 25.08**, with its separate runtime ABI, and additionally
+requires **host Documents-portal API 5 or later with `GetHostPaths`**. A host can meet the native
+Ubuntu/glibc baseline while still lacking this separate Flatpak prerequisite. These are release
 requirements. Native results are established by the source-bound runtime artifacts of the
 corresponding GitHub run, rather than by a successful local Windows build.
 
@@ -71,10 +73,21 @@ flatpak override --user --filesystem=/absolute/custom/prefix:ro io.github.p4kx_o
 ```
 
 File chooser selections use Documents-portal grants: Archive input requires read access;
-export destinations require write access to the selected destination. CLI callers can use
+export destinations require read/write access. Atomic file exports also need access to the
+selected parent directory for sibling temporary files; a file-only grant can be refused. CLI callers can use
 `flatpak document-export --app=io.github.p4kx_org.p4kx --forbid-write /absolute/Data.p4k`
 and use the returned portal path. Grant a separate output directory with `--allow-write`.
-The installation write guard still applies to granted destinations.
+The installation write guard still applies to granted destinations. A file-only Archive grant
+can hide its host parent and `Bin64`; authenticated origin lookup alone does not prove that the
+source is an ordinary copy. If installation membership or existing-target identity cannot be
+established, the write is refused with an uncertainty explanation. A separate write grant does
+not override source protection.
+
+All three Flatpak applications check the Documents prerequisite before opening a profile,
+loading a stored key or starting normal work. CLI/MCP startup failure uses exit 1 and the
+`[p4kx.runtime.documents-api5]` diagnostic; the GUI shows a prerequisite notice. `--help` and
+`--version` remain available. API 4 does not provide an operational mode. The release packages
+do not bundle or install a replacement host Documents service.
 
 The sandbox process namespace does not establish whether a host game is running. An observed
 positive game-process match is conclusive; a negative sandbox scan produces the existing unknown
@@ -130,7 +143,12 @@ Generic FUSE filesystem labels from `stat` do not establish portal identity. The
 retain the actual mount metadata and Flatpak/findmnt versions before testing portal operations.
 They also record the measured Documents API version, XML introspection and installed portal
 package versions through a bounded probe. The [portal identity core](portal-alias-core.md)
-documents the separate host-mapping and write-policy contracts.
+documents the separate host-mapping and write-policy contracts. Native validation uses two
+isolated sessions: the stock API-4 session must reject normal Flatpak startup while preserving
+help/version, and a source-pinned API-5 session must pass the original packaged runtime checks
+and actual grants. The additional service binaries are disposable CI inputs, not package
+payloads. Compilation, synthetic evidence tests and a recorded interface number do not by
+themselves establish real FUSE or package acceptance.
 
 [`release-linux.yml`](../.github/workflows/release-linux.yml) builds on the matching Ubuntu 24.04
 native CPU and verifies packages on a fresh matching runner. The consumer validates the source

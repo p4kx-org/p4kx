@@ -97,6 +97,8 @@ Linux runtime evidence covers all four actual package launchers and retains post
 ELF hashes with unchanged source `.text` hashes, plus Flatpak runtime/app OSTree identity and
 Documents-portal grants. [Linux packages](linux-packages.md) defines the Ubuntu 24.04 / glibc 2.39
 host baseline, separate Freedesktop 25.08 runtime, source/relink artifacts and permission policy.
+Flatpak additionally requires host Documents API 5 with `GetHostPaths`; an older Documents
+service is a startup failure rather than a successful or skipped runtime check.
 Packaging checks, signatures, scans, provenance and the full export/device audit remain required
 parts of the final release gate.
 

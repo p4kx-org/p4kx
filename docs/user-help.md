@@ -3,6 +3,17 @@
 How to use the P4KX window. Terms follow [CONTEXT.md](../CONTEXT.md). The command line and the
 MCP server are described in [commands.md](commands.md).
 
+## Flatpak startup and export protection
+
+The Flatpak window requires host Documents-portal API 5 with authenticated host-path lookup.
+When that prerequisite is missing, a notice explains it before the normal window or profile
+opens. See [Linux packages](linux-packages.md) for the separate host requirement and grants.
+
+An export refusal distinguishes a known Star Citizen installation from a source or destination
+whose identity cannot be verified. A file chooser grant can hide the Archive's host parent; a
+write grant does not establish that writing there is safe. Choose a source and destination with
+the required visibility. Cleanup or restoration failures remain visible even after cancellation.
+
 ## Preview
 
 Click an Entry's name in the table to preview it below the table. The Entry is read straight

@@ -7,7 +7,7 @@ use std::time::SystemTime;
 
 use p4kx_channels::{LAUNCHER_LOG_FILES, SearchPaths, known_library_folders, launcher_logs_folder};
 
-use crate::{Installation, WriteRefused};
+use crate::{Installation, WriteProtectionError, WriteRefused};
 
 const GAME_FOLDER: &str = "Bin64";
 const EXTRA_FOLDERS_VARIABLE: &str = "P4KX_PROTECT_FOLDERS";
@@ -111,10 +111,23 @@ fn protect_installation_of(archive: &Path) {
 ///
 /// # Errors
 ///
-/// Returns [`WriteRefused`] when `target` lies inside a protected folder.
-pub fn ensure_writable(target: &Path) -> Result<(), WriteRefused> {
+/// Returns an established installation refusal or unavailable target identity.
+pub fn ensure_writable(target: &Path) -> Result<(), WriteProtectionError> {
+    let host =
+        crate::write_target::host_target(target, &std::sync::atomic::AtomicBool::new(false))?;
+    check_known(&host).map_err(Into::into)
+}
+
+pub(crate) fn check_known(target: &Path) -> Result<(), WriteRefused> {
     PROTECTED
         .read()
         .unwrap_or_else(PoisonError::into_inner)
         .check(target)
+}
+
+pub(crate) fn check_known_namespace(target: &Path) -> Result<(), WriteRefused> {
+    PROTECTED
+        .read()
+        .unwrap_or_else(PoisonError::into_inner)
+        .check_namespace(target)
 }

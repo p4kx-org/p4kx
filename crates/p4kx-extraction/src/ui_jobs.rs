@@ -9,7 +9,7 @@ use std::path::Path;
 use p4kx_gfx::{Assets, Bitmap, BitmapSource, GfxError, MorphShape, RgbaImage, Shape};
 
 use crate::budget::{Budget, Lease};
-use crate::output_file::{write_error, write_replacing};
+use crate::output_file::{write_error, write_replacing_protected};
 use crate::ui_external::open_external;
 use crate::{ConversionError, Texture, UiAssetKind, UiMovie, WrittenUiAsset};
 
@@ -107,19 +107,23 @@ impl UiMovie<'_> {
         write: impl FnOnce(&mut BufWriter<File>) -> Result<(), GfxError>,
     ) -> Outcome {
         let path = folder.join(format!("{}_{id}.{}", kind.name(), kind.extension()));
-        let result = write_replacing(&path, |writer| {
-            write(writer).map_err(|source| match source {
-                GfxError::Write(source) => write_error(&path, source),
-                source => self.asset_error(id, source),
+        let result = self
+            .write_protection()
+            .and_then(|protection| {
+                write_replacing_protected(&path, protection, None, |writer| {
+                    write(writer).map_err(|source| match source {
+                        GfxError::Write(source) => write_error(&path, source),
+                        source => self.asset_error(id, source),
+                    })
+                })
             })
-        })
-        .and_then(|()| fs::metadata(&path).map_err(|source| write_error(&path, source)))
-        .map(|metadata| WrittenUiAsset {
-            kind,
-            id,
-            size: metadata.len(),
-            path: path.clone(),
-        });
+            .and_then(|()| fs::metadata(&path).map_err(|source| write_error(&path, source)))
+            .map(|metadata| WrittenUiAsset {
+                kind,
+                id,
+                size: metadata.len(),
+                path: path.clone(),
+            });
         Outcome {
             order,
             kind,

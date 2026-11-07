@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::{self, BufWriter, Write};
 
 use p4kx_archive::Checksum;
@@ -11,7 +11,7 @@ use crate::counting::Counting;
 use crate::texture_convert::Step;
 use crate::texture_outputs::step_of;
 use crate::tracker::Tracker;
-use crate::write::{Chunk, Destination, EntryWriter, Outcome, create_temporary, write_error};
+use crate::write::{Chunk, Destination, EntryWriter, Outcome, write_error};
 use crate::{ConflictPolicy, ExtractionError};
 
 const WRITE_BUFFER_LEN: usize = 256 * 1024;
@@ -54,7 +54,7 @@ impl EntryWriter<'_> {
         if self.tracker.should_stop() {
             return Ok(Ok(Step::Cancelled));
         }
-        let (temporary, file) = create_temporary(&destination.folder)?;
+        let (temporary, file, ownership) = self.temporary(&destination.folder)?;
         let mut sink = Sink {
             writer: Counting::new(BufWriter::with_capacity(WRITE_BUFFER_LEN, file)),
             tracker: self.tracker,
@@ -68,28 +68,44 @@ impl EntryWriter<'_> {
             Err(AudioError::Write(_)) if self.tracker.should_stop() => Ok(Some(Outcome::Cancelled)),
             Err(AudioError::Write(source)) => Err(write_error(destination.file.clone(), source)),
             Err(error) => {
-                let _ignored = fs::remove_file(&temporary);
-                return Ok(Err(error));
+                return match ownership
+                    .remove(&temporary, crate::output_file::cancel_flag(self.cancel))
+                {
+                    Ok(()) => Ok(Err(error)),
+                    Err(cleanup) => Err(ExtractionError::CleanupFailed {
+                        primary: Some(Box::new(error)),
+                        cleanup: Box::new(cleanup),
+                    }),
+                };
             }
         };
         match decided {
             Ok(None) => Ok(Ok(step_of(&self.put_in_place(
                 &temporary,
+                &ownership,
                 &destination.file,
                 Ok(Chunk::End),
                 Outcome::Converted,
             )?))),
-            Ok(Some(outcome)) => {
-                let _ignored = fs::remove_file(&temporary);
-                Ok(Ok(step_of(&outcome)))
-            }
-            Err(_) if self.tracker.should_stop() => {
-                let _ignored = fs::remove_file(&temporary);
-                Ok(Ok(Step::Cancelled))
+            Ok(Some(outcome)) => crate::output_cleanup::extraction(
+                Ok(Ok(step_of(&outcome))),
+                &ownership,
+                &temporary,
+                self.cancel,
+            ),
+            Err(error)
+                if self.tracker.should_stop()
+                    && !crate::guard_cancellation::retained_output(&error) =>
+            {
+                crate::output_cleanup::extraction(
+                    Ok(Ok(Step::Cancelled)),
+                    &ownership,
+                    &temporary,
+                    self.cancel,
+                )
             }
             Err(error) => {
-                let _ignored = fs::remove_file(&temporary);
-                Err(error)
+                crate::output_cleanup::extraction(Err(error), &ownership, &temporary, self.cancel)
             }
         }
     }
@@ -120,8 +136,12 @@ mod tests {
         let target = dir.path().join("out");
         fs::create_dir(&target).expect("target");
         let cancel = CancelToken::new();
+        let protection =
+            crate::ArchiveWriteProtection::new(&path, cancel.flag()).expect("source protection");
         let tracker = Tracker::new(&[], Some(&cancel), None, None);
         let writer = EntryWriter {
+            protection: Some(&protection),
+            cancel: Some(&cancel),
             source: &archive,
             target: &target,
             policy: ConflictPolicy::Overwrite,

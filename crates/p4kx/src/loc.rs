@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::borrow::Cow;
-use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 
@@ -212,17 +211,7 @@ fn export(args: &LocExportArgs, as_json: bool) -> Result<()> {
     if let Some(&language) = args.lang.iter().find(|&&l| set.entry(l).is_none()) {
         return Err(LanguageNotInArchive { language }.into());
     }
-    let columns: Vec<Language> = if args.lang.is_empty() {
-        set.languages().collect()
-    } else {
-        let mut columns: Vec<Language> = Vec::with_capacity(args.lang.len());
-        for &language in &args.lang {
-            if !columns.contains(&language) {
-                columns.push(language);
-            }
-        }
-        columns
-    };
+    let columns = export_languages(&set, &args.lang);
     let texts = set.index()?;
     print_notes(&set.notes(&texts));
     let Some(path) = &args.out else {
@@ -231,11 +220,15 @@ fn export(args: &LocExportArgs, as_json: bool) -> Result<()> {
         out.flush()?;
         return Ok(());
     };
-    let file = File::create(path).with_context(|| format!("cannot write {}", path.display()))?;
-    let mut out = BufWriter::new(file);
-    let keys = write_localization_table(&texts, &columns, format, &mut out)?;
-    out.flush()
-        .with_context(|| format!("cannot write {}", path.display()))?;
+    let cancel = p4kx_extraction::CancelToken::new();
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let keys = crate::query_file::write_replacing_protected(
+        path,
+        Some(&protection),
+        Some(&cancel),
+        |out| write_localization_table(&texts, &columns, format, out),
+    )
+    .with_context(|| format!("cannot write {}", path.display()))?;
     if as_json {
         json::print(&ExportJson {
             archive: json::path(archive.path()),
@@ -256,4 +249,17 @@ fn export(args: &LocExportArgs, as_json: bool) -> Result<()> {
         )?;
     }
     Ok(())
+}
+
+fn export_languages(set: &LocalizationSet, requested: &[Language]) -> Vec<Language> {
+    if requested.is_empty() {
+        return set.languages().collect();
+    }
+    let mut columns = Vec::with_capacity(requested.len());
+    for &language in requested {
+        if !columns.contains(&language) {
+            columns.push(language);
+        }
+    }
+    columns
 }

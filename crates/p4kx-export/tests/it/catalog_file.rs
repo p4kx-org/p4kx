@@ -9,7 +9,8 @@ use std::io::Read;
 use std::path::Path;
 
 use p4kx_export::{
-    CancelToken, CatalogError, CatalogFile, CatalogOptions, Compression, write_catalog_from,
+    CancelToken, CatalogError, CatalogFile, CatalogOptions, Compression, write_catalog_file_from,
+    write_catalog_from,
 };
 use p4kx_extraction::DataForgeEntry;
 
@@ -91,5 +92,85 @@ fn a_dropped_file_and_a_path_without_a_name_leave_nothing() -> TestResult {
         CatalogFile::create(Path::new("..")).is_err(),
         "no file name"
     );
+    Ok(())
+}
+
+#[test]
+fn protected_catalog_cancellation_explicitly_removes_the_created_temporary() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(dir.path())?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let out = dir.path().join("catalog.json");
+    fs::write(&out, b"prior")?;
+    let cancel = CancelToken::new();
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let options = CatalogOptions {
+        cancel: Some(&cancel),
+        ..options()
+    };
+    let result = write_catalog_file_from(&archive, &entry, &options, Compression::None, || {
+        let file = CatalogFile::create_protected(&out, &protection, &cancel)?;
+        cancel.cancel();
+        Ok(file)
+    });
+    assert!(matches!(result, Err(CatalogError::Cancelled)));
+    assert_eq!(fs::read(&out)?, b"prior");
+    assert_eq!(fs::read_dir(dir.path())?.count(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_changed_temporary_does_not_hide_cleanup_failure_as_catalog_cancellation() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(dir.path())?;
+    let source_before = fs::read(archive.path())?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let out = dir.path().join("catalog.json");
+    let temporary = out.with_file_name(format!("catalog.json.p4kx-{}.part", std::process::id()));
+    let retained = dir.path().join("original.part");
+    let cancel = CancelToken::new();
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let options = CatalogOptions {
+        cancel: Some(&cancel),
+        ..options()
+    };
+    let result = write_catalog_file_from(&archive, &entry, &options, Compression::None, || {
+        let file = CatalogFile::create_protected(&out, &protection, &cancel)?;
+        fs::rename(&temporary, &retained)?;
+        fs::hard_link(archive.path(), &temporary)?;
+        cancel.cancel();
+        Ok(file)
+    });
+    let CatalogError::CleanupFailed { primary, .. } = result.expect_err("typed retained output")
+    else {
+        return Err("cleanup failure was hidden".into());
+    };
+    assert!(matches!(*primary, CatalogError::Cancelled));
+    assert_eq!(fs::read(archive.path())?, source_before);
+    assert!(retained.is_file());
+    assert!(temporary.is_file());
+    assert!(!out.exists());
+    Ok(())
+}
+
+#[test]
+fn a_cancelled_build_never_calls_the_file_factory() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(dir.path())?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let cancel = CancelToken::new();
+    cancel.cancel();
+    let options = CatalogOptions {
+        cancel: Some(&cancel),
+        ..options()
+    };
+    let mut called = false;
+    let result = write_catalog_file_from(&archive, &entry, &options, Compression::None, || {
+        called = true;
+        CatalogFile::create(&dir.path().join("catalog.json"))
+    });
+    assert!(matches!(result, Err(CatalogError::Cancelled)));
+    assert!(!called);
+    assert_eq!(fs::read_dir(dir.path())?.count(), 1);
     Ok(())
 }

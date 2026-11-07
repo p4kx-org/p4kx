@@ -119,7 +119,7 @@ pub enum FolderError {
     },
     /// The output folder lies inside a Star Citizen installation.
     #[error(transparent)]
-    Installation(#[from] p4kx_guard::WriteRefused),
+    Installation(#[from] p4kx_guard::WriteProtectionError),
     /// The run was cancelled while the folder was read.
     #[error("cancelled")]
     Cancelled,

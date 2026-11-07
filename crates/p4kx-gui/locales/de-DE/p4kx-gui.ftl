@@ -1473,3 +1473,17 @@ folder-conversion-summary-input = Eingabeordner: { $path }
 folder-conversion-failed-title = Umwandlung fehlgeschlagen
 folder-conversion-failed = { $path } lässt sich nicht umwandeln: { $reason }
 folder-conversion-stopped = Die Umwandlung von { $path } wurde ohne Ergebnis beendet.
+
+protection-target-identity = Der Hostpfad des Ziels konnte nicht verifiziert werden. Das Schreiben ist hier gesperrt. Wähle einen anderen Ordner oder prüfe den Zugriff auf seinen Hostpfad.
+protection-source-identity = Der Hostpfad des Archivs konnte nicht verifiziert werden. Das Schreiben von Daten aus diesem Archiv ist gesperrt. Gib das Archiv erneut frei.
+protection-source-membership = Es konnte nicht festgestellt werden, ob der übergeordnete Archivordner { $parent } zu einer Spielinstallation gehört. Wähle einen Exportordner außerhalb dieses Ordners oder gib den Quellordner frei.
+protection-identity-unavailable = Der Ausgabepfad konnte nicht sicher identifiziert werden. Das Schreiben ist hier gesperrt.
+protection-prerequisite-title = Flatpak-Voraussetzung fehlt
+protection-prerequisite = Dieses Flatpak benötigt ein Documents-Portal mit API 5 oder neuer und funktionierender Hostpfadabfrage. Aktualisiere dein Desktop-Portal oder nutze das Paket als tar.gz, AppImage oder deb.
+protection-source-overwrite = Diese Ausgabe würde ein Eingabearchiv ersetzen. Wähle eine andere Datei oder einen anderen Ordner.
+gui-command-help =
+    P4KX Desktop
+    Aufruf: p4kx-gui [ARCHIV]
+    -h, --help: Diese Hilfe anzeigen
+    -V, --version: Die Version anzeigen
+    Flatpak benötigt das Documents-Portal mit API 5 oder neuer und authentifizierter Hostpfadabfrage.

@@ -11,6 +11,7 @@ mod interruptions;
 #[cfg(windows)]
 mod junctions;
 mod non_finite;
+mod owned_outputs;
 mod process_lock;
 mod providers;
 mod recovery;
@@ -27,3 +28,4 @@ mod streaming;
 mod support;
 mod transactions;
 mod unsupported_source;
+mod write_protection;

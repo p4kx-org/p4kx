@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
@@ -9,7 +8,9 @@ use p4kx_gltf::TextureLoader;
 use p4kx_texture::{RgbaImage, TextureError, write_png};
 use rayon::prelude::*;
 
-use crate::{AlphaMeaning, Cancelled, ColourSpace, PackageError, PackageResult, TextureUse};
+use crate::{
+    AlphaMeaning, ColourSpace, PackageError, PackageResult, PackageWriteContext, TextureUse,
+};
 
 /// How many textures are decoded and encoded at once; a texture can hold 64 megapixels.
 const BATCH: usize = 4;
@@ -50,7 +51,7 @@ pub(crate) fn write_all(
     loader: &dyn TextureLoader,
     mip: u32,
     folder: &Path,
-    cancelled: &Cancelled<'_>,
+    cancelled: &PackageWriteContext<'_>,
 ) -> PackageResult<Vec<Outcome>> {
     let mut outcomes = Vec::with_capacity(wanted.len());
     for (batch, chunk) in wanted.chunks(BATCH).enumerate() {
@@ -60,7 +61,14 @@ pub(crate) fn write_all(
             .enumerate()
             .map(|(offset, texture)| {
                 cancelled.check()?;
-                write_one(texture, &id_of(batch * BATCH + offset), loader, mip, folder)
+                write_one(
+                    texture,
+                    &id_of(batch * BATCH + offset),
+                    loader,
+                    mip,
+                    folder,
+                    cancelled,
+                )
             })
             .collect::<PackageResult<_>>()?;
         outcomes.extend(done);
@@ -74,6 +82,7 @@ fn write_one(
     loader: &dyn TextureLoader,
     mip: u32,
     folder: &Path,
+    context: &PackageWriteContext<'_>,
 ) -> PackageResult<Outcome> {
     let decoded = match loader.load(&texture.path, mip) {
         Ok(decoded) => decoded,
@@ -93,7 +102,7 @@ fn write_one(
         decoded.image
     };
     let path = folder.join(format!("{id}.png"));
-    let file = File::create_new(&path).map_err(|source| PackageError::write(&path, source))?;
+    let (file, ownership) = context.create_file(&path)?.into_parts();
     let mut writer = BufWriter::new(file);
     let written = write_png(&image, &mut writer);
     match written {
@@ -101,13 +110,14 @@ fn write_one(
         Err(TextureError::Write(source)) => return Err(PackageError::write(&path, source)),
         Err(error) => {
             drop(writer);
-            std::fs::remove_file(&path).map_err(|source| PackageError::write(&path, source))?;
+            context.cleanup_file(&ownership, &path)?;
             return Ok(Outcome::Failed(error.to_string()));
         }
     }
     writer
         .flush()
         .map_err(|source| PackageError::write(&path, source))?;
+    ownership.ensure_writable(&path, context.cancel_flag())?;
     writer
         .get_ref()
         .sync_all()
@@ -144,12 +154,13 @@ fn flip_green(image: RgbaImage) -> Result<RgbaImage, TextureError> {
 #[cfg(test)]
 mod tests {
     use std::error::Error;
+    use std::sync::atomic::AtomicBool;
 
     use p4kx_gltf::{LoadedTexture, TextureLoadError, TextureLoader};
     use p4kx_texture::RgbaImage;
 
     use super::{Outcome, Wanted, write_all};
-    use crate::{AlphaMeaning, Cancelled, ColourSpace, TextureUse};
+    use crate::{AlphaMeaning, ColourSpace, PackageWriteContext, TextureUse};
 
     struct One(LoadedTexture);
 
@@ -177,12 +188,13 @@ mod tests {
         let image = RgbaImage::new(2, 1, vec![10, 20, 30, 40, 250, 255, 0, 255])?;
         let dir = tempfile::tempdir()?;
         let never = || false;
+        let observed = AtomicBool::new(false);
         let outcomes = write_all(
             &[wanted(role, gloss)],
             &One(LoadedTexture::new(image, has_alpha)),
             0,
             dir.path(),
-            &Cancelled::new(&never),
+            &PackageWriteContext::standalone(&never, &observed),
         )?;
         let decoder = png::Decoder::new(std::io::Cursor::new(std::fs::read(
             dir.path().join("t0001.png"),

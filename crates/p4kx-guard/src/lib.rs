@@ -4,8 +4,15 @@
 //! Keeps P4KX read-only towards the game: writes into a Star Citizen installation are
 //! refused, and a running game is noticed from the process list alone.
 
+mod archive_source_identity;
+mod archive_write_protection;
+mod created_output_file;
 mod installation;
-#[cfg(any(target_os = "linux", test))]
+mod namespace_target;
+mod owned_directory_permit;
+mod owned_file_token;
+mod owned_output_cleanup;
+mod owned_output_error;
 mod portal_alias;
 #[cfg(any(target_os = "linux", test))]
 mod portal_dbus;
@@ -30,11 +37,25 @@ mod process;
 #[cfg(any(windows, test))]
 mod process_windows;
 mod registry;
+mod runtime_prerequisite;
+#[cfg(any(target_os = "linux", test))]
+mod source_membership;
+mod write_protection_error;
+mod write_target;
 
 use std::path::PathBuf;
 
+pub use archive_write_protection::ArchiveWriteProtection;
+pub use created_output_file::{CreatedOutputFile, create_output_file};
 pub use installation::{Installation, without_verbatim_prefix};
-#[cfg(any(target_os = "linux", test))]
+pub use owned_directory_permit::{
+    OwnedDirectoryPermit, create_output_directory, validated_output_directory,
+};
+pub use owned_file_token::OwnedFileToken;
+pub use owned_output_cleanup::{
+    OwnedOutputCleanupError, remove_owned_output, remove_owned_output_target_only,
+};
+pub use owned_output_error::OwnedOutputError;
 pub use portal_alias::{AliasUncertainty, DocumentGrant, HostAlias, PortalAlias, UnknownAlias};
 #[cfg(target_os = "linux")]
 pub use portal_native::resolve_portal_alias;
@@ -46,6 +67,8 @@ pub use process::{
 pub use registry::{
     ensure_writable, protect, protect_archive_folder, protect_libraries, protect_manual,
 };
+pub use runtime_prerequisite::{RuntimePrerequisiteError, check_runtime_prerequisites};
+pub use write_protection_error::WriteProtectionError;
 
 /// A write that was refused because its target lies inside a Star Citizen installation.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

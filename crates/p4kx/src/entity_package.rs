@@ -9,7 +9,8 @@ use p4kx_assembly::{
     LoadoutChanges, LoadoutResolver,
 };
 use p4kx_blender::{
-    BuildInfo, Issue, PackageInfo, PackageSummary, Replacement, check_output, write_package,
+    BuildInfo, Issue, PackageInfo, PackageSummary, PackageWriteContext, Replacement,
+    check_output_with_context, write_package_with_context,
 };
 use p4kx_channels::{PublicPatches, channel_name};
 use p4kx_extraction::{Archive, DataForgeEntry, GlbOptions, is_same_file};
@@ -74,9 +75,12 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
     if is_same_file(&args.out, &args.archive) {
         return Err(GlbOutputIsArchive(args.out.clone()).into());
     }
-    check_output(&args.out)?;
     let changes = args.changes.changes()?;
     let archive = crate::key::open(&args.archive)?;
+    let cancel = cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let context = PackageWriteContext::new(&protection, cancel.flag());
+    check_output_with_context(&args.out, &context)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = ArchiveFiles::new(&archive);
@@ -97,7 +101,6 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
     } else {
         assembly
     };
-    let cancel = cancel_on_interrupt()?;
     let mut glb = GlbOptions::default()
         .with_lod(args.lod)
         .with_texture_mip(args.texture_mip);
@@ -106,9 +109,9 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
     }
     let info = info_of(&archive, &changes);
     let loader = models.textures();
-    let summary = write_package(&assembly, &models, &loader, &glb, &info, &args.out, &|| {
-        cancel.is_cancelled()
-    })?;
+    let summary = write_package_with_context(
+        &assembly, &models, &loader, &glb, &info, &args.out, &context,
+    )?;
     if as_json {
         json::print(&PackageJson::of(
             &json::path(archive.path()),

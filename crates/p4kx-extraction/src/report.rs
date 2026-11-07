@@ -14,6 +14,18 @@ use crate::{ConversionError, NameRule, PathLimit, RecordExportReport};
 /// Why one Entry of an Extraction was not written.
 #[derive(Debug, Error)]
 pub enum ExtractionError {
+    /// Ownership capture or verified cleanup failed without losing its typed cause.
+    #[error(transparent)]
+    OwnedOutput(Box<p4kx_guard::OwnedOutputError>),
+    /// An unpublished output could not be removed after completion or failure.
+    #[error("owned output cleanup failed: {cleanup}")]
+    CleanupFailed {
+        /// The original failure when one preceded cleanup.
+        #[source]
+        primary: Option<Box<dyn std::error::Error + Send + Sync>>,
+        /// The separate cleanup failure.
+        cleanup: Box<p4kx_guard::OwnedOutputCleanupError>,
+    },
     /// The path would leave the target folder, or a folder on the way is a link.
     #[error("the path would leave the target folder")]
     UnsafePath,
@@ -52,9 +64,9 @@ pub enum ExtractionError {
         #[source]
         source: io::Error,
     },
-    /// The target lies inside a Star Citizen installation; nothing is written there.
+    /// Source or target protection refused the write.
     #[error(transparent)]
-    Installation(#[from] p4kx_guard::WriteRefused),
+    Installation(#[from] p4kx_guard::WriteProtectionError),
     /// The Entry is `CryXml` that could not be converted.
     #[error("cannot convert the CryXml")]
     Convert(#[source] CryXmlError),

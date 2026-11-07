@@ -35,10 +35,12 @@ mod entry_path;
 mod entry_tree;
 mod exclusion;
 mod extract;
+mod extract_outcome;
 mod filter;
 mod folder_cache;
 mod folder_convert;
 mod folder_source;
+mod guard_cancellation;
 pub mod hirc_select;
 pub mod hirc_view;
 mod hirc_view_build;
@@ -54,12 +56,16 @@ mod model_source;
 mod model_source_glb;
 mod model_textures;
 mod options;
+mod output_cleanup;
+mod output_creation;
 mod output_file;
+mod owned_output_failure;
 mod part_escape;
 mod path_index;
 mod portable_name;
 mod query_export;
 mod record_combined;
+mod record_existing;
 mod record_export;
 mod record_files;
 mod record_format;
@@ -75,10 +81,12 @@ mod sound_output;
 mod sound_workers;
 mod soundbank_convert;
 mod source;
+mod source_protection;
 mod target;
 pub mod text_line;
 mod text_window;
 mod texture;
+mod texture_conversion_error;
 mod texture_convert;
 mod texture_exr;
 mod texture_grey;
@@ -151,7 +159,11 @@ pub use model_textures::{ArchiveTextures, MAX_MODEL_TEXTURE_PIXELS};
 pub use options::{
     AudioConversion, CancelToken, ConflictPolicy, ExtractOptions, Progress, TextureConversion,
 };
-pub use output_file::{Replaced, write_bytes_replacing, write_replacing, write_replacing_counted};
+pub use output_file::{
+    Replaced, check_protected_output, write_bytes_replacing, write_replacing,
+    write_replacing_counted, write_replacing_counted_protected, write_replacing_protected,
+};
+pub use owned_output_failure::owned_output_failure;
 pub use p4kx_archive::{
     Archive, ArchiveError, Build, BuildError, Checksum, Compression, DemandScope, DosCalendar,
     DosTimestamp, EffectiveEncoding, Entry, EntryIssue, EntryMetadata, EntryReader,
@@ -195,8 +207,12 @@ pub use p4kx_gltf::{
     layered_base_texture, layered_base_textures,
 };
 pub use p4kx_guard::{
-    Installation, WriteRefused, ensure_writable, game_is_running, protect, protect_archive_folder,
-    protect_libraries, protect_manual,
+    ArchiveWriteProtection, CreatedOutputFile, Installation, OwnedDirectoryPermit, OwnedFileToken,
+    OwnedOutputCleanupError, OwnedOutputError, RuntimePrerequisiteError, WriteProtectionError,
+    WriteRefused, check_runtime_prerequisites, create_output_directory, create_output_file,
+    ensure_writable, game_is_running, protect, protect_archive_folder, protect_libraries,
+    protect_manual, remove_owned_output, remove_owned_output_target_only,
+    validated_output_directory,
 };
 pub use p4kx_localization::{
     GlobalIni, IniEncoding, IniText, Language, LocalizationError, Lookup, MAX_GLOBAL_INI_KEYS,
@@ -228,7 +244,9 @@ pub use report::{EntryFailure, ExtractionError, ExtractionReport};
 pub use resolved_texts::LanguageTexts;
 pub use selection::{UnknownEntries, select_entries};
 pub use sound::{MAX_SOUND_LEN, Sound};
-pub use target::{create_default_target, default_target_name, utc_rfc3339};
+pub use target::{
+    create_default_target, create_default_target_protected, default_target_name, utc_rfc3339,
+};
 pub use texture::Texture;
 pub use texture_exr::ExrReport;
 pub use texture_grey::{TextureVerdicts, probe_saturation};

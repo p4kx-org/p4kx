@@ -7,7 +7,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::chunk_copy;
-use crate::error;
 use crate::hashing;
 use crate::output_path;
 use crate::{Artifact, ByteScope, MediaError, MediaWriter};
@@ -185,33 +184,40 @@ impl MediaWriter<'_> {
         let size = chunk_size(&layout, self.limits.chunk_bytes)?;
         self.reserve_output(size)?;
         let directory = self.root.join("chunks");
-        let chunk = chunk_copy::copy(self, &directory, input, size)?;
-        let digest = chunk.digest;
+        let chunk_copy::ChunkFile {
+            mut temporary,
+            digest,
+        } = chunk_copy::copy(self, &directory, input, size)?;
         let artifact = Artifact {
             path: format!("chunks/{}", digest.hex),
             size,
             digest,
         };
         let path = self.root.join(&artifact.path);
-        let created = if output_path::file(&path)? {
-            let (digest, actual) =
-                hashing::file(&path, ByteScope::ArtifactFile, size, &self.checkpoint)?;
-            if digest != artifact.digest || actual != size {
-                return Err(MediaError::Contract(
-                    "typed chunk content-address collision".into(),
-                ));
-            }
-            false
-        } else {
-            chunk
-                .temporary
-                .persist(&path)
-                .map_err(|failure| error::io(&path, failure.error))?;
-            true
-        };
-        self.artifact(&artifact)?;
-        self.converted_output(created)?;
-        Ok(ChunkReference { artifact, layout })
+        let result = (|| {
+            self.namespace
+                .ensure_namespace_writable(&path, self.checkpoint.cancel.flag())?;
+            let created = if output_path::file(&path)? {
+                let (digest, actual) =
+                    hashing::file(&path, ByteScope::ArtifactFile, size, &self.checkpoint)?;
+                if digest != artifact.digest || actual != size {
+                    return Err(MediaError::Contract(
+                        "typed chunk content-address collision".into(),
+                    ));
+                }
+                false
+            } else {
+                temporary.persist(
+                    &path,
+                    crate::publication::Publication::Namespace(self.namespace),
+                )?;
+                true
+            };
+            self.artifact(&artifact)?;
+            self.converted_output(created)?;
+            Ok(ChunkReference { artifact, layout })
+        })();
+        temporary.finish(result)
     }
 }
 

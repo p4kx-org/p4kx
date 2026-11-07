@@ -10,6 +10,15 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CatalogError {
+    /// An unpublished catalog could not be removed after its original failure.
+    #[error("catalog output cleanup failed: {cleanup}")]
+    CleanupFailed {
+        /// The original catalog failure.
+        #[source]
+        primary: Box<Self>,
+        /// The separate verified cleanup failure.
+        cleanup: Box<p4kx_extraction::OwnedOutputCleanupError>,
+    },
     /// Production accounting could not establish a reliable export-health contract.
     #[error(transparent)]
     Accounting(#[from] crate::ExportAccountingError),

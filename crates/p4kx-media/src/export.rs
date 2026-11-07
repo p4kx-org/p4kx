@@ -8,7 +8,7 @@ use p4kx_extraction::{Archive, ArchiveWatch, CancelToken, ConflictPolicy, Exclus
 use crate::checkpoint::Checkpoint;
 use crate::export_run;
 use crate::generation::Generation;
-use crate::{Index, Limits, MediaError, MediaKind, ProviderRegistry};
+use crate::{Index, Limits, MediaError, MediaKind, Provider, ProviderRegistry};
 
 /// Settings of one media generation.
 #[derive(Debug, Clone, Default)]
@@ -88,30 +88,39 @@ pub fn export_with(
             archive: archive.path().to_path_buf(),
         });
     }
-    p4kx_extraction::protect_archive_folder(archive.path());
+    let protection =
+        p4kx_extraction::ArchiveWriteProtection::new(archive.path(), options.cancel.flag())?;
     let watch = ArchiveWatch::new(archive);
     let checkpoint = Checkpoint {
         cancel: &options.cancel,
         watch: &watch,
+        protection: &protection,
     };
     let mut generation = Generation::new(output, options.limits, &checkpoint)?;
+    let result = run_generation(archive, options, &providers, checkpoint, &mut generation);
+    generation.finish(result)
+}
+
+fn run_generation(
+    archive: &Archive,
+    options: &ExportOptions,
+    providers: &[&dyn Provider],
+    checkpoint: Checkpoint<'_>,
+    generation: &mut Generation<'_>,
+) -> Result<ExportOutcome, MediaError> {
     if options.conflict == ConflictPolicy::Skip
         && let Some(index) = generation.previous.take()
     {
-        generation.release()?;
         return Ok(ExportOutcome::Skipped {
             index: Box::new(index),
         });
     }
     let mut index = export_run::build(
         archive,
-        generation.stage.path(),
+        generation.stage.permit(),
         options,
-        &providers,
-        Checkpoint {
-            cancel: &options.cancel,
-            watch: &watch,
-        },
+        providers,
+        checkpoint,
     )?;
     let changed = generation.publish(&mut index, options.conflict, &checkpoint)?;
     let diagnostic = generation
@@ -119,7 +128,6 @@ pub fn export_with(
         .join("diagnostics")
         .join(&index.generation)
         .join("media-index.json");
-    generation.release()?;
     if index.complete {
         Ok(ExportOutcome::Published {
             index: Box::new(index),

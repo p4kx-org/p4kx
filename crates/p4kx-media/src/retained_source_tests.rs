@@ -4,11 +4,13 @@
 use std::fs;
 
 use p4kx_extraction::{
-    Archive, ArchiveWatch, CancelToken, ExtractOptions, ExtractionReport, Progress,
+    Archive, ArchiveWatch, ArchiveWriteProtection, CancelToken, ExtractOptions, ExtractionReport,
+    Progress,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use crate::checkpoint::Checkpoint;
+use crate::staged_directory::StagedDirectory;
 use crate::{Limits, MediaError, MediaWriter};
 
 #[test]
@@ -22,6 +24,20 @@ fn cancellation_during_actual_extraction_retains_returned_counts()
     let archive = Archive::open(path)?;
     let token = CancelToken::new();
     let watch = ArchiveWatch::new(&archive);
+    let protection = ArchiveWriteProtection::new(archive.path(), token.flag())?;
+    let checkpoint = Checkpoint {
+        cancel: &token,
+        watch: &watch,
+        protection: &protection,
+    };
+    let staging = StagedDirectory::create(folder.path(), ".test-stage-", checkpoint)?;
+    let writer = MediaWriter::new(
+        staging.permit(),
+        Vec::new(),
+        Limits::default(),
+        checkpoint,
+        false,
+    )?;
     let report = cancel_during_extraction(&archive, &token, &watch, &folder.path().join("entry"))?;
     assert!(
         token.is_cancelled(),
@@ -33,16 +49,6 @@ fn cancellation_during_actual_extraction_retains_returned_counts()
         report.cancelled().len(),
     );
     assert_eq!(expected, (0, 0, 1));
-    let writer = MediaWriter::new(
-        folder.path(),
-        Vec::new(),
-        Limits::default(),
-        Checkpoint {
-            cancel: &token,
-            watch: &watch,
-        },
-        false,
-    )?;
     let error = super::finish_extraction(report, &writer)
         .err()
         .ok_or("cancelled retention succeeded")?;
@@ -55,6 +61,7 @@ fn cancellation_during_actual_extraction_retains_returned_counts()
         expected
     );
     assert!(!folder.path().join("media-index.json").exists());
+    staging.close()?;
     Ok(())
 }
 

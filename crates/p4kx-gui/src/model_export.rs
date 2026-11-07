@@ -6,7 +6,7 @@ mod summary;
 
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::{AnimationChoice, WriteRefused};
+use p4kx_extraction::{AnimationChoice, WriteProtectionError};
 use p4kx_settings::{ModelExportSettings, ModelMaterials};
 
 pub use job::{ModelExport, ModelExportProgress, ModelExportStage, ModelExportStatus};
@@ -28,7 +28,7 @@ pub const MODEL_TEXTURE_MIPS: [u32; 4] = [0, 1, 2, 3];
 
 /// The choices of an Export as GLB before it starts: the level of detail, the materials, the
 /// animations and the file.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct ModelExportSetup {
     entry: u32,
     entry_path: String,
@@ -42,7 +42,7 @@ pub struct ModelExportSetup {
     vertex_colours: bool,
     folder: Option<PathBuf>,
     file: Option<PathBuf>,
-    refusal: Option<WriteRefused>,
+    refusal: Option<WriteProtectionError>,
 }
 
 impl ModelExportSetup {
@@ -207,7 +207,7 @@ impl ModelExportSetup {
     /// Returns why the chosen file cannot be written, when it lies inside a Star Citizen
     /// installation.
     #[must_use]
-    pub const fn refusal(&self) -> Option<&WriteRefused> {
+    pub const fn refusal(&self) -> Option<&WriteProtectionError> {
         self.refusal.as_ref()
     }
 

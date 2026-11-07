@@ -5,29 +5,34 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use crate::MediaError;
+use crate::checkpoint::Checkpoint;
 use crate::error;
-use crate::output_path;
+use crate::lock_namespace::LockNamespace;
 
 pub(crate) struct GenerationLock {
     file: File,
     path: PathBuf,
+    namespace: LockNamespace,
 }
 
 impl GenerationLock {
-    pub(crate) fn acquire(output: &Path) -> Result<Self, MediaError> {
-        let path = output.join(".media.lock");
-        p4kx_extraction::ensure_writable(&path)?;
-        output_path::file(&path)?;
-        let file = File::options()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(&path)
-            .map_err(|source| error::io(&path, source))?;
+    pub(crate) fn acquire(output: &Path, checkpoint: &Checkpoint<'_>) -> Result<Self, MediaError> {
+        let namespace = LockNamespace::bind(output, checkpoint)?;
+        let path = namespace.path().to_path_buf();
+        let file = namespace.open(checkpoint)?;
+        namespace.validate(&file, checkpoint)?;
         file.try_lock()
             .map_err(|source| error::io(&path, source.into()))?;
-        Ok(Self { file, path })
+        namespace.validate(&file, checkpoint)?;
+        Ok(Self {
+            file,
+            path,
+            namespace,
+        })
+    }
+
+    pub(crate) fn check(&self, checkpoint: &Checkpoint<'_>) -> Result<(), MediaError> {
+        self.namespace.validate(&self.file, checkpoint)
     }
 
     pub(crate) fn release(self) -> Result<(), MediaError> {

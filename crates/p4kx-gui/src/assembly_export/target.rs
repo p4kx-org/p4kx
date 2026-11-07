@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use p4kx_blender::{MANIFEST_FILE, PackageError, check_output};
-use p4kx_extraction::WriteRefused;
+use p4kx_extraction::WriteProtectionError;
 
 use crate::installation::refusal_of;
 
@@ -19,10 +19,10 @@ pub enum AssemblyExportForm {
 }
 
 /// Why a folder cannot receive a Blender package.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum PackageProblem {
-    /// The folder lies inside a Star Citizen installation.
-    Installation(WriteRefused),
+    /// The output violates a protection or identity boundary.
+    Protected(WriteProtectionError),
     /// The folder exists and holds something other than an earlier package or nothing, so it is
     /// not replaced.
     NotAPackage,
@@ -32,11 +32,11 @@ pub enum PackageProblem {
 
 /// What an export writes and where: the form, and the GLB file or the package folder chosen for
 /// it with what the dialog tells about it.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct Output {
     form: AssemblyExportForm,
     file: Option<PathBuf>,
-    refusal: Option<WriteRefused>,
+    refusal: Option<WriteProtectionError>,
     target: Option<PackageTarget>,
 }
 
@@ -90,10 +90,10 @@ impl Output {
         self.file = Some(file);
     }
 
-    pub(crate) fn refusal(&self) -> Option<&WriteRefused> {
+    pub(crate) fn refusal(&self) -> Option<&WriteProtectionError> {
         if self.form == AssemblyExportForm::Package {
             match self.package_problem() {
-                Some(PackageProblem::Installation(refused)) => Some(refused),
+                Some(PackageProblem::Protected(refused)) => Some(refused),
                 _ => None,
             }
         } else {
@@ -135,7 +135,7 @@ impl Output {
 }
 
 /// The folder a Blender package is written to and what the writer makes of it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub(crate) struct PackageTarget {
     folder: PathBuf,
     problem: Option<PackageProblem>,
@@ -149,7 +149,7 @@ impl PackageTarget {
     )]
     pub(super) fn new(folder: PathBuf) -> Self {
         let problem = match check_output(&folder) {
-            Err(PackageError::Refused(refused)) => Some(PackageProblem::Installation(refused)),
+            Err(PackageError::Refused(refused)) => Some(PackageProblem::Protected(refused)),
             Err(PackageError::NotAPackage { .. }) => Some(PackageProblem::NotAPackage),
             Err(PackageError::NoFolderName { .. }) => Some(PackageProblem::NoFolderName),
             Err(PackageError::Write { .. }) => None,

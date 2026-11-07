@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use egui::ColorImage;
 use p4kx_extraction::gfx::RasterOptions;
-use p4kx_extraction::{CancelToken, LocalizationEntry, ScreenTexts, UiMovie};
+use p4kx_extraction::{CancelToken, LocalizationEntry, ScreenTexts, UiMovie, WriteProtectionError};
 use p4kx_screens::{StillFormat, StillRequest, Variable};
 
 use super::contents::UiContents;
@@ -119,6 +119,7 @@ pub(super) enum Fail {
     ArchiveChanged,
     Stopped,
     Reason(String),
+    Protected(WriteProtectionError),
 }
 
 /// Fails with [`Fail::Stopped`] once `cancel` is cancelled.
@@ -139,8 +140,12 @@ impl From<ReadFailure> for Fail {
     }
 }
 
-pub(super) fn reason(error: &dyn std::error::Error) -> Fail {
-    Fail::Reason(describe(error))
+pub(super) fn reason(error: &(dyn std::error::Error + 'static)) -> Fail {
+    match crate::installation::refusal_in(error) {
+        Some(refused) if refused.is_cancelled() => Fail::Stopped,
+        Some(refused) => Fail::Protected(refused.clone()),
+        None => Fail::Reason(describe(error)),
+    }
 }
 
 /// Draws the picture of `key` as the PNG of `p4kx ui render` would hold it.

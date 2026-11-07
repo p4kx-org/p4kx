@@ -155,6 +155,10 @@ use crate::cli::{Cli, Command};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    if let Err(error) = p4kx_extraction::check_runtime_prerequisites() {
+        report(&anyhow::Error::new(error));
+        return ExitCode::from(exit::PARTIAL_FAILURE);
+    }
     let json = cli.json;
     guard::protect_installations();
     if !matches!(cli.command, Command::Key(_)) {

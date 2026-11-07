@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    CancelToken, ScreenTexts, WriteRefused, ensure_writable, is_same_file, write_bytes_replacing,
+    ArchiveWriteProtection, CancelToken, ConversionError, ScreenTexts, WriteProtectionError,
+    is_same_file, write_replacing_protected,
 };
 use p4kx_screens::{StillFormat, StillRequest};
 
@@ -44,8 +45,8 @@ pub enum UiExportStatus<'a> {
     IsArchive,
     /// The Archive changed on disk before the file was written, so nothing was written.
     ArchiveChanged,
-    /// The file lies inside this Star Citizen installation, where nothing is written.
-    Refused(&'a Path),
+    /// The output violates a protection or identity boundary.
+    Refused(&'a WriteProtectionError),
     /// Writing failed for the reason given, or stopped without a result.
     Failed(Option<&'a str>),
 }
@@ -57,6 +58,7 @@ enum Outcome {
     ArchiveChanged,
     Stopped,
     Failed(String),
+    Refused(WriteProtectionError),
 }
 
 enum State {
@@ -65,7 +67,7 @@ enum State {
     DoneArchiveChanged(UiExportSummary),
     IsArchive,
     ArchiveChanged,
-    Refused(PathBuf),
+    Refused(WriteProtectionError),
     Failed(Option<String>),
 }
 
@@ -129,6 +131,7 @@ impl UiExport {
             Poll::Ready(Outcome::IsArchive) => State::IsArchive,
             Poll::Ready(Outcome::ArchiveChanged) => State::ArchiveChanged,
             Poll::Ready(Outcome::Failed(reason)) => State::Failed(Some(reason)),
+            Poll::Ready(Outcome::Refused(error)) => State::Refused(error),
             Poll::Ready(Outcome::Stopped) | Poll::Lost => State::Failed(None),
         };
         true
@@ -143,11 +146,11 @@ pub(super) struct Request {
     pub(super) texts: Option<Arc<ScreenTexts>>,
 }
 
-/// Returns the export that did not start because `file` lies inside a Star Citizen installation.
-pub(super) fn refused(file: PathBuf, refused: WriteRefused) -> UiExport {
+/// Returns an export refused by an output-protection boundary.
+pub(super) const fn refused(file: PathBuf, refused: WriteProtectionError) -> UiExport {
     UiExport {
         file,
-        state: State::Refused(refused.installation),
+        state: State::Refused(refused),
     }
 }
 
@@ -175,15 +178,14 @@ fn run(index: &EntryIndex, request: &Request, cancel: &CancelToken) -> Outcome {
     if index.watch().check().is_err() {
         return Outcome::ArchiveChanged;
     }
-    let written = ensure_writable(&request.file)
-        .map_err(|error| reason(&error))
-        .and_then(|()| write(index, request, cancel));
+    let written = write(index, request, cancel);
     match written {
         Ok(summary) if index.watch().check().is_err() => Outcome::DoneArchiveChanged(summary),
         Ok(summary) => Outcome::Done(summary),
         Err(Fail::ArchiveChanged) => Outcome::ArchiveChanged,
         Err(Fail::Stopped) => Outcome::Stopped,
         Err(Fail::Reason(reason)) => Outcome::Failed(reason),
+        Err(Fail::Protected(error)) => Outcome::Refused(error),
     }
 }
 
@@ -273,7 +275,18 @@ fn write_screen(
     let (still, warnings) = still::draw(index, &forge, &texts, &asked, cancel)?;
     checkpoint(cancel)?;
     let bytes = still.encode().map_err(|e| reason(&e))?;
-    write_bytes_replacing(file, &bytes).map_err(|e| reason(&e))?;
+    let protection =
+        ArchiveWriteProtection::new(index.path(), cancel.flag()).map_err(|error| reason(&error))?;
+    write_replacing_protected(file, Some(&protection), Some(cancel), |writer| {
+        use std::io::Write as _;
+        writer
+            .write_all(&bytes)
+            .map_err(|source| ConversionError::Write {
+                path: file.clone(),
+                source,
+            })
+    })
+    .map_err(|error| reason(&error))?;
     Ok(UiExportSummary {
         file: file.clone(),
         width: still.width(),

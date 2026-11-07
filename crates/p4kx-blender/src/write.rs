@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
 use p4kx_assembly::{Assembly, Issue as AssemblyIssue, ModelProvider};
 use p4kx_gltf::{AnimationSummary, GlbOptions, TextureLoader};
@@ -20,7 +20,7 @@ use crate::manifest::{
 use crate::plan::MeshPlan;
 use crate::stage::Staging;
 use crate::textures::{self, Outcome};
-use crate::{Cancelled, PackageError, PackageResult, meshes};
+use crate::{PackageError, PackageResult, PackageWriteContext, meshes};
 
 /// What the package records about where the Assembly comes from and how it was chosen.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -161,18 +161,43 @@ pub fn write_package(
     out: &Path,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> PackageResult<PackageSummary> {
+    let observed = AtomicBool::new(false);
+    write_package_with_context(
+        assembly,
+        models,
+        textures,
+        options,
+        info,
+        out,
+        &PackageWriteContext::standalone(cancelled, &observed),
+    )
+}
+
+/// Writes an Assembly package with source protection at every output boundary.
+///
+/// # Errors
+/// Returns protection, cancellation, package validation, mesh or file failures.
+pub fn write_package_with_context(
+    assembly: &Assembly,
+    models: &dyn ModelProvider,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    info: &PackageInfo,
+    out: &Path,
+    context: &PackageWriteContext<'_>,
+) -> PackageResult<PackageSummary> {
     if assembly
         .creature_skins()
         .is_some_and(|mut skins| skins.next().is_some())
     {
-        return write_creature_package(assembly, textures, options, info, out, cancelled);
+        return write_creature_package(assembly, textures, options, info, out, context);
     }
     let scene = Scene {
         entity: entity_ref(assembly.root()),
         items: items(assembly),
         issues: assembly.issues(),
     };
-    write_scene(&scene, models, textures, options, info, out, cancelled)
+    write_scene(&scene, models, textures, options, info, out, context)
 }
 
 /// The nodes of a package before the files are written, and where they come from.
@@ -189,14 +214,34 @@ pub(crate) fn write_scene(
     options: &GlbOptions,
     info: &PackageInfo,
     out: &Path,
-    cancelled: &(dyn Fn() -> bool + Sync),
+    context: &PackageWriteContext<'_>,
 ) -> PackageResult<PackageSummary> {
-    let cancelled = Cancelled::new(cancelled);
-    let staging = Staging::create(out)?;
+    let staging = Staging::create(out, *context)?;
+    let result = write_scene_files(
+        scene,
+        models,
+        textures,
+        options,
+        info,
+        staging.path(),
+        context,
+    );
+    staging.complete(result)
+}
+
+fn write_scene_files(
+    scene: &Scene<'_>,
+    models: &dyn ModelProvider,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    info: &PackageInfo,
+    staging: &Path,
+    context: &PackageWriteContext<'_>,
+) -> PackageResult<PackageSummary> {
     let items = &scene.items;
     let plan = MeshPlan::of(items);
     let collected = Collected::of(items, &plan, options.lod, models);
-    cancelled.check()?;
+    context.check()?;
     let outcomes = if collected.wanted.is_empty() {
         Vec::new()
     } else {
@@ -204,18 +249,12 @@ pub(crate) fn write_scene(
             &collected.wanted,
             textures,
             options.texture_mip,
-            &staging.path().join(TEXTURES_FOLDER),
-            &cancelled,
+            &staging.join(TEXTURES_FOLDER),
+            context,
         )?
     };
-    let written = meshes::write_all(
-        items,
-        &plan,
-        options,
-        &staging.path().join(MESHES_FOLDER),
-        &cancelled,
-    )?;
-    cancelled.check()?;
+    let written = meshes::write_all(items, &plan, options, &staging.join(MESHES_FOLDER), context)?;
+    context.check()?;
     let mut manifest = manifest(&Inputs {
         entity: scene.entity.clone(),
         assembly_issues: scene.issues,
@@ -228,15 +267,18 @@ pub(crate) fn write_scene(
         meshes: &written,
     });
     sanitise(&mut manifest);
-    let manifest_len = write_manifest(&staging.path().join(MANIFEST_FILE), &manifest)?;
+    let manifest_len = write_manifest(&staging.join(MANIFEST_FILE), &manifest, context)?;
     let summary = summarise(&manifest, &outcomes, &written, manifest_len);
-    cancelled.check()?;
-    staging.commit()?;
+    context.check()?;
     Ok(summary)
 }
 
-pub(crate) fn write_manifest(path: &Path, manifest: &crate::Manifest) -> PackageResult<u64> {
-    let file = File::create_new(path).map_err(|source| PackageError::write(path, source))?;
+pub(crate) fn write_manifest(
+    path: &Path,
+    manifest: &crate::Manifest,
+    context: &PackageWriteContext<'_>,
+) -> PackageResult<u64> {
+    let (file, ownership) = context.create_file(path)?.into_parts();
     let mut writer = BufWriter::new(file);
     serde_json::to_writer_pretty(&mut writer, manifest)
         .map_err(|error| PackageError::write(path, error.into()))?;
@@ -247,6 +289,7 @@ pub(crate) fn write_manifest(path: &Path, manifest: &crate::Manifest) -> Package
     let file = writer
         .into_inner()
         .map_err(|error| PackageError::write(path, error.into_error()))?;
+    ownership.ensure_writable(path, context.cancel_flag())?;
     file.sync_all()
         .map_err(|source| PackageError::write(path, source))?;
     let len = file

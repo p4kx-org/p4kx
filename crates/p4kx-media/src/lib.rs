@@ -22,16 +22,21 @@ mod generation_tests;
 mod generation_validation;
 mod hashing;
 mod identifier;
+mod index_destination;
 mod index_file;
 mod integrity;
 mod kind;
 mod limits;
+mod lock_namespace;
 mod media_record;
 mod media_writer;
 mod numeric;
 mod observed_write;
 mod output_path;
+#[cfg(test)]
+mod owned_output_tests;
 mod provider;
+mod publication;
 mod raw_output;
 mod reference;
 mod reference_resolve;
@@ -52,7 +57,11 @@ mod shader_span;
 mod shader_values;
 mod shader_word;
 mod source;
+mod staged_directory;
+mod temporary_file;
 mod traversal;
+#[cfg(test)]
+mod write_context_tests;
 
 pub use archive_provider::ArchiveProvider;
 pub use chunk::{

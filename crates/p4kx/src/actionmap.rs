@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
@@ -52,11 +51,15 @@ fn export(args: &ActionMapExportArgs, as_json: bool) -> Result<()> {
         out.flush()?;
         return Ok(());
     };
-    let file = File::create(path).with_context(|| format!("cannot write {}", path.display()))?;
-    let mut out = BufWriter::new(file);
-    let counts = write_action_maps(&maps, &texts, args.language, format, &mut out)?;
-    out.flush()
-        .with_context(|| format!("cannot write {}", path.display()))?;
+    let cancel = p4kx_extraction::CancelToken::new();
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let counts = crate::query_file::write_replacing_protected(
+        path,
+        Some(&protection),
+        Some(&cancel),
+        |out| write_action_maps(&maps, &texts, args.language, format, out),
+    )
+    .with_context(|| format!("cannot write {}", path.display()))?;
     report(args, path, as_json, &archive, &counts)
 }
 

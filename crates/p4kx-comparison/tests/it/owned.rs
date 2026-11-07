@@ -134,3 +134,62 @@ fn a_selection_counts_only_the_selected_changes() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn report_writes_refuse_both_source_installations_but_allow_the_outside_target() -> TestResult {
+    let (dir, old, new) = pair()?;
+    let old_parent = old.path().parent().ok_or("old parent")?;
+    let new_parent = new.path().parent().ok_or("new parent")?;
+    std::fs::create_dir(old_parent.join("Bin64"))?;
+    std::fs::create_dir(new_parent.join("Bin64"))?;
+    let comparison = compare(&old, &new, None, &entries())?;
+    for parent in [old_parent, new_parent] {
+        let path = parent.join("report.json");
+        let error = comparison
+            .save_report(&path)
+            .expect_err("the actual source installation is protected");
+        assert_eq!(
+            error.kind(),
+            std::io::ErrorKind::PermissionDenied,
+            "the source protection is explicit"
+        );
+        assert!(
+            !path.exists(),
+            "neither source installation receives an output"
+        );
+    }
+    let outside = dir.path().join("outside-report.json");
+    comparison.save_report(&outside)?;
+    assert!(outside.is_file(), "an unrelated target remains writable");
+    Ok(())
+}
+
+#[test]
+fn a_cancelled_report_preserves_the_existing_file_and_creates_no_temporary_output() -> TestResult {
+    let (dir, old, new) = pair()?;
+    let comparison = compare(&old, &new, None, &entries())?;
+    let target = dir.path().join("report.json");
+    std::fs::write(&target, b"existing user report")?;
+    let before = std::fs::read_dir(dir.path())?.count();
+    let cancel = p4kx_extraction::CancelToken::new();
+    cancel.cancel();
+    let error = comparison
+        .save_report_with_cancel(&target, Some(&cancel))
+        .expect_err("cancelled");
+    assert_eq!(
+        error.kind(),
+        std::io::ErrorKind::Interrupted,
+        "the cancellation retains its meaning"
+    );
+    assert_eq!(
+        std::fs::read(&target)?,
+        b"existing user report",
+        "no replacement after cancellation"
+    );
+    assert_eq!(
+        std::fs::read_dir(dir.path())?.count(),
+        before,
+        "no temporary output is left"
+    );
+    Ok(())
+}

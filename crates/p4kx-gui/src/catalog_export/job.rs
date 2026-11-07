@@ -10,9 +10,9 @@ use std::time::SystemTime;
 
 use p4kx_export::{
     CancelToken, CatalogError, CatalogFile, CatalogOptions, CatalogProgress,
-    CatalogPublicationMode, Compression, ExportHealth, write_catalog_from,
+    CatalogPublicationMode, CatalogSummary, Compression, ExportHealth, write_catalog_file_from,
 };
-use p4kx_extraction::is_same_file;
+use p4kx_extraction::{ArchiveWriteProtection, is_same_file};
 
 use super::{
     CatalogExportOptions, CatalogExportProgress, CatalogExportStage, CatalogExportSummary, Shared,
@@ -291,37 +291,50 @@ impl Job {
             public_patches: Some(&patches),
             publication_mode: self.options.publication_mode,
         };
-        let created = write_catalog_from(
+        let protection = match ArchiveWriteProtection::new(archive.path(), self.cancel.flag()) {
+            Ok(protection) => protection,
+            Err(error) if error.is_cancelled() => return Ok(Outcome::Cancelled),
+            Err(error) => return Err(describe(&error)),
+        };
+        let created = write_catalog_file_from(
             archive,
             &source.entry,
             &options,
             Compression::for_path(&self.file),
             || {
                 self.shared.enter(CatalogExportStage::Writing);
-                crate::installation::refuse(&self.file)?;
-                CatalogFile::create(&self.file)
+                CatalogFile::create_protected(&self.file, &protection, &self.cancel)
             },
         );
         let (summary, file) = match created {
             Ok(created) => created,
             Err(CatalogError::Cancelled) => return Ok(Outcome::Cancelled),
+            Err(error) if crate::installation::guard_cancelled(&error) => {
+                return Ok(Outcome::Cancelled);
+            }
             Err(CatalogError::IncompleteExport { health }) => {
                 return Ok(Outcome::Incomplete(health));
             }
             Err(error) => return Err(describe(&error)),
         };
-        self.check_archive()?;
+        self.complete(summary, file)
+    }
+
+    fn complete(&self, summary: CatalogSummary, file: CatalogFile<'_>) -> RunResult {
+        if let Err(source) = self.index.watch().check() {
+            let primary = CatalogError::Write(std::io::Error::other(source));
+            return Err(describe(&super::output::discard(file, primary)));
+        }
         if self.cancel.is_cancelled() {
-            return Ok(Outcome::Cancelled);
+            return match super::output::discard(file, CatalogError::Cancelled) {
+                CatalogError::Cancelled => Ok(Outcome::Cancelled),
+                error => Err(describe(&error)),
+            };
         }
         file.commit().map_err(|error| describe(&error))?;
         Ok(Outcome::Written(Box::new(CatalogExportSummary {
             file: self.file.clone(),
             summary,
         })))
-    }
-
-    fn check_archive(&self) -> Result<(), String> {
-        self.index.watch().check().map_err(|error| describe(&error))
     }
 }

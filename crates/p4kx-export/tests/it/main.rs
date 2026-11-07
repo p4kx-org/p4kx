@@ -107,6 +107,7 @@ mod quality_numbers;
 mod quantization_fixture;
 mod record_export;
 mod record_export_plans;
+mod record_export_protection;
 mod reputation_fixture;
 mod resource_density_schema_fixture;
 mod resource_edges_fixture;

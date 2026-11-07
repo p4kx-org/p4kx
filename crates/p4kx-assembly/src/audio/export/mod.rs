@@ -9,10 +9,10 @@ mod write;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use p4kx_audio::Loop;
-use p4kx_extraction::{CancelToken, ConflictPolicy, ConversionError, ensure_writable};
+use p4kx_extraction::{ArchiveWriteProtection, CancelToken, ConflictPolicy, ConversionError};
 
 use self::write::Target;
 use super::{ArchiveAudio, TriggerSounds};
@@ -55,8 +55,7 @@ pub struct ExportOptions {
 /// leaving no partial file; the files it finished stay.
 #[derive(Debug, Default)]
 pub struct ExportWatch {
-    cancelled: AtomicBool,
-    token: Option<CancelToken>,
+    token: CancelToken,
     done: AtomicUsize,
     total: AtomicUsize,
 }
@@ -66,21 +65,20 @@ impl ExportWatch {
     #[must_use]
     pub fn linked(token: CancelToken) -> Self {
         Self {
-            token: Some(token),
+            token,
             ..Self::default()
         }
     }
 
     /// Asks the export to stop at the next write.
     pub fn cancel(&self) {
-        self.cancelled.store(true, Ordering::Relaxed);
+        self.token.cancel();
     }
 
     /// Returns whether the export was asked to stop.
     #[must_use]
     pub fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::Relaxed)
-            || self.token.as_ref().is_some_and(CancelToken::is_cancelled)
+        self.token.is_cancelled()
     }
 
     /// Returns how many sounds are handled so far, written, kept or failed.
@@ -244,7 +242,12 @@ impl ArchiveAudio<'_> {
             failures: plan.failures,
             ..ExportReport::default()
         };
-        ensure_writable(folder)?;
+        if watch.is_cancelled() {
+            report.cancelled = !plan.jobs.is_empty();
+            return Ok(report);
+        }
+        let protection = ArchiveWriteProtection::new(self.archive().path(), watch.token.flag())?;
+        protection.ensure_writable(folder, watch.token.flag())?;
         if plan.jobs.is_empty() {
             return Ok(report);
         }
@@ -259,6 +262,7 @@ impl ArchiveAudio<'_> {
         let target = Target {
             folder,
             absolute: &absolute,
+            protection: &protection,
         };
         for outcome in write::run(self, &plan.jobs, target, options, watch) {
             match outcome {

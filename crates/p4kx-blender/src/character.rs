@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
 use p4kx_assembly::{Armour, CharacterAnimations, PartOrigin};
 use p4kx_gltf::{GlbOptions, GlbSummary, TextureLoader};
@@ -81,11 +82,34 @@ pub fn write_character_package(
     out: &Path,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> PackageResult<PackageSummary> {
+    let observed = AtomicBool::new(false);
+    write_character_package_with_context(
+        character,
+        textures,
+        options,
+        info,
+        out,
+        &crate::PackageWriteContext::standalone(cancelled, &observed),
+    )
+}
+
+/// Writes a Character package with source protection at every output boundary.
+///
+/// # Errors
+/// Returns protection, cancellation, package validation, mesh or file failures.
+pub fn write_character_package_with_context(
+    character: &CharacterScene<'_>,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    info: &PackageInfo,
+    out: &Path,
+    context: &crate::PackageWriteContext<'_>,
+) -> PackageResult<PackageSummary> {
     write_rig_package(
         out,
         character.name,
         options,
-        cancelled,
+        context,
         |options, writer| {
             character.armour.write_glb_animated_with(
                 character.animations,

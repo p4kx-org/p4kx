@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use p4kx_texture::{RgbaImage, TextureError, cube_cross, write_png};
 use rayon::prelude::*;
 
-use crate::output_file::write_replacing;
+use crate::output_file::write_replacing_protected;
 use crate::texture_names::{image_suffixes, suffixed_path};
 use crate::{ConversionError, Texture};
 
@@ -111,7 +111,7 @@ impl Texture<'_> {
     }
 
     fn write_png_file(&self, out: &Path, image: &RgbaImage) -> Result<(), ConversionError> {
-        write_replacing(out, |writer| {
+        write_replacing_protected(out, self.write_protection()?, None, |writer| {
             write_png(image, writer)
                 .map_err(|error| ConversionError::of_texture(self.name(), error))
         })

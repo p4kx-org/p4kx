@@ -10,7 +10,10 @@ use std::path::PathBuf;
 use anyhow::{Result, anyhow};
 use p4kx_channels::SearchPaths;
 use p4kx_gui::smoke::Frames;
-use p4kx_gui::{App, ChannelList, Language, Model, RecordTextChoice, Text, frame, theme, window};
+use p4kx_gui::{
+    App, ChannelList, Language, Model, PrerequisiteNotice, ProtectionText, RecordTextChoice, Text,
+    Texts, frame, theme, window,
+};
 use p4kx_settings::{
     KEY_VARIABLE, KeyChoiceError, KeyStore, Settings, choose_key, default_settings_file,
 };
@@ -38,6 +41,10 @@ fn set_up_key(model: &mut Model) {
 }
 
 fn main() -> Result<()> {
+    if informational_argument()? {
+        return Ok(());
+    }
+    check_runtime()?;
     p4kx_extraction::protect_libraries();
     let settings_file = default_settings_file();
     let settings = settings_file
@@ -94,4 +101,44 @@ fn main() -> Result<()> {
         }),
     )
     .map_err(|error| anyhow!("cannot show the window: {error}"))
+}
+
+fn informational_argument() -> Result<bool> {
+    use std::io::Write as _;
+    let argument = std::env::args_os().nth(1);
+    let text = match argument.as_deref().and_then(std::ffi::OsStr::to_str) {
+        Some("--version" | "-V") => format!("p4kx-gui {}", env!("CARGO_PKG_VERSION")),
+        Some("--help" | "-h") => {
+            Texts::new(Language::resolve(None)).get(ProtectionText::CommandHelp)
+        }
+        _ => return Ok(false),
+    };
+    writeln!(std::io::stdout().lock(), "{text}")?;
+    Ok(true)
+}
+
+fn check_runtime() -> Result<()> {
+    if let Err(error) = p4kx_extraction::check_runtime_prerequisites() {
+        if Frames::from_environment().is_none() {
+            show_prerequisite()?;
+        }
+        return Err(error.into());
+    }
+    Ok(())
+}
+
+fn show_prerequisite() -> Result<()> {
+    let language = Language::resolve(None);
+    let title = Texts::new(language).get(Text::AppTitle);
+    let options = window::native_options(window::viewport(None, &title));
+    eframe::run_native(
+        &title,
+        options,
+        Box::new(move |creation| {
+            theme::apply(&creation.egui_ctx);
+            frame::tint(creation);
+            Ok(Box::new(PrerequisiteNotice::new(language)))
+        }),
+    )
+    .map_err(|error| anyhow!("cannot show the prerequisite notice: {error}"))
 }
