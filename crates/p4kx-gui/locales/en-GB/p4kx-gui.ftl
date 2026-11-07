@@ -461,6 +461,13 @@ record-export-failed = The Record export into { $path } failed: { $reason }
 record-export-stopped = The Record export into { $path } stopped without a result.
 
 catalog-action = Basetool catalog…
+catalog-diagnostic-action = Diagnostic Basetool catalog…
+catalog-diagnostic-running-title = Creating a diagnostic Basetool catalog
+catalog-diagnostic-summary-title = Diagnostic Basetool catalog written
+catalog-diagnostic-notice = Diagnostic catalog. Check its reported export health before treating missing data as removals.
+catalog-incomplete = Some selected data could not be read or included. No file was created or replaced. Use a diagnostic catalog to inspect the partial result.
+catalog-health-complete = Export health: all selected sources were read and projected successfully.
+catalog-health-incomplete = Export health: incomplete. Some selected sources could not be read or projected successfully.
 catalog-file-filter = Basetool catalog (JSON)
 catalog-file-filter-compressed = Basetool catalog (JSON, zstd-compressed)
 catalog-running-title = Creating the Basetool catalog
@@ -484,7 +491,7 @@ catalog-warning = { $kind ->
 catalog-warning-more = and { $number } more
 catalog-writing = Writing { $path }…
 catalog-summary-title = Basetool catalog created
-catalog-kinds-heading = Kinds
+catalog-kinds-heading = Kinds (selection scope)
 catalog-summary-kind = { $kind ->
     [manufacturers] Manufacturers
     [items] Items

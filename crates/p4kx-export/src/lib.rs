@@ -142,7 +142,31 @@ mod crafting_warning;
 mod digest;
 mod entity_selection;
 mod entity_spawn_model;
+mod entry_source;
 mod error;
+mod export_archive_health;
+mod export_builder_capture;
+mod export_dependency_read;
+mod export_diagnostic;
+mod export_entry_counts;
+mod export_entry_ledger;
+mod export_evidence_lock;
+mod export_field_collect;
+mod export_field_error;
+mod export_field_inspection;
+mod export_field_walk;
+mod export_health;
+mod export_health_compile;
+mod export_health_derived;
+mod export_health_entries;
+mod export_health_fields;
+mod export_health_records;
+mod export_health_warning;
+mod export_ledger;
+mod export_projection_fields;
+mod export_reference_issue;
+mod export_source_failure;
+mod export_tag_read;
 mod failure;
 mod form;
 mod guid_text;
@@ -150,6 +174,7 @@ mod harvest_config;
 mod harvest_link;
 mod harvest_locations;
 mod harvest_preset;
+mod harvest_source;
 mod item;
 mod item_class;
 mod item_stats;
@@ -159,6 +184,7 @@ mod loadout;
 mod loadout_port;
 mod localization_table;
 mod location_template;
+mod loot_container_source;
 mod loot_containers;
 mod loot_entry;
 mod loot_entxml;
@@ -166,6 +192,7 @@ mod loot_kinds;
 mod loot_legacy;
 mod loot_records;
 mod loot_soc;
+mod loot_soc_source;
 mod loot_unreadable;
 mod loot_walk;
 mod manufacturer;
@@ -175,6 +202,7 @@ mod mining_params;
 mod mission_blueprints;
 mod mission_cooldown;
 mod mission_data;
+mod mission_entry_source;
 mod mission_facts;
 mod mission_giver;
 mod mission_hauling;
@@ -183,13 +211,14 @@ mod mission_index;
 mod mission_intros;
 mod mission_kinds;
 mod mission_layers;
-mod mission_entry_source;
+mod mission_ledger;
+mod mission_places;
+mod mission_pool_ledger;
 mod mission_property_fields;
 mod mission_property_set;
 mod mission_property_set_index;
 mod mission_property_set_registry;
 mod mission_property_sources;
-mod mission_places;
 mod mission_results;
 mod mission_shared;
 mod mission_siblings;
@@ -202,6 +231,7 @@ mod npc_spawn_model;
 mod npc_spawn_read;
 mod options;
 mod paint;
+mod paint_ledger;
 mod paint_port;
 mod picked;
 mod playability;
@@ -215,12 +245,13 @@ mod recovery;
 mod reputation;
 mod resource_group;
 mod scan;
+mod scan_health;
+mod scan_signature;
 mod scoped_location;
 mod scoped_location_fields;
 mod scoped_location_link;
 mod scoped_location_read;
 mod scoped_location_weak;
-mod scan_signature;
 mod selection;
 mod selection_index;
 mod selection_lookup;
@@ -231,8 +262,11 @@ mod ship_pool;
 mod ship_store_slugs;
 mod shop_container_scan;
 mod shop_containers;
+mod shop_entry_read;
 mod shop_inventories;
 mod shop_links;
+#[cfg(test)]
+mod shop_observation_tests;
 mod shop_prefabs;
 mod shop_registry;
 mod shop_soc;
@@ -287,6 +321,21 @@ pub use crafting_types::{
 };
 pub use crafting_warning::CraftingWarning;
 pub use error::CatalogError;
+pub use export_diagnostic::{
+    EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT, ExportDiagnostic, ExportDiagnosticCode,
+    ExportDiagnosticExample, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
+    ExportSourceRole, FailedExportRecord,
+};
+pub use export_entry_counts::ExportEntryCounts;
+pub use export_entry_ledger::{EntryOperation, FailedExportEntry};
+pub use export_health::{
+    CatalogPublicationMode, ExportHealth, ExportHealthStatus, ExportSourceCounts, ExportSourceMode,
+    ExportStageStatus, KindExportHealth,
+};
+pub use export_ledger::ExportAccountingError;
+pub use export_reference_issue::{
+    ExportReferenceStatus, ExportSourcePointer, ExportUnresolvedReference,
+};
 pub use failure::CatalogFailure;
 pub use form::{FLAT_CSV_FILE, FLAT_NDJSON_FILE, NDJSON_FILE, RecordForm};
 pub use item_class::{ItemClass, ItemClassSummary};
@@ -301,7 +350,7 @@ pub use playability::{Playability, PlayabilityCounts, PlayabilitySummary};
 pub use quantization_summary::QuantizationSummary;
 pub use record_export::{RecordFilePlans, write_planned_record_export, write_record_export};
 pub use record_summary::RecordExportSummary;
-pub use selection::{EXCLUDED_TOKENS, Kind, KindRule, SHIP_EXCLUDED_TOKENS};
+pub use selection::{EXCLUDED_TOKENS, Kind, KindRule, SHIP_EXCLUDED_TOKENS, is_kind_leftover};
 pub use ship_base::{
     BuiltShipBase, Cargo, CargoGrid, Hull, HullThreshold, Implementation, LoadoutPort, Mass,
     MassBasis, PartialPartValue, SHIP_BASE_VERSION, ShipBase, ShipBaseError, ShipBaseOptions,

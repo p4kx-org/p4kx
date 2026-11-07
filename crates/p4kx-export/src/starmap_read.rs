@@ -6,6 +6,10 @@ use std::path::Path;
 
 use p4kx_extraction::{Archive, Entry};
 
+use crate::Kind;
+use crate::entry_source::EntrySource;
+use crate::export_entry_ledger::EntryOperation;
+use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::starmap_index::{SOCPAK, key};
 
 /// The largest container XML that is read, 128 MiB.
@@ -13,6 +17,7 @@ const MAX_XML_LEN: u64 = 128 << 20;
 
 /// The main XML of a container.
 pub(crate) struct MainXml {
+    pub(crate) source: EntrySource,
     pub(crate) bytes: Vec<u8>,
     /// The path of the XML entry taken because none is named like the container.
     pub(crate) fallback: Option<String>,
@@ -38,10 +43,55 @@ fn first_xml(entries: &[Entry]) -> Result<&Entry, String> {
 
 /// Reads the main XML of the container held in `socpak`: the entry named like the container, else
 /// the first XML entry that is no editor or metadata file.
-pub(crate) fn main_xml(archive: &Archive, socpak: &Entry) -> Result<MainXml, String> {
-    let container = archive
-        .open_container(socpak)
-        .map_err(|error| format!("cannot be opened as a container: {error:#}"))?;
+pub(crate) fn main_xml(
+    archive: &Archive,
+    socpak: &Entry,
+    ledger: &mut ExportLedger,
+) -> Result<MainXml, String> {
+    let source = EntrySource::outer(socpak).dependency();
+    let container = match archive.open_container(socpak) {
+        Ok(container) => container,
+        Err(error) => {
+            source.record(ledger, Kind::StarmapObjects, SourceDisposition::ReadFailed);
+            return Err(format!("cannot be opened as a container: {error:#}"));
+        }
+    };
+    source.record(ledger, Kind::StarmapObjects, SourceDisposition::Projected);
+    let parent = EntrySource::outer(socpak)
+        .dependency()
+        .operation(EntryOperation::ContainerXml);
+    match selected_xml(&container, socpak) {
+        Ok((xml, fallback)) => {
+            let source = EntrySource::inner(socpak, xml)
+                .dependency()
+                .operation(EntryOperation::ContainerXml);
+            match read_xml(&container, xml) {
+                Ok(bytes) => Ok(MainXml {
+                    source,
+                    bytes,
+                    fallback,
+                }),
+                Err(error) => {
+                    source.record(ledger, Kind::StarmapObjects, SourceDisposition::ReadFailed);
+                    Err(error)
+                }
+            }
+        }
+        Err(error) => {
+            parent.record(
+                ledger,
+                Kind::StarmapObjects,
+                SourceDisposition::ProjectionFailed,
+            );
+            Err(error)
+        }
+    }
+}
+
+fn selected_xml<'a>(
+    container: &'a Archive,
+    socpak: &Entry,
+) -> Result<(&'a Entry, Option<String>), String> {
     let stem = key(socpak.path());
     let stem = stem
         .rsplit('\\')
@@ -58,6 +108,10 @@ pub(crate) fn main_xml(archive: &Archive, socpak: &Entry) -> Result<MainXml, Str
         None => first_xml(container.entries())?,
     };
     let fallback = named.is_none().then(|| xml.path().to_owned());
+    Ok((xml, fallback))
+}
+
+fn read_xml(container: &Archive, xml: &Entry) -> Result<Vec<u8>, String> {
     if xml.uncompressed_size() > MAX_XML_LEN {
         return Err(format!(
             "its XML holds {} bytes, over the limit",
@@ -71,5 +125,5 @@ pub(crate) fn main_xml(archive: &Archive, socpak: &Entry) -> Result<MainXml, Str
         .take(MAX_XML_LEN)
         .read_to_end(&mut bytes)
         .map_err(|error| format!("its XML cannot be read: {error}"))?;
-    Ok(MainXml { bytes, fallback })
+    Ok(bytes)
 }

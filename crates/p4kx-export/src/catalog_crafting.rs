@@ -13,13 +13,17 @@ use crate::contract::{
 use crate::contract_quantization::QuantizationBand;
 use crate::contract_recipe::BlueprintDismantle;
 use crate::contract_rewards::{LocationOverride, PoolEntry, QualityCurve, RewardSource};
-use crate::crafting::Crafting;
+use crate::crafting::{Crafting, ReadCrafting};
 use crate::crafting_types as library;
 use crate::crafting_warning::CraftingWarning;
+use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::selection::is_leftover;
 use crate::texts::Texts;
 use crate::{CatalogFailure, Kind, QuantizationSummary};
+
+#[path = "crafting_ledger/catalog_rows.rs"]
+mod rows;
 
 /// The kinds of the catalog that [`Crafting`] fills, each ordered by the text of the GUID.
 pub(crate) struct CraftingKinds<'f> {
@@ -34,6 +38,7 @@ pub(crate) struct CraftingKinds<'f> {
     pub(crate) skipped: Vec<(Kind, usize)>,
     pub(crate) failures: Vec<CatalogFailure>,
     pub(crate) warnings: Vec<CraftingWarning>,
+    pub(crate) ledger: ExportLedger,
 }
 
 /// Maps `crafting` to the catalog kinds, its texts resolved by `texts`.
@@ -43,29 +48,34 @@ pub(crate) struct CraftingKinds<'f> {
 /// are kept only when `filter` matches their record path. Development leftovers of these kinds
 /// are left out and counted, like those of every other kind.
 pub(crate) fn kinds<'f>(
-    crafting: Crafting<'f>,
+    read: ReadCrafting<'f>,
     texts: &Texts<'f>,
     filter: Option<&Filter>,
 ) -> CraftingKinds<'f> {
-    let (properties, properties_skipped) = properties(&crafting, texts, filter);
-    let (distributions, distributions_skipped) = entities(
+    let ReadCrafting {
+        data: crafting,
+        mut ledger,
+    } = read;
+    let mut selected = rows::Selection::new(filter, &mut ledger);
+    let (properties, properties_skipped) = properties(&crafting, texts, &mut selected);
+    let (distributions, distributions_skipped) = selected.entities(
+        Kind::QualityDistributions,
         &crafting.quality_distributions,
-        filter,
         |item| (item.record_path, item.class_name),
         distribution,
         |entity| entity.guid,
     );
     let (quantizations, quantizations_skipped, quantization_summary) =
-        quantizations(&crafting, filter);
+        quantizations(&crafting, &mut selected);
     let sources = sources_by_pool(&crafting.reward_sources);
-    let (pools, pools_skipped) = entities(
+    let (pools, pools_skipped) = selected.entities(
+        Kind::BlueprintPools,
         &crafting.pools,
-        filter,
         |item| (item.record_path, item.class_name),
         |source| pool(source, &sources),
         |entity| entity.guid,
     );
-    let (dismantle, dismantle_skipped) = dismantle(&crafting, filter);
+    let (dismantle, dismantle_skipped) = dismantle(&crafting, &mut selected);
     let kept: HashSet<Guid> = dismantle.iter().map(|process| process.guid.0).collect();
     CraftingKinds {
         blueprints: blueprints(&crafting, texts, &kept),
@@ -86,17 +96,18 @@ pub(crate) fn kinds<'f>(
         ],
         failures: crafting.failures,
         warnings: crafting.warnings,
+        ledger,
     }
 }
 
 fn properties<'f>(
     crafting: &Crafting<'f>,
     texts: &Texts<'f>,
-    filter: Option<&Filter>,
+    selected: &mut rows::Selection<'_>,
 ) -> (Vec<GameplayProperty<'f>>, usize) {
-    entities(
+    selected.entities(
+        Kind::GameplayProperties,
         &crafting.properties,
-        filter,
         |item| (item.record_path, item.class_name),
         |source| GameplayProperty {
             guid: CatalogGuid(source.guid),
@@ -110,11 +121,11 @@ fn properties<'f>(
 
 fn dismantle<'f>(
     crafting: &Crafting<'f>,
-    filter: Option<&Filter>,
+    selected: &mut rows::Selection<'_>,
 ) -> (Vec<DismantleProcess<'f>>, usize) {
-    entities(
+    selected.entities(
+        Kind::DismantleProcesses,
         &crafting.dismantle,
-        filter,
         |item| (item.record_path, item.class_name),
         |source| DismantleProcess {
             guid: CatalogGuid(source.guid),
@@ -131,11 +142,11 @@ fn dismantle<'f>(
 /// the Records no `ResourceType` uses and of the links that reach no kept Record.
 fn quantizations<'f>(
     crafting: &Crafting<'f>,
-    filter: Option<&Filter>,
+    selected: &mut rows::Selection<'_>,
 ) -> (Vec<QualityQuantization<'f>>, usize, QuantizationSummary) {
-    let (kept, skipped) = entities(
+    let (kept, skipped) = selected.entities(
+        Kind::QualityQuantizations,
         &crafting.quality_quantizations,
-        filter,
         |item| (item.record_path, item.class_name),
         quantization,
         |entity| entity.guid,
@@ -143,7 +154,7 @@ fn quantizations<'f>(
     let leftover_links: usize = crafting
         .quality_quantizations
         .iter()
-        .filter(|item| filter.is_none_or(|filter| filter.matches(item.record_path)))
+        .filter(|item| selected.matches(item.record_path))
         .filter(|item| is_leftover(item.record_path, item.class_name))
         .map(|item| item.resource_types.len())
         .sum();
@@ -157,33 +168,6 @@ fn quantizations<'f>(
             .saturating_add(leftover_links),
     };
     (kept, skipped, summary)
-}
-
-/// Returns the entities `make` builds from the `items` whose record path `filter` matches and
-/// that are no development leftover, ordered by the text of the GUID `guid` gives, and the
-/// number of leftovers.
-fn entities<T, E>(
-    items: &[T],
-    filter: Option<&Filter>,
-    names: impl Fn(&T) -> (&str, &str),
-    make: impl Fn(&T) -> E,
-    guid: impl Fn(&E) -> CatalogGuid,
-) -> (Vec<E>, usize) {
-    let mut built = Vec::with_capacity(items.len());
-    let mut skipped = 0_usize;
-    for item in items {
-        let (path, class_name) = names(item);
-        if filter.is_some_and(|filter| !filter.matches(path)) {
-            continue;
-        }
-        if is_leftover(path, class_name) {
-            skipped = skipped.saturating_add(1);
-        } else {
-            built.push(make(item));
-        }
-    }
-    built.sort_by_cached_key(|entity| guid(entity).text());
-    (built, skipped)
 }
 
 /// Returns the blueprints of `crafting`; one links a dismantle process only when that process is

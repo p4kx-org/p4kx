@@ -1106,53 +1106,17 @@ printed as a note on stderr. An encrypted DataForge without the key is exit code
 
 ## `p4kx catalog <archive> --out <file> --json`
 
+The following excerpt shows the publication contract; other summary fields and the per-kind
+health and diagnostic lists are omitted. The complete health object is identical to the catalog's
+`exportHealth`; its nested keys retain camelCase inside the CLI's snake_case summary.
+
 ```json
-{"archive": "…", "out": "…", "schema_version": 2, "size": 131969336, "compressed_size": null,
- "upload_limit": 64000000, "decompressed_limit": 1000000000,
- "size_warning": "over_limit", "decompressed_warning": null, "kinds": [{"kind": "manufacturers", "count": 1201, "skipped": 2,
- "complete": true}, {"kind": "items", "count": 23280, "skipped": 1145, "complete": true},
- {"kind": "ships", "count": 1087, "skipped": 57, "complete": true},
- {"kind": "commodities", "count": 145, "skipped": 0, "complete": true},
- {"kind": "blueprints", "count": 1618, "skipped": 0, "complete": true},
- {"kind": "resourceGroups", "count": 19, "skipped": 0, "complete": true},
- {"kind": "blueprintCategories", "count": 21, "skipped": 0, "complete": true},
- {"kind": "gameplayProperties", "count": 29, "skipped": 0, "complete": true},
- {"kind": "qualityDistributions", "count": 21, "skipped": 1, "complete": true},
- {"kind": "qualityQuantizations", "count": 62, "skipped": 1, "complete": true},
- {"kind": "blueprintPools", "count": 160, "skipped": 0, "complete": true},
- {"kind": "dismantleProcesses", "count": 1, "skipped": 0, "complete": true},
- {"kind": "paints", "count": 1064, "skipped": 68, "complete": true},
- {"kind": "loadouts", "count": 10708, "skipped": 0, "complete": true},
- {"kind": "starmapObjects", "count": 2093, "skipped": 0, "complete": true},
- {"kind": "shops", "count": 1184, "skipped": 0, "complete": true}], "skipped": 1205,
- "failed": [{"guid": "…", "path": "libs/foundry/records/entities/scitem/odd", "error": "…"}],
- "warnings": [{"kind": "unreadable_reward_records", "count": 3}],
- "item_classes": {"classified": 347, "other": 408, "missing": 22525},
- "paints": {"paints": 1064, "assigned": 1039, "unassigned": 25, "ships": 1046, "unreadable_vehicles": 0},
- "loadouts": {"ships": 1087, "items": 9621, "ports": 293451, "attached": 152081,
- "docked_vehicles": 65, "unresolved": 505, "outside": 61, "with_issues": 193},
- "starmap": {"objects": 2093, "placed": 1239, "unplaced": 854, "ambiguous": 9, "systems": 3,
- "unreadable_containers": 0, "missing_containers": 2, "malformed_children": 0},
- "shops": {"shops": 1184, "registry_entries": 1184, "registry_missing": false, "registry_unreadable": false, "malformed": 0,
- "duplicate": 0, "containers_listed": 317, "containers_unreadable": 0, "containers_with_shop": 164,
- "other_containers_scanned": 8224, "other_containers_unreadable": 0, "other_containers_with_shop": 171,
- "prefabs_listed": 30, "prefabs_unreadable": 0, "prefab_entities": 8, "prefab_ambiguous": 1, "prefab_only_shops": 0,
- "with_kind": 590, "mixed_kind": 60, "without_container": 534, "with_items": 294, "inventory_ambiguous": 43,
- "inventory_placeholder": 399, "inventory_missing": 0, "inventory_unreadable": 1, "inventory_unscanned": 64,
- "soc_components": 320, "soc_paths_unattributed": 12, "inventories_unreadable": 1, "inventories_missing": 0, "inventories_named": 57,
- "inventories_in_archive": 119, "item_ids_dropped": 0, "commodity_exchanges": 16,
- "linked": 1000, "unlinked": 184, "ambiguous_link": 54, "unlinked_locations": ["…"]},
- "store_slugs": {"slugs": 256, "unmapped": 51, "mapped": 205, "resolved": 205, "retired": 0,
- "exported": 205, "stale": [], "stale_check_skipped": false},
- "playability": {"items": {"player": 7954, "ai": 0, "mission": 522, "special": 8570,
- "unclassified": 6234}, "ships": {"player": 324, "ai": 690, "mission": 25, "special": 35,
- "unclassified": 13}},
- "variants": {"items": {"groups": 1108, "variants": 4732},
- "ships": {"groups": 196, "variants": 850}},
- "quantizations": {"unused": 20, "unresolved_links": 0},
- "texts": [{"language": "en", "available": true, "resolved": 37963, "unresolved": 160,
- "placeholder": 23658}, {"language": "de", "available": true, "resolved": 25497,
- "unresolved": 12626, "placeholder": 23658}], "unresolved": 12786}
+{"archive": "Data.p4k", "out": "diagnostic.json.zst", "schema_version": 3,
+ "export_health": {"status": "incomplete", "read": "incomplete",
+   "projection": "complete", "publicationMode": "diagnosticPartial"},
+ "size": 12345, "compressed_size": 2345,
+ "failed": [{"guid": "90000000-0000-4000-8000-000000000009",
+   "path": "libs/foundry/records/crafting/blueprints/crafting/broken", "error": "source read failed"}]}
 ```
 
 `quantizations` counts two facts of the game data that do not affect the exit code: `unused`, the
@@ -1175,8 +1139,14 @@ does the same for `size` against `decompressed_limit` (1,000,000,000). `kinds` l
 development leftovers `skipped` and whether the kind is `complete` (no `--filter`); `skipped` sums
 them. `failed` lists the selected Records that could not be read and are left out of the catalog,
 with GUID, record path (empty when it cannot be read) and the reason and its causes joined by
-`: `, ordered by GUID; the example shows one, a healthy Archive has none. The catalog is written
-all the same, and the exit code is 1 when `failed` or `warnings` is not empty. `warnings` lists what
+`: `, ordered by GUID; the synthetic diagnostic example shows one, a healthy export has none.
+Normal publication refuses incomplete read/projection health or blocking source warnings, with
+exit code 1, empty stdout and no destination creation or replacement. Use `--diagnostic-partial`
+explicitly to write an incomplete diagnostic artifact and its JSON summary; incomplete diagnostic
+output still exits with 1. Its `export_health.publicationMode` is `diagnosticPartial`, including
+when all selected sources happened to succeed. The same marker travels in the file's
+`exportHealth`, so a copied file retains the publication contract. Filter-only selection scope
+does not itself make health incomplete or require diagnostic permission. `warnings` lists what
 makes the crafting data incomplete or ambiguous although every Record was read, each as an object
 with a `kind`: `unreadable_reward_records` with a `count` (Records that cannot be read although
 their struct type is that of a Record with a reward source, so a source may be missing) and

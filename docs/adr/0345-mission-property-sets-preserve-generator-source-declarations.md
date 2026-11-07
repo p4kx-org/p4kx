@@ -25,3 +25,9 @@ rows. Every authored set of a selected Generator Record is retained, including s
 IDs or derived contract rows and scopes whose rows are development leftovers or duplicates.
 Global Record selection bounds the source kind; row selection controls only derived contracts
 and their links. No runtime choice or final location is inferred.
+
+Physical Records can share the owning GUID and authored position. Identical complete serialized
+payloads are idempotent; incompatible payloads quarantine that canonical set and all links to it.
+Structural comparison retains IEEE floating-point bits. Normal publication refuses the ambiguity;
+an explicit diagnostic artifact retains other sets and rows, with both physical owner indices and
+separate failed derived joins. The owning GUID/location identity rule remains unchanged.

@@ -75,8 +75,8 @@ pub use audio::{
 };
 pub use browser::{Browser, EntryRow, EntryRowKind, HitLine, TreeNode, TreeRow};
 pub use catalog_export::{
-    CATALOG_FILE, CatalogExport, CatalogExportProgress, CatalogExportStage, CatalogExportStatus,
-    CatalogExportSummary,
+    CATALOG_FILE, CatalogExport, CatalogExportOptions, CatalogExportProgress, CatalogExportStage,
+    CatalogExportStatus, CatalogExportSummary, DIAGNOSTIC_CATALOG_FILE,
 };
 pub use channel_list::ChannelList;
 pub use characters::{

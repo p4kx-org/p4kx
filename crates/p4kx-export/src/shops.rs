@@ -3,19 +3,23 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use p4kx_assembly::{ArchiveFiles, LoadoutFileError, LoadoutFiles};
+use p4kx_assembly::ArchiveFiles;
 use p4kx_extraction::{Archive, CancelToken};
 
 use crate::collected::Collected;
 use crate::contract::{Shop, StarmapObject};
 use crate::crafting_warning::CraftingWarning;
+use crate::entry_source::EntrySource;
+use crate::export_diagnostic::ExportDiagnosticCode;
+use crate::export_ledger::{ExportLedger, SourceDiagnosis, SourceDisposition};
 use crate::shop_containers::{Containers, Found, Inventory};
+use crate::shop_entry_read;
 use crate::shop_inventories::{Inventories, ItemList, is_placeholder};
 use crate::shop_links::Links;
 use crate::shop_prefabs::Prefabs;
-use crate::shop_registry::{self, RegistryShop, clean, is_guid};
+use crate::shop_registry::{self, RegistryNeed, RegistryShop, clean, is_guid};
 use crate::shop_summary::ShopSummary;
-use crate::{CatalogError, CatalogOptions};
+use crate::{CatalogError, CatalogOptions, Kind};
 
 /// The shop registry of the layer recovery data.
 pub(crate) const REGISTRY: &str = "Data\\Libs\\CosmoTools\\LayerRecovery\\LayerBackups.xml";
@@ -30,6 +34,7 @@ const LISTED_LOCATIONS: usize = 200;
 
 /// The shops of the catalog and what reading them found.
 pub(crate) struct Built {
+    pub(crate) ledger: ExportLedger,
     pub(crate) shops: Vec<Shop>,
     pub(crate) summary: ShopSummary,
     pub(crate) unreadable_inventories: Vec<String>,
@@ -44,9 +49,11 @@ pub(crate) fn add_shops(
     options: &CatalogOptions<'_>,
 ) -> Result<ShopSummary, CatalogError> {
     if options.filter.is_some() {
+        collected.ledger.inventory(Kind::Shops);
         return Ok(ShopSummary::default());
     }
     let built = shops(archive, files, &collected.starmap_objects, options.cancel)?;
+    collected.ledger.merge(built.ledger);
     let summary = built.summary;
     if summary.registry_unreadable {
         collected
@@ -95,9 +102,17 @@ pub(crate) fn shops(
     cancel: Option<&CancelToken>,
 ) -> Result<Built, CatalogError> {
     let mut summary = ShopSummary::default();
-    let registry = read_registry(files, &mut summary);
-    let Some(registry) = registry else {
+    let mut ledger = ExportLedger::default();
+    ledger.inventory(Kind::Shops);
+    let need = if starmap.is_empty() {
+        RegistryNeed::Optional
+    } else {
+        RegistryNeed::Required
+    };
+    let registry = shop_registry::read_source(archive, files, need, &mut summary, &mut ledger);
+    let Some((registry, registry_source)) = registry else {
         return Ok(Built {
+            ledger,
             shops: Vec::new(),
             summary,
             unreadable_inventories: Vec::new(),
@@ -121,11 +136,31 @@ pub(crate) fn shops(
     summary.registry_entries = registry.len();
     let links = Links::new(starmap);
     let inventories = Inventories::new(archive);
+    let lists = inventory_lists(&containers, &inventories, &mut summary, &mut ledger);
+    let unreadable_inventories = unreadable_details(&lists);
+    let projected = list(&registry, &containers, &links, &lists, &mut summary);
+    record_registry(registry_source, projected.disposition, &mut ledger);
+    ledger.merge(containers.ledger);
+    ledger.merge(prefabs.ledger);
+    Ok(Built {
+        ledger,
+        shops: projected.shops,
+        summary,
+        unreadable_inventories,
+    })
+}
+
+fn inventory_lists<'a>(
+    containers: &'a Containers,
+    inventories: &Inventories<'_>,
+    summary: &mut ShopSummary,
+    ledger: &mut ExportLedger,
+) -> Lists<'a> {
     let lists: Lists<'_> = containers
         .inventory_stems()
         .into_iter()
         .filter(|stem| !is_placeholder(stem))
-        .map(|stem| (stem, inventories.items(stem)))
+        .map(|stem| (stem, inventories.items(stem, ledger)))
         .collect();
     summary.soc_components = containers.components;
     summary.inventories_named = containers.inventory_stems().len();
@@ -134,7 +169,6 @@ pub(crate) fn shops(
         .values()
         .filter(|list| matches!(list, ItemList::Unreadable(_)))
         .count();
-    let unreadable_inventories = unreadable_details(&lists);
     summary.inventories_missing = lists
         .values()
         .filter(|list| **list == ItemList::Missing)
@@ -146,12 +180,19 @@ pub(crate) fn shops(
             ItemList::Missing | ItemList::Unreadable(_) => 0,
         })
         .sum();
-    let shops = list(&registry, &containers, &links, &lists, &mut summary);
-    Ok(Built {
-        shops,
-        summary,
-        unreadable_inventories,
-    })
+    lists
+}
+
+fn record_registry(source: EntrySource, disposition: SourceDisposition, ledger: &mut ExportLedger) {
+    let diagnosis = if disposition == SourceDisposition::ProjectionFailed {
+        shop_entry_read::diagnosis(
+            ExportDiagnosticCode::MalformedSource,
+            "ShopBackup.ID/SuperName",
+        )
+    } else {
+        SourceDiagnosis::default()
+    };
+    source.diagnosed(ledger, Kind::Shops, disposition, diagnosis);
 }
 
 /// Returns the reasons of the unreadable lists of `lists`, ordered and without repeats.
@@ -168,25 +209,12 @@ fn unreadable_details(lists: &Lists<'_>) -> Vec<String> {
     details
 }
 
-fn read_registry(files: &ArchiveFiles<'_>, summary: &mut ShopSummary) -> Option<Vec<RegistryShop>> {
-    match files.read(REGISTRY) {
-        Ok(bytes) => {
-            let parsed = shop_registry::read(&bytes);
-            summary.registry_unreadable = parsed.is_none();
-            parsed
-        }
-        Err(LoadoutFileError::NotFound) => {
-            summary.registry_missing = true;
-            None
-        }
-        Err(_) => {
-            summary.registry_unreadable = true;
-            None
-        }
-    }
-}
-
 type Lists<'a> = HashMap<&'a str, ItemList>;
+
+struct Listed {
+    shops: Vec<Shop>,
+    disposition: SourceDisposition,
+}
 
 /// Turns the registry entries into shops, ordered by key, and counts them in `summary`.
 fn list(
@@ -195,15 +223,17 @@ fn list(
     links: &Links,
     lists: &Lists<'_>,
     summary: &mut ShopSummary,
-) -> Vec<Shop> {
+) -> Listed {
     let mut seen: HashSet<String> = HashSet::new();
     let mut built = Vec::with_capacity(registry.len());
     let mut unlinked: BTreeSet<String> = BTreeSet::new();
     let mut systems: BTreeMap<String, usize> = BTreeMap::new();
     let mut kinds: BTreeMap<String, usize> = BTreeMap::new();
+    let mut disposition = SourceDisposition::Projected;
     for raw in registry {
         let Some(shop) = shop(raw, containers, links, lists) else {
             summary.malformed += 1;
+            disposition = SourceDisposition::ProjectionFailed;
             continue;
         };
         if !seen.insert(shop.key.clone()) {
@@ -227,22 +257,7 @@ fn list(
             Found::Mixed => summary.mixed_kind += 1,
             Found::Nowhere => summary.without_container += 1,
         }
-        match (containers.inventory(&shop.entity_guid), &shop.item_guids) {
-            (_, Some(_)) => {
-                summary.with_items += 1;
-                summary.prefab_only_shops += usize::from(containers.only_prefab(&shop.entity_guid));
-            }
-            (Inventory::Ambiguous, None) => summary.inventory_ambiguous += 1,
-            (Inventory::One(stem), None) if is_placeholder(stem) => {
-                summary.inventory_placeholder += 1;
-            }
-            (Inventory::One(stem), None) => match lists.get(stem) {
-                Some(ItemList::Unreadable(_)) => summary.inventory_unreadable += 1,
-                _ => summary.inventory_missing += 1,
-            },
-            (Inventory::Unknown, None) => summary.inventory_unscanned += 1,
-            (Inventory::None, None) => {}
-        }
+        count_inventory(&shop, containers, lists, summary);
         summary.commodity_exchanges += usize::from(shop.commodity_exchange);
         *systems.entry(shop.system.clone()).or_default() += 1;
         if let Some(kind) = &shop.kind {
@@ -255,7 +270,34 @@ fn list(
     summary.systems = systems.into_iter().collect();
     summary.kinds = kinds.into_iter().collect();
     summary.unlinked_locations = unlinked.into_iter().take(LISTED_LOCATIONS).collect();
-    built
+    Listed {
+        shops: built,
+        disposition,
+    }
+}
+
+fn count_inventory(
+    shop: &Shop,
+    containers: &Containers,
+    lists: &Lists<'_>,
+    summary: &mut ShopSummary,
+) {
+    match (containers.inventory(&shop.entity_guid), &shop.item_guids) {
+        (_, Some(_)) => {
+            summary.with_items += 1;
+            summary.prefab_only_shops += usize::from(containers.only_prefab(&shop.entity_guid));
+        }
+        (Inventory::Ambiguous, None) => summary.inventory_ambiguous += 1,
+        (Inventory::One(stem), None) if is_placeholder(stem) => {
+            summary.inventory_placeholder += 1;
+        }
+        (Inventory::One(stem), None) => match lists.get(stem) {
+            Some(ItemList::Unreadable(_)) => summary.inventory_unreadable += 1,
+            _ => summary.inventory_missing += 1,
+        },
+        (Inventory::Unknown, None) => summary.inventory_unscanned += 1,
+        (Inventory::None, None) => {}
+    }
 }
 
 fn shop(

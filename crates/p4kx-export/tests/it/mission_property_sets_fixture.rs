@@ -4,7 +4,7 @@
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{Archive, Filter};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestValue,
@@ -71,6 +71,21 @@ pub(crate) fn owner() -> TestRecord {
 }
 
 pub(crate) fn build(record: TestRecord, filter: Option<&str>) -> Result<Report, Box<dyn Error>> {
+    build_mode(record, filter, CatalogPublicationMode::Normal)
+}
+
+pub(crate) fn diagnostic(
+    record: TestRecord,
+    filter: Option<&str>,
+) -> Result<Report, Box<dyn Error>> {
+    build_mode(record, filter, CatalogPublicationMode::DiagnosticPartial)
+}
+
+fn build_mode(
+    record: TestRecord,
+    filter: Option<&str>,
+    publication_mode: CatalogPublicationMode,
+) -> Result<Report, Box<dyn Error>> {
     let builder = scoped_fixture::schema(DataForgeBuilder::new().version(8))
         .record(record)
         .record(TestRecord::new(
@@ -100,12 +115,13 @@ pub(crate) fn build(record: TestRecord, filter: Option<&str>) -> Result<Report, 
             )
             .value("missionVariableName", TestValue::text("Foreign_BP")),
         );
-    build_database(&builder, filter)
+    build_database(&builder, filter, publication_mode)
 }
 
 fn build_database(
     builder: &DataForgeBuilder,
     filter: Option<&str>,
+    publication_mode: CatalogPublicationMode,
 ) -> Result<Report, Box<dyn Error>> {
     let root = tempfile::tempdir()?;
     let path = root.path().join("Data.p4k");
@@ -115,6 +131,7 @@ fn build_database(
     let archive = Archive::open(&path)?;
     let filter = filter.map(Filter::new);
     let options = CatalogOptions {
+        publication_mode,
         filter: filter.as_ref(),
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
     };

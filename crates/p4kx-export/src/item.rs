@@ -40,6 +40,7 @@ pub(crate) fn item<'f>(tree: &RecordTree<'f>, texts: &Texts<'f>) -> (Item<'f>, C
     let name_key = locale_key(localization, "Name");
     let r#type = text(definition, "Type");
     let item = Item {
+        source_record_index: tree.record_index(),
         guid: CatalogGuid(tree.guid()),
         class_name: class_name(tree),
         record_path: tree.record_path(),

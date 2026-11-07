@@ -3,32 +3,21 @@
 
 use std::collections::HashMap;
 
-use p4kx_extraction::{
-    CancelToken, DataForge, Guid, Record, RecordTree, StructValue, TagTree, TreeBuilder, Value,
-    is_placeholder_key,
-};
+use p4kx_extraction::{CancelToken, DataForge, Guid, Record, TagTree, TreeBuilder};
 use rayon::prelude::*;
 
-use crate::blueprint::as_struct;
 use crate::contract_hauling::HaulingRequirement;
-use crate::mission_hauling::{HaulingProperty, objective_orders, property_orders};
-use crate::mission_layers::{Property, items, key, one, properties};
-use crate::record_fields::{boolean, integer, reference};
-use crate::spawn_error::SpawnError;
+use crate::export_ledger::ExportLedger;
+use crate::mission_hauling::HaulingProperty;
+use crate::mission_layers::Property;
 use crate::spawn_layers::Level;
-use crate::spawn_model::SpawnLevel;
 use crate::spawn_pools::SpawnPools;
-use crate::spawn_read::Reader;
 use crate::{CatalogError, CatalogFailure};
 
-const TEMPLATES: &str = "libs/foundry/records/contracts/contracttemplates/";
-const TEMPLATE_TYPE: &str = "ContractTemplate";
-const TYPES: &str = "libs/foundry/records/missiontype/";
-const ORGANIZATIONS: &str = "libs/foundry/records/missiondata/pu_organizations/";
-const REWARDS: &str = "libs/foundry/records/reputation/rewards/missionrewards_reputation/";
-const LOCALITIES: &str = "libs/foundry/records/missiondata/pu_missionlocality/";
-const BROKERS: &str = "libs/foundry/records/missionbroker/";
-const FACTIONS: &str = "libs/foundry/records/factions/factionreputation/";
+#[path = "mission_index_read/mod.rs"]
+mod read;
+
+pub(crate) use read::title_key;
 
 /// A `MissionBrokerEntry` Record: what a contract without a template states about itself.
 #[derive(Debug, Default)]
@@ -90,6 +79,7 @@ pub(crate) struct MissionIndex<'f> {
     tags: TagTree,
     pools: SpawnPools<'f>,
     failures: Vec<CatalogFailure>,
+    ledger: ExportLedger,
 }
 
 impl<'f> MissionIndex<'f> {
@@ -104,17 +94,14 @@ impl<'f> MissionIndex<'f> {
         cancel: Option<&CancelToken>,
     ) -> Result<Self, CatalogError> {
         let records: Vec<Record<'f>> = forge.records().collect();
-        let tags = TagTree::build(forge);
-        let pieces: Vec<Piece<'f>> = records
+        let (tags, failures, ledger) = read::read_tags(forge, cancel)?;
+        let pieces = records
             .par_iter()
             .map_init(TreeBuilder::new, |trees, record| {
-                if cancel.is_some_and(CancelToken::is_cancelled) {
-                    return Err(CatalogError::Cancelled);
-                }
-                Ok(piece(trees, record, &tags).ok().flatten())
+                read::read(trees, record, &tags, cancel)
             })
             .filter_map(Result::transpose)
-            .collect::<Result<_, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
         let mut index = Self {
             templates: HashMap::new(),
             types: HashMap::new(),
@@ -125,44 +112,55 @@ impl<'f> MissionIndex<'f> {
             factions: HashMap::new(),
             tags,
             pools: SpawnPools::default(),
-            failures: Vec::new(),
+            failures,
+            ledger,
         };
-        for piece in pieces {
-            match piece {
-                Piece::Template(guid, template, found) => {
-                    index.templates.insert(guid, template);
-                    index.pools.merge(found);
-                }
-                Piece::Failed(failure) => index.failures.push(failure),
-                Piece::Type(guid, kind) => {
-                    index.types.insert(guid, kind);
-                }
-                Piece::Organization(guid, variants) => {
-                    index.organizations.insert(guid, variants);
-                }
-                Piece::Reward(guid, amount) => {
-                    index.rewards.insert(guid, amount);
-                }
-                Piece::Locality(guid, locations) => {
-                    index.localities.insert(guid, locations);
-                }
-                Piece::Broker(guid, broker) => {
-                    index.brokers.insert(guid, broker);
-                }
-                Piece::Faction(guid, name) => {
-                    index.factions.insert(guid, name);
-                }
+        for read in pieces {
+            index.ledger.merge(read.ledger);
+            if let Some(piece) = read.piece {
+                index.insert(piece);
             }
         }
         Ok(index)
     }
 
+    fn insert(&mut self, piece: Piece<'f>) {
+        match piece {
+            Piece::Template(guid, template, found) => {
+                self.templates.insert(guid, template);
+                self.pools.merge(found);
+            }
+            Piece::Failed(failure) => self.failures.push(failure),
+            Piece::Type(guid, kind) => {
+                self.types.insert(guid, kind);
+            }
+            Piece::Organization(guid, variants) => {
+                self.organizations.insert(guid, variants);
+            }
+            Piece::Reward(guid, amount) => {
+                self.rewards.insert(guid, amount);
+            }
+            Piece::Locality(guid, locations) => {
+                self.localities.insert(guid, locations);
+            }
+            Piece::Broker(guid, broker) => {
+                self.brokers.insert(guid, broker);
+            }
+            Piece::Faction(guid, name) => {
+                self.factions.insert(guid, name);
+            }
+        }
+    }
+
     /// Takes the spawn descriptions and location queries of the templates and the templates that
     /// could not be read.
-    pub(crate) fn take_template_results(&mut self) -> (SpawnPools<'f>, Vec<CatalogFailure>) {
+    pub(crate) fn take_template_results(
+        &mut self,
+    ) -> (SpawnPools<'f>, Vec<CatalogFailure>, ExportLedger) {
         (
             std::mem::take(&mut self.pools),
             std::mem::take(&mut self.failures),
+            std::mem::take(&mut self.ledger),
         )
     }
 
@@ -214,132 +212,4 @@ impl<'f> MissionIndex<'f> {
             .find(|(tag, _)| self.tags.get(*tag).is_some_and(|tag| tag.name() == name))
             .map(|(_, key)| *key)
     }
-}
-
-fn piece<'f>(
-    trees: &mut TreeBuilder<'f>,
-    record: &Record<'f>,
-    tags: &TagTree,
-) -> Result<Option<Piece<'f>>, p4kx_extraction::DataForgeError> {
-    let path = record.record_path()?;
-    let starts = |prefix: &str| {
-        path.get(..prefix.len())
-            .is_some_and(|start| start.eq_ignore_ascii_case(prefix))
-    };
-    let wanted = [
-        TEMPLATES,
-        TYPES,
-        ORGANIZATIONS,
-        REWARDS,
-        LOCALITIES,
-        BROKERS,
-        FACTIONS,
-    ]
-    .into_iter()
-    .any(starts);
-    if !wanted && record.type_name()? != TEMPLATE_TYPE {
-        return Ok(None);
-    }
-    let tree = trees.build(record)?;
-    let root = Some(tree.root());
-    let guid = tree.guid();
-    Ok(Some(if starts(TEMPLATES) || !wanted {
-        let mut pools = SpawnPools::default();
-        match template_of(&tree, tags, &mut pools) {
-            Ok(template) => Piece::Template(guid, template, pools),
-            Err(source) => Piece::Failed(CatalogFailure::of(record, &source)),
-        }
-    } else if starts(TYPES) {
-        Piece::Type(
-            guid,
-            MissionTypeName {
-                name_key: key(root, "LocalisedTypeName"),
-            },
-        )
-    } else if starts(ORGANIZATIONS) {
-        Piece::Organization(guid, organization_variants(root))
-    } else if starts(LOCALITIES) {
-        Piece::Locality(guid, available_locations(root))
-    } else if starts(BROKERS) {
-        Piece::Broker(
-            guid,
-            Broker {
-                title: key(root, "title"),
-                description: key(root, "description"),
-                mission_type: reference(root, "type").map(|guid| guid.0),
-                location: reference(root, "locationMissionAvailable").map(|guid| guid.0),
-                objective_orders: objective_orders(root),
-            },
-        )
-    } else if starts(FACTIONS) {
-        Piece::Faction(guid, key(root, "displayName"))
-    } else {
-        match integer(root, "reputationAmount") {
-            Some(amount) => Piece::Reward(guid, amount),
-            None => return Ok(None),
-        }
-    }))
-}
-
-fn template_of<'f>(
-    tree: &RecordTree<'f>,
-    tags: &TagTree,
-    pools: &mut SpawnPools<'f>,
-) -> Result<Template<'f>, SpawnError> {
-    let root = Some(tree.root());
-    let display = one(root, "contractDisplayInfo");
-    let reader = Reader::new(tags, tree.root());
-    let spawns = Level::read(
-        SpawnLevel::Template,
-        &reader,
-        (root, "contractProperties"),
-        (None, ""),
-        pools,
-    )?;
-    Ok(Template {
-        title: title_key(display),
-        mission_type: reference(display, "type").map(|guid| guid.0),
-        properties: properties(root, "contractProperties"),
-        hauling: property_orders(root, "contractProperties"),
-        objective_orders: objective_orders(root),
-        illegal: boolean(display, "illegal"),
-        can_be_shared: items(one(root, "contractClass"), "additionalParams")
-            .iter()
-            .filter_map(as_struct)
-            .find_map(|settings| boolean(Some(settings), "canBeShared")),
-        spawns: Some(spawns),
-    })
-}
-
-fn available_locations(locality: Option<&StructValue<'_>>) -> Vec<Guid> {
-    items(locality, "availableLocations")
-        .iter()
-        .filter_map(|location| match location {
-            Value::Reference(target) if target.location().is_none() => Some(target.guid()),
-            _ => None,
-        })
-        .collect()
-}
-
-/// Returns the localisation key of the first display string of `display`, a `ContractDisplayInfo`.
-pub(crate) fn title_key<'f>(display: Option<&StructValue<'f>>) -> Option<&'f str> {
-    match items(display, "displayString").first()? {
-        Value::Struct(entry) => key(Some(entry), "value"),
-        Value::Locale(text) | Value::String(text) => {
-            Some(*text).filter(|text| text.starts_with('@') && !is_placeholder_key(text))
-        }
-        _ => None,
-    }
-}
-
-fn organization_variants<'f>(organization: Option<&StructValue<'f>>) -> Variants<'f> {
-    let container = one(organization, "stringVariants");
-    items(container, "variants")
-        .iter()
-        .filter_map(as_struct)
-        .filter_map(|variant| {
-            let tag = reference(Some(variant), "tag")?;
-            Some((tag.0, key(Some(variant), "string")?))
-        })
-        .collect()
 }

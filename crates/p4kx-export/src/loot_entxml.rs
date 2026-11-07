@@ -3,7 +3,7 @@
 
 use p4kx_extraction::Guid;
 
-use crate::starmap_xml::{Document, Node, attribute};
+use crate::starmap_xml::{Document, Node, XmlError, attribute};
 
 /// The attribute of an entity component that names the container the entity places.
 const CONTAINER_ATTRIBUTE: &str = "objectContainer";
@@ -21,24 +21,13 @@ pub(crate) struct EntityLink {
     pub(crate) config: Option<Guid>,
     /// Whether the file names a second, different container or config that is not used.
     pub(crate) several: bool,
+    /// A populated multi-config attribute is not a GUID.
+    pub(crate) malformed_config: bool,
 }
 
-/// Reads the property file `bytes` of an entity, `CryXml` or text XML; the empty link for a file
-/// that holds neither attribute or is no XML.
-pub(crate) fn read(bytes: &[u8]) -> EntityLink {
-    if !contains(bytes, CONTAINER_ATTRIBUTE) && !contains(bytes, CONFIG_ATTRIBUTE) {
-        return EntityLink::default();
-    }
-    Document::parse(bytes).map_or_else(
-        |_| EntityLink::default(),
-        |document| link_below(document.root()),
-    )
-}
-
-fn contains(bytes: &[u8], needle: &str) -> bool {
-    bytes
-        .windows(needle.len())
-        .any(|window| window == needle.as_bytes())
+/// Reads the configured container links, distinguishing valid empty XML from malformed XML.
+pub(crate) fn read(bytes: &[u8]) -> Result<EntityLink, XmlError> {
+    Ok(link_below(Document::parse(bytes)?.root()))
 }
 
 /// Returns the first container and the first config named by an element at or below `root`, in
@@ -53,12 +42,15 @@ fn link_below<'d, N: Node<'d>>(root: N) -> EntityLink {
                 Some(first) => link.several |= first != path,
             }
         }
-        if let Some(guid) =
-            attribute(node, CONFIG_ATTRIBUTE).and_then(|text| text.trim().parse().ok())
+        if let Some(text) = attribute(node, CONFIG_ATTRIBUTE).filter(|text| !text.trim().is_empty())
         {
-            match link.config {
-                None => link.config = Some(guid),
-                Some(first) => link.several |= first != guid,
+            if let Ok(guid) = text.trim().parse() {
+                match link.config {
+                    None => link.config = Some(guid),
+                    Some(first) => link.several |= first != guid,
+                }
+            } else {
+                link.malformed_config = true;
             }
         }
         let mark = pending.len();
@@ -73,6 +65,23 @@ fn link_below<'d, N: Node<'d>>(root: N) -> EntityLink {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn read(bytes: &[u8]) -> EntityLink {
+        super::read(bytes).expect("valid source XML")
+    }
+
+    #[test]
+    fn malformed_source_is_distinct_from_a_valid_empty_projection() {
+        assert!(
+            super::read(b"not XML").is_err(),
+            "malformed source is reported"
+        );
+        assert_eq!(
+            super::read(b"<Entity/>"),
+            Ok(EntityLink::default()),
+            "empty source is valid"
+        );
+    }
 
     const CONFIG: &str = "687af3db-4c0d-4e8d-9261-102274f8b6ed";
     const OTHER: &str = "11111111-4c0d-4e8d-9261-102274f8b6ed";
@@ -95,6 +104,7 @@ mod tests {
                 container: Some("ObjectContainers/PU/loot.socpak".to_owned()),
                 config: Some(guid(CONFIG)),
                 several: false,
+                malformed_config: false,
             }
         );
     }
@@ -112,14 +122,24 @@ mod tests {
     fn a_file_with_neither_attribute_is_the_empty_link() {
         let empty = EntityLink::default();
         assert_eq!(read(b"<Entity Name=\"x\"/>"), empty);
-        assert_eq!(read(b"not xml but objectContainer"), empty);
-        assert_eq!(read(b""), empty);
+        assert!(
+            super::read(b"not xml but objectContainer").is_err(),
+            "invalid XML is reported"
+        );
+        assert!(
+            super::read(b"").is_err(),
+            "empty bytes are not an XML document"
+        );
     }
 
     #[test]
-    fn a_config_that_is_no_guid_is_none() {
+    fn a_config_that_is_no_guid_is_reported_without_losing_other_links() {
         let link = read(br#"<Entity><a multiConfigRef="nope"/></Entity>"#);
-        assert_eq!(link, EntityLink::default());
+        assert_eq!(link.config, None, "no invented GUID");
+        assert!(
+            link.malformed_config,
+            "populated invalid source is distinguished from absence"
+        );
     }
 
     #[test]

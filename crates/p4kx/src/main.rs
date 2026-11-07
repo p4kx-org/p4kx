@@ -17,6 +17,7 @@ mod catalog_json;
 mod catalog_json_shops;
 mod catalog_json_slugs;
 mod catalog_size;
+mod catalog_summary;
 mod channels;
 mod character_package;
 mod chf;
@@ -178,7 +179,10 @@ fn main() -> ExitCode {
 fn report(error: &anyhow::Error) {
     let mut stderr = io::stderr().lock();
     let _ignored = writeln!(stderr, "error: {error:#}");
-    if let Some(hint) = key::hint(error).or_else(|| no_match::no_match_hint(error)) {
+    if let Some(hint) = key::hint(error)
+        .or_else(|| no_match::no_match_hint(error))
+        .or_else(|| catalog::hint(error))
+    {
         let _ignored = writeln!(stderr, "hint: {hint}");
     }
 }

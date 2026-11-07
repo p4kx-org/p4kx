@@ -1608,6 +1608,20 @@
       ],
       "type": "object"
     },
+    "CatalogPublicationMode": {
+      "description": "Whether a catalog is intended for normal import or explicit partial diagnosis.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "Publishes only a successfully read and projected catalog without source warnings.",
+          "value": "normal"
+        },
+        {
+          "description": "Explicitly publishes diagnostic data with its incomplete health attached.",
+          "value": "diagnosticPartial"
+        }
+      ]
+    },
     "CategoryRule": {
       "description": "A polymorphic struct that names blueprint categories: the condition of a modifier or the\navailability of a queue.",
       "properties": {
@@ -3640,6 +3654,15 @@
           "$ref": "#/$defs/DefinitionStatus",
           "description": "Whether the target Record is present in the source `DataForge`."
         },
+        "targetRecordIndex": {
+          "description": "The resolved target position in this Build, null when no physical target is known.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "targetType": {
           "description": "The source target struct name when available.",
           "type": [
@@ -3652,6 +3675,7 @@
         "guid",
         "recordPath",
         "status",
+        "targetRecordIndex",
         "targetType"
       ],
       "type": "object"
@@ -3885,6 +3909,88 @@
       ],
       "type": "object"
     },
+    "EntryOperation": {
+      "description": "The required operation performed on a physical Archive Entry.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "Enumerating the selected Entry within a bounded source walk.",
+          "value": "enumeration"
+        },
+        {
+          "description": "Opening a container and reading its directory.",
+          "value": "containerDirectory"
+        },
+        {
+          "description": "Reading and projecting container placement XML.",
+          "value": "containerXml"
+        },
+        {
+          "description": "Reading entity links that place nested containers.",
+          "value": "entityLinks"
+        },
+        {
+          "description": "Scanning a SOC for its authored harvest preset.",
+          "value": "socPreset"
+        },
+        {
+          "description": "Counting entity tags in SOC content.",
+          "value": "socTags"
+        },
+        {
+          "description": "Reading the shop registry.",
+          "value": "shopRegistry"
+        },
+        {
+          "description": "Reading an authored shop inventory.",
+          "value": "shopInventory"
+        },
+        {
+          "description": "Reading a shop prefab.",
+          "value": "shopPrefab"
+        },
+        {
+          "description": "Reading shop metadata XML.",
+          "value": "shopMetadata"
+        },
+        {
+          "description": "Reading shop editor XML.",
+          "value": "shopEditor"
+        },
+        {
+          "description": "Projecting shop components from SOC content.",
+          "value": "shopSoc"
+        },
+        {
+          "description": "Reading another required source XML document.",
+          "value": "sourceXml"
+        },
+        {
+          "description": "Completing the byte read required by an XML Loadout.",
+          "value": "xmlLoadoutBytes"
+        },
+        {
+          "description": "Completing the byte read required by a vehicle implementation.",
+          "value": "vehicleImplementationBytes"
+        },
+        {
+          "description": "Completing the byte read required by a vehicle implementation patch.",
+          "value": "vehiclePatchBytes"
+        },
+        {
+          "description": "Reading and projecting an XML Loadout document.",
+          "value": "xmlLoadout"
+        },
+        {
+          "description": "Reading and projecting a vehicle implementation document.",
+          "value": "vehicleImplementation"
+        },
+        {
+          "description": "Reading and projecting a vehicle implementation patch.",
+          "value": "vehiclePatch"
+        }
+      ]
+    },
     "EscalatingClaims": {
       "description": "The `escalatingClaimsParams` of the item recovery rules.",
       "properties": {
@@ -3952,6 +4058,769 @@
       "required": [
         "dangerPoolFactor",
         "defaultVolume"
+      ],
+      "type": "object"
+    },
+    "ExportDiagnostic": {
+      "description": "One aggregate diagnostic with deterministic bounded examples.",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ExportDiagnosticCode",
+          "description": "The stable semantic category."
+        },
+        "count": {
+          "description": "The total number of affected units, independently of the bounded example list.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "countUnit": {
+          "$ref": "#/$defs/ExportDiagnosticUnit",
+          "description": "What the count measures."
+        },
+        "examples": {
+          "description": "Deterministically ordered examples without raw confidential source values.",
+          "items": {
+            "$ref": "#/$defs/ExportDiagnosticExample"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Kind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The affected kind, null for a catalog-wide dependency."
+        },
+        "severity": {
+          "$ref": "#/$defs/ExportDiagnosticSeverity",
+          "description": "Whether this diagnostic blocks normal publication."
+        },
+        "sourceRole": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExportSourceRole"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The source relationship, null for a source warning without Record identity."
+        },
+        "stage": {
+          "$ref": "#/$defs/ExportDiagnosticStage",
+          "description": "The source or projection stage."
+        },
+        "warningCode": {
+          "description": "The established warning code, null for a non-warning diagnostic.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "count",
+        "countUnit",
+        "examples",
+        "kind",
+        "severity",
+        "sourceRole",
+        "stage",
+        "warningCode"
+      ],
+      "type": "object"
+    },
+    "ExportDiagnosticCode": {
+      "description": "The stable semantic category of a source diagnostic.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "Optional source data is absent.",
+          "value": "optionalAbsent"
+        },
+        {
+          "description": "A source field explicitly contains an empty value.",
+          "value": "emptyValue"
+        },
+        {
+          "description": "A configured Reference names no available target.",
+          "value": "danglingReference"
+        },
+        {
+          "description": "A weak pointer identifies an instance outside its original owner.",
+          "value": "outsideOwner"
+        },
+        {
+          "description": "A populated concrete value is unsupported.",
+          "value": "unsupportedValue"
+        },
+        {
+          "description": "A present source value has an invalid shape.",
+          "value": "malformedSource"
+        },
+        {
+          "description": "A present source field could not be decoded.",
+          "value": "unreadableSource"
+        },
+        {
+          "description": "Source-field inspection reached a declared depth or value budget.",
+          "value": "fieldWalkLimit"
+        },
+        {
+          "description": "Canonical source reading failed.",
+          "value": "sourceReadFailure"
+        },
+        {
+          "description": "Typed source projection failed.",
+          "value": "projectionFailure"
+        },
+        {
+          "description": "A secondary derived projection failed.",
+          "value": "derivedProjectionFailure"
+        },
+        {
+          "description": "Source metadata could not establish selection membership.",
+          "value": "selectionFailure"
+        },
+        {
+          "description": "The required source inputs could not all be enumerated.",
+          "value": "incompleteInventory"
+        },
+        {
+          "description": "One exported identity names incompatible physical source payloads.",
+          "value": "ambiguousIdentity"
+        },
+        {
+          "description": "A source warning retains its established warning code.",
+          "value": "sourceWarning"
+        }
+      ]
+    },
+    "ExportDiagnosticExample": {
+      "description": "A bounded diagnostic example containing identities and field metadata without raw values.",
+      "properties": {
+        "field": {
+          "description": "The canonical source field location when available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recordGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The source Record GUID when available."
+        },
+        "recordIndex": {
+          "description": "The physical Record-table index in this source build when available.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "recordPath": {
+          "description": "The source Record path when available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceType": {
+          "description": "The technical source struct name when available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targetGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A configured target GUID when available."
+        }
+      },
+      "required": [
+        "field",
+        "recordGuid",
+        "recordIndex",
+        "recordPath",
+        "sourceType",
+        "targetGuid"
+      ],
+      "type": "object"
+    },
+    "ExportDiagnosticSeverity": {
+      "description": "Whether a diagnostic blocks normal publication.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "A represented source state that does not make the export incomplete.",
+          "value": "information"
+        },
+        {
+          "description": "A source warning that makes the export incomplete.",
+          "value": "warning"
+        },
+        {
+          "description": "A failed required operation.",
+          "value": "error"
+        }
+      ]
+    },
+    "ExportDiagnosticStage": {
+      "description": "The source or projection stage described by a diagnostic.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "Deciding whether unreadable metadata belongs to the selection.",
+          "value": "selection"
+        },
+        {
+          "description": "Reading the canonical Record tree or a required Archive Entry.",
+          "value": "sourceRead"
+        },
+        {
+          "description": "Mapping a readable source into typed catalog rows.",
+          "value": "projection"
+        },
+        {
+          "description": "Deriving secondary data while the original row may remain present.",
+          "value": "derivedProjection"
+        },
+        {
+          "description": "Interpreting one optional field or configured Reference.",
+          "value": "sourceField"
+        }
+      ]
+    },
+    "ExportDiagnosticUnit": {
+      "description": "The unit counted by an aggregate diagnostic.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "Distinct source Record identities.",
+          "value": "records"
+        },
+        {
+          "description": "Distinct Archive Entries identified by the producing warning.",
+          "value": "archiveEntries"
+        },
+        {
+          "description": "Distinct required operations on Archive Entries.",
+          "value": "entryOperations"
+        },
+        {
+          "description": "Stored fields or values.",
+          "value": "values"
+        },
+        {
+          "description": "Derived projection operations.",
+          "value": "projections"
+        },
+        {
+          "description": "Emitted or intentionally skipped rows.",
+          "value": "rows"
+        },
+        {
+          "description": "Warning occurrences whose source has no more specific count.",
+          "value": "occurrences"
+        }
+      ]
+    },
+    "ExportEntryCounts": {
+      "description": "Actual required Entry operations, independently of retained partial output rows.",
+      "properties": {
+        "dependencies": {
+          "description": "Distinct Entry dependencies consumed by this kind.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failedDependencies": {
+          "description": "Entry dependencies whose required read or projection failed.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failedProjections": {
+          "description": "Inputs whose typed projection failed, regardless of retained partial output.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failedRequiredReads": {
+          "description": "Inputs whose required read failed, regardless of retained partial output.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failedSelectionCandidates": {
+          "description": "Entries whose source metadata prevented a definitive selection decision.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "intentionallySkipped": {
+          "description": "Inputs intentionally excluded by a documented source policy.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "projected": {
+          "description": "Inputs whose typed projection completed, including zero-row projections.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "readSuccessful": {
+          "description": "Inputs whose required read completed; this does not assert full-file integrity validation.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selected": {
+          "description": "Distinct Entry inputs selected by the actual reader.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dependencies",
+        "failedDependencies",
+        "failedProjections",
+        "failedRequiredReads",
+        "failedSelectionCandidates",
+        "intentionallySkipped",
+        "projected",
+        "readSuccessful",
+        "selected"
+      ],
+      "type": "object"
+    },
+    "ExportHealth": {
+      "description": "Machine-readable export health carried by the catalog itself.",
+      "properties": {
+        "diagnostics": {
+          "description": "Deterministically ordered diagnostic counts and bounded examples.",
+          "items": {
+            "$ref": "#/$defs/ExportDiagnostic"
+          },
+          "type": "array"
+        },
+        "failedEntries": {
+          "description": "Exact failed Archive Entry identities across kinds, without a sample limit.",
+          "items": {
+            "$ref": "#/$defs/FailedExportEntry"
+          },
+          "type": "array"
+        },
+        "failedRecords": {
+          "description": "Exact failed identities across kinds and non-kind sources, without a sample limit.",
+          "items": {
+            "$ref": "#/$defs/FailedExportRecord"
+          },
+          "type": "array"
+        },
+        "kinds": {
+          "description": "Health in the same order as the catalog kinds.",
+          "items": {
+            "$ref": "#/$defs/KindExportHealth"
+          },
+          "type": "array"
+        },
+        "projection": {
+          "$ref": "#/$defs/ExportStageStatus",
+          "description": "Overall typed and derived projection health."
+        },
+        "publicationMode": {
+          "$ref": "#/$defs/CatalogPublicationMode",
+          "description": "The explicitly requested publication mode."
+        },
+        "read": {
+          "$ref": "#/$defs/ExportStageStatus",
+          "description": "Overall canonical source-read health."
+        },
+        "selectedKindRecords": {
+          "description": "Sum of per-kind selected Record counts, including shared sources in each affected kind.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/ExportHealthStatus",
+          "description": "Whether every required read and projection completed without a source warning."
+        },
+        "uniqueSelectedSourceRecords": {
+          "description": "Distinct physical source Records across all kinds, counting overlap once.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unresolvedReferences": {
+          "description": "Exact unresolved source links, including declared target identities beyond the example limit.",
+          "items": {
+            "$ref": "#/$defs/ExportUnresolvedReference"
+          },
+          "type": "array"
+        },
+        "writtenRows": {
+          "description": "Sum of the rows serialized for all catalog kinds.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "diagnostics",
+        "failedEntries",
+        "failedRecords",
+        "kinds",
+        "projection",
+        "publicationMode",
+        "read",
+        "selectedKindRecords",
+        "status",
+        "uniqueSelectedSourceRecords",
+        "unresolvedReferences",
+        "writtenRows"
+      ],
+      "type": "object"
+    },
+    "ExportHealthStatus": {
+      "description": "Whether all required source reads and projections completed without a blocking diagnostic.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "No source read, projection or source warning makes the result incomplete.",
+          "value": "complete"
+        },
+        {
+          "description": "At least one required operation failed or produced a source warning.",
+          "value": "incomplete"
+        }
+      ]
+    },
+    "ExportReferenceStatus": {
+      "description": "The retained source state of a Reference or instance pointer that cannot be followed.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "A declared GUID names no source Record.",
+          "value": "dangling"
+        },
+        {
+          "description": "A weak pointer names an instance outside the original owning Record.",
+          "value": "outsideOwner"
+        },
+        {
+          "description": "A pointer names an unavailable struct or instance.",
+          "value": "invalidPointer"
+        },
+        {
+          "description": "The declared target type does not match the actual target.",
+          "value": "unexpectedTargetType"
+        },
+        {
+          "description": "A strong pointer attempts to own an instance a second time.",
+          "value": "ownedTwice"
+        }
+      ]
+    },
+    "ExportSourceCounts": {
+      "description": "Accounting of one declared source unit's selected inputs and dependencies.",
+      "properties": {
+        "dependencies": {
+          "description": "Distinct sources read as dependencies of this kind.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failedDependencies": {
+          "description": "Dependencies whose required read or projection failed.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failedSelectionCandidates": {
+          "description": "Sources whose selection could not be established because metadata was unreadable.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "intentionallySkipped": {
+          "description": "Selected sources intentionally left out by a documented selection policy.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "omittedAfterProjectionFailure": {
+          "description": "Selected sources omitted because their typed projection failed.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "omittedAfterReadFailure": {
+          "description": "Selected sources omitted because their canonical content could not be read.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "projected": {
+          "description": "Selected sources whose typed projection completed, including zero-row projections.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "readSuccessful": {
+          "description": "Selected sources whose canonical content was successfully read.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selected": {
+          "description": "Distinct selected sources, including inputs of a derived kind.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dependencies",
+        "failedDependencies",
+        "failedSelectionCandidates",
+        "intentionallySkipped",
+        "omittedAfterProjectionFailure",
+        "omittedAfterReadFailure",
+        "projected",
+        "readSuccessful",
+        "selected"
+      ],
+      "type": "object"
+    },
+    "ExportSourceMode": {
+      "description": "The primary selected source unit of a kind.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "Records selected by the kind's own source rule.",
+          "value": "records"
+        },
+        {
+          "description": "Original Records selected as inputs to a derived kind.",
+          "value": "recordInputs"
+        },
+        {
+          "description": "Archive Entries rather than DataForge Records.",
+          "value": "archiveEntries"
+        }
+      ]
+    },
+    "ExportSourcePointer": {
+      "description": "Available raw source coordinates of an unresolved instance pointer.",
+      "properties": {
+        "declaredTypeIndex": {
+          "description": "The field's declared source struct index when available.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "instanceIndex": {
+          "description": "The source instance index when available.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "structIndex": {
+          "description": "The source struct index when available.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "declaredTypeIndex",
+        "instanceIndex",
+        "structIndex"
+      ],
+      "type": "object"
+    },
+    "ExportSourceRole": {
+      "description": "The relationship of a source identity to the affected kind.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "A source selected by the affected kind.",
+          "value": "selected"
+        },
+        {
+          "description": "An original source selected as a derived kind's input.",
+          "value": "derivedInput"
+        },
+        {
+          "description": "A required source that is not a selected output row of the affected kind.",
+          "value": "dependency"
+        },
+        {
+          "description": "Unreadable metadata prevented a definitive selection decision.",
+          "value": "selectionCandidate"
+        }
+      ]
+    },
+    "ExportStageStatus": {
+      "description": "The result of one export stage, independently of Filter selection scope.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "Every required operation of the stage completed.",
+          "value": "complete"
+        },
+        {
+          "description": "At least one required operation of the stage failed.",
+          "value": "incomplete"
+        }
+      ]
+    },
+    "ExportUnresolvedReference": {
+      "description": "One unresolved source link with its exact owner and field identity, without sampling.",
+      "properties": {
+        "field": {
+          "description": "The canonical field location inside the original owner.",
+          "type": "string"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Kind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The affected catalog kind, null for a catalog-wide configuration or dependency."
+        },
+        "recordGuid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The original owning source Record GUID."
+        },
+        "recordIndex": {
+          "description": "The physical owning Record-table index in this source build.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recordPath": {
+          "description": "The original owning source Record path.",
+          "type": "string"
+        },
+        "sourcePointer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExportSourcePointer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Available stored instance coordinates, null for a GUID-only Reference."
+        },
+        "sourceRole": {
+          "$ref": "#/$defs/ExportSourceRole",
+          "description": "The relationship of the owner to the affected kind."
+        },
+        "sourceType": {
+          "description": "The source struct that declares the field.",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ExportReferenceStatus",
+          "description": "The retained source state."
+        },
+        "targetGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The declared target GUID when available, including a dangling GUID."
+        },
+        "targetLocation": {
+          "description": "The known target's canonical location, null when unavailable.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targetRecordIndex": {
+          "description": "The resolved target's physical Record-table index in this source Build, null when unknown.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "targetRecordPath": {
+          "description": "The known target Record path, null for an unavailable target.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targetType": {
+          "description": "The known target struct name, null for an unavailable target.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "field",
+        "kind",
+        "recordGuid",
+        "recordIndex",
+        "recordPath",
+        "sourcePointer",
+        "sourceRole",
+        "sourceType",
+        "status",
+        "targetGuid",
+        "targetLocation",
+        "targetRecordIndex",
+        "targetRecordPath",
+        "targetType"
       ],
       "type": "object"
     },
@@ -4104,6 +4973,147 @@
         "isNpc",
         "lawful",
         "recordPath"
+      ],
+      "type": "object"
+    },
+    "FailedExportEntry": {
+      "description": "One exact failed Archive Entry identity, retained independently of bounded examples.",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ExportDiagnosticCode",
+          "description": "The stable failure category."
+        },
+        "containerEntryIndex": {
+          "description": "The nested container Entry index when available.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "entryIndex": {
+          "description": "The outer Archive Entry index, null when unavailable or the configured Entry is missing.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "field": {
+          "description": "The technical source field when the failing operation identifies one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind",
+          "description": "The affected catalog kind."
+        },
+        "operation": {
+          "$ref": "#/$defs/EntryOperation",
+          "description": "The failed required operation on the physical Entry."
+        },
+        "path": {
+          "description": "The canonical Entry path, using `outer!inner` for a nested file.",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/ExportSourceRole",
+          "description": "The relationship of the source to the affected kind."
+        },
+        "sourceType": {
+          "description": "The technical source struct or document type when available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stage": {
+          "$ref": "#/$defs/ExportDiagnosticStage",
+          "description": "The failed source-read or projection stage."
+        },
+        "targetGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The configured target GUID when the failing operation identifies one."
+        }
+      },
+      "required": [
+        "code",
+        "containerEntryIndex",
+        "entryIndex",
+        "field",
+        "kind",
+        "operation",
+        "path",
+        "role",
+        "sourceType",
+        "stage",
+        "targetGuid"
+      ],
+      "type": "object"
+    },
+    "FailedExportRecord": {
+      "description": "One exact failed source identity, retained independently of bounded diagnostic examples.",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ExportDiagnosticCode",
+          "description": "The stable failure category."
+        },
+        "guid": {
+          "$ref": "#/$defs/Guid",
+          "description": "The original source Record GUID."
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Kind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The affected kind, null for a catalog-wide source or dependency."
+        },
+        "recordIndex": {
+          "description": "The physical Record-table index in this source build.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recordPath": {
+          "description": "The source Record path, null when its metadata cannot be read.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "$ref": "#/$defs/ExportSourceRole",
+          "description": "The relationship of this source to the affected kind."
+        },
+        "stage": {
+          "$ref": "#/$defs/ExportDiagnosticStage",
+          "description": "The failed stage."
+        }
+      },
+      "required": [
+        "code",
+        "guid",
+        "kind",
+        "recordIndex",
+        "recordPath",
+        "role",
+        "stage"
       ],
       "type": "object"
     },
@@ -6344,6 +7354,204 @@
       ],
       "type": "object"
     },
+    "Kind": {
+      "description": "A kind of entity in the Basetool catalog.",
+      "type": "string",
+      "x-values": [
+        {
+          "description": "Manufacturers: `SCItemManufacturer` Records.",
+          "value": "manufacturers"
+        },
+        {
+          "description": "Items: `EntityClassDefinition` Records under `entities/scitem` and `entities/legacyitems`.",
+          "value": "items"
+        },
+        {
+          "description": "Ships and ground vehicles: `EntityClassDefinition` Records under `entities/spaceships` and\n`entities/groundvehicles`.",
+          "value": "ships"
+        },
+        {
+          "description": "Commodities: `EntityClassDefinition` Records under `entities/commodities`.",
+          "value": "commodities"
+        },
+        {
+          "description": "Blueprints: `CraftingBlueprintRecord` Records under `crafting/blueprints/crafting`.",
+          "value": "blueprints"
+        },
+        {
+          "description": "Resource groups: `ResourceTypeGroup` Records under `resourcetypedatabase`.",
+          "value": "resourceGroups"
+        },
+        {
+          "description": "Blueprint categories: `BlueprintCategoryRecord` Records under\n`crafting/blueprintcategories`.",
+          "value": "blueprintCategories"
+        },
+        {
+          "description": "Gameplay property definitions: `CraftingGameplayPropertyDef` Records under\n`crafting/craftedproperties`.",
+          "value": "gameplayProperties"
+        },
+        {
+          "description": "Quality distributions: `CraftingQualityDistributionRecord` and\n`CraftingQualityLocationOverrideRecord` Records under `crafting/qualitydistribution`.",
+          "value": "qualityDistributions"
+        },
+        {
+          "description": "Quality quantizations: `CraftingQualityQuantizationRecord` Records under\n`crafting/qualityquantization`, each linked to the `ResourceType`s that use it.",
+          "value": "qualityQuantizations"
+        },
+        {
+          "description": "Blueprint pools: `BlueprintPoolRecord` Records under `crafting/blueprintrewards`.",
+          "value": "blueprintPools"
+        },
+        {
+          "description": "Dismantle processes: `CraftingBlueprintRecord` Records under\n`crafting/blueprints/dismantle` whose process is a `GenericCraftingProcess_Dismantle`.",
+          "value": "dismantleProcesses"
+        },
+        {
+          "description": "Paints: the items whose `AttachDef.Type` is `Paints`, with the ships they fit. Derived from\nthe items and ships, so no record-path rule of its own.",
+          "value": "paints"
+        },
+        {
+          "description": "Loadouts: the ports of every ship and of every item that has ports, with the Entity the\nDefault Loadout attaches to each. Derived from the items and ships, so no record-path rule\nof its own.",
+          "value": "loadouts"
+        },
+        {
+          "description": "Starmap objects: `StarMapObject` Records under `starmap/pu`, each with the position the\nsystem containers place it at.",
+          "value": "starmapObjects"
+        },
+        {
+          "description": "Contracts: every contract and every sub contract of the `ContractGenerator` Records under\n`contracts/contractgenerator`, one entry each.",
+          "value": "contracts"
+        },
+        {
+          "description": "Mineable elements: `MineableElement` Records under `mining/mineableelements`.",
+          "value": "mineableElements"
+        },
+        {
+          "description": "Refining processes: `RefiningProcess` Records under `refiningprocess`.",
+          "value": "refiningProcesses"
+        },
+        {
+          "description": "Mineable compositions: `MineableComposition` Records under\n`mining/rockcompositionpresets`.",
+          "value": "mineableCompositions"
+        },
+        {
+          "description": "Mining global parameters: `MiningGlobalParams` Records under `mining`.",
+          "value": "miningGlobalParams"
+        },
+        {
+          "description": "Harvestable provider presets: `HarvestableProviderPreset` Records under\n`harvestable/providerpresets`.",
+          "value": "harvestableProviderPresets"
+        },
+        {
+          "description": "Sub harvestable multi configs: `SubHarvestableMultiConfigRecord` Records under\n`harvestable/slotpresets`.",
+          "value": "subHarvestableMultiConfigs"
+        },
+        {
+          "description": "Harvestable locations: the containers whose `.soc` names a provider preset, with the\nstarmap object they hang below. Derived from the system containers, so no record-path rule\nof its own.",
+          "value": "harvestableLocations"
+        },
+        {
+          "description": "Shops: the `ShopBackup` entries of the shop registry `LayerBackups.xml`, with kind and brand\nfrom the shop containers. Derived from Archive files, so no record-path rule of its own.",
+          "value": "shops"
+        },
+        {
+          "description": "Factions: `FactionReputation` Records under `factions/factionreputation`.",
+          "value": "factionReputations"
+        },
+        {
+          "description": "Reputation scopes: `SReputationScopeParams` Records under `reputation/scopes`.",
+          "value": "reputationScopes"
+        },
+        {
+          "description": "Reputation standings: `SReputationStandingParams` Records under `reputation/standings`.",
+          "value": "reputationStandings"
+        },
+        {
+          "description": "Reputation contexts: `SReputationContextUI` Records under `reputation/contexts`.",
+          "value": "reputationContexts"
+        },
+        {
+          "description": "Mission types: `MissionType` Records under `missiontype`.",
+          "value": "missionTypes"
+        },
+        {
+          "description": "Mission localities: `MissionLocality` Records under `missiondata/pu_missionlocality`.",
+          "value": "missionLocalities"
+        },
+        {
+          "description": "Contract scenarios: `ScenarioProgress` Records under `contracts/contractscenarios`.",
+          "value": "contractScenarios"
+        },
+        {
+          "description": "Loot tables: `LootTableV3Record` Records under `lootgeneration/loottables`.",
+          "value": "lootTables"
+        },
+        {
+          "description": "Loot archetypes: `LootArchetypeV3Record` Records under `lootgeneration/lootarchetypes`.",
+          "value": "lootArchetypes"
+        },
+        {
+          "description": "Loot pool filters: `PoolFilterRecord` Records under `lootgeneration/filters`.",
+          "value": "lootPoolFilters"
+        },
+        {
+          "description": "Loot containers: the containers whose placing entity carries a multi config, read from the\nentity files of the containers below the system containers. Derived from Archive files, so\nno record-path rule of its own.",
+          "value": "lootContainers"
+        },
+        {
+          "description": "Mineable entities: `EntityClassDefinition` Records under `entities/mineable`, the rocks and\ndeposits with their scan signature.",
+          "value": "mineableEntities"
+        },
+        {
+          "description": "Older loot tables: `LootTable` Records under `lootgeneration/loottables`, which the\n`lootTable` of a slot's `lootConfig` links to.",
+          "value": "legacyLootTables"
+        },
+        {
+          "description": "Older loot archetypes: `LootArchetype` Records under `lootgeneration/lootarchetypes`.",
+          "value": "legacyLootArchetypes"
+        },
+        {
+          "description": "Crafters: the entities whose `Components` hold a `CrafterComponentParams`. The rule takes\nthe `EntityClassDefinition` Records under `entities` that no earlier kind takes, so it\ncomes last; an item, ship or commodity that is a crafter is read from its own Record.\n[`Kind::rule`] alone does not select a crafter: the Record must also hold the component.",
+          "value": "crafters"
+        },
+        {
+          "description": "Cargo manifests: `CargoManifest` Records under `cargomanifest`.",
+          "value": "cargoManifests"
+        },
+        {
+          "description": "Mission location templates: `MissionLocationTemplate` Records under\n`missiondata/pu_locations`, what a location query of a contract matches by tags.",
+          "value": "missionLocationTemplates"
+        },
+        {
+          "description": "Contract ship spawns: the distinct ship spawn descriptions the contracts state. Derived from\nthe contracts, so no record-path rule of its own.",
+          "value": "contractShipSpawns"
+        },
+        {
+          "description": "Contract location queries: the distinct location queries the contracts state. Derived from\nthe contracts, so no record-path rule of its own.",
+          "value": "contractLocationQueries"
+        },
+        {
+          "description": "Contract templates: every `ContractTemplate` Record, whatever its folder, the structure a\ncontract names in `templateGuid`.",
+          "value": "contractTemplates"
+        },
+        {
+          "description": "Mission broker entries: every `MissionBrokerEntry` Record, whatever its folder, the offers\nof the mission board.",
+          "value": "missionBrokerEntries"
+        },
+        {
+          "description": "Contract NPC spawns: the distinct NPC spawn descriptions. Derived, so no record-path rule.",
+          "value": "contractNpcSpawns"
+        },
+        {
+          "description": "Contract entity spawns: the distinct entity spawn descriptions. Derived, so no rule either.",
+          "value": "contractEntitySpawns"
+        },
+        {
+          "description": "Authored Generator property arrays, shared by all contract rows that reference them.",
+          "value": "missionPropertySets"
+        }
+      ]
+    },
     "KindCompleteness": {
       "description": "Whether a kind holds every Record of the Build or only those a Filter selected.",
       "oneOf": [
@@ -6379,6 +7587,98 @@
           "type": "object"
         }
       ]
+    },
+    "KindExportHealth": {
+      "description": "The exact read and projection health of one catalog kind.",
+      "properties": {
+        "failedDerivedProjections": {
+          "description": "Failed derived operations whose original source row can remain present.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failedEntries": {
+          "description": "Exact failed Archive Entry identities, without a sample limit.",
+          "items": {
+            "$ref": "#/$defs/FailedExportEntry"
+          },
+          "type": "array"
+        },
+        "failedRecords": {
+          "description": "Exact affected identities for import retention, without a sample limit.",
+          "items": {
+            "$ref": "#/$defs/FailedExportRecord"
+          },
+          "type": "array"
+        },
+        "fieldInventoryComplete": {
+          "description": "Whether all materialized source fields were inspected within the declared budgets.",
+          "type": "boolean"
+        },
+        "intentionallySkippedRows": {
+          "description": "Authored rows intentionally skipped or removed as duplicates.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind",
+          "description": "The catalog kind."
+        },
+        "projection": {
+          "$ref": "#/$defs/ExportStageStatus",
+          "description": "Typed and derived projection health."
+        },
+        "read": {
+          "$ref": "#/$defs/ExportStageStatus",
+          "description": "Canonical source-read health, including required dependencies."
+        },
+        "sourceEntries": {
+          "$ref": "#/$defs/ExportEntryCounts",
+          "description": "Counts in distinct Archive Entry units, separately from source Records."
+        },
+        "sourceInventoryComplete": {
+          "description": "Whether this build completely enumerated the kind's required source inputs.",
+          "type": "boolean"
+        },
+        "sourceMode": {
+          "$ref": "#/$defs/ExportSourceMode",
+          "description": "Whether the inputs are selected Records, Record inputs or Archive Entries."
+        },
+        "sourceRecords": {
+          "$ref": "#/$defs/ExportSourceCounts",
+          "description": "Counts in distinct source-Record units."
+        },
+        "unresolvedReferenceCount": {
+          "description": "Exact unresolved source links reported for this kind.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "writtenRows": {
+          "description": "Rows actually serialized for this kind.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "failedDerivedProjections",
+        "failedEntries",
+        "failedRecords",
+        "fieldInventoryComplete",
+        "intentionallySkippedRows",
+        "kind",
+        "projection",
+        "read",
+        "sourceEntries",
+        "sourceInventoryComplete",
+        "sourceMode",
+        "sourceRecords",
+        "unresolvedReferenceCount",
+        "writtenRows"
+      ],
+      "type": "object"
     },
     "LegacyLootArchetype": {
       "description": "An older loot archetype: a `LootArchetype` Record under `lootgeneration/lootarchetypes`, the\nweighted tags of item a table entry stands for.",
@@ -10122,6 +11422,15 @@
           "$ref": "#/$defs/PropertyReferenceStatus",
           "description": "The owner-scoped resolution outcome."
         },
+        "targetRecordIndex": {
+          "description": "The resolved target position in this Build, null when no physical target is known.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "targetType": {
           "description": "The source target struct name when known.",
           "type": [
@@ -10144,6 +11453,7 @@
         "sourceError",
         "sourcePointer",
         "status",
+        "targetRecordIndex",
         "targetType",
         "variable"
       ],
@@ -14782,6 +16092,10 @@
       },
       "type": "array"
     },
+    "exportHealth": {
+      "$ref": "#/$defs/ExportHealth",
+      "description": "The measured source-read and projection health, separately from Filter selection scope."
+    },
     "factionReputations": {
       "description": "The factions with their reputation links, ordered by GUID.",
       "items": {
@@ -15067,6 +16381,7 @@
     "crafters",
     "craftingGlobal",
     "dismantleProcesses",
+    "exportHealth",
     "factionReputations",
     "gameplayProperties",
     "harvestableLocations",

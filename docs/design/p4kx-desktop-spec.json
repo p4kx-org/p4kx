@@ -736,11 +736,11 @@
     "summary": "non-modal modal frame, width 600: cancel note in color-warning, counts and target in color-gray-1, failed Records as collapsibleSection rows with the reason in color-danger-text; Close buttonCta alone in the foot; no target line when none was created"
   },
   "basetoolCatalog": {
-    "menu": "Export menu entry dropdownItem below Record export; disabled without a DataForge and while a catalog is created; opens the system save dialog with basetool-catalog.json",
-    "progress": "non-modal modal frame, width 440: spinner while DataForge is read and while the file is written, progressBar with Records checked of total between; Cancel buttonGhost alone in the foot",
-    "summary": "non-modal modal frame, width 600: alertWarning near the upload limit or alertDanger over it on top; group labels Kinds and Texts with one color-gray-1 line per kind and language, then size in decimal units with the upload limit of 64 MB and the file; Close buttonCta alone in the foot",
+    "menu": "Two Export menu dropdownItems below Record export: normal Basetool catalog and explicit diagnostic Basetool catalog; disabled without a DataForge and while a catalog is created; system save dialog defaults to basetool-catalog.json.zst or basetool-catalog.diagnostic.json.zst; diagnostic permission applies to one job and is never persisted",
+    "progress": "non-modal modal frame, width 440: title explicitly names a diagnostic job; spinner while DataForge is read and while the file is written, progressBar with Records checked of total between; Cancel buttonGhost alone in the foot",
+    "summary": "non-modal modal frame, width 600: diagnostic title and color-warning notice for an explicit diagnostic export; source/projection health in color-gray-1 when complete or color-warning when incomplete; alertWarning near the upload limit or alertDanger over it; group labels Kinds (selection scope) and Texts with one color-gray-1 line per kind and language, then size in decimal units with the upload limit of 64 MB and the file; Close buttonCta alone in the foot",
     "cancelled": "non-modal modal frame: note in color-warning, no file written",
-    "failed": "non-modal danger modal frame: the reason in color-danger-text, also when the chosen file is the open Archive, which is never written"
+    "failed": "non-modal danger modal frame: the reason in color-danger-text; incomplete normal export creates or replaces no file and explains the separate diagnostic action; choosing the open Archive never writes it"
   },
   "factsBar": {
     "dsClass": "facts-bar",

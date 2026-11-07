@@ -3,24 +3,20 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use p4kx_extraction::{CancelToken, DataForge, DataForgeError, Filter, Guid, Record, TreeBuilder};
-use rayon::prelude::*;
+use p4kx_extraction::{CancelToken, DataForge, Filter, Guid};
 
-use crate::crafting_quantization::{
-    QUANTIZATIONS, RESOURCE_TYPES, linked_quantizations, quantization,
-};
-use crate::crafting_records::{
-    DISMANTLES, DISTRIBUTIONS, GLOBALS, OVERRIDES, POOLS, PROPERTIES, blueprint, dismantle,
-    distribution, globals, is_crafting_path, pool, property,
-};
-use crate::crafting_scan::reward_sources;
 use crate::crafting_types::{
     BlueprintPool, BlueprintTiers, DismantleProcess, DismantleReturn, GameplayProperty,
     GlobalParams, QualityDistribution, QualityQuantization, RewardChance, RewardSource,
 };
 use crate::crafting_warning::CraftingWarning;
-use crate::selection::{BlueprintSelection, is_leftover, selects_blueprint};
+use crate::selection::is_leftover;
 use crate::{CatalogError, CatalogFailure, CatalogProgress};
+
+#[path = "crafting_ledger/mod.rs"]
+pub(crate) mod ledger;
+
+pub(crate) use ledger::ReadCrafting;
 
 /// The crafting data of a DataForge: the blueprints with all their tiers and what surrounds them.
 ///
@@ -57,22 +53,6 @@ pub struct Crafting<'f> {
     pub warnings: Vec<CraftingWarning>,
 }
 
-enum Piece<'f> {
-    Blueprint(BlueprintTiers<'f>),
-    Property(GameplayProperty<'f>),
-    Distribution(QualityDistribution<'f>),
-    Quantization(QualityQuantization<'f>),
-    ResourceLinks {
-        resource_type: Guid,
-        quantizations: Vec<Guid>,
-    },
-    Pool(BlueprintPool<'f>),
-    Dismantle(DismantleProcess<'f>),
-    Globals(GlobalParams),
-    Skipped,
-    Failed(CatalogFailure),
-}
-
 /// Reads the crafting data of `forge`.
 ///
 /// The Records are read in parallel. A `Filter` keeps only the blueprints and pools whose record
@@ -90,7 +70,7 @@ pub fn read_crafting<'f>(
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
 ) -> Result<Crafting<'f>, CatalogError> {
-    read_with_progress(forge, filter, cancel, None)
+    read_with_progress(forge, filter, cancel, None).map(|read| read.data)
 }
 
 /// Reads the crafting data like [`read_crafting`] and reports the scan for reward sources to
@@ -100,181 +80,8 @@ pub(crate) fn read_with_progress<'f>(
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
     progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
-) -> Result<Crafting<'f>, CatalogError> {
-    let cancelled = || cancel.is_some_and(CancelToken::is_cancelled);
-    let records: Vec<Record<'f>> = forge.records().collect();
-    let pieces: Vec<Piece<'f>> = records
-        .par_iter()
-        .map_init(TreeBuilder::new, |trees, record| {
-            if cancelled() {
-                return Err(CatalogError::Cancelled);
-            }
-            Ok(piece(trees, record, filter).unwrap_or_else(|source| {
-                (!outside(record, filter))
-                    .then(|| Piece::Failed(CatalogFailure::of(record, &source)))
-            }))
-        })
-        .filter_map(Result::transpose)
-        .collect::<Result<_, _>>()?;
-    let mut crafting = assemble(pieces);
-    if !crafting.pools.is_empty() {
-        let found = reward_sources(&records, &crafting.pools, cancel, progress)?;
-        crafting.reward_sources = found.sources;
-        if found.unreadable > 0 {
-            crafting
-                .warnings
-                .push(CraftingWarning::UnreadableRewardRecords(found.unreadable));
-        }
-    }
-    if let Some(warning) = crafting.unknown_ranges_warning() {
-        crafting.warnings.push(warning);
-    }
-    let processes = crafting.live_dismantle().count();
-    if processes > 1 {
-        crafting
-            .warnings
-            .push(CraftingWarning::AmbiguousDismantle(processes));
-    }
-    Ok(crafting)
-}
-
-fn assemble(pieces: Vec<Piece<'_>>) -> Crafting<'_> {
-    let mut crafting = Crafting::default();
-    let mut links: HashMap<Guid, Vec<Guid>> = HashMap::new();
-    for piece in pieces {
-        match piece {
-            Piece::Blueprint(blueprint) => crafting.blueprints.push(blueprint),
-            Piece::Property(property) => crafting.properties.push(property),
-            Piece::Distribution(distribution) => crafting.quality_distributions.push(distribution),
-            Piece::Quantization(quantization) => crafting.quality_quantizations.push(quantization),
-            Piece::ResourceLinks {
-                resource_type,
-                quantizations,
-            } => {
-                for quantization in quantizations {
-                    links.entry(quantization).or_default().push(resource_type);
-                }
-            }
-            Piece::Pool(pool) => crafting.pools.push(pool),
-            Piece::Dismantle(process) => crafting.dismantle.push(process),
-            Piece::Globals(globals) => {
-                crafting
-                    .global
-                    .default_blueprints
-                    .extend(globals.default_blueprints);
-                crafting
-                    .global
-                    .dismantle_blacklist_resources
-                    .extend(globals.dismantle_blacklist_resources);
-                crafting
-                    .global
-                    .dismantle_blacklist_items
-                    .extend(globals.dismantle_blacklist_items);
-            }
-            Piece::Skipped => {
-                crafting.skipped_blueprints = crafting.skipped_blueprints.saturating_add(1);
-            }
-            Piece::Failed(failure) => crafting.failures.push(failure),
-        }
-    }
-    crafting.blueprints.sort_by_key(|item| item.guid);
-    crafting.properties.sort_by_key(|item| item.guid);
-    crafting.quality_distributions.sort_by_key(|item| item.guid);
-    crafting.quality_quantizations.sort_by_key(|item| item.guid);
-    for quantization in &mut crafting.quality_quantizations {
-        if let Some(mut resource_types) = links.remove(&quantization.guid) {
-            resource_types.sort_unstable();
-            resource_types.dedup();
-            quantization.resource_types = resource_types;
-        }
-    }
-    crafting.unresolved_quantization_links = links
-        .into_values()
-        .map(|mut resource_types| {
-            resource_types.sort_unstable();
-            resource_types.dedup();
-            resource_types.len()
-        })
-        .sum();
-    crafting.dismantle.sort_by_key(|item| item.guid);
-    crafting.pools.sort_by_key(|item| item.guid);
-    crafting
-}
-
-/// Returns whether `record` lies outside the `filter`, so that a failure to read it is no
-/// failure of the selection; the global parameters are read whatever the Filter.
-fn outside(record: &Record<'_>, filter: Option<&Filter>) -> bool {
-    let (Some(filter), Ok(path)) = (filter, record.record_path()) else {
-        return false;
-    };
-    !filter.matches(path)
-        && !record.type_name().is_ok_and(|type_name| {
-            GLOBALS.selects(path, type_name) || RESOURCE_TYPES.selects(path, type_name)
-        })
-}
-
-fn resource_links<'f>(
-    trees: &mut TreeBuilder<'f>,
-    record: &Record<'f>,
-) -> Result<Option<Piece<'f>>, DataForgeError> {
-    if record.type_name()? != RESOURCE_TYPES.type_name
-        || is_leftover(record.record_path()?, record.name()?)
-    {
-        return Ok(None);
-    }
-    let quantizations = linked_quantizations(&trees.build(record)?);
-    Ok((!quantizations.is_empty()).then(|| Piece::ResourceLinks {
-        resource_type: record.guid(),
-        quantizations,
-    }))
-}
-
-fn piece<'f>(
-    trees: &mut TreeBuilder<'f>,
-    record: &Record<'f>,
-    filter: Option<&Filter>,
-) -> Result<Option<Piece<'f>>, DataForgeError> {
-    let path = record.record_path()?;
-    if RESOURCE_TYPES.matches_path(path) {
-        return resource_links(trees, record);
-    }
-    if !is_crafting_path(path) {
-        return Ok(None);
-    }
-    match selects_blueprint(record, filter)? {
-        BlueprintSelection::Kept => {
-            let piece = match blueprint(&trees.build(record)?) {
-                Ok(blueprint) => Piece::Blueprint(blueprint),
-                Err(error) => Piece::Failed(CatalogFailure::of(record, &error)),
-            };
-            return Ok(Some(piece));
-        }
-        BlueprintSelection::Leftover => return Ok(Some(Piece::Skipped)),
-        BlueprintSelection::Outside => {}
-    }
-    let type_name = record.type_name()?;
-    if POOLS.selects(path, type_name) && filter.is_some_and(|filter| !filter.matches(path)) {
-        return Ok(None);
-    }
-    let piece = if DISMANTLES.selects(path, type_name) {
-        dismantle(&trees.build(record)?).map(Piece::Dismantle)
-    } else if PROPERTIES.selects(path, type_name) {
-        Some(Piece::Property(property(&trees.build(record)?)))
-    } else if DISTRIBUTIONS.selects(path, type_name) || OVERRIDES.selects(path, type_name) {
-        Some(Piece::Distribution(distribution(&trees.build(record)?)))
-    } else if QUANTIZATIONS.selects(path, type_name) {
-        Some(match quantization(&trees.build(record)?) {
-            Ok(quantization) => Piece::Quantization(quantization),
-            Err(malformed) => Piece::Failed(CatalogFailure::of(record, &malformed)),
-        })
-    } else if POOLS.selects(path, type_name) {
-        Some(Piece::Pool(pool(&trees.build(record)?)))
-    } else if GLOBALS.selects(path, type_name) {
-        Some(Piece::Globals(globals(&trees.build(record)?)))
-    } else {
-        None
-    };
-    Ok(piece)
+) -> Result<ReadCrafting<'f>, CatalogError> {
+    ledger::read(forge, filter, cancel, progress)
 }
 
 impl<'f> Crafting<'f> {

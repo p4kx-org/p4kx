@@ -3,6 +3,9 @@
 
 use p4kx_assembly::{LoadoutError, VehicleImplementation};
 
+#[cfg(test)]
+mod tests;
+
 use crate::guid_text::CatalogGuid;
 use crate::variants::ShipKey;
 
@@ -38,6 +41,7 @@ fn tags(value: Option<&str>) -> Vec<String> {
 /// implementation the ship base data read.
 #[derive(Debug)]
 pub(crate) struct VehicleFacts {
+    pub(crate) source_record_index: Option<u32>,
     pub(crate) ship: CatalogGuid,
     pub(crate) tags: Vec<String>,
     pub(crate) paint_ports: Vec<PaintPort>,

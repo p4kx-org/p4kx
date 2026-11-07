@@ -6,7 +6,7 @@
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::Value;
 
@@ -20,7 +20,8 @@ fn build() -> Result<Value, Box<dyn Error>> {
         spawns_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     Ok(serde_json::from_slice(
         build_catalog(&archive, &options)?.json(),
     )?)

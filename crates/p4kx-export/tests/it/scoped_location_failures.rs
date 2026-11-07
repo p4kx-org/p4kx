@@ -23,7 +23,7 @@ fn an_unknown_concrete_variant_in_each_family_fails_both_owning_records() -> Tes
             "LocationCondition_UnknownRelative",
         ),
     ] {
-        let report = scoped_fixture::build(vec![property(
+        let report = scoped_fixture::diagnostic(vec![property(
             "Scoped_BP",
             scoped([(field, object(TestInstance::new(source_type)))]),
         )])?;
@@ -61,7 +61,7 @@ fn an_unreadable_populated_filter_is_not_exported_as_an_absent_pointer() -> Test
         .into_iter()
         .chain(3_u32.to_le_bytes())
         .collect();
-    let report = scoped_fixture::build(vec![property(
+    let report = scoped_fixture::diagnostic(vec![property(
         "Scoped_BP",
         scoped([("locationClassFilter", TestValue::Raw(bad))]),
     )])?;
@@ -85,7 +85,7 @@ fn an_unreadable_populated_filter_is_not_exported_as_an_absent_pointer() -> Test
 
 #[test]
 fn an_unreadable_enum_is_distinct_from_a_preserved_unknown_enum_name() -> TestResult {
-    let report = scoped_fixture::build(vec![property(
+    let report = scoped_fixture::diagnostic(vec![property(
         "Scoped_BP",
         scoped([(
             "factionFilter",

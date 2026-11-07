@@ -24,6 +24,10 @@ pub(crate) struct CatalogArgs {
     /// kind is then marked partial with this Filter.
     #[arg(long, value_name = "FILTER")]
     pub(crate) filter: Option<String>,
+    /// Writes an explicitly marked diagnostic catalog even when selected source data could not
+    /// be read or projected; an incomplete result still exits with status 1.
+    #[arg(long)]
+    pub(crate) diagnostic_partial: bool,
     /// The export time the catalog states, in seconds since 1970-01-01 UTC; defaults to the
     /// current time.
     #[arg(long, env = "SOURCE_DATE_EPOCH", value_name = "SECONDS")]

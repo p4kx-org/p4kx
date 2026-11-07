@@ -4,15 +4,16 @@
 use std::collections::HashSet;
 
 use p4kx_extraction::{
-    Guid, Record, RecordTree, StructValue, TreeBuilder, Value, is_placeholder_key,
+    CancelToken, Guid, Record, RecordTree, StructValue, TreeBuilder, Value, is_placeholder_key,
 };
 use rayon::prelude::*;
 
-use crate::CatalogFailure;
+use crate::export_ledger::ExportLedger;
 use crate::playability::Playability;
 use crate::record_fields::{
     boolean, component, elements, locale_key, number, reference, structure, text,
 };
+use crate::{CatalogError, CatalogFailure, Kind};
 
 const MANIFEST_TYPE: &str = "CrewManifest";
 const TAG_TYPE: &str = "Tag";
@@ -31,8 +32,7 @@ enum Found {
     Unmanned(Guid),
 }
 
-/// The Records the ship rule looks up: the crew manifests that list a crew, the `Unmanned` tags,
-/// and the manifests and tags that could not be read.
+/// The canonical manifest and tag evidence used by the ship playability projection.
 #[derive(Debug, Default)]
 pub(crate) struct Evidence {
     crewed: HashSet<Guid>,
@@ -40,42 +40,86 @@ pub(crate) struct Evidence {
     unreadable: HashSet<Guid>,
 }
 
+fn evidence_record(record: &Record<'_>) -> bool {
+    record
+        .type_name()
+        .is_ok_and(|name| name == MANIFEST_TYPE || name == TAG_TYPE)
+}
+
+fn project_evidence(tree: &RecordTree<'_>) -> Option<Found> {
+    if tree.type_name() == MANIFEST_TYPE {
+        (!elements(Some(tree.root()), "crew").is_empty()).then(|| Found::Crewed(tree.guid()))
+    } else {
+        (text(Some(tree.root()), "tagName") == Some(UNMANNED_TAG))
+            .then(|| Found::Unmanned(tree.guid()))
+    }
+}
+
 impl Evidence {
-    /// Reads the crew manifests and tags among `records` in parallel; a Record that cannot be read
-    /// is returned as a failure.
+    /// Reads the crew manifests and tags required by playability indexing.
     pub(crate) fn read(records: &[Record<'_>]) -> (Self, Vec<CatalogFailure>) {
-        let found: Vec<Result<Found, CatalogFailure>> = records
+        let found = records
             .par_iter()
             .map_init(TreeBuilder::new, |trees, record| {
-                let type_name = record.type_name().ok()?;
-                if type_name != MANIFEST_TYPE && type_name != TAG_TYPE {
-                    return None;
-                }
-                let tree = match trees.build(record) {
-                    Ok(tree) => tree,
-                    Err(source) => return Some(Err(CatalogFailure::of(record, &source))),
-                };
-                let root = Some(tree.root());
-                let found = if type_name == MANIFEST_TYPE {
-                    (!elements(root, "crew").is_empty()).then(|| Found::Crewed(tree.guid()))
-                } else {
-                    (text(root, "tagName") == Some(UNMANNED_TAG))
-                        .then(|| Found::Unmanned(tree.guid()))
-                };
-                found.map(Ok)
+                evidence_record(record).then(|| {
+                    trees
+                        .build(record)
+                        .map(|tree| project_evidence(&tree))
+                        .map_err(|source| CatalogFailure::of(record, &source))
+                })
             })
             .flatten()
             .collect();
+        Self::gather(found)
+    }
+
+    /// Reads playability dependencies and retains their actual canonical field inspections.
+    pub(crate) fn read_catalog(
+        records: &[Record<'_>],
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self, Vec<CatalogFailure>, ExportLedger), CatalogError> {
+        let found = records
+            .par_iter()
+            .map_init(TreeBuilder::new, |trees, record| {
+                if cancel.is_some_and(CancelToken::is_cancelled) {
+                    return Err(CatalogError::Cancelled);
+                }
+                if !evidence_record(record) {
+                    return Ok(None);
+                }
+                let read = crate::export_dependency_read::read(trees, record, Kind::Ships, cancel)?;
+                let outcome = read
+                    .tree
+                    .map(|tree| project_evidence(&tree))
+                    .map_err(|error| CatalogFailure::of(record, &error));
+                Ok(Some((outcome, read.ledger)))
+            })
+            .filter_map(Result::transpose)
+            .collect::<Result<Vec<_>, CatalogError>>()?;
+        let mut ledger = ExportLedger::default();
+        let outcomes = found
+            .into_iter()
+            .map(|(outcome, observed)| {
+                ledger.merge(observed);
+                outcome
+            })
+            .collect();
+        let (evidence, failures) = Self::gather(outcomes);
+        Ok((evidence, failures, ledger))
+    }
+
+    fn gather(found: Vec<Result<Option<Found>, CatalogFailure>>) -> (Self, Vec<CatalogFailure>) {
         let mut evidence = Self::default();
         let mut failures = Vec::new();
         for result in found {
             match result {
-                Ok(Found::Crewed(guid)) => {
+                Ok(Some(Found::Crewed(guid))) => {
                     evidence.crewed.insert(guid);
                 }
-                Ok(Found::Unmanned(guid)) => {
+                Ok(Some(Found::Unmanned(guid))) => {
                     evidence.unmanned.insert(guid);
                 }
+                Ok(None) => {}
                 Err(failure) => {
                     evidence.unreadable.insert(failure.guid);
                     failures.push(failure);
@@ -199,3 +243,7 @@ pub(crate) fn item(tree: &RecordTree<'_>, name_key: Option<&str>) -> Option<Play
         None
     }
 }
+
+#[cfg(test)]
+#[path = "playability_evidence_tests.rs"]
+mod evidence_tests;

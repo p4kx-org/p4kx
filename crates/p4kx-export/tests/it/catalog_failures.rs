@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! A selected Record that cannot be read is left out and reported; the catalog is still built.
+//! Explicit diagnostic publication retains readable rows and measured source failures.
 
 use std::error::Error;
 use std::path::PathBuf;
@@ -76,7 +76,10 @@ fn built() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
         .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()).encrypted())
         .write_to(&path)?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let options = CatalogOptions {
+        publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+        ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
+    };
     let built = build_catalog(&archive, &options)?;
     let catalog = serde_json::from_slice(built.json())?;
     Ok((built, catalog))

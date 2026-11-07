@@ -7,7 +7,9 @@
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, CraftingWarning, build_catalog};
+use p4kx_export::{
+    BuiltCatalog, CatalogOptions, CatalogPublicationMode, CraftingWarning, build_catalog,
+};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
@@ -177,7 +179,8 @@ fn records_that_nest_phases_or_conditions_too_deep_fail_instead_of_being_cut() -
         spawns_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     let built = build_catalog(&archive, &options)?;
     let failed = failures(&built);
     assert_eq!(failed.len(), UNKNOWN_STRUCTS.len() + TOO_DEEP, "{failed:?}");
@@ -240,7 +243,8 @@ fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_
         spawns_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     let built = build_catalog(&archive, &options)?;
     assert_failures(&failures(&built), &UNKNOWN_STRUCTS);
     Ok(())
@@ -275,7 +279,8 @@ fn stored_names_the_catalog_does_not_know_are_counted_in_a_warning() -> TestResu
         spawns_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     let built = build_catalog(&archive, &options)?;
     let warning = built
         .summary()

@@ -10,7 +10,7 @@ use crate::crafting_detail_fixture;
 
 use std::error::Error;
 
-use catalog_crafting_support::{blueprint, build_from, text};
+use catalog_crafting_support::{blueprint, build_from, diagnostic_from, text};
 use crafting_detail_fixture as fixture;
 use p4kx_export::{BuiltCatalog, CraftingWarning, Filter, Kind, read_crafting};
 use p4kx_extraction::DataForge;
@@ -274,7 +274,7 @@ fn a_default_blueprint_is_marked_available() -> TestResult {
 
 #[test]
 fn several_dismantle_processes_leave_no_link_and_the_summary_incomplete() -> TestResult {
-    let (built, catalog) = build_from(&fixture::ambiguous_database(), None)?;
+    let (built, catalog) = diagnostic_from(&fixture::ambiguous_database(), None)?;
     for entry in catalog["blueprints"].as_array().ok_or("blueprints")? {
         assert_eq!(entry["dismantle"], Value::Null, "{}", entry["className"]);
     }

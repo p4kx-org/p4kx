@@ -10,7 +10,9 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, CraftingWarning, build_catalog};
+use p4kx_export::{
+    BuiltCatalog, CatalogOptions, CatalogPublicationMode, CraftingWarning, build_catalog,
+};
 use p4kx_extraction::Archive;
 use serde_json::Value;
 
@@ -21,7 +23,8 @@ fn build_with(
 ) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(write(dir.path())?, Some(p4kx_testkit::test_key()))?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     let built = build_catalog(&archive, &options)?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))

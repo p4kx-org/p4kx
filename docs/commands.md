@@ -372,22 +372,29 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   joystick. The CSV has one row per action and a cell per device, bindings joined with ` | `; the
   JSON lists every binding with its device, input and activation mode ([ADR-0180](adr/0180-the-action-map-export-lists-every-default-binding-of-the-default-profile.md)).
   A label whose key has no text in `--language` (English by default) stays empty.
-- `p4kx catalog <archive> --out <file> [--filter <filter>] [--exported-at <seconds>]` writes the
+- `p4kx catalog <archive> --out <file> [--filter <filter>] [--diagnostic-partial]
+  [--exported-at <seconds>]` writes the
   Basetool catalog for the basetool's P4K import ([docs/basetool-catalog.md](basetool-catalog.md)):
-  schema version (2), Channel and Build, completeness per kind and the kinds of the catalog:
+  schema version (3), Channel and Build, Filter selection scope per kind, read/projection health
+  and the kinds of the catalog:
   manufacturers, items (with their item class), ships and ground vehicles, commodities, crafting
   blueprints, loadouts, paints, shops, the starmap, contracts (with their ship, NPC and entity
-  spawns, location queries and hauling orders), contract templates, mission broker entries and
+  spawns, location queries, hauling orders and canonical mission-property sets), contract templates, mission broker entries and
   cargo manifests, factions and reputation, mining,
   refining and loot, each ordered by GUID, with test, template, dummy,
   debug, deprecated and dev Records left out and counted as skipped, and names and descriptions
-  resolved in English and German. `--filter` marks the catalog partial. It prints the counts per
+  resolved in English and German. `--filter` marks the selection scope partial independently of
+  read/projection health. It prints the counts per
   kind, the item classes read and the unresolved texts per language and warns when the catalog
   nears or exceeds the 64 MB upload limit. An `--out` name ending in `.zst` writes the catalog as
   one zstd frame (level 19, content size declared, plain `zstd -d` decodes it), a fraction of the size, which the Basetool accepts as
-  it does plain JSON. A selected Record that cannot be read is left out,
-  listed on stderr with its GUID and reason and counted as failed; the catalog is still written
-  and the exit code is 1. `p4kx catalog schema` prints the catalog's JSON Schema.
+  it does plain JSON. A read/projection failure or a source warning that makes the export incomplete
+  refuses normal publication with exit code 1, before creating or replacing the destination.
+  `--diagnostic-partial` explicitly permits writing the diagnostic result, marks its publication
+  mode in the file and CLI status, and still exits with 1 when incomplete. Each invocation must
+  request that permission; a healthy Filter-scoped export needs none. A consumer must check
+  `exportHealth` and selection scope before treating missing rows as removals.
+  `p4kx catalog schema` prints the catalog's JSON Schema.
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship
   ([docs/ship-base-data.md](ship-base-data.md)): hull mass and hit points summed from the

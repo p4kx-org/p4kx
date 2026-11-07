@@ -24,3 +24,8 @@ extensions against that schema instead of regenerating a purported old contract 
 Schema tests distinguish unknown additive fields from unsupported tagged variants and distinguish
 explicit null from missing payload fields. ResourceType compatibility is tested independently of the
 catalog version migration. Documentation and callers use the runtime version constant.
+
+Version 3 also carries measured `exportHealth` separately from Filter completeness (ADR-0347).
+Normal publication requires healthy source reads and projections; explicit diagnostic publication
+retains incomplete status, exact affected source identities and observed counter units in the
+artifact. Consumers require both healthy export and unfiltered selection before inferring removals.

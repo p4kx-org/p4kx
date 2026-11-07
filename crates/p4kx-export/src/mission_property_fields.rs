@@ -6,7 +6,7 @@ use p4kx_extraction::{StructValue, Value, ValueError};
 use crate::record_read::ReadError;
 
 #[derive(Debug, thiserror::Error)]
-enum PropertyFieldError {
+pub(crate) enum PropertyFieldError {
     #[error("mission property {field} must hold {expected}")]
     Malformed {
         field: &'static str,

@@ -18,7 +18,7 @@ fn unsupported_value_variants_fail_the_generator_without_leaving_partial_sets() 
         )]),
         parameters(vec![]),
     ]);
-    let report = fixture::build(source, None)?;
+    let report = fixture::diagnostic(source, None)?;
     assert_eq!(report.failures.len(), 1, "{:?}", report.failures);
     assert!(
         report
@@ -54,7 +54,7 @@ fn unreadable_value_pointers_are_not_exported_as_a_null_declaration() -> TestRes
             .value("missionVariableName", TestValue::text("Unreadable"))
             .value("value", TestValue::Raw(invalid)),
     );
-    let report = fixture::build(
+    let report = fixture::diagnostic(
         generator([
             parameters(vec![bad]),
             parameters(vec![]),
@@ -83,7 +83,7 @@ fn an_unsupported_scoped_variant_on_a_subcontract_fails_its_original_generator()
         "relativeLocationFilter",
         object(TestInstance::new("LocationCondition_UnknownRelative")),
     )]);
-    let report = fixture::build(
+    let report = fixture::diagnostic(
         generator([
             parameters(vec![]),
             parameters(vec![]),
@@ -117,7 +117,7 @@ fn an_unreadable_override_array_is_not_an_empty_source_set() -> TestResult {
         TestInstance::new("ContractParamOverrides")
             .value("propertyOverrides", TestValue::Raw(invalid)),
     );
-    let report = fixture::build(
+    let report = fixture::diagnostic(
         generator([overrides, parameters(vec![]), parameters(vec![])]),
         None,
     )?;

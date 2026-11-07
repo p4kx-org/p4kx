@@ -16,6 +16,10 @@ use crate::{ItemClass, MassBasis, Playability, VehicleKind};
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct Item<'a> {
+    /// The original physical Record position within the source Build.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) source_record_index: u32,
     /// The GUID of the Record.
     pub(crate) guid: CatalogGuid,
     /// The Record name without its type, e.g. `POWR_ACAS_S01_Lumen`.
@@ -87,6 +91,10 @@ pub(crate) struct Paint {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct Ship<'a> {
+    /// The original physical Record position within the source Build.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) source_record_index: u32,
     /// The GUID of the Record.
     pub(crate) guid: CatalogGuid,
     /// The Record name without its type, e.g. `AEGS_Avenger_Titan`.

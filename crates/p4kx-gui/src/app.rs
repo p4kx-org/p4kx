@@ -8,13 +8,15 @@ use std::sync::mpsc::{self, Receiver};
 use std::thread;
 
 use model_file::ModelFileDialog;
+use p4kx_export::CatalogPublicationMode;
 use p4kx_settings::{Settings, WindowGeometry};
 
 use crate::ui::Dialog;
 use crate::ui_file_dialog::UiFileDialog;
 use crate::{
-    CATALOG_FILE, CatalogText, CharacterText, ComparisonText, HeadSource, Model, QueryExportFormat,
-    QueryText, Text, ViewerSupport, smoke::Frames, ui, window,
+    CATALOG_FILE, CatalogExportOptions, CatalogText, CharacterText, ComparisonText,
+    DIAGNOSTIC_CATALOG_FILE, HeadSource, Model, QueryExportFormat, QueryText, Text, ViewerSupport,
+    smoke::Frames, ui, window,
 };
 
 /// The eframe application: a [`Model`] drawn by [`ui::show`], with the open dialog and the
@@ -206,6 +208,17 @@ impl App {
                 self.model
                     .start_catalog(path, move || ctx.request_repaint());
             }
+            Some((Dialog::DiagnosticCatalogFile, path)) => {
+                let ctx = ui.ctx().clone();
+                self.model.start_catalog_with_options(
+                    path,
+                    CatalogExportOptions {
+                        publication_mode: CatalogPublicationMode::DiagnosticPartial,
+                        ..CatalogExportOptions::default()
+                    },
+                    move || ctx.request_repaint(),
+                );
+            }
             Some((Dialog::ComparisonArchive(side), path)) => {
                 self.model.comparison_mut().set_archive(side, path);
             }
@@ -302,10 +315,14 @@ fn pick(
             .add_filter(filters.report, &["json"])
             .set_file_name("comparison.json")
             .save_file(),
-        Dialog::CatalogFile => picker
+        Dialog::CatalogFile | Dialog::DiagnosticCatalogFile => picker
             .add_filter(filters.catalog_compressed, &["zst"])
             .add_filter(filters.catalog, &["json"])
-            .set_file_name(CATALOG_FILE)
+            .set_file_name(if dialog == Dialog::DiagnosticCatalogFile {
+                DIAGNOSTIC_CATALOG_FILE
+            } else {
+                CATALOG_FILE
+            })
             .save_file(),
         Dialog::ModelFile | Dialog::AssemblyFile | Dialog::CharacterFile => model_file.save(picker),
         Dialog::AssemblyPackage | Dialog::CharacterPackage => model_file.pick_folder(picker),

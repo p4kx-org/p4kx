@@ -48,11 +48,40 @@ pub(crate) fn build_from(
     Ok((built, json))
 }
 
+/// Builds an intentionally incomplete crafting fixture with explicit diagnostic publication.
+pub(crate) fn diagnostic_from(
+    forge: &DataForgeBuilder,
+    filter: Option<&Filter>,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
+    let built = build_with_mode(
+        forge,
+        filter,
+        None,
+        p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+    )?;
+    let json = serde_json::from_slice(built.json())?;
+    Ok((built, json))
+}
+
 /// Builds the catalog of an Archive holding `forge`, reporting its progress to `progress`.
 pub(crate) fn build_with(
     forge: &DataForgeBuilder,
     filter: Option<&Filter>,
     progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
+) -> Result<BuiltCatalog, Box<dyn Error>> {
+    build_with_mode(
+        forge,
+        filter,
+        progress,
+        p4kx_export::CatalogPublicationMode::Normal,
+    )
+}
+
+fn build_with_mode(
+    forge: &DataForgeBuilder,
+    filter: Option<&Filter>,
+    progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
+    publication_mode: p4kx_export::CatalogPublicationMode,
 ) -> Result<BuiltCatalog, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(
@@ -60,6 +89,7 @@ pub(crate) fn build_with(
         Some(p4kx_testkit::test_key()),
     )?;
     let options = CatalogOptions {
+        publication_mode,
         filter,
         progress,
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))

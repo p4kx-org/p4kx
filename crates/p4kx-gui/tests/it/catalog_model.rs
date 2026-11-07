@@ -15,30 +15,23 @@ use p4kx_gui::{Browser, CATALOG_FILE, CatalogExportStatus, Model};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 #[test]
-fn an_unreadable_record_is_counted_as_a_failure_and_the_catalog_is_written() -> TestResult {
+fn an_unreadable_record_refuses_a_normal_catalog_without_writing() -> TestResult {
     let (_dir, mut model, out) = opened(&cataloging::unreadable())?;
     let file = out.join("basetool-catalog.json");
 
     assert!(model.start_catalog(file.clone(), || {}), "started");
-    let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
-        return Err("no summary".into());
+    let CatalogExportStatus::Incomplete(health) = ended(&mut model)? else {
+        return Err("no incomplete publication refusal".into());
     };
-    let summary = outcome.summary();
-
-    assert!(!summary.is_complete(), "a Record failed");
-    let failures = summary.failures();
-    assert_eq!(failures.len(), 1, "the broken blueprint");
-    assert_eq!(
-        failures.first().map(|failure| failure.guid.to_string()),
-        Some("90000000-0000-4000-8000-000000000009".to_owned()),
-        "its GUID"
+    assert!(!health.is_complete(), "a selected source failed");
+    assert!(
+        health
+            .failed_records
+            .iter()
+            .any(|record| record.guid == "90000000-0000-4000-8000-000000000009"),
+        "the failed source identity is retained"
     );
-    let json: serde_json::Value = serde_json::from_slice(&fs::read(&file)?)?;
-    assert_eq!(
-        json["manufacturers"].as_array().map(Vec::len),
-        Some(1),
-        "the readable manufacturer is written"
-    );
+    assert!(!file.exists(), "normal publication creates no snapshot");
     Ok(())
 }
 
@@ -82,7 +75,11 @@ fn the_catalog_is_written_and_summarised() -> TestResult {
     assert_eq!(german.unresolved, 1, "DRAK has no German name");
     assert_eq!(summary.size_warning(), None, "small");
     let json: serde_json::Value = serde_json::from_slice(&fs::read(&file)?)?;
-    assert_eq!(json["schemaVersion"], 2, "a Basetool catalog");
+    assert_eq!(
+        json["schemaVersion"],
+        p4kx_export::SCHEMA_VERSION,
+        "a Basetool catalog"
+    );
     assert_eq!(
         json["manufacturers"].as_array().map(Vec::len),
         Some(2),

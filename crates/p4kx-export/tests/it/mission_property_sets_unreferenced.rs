@@ -159,7 +159,7 @@ fn unsupported_unreferenced_values_are_diagnosed_instead_of_disappearing() -> Te
             TestInstance::new("MissionPropertyValue_Unknown"),
         )]),
     );
-    let report = fixture::build(owner(handler), None)?;
+    let report = fixture::diagnostic(owner(handler), None)?;
     assert_eq!(
         report.failures.len(),
         1,

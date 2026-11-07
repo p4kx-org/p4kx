@@ -270,6 +270,13 @@ fn export_menu(ui: &mut Ui, model: &Model, requests: &mut Requests) -> Option<Pi
         if ui.add_enabled(model.catalog_available(), catalog).clicked() {
             requests.dialog = Some(Dialog::CatalogFile);
         }
+        let diagnostic = Button::new(entry(&texts.get(CatalogText::DiagnosticAction)));
+        if ui
+            .add_enabled(model.catalog_available(), diagnostic)
+            .clicked()
+        {
+            requests.dialog = Some(Dialog::DiagnosticCatalogFile);
+        }
     });
     label(&response.response, &title);
     picked

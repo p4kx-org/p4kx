@@ -18,16 +18,35 @@ type TestResult = Result<(), Box<dyn Error>>;
 const EXPORTED_AT: Duration = Duration::from_secs(1_792_000_000);
 
 fn catalog() -> Result<(p4kx_export::BuiltCatalog, Value), Box<dyn Error>> {
-    catalog_of(Corrupt::Nothing)
+    catalog_mode(
+        Corrupt::Nothing,
+        p4kx_export::CatalogPublicationMode::Normal,
+    )
 }
 
 fn catalog_of(corrupt: Corrupt) -> Result<(p4kx_export::BuiltCatalog, Value), Box<dyn Error>> {
+    catalog_mode(
+        corrupt,
+        p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+    )
+}
+
+fn catalog_mode(
+    corrupt: Corrupt,
+    publication_mode: p4kx_export::CatalogPublicationMode,
+) -> Result<(p4kx_export::BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(
         write_archive_with(dir.path(), corrupt)?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
+    let built = build_catalog(
+        &archive,
+        &CatalogOptions {
+            publication_mode,
+            ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
+        },
+    )?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }

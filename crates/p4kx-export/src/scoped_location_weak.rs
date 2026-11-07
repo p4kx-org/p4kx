@@ -46,6 +46,7 @@ pub(crate) fn read(
 
 fn reference(reader: &Reader<'_, '_>, target: &Reference<'_>) -> PropertyReference {
     let mut link = empty(PropertyReferenceStatus::OutsideOwner);
+    link.target_record_index = Some(target.record_index());
     link.record_guid = Some(CatalogGuid(target.guid()));
     link.record_path = Some(target.record_path().to_owned());
     link.target_type = Some(target.type_name().to_owned());
@@ -96,6 +97,7 @@ const fn unresolved(
 
 const fn empty(status: PropertyReferenceStatus) -> PropertyReference {
     PropertyReference {
+        target_record_index: None,
         record_guid: None,
         record_path: None,
         target_type: None,

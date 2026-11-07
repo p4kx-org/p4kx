@@ -26,7 +26,9 @@ const CONTRACT_TEMPLATE_EXCLUDED_TOKENS: [&str; 5] =
 pub const SHIP_EXCLUDED_TOKENS: [&str; 3] = ["temp", "display", "hijacked"];
 
 /// A kind of entity in the Basetool catalog.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = crate::closed_set::closed_string_set)]
 #[non_exhaustive]
 pub enum Kind {
     /// Manufacturers: `SCItemManufacturer` Records.
@@ -313,10 +315,10 @@ pub(crate) fn is_leftover(record_path: &str, name: &str) -> bool {
     has_word(record_path, name, &EXCLUDED_TOKENS)
 }
 
-/// Returns whether a Record of `kind` with `record_path` and `name` is a development leftover:
-/// one of [`is_leftover`], or a ship with a [`SHIP_EXCLUDED_TOKENS`] word. A contract template
-/// is a leftover by the words of [`EXCLUDED_TOKENS`] except `template`, which names live ones.
-pub(crate) fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
+/// Returns whether a source Record is excluded by the kind's development-leftover policy.
+/// Contract templates permit `template`; ships also exclude [`SHIP_EXCLUDED_TOKENS`].
+#[must_use]
+pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
     match kind {
         Kind::ContractTemplates => has_word(record_path, name, &CONTRACT_TEMPLATE_EXCLUDED_TOKENS),
         Kind::Ships => {

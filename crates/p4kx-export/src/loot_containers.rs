@@ -6,8 +6,9 @@ use std::collections::HashMap;
 use p4kx_extraction::{Archive, CancelToken};
 use rayon::prelude::*;
 
-use crate::container_read::{MAX_SOC_LEN, read_limited, soc_entries};
+use crate::Kind;
 use crate::contract_loot::{LootContainer, TagCount};
+use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::harvest_locations::Objects;
 use crate::loot_soc::EntityTags;
@@ -21,6 +22,7 @@ type Tags = Result<EntityTags, Unreadable>;
 
 /// The loot containers found and what could not be read or used while looking for them.
 pub(crate) struct Located {
+    pub(crate) ledger: ExportLedger,
     pub(crate) containers: Vec<LootContainer>,
     /// The containers and entity files that cannot be read, ordered by path.
     pub(crate) unreadable: Vec<UnreadableContainer>,
@@ -46,10 +48,16 @@ pub(crate) fn locate(
     let Explored {
         summaries,
         beyond_limit,
+        mut ledger,
     } = explore(archive, &index, opened, cancel);
-    let tags = read_tags(archive, &summaries, cancel);
+    let (tags, observed) = read_tags(archive, &summaries, cancel);
+    ledger.merge(observed);
     let containers = rows(opened, objects, &summaries, &tags);
+    if !cancel.is_some_and(CancelToken::is_cancelled) {
+        ledger.inventory(Kind::LootContainers);
+    }
     Located {
+        ledger,
         containers,
         unreadable: unreadable(archive, &summaries, &tags),
         beyond_limit,
@@ -179,36 +187,25 @@ fn read_tags(
     archive: &Archive,
     summaries: &HashMap<usize, Summary>,
     cancel: Option<&CancelToken>,
-) -> HashMap<usize, Tags> {
+) -> (HashMap<usize, Tags>, ExportLedger) {
     let mut entries: Vec<usize> = summaries
         .values()
         .flat_map(|summary| summary.placed.iter().filter_map(|placed| placed.entry))
         .collect();
     entries.sort_unstable();
     entries.dedup();
-    entries
+    let reads: Vec<_> = entries
         .par_iter()
         .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
-        .map(|&entry| (entry, soc_tags(archive, entry)))
-        .collect()
-}
-
-/// Sums the entities and tags of every `.soc` of the container `entry`; a container without a
-/// `.soc` has none.
-fn soc_tags(archive: &Archive, entry: usize) -> Tags {
-    let socpak = archive
-        .entries()
-        .get(entry)
-        .ok_or(Unreadable::NoSuchEntry)?;
-    let container = archive
-        .open_container(socpak)
-        .map_err(|_| Unreadable::NotAContainer)?;
-    let mut counts = EntityTags::default();
-    for soc in soc_entries(&container) {
-        let bytes = read_limited(&container, soc, MAX_SOC_LEN).ok_or(Unreadable::SocFile)?;
-        counts.add_soc(&bytes)?;
+        .map(|&entry| (entry, crate::loot_soc_source::read(archive, entry, cancel)))
+        .collect();
+    let mut ledger = ExportLedger::default();
+    let mut tags = HashMap::with_capacity(reads.len());
+    for (entry, (counted, observed)) in reads {
+        tags.insert(entry, counted);
+        ledger.merge(observed);
     }
-    Ok(counts)
+    (tags, ledger)
 }
 
 #[cfg(test)]

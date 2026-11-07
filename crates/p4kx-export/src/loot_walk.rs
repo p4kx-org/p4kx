@@ -4,28 +4,21 @@
 //! The walk through the containers that entities of containers place.
 
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 
 use p4kx_extraction::{Archive, CancelToken, Guid};
 use rayon::prelude::*;
 
-use crate::container_read::read_limited;
-use crate::loot_entxml::{self, EntityLink};
+use crate::Kind;
+use crate::entry_source::EntrySource;
+use crate::export_entry_ledger::EntryOperation;
+use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::loot_entxml::EntityLink;
 use crate::loot_unreadable::Unreadable;
-use crate::starmap_index::{Index, key};
+use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
 
 /// The most distinct containers followed from the system containers.
 pub(crate) const MAX_CONTAINERS: usize = 1 << 18;
-
-/// The largest property file of one entity that is read, 1 MiB.
-const MAX_ENTXML_LEN: u64 = 1 << 20;
-
-/// The folder of a container that holds the property file of each entity.
-const ENTITY_FOLDER: &str = "entdata/";
-
-/// The extension of the property file of an entity.
-const ENTITY_EXTENSION: &str = "entxml";
 
 /// An entity of a container that carries a multi config.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,6 +43,7 @@ pub(crate) struct Summary {
 
 /// The containers read, by Archive entry, and how many distinct containers the limit left unread.
 pub(crate) struct Explored {
+    pub(crate) ledger: ExportLedger,
     pub(crate) summaries: HashMap<usize, Summary>,
     pub(crate) beyond_limit: usize,
 }
@@ -72,6 +66,7 @@ fn explore_within(
     cancel: Option<&CancelToken>,
     limit: usize,
 ) -> Explored {
+    let mut ledger = ExportLedger::default();
     let mut summaries: HashMap<usize, Summary> = HashMap::new();
     let mut unread: HashSet<usize> = HashSet::new();
     let mut frontier: Vec<usize> = opened.iter().map(|root| root.entry).collect();
@@ -83,51 +78,66 @@ fn explore_within(
         if frontier.len() > room {
             unread.extend(frontier.split_off(room));
         }
-        let read: Vec<(usize, Summary)> = frontier
+        let read: Vec<_> = frontier
             .par_iter()
             .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
             .map(|&entry| (entry, summarise(archive, index, entry)))
             .collect();
         frontier = read
             .iter()
-            .flat_map(|(_, summary)| summary.nested.iter().copied())
+            .flat_map(|(_, (summary, _))| summary.nested.iter().copied())
             .collect();
-        summaries.extend(read);
+        for (entry, (summary, observed)) in read {
+            summaries.insert(entry, summary);
+            ledger.merge(observed);
+        }
+    }
+    for entry in &unread {
+        if let Some(entry) = archive.entries().get(*entry) {
+            EntrySource::outer(entry)
+                .operation(EntryOperation::Enumeration)
+                .record(
+                    &mut ledger,
+                    Kind::LootContainers,
+                    SourceDisposition::ReadFailed,
+                );
+        }
+    }
+    if !unread.is_empty() {
+        ledger.incomplete_inventory(Kind::LootContainers);
     }
     Explored {
+        ledger,
         summaries,
         beyond_limit: unread.len(),
     }
 }
 
-fn summarise(archive: &Archive, index: &Index<'_>, entry: usize) -> Summary {
-    let mut summary = Summary::default();
-    let Some(socpak) = archive.entries().get(entry) else {
-        summary.unreadable = Some(Unreadable::NoSuchEntry);
-        return summary;
+fn summarise(archive: &Archive, index: &Index<'_>, entry: usize) -> (Summary, ExportLedger) {
+    let read = crate::loot_container_source::read(archive, entry);
+    let mut ledger = read.ledger;
+    let mut summary = Summary {
+        unreadable: read.unreadable,
+        ..Summary::default()
     };
-    let Ok(container) = archive.open_container(socpak) else {
-        summary.unreadable = Some(Unreadable::NotAContainer);
-        return summary;
-    };
-    for inner in container
-        .entries()
-        .iter()
-        .filter(|inner| is_entity_file(inner.path()))
-    {
-        let Some(bytes) = read_limited(&container, inner, MAX_ENTXML_LEN) else {
-            summary.unreadable = Some(Unreadable::EntityFile);
-            continue;
-        };
+    for (path, link) in read.links {
         let EntityLink {
             container: written,
             config,
             several,
-        } = loot_entxml::read(&bytes);
+            malformed_config: _,
+        } = link;
         if several {
-            summary.several.push(inner.path().to_owned());
+            summary.several.push(path);
         }
         let found = written.as_deref().and_then(|path| index.find(path));
+        if let Some(path) = written.as_deref().filter(|_| found.is_none()) {
+            EntrySource::missing(path).record(
+                &mut ledger,
+                Kind::LootContainers,
+                SourceDisposition::ReadFailed,
+            );
+        }
         if let Some(found) = found {
             summary.nested.push(found);
         }
@@ -145,14 +155,7 @@ fn summarise(archive: &Archive, index: &Index<'_>, entry: usize) -> Summary {
     }
     summary.nested.sort_unstable();
     summary.nested.dedup();
-    summary
-}
-
-fn is_entity_file(path: &str) -> bool {
-    key(path).replace('\\', "/").contains(ENTITY_FOLDER)
-        && Path::new(path)
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case(ENTITY_EXTENSION))
+    (summary, ledger)
 }
 
 /// Returns every [`Placed`] in `root` and the containers below it, each container once; a cycle
@@ -182,6 +185,7 @@ pub(crate) fn path_of(archive: &Archive, entry: usize) -> &str {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
     use std::sync::Arc;
 
     use p4kx_testkit::{ArchiveBuilder, TestContainer, TestElement, TestEntry, test_key};

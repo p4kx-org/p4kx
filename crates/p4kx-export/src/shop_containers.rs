@@ -7,7 +7,8 @@ use p4kx_extraction::{Archive, CancelToken, Entry};
 use rayon::prelude::*;
 
 use crate::CatalogError;
-use crate::shop_container_scan::{Shops, shop_entities};
+use crate::export_ledger::ExportLedger;
+use crate::shop_container_scan::{Scanned, shop_entities};
 use crate::shop_prefabs::Prefabs;
 use crate::starmap_index::key;
 
@@ -102,6 +103,7 @@ pub(crate) fn verdict(states: &[Component]) -> Inventory<'_> {
 /// name.
 #[derive(Debug, Default)]
 pub(crate) struct Containers {
+    pub(crate) ledger: ExportLedger,
     by_entity: HashMap<String, Named>,
     pub(crate) listed: usize,
     pub(crate) unreadable: usize,
@@ -122,11 +124,11 @@ impl Containers {
         cancel: Option<&CancelToken>,
     ) -> Result<Self, CatalogError> {
         let listed = listed(archive);
-        let read: Vec<Option<(Shops, usize)>> = listed
+        let read: Vec<Scanned> = listed
             .par_iter()
             .map(|(entry, _)| {
                 if cancel.is_some_and(CancelToken::is_cancelled) {
-                    return None;
+                    return Scanned::default();
                 }
                 shop_entities(archive, entry)
             })
@@ -141,7 +143,8 @@ impl Containers {
             } else {
                 containers.other_scanned += 1;
             }
-            let Some((entities, rejected)) = entities else {
+            containers.ledger.merge(entities.ledger);
+            let Some((entities, rejected)) = entities.entities else {
                 if class.is_some() {
                     containers.unreadable += 1;
                 } else {

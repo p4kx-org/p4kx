@@ -23,7 +23,10 @@ use egui::Rect;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
-use p4kx_gui::{CatalogExportStage, CatalogExportStatus, Language, Model, ui};
+use p4kx_export::CatalogPublicationMode;
+use p4kx_gui::{
+    CatalogExportOptions, CatalogExportStage, CatalogExportStatus, Language, Model, ui,
+};
 
 const SIZES: [[f32; 2]; 2] = [[1280.0, 800.0], [640.0, 400.0]];
 const LANGUAGES: [(Language, &str); 2] =
@@ -169,7 +172,14 @@ fn the_warnings_of_the_game_data_are_drawn_at_both_sizes_in_both_languages() -> 
         for size in SIZES {
             let (_dir, mut model, out) = opened(&cataloging::ambiguous())?;
             model.set_language(language);
-            model.start_catalog(out.join("basetool-catalog.json.zst"), || {});
+            model.start_catalog_with_options(
+                out.join("basetool-catalog.diagnostic.json.zst"),
+                CatalogExportOptions {
+                    publication_mode: CatalogPublicationMode::DiagnosticPartial,
+                    ..CatalogExportOptions::default()
+                },
+                || {},
+            );
             let Some(mut harness) = window(model, size) else {
                 return Ok(());
             };
@@ -188,6 +198,36 @@ fn the_warnings_of_the_game_data_are_drawn_at_both_sizes_in_both_languages() -> 
             };
             harness.get_by_label_contains(sentence);
             shoot(&mut harness, ("warnings", tag, size), close)?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn normal_incomplete_publication_is_drawn_as_a_refusal_in_both_languages() -> TestResult {
+    for (language, tag) in LANGUAGES {
+        for size in SIZES {
+            let (_dir, mut model, out) = opened(&cataloging::unreadable())?;
+            model.set_language(language);
+            model.start_catalog(out.join("catalog.json"), || {});
+            let Some(mut harness) = window(model, size) else {
+                return Ok(());
+            };
+            wait_for(&mut harness, "the catalog refusal", |harness| {
+                harness
+                    .state()
+                    .catalog()
+                    .is_some_and(|run| !run.is_running())
+            })?;
+            harness.run_steps(3);
+
+            let (sentence, close) = if tag == "en" {
+                ("No file was created or replaced.", "Close")
+            } else {
+                ("Es wurde keine Datei erstellt oder ersetzt.", "Schließen")
+            };
+            harness.get_by_label_contains(sentence);
+            shoot(&mut harness, ("incomplete-refusal", tag, size), close)?;
         }
     }
     Ok(())

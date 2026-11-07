@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Record, RecordTree, TreeBuilder, Value};
+use p4kx_extraction::{CancelToken, Record, RecordTree, TreeBuilder, Value};
 use rayon::prelude::*;
 
-use crate::CatalogFailure;
 use crate::crafting_warning::CraftingWarning;
+use crate::export_ledger::ExportLedger;
 use crate::record_fields::{elements, locale_key, structure};
+use crate::{CatalogError, CatalogFailure, Kind};
 
 const RADAR_GLOBAL_PARAMS: &str = "RadarSystemGlobalParams";
 const SCAN_SIGNATURE_KEY: &str = "@hud_scanning_info_rs_signature";
@@ -44,6 +45,13 @@ impl SlotProblem {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SignatureSlot(Option<(usize, usize)>);
 
+type CatalogSlotRead = (
+    SignatureSlot,
+    Vec<CatalogFailure>,
+    Option<SlotProblem>,
+    ExportLedger,
+);
+
 impl SignatureSlot {
     /// Returns the slot of an Archive that names none.
     pub(crate) const fn unknown() -> Self {
@@ -56,29 +64,39 @@ impl SignatureSlot {
         Self(Some((index, types)))
     }
 
-    /// Reads the slot from the `RadarSystemGlobalParams` Record among `records`.
-    ///
-    /// Returns the failures of Records that cannot be read, and the problem when the slot is
-    /// unknown although every Record could be read.
-    pub(crate) fn read(records: &[Record<'_>]) -> (Self, Vec<CatalogFailure>, Option<SlotProblem>) {
-        let found: Vec<Result<Result<Self, SlotProblem>, CatalogFailure>> = records
+    /// Reads scan-signature dependencies and retains their canonical field inspections.
+    pub(crate) fn read_catalog(
+        records: &[Record<'_>],
+        cancel: Option<&CancelToken>,
+    ) -> Result<CatalogSlotRead, CatalogError> {
+        let found = records
             .par_iter()
             .map_init(TreeBuilder::new, |trees, record| {
-                if record.type_name().ok()? != RADAR_GLOBAL_PARAMS {
-                    return None;
+                if cancel.is_some_and(CancelToken::is_cancelled) {
+                    return Err(CatalogError::Cancelled);
                 }
-                Some(
-                    trees
-                        .build(record)
-                        .map(|tree| Self::of_tree(&tree))
-                        .map_err(|source| CatalogFailure::of(record, &source)),
-                )
+                if record.type_name().ok() != Some(RADAR_GLOBAL_PARAMS) {
+                    return Ok(None);
+                }
+                let read = crate::export_dependency_read::read(
+                    trees,
+                    record,
+                    Kind::MineableEntities,
+                    cancel,
+                )?;
+                let outcome = read
+                    .tree
+                    .map(|tree| Self::of_tree(&tree))
+                    .map_err(|error| CatalogFailure::of(record, &error));
+                Ok(Some((outcome, read.ledger)))
             })
-            .flatten()
-            .collect();
+            .filter_map(Result::transpose)
+            .collect::<Result<Vec<_>, CatalogError>>()?;
         let mut failures = Vec::new();
         let mut slots = Vec::new();
-        for result in found {
+        let mut ledger = ExportLedger::default();
+        for (result, observed) in found {
+            ledger.merge(observed);
             match result {
                 Ok(slot) => slots.push(slot),
                 Err(failure) => failures.push(failure),
@@ -86,13 +104,13 @@ impl SignatureSlot {
         }
         let outcome = match slots.as_slice() {
             [] if failures.is_empty() => Err(SlotProblem::NoRecord),
-            [] => return (Self::unknown(), failures, None),
+            [] => return Ok((Self::unknown(), failures, None, ledger)),
             [only] => *only,
             _ => Err(SlotProblem::Ambiguous),
         };
         match outcome {
-            Ok(slot) => (slot, failures, None),
-            Err(problem) => (Self::unknown(), failures, Some(problem)),
+            Ok(slot) => Ok((slot, failures, None, ledger)),
+            Err(problem) => Ok((Self::unknown(), failures, Some(problem), ledger)),
         }
     }
 
@@ -170,3 +188,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "scan_signature_health_tests.rs"]
+mod health_tests;

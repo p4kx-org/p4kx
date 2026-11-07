@@ -461,6 +461,13 @@ record-export-failed = Der Record-Export nach { $path } ist fehlgeschlagen: { $r
 record-export-stopped = Der Record-Export nach { $path } brach ohne Ergebnis ab.
 
 catalog-action = Basetool-Katalog …
+catalog-diagnostic-action = Basetool-Diagnosekatalog …
+catalog-diagnostic-running-title = Erstelle Basetool-Diagnosekatalog
+catalog-diagnostic-summary-title = Basetool-Diagnosekatalog geschrieben
+catalog-diagnostic-notice = Diagnosekatalog. Prüfe den gemeldeten Exportzustand, bevor fehlende Daten als Löschungen gewertet werden.
+catalog-incomplete = Einige ausgewählte Daten konnten nicht gelesen oder übernommen werden. Es wurde keine Datei erstellt oder ersetzt. Nutze einen Diagnosekatalog, um das Teilergebnis zu untersuchen.
+catalog-health-complete = Exportzustand: Alle ausgewählten Quellen wurden erfolgreich gelesen und übernommen.
+catalog-health-incomplete = Exportzustand: unvollständig. Einige ausgewählte Quellen konnten nicht gelesen oder übernommen werden.
 catalog-file-filter = Basetool-Katalog (JSON)
 catalog-file-filter-compressed = Basetool-Katalog (JSON, zstd-komprimiert)
 catalog-running-title = Erstelle Basetool-Katalog
@@ -484,7 +491,7 @@ catalog-warning = { $kind ->
 catalog-warning-more = und { $number } weitere
 catalog-writing = Schreibe { $path } …
 catalog-summary-title = Basetool-Katalog erstellt
-catalog-kinds-heading = Arten
+catalog-kinds-heading = Arten (Auswahlumfang)
 catalog-summary-kind = { $kind ->
     [manufacturers] Hersteller
     [items] Items

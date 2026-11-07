@@ -10,6 +10,15 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CatalogError {
+    /// Production accounting could not establish a reliable export-health contract.
+    #[error(transparent)]
+    Accounting(#[from] crate::ExportAccountingError),
+    /// Normal publication was refused before any output was created.
+    #[error("catalog export is incomplete; explicit diagnostic partial export is required")]
+    IncompleteExport {
+        /// The machine-readable source and projection health that prevented publication.
+        health: Box<crate::ExportHealth>,
+    },
     /// The DataForge Entry cannot be found or read.
     #[error(transparent)]
     Load(DataForgeLoadError),

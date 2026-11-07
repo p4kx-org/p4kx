@@ -12,6 +12,8 @@ use crate::guid_text::CatalogGuid;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct DefinitionReference {
+    /// The resolved target position in this Build, null when no physical target is known.
+    pub(crate) target_record_index: Option<u32>,
     /// The target GUID, retained when its Record is missing.
     pub(crate) guid: CatalogGuid,
     /// The target Record path when its source identity is available.
@@ -38,6 +40,8 @@ pub(crate) enum DefinitionStatus {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct PropertyReference {
+    /// The resolved target position in this Build, null when no physical target is known.
+    pub(crate) target_record_index: Option<u32>,
     /// The target Record GUID when known.
     pub(crate) record_guid: Option<CatalogGuid>,
     /// The target Record path when known.

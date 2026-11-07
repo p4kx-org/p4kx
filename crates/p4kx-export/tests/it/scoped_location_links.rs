@@ -38,18 +38,20 @@ fn weak_array_property() -> TestValue {
 #[test]
 fn weak_arrays_keep_nulls_repetitions_owner_paths_and_unresolved_source_coordinates() -> TestResult
 {
-    let report = scoped_fixture::build(vec![weak_array_property()])?;
+    let report = scoped_fixture::diagnostic(vec![weak_array_property()])?;
     assert!(report.failures.is_empty(), "{:?}", report.failures);
-    for (kind, guid, location) in [
+    for (kind, guid, location, record_index) in [
         (
             "contractTemplates",
             "11000000-0000-4000-8000-000000000001",
             "contractProperties[0]",
+            1_u32,
         ),
         (
             "missionBrokerEntries",
             "22000000-0000-4000-8000-000000000001",
             "properties[0]",
+            2_u32,
         ),
     ] {
         let filter = &value(&report.document, kind, "Scoped_BP")?["otherLocationFilter"];
@@ -57,6 +59,10 @@ fn weak_arrays_keep_nulls_repetitions_owner_paths_and_unresolved_source_coordina
         let links = filter["locations"].as_array().ok_or("locations")?;
         assert_eq!(links.len(), 6);
         assert_eq!(links[0]["recordGuid"], guid);
+        assert_eq!(
+            links[0]["targetRecordIndex"], record_index,
+            "weak links identify the physical owning source"
+        );
         assert_eq!(links[0]["location"], location);
         assert_eq!(links[0]["targetType"], "MissionProperty");
         assert_eq!(links[0]["status"], "resolved");
@@ -68,12 +74,21 @@ fn weak_arrays_keep_nulls_repetitions_owner_paths_and_unresolved_source_coordina
         assert!(links[3]["sourcePointer"]["structIndex"].is_u64());
         assert!(links[3]["sourcePointer"]["instanceIndex"].is_u64());
         assert_eq!(links[3]["recordGuid"], Value::Null);
+        assert_eq!(
+            links[3]["targetRecordIndex"],
+            Value::Null,
+            "unresolved instance coordinates do not fabricate a Record index"
+        );
         assert_eq!(links[4]["status"], "outsideOwner");
         assert_eq!(
             links[4]["recordGuid"],
             "33000000-0000-4000-8000-000000000001"
         );
         assert_eq!(links[4]["variable"], Value::Null);
+        assert_eq!(
+            links[4]["targetRecordIndex"], 0,
+            "the known outside-owner target retains its actual index"
+        );
         assert_eq!(links[5]["status"], "missingTarget");
         assert_eq!(links[5]["sourcePointer"]["structIndex"], u32::MAX - 1);
         assert_eq!(links[5]["sourcePointer"]["instanceIndex"], 7_u32);
@@ -130,7 +145,7 @@ fn a_non_property_owned_target_keeps_its_identity_without_a_fabricated_variable(
 
 #[test]
 fn an_unreadable_target_variable_is_distinct_from_a_missing_or_null_link() -> TestResult {
-    let report = scoped_fixture::build_with_origin(
+    let report = scoped_fixture::diagnostic_with_origin(
         vec![property(
             "Scoped_BP",
             scoped([(
@@ -184,9 +199,18 @@ fn a_dangling_definition_guid_is_not_dropped_or_resolved_by_name() -> TestResult
             "44000000-0000-4000-8000-0000000000ff"
         );
         assert_eq!(references[0]["status"], "dangling");
+        assert_eq!(
+            references[0]["targetRecordIndex"],
+            Value::Null,
+            "a dangling GUID has no physical source position"
+        );
         assert_eq!(references[0]["recordPath"], Value::Null);
         assert_eq!(references[1], Value::Null);
         assert_eq!(references[2]["status"], "present");
+        assert_eq!(
+            references[2]["targetRecordIndex"], 4,
+            "the actual definition source position is preserved"
+        );
     }
     Ok(())
 }

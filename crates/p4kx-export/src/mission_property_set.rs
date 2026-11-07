@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeMap;
+#[path = "mission_property_set_rows/mod.rs"]
+mod rows;
 
-use p4kx_extraction::Guid;
+pub(crate) use rows::{MissionPropertySets, SetOwner};
+
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::contract::every_field_required;
-use crate::guid_text::{CatalogGuid, sort_by_guid};
+use crate::guid_text::CatalogGuid;
 use crate::template_property::PropertyValue;
 
 /// The authored source level of a Generator property array.
@@ -58,32 +60,4 @@ pub(crate) struct MissionPropertySet<'f> {
     pub(crate) level: MissionPropertyLevel,
     /// Declarations in source order, retaining null pointer elements.
     pub(crate) properties: Vec<Option<MissionPropertyDeclaration<'f>>>,
-}
-
-/// Distinct source sets emitted by the selected Generator Records.
-#[derive(Debug, Default)]
-pub(crate) struct MissionPropertySets<'f>(BTreeMap<Guid, MissionPropertySet<'f>>);
-
-impl<'f> MissionPropertySets<'f> {
-    /// Returns whether this authored source identity is registered.
-    pub(crate) fn contains(&self, guid: CatalogGuid) -> bool {
-        self.0.contains_key(&guid.0)
-    }
-
-    /// Registers the parsed declaration once for its source identity.
-    pub(crate) fn insert(&mut self, set: MissionPropertySet<'f>) {
-        self.0.entry(set.guid.0).or_insert(set);
-    }
-
-    /// Combines disjoint owning Records and shared references to their source sets.
-    pub(crate) fn merge(&mut self, other: Self) {
-        self.0.extend(other.0);
-    }
-
-    /// Returns the canonical set rows in GUID text order.
-    pub(crate) fn into_rows(self) -> Vec<MissionPropertySet<'f>> {
-        let mut rows: Vec<_> = self.0.into_values().collect();
-        sort_by_guid(&mut rows, |set| set.guid);
-        rows
-    }
 }

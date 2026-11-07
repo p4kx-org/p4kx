@@ -10,7 +10,7 @@ use super::Model;
 use crate::catalog_export::{is_gzip, normalised_catalog_file, refused, refused_gzip, start};
 #[cfg(feature = "test-hooks")]
 use crate::hold::Pause;
-use crate::{CatalogExport, RecordTreeStatus};
+use crate::{CatalogExport, CatalogExportOptions, RecordTreeStatus};
 
 /// The Basetool catalog of the window: the running or finished catalog.
 #[derive(Debug, Default)]
@@ -35,17 +35,20 @@ impl Model {
                 .is_some_and(CatalogExport::is_running)
     }
 
-    /// Starts creating the Basetool catalog of the open Archive into `file` on a background
-    /// thread, calling `wake` from it once it ended; returns whether it started.
-    ///
-    /// Nothing starts while no catalog is available or once the Archive changed on disk. A
-    /// finished catalog is dismissed. When `file` is the open Archive nothing starts either, and
-    /// the catalog shows [`CatalogExportStatus::IsArchive`](crate::CatalogExportStatus::IsArchive),
-    /// and when it ends in `.gz` the catalog shows
-    /// [`CatalogExportStatus::GzipNotSupported`](crate::CatalogExportStatus::GzipNotSupported).
-    /// The file name is normalised first: `foo.zst` becomes `foo.json.zst` and a doubled `.json`
-    /// is collapsed, whatever the save dialog appended.
+    /// Starts a normal catalog job for the open Archive and calls `wake` when it ends.
+    /// Normalizes the filename and refuses invalid targets or incomplete publication.
     pub fn start_catalog(&mut self, file: PathBuf, wake: impl Fn() + Send + 'static) -> bool {
+        self.start_catalog_with_options(file, CatalogExportOptions::default(), wake)
+    }
+
+    /// Starts a catalog job with explicit source selection and publication policy.
+    /// Refusals write nothing; diagnostic permission applies only to this job.
+    pub fn start_catalog_with_options(
+        &mut self,
+        file: PathBuf,
+        options: CatalogExportOptions,
+        wake: impl Fn() + Send + 'static,
+    ) -> bool {
         if self.check_archive() || !self.catalog_available() {
             return false;
         }
@@ -54,11 +57,11 @@ impl Model {
         };
         let file = normalised_catalog_file(file);
         if is_gzip(&file) {
-            self.catalog.run = Some(refused_gzip(file));
+            self.catalog.run = Some(refused_gzip(file, options.publication_mode));
             return false;
         }
         if is_same_file(&file, browser.archive_index().path()) {
-            self.catalog.run = Some(refused(file));
+            self.catalog.run = Some(refused(file, options.publication_mode));
             return false;
         }
         let index = Arc::clone(browser.shared_index());
@@ -66,6 +69,7 @@ impl Model {
         let run = start(
             &index,
             file,
+            options,
             wake,
             self.catalog
                 .gate
@@ -73,7 +77,7 @@ impl Model {
                 .map_or_else(Pause::default, Pause::at),
         );
         #[cfg(not(feature = "test-hooks"))]
-        let run = start(&index, file, wake);
+        let run = start(&index, file, options, wake);
         self.catalog.run = Some(run);
         true
     }

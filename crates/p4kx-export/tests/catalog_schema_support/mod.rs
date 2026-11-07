@@ -11,6 +11,7 @@ mod contract_properties;
 mod contracts;
 mod crafters;
 mod harvest;
+mod health;
 mod loadouts;
 mod loot;
 mod mission_sets;
@@ -23,7 +24,7 @@ mod spawns;
 use recovery::item_recovery;
 
 pub(crate) fn minimal_catalog() -> serde_json::Value {
-    json!({
+    let mut catalog = json!({
         "schemaVersion": p4kx_export::SCHEMA_VERSION,
         "source": {
             "channel": null,
@@ -318,5 +319,11 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
         "cargoManifests": contracts::manifests(),
         "shipStoreSlugs": slugs::ship_store_slugs(),
         "itemRecovery": item_recovery()
-    })
+    });
+    let export_health = health::fixture(&catalog);
+    let serde_json::Value::Object(fields) = &mut catalog else {
+        unreachable!("the authored catalog fixture is a JSON object");
+    };
+    fields.insert("exportHealth".to_owned(), export_health);
+    catalog
 }

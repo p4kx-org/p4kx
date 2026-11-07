@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Guid, RecordTree, Reference, StructValue, TagTree, Value};
+use p4kx_extraction::{RecordTree, Reference, StructValue, TagTree, Value};
 
 use crate::blueprint::as_struct;
 use crate::entity_spawn_model::EntitySpawnPool;
@@ -41,7 +41,7 @@ pub(crate) enum Spawn<'f> {
 pub(crate) struct Reader<'x, 'f> {
     tags: &'x TagTree,
     root: &'x StructValue<'f>,
-    owner: Option<Guid>,
+    owner: Option<u32>,
 }
 
 impl<'x, 'f> Reader<'x, 'f> {
@@ -59,13 +59,14 @@ impl<'x, 'f> Reader<'x, 'f> {
         Self {
             tags,
             root: tree.root(),
-            owner: Some(tree.guid()),
+            owner: Some(tree.record_index()),
         }
     }
 
     /// Returns whether a weak reference names the original owning Record.
     pub(crate) fn owns(&self, target: &Reference<'_>) -> bool {
-        self.owner.is_some_and(|owner| owner == target.guid())
+        self.owner
+            .is_some_and(|owner| owner == target.record_index())
     }
 
     /// Returns a weak target only within the original owning Record.
@@ -381,3 +382,7 @@ impl Cursor<'_, '_> {
         Some(at)
     }
 }
+
+#[cfg(test)]
+#[path = "spawn_owner_tests.rs"]
+mod owner_tests;

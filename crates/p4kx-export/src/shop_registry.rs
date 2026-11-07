@@ -1,8 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_assembly::{ArchiveFiles, LoadoutFileError, LoadoutFiles};
+use p4kx_extraction::Archive;
 use p4kx_extraction::cryxml::{self, Xml};
 
+use crate::Kind;
+use crate::entry_source::EntrySource;
+use crate::export_diagnostic::ExportDiagnosticCode;
+use crate::export_entry_ledger::EntryOperation;
+use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::shop_entry_read;
+use crate::shop_summary::ShopSummary;
+use crate::shops::REGISTRY;
 use crate::starmap_xml::{Node, attribute};
 
 /// One `ShopBackup` entry of the shop registry, as it is stored.
@@ -13,6 +23,13 @@ pub(crate) struct RegistryShop {
     pub(crate) super_name: String,
     pub(crate) default_value: String,
     pub(crate) shop_name: String,
+}
+
+/// Whether the consuming catalog requires a registry to describe its starmap.
+#[derive(Clone, Copy)]
+pub(crate) enum RegistryNeed {
+    Optional,
+    Required,
 }
 
 /// Reads the `ShopBackup` entries of the registry `bytes`, text XML or `CryXml`, in document order;
@@ -29,6 +46,84 @@ pub(crate) fn read(bytes: &[u8]) -> Option<Vec<RegistryShop>> {
             Some(collect(document.root_element()))
         }
     }
+}
+
+/// Reads the registry once and retains its Entry identity until row projection finishes.
+pub(crate) fn read_source(
+    archive: &Archive,
+    files: &ArchiveFiles<'_>,
+    need: RegistryNeed,
+    summary: &mut ShopSummary,
+    ledger: &mut ExportLedger,
+) -> Option<(Vec<RegistryShop>, EntrySource)> {
+    let wanted = crate::starmap_index::key(REGISTRY);
+    let source = archive
+        .entries()
+        .iter()
+        .rev()
+        .find(|entry| crate::starmap_index::key(entry.path()) == wanted)
+        .map_or_else(|| EntrySource::missing(REGISTRY), EntrySource::outer)
+        .operation(EntryOperation::ShopRegistry);
+    match files.read(REGISTRY) {
+        Ok(bytes) => {
+            if let Some(parsed) = read(&bytes) {
+                Some((parsed, source))
+            } else {
+                summary.registry_unreadable = true;
+                ledger.incomplete_inventory(Kind::Shops);
+                source.diagnosed(
+                    ledger,
+                    Kind::Shops,
+                    SourceDisposition::ProjectionFailed,
+                    shop_entry_read::diagnosis(ExportDiagnosticCode::MalformedSource, "ShopBackup"),
+                );
+                None
+            }
+        }
+        Err(LoadoutFileError::NotFound) => {
+            summary.registry_missing = true;
+            missing(source, need, ledger);
+            None
+        }
+        Err(error) => {
+            summary.registry_unreadable = true;
+            ledger.incomplete_inventory(Kind::Shops);
+            let code = if matches!(error, LoadoutFileError::TooLarge { .. }) {
+                ExportDiagnosticCode::FieldWalkLimit
+            } else {
+                ExportDiagnosticCode::SourceReadFailure
+            };
+            source.diagnosed(
+                ledger,
+                Kind::Shops,
+                SourceDisposition::ReadFailed,
+                shop_entry_read::diagnosis(code, "ShopBackup"),
+            );
+            None
+        }
+    }
+}
+
+fn missing(source: EntrySource, need: RegistryNeed, ledger: &mut ExportLedger) {
+    if matches!(need, RegistryNeed::Required) {
+        ledger.incomplete_inventory(Kind::Shops);
+    }
+    let (disposition, code) = match need {
+        RegistryNeed::Required => (
+            SourceDisposition::ReadFailed,
+            ExportDiagnosticCode::DanglingReference,
+        ),
+        RegistryNeed::Optional => (
+            SourceDisposition::SkippedBeforeRead,
+            ExportDiagnosticCode::OptionalAbsent,
+        ),
+    };
+    source.diagnosed(
+        ledger,
+        Kind::Shops,
+        disposition,
+        shop_entry_read::diagnosis(code, "ShopBackup"),
+    );
 }
 
 fn named<'d, N: Node<'d>>(node: N, name: &'static str) -> impl Iterator<Item = N> {

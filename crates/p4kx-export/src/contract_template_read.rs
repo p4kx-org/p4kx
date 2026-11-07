@@ -65,13 +65,14 @@ pub(crate) fn read<'f>(
         tags,
         unknowns: &unknowns,
     };
-    let read = read_kind(
+    let mut read = read_kind(
         forge,
         Kind::ContractTemplates,
         (filter, cancel),
         |tree| template(&sources, tree),
         |(template, _)| template.guid,
     )?;
+    crate::mission_pool_ledger::templates(&mut read.ledger);
     let mut pools = SpawnPools::default();
     let items = read
         .items
@@ -86,6 +87,7 @@ pub(crate) fn read<'f>(
             items,
             skipped: read.skipped,
             failures: read.failures,
+            ledger: read.ledger,
         },
         pools,
         unknowns,

@@ -21,9 +21,7 @@ use crate::mining::{mineable_composition, mineable_element, refining_process};
 use crate::mining_params::mining_global_params;
 use crate::mission_kinds::MissionPick;
 use crate::paint_port::VehicleFacts;
-use crate::playability_rules::Evidence;
 use crate::resource_group::{Groups, resource_group};
-use crate::ship::ship;
 use crate::ship_base::ShipRead;
 use crate::texts::Texts;
 use crate::{CatalogFailure, Kind};
@@ -81,18 +79,13 @@ pub(crate) enum Picked<'f> {
 impl<'f> Picked<'f> {
     /// Returns the entity of `kind` the Record tree `tree` describes, its texts resolved by
     /// `texts`; a commodity may take texts from its `ResourceType` Record `resource_type` and its
-    /// type from `groups`, a ship its playability from `evidence`. A ship's base data is read by
-    /// `ship_base`, called for a ship only; a ship it cannot read becomes a
-    /// [`Failed`](Self::Failed), never a missing Record. `None` for a kind that
-    /// [`read_crafting`](crate::read_crafting) fills.
+    /// type from `groups`. `None` for a kind whose dedicated reader supplies its rows.
     pub(crate) fn entity(
         kind: Kind,
         tree: &RecordTree<'f>,
         texts: &Texts<'f>,
         resource_type: Option<&RecordTree<'f>>,
         groups: &Groups,
-        evidence: &Evidence,
-        ship_base: &dyn Fn() -> Result<ShipRead, CatalogFailure>,
     ) -> Option<Self> {
         Some(match kind {
             Kind::Manufacturers => Self::Manufacturer(manufacturer(tree, texts)),
@@ -100,7 +93,6 @@ impl<'f> Picked<'f> {
                 let (item, line) = item(tree, texts);
                 Self::Item(item, line, carries_ports(tree))
             }
-            Kind::Ships => Self::of_ship(ship_base(), |read| ship(tree, texts, evidence, read)),
             Kind::Commodities => Self::Commodity(commodity(tree, texts, resource_type, groups)),
             Kind::Crafters => return crafter(tree).map(Self::Crafter),
             Kind::ResourceGroups => Self::ResourceGroup(resource_group(tree, texts, groups)),
@@ -126,7 +118,8 @@ impl<'f> Picked<'f> {
             | Kind::LegacyLootArchetypes => {
                 return LootPick::entity(kind, tree).map(Self::Loot);
             }
-            Kind::Blueprints
+            Kind::Ships
+            | Kind::Blueprints
             | Kind::GameplayProperties
             | Kind::QualityDistributions
             | Kind::QualityQuantizations

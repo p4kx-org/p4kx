@@ -13,7 +13,9 @@ use crate::harvest_fixture::{
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, Filter, Kind, build_catalog};
+use p4kx_export::{
+    BuiltCatalog, CatalogOptions, CatalogPublicationMode, Filter, Kind, build_catalog,
+};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
@@ -24,6 +26,7 @@ fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error
     let archive =
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
     let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
     let built = build_catalog(&archive, &options)?;
     let json = serde_json::from_slice(built.json())?;
@@ -119,10 +122,11 @@ fn a_record_without_the_mass_multiplier_leaves_it_null() -> TestResult {
         write_archive_without_mass_multiplier(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(
-        &archive,
-        &CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000)),
-    )?;
+    let options = CatalogOptions {
+        publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
+    };
+    let built = build_catalog(&archive, &options)?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let params = entry(&catalog, "miningGlobalParams", PARAMS)?;
     assert_eq!(params["compositionMassMultiplier"], Value::Null);

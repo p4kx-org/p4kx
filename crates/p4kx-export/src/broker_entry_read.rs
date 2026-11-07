@@ -67,13 +67,14 @@ pub(crate) fn read<'f>(
         index,
         unknowns,
     };
-    let read = read_kind(
+    let mut read = read_kind(
         forge,
         Kind::MissionBrokerEntries,
         (filter, cancel),
         |tree| entry(&sources, tree),
         |(entry, _)| entry.guid,
     )?;
+    crate::mission_pool_ledger::broker(&mut read.ledger);
     let mut pools = SpawnPools::default();
     let items = read
         .items
@@ -88,6 +89,7 @@ pub(crate) fn read<'f>(
             items,
             skipped: read.skipped,
             failures: read.failures,
+            ledger: read.ledger,
         },
         pools,
     })

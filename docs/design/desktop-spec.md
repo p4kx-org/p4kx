@@ -280,14 +280,20 @@ nach 64 MiB an einer Zeilengrenze gekürzt und trägt dann den Kürzungshinweis 
 wie der Tab „Text". Schlägt die Umwandlung fehl, steht der Grund in `color-danger-text` im Tab;
 „Text" und „Hex" zeigen die Daten weiter. „Kopieren" kopiert im Tab „XML" das umgewandelte XML.
 
-**D.20 Basetool-Katalog im Export-Menü ohne eigenen Dialog.** „Basetool-Katalog …" steht im
-Menü „Export" unter „Record-Export …" und ist gesperrt, solange das Archiv kein DataForge hat oder
-DataForge nicht geladen werden konnte, und während ein Katalog erstellt wird. Es gibt nichts zu
-entscheiden außer der Zieldatei, deshalb öffnet der Eintrag direkt den Speichern-Dialog des
-Systems mit `basetool-catalog.json` (D.3); erst die gewählte Datei startet den Katalog. Fortschritt
-und Ergebnis sind wie beim Record-Export nicht modal mit je genau einer Aktion im Fuß (D.7, D.17):
+**D.20 Basetool-Katalog im Export-Menü ohne eigenen Dialog.** „Basetool-Katalog …" und
+„Basetool-Diagnosekatalog …" stehen im Menü „Export" unter „Record-Export …". Beide sind gesperrt,
+solange das Archiv kein DataForge hat oder DataForge nicht geladen werden konnte, und während ein
+Katalog erstellt wird. Jeder Eintrag öffnet direkt den Speichern-Dialog des Systems (D.3), mit
+`basetool-catalog.json.zst` bzw. `basetool-catalog.diagnostic.json.zst`; erst die gewählte Datei
+startet den Katalog. Die Diagnosefreigabe gilt nur für diesen Auftrag und wird nicht gespeichert.
+Normale Exporte verweigern bei unvollständigen Quellen oder Projektionen das Erstellen oder Ersetzen
+der Datei; das Gefahrenfenster erläutert die separate Diagnoseaktion. Fortschritts- und Ergebnistitel
+benennen einen Diagnosekatalog ausdrücklich. Dessen Ergebnis zeigt zusätzlich einen Hinweis in
+`color-warning`. Fortschritt und Ergebnis sind wie beim Record-Export nicht modal mit je genau einer Aktion im Fuß (D.7, D.17):
 Spinner beim Lesen von DataForge und beim Schreiben, dazwischen der Balken mit geprüften Records.
-Die Zusammenfassung gliedert sich mit Gruppenlabels in „Arten" (je Art geschrieben, übersprungen,
+Die Zusammenfassung beginnt mit dem Exportzustand: vollständige Quellen und Projektionen in
+`color-gray-1`, unvollständige in `color-warning`. Sie gliedert sich mit Gruppenlabels in
+„Arten (Auswahlumfang)" (je Art geschrieben, übersprungen,
 vollständig oder teilweise, darunter die übersprungenen Entwicklungsreste) und „Texte" (je Sprache
 aufgelöst, fehlend, Platzhalter, darunter die fehlenden Texte), dann Größe mit Upload-Limit und
 Datei, alles in `color-gray-1`. Größe und Limit stehen in Dezimaleinheiten, das Limit wie in der

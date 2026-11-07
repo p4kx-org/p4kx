@@ -2,14 +2,17 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    DataForge, DataForgeError, Filter, Record, RecordTree, StructValue, TreeBuilder, Value,
+    CancelToken, DataForge, DataForgeError, Filter, Record, RecordTree, StructValue, TreeBuilder,
+    Value,
 };
 
-use crate::CatalogFailure;
 use crate::contract_recovery::{EscalatingClaims, ItemRecovery, RecoveryOverride};
+use crate::export_diagnostic::ExportSourceRole;
+use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
 use crate::guid_text::CatalogGuid;
 use crate::record_fields::{class_name, elements, integer, number, record_reference, structure};
 use crate::selection::KindRule;
+use crate::{CatalogError, CatalogFailure};
 
 /// Selects the Records that hold the item recovery rules.
 const RECOVERY: KindRule = KindRule {
@@ -19,6 +22,7 @@ const RECOVERY: KindRule = KindRule {
 
 /// The item recovery rules of a DataForge and the Records that could not be read.
 pub(crate) struct Recovery<'f> {
+    pub(crate) ledger: ExportLedger,
     /// The rules of the Record with the smallest record path that can be read, `None` when there
     /// is none.
     pub(crate) rules: Option<ItemRecovery<'f>>,
@@ -28,34 +32,87 @@ pub(crate) struct Recovery<'f> {
 
 /// Reads the item recovery rules of `forge` from the `ItemRecoveryConfigurationParams` Records
 /// that `filter` matches.
-pub(crate) fn read_recovery<'f>(forge: &'f DataForge<'f>, filter: Option<&Filter>) -> Recovery<'f> {
+pub(crate) fn read_recovery<'f>(
+    forge: &'f DataForge<'f>,
+    filter: Option<&Filter>,
+    cancel: Option<&CancelToken>,
+) -> Result<Recovery<'f>, CatalogError> {
     let mut trees = TreeBuilder::new();
     let mut best: Option<RecordTree<'f>> = None;
     let mut failures = Vec::new();
+    let mut ledger = ExportLedger::default();
+    let mut chosen = None;
     for record in forge.records() {
-        match is_selected(&record, filter) {
-            Ok(true) => {}
-            Ok(false) => continue,
-            Err(source) => {
-                failures.push(CatalogFailure::of(&record, &source));
-                continue;
-            }
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
+        }
+        if !selected(&record, filter, &mut ledger, &mut failures) {
+            continue;
         }
         match trees.build(&record) {
             Ok(tree) => {
+                ledger.merge(crate::export_field_walk::inspect(
+                    &tree,
+                    &record,
+                    None,
+                    ExportSourceRole::Dependency,
+                    cancel,
+                )?);
+                ledger.observe(SourceObservation::catalog_source(
+                    &record,
+                    ExportSourceRole::Dependency,
+                    SourceDisposition::SkippedAfterRead,
+                ));
                 if best
                     .as_ref()
                     .is_none_or(|have| tree.record_path() < have.record_path())
                 {
+                    chosen = Some(record.index());
                     best = Some(tree);
                 }
             }
-            Err(source) => failures.push(CatalogFailure::of(&record, &source)),
+            Err(source) => {
+                ledger.observe(SourceObservation::catalog_source(
+                    &record,
+                    ExportSourceRole::Dependency,
+                    SourceDisposition::ReadFailed,
+                ));
+                failures.push(CatalogFailure::of(&record, &source));
+            }
         }
     }
-    Recovery {
+    for source in &mut ledger.sources {
+        if Some(source.record_index) == chosen {
+            source.disposition = SourceDisposition::Projected;
+        }
+    }
+    Ok(Recovery {
+        ledger,
         rules: best.map(|tree| recovery(&tree)),
         failures,
+    })
+}
+
+fn selected(
+    record: &Record<'_>,
+    filter: Option<&Filter>,
+    ledger: &mut ExportLedger,
+    failures: &mut Vec<CatalogFailure>,
+) -> bool {
+    if record.record_path().is_err() {
+        return false;
+    }
+    match is_selected(record, filter) {
+        Ok(selected) => selected,
+        Err(error) => {
+            ledger.observe(SourceObservation::catalog_source(
+                record,
+                ExportSourceRole::SelectionCandidate,
+                SourceDisposition::ReadFailed,
+            ));
+            failures.push(CatalogFailure::of(record, &error));
+            false
+        }
     }
 }
 

@@ -30,6 +30,7 @@ fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error
     let archive =
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
     let mut options = CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT);
+    options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
     let built = build_catalog(&archive, &options)?;
     let json = serde_json::from_slice(built.json())?;

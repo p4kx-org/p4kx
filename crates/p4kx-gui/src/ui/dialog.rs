@@ -30,6 +30,8 @@ pub enum Dialog {
     RecordExportFolder,
     /// Picks the file the Basetool catalog is written to.
     CatalogFile,
+    /// Picks the file of an explicitly requested diagnostic Basetool catalog.
+    DiagnosticCatalogFile,
     /// Picks the GLB file a model is exported to.
     ModelFile,
     /// Picks the GLB file an Entity is exported to.

@@ -704,6 +704,13 @@ One group of entities in the Basetool catalog, e.g. manufacturers or items, sele
 prefix and type and complete or partial on its own.
 _Avoid_: category, entity type
 
+**Export health**:
+Measured source-read and projection outcomes carried by the Basetool catalog, independently of
+Filter completeness. Physical source Records, required Archive Entry operations and emitted rows
+have separate accounting units; an incomplete result requires explicit diagnostic publication
+(`exportHealth`, ADR-0347).
+_Avoid_: completeness (when describing read failures), successful absence (without source evidence)
+
 **Contract template**:
 A `ContractTemplate` Record that a contract names by `templateGuid`: its mission properties, ship
 spawn and location links, hauling orders, modifiers, mission flow and reward contributions, stated

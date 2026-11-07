@@ -22,7 +22,13 @@ fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
         variants_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
+    let built = build_catalog(
+        &archive,
+        &CatalogOptions {
+            publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+            ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
+        },
+    )?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }

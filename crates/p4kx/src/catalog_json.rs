@@ -4,9 +4,9 @@
 use std::path::Path;
 
 use p4kx_export::{
-    CatalogSummary, CraftingWarning, DECOMPRESSED_LIMIT, KindSummary, LoadoutSummary, PaintSummary,
-    Playability, PlayabilityCounts, SCHEMA_VERSION, SizeWarning, StarmapSummary, UPLOAD_LIMIT,
-    VariantCounts,
+    CatalogSummary, CraftingWarning, DECOMPRESSED_LIMIT, ExportHealth, KindSummary, LoadoutSummary,
+    PaintSummary, Playability, PlayabilityCounts, SCHEMA_VERSION, SizeWarning, StarmapSummary,
+    UPLOAD_LIMIT, VariantCounts,
 };
 use p4kx_extraction::Archive;
 use serde::Serialize;
@@ -20,6 +20,7 @@ pub(super) struct SummaryJson<'a> {
     archive: String,
     out: String,
     schema_version: u32,
+    export_health: &'a ExportHealth,
     size: u64,
     compressed_size: Option<u64>,
     upload_limit: u64,
@@ -293,6 +294,7 @@ pub(super) fn summary_json<'a>(
         archive: json::path(archive.path()),
         out: json::path(out),
         schema_version: SCHEMA_VERSION,
+        export_health: summary.export_health(),
         size: summary.size(),
         compressed_size: summary.compressed_size(),
         upload_limit: UPLOAD_LIMIT,

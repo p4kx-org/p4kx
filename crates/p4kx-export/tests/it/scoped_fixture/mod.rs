@@ -6,7 +6,7 @@ mod schema;
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestValue,
@@ -63,6 +63,29 @@ pub(crate) fn build_with_origin(
     properties: Vec<TestValue>,
     origin: TestValue,
 ) -> Result<Report, Box<dyn Error>> {
+    build_mode(properties, origin, CatalogPublicationMode::Normal)
+}
+
+pub(crate) fn diagnostic(properties: Vec<TestValue>) -> Result<Report, Box<dyn Error>> {
+    diagnostic_with_origin(properties, TestValue::text("Origin_BP"))
+}
+
+pub(crate) fn diagnostic_with_origin(
+    properties: Vec<TestValue>,
+    origin: TestValue,
+) -> Result<Report, Box<dyn Error>> {
+    build_mode(
+        properties,
+        origin,
+        CatalogPublicationMode::DiagnosticPartial,
+    )
+}
+
+fn build_mode(
+    properties: Vec<TestValue>,
+    origin: TestValue,
+    publication_mode: CatalogPublicationMode,
+) -> Result<Report, Box<dyn Error>> {
     let root = tempfile::tempdir()?;
     let path = root.path().join("Data.p4k");
     ArchiveBuilder::new()
@@ -74,7 +97,10 @@ pub(crate) fn build_with_origin(
     let archive = Archive::open(&path)?;
     let built = build_catalog(
         &archive,
-        &CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000)),
+        &CatalogOptions {
+            publication_mode,
+            ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
+        },
     )?;
     Ok(Report {
         document: serde_json::from_slice(built.json())?,

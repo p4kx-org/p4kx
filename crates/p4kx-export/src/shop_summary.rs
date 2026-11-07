@@ -80,7 +80,7 @@ pub struct ShopSummary {
     pub inventories_named: usize,
     /// The inventory files below `Data\Scripts\ShopInventories` in the Archive.
     pub inventories_in_archive: usize,
-    /// The `ID` values of the distinct inventory files that were no GUID and left out.
+    /// The malformed item/ID values left out of the distinct inventory files.
     pub item_ids_dropped: usize,
     /// The commodity exchanges and commodity terminals.
     pub commodity_exchanges: usize,

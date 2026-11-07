@@ -25,6 +25,11 @@ pub(crate) fn add_loot_containers(
     collected: &mut Collected<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<(), CatalogError> {
+    crate::entry_source::dependencies(
+        &placements.ledger,
+        &mut collected.ledger,
+        crate::Kind::LootContainers,
+    );
     let located = locate(
         archive,
         &placements.opened,
@@ -35,11 +40,13 @@ pub(crate) fn add_loot_containers(
         return Err(CatalogError::Cancelled);
     }
     let Located {
+        ledger,
         containers,
         unreadable,
         beyond_limit,
         several,
     } = located;
+    collected.ledger.merge(ledger);
     let mut details: Vec<String> = unreadable.iter().map(ToString::to_string).collect();
     if beyond_limit > 0 {
         details.push(format!(

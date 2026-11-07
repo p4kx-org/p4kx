@@ -114,15 +114,18 @@ impl<'r, 'f> MissionPropertySetRegistry<'r, 'f> {
         };
         let reader = PropertyReader::new(&self.reader, self.texts, self.unknowns, &self.spawns);
         let properties = reader.source_properties(values)?;
-        self.sets.borrow_mut().insert(MissionPropertySet {
-            guid,
-            record_guid: CatalogGuid(self.tree.guid()),
-            record_path: self.tree.record_path(),
-            source_type: self.tree.type_name(),
-            source_location,
-            level,
-            properties,
-        });
+        self.sets.borrow_mut().insert(
+            self.tree.record_index(),
+            MissionPropertySet {
+                guid,
+                record_guid: CatalogGuid(self.tree.guid()),
+                record_path: self.tree.record_path(),
+                source_type: self.tree.type_name(),
+                source_location,
+                level,
+                properties,
+            },
+        )?;
         Ok(Some(guid))
     }
 

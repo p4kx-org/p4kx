@@ -54,6 +54,7 @@ Each `locationClass`, `locationSize` and `locationFunction` target is null or an
 | Field | Meaning |
 | --- | --- |
 | guid | The declared target Record GUID, including a dangling GUID |
+| targetRecordIndex | Actual target position in this Build; null for a dangling or unknown target |
 | recordPath | The known source Record path without .xml; null for a missing Record |
 | targetType | The known source target struct name; null for a missing Record |
 | status | present when the DataForge identifies the Record; dangling when only its GUID is known |
@@ -70,6 +71,7 @@ a resolved variable name:
 | Field | Meaning |
 | --- | --- |
 | recordGuid | The target Record GUID when available |
+| targetRecordIndex | Actual target position in this Build, including an outside-owner target; null when unknown |
 | recordPath | The target Record path when available |
 | targetType | The source target struct name when available |
 | location | The canonical position inside the target Record when available |
@@ -78,7 +80,9 @@ a resolved variable name:
 | sourcePointer | An unresolved source pointer's structIndex and instanceIndex, or null |
 | sourceError | An available source read error, or null |
 
-Resolution is restricted to the owning Record GUID before its canonical location is followed.
+Resolution compares the actual physical owner and target Record indices before following the canonical location.
+A GUID or path alias cannot authorize crossing to another physical owner. `targetRecordIndex` is
+Build-local provenance, not a stable game identifier or replacement domain key.
 An external Record is never searched, and its location is never interpreted against a different
 Record with a similarly named property.
 

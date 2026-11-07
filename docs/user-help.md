@@ -231,13 +231,20 @@ shows the compressed and the uncompressed size, so it tells which form was writt
 
 The catalog is created in the background with a progress window; DataForge already read for the
 Record tree, a Query or a Record export is reused, and the other way round. **Cancel** stops it at once and writes no file; an
-existing file stays as it was. The summary lists per kind the entities written, the Records left
-out as development leftovers and whether the kind is complete, per language the texts resolved,
+existing file stays as it was. The summary shows export health separately from each kind's selection
+scope, then the entities written, the Records left out as development leftovers, per language the texts resolved,
 missing and placeholders, the size against the basetool upload limit of 64 MB and the file. A
 catalog close to the upload limit gets a warning, one over it an error note, because the basetool
-rejects it. A selected Record that cannot be read does not stop the catalog: it is left out and
-listed in the summary under "Records that could not be read and were left out", with its record
-path, GUID and reason.
+rejects it. A read/projection failure or a source warning that makes the export incomplete refuses
+normal publication. The window explains the refusal; no file is created or replaced.
+
+**Export › Diagnostic Basetool catalog…** explicitly writes a result for investigation, including
+incomplete data. Its save dialog proposes `basetool-catalog.diagnostic.json.zst`. The progress and
+outcome windows identify the diagnostic job, and the file carries its publication mode and health.
+Unreadable selected Records are listed with their record path, GUID and reason. This permission
+applies only to that job. Check the file's `exportHealth` before importing it; incomplete source
+data must not become deletions of previously stored entities. A healthy Filter-scoped export is
+publishable normally, while its selection scope remains partial.
 
 ## Searching the contents
 

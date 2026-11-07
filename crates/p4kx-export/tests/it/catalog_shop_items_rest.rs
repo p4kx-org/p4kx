@@ -10,7 +10,7 @@ use crate::shops_fixture::{CLOTHING, EXCHANGE, FOOD, LOOSE, MIXED};
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::Value;
 
@@ -28,7 +28,8 @@ fn components_in_any_container_and_prefabs_give_lists_and_placeholders_none() ->
     let dir = tempfile::tempdir()?;
     let path = shop_items_rest_fixture::write_archive(dir.path())?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     let built = build_catalog(&archive, &options)?;
     let catalog: Value = serde_json::from_slice(built.json())?;
 

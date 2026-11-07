@@ -9,8 +9,9 @@ use p4kx_extraction::{Archive, CancelToken, Guid};
 use rayon::prelude::*;
 
 use crate::CatalogError;
+use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, unreferenced};
-use crate::starmap_parse::read_all;
+use crate::starmap_parse::{Read, read_all};
 use crate::starmap_report::{ContainerCounts, Placement, StarmapReport, apart, clip};
 use crate::starmap_walk::{Opened, System, SystemRead};
 
@@ -38,6 +39,7 @@ impl Default for Limits {
 /// The placements of the Starmap Records in the system containers of an Archive.
 #[derive(Debug, Default)]
 pub(crate) struct Placements {
+    pub(crate) ledger: ExportLedger,
     by_record: HashMap<Guid, Placement>,
     pub(crate) counts: ContainerCounts,
     pub(crate) report: StarmapReport,
@@ -73,15 +75,14 @@ impl Placements {
         let index = Index::new(archive);
         let systems = index.systems();
         let roots: Vec<usize> = systems.iter().map(|(_, entry)| *entry).collect();
-        let bodies = read_all(
+        let Read { bodies, ledger, .. } = read_all(
             archive,
             &index,
             &roots,
             cancel,
             limits.external,
             (limits.depth, limits.children),
-        )
-        .bodies;
+        );
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
@@ -92,7 +93,10 @@ impl Placements {
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        let mut placements = Self::default();
+        let mut placements = Self {
+            ledger,
+            ..Self::default()
+        };
         placements.counts.systems = systems.len();
         let mut repeated: HashSet<Guid> = HashSet::new();
         let mut opened: HashSet<usize> = HashSet::new();

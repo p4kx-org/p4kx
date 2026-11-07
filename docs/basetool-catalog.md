@@ -153,6 +153,7 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `source.toolVersion` | The version of P4KX that wrote the catalog |
 | `source.exportedAt` | When the catalog was written, UTC in RFC 3339 form |
 | `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "…"}` when a Filter selected the Records |
+| `exportHealth` | Measured source-read and projection health, exact affected identities, separate Record/Archive Entry counters and bounded diagnostics; independent of Filter completeness ([contract](catalog-export-health.md)) |
 | `manufacturers` | The manufacturers, ordered by GUID |
 | `items` | The items, ordered by GUID |
 | `ships` | The ships and ground vehicles, ordered by GUID |
@@ -205,8 +206,10 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `craftingGlobal` | Not a kind: the global crafting parameters that apply to every dismantle |
 | `itemRecovery` | Not a kind: the item recovery multipliers and rates behind claims, with the override groups of entity classes, `null` without the Record; see "Item recovery rules" below |
 
-A complete kind lists every Record of its kind in the Build, so the import may treat a Record it
-knows but no longer finds as removed. A partial kind lists only what the Filter selected.
+An unfiltered kind with complete catalog-wide `exportHealth` lists its successfully read sources,
+so an import can use absence as removal evidence within that kind's selection policy. A partial
+kind lists only what the Filter selected. Incomplete health, including global blocking diagnostics,
+cannot establish removal even when a kind's Filter scope is complete.
 
 ### Ordering Builds
 
@@ -1629,8 +1632,9 @@ with a condition, an action or a modifier of a struct the catalog does not know:
 the build and not an entry (none on LIVE). A future Build that meets such a struct therefore
 lacks the whole Record: it is not in the kind, the summary counts it in the `failed` list of the
 build (`p4kx catalog` prints it, with the record path and the struct name as reason, and exits with
-code 1), and the contracts that name it keep a GUID that resolves to no entry, so a consumer must
-check the failure list before it relies on the links being complete.
+code 1). Normal publication refuses that incomplete result. An explicit diagnostic artifact can
+retain contracts whose template GUID resolves to no entry; its `exportHealth` identifies the
+failure, so consumers preserve the affected stored data rather than infer removal.
 
 ### Mission broker entries
 
@@ -2554,12 +2558,19 @@ kinds keep their `display` and `temp` Records (radar displays, shop displays and
 changed the selection of `ships` for `schemaVersion` 2 (ADR-0167): 21 ships on LIVE are skipped
 that version 1 listed.
 
-A selected Record that cannot be read, such as one whose struct layout is corrupt, does not stop
-the catalog: it is left out, counted as a failure and reported with its record path, GUID and
-reason (a ship whose loadout cannot be resolved is the exception: it stays in `ships`, see
-"Loadouts"). `p4kx catalog` prints each failure on stderr, lists them under `failed` in `--json` and
-exits with code 1, with the catalog written; the desktop app lists them in the summary. The
-catalog file itself, its schema and its completeness are not affected.
+A selected Record that cannot be read or projected is recorded in the measured `exportHealth`,
+with its physical source index, GUID, readable path, stage and stable diagnostic category. A ship
+whose loadout fails can retain its original ship row; that secondary failure is distinct from an
+omitted ship source. Unreadable owned fields also remain visible when an optional mapper retained
+the row. Source warning codes retain their producer counts and explicit units.
+
+Normal publication refuses incomplete health before creating or replacing the destination.
+Explicit `--diagnostic-partial`, or the separate diagnostic action in the desktop window, permits
+the diagnostic file and records that mode inside it. A successful diagnostic write remains an
+incomplete result. `completeness` retains its Filter-selection meaning. Consumers require both an
+unfiltered selection and complete export health before treating absent rows as removals; preserve
+existing data when a diagnostic artifact cannot establish absence. The complete field and counter
+contract is [catalog export health](catalog-export-health.md) and ADR-0347.
 
 ## Determinism and size
 

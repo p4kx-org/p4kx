@@ -10,7 +10,7 @@ use crate::scoped_location_weak;
 use crate::spawn_read::Reader;
 
 #[derive(Debug, thiserror::Error)]
-enum FieldError {
+pub(crate) enum FieldError {
     #[error("ScopedLocation {owner}.{field} must hold {expected}")]
     Malformed {
         owner: String,
@@ -99,12 +99,14 @@ fn definition_value(
     Ok(match value {
         Value::Null => None,
         Value::Reference(target) if target.location().is_none() => Some(DefinitionReference {
+            target_record_index: Some(target.record_index()),
             guid: CatalogGuid(target.guid()),
             record_path: Some(target.record_path().to_owned()),
             target_type: Some(target.type_name().to_owned()),
             status: DefinitionStatus::Present,
         }),
         Value::Error(ValueError::DanglingReference { guid }) => Some(DefinitionReference {
+            target_record_index: None,
             guid: CatalogGuid(*guid),
             record_path: None,
             target_type: None,

@@ -42,8 +42,8 @@ pub(crate) use crate::contract_store_slugs::ShipStoreSlug;
 pub(crate) use crate::contract_template::ContractTemplate;
 pub(crate) use crate::entity_spawn_model::EntitySpawnPool;
 pub(crate) use crate::location_template::MissionLocationTemplate;
-pub(crate) use crate::npc_spawn_model::NpcSpawnPool;
 pub(crate) use crate::mission_property_set::MissionPropertySet;
+pub(crate) use crate::npc_spawn_model::NpcSpawnPool;
 pub(crate) use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 
 /// The version of the catalog shape and its closed payload unions.
@@ -62,6 +62,8 @@ pub(crate) struct Catalog<'a> {
     pub(crate) source: Source<'a>,
     /// Whether each kind is a complete snapshot of the Build.
     pub(crate) completeness: Completeness<'a>,
+    /// The measured source-read and projection health, separately from Filter selection scope.
+    pub(crate) export_health: crate::ExportHealth,
     /// The manufacturers, ordered by GUID.
     pub(crate) manufacturers: Vec<Manufacturer<'a>>,
     /// The items, ordered by GUID.
