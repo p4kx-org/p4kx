@@ -9,6 +9,7 @@ use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_channels::{PublicPatches, channel_name};
 use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry, utc_rfc3339};
 
+use crate::archive_key_use::ArchiveKeyUse;
 use crate::build_derived::{add_contracts, add_loadouts, add_paints};
 use crate::build_harvest::add_harvest_locations;
 use crate::build_loot::add_loot_containers;
@@ -213,6 +214,7 @@ fn assemble<R>(
             health: Box::new(health),
         });
     }
+    let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
     let resolved = store_slugs.resolve(
         collected
@@ -223,7 +225,12 @@ fn assemble<R>(
     );
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
-        source: source(archive, options.exported_at, options.public_patches),
+        source: source(
+            archive,
+            options.exported_at,
+            options.public_patches,
+            key_use,
+        ),
         completeness: Completeness::of_every_kind(completeness_of(options)),
         export_health: health.clone(),
         manufacturers: collected.manufacturers,
@@ -298,6 +305,7 @@ fn assemble<R>(
             quantizations: collected.quantization_summary,
             failures: collected.failures,
             warnings: collected.warnings,
+            archive_key: key_use,
         },
         output,
     ))
@@ -359,6 +367,7 @@ pub(crate) fn source<'a>(
     archive: &'a Archive,
     exported_at: SystemTime,
     patches: Option<&'a PublicPatches>,
+    key_use: ArchiveKeyUse,
 ) -> Source<'a> {
     Source {
         channel: channel_name(archive.path()),
@@ -371,6 +380,8 @@ pub(crate) fn source<'a>(
         }),
         archive_size: archive.file_len(),
         archive_modified: archive.file_modified().map(utc_rfc3339),
+        archive_key: key_use.state(),
+        encrypted_entries_unread: key_use.entries_unread(),
         tool_version: env!("CARGO_PKG_VERSION"),
         exported_at: utc_rfc3339(exported_at),
     }

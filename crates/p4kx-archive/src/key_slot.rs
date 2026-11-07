@@ -7,6 +7,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock};
 
 use p4kx_foundation::ArchiveKey;
 
+use crate::key_demand::KeyDemand;
+
 /// The outcome of checking a key: it passed, or it failed on the named encrypted Entry.
 pub(crate) type Outcome = Result<(), String>;
 
@@ -23,12 +25,18 @@ struct State {
 pub(crate) struct KeySlot {
     state: Arc<RwLock<State>>,
     turn: Arc<Mutex<()>>,
+    demand: KeyDemand,
 }
 
 impl KeySlot {
     /// Takes the turn to check the key, so that threads that open Entries at once check it once.
     pub(crate) fn check_turn(&self) -> MutexGuard<'_, ()> {
         self.turn.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Returns the handle to the record of the encrypted Entries that no key opened.
+    pub(crate) const fn demand(&self) -> &KeyDemand {
+        &self.demand
     }
 
     pub(crate) fn with(key: Option<ArchiveKey>) -> Self {

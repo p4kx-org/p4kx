@@ -23,6 +23,7 @@ mod bnk_objects;
 mod bnk_objects_limits;
 mod catalog;
 mod catalog_failures;
+mod catalog_key;
 mod catalog_support;
 mod channel_notice;
 mod channels;

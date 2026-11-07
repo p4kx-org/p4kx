@@ -108,6 +108,7 @@ mod interior_package;
 mod issues;
 mod json;
 mod key;
+mod key_note;
 mod layers_json;
 mod list;
 mod loc;
@@ -168,20 +169,26 @@ fn main() -> ExitCode {
         file: cli.key_file.clone(),
     };
     let result = dispatch(cli.command, json, &given);
-    match result {
+    let code = match result {
         Ok(code) => code,
         Err(error) if is_broken_pipe(&error) => ExitCode::from(exit::SUCCESS),
         Err(error) => {
             report(&error);
             exit::for_error(&error)
         }
-    }
+    };
+    key_note::print();
+    code
 }
 
 fn report(error: &anyhow::Error) {
     let mut stderr = io::stderr().lock();
     let _ignored = writeln!(stderr, "error: {error:#}");
-    if let Some(hint) = key::hint(error)
+    let key_hint = key::hint(error);
+    if key_hint.is_some() {
+        key_note::suppress();
+    }
+    if let Some(hint) = key_hint
         .or_else(|| no_match::no_match_hint(error))
         .or_else(|| catalog::hint(error))
     {
