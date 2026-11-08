@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::dos_timestamp::DosTimestamp;
+use crate::encryption_declarations::EncryptionDeclarations;
 use crate::entry_record_format::EntryRecordFormat;
 use crate::metadata_range::MetadataRange;
 use crate::zip_header_metadata::ZipHeaderMetadata;
@@ -14,12 +15,13 @@ pub struct EntryMetadata {
     raw_compression_method: u16,
     header: RecordHeader,
     record: MetadataRange,
+    encryption: EncryptionDeclarations,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RecordHeader {
     ZipCentralDirectory(ZipHeaderMetadata),
-    P4kV2 { encryption: u16 },
+    P4kV2,
 }
 
 impl EntryMetadata {
@@ -29,6 +31,7 @@ impl EntryMetadata {
         original_directory_ordinal: Option<u64>,
         header: ZipHeaderMetadata,
         record: MetadataRange,
+        encryption: EncryptionDeclarations,
     ) -> Self {
         Self {
             dos_timestamp,
@@ -36,6 +39,7 @@ impl EntryMetadata {
             raw_compression_method,
             header: RecordHeader::ZipCentralDirectory(header),
             record,
+            encryption,
         }
     }
 
@@ -44,14 +48,16 @@ impl EntryMetadata {
         raw_compression_method: u16,
         original_directory_ordinal: u64,
         encryption: u16,
+        encryption_offset: u64,
         record: MetadataRange,
     ) -> Self {
         Self {
             dos_timestamp,
             original_directory_ordinal: Some(original_directory_ordinal),
             raw_compression_method,
-            header: RecordHeader::P4kV2 { encryption },
+            header: RecordHeader::P4kV2,
             record,
+            encryption: EncryptionDeclarations::v2(encryption_offset, encryption),
         }
     }
 
@@ -72,7 +78,7 @@ impl EntryMetadata {
     pub const fn record_format(&self) -> EntryRecordFormat {
         match self.header {
             RecordHeader::ZipCentralDirectory(_) => EntryRecordFormat::ZipCentralDirectory,
-            RecordHeader::P4kV2 { .. } => EntryRecordFormat::P4kV2,
+            RecordHeader::P4kV2 => EntryRecordFormat::P4kV2,
         }
     }
 
@@ -94,8 +100,14 @@ impl EntryMetadata {
     pub const fn zip_header(&self) -> Option<&ZipHeaderMetadata> {
         match &self.header {
             RecordHeader::ZipCentralDirectory(header) => Some(header),
-            RecordHeader::P4kV2 { .. } => None,
+            RecordHeader::P4kV2 => None,
         }
+    }
+
+    /// Returns every stored encryption declaration independently of decoder selection.
+    #[must_use]
+    pub const fn encryption_declarations(&self) -> &EncryptionDeclarations {
+        &self.encryption
     }
 
     /// Returns the stored v2 encryption word, absent for a ZIP directory record.
@@ -103,7 +115,7 @@ impl EntryMetadata {
     pub const fn raw_v2_encryption_word(&self) -> Option<u16> {
         match self.header {
             RecordHeader::ZipCentralDirectory(_) => None,
-            RecordHeader::P4kV2 { encryption } => Some(encryption),
+            RecordHeader::P4kV2 => self.encryption.raw_v2_word(),
         }
     }
 }

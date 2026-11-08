@@ -116,6 +116,7 @@ fn parse_record(
     let data_offset = reader.read_u64()?;
     let name_offset = reader.read_u64()?;
     reader.skip(RECORD_SIGNATURE_LEN)?;
+    let encryption_offset = reader.offset();
     let encryption = reader.read_u16()?;
     let sha256 = stated_sha256(reader.read_bytes(RECORD_SHA256_LEN)?);
     let ordinal = u64::try_from(index)
@@ -138,6 +139,7 @@ fn parse_record(
             method,
             ordinal,
             encryption,
+            encryption_offset,
             MetadataRange::checked(offset, RECORD_LEN as u64, source_len)?,
         ),
         path: read_name(names, name_offset, offset, index, log)?,

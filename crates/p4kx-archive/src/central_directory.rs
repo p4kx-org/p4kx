@@ -4,6 +4,9 @@
 use p4kx_foundation::{ByteReader, ParseError};
 
 use crate::archive_metadata::ArchiveMetadata;
+use crate::encryption_declarations::{
+    ENCRYPTION_BLOCK_LEN, EncryptionDeclarationsBuilder, StoredEncryptionDeclaration,
+};
 use crate::entry::stated_sha256;
 use crate::extra_block_header::ExtraBlockHeader;
 use crate::format_error::FormatError;
@@ -20,7 +23,6 @@ const BLOCK_ZIP64: u16 = 0x0001;
 const BLOCK_CIG_ENCRYPTION: u16 = 0x5002;
 const BLOCK_CIG_HASH: u16 = 0x5003;
 const BLOCK_HEADER_LEN: usize = 4;
-const ENCRYPTION_BLOCK_LEN: u16 = 6;
 const SHA256_LEN: usize = 32;
 
 struct FixedFields {
@@ -48,6 +50,7 @@ struct ExtraFields {
     uncompressed_size: u64,
     local_header_offset: u64,
     encrypted: bool,
+    encryption: EncryptionDeclarationsBuilder,
     sha256: Option<[u8; 32]>,
     zip64_block: bool,
 }
@@ -153,6 +156,7 @@ fn parse_entry_parts<'a>(
             original_directory_ordinal,
             fixed.header,
             record,
+            extra.encryption.finish(),
         ),
         path,
         compressed_size: extra.compressed_size,
@@ -241,6 +245,7 @@ fn parse_extra(
         uncompressed_size: u64::from(fixed.uncompressed_size),
         local_header_offset: u64::from(fixed.local_header_offset),
         encrypted: false,
+        encryption: EncryptionDeclarationsBuilder::default(),
         sha256: None,
         zip64_block: false,
     };
@@ -264,7 +269,14 @@ fn parse_extra(
                 read_zip64(&mut block, fixed, &mut fields)?;
             }
             BLOCK_CIG_ENCRYPTION => {
-                fields.encrypted = read_encryption(&mut block, stored_len, index, log);
+                fields.encrypted = read_encryption(
+                    &mut block,
+                    stored_len,
+                    data.first().copied(),
+                    &mut fields.encryption,
+                    index,
+                    log,
+                );
             }
             BLOCK_CIG_HASH => {
                 fields.sha256 = read_hash(data, stored_len, index, log);
@@ -297,10 +309,20 @@ fn read_hash(data: &[u8], stored_len: u16, index: usize, log: &mut IssueLog) -> 
 fn read_encryption(
     block: &mut ByteReader<'_>,
     stored_len: u16,
+    first_byte: Option<u8>,
+    declarations: &mut EncryptionDeclarationsBuilder,
     index: usize,
     log: &mut IssueLog,
 ) -> bool {
-    match (stored_len, block.read_u16()) {
+    let value_offset = block.offset();
+    let value = block.read_u16();
+    declarations.push(StoredEncryptionDeclaration::cig(
+        value_offset,
+        stored_len,
+        value.as_ref().ok().copied(),
+        first_byte,
+    ));
+    match (stored_len, value) {
         (ENCRYPTION_BLOCK_LEN, Ok(0)) => false,
         (ENCRYPTION_BLOCK_LEN, Ok(1)) => true,
         (len, value) => encryption_defect(len, value.ok(), index, log),

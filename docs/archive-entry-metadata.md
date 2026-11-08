@@ -118,3 +118,29 @@ the authoritative recovery, installation or integrity status.
 
 The packed field definition follows
 [Microsoft's DOS date/time contract](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-dosdatetimetofiletime).
+
+## Stored encryption declarations
+
+`EntryMetadata::encryption_declarations()` retains every CIG/v2 declaration in source order,
+independently of the bounded Entry-issue samples. `iter()` exposes the declaration source kind,
+expected value offset, stored CIG block length and available zero/one/two value bytes. `raw_value()`
+is `None` for a short word and preserves every unsigned 16-bit value otherwise. Offsets are relative
+to the immediately owning Archive source, including a nested Container's own decoded byte origin.
+An empty block has an expected value position but no value bytes at that position.
+
+`state()` classifies the stored CIG/v2 declarations as `Encrypted`, `Unencrypted` or `Unknown`.
+A known result requires every declaration to have its valid layout, a recognized word (0 or 1),
+and the same interpretation. Missing, malformed, unsupported and conflicting declarations remain
+`Unknown`. Repeated equal valid declarations remain known and every occurrence stays available.
+No allocation is needed for absent or single declarations; repeated blocks use a bounded-by-input
+collection. The existing `raw_v2_encryption_word()` returns the same original word.
+
+This classification does not reconcile general-purpose ZIP encryption flags, classify every possible
+ZIP scheme, prove decryption, or summarize Container ancestors. The raw ZIP flags remain separate
+source facts. `Entry::is_encrypted()` retains its established decoder policy, including malformed
+fallback and last-declaration precedence; it is not replaced by the new provenance observation.
+Keys and failed payload reads do not change the retained declarations.
+
+The shared frontend DTO described above does not yet include these newly captured declarations.
+Per-data-value origin marking and complete source propagation are the separate implementation
+contract in [ADR-0357](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md).

@@ -26,6 +26,7 @@ mod directory_v2_trailer;
 mod dos_calendar;
 mod dos_timestamp;
 mod effective_encoding;
+mod encryption_declarations;
 mod end_records;
 mod entry;
 mod entry_decoder;
@@ -87,6 +88,10 @@ pub use data_error::DataError;
 pub use dos_calendar::DosCalendar;
 pub use dos_timestamp::DosTimestamp;
 pub use effective_encoding::EffectiveEncoding;
+pub use encryption_declarations::{
+    DeclaredEncryption, EncryptionDeclarationSource, EncryptionDeclarations,
+    StoredEncryptionDeclaration,
+};
 pub use entry::Entry;
 pub use entry_metadata::EntryMetadata;
 pub use entry_reader::EntryReader;

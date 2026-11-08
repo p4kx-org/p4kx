@@ -100,6 +100,21 @@ an image one mip at a time, or a Model drawn in 3D that the user turns, pans and
 an Extraction.
 _Avoid_: viewer, inspector
 
+**Source encryption**:
+The declared encryption of an original physical input, independently of whether it can be read or
+whether its exported bytes are encrypted. Missing or contradictory evidence remains unknown.
+_Avoid_: key status, output encryption
+
+**Data origin**:
+The original inputs and containing Entries that actually supplied a data value, selected it through
+authored declarations, or were used to convert it. An unused reference target is not a contribution.
+_Avoid_: Archive-wide encryption, reference closure
+
+**Source use**:
+One actual contribution to a data value, retaining its physical source and payload, selector or
+conversion role. The complete set supports origin classification separately for each data value.
+_Avoid_: candidate, attempted dependency
+
 ### Game data
 
 **DataForge**:
