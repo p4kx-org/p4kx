@@ -104,8 +104,22 @@ impl DdsSourceInfo {
     /// # Errors
     /// Returns the current reader's invalid-topology error while raw fields stay available.
     pub fn from_raw(raw: &DdsRawHeader, header_source_bytes: u64) -> Result<Self, TextureError> {
+        Self::from_raw_with_header(raw, header_source_bytes).map(|(info, _)| info)
+    }
+
+    /// Projects captured source fields together with their normalized reader header.
+    ///
+    /// # Errors
+    /// Returns invalid-topology errors without modifying the captured source fields.
+    pub fn from_raw_with_header(
+        raw: &DdsRawHeader,
+        header_source_bytes: u64,
+    ) -> Result<(Self, DdsHeader), TextureError> {
         let normalized = DdsHeader::from_raw(raw)?;
-        Ok(Self::of_parts(raw, &normalized, header_source_bytes))
+        Ok((
+            Self::of_parts(raw, &normalized, header_source_bytes),
+            normalized,
+        ))
     }
 
     pub(crate) fn of_parts(raw: &DdsRawHeader, normalized: &DdsHeader, size: u64) -> Self {

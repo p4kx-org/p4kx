@@ -6,6 +6,8 @@ use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use p4kx_texture::{DdsHeader, TextureError};
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::texture_names::suffixed_path;
 use crate::{CUBE_FACE_NAMES, CubemapLayout};
@@ -55,7 +57,13 @@ impl TextureImageFormat {
 }
 
 /// The source face represented by one image, or the existing combined cross layout.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(
+    tag = "type",
+    content = "index",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
 #[non_exhaustive]
 pub enum TextureImageFace {
     /// A texture with no independently named face.
@@ -73,7 +81,7 @@ pub enum TextureImageFace {
     /// DDS negative Z.
     NegativeZ,
     /// A face ordinal whose orientation the normalized header does not establish.
-    Indexed(u32),
+    Indexed(#[schemars(range(max = u32::MAX))] u32),
     /// One horizontal cross containing all six source faces.
     Cross,
 }

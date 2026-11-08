@@ -186,6 +186,95 @@ fn metadata_distinguishes_integer_and_float_sources_without_decoding_images() ->
     Ok(())
 }
 
+#[test]
+fn captured_projection_returns_the_same_layout_for_split_cube_array_expectations() -> TestResult {
+    let bytes = SplitDds::new(TestTextureFormat::BC7_SRGB, 16, 8)
+        .mips(4)
+        .split(2)
+        .cubemap()
+        .array(2)
+        .header_bytes();
+    let size = u64::try_from(bytes.len())?;
+    let raw = DdsRawHeader::parse(&bytes)?;
+    let (info, header) = DdsSourceInfo::from_raw_with_header(&raw, size)?;
+    assert_eq!(
+        info,
+        DdsSourceInfo::from_raw(&raw, size)?,
+        "the existing projection contract remains identical"
+    );
+    assert_eq!(
+        (
+            header.width(),
+            header.height(),
+            header.mip_count(),
+            header.array_size(),
+            header.faces()
+        ),
+        (16, 8, 4, 2, 6),
+        "the returned layout belongs to this exact captured header"
+    );
+    assert_eq!(header.part_count(size)?, 2, "two outsourced mips");
+    assert_eq!(
+        header.mip_size(1),
+        Some(384),
+        "part 1 holds mip 1 of twelve faces"
+    );
+    assert_eq!(
+        header.mip_size(0),
+        Some(1536),
+        "part 2 holds mip 0 of twelve faces"
+    );
+    assert_eq!(
+        info.raw,
+        DdsRawHeaderInfo::of(&raw),
+        "authored words stay exact"
+    );
+    Ok(())
+}
+
+#[test]
+fn joined_projection_preserves_unknown_layout_and_does_not_consume_invalid_raw() -> TestResult {
+    let mut bytes = SplitDds::new(TestTextureFormat::BC7_SRGB, 8, 8)
+        .mips(1)
+        .header_bytes();
+    set_word(&mut bytes, DXGI_FORMAT_OFFSET, u32::MAX)?;
+    let unknown = DdsRawHeader::parse(&bytes)?;
+    let (info, header) = DdsSourceInfo::from_raw_with_header(&unknown, u64::MAX)?;
+    assert_eq!(
+        info.header_source_bytes.get(),
+        u64::MAX,
+        "lossless source length"
+    );
+    assert!(
+        info.normalized.block_layout.is_none(),
+        "unknown layout stays explicit"
+    );
+    assert!(!header.format().is_decodable(), "no decoding is inferred");
+    assert!(
+        matches!(
+            header.part_count(u64::MAX),
+            Err(TextureError::UnsupportedFormat(_))
+        ),
+        "part-count unavailability remains distinct from zero"
+    );
+    set_word(&mut bytes, 16, 0)?;
+    let invalid = DdsRawHeader::parse(&bytes)?;
+    let authored = DdsRawHeaderInfo::of(&invalid);
+    assert!(
+        matches!(
+            DdsSourceInfo::from_raw_with_header(&invalid, 148),
+            Err(TextureError::InvalidHeader(_))
+        ),
+        "normalization failure is preserved"
+    );
+    assert_eq!(
+        DdsRawHeaderInfo::of(&invalid),
+        authored,
+        "raw capture survives failure"
+    );
+    Ok(())
+}
+
 fn set_word(bytes: &mut [u8], offset: usize, value: u32) -> TestResult {
     bytes
         .get_mut(offset..offset + 4)

@@ -9,6 +9,7 @@ use p4kx_extraction::{
     TextureImageFormat as Format, TextureImagePlan,
 };
 use p4kx_testkit::{SplitDds, TestTextureFormat};
+use serde_json::json;
 
 type TestResult = Result<(), Box<dyn Error>>;
 const RGBA: TestTextureFormat = TestTextureFormat::Dx10Pixel {
@@ -194,5 +195,57 @@ fn hdr_selection_does_not_override_explicit_png_previews_or_hide_invalid_mips() 
         ),
         "an absent mip retains its typed error"
     );
+    Ok(())
+}
+
+#[test]
+fn source_face_json_uses_one_typed_shared_orientation_view() -> TestResult {
+    let validator = jsonschema::validator_for(&schemars::schema_for!(Face).to_value())?;
+    for (face, expected) in [
+        (Face::Plane, json!({"type": "plane"})),
+        (Face::PositiveX, json!({"type": "positive-x"})),
+        (Face::NegativeX, json!({"type": "negative-x"})),
+        (Face::PositiveY, json!({"type": "positive-y"})),
+        (Face::NegativeY, json!({"type": "negative-y"})),
+        (Face::PositiveZ, json!({"type": "positive-z"})),
+        (Face::NegativeZ, json!({"type": "negative-z"})),
+        (
+            Face::Indexed(u32::MAX),
+            json!({"type": "indexed", "index": u32::MAX}),
+        ),
+        (Face::Cross, json!({"type": "cross"})),
+    ] {
+        let value = serde_json::to_value(face)?;
+        assert_eq!(
+            value, expected,
+            "the shared face has one stable wire spelling"
+        );
+        assert!(
+            validator.is_valid(&value),
+            "the shared face schema accepts its output"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn source_face_schema_rejects_missing_tags_and_invalid_index_widths() -> TestResult {
+    let validator = jsonschema::validator_for(&schemars::schema_for!(Face).to_value())?;
+    for invalid in [
+        json!({}),
+        json!("positive-x"),
+        json!({"type": "positive_x"}),
+        json!({"type": "indexed"}),
+        json!({"type": "indexed", "index": -1}),
+        json!({"type": "indexed", "index": u64::from(u32::MAX) + 1}),
+        json!({"type": "indexed", "index": 0.5}),
+        json!({"type": "plane", "index": 1}),
+        json!({"type": "cross", "other": 1}),
+    ] {
+        assert!(
+            !validator.is_valid(&invalid),
+            "invalid source-face shape: {invalid}"
+        );
+    }
     Ok(())
 }
