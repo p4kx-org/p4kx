@@ -19,6 +19,7 @@ mod banking;
 mod catalog_model;
 mod catalog_publication;
 mod catalog_render;
+mod catalog_resource_wire;
 mod catalog_window;
 mod cataloging;
 mod channel_picker;

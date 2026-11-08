@@ -365,17 +365,6 @@ fn an_independent_resource_has_its_own_written_kind_and_source_health() -> TestR
         "the source and projection completed"
     );
     let document: serde_json::Value = serde_json::from_slice(&fs::read(file)?)?;
-    let rows = document
-        .get("resourceTypes")
-        .and_then(serde_json::Value::as_array)
-        .ok_or("no resource rows")?;
-    assert_eq!(rows.len(), resources.count, "file and GUI summary agree");
-    assert_eq!(
-        rows.first()
-            .and_then(|row| row.get("validateDefaultCargoBox"))
-            .and_then(serde_json::Value::as_bool),
-        Some(false),
-        "false remains authored data"
-    );
+    crate::catalog_resource_wire::assert_written_resource(&document, resources.count)?;
     Ok(())
 }
