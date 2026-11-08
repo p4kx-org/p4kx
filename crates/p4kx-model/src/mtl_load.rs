@@ -34,20 +34,28 @@ pub(crate) fn load(
         return MaterialStatus::Unnamed;
     };
     let path = name.to_owned();
-    let Some(request) = request_path(name) else {
-        return MaterialStatus::Unreadable {
-            path,
-            reason: "the path leaves the Data folder or is no plain path".to_owned(),
-        };
+    let request = match companions.material_request(name) {
+        Ok(request) => request,
+        Err(error) => {
+            return MaterialStatus::Unreadable {
+                path,
+                reason: error.to_string(),
+                target: None,
+            };
+        }
     };
-    match fetch(&request, companions) {
-        Ok(None) => MaterialStatus::Missing { path },
+    let fetched = fetch(&request, companions);
+    let target = request.into_target();
+    match fetched {
+        Ok(None) => MaterialStatus::Missing { path, target },
         Err(error) => MaterialStatus::Unreadable {
             path,
             reason: error.to_string(),
+            target,
         },
         Ok(Some(bytes)) => match MaterialLibrary::parse(name, &bytes) {
             Ok(mut library) => {
+                library.target = target;
                 if reading == MaterialReading::Drawn {
                     crate::mtl_layers::resolve(&mut library, companions, cache);
                     crate::mtl_relief::check_diffuse_maps(&mut library, companions);
@@ -57,24 +65,25 @@ pub(crate) fn load(
             Err(error) => MaterialStatus::Unreadable {
                 path,
                 reason: error.to_string(),
+                target,
             },
         },
     }
 }
 
-/// Fetches the library: a bare name is first looked for beside the model, as the engine does,
-/// then, like any other path, below `Data`.
+/// Fetches an unrooted bare name beside the model first, then searches below `Data`.
 fn fetch(
-    request: &str,
+    request: &crate::MaterialRequest,
     companions: &mut dyn CompanionResolver,
 ) -> Result<Option<Vec<u8>>, CompanionError> {
-    if !request.contains('/')
-        && let Some(bytes) =
-            companions.resolve(CompanionPath::Sibling(&format!("{request}.mtl")))?
+    let path = request.path();
+    if request.searches_sibling()
+        && !path.contains('/')
+        && let Some(bytes) = companions.resolve(CompanionPath::Sibling(&format!("{path}.mtl")))?
     {
         return Ok(Some(bytes));
     }
-    companions.resolve(CompanionPath::Material(request))
+    companions.resolve(CompanionPath::Material(path))
 }
 
 /// Returns `name` with `/` separators and without a leading `Data/` or a `.mtl` extension, or

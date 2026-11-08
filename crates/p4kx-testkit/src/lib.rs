@@ -84,6 +84,8 @@ mod interior_lit;
 mod interior_sample;
 mod layout_v1;
 mod layout_v2;
+mod material_identity;
+mod material_reference;
 pub mod media_fixture;
 mod mesh_streams;
 mod model;
@@ -252,6 +254,8 @@ pub use interior_lit::{LIT_ROOM, lit_room_entries};
 pub use interior_sample::{
     INTERIOR_LAMP, INTERIOR_ROOT, INTERIOR_ROOT_NAME, interior_entries, lit_interior_entries,
 };
+pub use material_identity::material_identity_entries;
+pub use material_reference::{MATERIAL_REFERENCE_MODEL, material_reference_entries};
 pub use mesh_streams::{MeshStream, MeshStreams, mesh_streams};
 pub use model::{
     CUBE_CAPS_MATERIAL, CUBE_MATERIAL_LIBRARY, CUBE_MESH_OFFSET, CUBE_SIDES_MATERIAL, TestModel,

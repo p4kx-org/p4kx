@@ -10,6 +10,7 @@ use crate::material_source_info::{MaterialAuthoredInfo, MaterialLibrarySourceInf
 #[derive(Debug, Serialize)]
 pub struct LibraryInfo<'a> {
     path: Option<&'a str>,
+    target: Option<&'a str>,
     status: &'static str,
     problem: Option<String>,
     single: Option<bool>,
@@ -24,6 +25,7 @@ impl<'a> LibraryInfo<'a> {
         let library = model.materials.library();
         Self {
             path: model.material_library.as_deref(),
+            target: model.materials.target(),
             status: match &model.materials {
                 MaterialStatus::Missing { .. } => "missing",
                 MaterialStatus::Unreadable { .. } => "unreadable",

@@ -33,7 +33,7 @@ impl Assembly {
     /// and each library is read once. A part whose Entity or geometry cannot be resolved is left
     /// out or kept without a model, and the [`Issue`] says why. The number of parts, their depth
     /// and the vertices of their models are limited by [`MAX_ASSEMBLY_PARTS`](crate::MAX_ASSEMBLY_PARTS),
-    /// [`MAX_ASSEMBLY_DEPTH`](crate::MAX_ASSEMBLY_DEPTH) and [`MAX_ASSEMBLY_VERTICES`].
+    /// [`MAX_ASSEMBLY_DEPTH`](crate::MAX_ASSEMBLY_DEPTH) and [`MAX_ASSEMBLY_VERTICES`](crate::MAX_ASSEMBLY_VERTICES).
     ///
     /// # Errors
     ///
@@ -267,6 +267,9 @@ fn library_key(draft: &Draft<'_>, loaded: &Loaded) -> Option<String> {
 
 /// Returns the key under which the library `name` of the model at `entry` is cached.
 pub(crate) fn library_key_of(name: &str, entry: &str) -> String {
+    if name.trim_start().starts_with(['/', '\\']) {
+        return name.to_ascii_lowercase();
+    }
     let key = file_key(name);
     let key = key.strip_suffix(".mtl").unwrap_or(&key).to_owned();
     if key.contains('\\') {

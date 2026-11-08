@@ -52,6 +52,7 @@ mod hierarchy;
 mod included;
 mod lod_skeleton_origin;
 mod material;
+mod material_request;
 mod mesh;
 mod model;
 mod model_chunk_layout;
@@ -120,6 +121,7 @@ pub use included::{
     MAX_INCLUDED_OBJECTS,
 };
 pub use lod_skeleton_origin::LodSkeletonOrigin;
+pub use material_request::MaterialRequest;
 pub use model::{ChunkUsage, Lod, LodSelection, Mesh, Model, ModelChunk, ModelFile, Node, Submesh};
 pub use model_chunk_layout::ModelChunkLayout;
 pub use model_options::{ModelIssue, PositionBox};

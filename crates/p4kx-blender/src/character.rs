@@ -69,11 +69,11 @@ impl<'a> CharacterScene<'a> {
 ///
 /// # Errors
 ///
-/// Returns [`PackageError::Refused`] when `out` lies inside a Star Citizen installation,
-/// [`PackageError::NotAPackage`] when `out` is something else than an empty folder or a package,
-/// [`PackageError::Mesh`] when the Character does not fit in a GLB file,
-/// [`PackageError::Write`] when a file or folder cannot be written and
-/// [`PackageError::Cancelled`] when `cancelled` returned true.
+/// Returns [`crate::PackageError::Refused`] when `out` lies inside a Star Citizen installation,
+/// [`crate::PackageError::NotAPackage`] when `out` is something else than an empty folder or a package,
+/// [`crate::PackageError::Mesh`] when the Character does not fit in a GLB file,
+/// [`crate::PackageError::Write`] when a file or folder cannot be written and
+/// [`crate::PackageError::Cancelled`] when `cancelled` returned true.
 pub fn write_character_package(
     character: &CharacterScene<'_>,
     textures: &dyn TextureLoader,

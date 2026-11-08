@@ -3,6 +3,7 @@
 
 use std::error::Error;
 
+use crate::MaterialRequest;
 use crate::build::MAX_LOD;
 
 /// Returns the names of the files next to the model file `name` that reading it can fetch: the
@@ -38,7 +39,7 @@ pub enum CompanionPath<'a> {
     /// A file in the model's own folder, by file name, e.g. the geometry companion `box.cgfm` of
     /// `box.cgf`.
     Sibling(&'a str),
-    /// The material library the model names, as a path below the `Data` folder with `/` as
+    /// A validated material request below the logical `Data` root, with `/` as
     /// separator and without the `.mtl` extension, e.g. `Objects/Ships/Gladius/gladius`. The
     /// model has checked that it is a plain path: no empty, `.` or `..` component, no drive.
     Material(&'a str),
@@ -53,6 +54,14 @@ pub const MAX_GREY_SATURATION: f32 = 0.05;
 
 /// Supplies the companion files of a model, so that reading a model needs no Archive.
 pub trait CompanionResolver {
+    /// Validates a material name under this resolver's source-path policy.
+    ///
+    /// # Errors
+    /// Returns an error when the name is not admitted by the source-path policy.
+    fn material_request(&self, name: &str) -> Result<MaterialRequest, CompanionError> {
+        MaterialRequest::new(name)
+    }
+
     /// Returns the bytes of the companion at `path`, or `None` when it does not exist.
     ///
     /// # Errors

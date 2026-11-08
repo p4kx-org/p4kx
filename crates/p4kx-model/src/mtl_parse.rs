@@ -40,6 +40,7 @@ pub(crate) fn library<'a, Interrupted>(
         checkpoint().map_err(MaterialReadError::Interrupted)?;
         return Ok(MaterialLibrary {
             path: path.to_owned(),
+            target: None,
             authored: Arc::new(authored),
             default_palette,
             single: true,
@@ -51,6 +52,7 @@ pub(crate) fn library<'a, Interrupted>(
     let (materials, unknown_entries) = submaterials(sub_materials, &mut authored, checkpoint)?;
     Ok(MaterialLibrary {
         path: path.to_owned(),
+        target: None,
         authored: Arc::new(authored),
         default_palette,
         single: false,

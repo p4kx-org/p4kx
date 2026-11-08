@@ -36,6 +36,7 @@ mod field_statistics;
 mod glb_hashes;
 mod loc_keys;
 mod localization;
+mod material_references;
 mod material_source_census;
 mod material_source_census_compare;
 mod material_source_census_fault;

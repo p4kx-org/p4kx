@@ -254,8 +254,10 @@ impl Material {
 pub struct MaterialLibrary {
     /// Ordered authored root syntax, original submaterial dispositions and actual loss boundaries.
     pub authored: Arc<MaterialSource>,
-    /// The path the model gave, below `Data` without `.mtl`.
+    /// The original library reference supplied to the reader.
     pub path: String,
+    /// The mapped companion destination, absent for a direct parse or an unreported target.
+    pub target: Option<String>,
     /// The tint palette the library names as its default, a Record path.
     pub default_palette: Option<String>,
     /// Whether the file is one material that serves every material ID, rather than a list of
@@ -282,6 +284,8 @@ pub enum MaterialStatus {
     Missing {
         /// The path the model gave.
         path: String,
+        /// The destination established by the owning resolver.
+        target: Option<String>,
     },
     /// The library exists but cannot be read, or its name is no safe path.
     Unreadable {
@@ -289,6 +293,8 @@ pub enum MaterialStatus {
         path: String,
         /// What is wrong.
         reason: String,
+        /// The destination established by the owning resolver.
+        target: Option<String>,
     },
     /// The library was read.
     Loaded(MaterialLibrary),
@@ -328,6 +334,16 @@ impl MaterialStatus {
         }
     }
 
+    /// Returns the destination established by the owning resolver.
+    #[must_use]
+    pub fn target(&self) -> Option<&str> {
+        match self {
+            Self::Missing { target, .. } | Self::Unreadable { target, .. } => target.as_deref(),
+            Self::Loaded(library) => library.target.as_deref(),
+            Self::Unnamed | Self::Skipped => None,
+        }
+    }
+
     /// Returns what went wrong with the layer files of a read library, or `None` when all were
     /// read: the materials of the missing layers keep the colours of their own file.
     #[must_use]
@@ -346,9 +362,21 @@ impl MaterialStatus {
     #[must_use]
     pub fn problem(&self) -> Option<String> {
         match self {
-            Self::Missing { path } => Some(format!("the material library {path} does not exist")),
-            Self::Unreadable { path, reason } => Some(format!(
-                "the material library {path} cannot be read: {reason}"
+            Self::Missing { path, target } => Some(target.as_ref().map_or_else(
+                || format!("the material library {path} does not exist"),
+                |target| format!("the material library {path} mapped to {target} does not exist"),
+            )),
+            Self::Unreadable {
+                path,
+                reason,
+                target,
+            } => Some(target.as_ref().map_or_else(
+                || format!("the material library {path} cannot be read: {reason}"),
+                |target| {
+                    format!(
+                        "the material library {path} mapped to {target} cannot be read: {reason}"
+                    )
+                },
             )),
             Self::Unnamed | Self::Loaded(_) | Self::Skipped => None,
         }

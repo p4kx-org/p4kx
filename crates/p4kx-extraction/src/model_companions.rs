@@ -5,9 +5,10 @@ use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use p4kx_model::{CompanionError, CompanionPath, CompanionResolver};
+use p4kx_model::{CompanionError, CompanionPath, CompanionResolver, MaterialRequest};
 use thiserror::Error;
 
+use crate::archive_material_reference;
 use crate::chunk_source::MAX_CHUNK_FILE_LEN;
 use crate::disk_case::CaseIndex;
 use crate::entry_path::relative_path;
@@ -36,6 +37,12 @@ pub(crate) struct ArchiveCompanions<'i, 'a> {
 }
 
 impl CompanionResolver for ArchiveCompanions<'_, '_> {
+    fn material_request(&self, name: &str) -> Result<MaterialRequest, CompanionError> {
+        let request = archive_material_reference::request(name)?;
+        let target = archive_material_reference::target(self.index, self.folder, &request)?;
+        Ok(request.with_target(target))
+    }
+
     fn resolve(&mut self, path: CompanionPath<'_>) -> Result<Option<Vec<u8>>, CompanionError> {
         let (entry_path, limit) = match path {
             CompanionPath::Sibling(name) => {
@@ -53,7 +60,13 @@ impl CompanionResolver for ArchiveCompanions<'_, '_> {
             ),
             _ => return Ok(None),
         };
-        let Some(entry) = self.index.find(&entry_path) else {
+        let entry = match path {
+            CompanionPath::Material(_) => {
+                archive_material_reference::unique_entry(self.index, &entry_path)?
+            }
+            _ => self.index.find(&entry_path),
+        };
+        let Some(entry) = entry else {
             return Ok(None);
         };
         let reader = self.index.archive().open_entry(entry)?;

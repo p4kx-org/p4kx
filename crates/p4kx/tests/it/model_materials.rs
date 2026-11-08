@@ -127,7 +127,7 @@ fn a_missing_mtl_is_reported_and_the_model_exports_with_a_default_material() -> 
     let stdout = String::from_utf8(output.stdout)?;
     assert!(
         stdout.contains(
-            "the material library objects/test/cube does not exist; the default material is used"
+            "the material library objects/test/cube mapped to Data/objects/test/cube.mtl does not exist; the default material is used"
         ),
         "reported: {stdout}"
     );
@@ -146,6 +146,10 @@ fn a_missing_mtl_is_reported_and_the_model_exports_with_a_default_material() -> 
     let summary: Value = serde_json::from_slice(&json.stdout)?;
     assert_eq!(summary["library"]["status"], "missing", "status");
     assert_eq!(summary["library"]["path"], "objects/test/cube", "path");
+    assert_eq!(
+        summary["library"]["target"], "Data/objects/test/cube.mtl",
+        "mapped target"
+    );
     assert_eq!(summary["default_material_ids"], 2, "both IDs");
     assert!(summary["library"]["problem"].is_string(), "problem text");
     Ok(())

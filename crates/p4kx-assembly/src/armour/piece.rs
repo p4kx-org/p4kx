@@ -152,7 +152,7 @@ impl Piece {
         self
     }
 
-    /// Chooses the Entity's material library by `tags`, see [`MaterialVariant::resolve`]; the
+    /// Chooses the Entity's material library by `tags`, see [`MaterialVariant::resolve`](crate::MaterialVariant::resolve); the
     /// body variant's tag is always among them.
     #[must_use]
     pub fn with_material_tags(mut self, tags: Vec<String>) -> Self {

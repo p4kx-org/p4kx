@@ -215,6 +215,7 @@ impl LayerCache {
             return Arc::new(MaterialStatus::Unreadable {
                 path: path.to_owned(),
                 reason: "the path leaves the Data folder or is no plain path".to_owned(),
+                target: None,
             });
         };
         let key = request.to_ascii_lowercase();
@@ -222,6 +223,7 @@ impl LayerCache {
             return Arc::new(MaterialStatus::Unreadable {
                 path: request,
                 reason: "the layer-file budget is spent".to_owned(),
+                target: None,
             });
         }
         let cell = self.cell(&key);
@@ -259,12 +261,13 @@ impl LayerCache {
 fn fetch(request: &str, key: &str, companions: &mut dyn CompanionResolver) -> Fetched {
     let path = request.to_owned();
     let (bytes, status) = match companions.resolve(CompanionPath::Material(request)) {
-        Ok(None) => (0, MaterialStatus::Missing { path }),
+        Ok(None) => (0, MaterialStatus::Missing { path, target: None }),
         Err(error) => (
             0,
             MaterialStatus::Unreadable {
                 path,
                 reason: error.to_string(),
+                target: None,
             },
         ),
         Ok(Some(bytes)) => (
@@ -274,6 +277,7 @@ fn fetch(request: &str, key: &str, companions: &mut dyn CompanionResolver) -> Fe
                 Err(error) => MaterialStatus::Unreadable {
                     path,
                     reason: error.to_string(),
+                    target: None,
                 },
             },
         ),

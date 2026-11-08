@@ -117,13 +117,8 @@ fn a_sample_of_models_finds_its_material_library_and_exports_valid_glb() -> Test
 
 fn check(index: &PathIndex<'_>, entry: &Entry, glb: &Path) -> Result<Outcome, String> {
     let is_static = !entry.path().to_ascii_lowercase().ends_with(SKIN_EXTENSION);
-    let Ok(source) = ModelSource::from_index(index, entry.path()) else {
-        return Ok(Outcome {
-            is_static,
-            named: false,
-            loaded: false,
-        });
-    };
+    let source =
+        ModelSource::from_index(index, entry.path()).map_err(|error| format!("{error:#?}"))?;
     let summary = source
         .write_glb(&GlbOptions::default(), glb)
         .map_err(|e| format!("{e:#?}"))?;

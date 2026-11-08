@@ -44,7 +44,7 @@ expression: "serde_json::to_string_pretty(&shaped)?"
       "kind": "material_library",
       "name": "lodded",
       "path": "ship_interior",
-      "reason": "the material library objects/test/cube does not exist",
+      "reason": "the material library objects/test/cube mapped to Data/objects/test/cube.mtl does not exist",
       "skipped": false
     },
     {
@@ -58,7 +58,7 @@ expression: "serde_json::to_string_pretty(&shaped)?"
       "kind": "material_library",
       "name": "cockpit_seat",
       "path": "ship_interior/cockpit",
-      "reason": "the material library objects/test/cube does not exist",
+      "reason": "the material library objects/test/cube mapped to Data/objects/test/cube.mtl does not exist",
       "skipped": false
     }
   ],

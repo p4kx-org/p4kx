@@ -76,6 +76,7 @@ impl MaterialLibrary {
         size_of::<Self>()
             + mtl_source_size::library(&self.authored)
             + text(&self.path)
+            + self.target.as_deref().map_or(0, text)
             + self.default_palette.as_deref().map_or(0, text)
             + self.unresolved_layers.capacity() * size_of::<String>()
             + self

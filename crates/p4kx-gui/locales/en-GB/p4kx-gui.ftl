@@ -992,6 +992,8 @@ model-export-summary-counts = Nodes { $nodes }, meshes { $meshes }, materials { 
 model-export-summary-bones = Bones { $bones }, skinned meshes { $skinned }
 model-export-summary-library-missing = The material library { $library } does not exist; the default material is used.
 model-export-summary-library-unreadable = The material library { $library } cannot be read ({ $reason }); the default material is used.
+model-export-summary-library-missing-mapped = The material library { $library } (resolved to { $target }) does not exist; the default material is used.
+model-export-summary-library-unreadable-mapped = The material library { $library } (resolved to { $target }) cannot be read ({ $reason }); the default material is used.
 model-export-summary-default-materials = { $count ->
     [one] One material ID has no sub-material in the library; the default material is used for it.
    *[other] { $number } material IDs have no sub-material in the library; the default material is used for them.

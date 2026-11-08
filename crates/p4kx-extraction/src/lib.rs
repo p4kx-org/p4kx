@@ -16,6 +16,7 @@ mod archive_layout_info;
 mod archive_layout_info_tests;
 mod archive_layout_v2;
 mod archive_layout_zip;
+mod archive_material_reference;
 mod archive_metadata_version;
 mod archive_region_info;
 mod archive_table_declaration;

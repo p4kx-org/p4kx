@@ -992,6 +992,8 @@ model-export-summary-counts = Knoten { $nodes }, Meshes { $meshes }, Materialien
 model-export-summary-bones = Knochen { $bones }, Meshes mit Skinning { $skinned }
 model-export-summary-library-missing = Die Materialbibliothek { $library } existiert nicht; es wird das Standardmaterial verwendet.
 model-export-summary-library-unreadable = Die Materialbibliothek { $library } ist nicht lesbar ({ $reason }); es wird das Standardmaterial verwendet.
+model-export-summary-library-missing-mapped = Die Materialbibliothek { $library } (aufgelöst zu { $target }) existiert nicht; es wird das Standardmaterial verwendet.
+model-export-summary-library-unreadable-mapped = Die Materialbibliothek { $library } (aufgelöst zu { $target }) ist nicht lesbar ({ $reason }); es wird das Standardmaterial verwendet.
 model-export-summary-default-materials = { $count ->
     [one] Eine Material-ID hat kein Teilmaterial in der Bibliothek; dafür wird das Standardmaterial verwendet.
    *[other] { $number } Material-IDs haben kein Teilmaterial in der Bibliothek; dafür wird das Standardmaterial verwendet.

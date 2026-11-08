@@ -57,11 +57,46 @@ pub enum AnimationNoteKind {
 
 /// Why the material library of a model was not used.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MaterialProblem {
-    /// The library as the model names it, below `Data` without `.mtl`.
-    pub library: String,
-    /// Why it cannot be read, or `None` when it does not exist.
-    pub reason: Option<String>,
+#[non_exhaustive]
+pub enum MaterialProblem {
+    /// The library does not exist at its resolved destination.
+    Missing {
+        /// The original material-library reference.
+        library: String,
+        /// The destination established by the owning resolver, when available.
+        target: Option<String>,
+    },
+    /// The library exists but cannot be read or its reference is invalid.
+    Unreadable {
+        /// The original material-library reference.
+        library: String,
+        /// The destination established by the owning resolver, when available.
+        target: Option<String>,
+        /// The underlying read, parse or admission error.
+        reason: String,
+    },
+}
+
+impl MaterialProblem {
+    /// Retains the material status and resolver destination as independent presentation data.
+    pub(crate) fn of(status: &MaterialStatus) -> Option<Self> {
+        match status {
+            MaterialStatus::Missing { path, target } => Some(Self::Missing {
+                library: printable(path),
+                target: target.as_deref().map(printable),
+            }),
+            MaterialStatus::Unreadable {
+                path,
+                target,
+                reason,
+            } => Some(Self::Unreadable {
+                library: printable(path),
+                target: target.as_deref().map(printable),
+                reason: printable(reason),
+            }),
+            _ => None,
+        }
+    }
 }
 
 /// A texture of a material that the file lacks, so the material keeps its plain colour.
@@ -104,17 +139,7 @@ impl ModelExportSummary {
                 .collect(),
             written,
             unread: info.unread,
-            material_problem: match &model.materials {
-                MaterialStatus::Missing { path } => Some(MaterialProblem {
-                    library: printable(path),
-                    reason: None,
-                }),
-                MaterialStatus::Unreadable { path, reason } => Some(MaterialProblem {
-                    library: printable(path),
-                    reason: Some(printable(reason)),
-                }),
-                _ => None,
-            },
+            material_problem: MaterialProblem::of(&model.materials),
             unnamed_sub_materials: model
                 .materials
                 .library()

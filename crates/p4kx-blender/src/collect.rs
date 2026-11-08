@@ -127,8 +127,11 @@ impl Collected {
         let adjusted = original.hair_cap_of_body(&library.path);
         let material = adjusted.as_ref().unwrap_or(original);
         let index = (!library.single).then_some(position);
-        let path = library_path(&library.path);
-        let identity = if path.contains('/') {
+        let relative = p4kx_model::material_library_path(&library.path);
+        let mapped_root = relative.is_none() && library.target.is_some();
+        let path = relative
+            .unwrap_or_else(|| library_path(library.target.as_deref().unwrap_or(&library.path)));
+        let identity = if mapped_root || path.contains('/') {
             path.to_ascii_lowercase()
         } else {
             format!("{}/{}", self.folder, path.to_ascii_lowercase())
