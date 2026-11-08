@@ -4,7 +4,7 @@
 param([Parameter(Mandatory)][string]$Directory)
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'linux-package-tools.ps1')
+. (Join-Path $PSScriptRoot 'pinned-download.ps1')
 if (Test-Path -LiteralPath $Directory) { throw 'Download contract fixture directory must be new.' }
 New-Item -ItemType Directory -Path $Directory | Out-Null
 $script:payload = [Text.Encoding]::UTF8.GetBytes('synthetic complete pinned tool')

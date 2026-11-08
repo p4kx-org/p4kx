@@ -29,7 +29,7 @@ jobs:
           ACTIONLINT_VERSION: 1.7.12
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
         run: |
-          . .github/scripts/linux-package-tools.ps1
+          . .github/scripts/pinned-download.ps1
           $archive = "actionlint_$($env:ACTIONLINT_VERSION)_linux_amd64.tar.gz"
           $download = Join-Path $env:RUNNER_TEMP 'actionlint.tar.gz'
           Save-P4kxPinnedDownload "https://github.com/rhysd/actionlint/releases/download/v$($env:ACTIONLINT_VERSION)/$archive" $env:ACTIONLINT_SHA256 $download
