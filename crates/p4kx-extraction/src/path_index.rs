@@ -52,7 +52,19 @@ impl PathKeys {
     /// Returns the original admission error, allocation failure or an invalid physical index.
     pub fn try_new_with<E>(
         archive: &Archive,
+        check: impl FnMut(u64) -> Result<(), E>,
+    ) -> Result<Self, PathIndexBuildError<E>> {
+        Self::try_new_observed(archive, check, |_| Ok(()))
+    }
+
+    /// Builds the same keys while observing each actual hashed physical input in order.
+    ///
+    /// # Errors
+    /// Returns the original admission or observer error, allocation failure or invalid index.
+    pub fn try_new_observed<E>(
+        archive: &Archive,
         mut check: impl FnMut(u64) -> Result<(), E>,
+        mut observe: impl FnMut(&Entry) -> Result<(), E>,
     ) -> Result<Self, PathIndexBuildError<E>> {
         check(0).map_err(PathIndexBuildError::Interrupted)?;
         if let Some(position) = archive.entries().len().checked_sub(1) {
@@ -65,6 +77,7 @@ impl PathKeys {
             let hash = try_path_key(entry.path(), &mut check)?;
             let physical =
                 u32::try_from(position).map_err(|_| PathIndexError::IndexWidth { position })?;
+            observe(entry).map_err(PathIndexBuildError::Interrupted)?;
             keys.push((hash, physical));
         }
         path_key_sort::sort(&mut keys, &mut check)?;
@@ -239,3 +252,7 @@ fn match_entry<'a, E>(
 #[cfg(test)]
 #[path = "path_index_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "path_index_observer_tests.rs"]
+mod observer_tests;

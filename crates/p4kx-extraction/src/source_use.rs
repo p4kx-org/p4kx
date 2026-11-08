@@ -6,9 +6,9 @@ use std::sync::Arc;
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
-use crate::Language;
 use crate::projection_schema;
 use crate::source_inventory::{PhysicalSourceRef, SourceEncryptionState};
+use crate::{DecimalU64, Language};
 
 /// A document-local source-use identifier, independent of addresses or pointer values.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
@@ -106,6 +106,17 @@ pub enum SourceLocation {
         /// The source use holding the actual lookup key.
         selector: SourceUseRef,
     },
+    /// One exact logical field inside an already observed structured source subresource.
+    Subresource {
+        /// Format-owned namespace for the original source object.
+        namespace: String,
+        /// Original source ordinals, including repeated declarations and unknown slots.
+        #[serde(serialize_with = "subresource_indices")]
+        #[schemars(with = "Vec<DecimalU64>")]
+        indices: Vec<u64>,
+        /// Original source field or token-range label within that object.
+        field: String,
+    },
     /// A directory or standalone input metadata field.
     Metadata {
         /// Exact metadata field, including stored occurrence positions.
@@ -124,11 +135,27 @@ impl SourceLocation {
                 let code = language.code();
                 format!("q{}:{code}{}:{}", code.len(), selector.0.len(), selector.0)
             }
+            Self::Subresource {
+                namespace,
+                indices,
+                field,
+            } => {
+                use std::fmt::Write as _;
+                let mut key = format!("s{}:{namespace}{}:", namespace.len(), indices.len());
+                for index in indices {
+                    let _written = write!(&mut key, "{index}.");
+                }
+                let _written = write!(&mut key, "{}:{field}", field.len());
+                key
+            }
             Self::Metadata { field } => format!("m{}:{field}", field.len()),
         }
     }
 }
 
+fn subresource_indices<S: Serializer>(indices: &[u64], serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.collect_seq(indices.iter().copied().map(DecimalU64::new))
+}
 #[expect(
     clippy::trivially_copy_pass_by_ref,
     reason = "Serde field serializers receive references"
@@ -140,8 +167,7 @@ fn language_code<S: Serializer>(language: &Language, serializer: S) -> Result<S:
 /// A registered observed use and its captured encryption evidence.
 #[derive(Debug, Clone)]
 pub struct SourceUse {
-    pub(crate) reference: SourceUseRef,
-    pub(crate) role: SourceUseRole,
+    pub(crate) description: Arc<SourceUseDescription>,
     pub(crate) encryption: SourceEncryptionState,
     pub(crate) identity: Arc<()>,
 }
@@ -149,17 +175,25 @@ pub struct SourceUse {
 impl SourceUse {
     /// Returns this use's stable document-local reference.
     #[must_use]
-    pub const fn reference(&self) -> &SourceUseRef {
-        &self.reference
+    pub fn reference(&self) -> &SourceUseRef {
+        &self.description.id
     }
 
     /// Returns whether this observation supplied payload, selection or conversion input.
     #[must_use]
-    pub const fn role(&self) -> SourceUseRole {
-        self.role
+    pub fn role(&self) -> SourceUseRole {
+        self.description.role
     }
 
-    pub(crate) const fn encryption(&self) -> SourceEncryptionState {
+    /// Borrows the original registered observation without restoring authority from wire metadata.
+    #[must_use]
+    pub fn description(&self) -> &SourceUseDescription {
+        &self.description
+    }
+
+    /// Returns the captured effective encryption in this original observation's byte domain.
+    #[must_use]
+    pub const fn encryption(&self) -> SourceEncryptionState {
         self.encryption
     }
 }
@@ -248,3 +282,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "source_use_runtime_tests.rs"]
+mod runtime_tests;

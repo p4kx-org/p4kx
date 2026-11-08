@@ -50,6 +50,12 @@ impl SourceUses {
         })
     }
 
+    /// Returns whether two preparation handles share the same original evidence authority.
+    #[must_use]
+    pub fn is_same_inventory(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.identity, &other.identity)
+    }
+
     /// Binds a typed value to its actual retained payload, selector and conversion uses.
     /// Foreign-inventory contributions make the set incomplete and are never misattributed.
     #[must_use]
@@ -79,7 +85,11 @@ impl SourceUses {
         let registry = source_evidence_error::lock(&self.registry)?;
         Ok(SourceInventory {
             sources: registry.sources.values().cloned().collect(),
-            uses: registry.uses.values().cloned().collect(),
+            uses: registry
+                .uses
+                .values()
+                .map(|description| description.as_ref().clone())
+                .collect(),
         })
     }
 }

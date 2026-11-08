@@ -61,6 +61,9 @@ context. No separate worker or source lookup reconstructs it from the current Ar
 
 ## Export contract and verification
 
+The [shared source-contribution API](source-contributions.md) defines runtime inventory authority,
+byte domains, exact field addresses and explicit bounded readers for serialized descriptions.
+
 This API preserves evidence for [per-data-value output origins](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md).
 It does not itself add the required field markers to every tool serializer. #1125 owns those shared
 carriers, actual payload/selector/conversion uses, source references and immediate nullable

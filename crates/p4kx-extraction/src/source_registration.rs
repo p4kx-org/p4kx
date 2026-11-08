@@ -6,8 +6,9 @@ use p4kx_archive::{
 };
 
 use crate::source_inventory::{
-    ArchiveEntrySource, FileSource, PhysicalSource, PhysicalSourceKind, PhysicalSourceRef,
-    SourceDeclarationKind, SourceEncryptionDeclaration, SourceEncryptionState, SourceRecordFormat,
+    ArchiveEntrySource, ArchiveFileSource, FileSource, PhysicalSource, PhysicalSourceKind,
+    PhysicalSourceRef, SourceDeclarationKind, SourceEncryptionDeclaration, SourceEncryptionState,
+    SourceRecordFormat,
 };
 use crate::source_registry::SourceRegistry;
 use crate::source_value::{SourceValue, SourcedValue};
@@ -133,5 +134,23 @@ pub(crate) fn file(
         ancestors: Vec::new(),
         stored_encryption: SourceEncryptionState::Unknown,
         source: PhysicalSourceKind::File(FileSource { name, byte_length }),
+    }
+}
+
+pub(crate) fn archive_file(
+    registry: &mut SourceRegistry,
+    id: PhysicalSourceRef,
+    byte_length: u64,
+) -> PhysicalSource {
+    let byte_length = registry.file_metadata_value(
+        &id,
+        "byteLength".to_owned(),
+        SourceValue::Present(DecimalU64::new(byte_length)),
+    );
+    PhysicalSource {
+        id,
+        ancestors: Vec::new(),
+        stored_encryption: SourceEncryptionState::Unknown,
+        source: PhysicalSourceKind::ArchiveFile(ArchiveFileSource { byte_length }),
     }
 }

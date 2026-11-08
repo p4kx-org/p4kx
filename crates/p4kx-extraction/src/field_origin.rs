@@ -101,3 +101,30 @@ impl JsonSchema for FieldOrigin {
         OriginFields::json_schema(generator)
     }
 }
+
+impl FieldOrigin {
+    pub(crate) fn from_wire(
+        contains_encrypted_source: Option<bool>,
+        source_uses_refs: Vec<SourceUseRef>,
+        source_set_complete: bool,
+    ) -> Result<Self, &'static str> {
+        if contains_encrypted_source == Some(false) && !source_set_complete {
+            return Err("unencrypted field origin requires complete contributors");
+        }
+        let empty_marker = if source_set_complete {
+            Some(false)
+        } else {
+            None
+        };
+        if source_uses_refs.is_empty() && contains_encrypted_source != empty_marker {
+            return Err("empty contributor origin has an inconsistent marker");
+        }
+        Ok(Self {
+            fields: Arc::new(OriginFields {
+                contains_encrypted_source,
+                source_uses_refs,
+                source_set_complete,
+            }),
+        })
+    }
+}

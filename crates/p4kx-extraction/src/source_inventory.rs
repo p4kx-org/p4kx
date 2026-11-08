@@ -109,6 +109,14 @@ pub struct ArchiveEntrySource {
     pub(crate) declarations: SourcedValue<Vec<SourcedValue<SourceEncryptionDeclaration>>>,
 }
 
+/// Measured whole-Archive file facts independently of its stored Entry declarations.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = projection_schema::require_properties)]
+pub struct ArchiveFileSource {
+    pub(crate) byte_length: SourcedValue<DecimalU64>,
+}
+
 /// Observed standalone-file facts without a claim of original P4K lineage.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -125,6 +133,8 @@ pub struct FileSource {
 pub enum PhysicalSourceKind {
     /// One physical Entry inside its observed root input.
     ArchiveEntry(ArchiveEntrySource),
+    /// The completed whole-file read of an observed Archive input.
+    ArchiveFile(ArchiveFileSource),
     /// One observed file input, without publication of its host path.
     File(FileSource),
     /// A source or ancestor whose physical binding is not known.

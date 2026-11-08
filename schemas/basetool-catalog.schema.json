@@ -236,6 +236,18 @@
       ],
       "type": "object"
     },
+    "ArchiveFileSource": {
+      "description": "Measured whole-Archive file facts independently of its stored Entry declarations.",
+      "properties": {
+        "byteLength": {
+          "$ref": "#/$defs/SourcedValue53"
+        }
+      },
+      "required": [
+        "byteLength"
+      ],
+      "type": "object"
+    },
     "ArchiveKeyState": {
       "description": "Whether the Archive key was there for the encrypted Entries an export asked for.",
       "type": "string",
@@ -12455,6 +12467,20 @@
           "type": "object"
         },
         {
+          "$ref": "#/$defs/ArchiveFileSource",
+          "description": "The completed whole-file read of an observed Archive input.",
+          "properties": {
+            "kind": {
+              "const": "archiveFile",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
           "$ref": "#/$defs/FileSource",
           "description": "One observed file input, without publication of its host path.",
           "properties": {
@@ -16941,6 +16967,37 @@
             "type",
             "language",
             "selector"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One exact logical field inside an already observed structured source subresource.",
+          "properties": {
+            "field": {
+              "description": "Original source field or token-range label within that object.",
+              "type": "string"
+            },
+            "indices": {
+              "description": "Original source ordinals, including repeated declarations and unknown slots.",
+              "items": {
+                "$ref": "#/$defs/DecimalU64"
+              },
+              "type": "array"
+            },
+            "namespace": {
+              "description": "Format-owned namespace for the original source object.",
+              "type": "string"
+            },
+            "type": {
+              "const": "subresource",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "namespace",
+            "indices",
+            "field"
           ],
           "type": "object"
         },

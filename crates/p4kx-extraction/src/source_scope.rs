@@ -4,7 +4,7 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use p4kx_archive::EntryOrigin;
+use p4kx_archive::{ArchiveInputOrigin, EntryOrigin};
 
 use crate::DataForgeFileOrigin;
 use crate::source_evidence_error::{self, SourceEvidenceError};
@@ -18,6 +18,13 @@ use crate::source_use::{InputScope, SourceLocation, SourceUse, SourceUseRole};
 pub enum SourceInput<'a> {
     /// An observed Archive Entry and its containing Entries.
     Archive(&'a EntryOrigin),
+    /// One completed whole-Archive file read bound to its actual opaque input owner.
+    ArchiveFile {
+        /// Observed input identity retained by the owning Archive.
+        input: &'a ArchiveInputOrigin,
+        /// Actual completed byte count, validated at the owning read seam.
+        byte_length: u64,
+    },
     /// An observed standalone file with unknown original P4K lineage.
     File(&'a DataForgeFileOrigin),
     /// An input without trusted physical binding.
@@ -60,6 +67,48 @@ impl SourceScope {
             scope,
             ..self.clone()
         }
+    }
+
+    /// Returns an already observed containing Entry at its original outermost-first position.
+    ///
+    /// # Errors
+    /// Returns an error when a mutation interrupted the shared evidence registry.
+    pub fn ancestor(&self, position: usize) -> Result<Option<Self>, SourceEvidenceError> {
+        let registry = source_evidence_error::lock(&self.registry)?;
+        let Some(reference) = registry
+            .sources
+            .get(&self.source)
+            .and_then(|source| source.ancestors.get(position))
+        else {
+            return Ok(None);
+        };
+        let Some(source) = registry.sources.get(reference) else {
+            return Ok(None);
+        };
+        let metadata =
+            source
+                .ancestors
+                .iter()
+                .fold(SourceEncryptionState::Unencrypted, |state, ancestor| {
+                    state.combine(
+                        registry
+                            .sources
+                            .get(ancestor)
+                            .map_or(SourceEncryptionState::Unknown, |source| {
+                                source.stored_encryption
+                            }),
+                    )
+                });
+        let payload = metadata.combine(source.stored_encryption);
+        let ancestor_source = reference.clone();
+        drop(registry);
+        Ok(Some(Self {
+            registry: Arc::clone(&self.registry),
+            source: ancestor_source,
+            payload,
+            metadata,
+            scope: self.scope,
+        }))
     }
 
     /// Returns this scope's physical-source reference.

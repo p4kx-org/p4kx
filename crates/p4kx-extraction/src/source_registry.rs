@@ -34,7 +34,7 @@ pub(crate) struct SourceRegistry {
     pub(crate) identity: Arc<()>,
     inputs: Vec<InputIdentity>,
     pub(crate) sources: BTreeMap<PhysicalSourceRef, PhysicalSource>,
-    pub(crate) uses: BTreeMap<SourceUseRef, SourceUseDescription>,
+    pub(crate) uses: BTreeMap<SourceUseRef, Arc<SourceUseDescription>>,
 }
 
 impl SourceRegistry {
@@ -50,6 +50,20 @@ impl SourceRegistry {
     pub(crate) fn observe(&mut self, input: SourceInput<'_>) -> RegisteredSource {
         match input {
             SourceInput::Archive(origin) => self.archive(origin),
+            SourceInput::ArchiveFile { input, byte_length } => {
+                let index = self.archive_input(input);
+                let id = PhysicalSourceRef(format!("a{index}:file"));
+                if !self.sources.contains_key(&id) {
+                    let source = source_registration::archive_file(self, id.clone(), byte_length);
+                    self.sources.insert(id.clone(), source);
+                }
+                RegisteredSource {
+                    id,
+                    payload: SourceEncryptionState::Unknown,
+                    metadata: SourceEncryptionState::Unknown,
+                }
+            }
+
             SourceInput::File(origin) => {
                 let index = self.file_input(origin);
                 let id = PhysicalSourceRef(format!("f{index}"));
@@ -175,18 +189,17 @@ impl SourceRegistry {
             role.key(),
             location.key()
         ));
-        self.uses
-            .entry(id.clone())
-            .or_insert_with(|| SourceUseDescription {
+        let description = self.uses.entry(id.clone()).or_insert_with(|| {
+            Arc::new(SourceUseDescription {
                 id: id.clone(),
                 source: source.clone(),
                 scope,
                 role,
                 location,
-            });
+            })
+        });
         SourceUse {
-            reference: id,
-            role,
+            description: Arc::clone(description),
             encryption,
             identity: Arc::clone(&self.identity),
         }

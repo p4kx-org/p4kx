@@ -56,6 +56,13 @@ mod exclusion;
 mod extract;
 mod extract_outcome;
 mod field_origin;
+mod field_origin_seed;
+mod field_origins;
+mod field_origins_seed;
+#[cfg(test)]
+mod field_origins_tests;
+mod field_path;
+mod field_path_seed;
 mod filter;
 mod folder_cache;
 mod folder_convert;
@@ -81,6 +88,11 @@ mod model_source;
 mod model_source_glb;
 mod model_textures;
 mod options;
+#[cfg(test)]
+mod origin_reader_admission_tests;
+mod origin_reader_limits;
+#[cfg(test)]
+mod origin_reader_tests;
 mod output_cleanup;
 mod output_creation;
 mod output_file;
@@ -110,6 +122,8 @@ mod sound_output;
 mod sound_workers;
 mod soundbank_convert;
 mod source;
+#[cfg(test)]
+mod source_ancestor_tests;
 mod source_evidence_error;
 mod source_inventory;
 mod source_protection;
@@ -117,6 +131,7 @@ mod source_registration;
 mod source_registry;
 mod source_scope;
 mod source_use;
+mod source_use_wire;
 mod source_uses;
 mod source_value;
 mod source_value_schema;
@@ -204,6 +219,11 @@ pub use entry_tree::{EntryTree, Folder, FolderId};
 pub use exclusion::{Exclusion, LeftOut, MAX_EXCLUSIONS};
 pub use extract::extract;
 pub use field_origin::FieldOrigin;
+pub use field_origin_seed::FieldOriginSeed;
+pub use field_origins::{FieldOrigins, FieldOriginsError};
+pub use field_origins_seed::FieldOriginsSeed;
+pub use field_path::{FieldPath, FieldPathError};
+pub use field_path_seed::FieldPathSeed;
 pub use filter::{Filter, FilterError, MAX_FILTER_LEN, MAX_FILTER_WILDCARDS};
 pub use folder_convert::convert_folder;
 pub use folder_source::{
@@ -233,6 +253,7 @@ pub use model_textures::{ArchiveTextures, MAX_MODEL_TEXTURE_PIXELS};
 pub use options::{
     AudioConversion, CancelToken, ConflictPolicy, ExtractOptions, Progress, TextureConversion,
 };
+pub use origin_reader_limits::OriginReaderLimits;
 pub use output_file::{
     Replaced, check_protected_output, write_bytes_replacing, write_replacing,
     write_replacing_counted, write_replacing_counted_protected, write_replacing_protected,
@@ -334,9 +355,9 @@ pub use selection::{UnknownEntries, select_entries};
 pub use sound::{MAX_SOUND_LEN, Sound};
 pub use source_evidence_error::SourceEvidenceError;
 pub use source_inventory::{
-    ArchiveEntrySource, FileSource, PhysicalSource, PhysicalSourceKind, PhysicalSourceRef,
-    SourceDeclarationKind, SourceEncryptionDeclaration, SourceEncryptionState, SourceInventory,
-    SourceRecordFormat,
+    ArchiveEntrySource, ArchiveFileSource, FileSource, PhysicalSource, PhysicalSourceKind,
+    PhysicalSourceRef, SourceDeclarationKind, SourceEncryptionDeclaration, SourceEncryptionState,
+    SourceInventory, SourceRecordFormat,
 };
 pub use source_scope::{SourceInput, SourceScope};
 pub use source_use::{
