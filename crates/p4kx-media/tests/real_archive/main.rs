@@ -4,17 +4,22 @@
 //! Opt-in bounded preservation verification without game fixtures or keys in source control.
 
 use std::fs;
-use std::io::Read;
+use std::path::Path;
 
-use p4kx_extraction::{Archive, ArchiveWatch, Checksum, Exclusion, Filter};
-use p4kx_media::{Algorithm, ByteScope, ExportOptions, ExportOutcome, MediaRecord};
-use p4kx_testkit::real_archive_path;
+use p4kx_extraction::{Archive, ArchiveWatch, Checksum, Entry, Exclusion, Filter};
+use p4kx_media::{Algorithm, ByteScope, ExportOptions, ExportOutcome, Index, MediaKind, Source};
+use sha2::Sha256;
 
 mod manifests;
+mod preservation_provider;
 mod privacy;
-use sha2::{Digest as _, Sha256};
+
+use preservation_provider::PreservationProvider;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+const MAX_SELECTED_ENTRIES: usize = 64;
+const MAX_SOURCE_BYTES: u64 = 8 << 20;
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
@@ -24,7 +29,7 @@ fn selected_real_payloads_match_physical_entries_manifests_and_sidecar_hashes()
 }
 
 fn verify() -> TestResult {
-    let archive = Archive::open(real_archive_path()?)?;
+    let archive = Archive::open(p4kx_testkit::real_archive_path()?)?;
     let watch = ArchiveWatch::new(&archive);
     watch.check()?;
     let candidate = archive
@@ -39,43 +44,99 @@ fn verify() -> TestResult {
                 && !entry.path().to_ascii_lowercase().ends_with(".socpak")
         })
         .ok_or("no deterministic small unencrypted root Entry")?;
-    let filter = Filter::parse(candidate.path())?;
-    let excluded = Exclusion::parse(["*.pak", "*.socpak"])?;
-    let selected: Vec<_> = archive
-        .entries()
-        .iter()
-        .filter(|entry| filter.matches(entry.path()) && !excluded.matches(entry.path()))
-        .collect();
-    let size: u64 = selected.iter().map(|entry| entry.uncompressed_size()).sum();
-    assert!(
-        selected.len() <= 64 && size <= 8 << 20,
-        "declared real-Archive selection exceeds 64 Entries or 8 MiB"
-    );
+    verify_archive(&archive, Filter::parse(candidate.path())?)?;
+    watch.check()?;
+    Ok(())
+}
+
+fn options(filter: Filter) -> TestResult<ExportOptions> {
     let mut options = ExportOptions {
+        kinds: vec![MediaKind::Archive],
         include: Some(filter),
-        exclude: excluded,
+        exclude: Exclusion::parse(["*.pak", "*.socpak"])?,
         ..ExportOptions::default()
     };
     options.limits.entry_bytes = 1 << 20;
-    options.limits.source_bytes = 8 << 20;
+    options.limits.source_bytes = MAX_SOURCE_BYTES;
+    options.limits.output_bytes = manifests::MAX_ARTIFACT_BYTES;
+    Ok(options)
+}
+
+fn verify_archive(archive: &Archive, filter: Filter) -> TestResult {
+    let options = options(filter)?;
+    let include = options.include.as_ref().ok_or("selection filter")?;
+    let selected: Vec<_> = archive
+        .entries()
+        .iter()
+        .filter(|entry| include.matches(entry.path()) && !options.exclude.matches(entry.path()))
+        .take(MAX_SELECTED_ENTRIES + 1)
+        .collect();
+    let size = selected
+        .iter()
+        .try_fold(0_u64, |total, entry| {
+            total.checked_add(entry.uncompressed_size())
+        })
+        .ok_or("declared selection size overflow")?;
+    assert!(
+        selected.len() <= MAX_SELECTED_ENTRIES && size <= MAX_SOURCE_BYTES,
+        "declared real-Archive selection exceeds 64 Entries or 8 MiB"
+    );
+    let providers = p4kx_media::ProviderRegistry::try_new(vec![Box::new(PreservationProvider)])?;
     let folder = tempfile::tempdir()?;
-    let result = p4kx_media::export(&archive, folder.path(), &options)?;
+    let result = p4kx_media::export_with(archive, folder.path(), &options, &providers)?;
     let ExportOutcome::Published { index, .. } = result else {
         return Err("expected complete bounded generation".into());
     };
-    assert_index(&index, selected.len())?;
-    assert_retained_payloads(&archive, folder.path(), &index, &selected)?;
-    manifests::verify(&archive, folder.path(), &index, &selected)?;
-    watch.check()?;
+    assert_index(&index, archive.entries().len(), selected.len())?;
+    manifests::verify(archive, folder.path(), &index, &selected)?;
+    assert_retained_payloads(archive, folder.path(), &index, &selected)?;
     folder.close()?;
     Ok(())
 }
 
-fn assert_index(index: &p4kx_media::Index, count: usize) -> TestResult {
+fn assert_index(index: &Index, physical: usize, selected: usize) -> TestResult {
+    let physical = u64::try_from(physical)?;
+    let selected = u64::try_from(selected)?;
     assert_eq!(
-        index.source_entries.written, count as u64,
-        "every selected Entry is retained"
+        index.source_entries.enumerated, physical,
+        "physical inventory"
     );
+    assert_eq!(
+        index.source_entries.written, selected,
+        "retained physical Entries"
+    );
+    assert_eq!(
+        index.source_entries.skipped,
+        physical - selected,
+        "unselected Entries"
+    );
+    assert_eq!(
+        index.kinds.len(),
+        1,
+        "only the preservation verification provider"
+    );
+    let kind = index.kinds.first().ok_or("verification provider")?;
+    assert_eq!(
+        kind.provider.id, "verification.selected-raw",
+        "the explicit preservation provider owns this probe"
+    );
+    assert_eq!(
+        kind.counts.source_entries.enumerated, selected,
+        "provider callbacks count selected physical sources"
+    );
+    assert_eq!(
+        kind.counts.source_entries.skipped, selected,
+        "the verification provider adds no semantic projection"
+    );
+    assert_eq!(
+        kind.counts.records.enumerated, 0,
+        "no typed metadata projection"
+    );
+    assert_eq!(
+        kind.counts.converted_outputs.enumerated, 0,
+        "raw is not converted output"
+    );
+    assert_eq!(kind.artifact.size, 0, "no hidden semantic records");
     assert_eq!(
         index.source.digest.algorithm,
         Algorithm::Sha256,
@@ -95,38 +156,35 @@ fn assert_index(index: &p4kx_media::Index, count: usize) -> TestResult {
 
 fn assert_retained_payloads(
     archive: &Archive,
-    output: &std::path::Path,
-    index: &p4kx_media::Index,
-    selected: &[&p4kx_extraction::Entry],
+    output: &Path,
+    index: &Index,
+    selected: &[&Entry],
 ) -> TestResult {
-    let stream = fs::read_to_string(output.join(&index.artifact_base).join("archive.jsonl"))?;
-    let records: Vec<MediaRecord> = stream
+    use std::io::Read;
+
+    use sha2::Digest as _;
+
+    let base = output.join(&index.artifact_base);
+    let stream = fs::read_to_string(base.join(&index.source_manifest.path))?;
+    let sources: Vec<Source> = stream
         .lines()
         .map(serde_json::from_str)
         .collect::<Result<_, _>>()?;
-    let sources: Vec<_> = records
-        .iter()
-        .filter(|record| record.source.raw.is_some())
-        .collect();
-    assert_eq!(
-        sources.len(),
-        selected.len(),
-        "exact source count differs from metadata and root count"
-    );
-    for (record, entry) in sources.into_iter().zip(selected.iter().copied()) {
-        let raw = record.source.raw.as_ref().ok_or("raw retention")?;
-        let actual = fs::read(output.join(&index.artifact_base).join(&raw.path))?;
-        let mut source = Vec::new();
+    assert_eq!(sources.len(), selected.len(), "exact retained source count");
+    for (source, entry) in sources.iter().zip(selected.iter().copied()) {
+        let raw = source.raw.as_ref().ok_or("raw retention")?;
+        let actual = fs::read(base.join(&raw.path))?;
+        let mut original = Vec::new();
         archive
             .open_entry_verified(entry)?
-            .read_to_end(&mut source)?;
+            .read_to_end(&mut original)?;
         assert!(
-            actual == source,
-            "retained bytes differ from the selected physical Entry"
+            actual == original,
+            "retained bytes differ from the physical Entry"
         );
         assert!(
             Checksum::Sha256(Sha256::digest(&actual).into()).hex() == raw.digest.hex,
-            "retained payload hash differs from its artifact declaration"
+            "retained hash differs from its artifact declaration"
         );
     }
     Ok(())

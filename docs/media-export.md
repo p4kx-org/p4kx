@@ -238,12 +238,19 @@ floats, capability refusal, honest counts, budgets, cancellation, corruption and
 failures. A real two-process test verifies exclusion and recovery after a killed writer.
 
 The ignored real-Archive test reads `P4KX_DATA_P4K` and deterministically selects small unencrypted
-root Entries, refusing more than 64 Entries or 8 MiB of decoded data. It excludes container
-traversal and independently checks physical source identities, both manifests, artifact hashes,
-exact sidecar bytes and schema validity under ArchiveWatch. Temporary output is removed after
-successful verification. Test results expose a static failure category rather than source errors.
-The root fingerprint still reads the entire Archive; the bounded selection applies to retained
-payloads. Run the optimised test once for LIVE and again for PTU:
+root Entries, refusing more than 64 Entries or 8 MiB of decoded data. It injects a verification-only
+provider through the public registry: the shared service retains the selected raw payloads and the
+provider emits no typed records or converted outputs. It excludes container traversal and checks
+physical source identities, both manifests, artifact hashes, exact sidecar bytes and schema validity
+under ArchiveWatch. Each manifest is bounded to 1 MiB and checked artifacts together to 16 MiB;
+the generation's output limit is also 16 MiB. Temporary output is removed after successful
+verification. Results expose a static failure category rather than source errors.
+
+The reader still inventories the root directory, traversal examines all physical root Entries, and
+the root fingerprint reads the entire Archive. The 8 MiB bound covers retained decoded payloads,
+not those root operations. A synthetic regression uses a directory larger than that bound to
+distinguish the focused probe from the permanent Archive provider's full-directory metadata reads.
+Run the optimised test once for LIVE and again for PTU:
 
 ```powershell
 $env:P4KX_DATA_P4K = '<absolute installed Data.p4k path>'
@@ -254,6 +261,8 @@ cargo test --locked --release -p p4kx-media --test real_archive -- `
   selected_real_payloads_match_physical_entries_manifests_and_sidecar_hashes --exact --ignored
 ```
 
-This verifies bounded raw preservation and the initial Archive provider. Domain providers, encrypted
-payloads, nested real containers and full-Archive semantic coverage require their own checks. No
-game files or keys are fixtures; source assets and generated real-Archive output must stay private.
+This verifies foundation raw preservation and accounting through the injectable provider contract.
+The permanent Archive provider's default-registry CLI and full-directory metadata projection have
+separate synthetic/native checks; this focused probe does not exercise them. Domain providers,
+encrypted payloads, nested real containers and full-Archive semantic coverage require their own checks.
+No game files or keys are fixtures; source assets and generated real-Archive output must stay private.

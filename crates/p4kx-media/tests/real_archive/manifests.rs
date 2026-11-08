@@ -11,7 +11,7 @@ use sha2::{Digest as _, Sha256};
 use super::TestResult;
 
 const MAX_MANIFEST_BYTES: u64 = 1 << 20;
-const MAX_ARTIFACT_BYTES: u64 = 16 << 20;
+pub(super) const MAX_ARTIFACT_BYTES: u64 = 16 << 20;
 
 pub(super) fn verify(
     archive: &Archive,
