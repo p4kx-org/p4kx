@@ -2128,10 +2128,11 @@ without decoding a key (ADR-0157): one whose key format the reader refuses is li
 so such an animation in them is unread, as before. The `reason` of an unreadable file starts
 with the Entry path or file, then the cause, e.g. `Data\x\a.caf: the CafData chunk is corrupt`;
 the cause no longer repeats the file name.
-`chunks` lists every chunk of the model file and of its
-geometry companion (`file` is `model`, `geometry` or `lod<n>-geometry`) with `usage` `read` when
-the model was read from it, `skipped` for a known type the model does not read and `unknown` for
-an unknown type.
+`chunks` lists every chunk of actually read model and geometry files. `file` is `model`,
+`geometry`, `lod<n>-geometry` or `lod<n>-model`; the last role identifies a level-specific model
+file read for its skeleton. These roles do not independently prove physical source identity.
+`usage` is `read` when the model was read from it, `skipped` for a known type the model does not
+read and `unknown` for an unknown type.
 A geometry companion that does not exist exits with code 2, a corrupt or unreadable model or
 companion with 3. A `CrCh` model that is well-formed but has a layout the reader does not
 implement (a mesh in data streams, a big-endian chunk, a `Mesh` or physics data chunk of another

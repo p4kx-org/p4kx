@@ -349,13 +349,14 @@ impl ChunkJson {
     }
 }
 
-/// Returns `model`, `geometry` or `lod<n>-geometry`.
+/// Returns the logical model or geometry role, including a level-specific file.
 #[must_use]
 pub fn file_name(file: ModelFile) -> Cow<'static, str> {
     match file {
         ModelFile::Model => Cow::Borrowed("model"),
         ModelFile::Geometry => Cow::Borrowed("geometry"),
         ModelFile::LodGeometry(level) => Cow::Owned(format!("lod{level}-geometry")),
+        ModelFile::LodModel(level) => Cow::Owned(format!("lod{level}-model")),
         _ => Cow::Borrowed("other"),
     }
 }

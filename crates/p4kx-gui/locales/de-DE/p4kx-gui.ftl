@@ -950,6 +950,7 @@ model-info-usage-unknown = Unbekannt, übersprungen
 model-info-file-model = Modelldatei
 model-info-file-geometry = Geometriedatei
 model-info-file-lod = Geometrie von LOD { $level }
+model-info-file-lod-model = Modelldatei von LOD { $level }
 model-info-type-unknown = Unbekannt
 model-export-action = Als GLB exportieren …
 model-export-title = Als GLB exportieren

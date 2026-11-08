@@ -10,8 +10,8 @@ use crate::error::failure;
 use crate::material::material_library;
 use crate::mtl_load::load;
 use crate::{
-    CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection, MaterialReading, Mesh, Model,
-    ModelError, ModelFile, ModelIssue, UnsupportedLayout,
+    CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection, LodSkeletonOrigin,
+    MaterialReading, Mesh, Model, ModelError, ModelFile, ModelIssue, UnsupportedLayout,
 };
 
 const MESH_VERSION: u32 = 0x801;
@@ -48,6 +48,7 @@ pub(crate) fn build<B: AsRef<[u8]>>(
             level,
             meshes,
             bones: None,
+            skeleton_origin: LodSkeletonOrigin::ModelFile,
         });
     }
     if let LodSelection::Only(level) = selection

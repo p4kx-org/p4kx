@@ -77,13 +77,15 @@ pub enum ModelInfoText {
     FileGeometry,
     /// The chunk is in the companion of a level of detail; takes `level`.
     FileLod,
+    /// The chunk is in the model file of a level of detail; takes `level`.
+    FileLodModel,
     /// The type of a chunk has no name.
     TypeUnknown,
 }
 
 impl ModelInfoText {
     /// Every text of the Info tab.
-    pub(crate) const ALL: [Self; 36] = [
+    pub(crate) const ALL: [Self; 37] = [
         Self::Tab,
         Self::Geometry,
         Self::GeometryInFile,
@@ -119,6 +121,7 @@ impl ModelInfoText {
         Self::FileModel,
         Self::FileGeometry,
         Self::FileLod,
+        Self::FileLodModel,
         Self::TypeUnknown,
     ];
 
@@ -161,6 +164,7 @@ impl ModelInfoText {
             Self::FileModel => "model-info-file-model",
             Self::FileGeometry => "model-info-file-geometry",
             Self::FileLod => "model-info-file-lod",
+            Self::FileLodModel => "model-info-file-lod-model",
             Self::TypeUnknown => "model-info-type-unknown",
         }
     }

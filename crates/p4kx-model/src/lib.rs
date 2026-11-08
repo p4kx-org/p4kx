@@ -50,6 +50,7 @@ mod error;
 mod hair_cap;
 mod hierarchy;
 mod included;
+mod lod_skeleton_origin;
 mod material;
 mod mesh;
 mod model;
@@ -117,6 +118,7 @@ pub use included::{
     IncludedObject, IncludedObjects, IncludedObjectsError, MAX_INCLUDED_MODELS,
     MAX_INCLUDED_OBJECTS,
 };
+pub use lod_skeleton_origin::LodSkeletonOrigin;
 pub use model::{ChunkUsage, Lod, LodSelection, Mesh, Model, ModelChunk, ModelFile, Node, Submesh};
 pub use model_options::{ModelIssue, PositionBox};
 pub use mtl::{

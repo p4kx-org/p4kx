@@ -14,8 +14,8 @@ use crate::skeleton::{read_bones, read_compact_bones};
 use crate::skin::read_skin;
 use crate::{
     Bone, ChunkUsage, CompanionPath, CompanionResolver, CorruptChunk, LayerCache, Lod,
-    LodSelection, MaterialReading, Mesh, Model, ModelChunk, ModelError, ModelFile, ModelIssue,
-    Node, PositionBox, RigLogicBytes, Transform,
+    LodSelection, LodSkeletonOrigin, MaterialReading, Mesh, Model, ModelChunk, ModelError,
+    ModelFile, ModelIssue, Node, PositionBox, RigLogicBytes, Transform,
 };
 
 const MATERIAL_TYPES: [ChunkType; 2] = [ivo::MTL_NAME_320, ivo::MTL_NAME];
@@ -36,6 +36,7 @@ pub(crate) struct Rig<'a> {
 pub(crate) fn read_skeleton<B: AsRef<[u8]>>(
     name: &str,
     file: &ChunkFile<B>,
+    which: ModelFile,
     read: &mut Vec<(ModelFile, usize)>,
 ) -> Result<Vec<Bone>, ModelError> {
     let Some((index, chunk)) = [ivo::COMPILED_BONES_2, ivo::COMPILED_BONES]
@@ -44,7 +45,7 @@ pub(crate) fn read_skeleton<B: AsRef<[u8]>>(
     else {
         return Ok(Vec::new());
     };
-    read.push((ModelFile::Model, index));
+    read.push((which, index));
     let data = file.chunk_data(index).unwrap_or_default();
     let (chunk_name, bones) = if chunk.chunk_type() == ivo::COMPILED_BONES_2 {
         ("CompiledBones2", read_bones(data))
@@ -75,7 +76,7 @@ pub(crate) fn build<B: AsRef<[u8]>>(
     let (nodes, material_indices) = nmc.map_or((None, Vec::new()), |nmc| {
         (Some(nmc.nodes), nmc.material_indices)
     });
-    let bones = read_skeleton(name, file, &mut read)?;
+    let bones = read_skeleton(name, file, ModelFile::Model, &mut read)?;
     let rig = Rig {
         nodes: nodes.as_ref().map(Vec::len),
         bones: &bones,
@@ -267,6 +268,7 @@ fn read_base_lod<B: AsRef<[u8]>>(
         level: 0,
         meshes,
         bones: None,
+        skeleton_origin: LodSkeletonOrigin::ModelFile,
     })
 }
 

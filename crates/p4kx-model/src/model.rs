@@ -6,8 +6,8 @@ use p4kx_chunks::{ChunkFile, ChunkType, Container, ivo};
 use crate::build::build;
 use crate::crch::build as build_crch;
 use crate::{
-    Bone, CompanionResolver, Influences, MaterialReading, MaterialStatus, ModelError, ModelIssue,
-    PositionBox, RigLogicBytes, Transform,
+    Bone, CompanionResolver, Influences, LodSkeletonOrigin, MaterialReading, MaterialStatus,
+    ModelError, ModelIssue, PositionBox, RigLogicBytes, Transform,
 };
 
 /// A model read from a chunk file and its companions, in `CryEngine` coordinates: Z up, metres.
@@ -38,7 +38,7 @@ pub struct Model {
     /// ([`LodSelection::OnlyOrBase`]) and data a `CrCh` read left out
     /// ([`ModelIssue::PhysicsSlotsIgnored`]), which every selection reports.
     pub issues: Vec<ModelIssue>,
-    /// Every chunk of the model file and its geometry companion, with how the model used it.
+    /// Every chunk of actually read model and geometry files, including LOD skeleton models.
     pub chunks: Vec<ModelChunk>,
     /// The bytes of the model file's `RigLogic` chunk, which a consumer above this layer parses;
     /// `None` for a model without one.
@@ -105,6 +105,8 @@ pub struct Lod {
     /// `<stem>_lod<n>.<extension>` file carries one that differs from [`Model::bones`]; see
     /// [`Model::bones_of`].
     pub bones: Option<Vec<Bone>>,
+    /// What the level-specific skeleton lookup observed without changing its effective bones.
+    pub skeleton_origin: LodSkeletonOrigin,
 }
 
 impl Lod {
@@ -187,6 +189,8 @@ pub enum ModelFile {
     Geometry,
     /// The geometry companion of a level of detail from 1 on, e.g. `_lod1.cgfm`.
     LodGeometry(u32),
+    /// The model file of a level from 1 on, read for its skeleton.
+    LodModel(u32),
 }
 
 /// Which levels of detail [`Model::read_with`] reads.
