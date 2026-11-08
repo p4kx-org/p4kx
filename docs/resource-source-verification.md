@@ -78,5 +78,5 @@ The historical LIVE 4.10.2 observation in #1044 recorded 170 commodity rows and 
 subtypeGuid values. Its original export and complete Build identity are no longer available.
 Those numbers remain an unpinned historical observation. They must not be assigned to a current
 Build, regenerated from another Build or presented as a passed historical cardinality test.
-The current-Build invariants and sampled source-value checks are independent of that missing
-historical evidence.
+Current-Build evidence replaces the lost historical cardinality pin for #1044. The installed
+current-Build acceptance remains required; synthetic or compile-only success does not replace it.
