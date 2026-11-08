@@ -7,19 +7,18 @@ use p4kx_texture::{RgbaImage, TextureError, cube_cross, write_png};
 use rayon::prelude::*;
 
 use crate::output_file::write_replacing_protected;
-use crate::texture_names::{image_suffixes, suffixed_path};
-use crate::{ConversionError, Texture};
+use crate::{ConversionError, Texture, TextureImageFormat, TextureImagePlan};
 
 const CUBE_FACES: usize = 6;
 
-/// The names of a cubemap's faces in DDS order +X, −X, +Y, −Y, +Z, −Z, as the face files of
+/// The names of a cubemap's faces in DDS order +X, âˆ’X, +Y, âˆ’Y, +Z, âˆ’Z, as the face files of
 /// [`CubemapLayout::Faces`] carry them.
 pub const CUBE_FACE_NAMES: [&str; 6] = ["posx", "negx", "posy", "negy", "posz", "negz"];
 
 /// How a PNG export writes a cubemap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CubemapLayout {
-    /// One file per face, `<stem>_posx.<extension>` … `<stem>_negz.<extension>` next to the
+    /// One file per face, `<stem>_posx.<extension>` â€¦ `<stem>_negz.<extension>` next to the
     /// requested file.
     #[default]
     Faces,
@@ -78,10 +77,11 @@ impl Texture<'_> {
         layout: CubemapLayout,
     ) -> Result<PngReport, ConversionError> {
         let cross = layout == CubemapLayout::Cross;
-        let files: Vec<PathBuf> = image_suffixes(self.header(), level, cross)
-            .iter()
-            .map(|suffix| suffixed_path(out, suffix))
-            .collect();
+        let files: Vec<PathBuf> =
+            TextureImagePlan::new(self.header(), level, layout, TextureImageFormat::Png)
+                .map_err(|error| ConversionError::of_texture(self.name(), error))?
+                .map(|image| image.path(out))
+                .collect();
         for file in &files {
             self.refuse_input(file)?;
         }

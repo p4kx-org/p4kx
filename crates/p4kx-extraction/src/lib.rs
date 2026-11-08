@@ -111,6 +111,7 @@ mod texture_convert;
 mod texture_exr;
 mod texture_grey;
 mod texture_groups;
+mod texture_image_plan;
 mod texture_images;
 mod texture_job;
 mod texture_names;
@@ -305,6 +306,9 @@ pub use texture::Texture;
 pub use texture_exr::ExrReport;
 pub use texture_grey::{TextureVerdicts, probe_saturation};
 pub use texture_groups::{TextureGroup, TextureGroups};
+pub use texture_image_plan::{
+    TextureImage, TextureImageFace, TextureImageFormat, TextureImagePlan,
+};
 pub use texture_png::{CUBE_FACE_NAMES, CubemapLayout, PngReport};
 pub use texture_preview_png::PreviewPng;
 pub use ui_extract::{UiAssetFailure, UiAssetKind, UiExtraction, WrittenUiAsset};

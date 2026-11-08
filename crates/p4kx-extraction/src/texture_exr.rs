@@ -7,8 +7,7 @@ use p4kx_texture::{HdrImage, TextureError, cube_cross_hdr, write_exr};
 use rayon::prelude::*;
 
 use crate::output_file::write_replacing_protected;
-use crate::texture_names::{image_suffixes, suffixed_path};
-use crate::{ConversionError, CubemapLayout, Texture};
+use crate::{ConversionError, CubemapLayout, Texture, TextureImageFormat, TextureImagePlan};
 
 const CUBE_FACES: usize = 6;
 
@@ -83,10 +82,11 @@ impl Texture<'_> {
         layout: CubemapLayout,
     ) -> Result<ExrReport, ConversionError> {
         let cross = layout == CubemapLayout::Cross;
-        let files: Vec<PathBuf> = image_suffixes(self.header(), level, cross)
-            .iter()
-            .map(|suffix| suffixed_path(out, suffix))
-            .collect();
+        let files: Vec<PathBuf> =
+            TextureImagePlan::new(self.header(), level, layout, TextureImageFormat::Exr)
+                .map_err(|error| ConversionError::of_texture(self.name(), error))?
+                .map(|image| image.path(out))
+                .collect();
         for file in &files {
             self.refuse_input(file)?;
         }

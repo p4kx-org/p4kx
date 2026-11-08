@@ -9,11 +9,12 @@ use p4kx_texture::{Mip, TextureError, read_mip, write_exr, write_png};
 
 use crate::buffers::Buffers;
 use crate::texture_convert::{Source, Step};
-use crate::texture_names::image_suffixes;
 use crate::texture_outputs::step_of;
 use crate::texture_siblings::Replay;
 use crate::write::{Chunk, Destination, EntryWriter, Outcome, write_error};
-use crate::{ConflictPolicy, ExtractionError, Texture};
+use crate::{
+    ConflictPolicy, CubemapLayout, ExtractionError, Texture, TextureImageFormat, TextureImagePlan,
+};
 
 /// The extensions of the image files a texture is exported to.
 pub(crate) const IMAGE_EXTENSIONS: [&str; 2] = ["png", "exr"];
@@ -47,7 +48,7 @@ impl EntryWriter<'_> {
     /// Decodes mip `level` of `source`, its part taken from `buffers.data` when the merge kept it
     /// there, and writes it next to `header` under the Conflict policy: as `<name>.png` with the
     /// alpha tail in its alpha channel, or for a high-range texture as OpenEXR `<name>.exr`, the
-    /// range kept; a cubemap's six faces as `<name>_posx` … `<name>_negz`, an array's elements as
+    /// range kept; a cubemap's six faces as `<name>_posx` â€¦ `<name>_negz`, an array's elements as
     /// `<name>_layerN` and a volume's slices as `<name>_sliceN`.
     pub(crate) fn write_images(
         &self,
@@ -57,14 +58,10 @@ impl EntryWriter<'_> {
         buffers: &mut Buffers,
     ) -> Result<Step, ExtractionError> {
         let dds = source.texture.header();
-        let extension = if dds.format().is_high_range() {
-            "exr"
-        } else {
-            "png"
-        };
-        let names: Vec<OsString> = image_suffixes(dds, level, false)
-            .iter()
-            .map(|suffix| image_name(header, suffix, extension))
+        let format = TextureImageFormat::for_header(dds);
+        let names: Vec<OsString> = TextureImagePlan::new(dds, level, CubemapLayout::Faces, format)
+            .map_err(|error| source.texture_error(error))?
+            .map(|image| image_name(header, &image.suffix, image.format.extension()))
             .collect();
         let destinations = names
             .iter()
