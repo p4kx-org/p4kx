@@ -82,7 +82,7 @@ pub(crate) fn on_archive_open(path: &Path) {
     }
     WARNED.call_once(|| {
         let started = CHECK.lock().unwrap_or_else(PoisonError::into_inner).take();
-        let running = started.map_or_else(look_for_game, |handle| handle.join().unwrap_or(false));
+        let running = started.map_or_else(look_for_game, completed_game_check);
         if running {
             let _ignored = writeln!(
                 io::stderr().lock(),
@@ -90,6 +90,10 @@ pub(crate) fn on_archive_open(path: &Path) {
             );
         }
     });
+}
+
+fn completed_game_check(handle: JoinHandle<bool>) -> bool {
+    handle.join().unwrap_or(true)
 }
 
 /// Returns whether a pure source or target refusal ended the write.
@@ -181,3 +185,7 @@ pub(crate) fn ensure_writable(target: &Path) -> io::Result<()> {
 #[cfg(test)]
 #[path = "guard_error_tests.rs"]
 mod error_tests;
+
+#[cfg(test)]
+#[path = "guard_game_tests.rs"]
+mod game_tests;
