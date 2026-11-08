@@ -118,6 +118,7 @@ mod texture_header;
 mod texture_image_plan;
 mod texture_images;
 mod texture_job;
+mod texture_member_keys;
 mod texture_names;
 mod texture_outputs;
 mod texture_parts;
@@ -318,6 +319,10 @@ pub use texture_grey::{TextureVerdicts, probe_saturation};
 pub use texture_groups::{TextureGroup, TextureGroups};
 pub use texture_image_plan::{
     TextureImage, TextureImageFace, TextureImageFormat, TextureImagePlan,
+};
+pub use texture_job::{Member as TextureMember, Role as TextureMemberRole, role as texture_role};
+pub use texture_member_keys::{
+    TextureMemberCandidate, TextureMemberIndex, TextureMemberKeys, TextureMemberRelation,
 };
 pub use texture_png::{CUBE_FACE_NAMES, CubemapLayout, PngReport};
 pub use texture_preview_png::PreviewPng;

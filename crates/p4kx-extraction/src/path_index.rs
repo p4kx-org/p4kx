@@ -119,25 +119,9 @@ impl<'a> PathIndex<'a> {
         PathIndexBuildError<E>,
     > {
         let key = try_path_key(path, &mut check)?;
-        let start = lower_bound(&self.keys, key, &mut check)?;
-        Ok(self
-            .keys
-            .get(start..)
-            .unwrap_or_default()
-            .iter()
-            .scan(false, move |done, &(candidate, position)| {
-                if *done {
-                    return None;
-                }
-                if let Err(error) = check(1) {
-                    *done = true;
-                    return Some(Err(PathIndexBuildError::Interrupted(error)));
-                }
-                if candidate != key {
-                    *done = true;
-                    return None;
-                }
-                Some(match_entry(self.archive, position, path))
+        Ok(matching_positions_with(&self.keys, key, check)?
+            .map(move |position| {
+                position.and_then(|position| match_entry(self.archive, position, path))
             })
             .filter_map(|result| match result {
                 Ok(Some(entry)) => Some(Ok(entry)),
@@ -170,7 +154,7 @@ pub(crate) fn path_key(path: &str) -> u64 {
     path.bytes().fold(FNV_OFFSET, fold_path_byte)
 }
 
-fn try_path_key<E>(
+pub(crate) fn try_path_key<E>(
     path: &str,
     check: &mut impl FnMut(u64) -> Result<(), E>,
 ) -> Result<u64, PathIndexBuildError<E>> {
@@ -211,6 +195,32 @@ fn lower_bound<E>(
         }
     }
     Ok(low)
+}
+
+pub(crate) fn matching_positions_with<'i, E: 'i>(
+    keys: &'i [(u64, u32)],
+    key: u64,
+    mut check: impl FnMut(u64) -> Result<(), E> + 'i,
+) -> Result<impl Iterator<Item = Result<u32, PathIndexBuildError<E>>> + 'i, PathIndexBuildError<E>>
+{
+    let start = lower_bound(keys, key, &mut check)?;
+    Ok(keys.get(start..).unwrap_or_default().iter().scan(
+        false,
+        move |done, &(candidate, position)| {
+            if *done {
+                return None;
+            }
+            if let Err(error) = check(1) {
+                *done = true;
+                return Some(Err(PathIndexBuildError::Interrupted(error)));
+            }
+            if candidate != key {
+                *done = true;
+                return None;
+            }
+            Some(Ok(position))
+        },
+    ))
 }
 
 fn match_entry<'a, E>(

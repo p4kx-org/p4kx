@@ -3,7 +3,7 @@
 
 use std::cell::Cell;
 
-use p4kx_extraction::Entry;
+use p4kx_extraction::{Entry, TextureMemberCandidate};
 
 use crate::directory_index::{self, DirectoryIndex};
 use crate::directory_inputs::DirectoryInputs;
@@ -11,9 +11,10 @@ use crate::lookup_work::LookupWork;
 use crate::source;
 use crate::source_selection::{EntrySelection, SourceSelection};
 use crate::{
-    CandidateState, ContainerIdentity, Digest, EntryInput, Identity, InputLookup, MediaError,
-    MediaKind, MediaWriter, NotSelectedReason, OriginalIdentifier, Reference, ReferenceCandidate,
-    ReferenceResolution, ReferenceTarget, ReferenceUnavailable, Source, Verification,
+    CandidateInventory, CandidateState, ContainerIdentity, Digest, EntryInput, Identity,
+    InputLookup, MediaError, MediaKind, MediaWriter, NotSelectedReason, OriginalIdentifier,
+    Reference, ReferenceCandidate, ReferenceResolution, ReferenceTarget, ReferenceUnavailable,
+    Source, Verification,
 };
 
 /// Source-bound candidate identities without opening or decoding target Entries.
@@ -97,9 +98,7 @@ impl<'a> DirectoryLookup<'a> {
         kind: Option<MediaKind>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<InputLookup<'_>, MediaError> {
-        let source_allowance = self.inputs.map_or(self.source_allowance, |inputs| {
-            inputs.source_allowance(writer.limits().sources)
-        });
+        let source_allowance = self.allowance(writer.limits().sources);
         let work = LookupWork {
             checkpoint: writer.checkpoint,
             limits: writer.limits(),
@@ -138,6 +137,49 @@ impl<'a> DirectoryLookup<'a> {
             None
         };
         Ok(InputLookup { reference, input })
+    }
+
+    /// Visits all physical texture-family candidates without reading or resolving any target.
+    ///
+    /// Candidate states retain selection and raw-path proof; the returned inventory bounds absence.
+    ///
+    /// # Errors
+    /// Returns original lookup/work/checkpoint, physical-index or visitor failures.
+    pub fn visit_texture_family(
+        &self,
+        header_path: &str,
+        writer: &mut MediaWriter<'_>,
+        mut visit: impl FnMut(
+            TextureMemberCandidate<'_>,
+            ReferenceCandidate,
+            &mut MediaWriter<'_>,
+        ) -> Result<(), MediaError>,
+    ) -> Result<CandidateInventory, MediaError> {
+        let work = LookupWork {
+            checkpoint: writer.checkpoint,
+            limits: writer.limits(),
+            current: self.work,
+            source_allowance: self.allowance(writer.limits().sources),
+        };
+        let index = self.index.texture_members(&work)?;
+        work.charge(1)?;
+        let requested = writer.has_kind(MediaKind::Texture);
+        for candidate in index
+            .family_candidates_with(header_path, |count| work.charge(count))
+            .map_err(directory_index::error)?
+        {
+            let candidate = candidate.map_err(directory_index::error)?;
+            let reference = self.candidate(candidate.entry, Some(MediaKind::Texture), requested);
+            visit(candidate, reference, writer)?;
+        }
+        work.charge(0)?;
+        Ok(self.index.inventory())
+    }
+
+    fn allowance(&self, limit: u64) -> u64 {
+        self.inputs.map_or(self.source_allowance, |inputs| {
+            inputs.source_allowance(limit)
+        })
     }
 
     fn candidate(
@@ -195,3 +237,7 @@ impl<'a> DirectoryLookup<'a> {
 #[cfg(test)]
 #[path = "directory_lookup_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "directory_texture_lookup_tests.rs"]
+mod texture_tests;

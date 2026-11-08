@@ -204,7 +204,8 @@ fn source_members<'a>(
 
 /// What an Entry is to texture Conversion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Role<'p> {
+#[non_exhaustive]
+pub enum Role<'p> {
     /// A `.dds` header.
     Header,
     /// An Entry belonging to the header at the given path.
@@ -213,7 +214,8 @@ pub(crate) enum Role<'p> {
 
 /// What an Entry other than the header is to its texture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Member {
+#[non_exhaustive]
+pub enum Member {
     /// Part `N`, `.dds.N`.
     Part(u32),
     /// The alpha tail's header, `.dds.a`.
@@ -222,8 +224,11 @@ pub(crate) enum Member {
     AlphaPart(u32),
 }
 
-/// Returns the role of the Entry at `path`, or `None` when it belongs to no texture.
-pub(crate) fn role(path: &str) -> Option<Role<'_>> {
+/// Classifies DDS family syntax in the supplied UTF-8 path.
+///
+/// Physical identity and raw-path losslessness require the owning Archive's evidence.
+#[must_use]
+pub fn role(path: &str) -> Option<Role<'_>> {
     if has_dds_extension(path) {
         return Some(Role::Header);
     }
