@@ -1,5 +1,18 @@
 # Versioned media export
 
+Providers can write unknown-length encoded output through `MediaWriter::converted_artifact`.
+Its callback receives only a bounded protected `Write` sink; every actual output byte shares
+the generation's `output_bytes` budget. `ArtifactExtension` accepts a lower-case ASCII
+alphanumeric suffix without a dot, bounded by the existing portable filename limit together
+with the SHA-256 name. Returned paths are `chunks/<sha256>.<extension>`; an `Artifact` is
+returned only after verified placement, manifest admission and converted-output accounting.
+Repeated content still charges actual writes and records a converted skip when its exact
+output already exists. Typed chunks remain converted outputs; retained metadata chunks do not.
+Any sink failure is sticky even when the encoder ignores it. Independent encoder, output,
+post-operation source-check and cleanup failures retain their typed causes. A checkpoint
+observes cancellation and Archive changes before and after actual output I/O; the operation
+does not claim an adversarial immutable snapshot or an encoder processing/memory bound.
+
 `p4kx media export ARCHIVE --out DIR` writes a versioned, streaming media export. Its format is
 `p4kx-media`, `format_version: "1.0"`; catalog schema versions do not apply.
 

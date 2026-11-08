@@ -4,10 +4,10 @@
 use std::io::{Read, Write};
 use std::path::Path;
 
+use crate::artifact_placement;
 use crate::checkpoint::IO_BLOCK_BYTES;
 use crate::error;
 use crate::hashing;
-use crate::output_path;
 use crate::temporary_file::TemporaryFile;
 use crate::{Algorithm, ByteScope, Digest, MediaError, MediaWriter};
 use sha2::{Digest as _, Sha256};
@@ -23,15 +23,8 @@ pub(crate) fn copy<'a>(
     input: &mut dyn Read,
     size: u64,
 ) -> Result<ChunkFile<'a>, MediaError> {
-    writer
-        .namespace
-        .ensure_namespace_writable(directory, writer.checkpoint.cancel.flag())?;
-    if !output_path::directory(directory)? {
-        return Err(MediaError::Destination(
-            "chunk staging directory is missing".into(),
-        ));
-    }
-    let mut temporary = TemporaryFile::create(directory, writer.checkpoint)?;
+    let mut temporary =
+        artifact_placement::temporary(writer, directory, "chunk staging directory is missing")?;
     match stream(writer, directory, input, size, &mut temporary) {
         Ok(digest) => Ok(ChunkFile { temporary, digest }),
         Err(primary) => temporary.finish(Err(primary)),

@@ -12,8 +12,10 @@ use crate::artifact::{BoundedLine, Stream};
 use crate::checkpoint::Checkpoint;
 use crate::contract::Tally;
 use crate::error;
+use crate::json_output;
 use crate::media_record;
 use crate::media_record::Record;
+use crate::output_operation;
 use crate::{
     Artifact, Capability, Counts, KindSummary, Limits, MediaError, MediaIssue, MediaKind, Source,
     Status, Subresource,
@@ -135,15 +137,18 @@ impl<'a> MediaWriter<'a> {
             .kinds
             .get_mut(active)
             .ok_or_else(|| MediaError::Contract("unknown active provider".into()))?;
-        stream
-            .stream
-            .write_all(&line)
-            .map_err(|source| error::io(&self.root, source))?;
-        stream.counts.records.enumerated += 1;
-        observe(&mut stream.counts.records, status);
-        self.records += 1;
-        self.terminal = Some(worst(self.terminal.unwrap_or(Status::Complete), status));
-        Ok(())
+        let result = (|| {
+            stream
+                .stream
+                .write_all(&line)
+                .map_err(|source| error::io(&self.root, source))?;
+            stream.counts.records.enumerated += 1;
+            observe(&mut stream.counts.records, status);
+            self.records += 1;
+            self.terminal = Some(worst(self.terminal.unwrap_or(Status::Complete), status));
+            Ok(())
+        })();
+        output_operation::checked(result, self.checkpoint())
     }
 
     fn record_line<T: Serialize>(
@@ -269,22 +274,25 @@ impl<'a> MediaWriter<'a> {
 
     pub(crate) fn artifact(&mut self, artifact: &Artifact) -> Result<(), MediaError> {
         self.checkpoint()?;
-        if self.artifacts >= self.limits.sources.saturating_add(self.limits.records) {
-            return Err(MediaError::Limit {
-                budget: "artifacts",
-                limit: self.limits.sources.saturating_add(self.limits.records),
-            });
-        }
-        let mut line = BoundedLine::new(self.limits.record_bytes);
-        serde_json::to_writer(&mut line, artifact)?;
-        line.write_all(b"\n")
-            .map_err(|source| error::io(&self.root, source))?;
-        self.reserve_output(line.bytes.len() as u64)?;
-        self.manifest
-            .write_all(&line.bytes)
-            .map_err(|source| error::io(&self.root, source))?;
-        self.artifacts += 1;
-        Ok(())
+        let result = (|| {
+            if self.artifacts >= self.limits.sources.saturating_add(self.limits.records) {
+                return Err(MediaError::Limit {
+                    budget: "artifacts",
+                    limit: self.limits.sources.saturating_add(self.limits.records),
+                });
+            }
+            let mut line = BoundedLine::new(self.limits.record_bytes);
+            serde_json::to_writer(&mut line, artifact)?;
+            line.write_all(b"\n")
+                .map_err(|source| error::io(&self.root, source))?;
+            self.reserve_output(line.bytes.len() as u64)?;
+            self.manifest
+                .write_all(&line.bytes)
+                .map_err(|source| error::io(&self.root, source))?;
+            self.artifacts += 1;
+            Ok(())
+        })();
+        output_operation::checked(result, self.checkpoint())
     }
 
     pub(crate) fn retained(&mut self, source: &Source) -> Result<(), MediaError> {
@@ -294,16 +302,26 @@ impl<'a> MediaWriter<'a> {
             crate::observed_write::ObservedWrite::new(&mut line, &self.checkpoint),
             source,
         );
-        self.checkpoint()?;
-        serialised?;
+        json_output::finish(serialised, self.checkpoint)?;
         line.write_all(b"\n").map_err(|_| MediaError::Limit {
             budget: "record_bytes",
             limit: self.limits.record_bytes,
         })?;
         self.reserve_output(line.bytes.len() as u64)?;
-        self.sources
+        let result = self
+            .sources
             .write_all(&line.bytes)
-            .map_err(|cause| error::io(&self.root, cause))?;
+            .map_err(|cause| error::io(&self.root, cause));
+        output_operation::checked(result, self.checkpoint())
+    }
+
+    pub(crate) fn require_output_callback(&self) -> Result<(), MediaError> {
+        self.checkpoint()?;
+        if self.active.is_none() || self.source.is_none() {
+            return Err(MediaError::Contract(
+                "converted artifact outside provider callback".into(),
+            ));
+        }
         Ok(())
     }
 
@@ -326,8 +344,12 @@ impl<'a> MediaWriter<'a> {
         Ok(())
     }
 
+    pub(crate) const fn remaining_output_bytes(&self) -> u64 {
+        self.limits.output_bytes.saturating_sub(self.output_bytes)
+    }
+
     pub(crate) const fn reserve_output(&mut self, bytes: u64) -> Result<(), MediaError> {
-        if bytes > self.limits.output_bytes.saturating_sub(self.output_bytes) {
+        if bytes > self.remaining_output_bytes() {
             return Err(MediaError::Limit {
                 budget: "output_bytes",
                 limit: self.limits.output_bytes,
@@ -354,6 +376,10 @@ impl<'a> MediaWriter<'a> {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "artifact_accounting_tests.rs"]
+mod artifact_tests;
 
 pub(crate) const fn observe(tally: &mut Tally, status: Status) {
     match status {

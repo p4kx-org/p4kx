@@ -52,11 +52,17 @@ impl<'a> TemporaryFile<'a> {
             .ok_or_else(|| MediaError::Contract("temporary file already placed".into()))
     }
 
-    pub(crate) fn sync_all(&self) -> Result<(), MediaError> {
+    pub(crate) fn ensure_writable(&self) -> Result<(), MediaError> {
         let file = self.file()?;
         file.as_file()
             .token
             .ensure_writable(file.path(), self.checkpoint.cancel.flag())?;
+        Ok(())
+    }
+
+    pub(crate) fn sync_all(&self) -> Result<(), MediaError> {
+        self.ensure_writable()?;
+        let file = self.file()?;
         file.as_file()
             .file
             .sync_all()

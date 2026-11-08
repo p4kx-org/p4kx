@@ -97,6 +97,10 @@ fn code(error: &MediaError) -> Option<u8> {
         MediaError::Source { cause, .. } | MediaError::ExtractionInterrupted { cause, .. } => {
             code(cause)
         }
+        MediaError::Output {
+            cause,
+            callback: None,
+        } => code(cause),
         MediaError::Changed(_) => Some(exit::ARCHIVE_CHANGED),
         MediaError::Protected(cause) => Some(if cause.is_cancelled() {
             exit::PARTIAL_FAILURE
@@ -117,6 +121,10 @@ fn code(error: &MediaError) -> Option<u8> {
         | MediaError::OwnedOutput(_)
         | MediaError::CleanupFailed { .. }
         | MediaError::InputCheckFailed { .. }
+        | MediaError::Output {
+            callback: Some(_), ..
+        }
+        | MediaError::OutputCheckFailed { .. }
         | MediaError::RetainedOutput { .. }
         | MediaError::Json(_) => Some(exit::PARTIAL_FAILURE),
         _ => None,
@@ -126,3 +134,11 @@ fn code(error: &MediaError) -> Option<u8> {
 #[cfg(test)]
 #[path = "media_input_tests.rs"]
 mod input_tests;
+
+#[cfg(test)]
+#[path = "media_output_tests.rs"]
+mod output_tests;
+
+#[cfg(test)]
+#[path = "media_serialization_tests.rs"]
+mod serialization_tests;

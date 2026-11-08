@@ -10,6 +10,7 @@ use sha2::{Digest as _, Sha256};
 
 use crate::checkpoint::{Checkpoint, IO_BLOCK_BYTES};
 use crate::error;
+use crate::json_output;
 use crate::observed_write::ObservedWrite;
 use crate::{Algorithm, ByteScope, Digest, MediaError};
 
@@ -76,33 +77,28 @@ pub(crate) fn generation(
     let mut writer = HashWriter {
         hash: Sha256::new(),
         remaining: index.limits.record_bytes,
-        exceeded: false,
+        limit: index.limits.record_bytes,
     };
     let serialised = serde_json::to_writer(ObservedWrite::new(&mut writer, checkpoint), &*index);
     index.generation = generation;
     index.artifact_base = base;
-    checkpoint.check()?;
-    if writer.exceeded {
-        return Err(MediaError::Limit {
-            budget: "index_bytes",
-            limit: index.limits.record_bytes,
-        });
-    }
-    serialised?;
+    json_output::finish(serialised, *checkpoint)?;
     Ok(hex(writer.hash.finalize().into()))
 }
 
 struct HashWriter {
     hash: Sha256,
     remaining: u64,
-    exceeded: bool,
+    limit: u64,
 }
 
 impl Write for HashWriter {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         if bytes.len() as u64 > self.remaining {
-            self.exceeded = true;
-            return Err(io::Error::other("media index_bytes budget exceeded"));
+            return Err(io::Error::other(MediaError::Limit {
+                budget: "index_bytes",
+                limit: self.limit,
+            }));
         }
         self.remaining -= bytes.len() as u64;
         self.hash.update(bytes);

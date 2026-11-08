@@ -8,6 +8,7 @@ use crate::artifact::BoundedLine;
 use crate::checkpoint::Checkpoint;
 use crate::error;
 use crate::generation::Boundary;
+use crate::json_output;
 use crate::observed_write::ObservedWrite;
 use crate::output_path;
 use crate::publication::Publication;
@@ -29,8 +30,7 @@ pub(crate) fn write(
     output_path::file(path)?;
     let mut line = BoundedLine::new(index.limits.record_bytes);
     let serialised = serde_json::to_writer_pretty(ObservedWrite::new(&mut line, checkpoint), index);
-    checkpoint.check()?;
-    serialised?;
+    json_output::finish(serialised, *checkpoint)?;
     line.write_all(b"\n").map_err(|_| MediaError::Limit {
         budget: "index_bytes",
         limit: index.limits.record_bytes,

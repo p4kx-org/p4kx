@@ -107,7 +107,10 @@ impl BoundedLine {
 impl Write for BoundedLine {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         if bytes.len() as u64 > self.limit.saturating_sub(self.bytes.len() as u64) {
-            return Err(io::Error::other("media record_bytes budget exceeded"));
+            return Err(io::Error::other(MediaError::Limit {
+                budget: "record_bytes",
+                limit: self.limit,
+            }));
         }
         self.bytes.extend_from_slice(bytes);
         Ok(bytes.len())

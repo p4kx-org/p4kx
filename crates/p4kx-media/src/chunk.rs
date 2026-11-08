@@ -6,11 +6,9 @@ use std::io::Read;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::artifact_placement;
 use crate::chunk_copy;
-use crate::hashing;
-use crate::output_path;
-use crate::temporary_file::TemporaryFile;
-use crate::{Artifact, ByteScope, MediaError, MediaWriter};
+use crate::{Artifact, MediaError, MediaWriter};
 
 /// Element representation of a typed payload chunk.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
@@ -218,7 +216,12 @@ impl MediaWriter<'_> {
             digest,
         };
         let result = (|| {
-            let created = place_chunk(self, &artifact, &mut temporary)?;
+            let created = artifact_placement::place(
+                self,
+                &artifact,
+                &mut temporary,
+                "typed chunk content-address collision",
+            )?;
             self.artifact(&artifact)?;
             if matches!(accounting, ChunkAccounting::Converted) {
                 self.converted_output(created)?;
@@ -226,37 +229,6 @@ impl MediaWriter<'_> {
             Ok(ChunkReference { artifact, layout })
         })();
         temporary.finish(result)
-    }
-}
-
-fn place_chunk(
-    writer: &MediaWriter<'_>,
-    artifact: &Artifact,
-    temporary: &mut TemporaryFile<'_>,
-) -> Result<bool, MediaError> {
-    let path = writer.root.join(&artifact.path);
-    writer
-        .namespace
-        .ensure_namespace_writable(&path, writer.checkpoint.cancel.flag())?;
-    if output_path::file(&path)? {
-        let (digest, actual) = hashing::file(
-            &path,
-            ByteScope::ArtifactFile,
-            artifact.size,
-            &writer.checkpoint,
-        )?;
-        if digest != artifact.digest || actual != artifact.size {
-            return Err(MediaError::Contract(
-                "typed chunk content-address collision".into(),
-            ));
-        }
-        Ok(false)
-    } else {
-        temporary.persist(
-            &path,
-            crate::publication::Publication::Namespace(writer.namespace),
-        )?;
-        Ok(true)
     }
 }
 

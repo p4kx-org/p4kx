@@ -5,6 +5,7 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use p4kx_extraction::{
     ArchiveChanged, ArchiveError, ExtractionError, OwnedOutputCleanupError, OwnedOutputError,
@@ -96,6 +97,20 @@ pub enum MediaError {
     Cleanup(OwnedOutputCleanupError),
     /// An exclusively created output or its cleanup retained a typed failure.
     OwnedOutput(OwnedOutputError),
+    /// A sticky output failure with an independently failed encoder callback when present.
+    Output {
+        /// Original typed failure shared only between the sink and its I/O result.
+        cause: Arc<Self>,
+        /// Separate callback failure that does not contain the original sink failure.
+        callback: Option<Box<Self>>,
+    },
+    /// Both an output operation and its post-operation source check failed.
+    OutputCheckFailed {
+        /// Original typed operation failure.
+        operation: Box<Self>,
+        /// Original typed cancellation or source-change failure.
+        checkpoint: Box<Self>,
+    },
     /// Both a required-input operation and its post-operation source check failed.
     InputCheckFailed {
         /// Original typed operation failure.
@@ -144,25 +159,17 @@ impl Display for MediaError {
                 f,
                 "media provider {kind} reported projection loss; request diagnostic export to retain it"
             ),
-            Self::Extraction { cause, .. } => {
-                write!(f, "cannot retain media Entry: {cause}")
-            }
+            Self::Extraction { cause, .. } => write!(f, "cannot retain media Entry: {cause}"),
             Self::ExtractionInterrupted { cause, .. } => {
                 write!(f, "media Entry retention stopped: {cause}")
             }
-            Self::Source { cause, .. } => {
-                write!(f, "media source operation failed: {cause}")
-            }
+            Self::Source { cause, .. } => write!(f, "media source operation failed: {cause}"),
             Self::Archive(cause) => write!(f, "cannot enumerate media container: {cause}"),
-            Self::Metadata(cause) => {
-                write!(f, "cannot read Archive source metadata: {cause}")
-            }
+            Self::Metadata(cause) => write!(f, "cannot read Archive source metadata: {cause}"),
             Self::Unsupported { kind, detail } => {
                 write!(f, "media capability {kind} is unavailable: {detail}")
             }
-            Self::ReferenceIndex(cause) => {
-                write!(f, "media reference index failed: {cause}")
-            }
+            Self::ReferenceIndex(cause) => write!(f, "media reference index failed: {cause}"),
             Self::Limit { budget, limit } => {
                 write!(f, "media budget {budget} exceeded its limit {limit}")
             }
@@ -171,6 +178,14 @@ impl Display for MediaError {
             Self::Protected(cause) => Display::fmt(cause, f),
             Self::Cleanup(cause) => Display::fmt(cause, f),
             Self::OwnedOutput(cause) => Display::fmt(cause, f),
+            Self::Output { cause, callback } => write_output(cause, callback.as_deref(), f),
+            Self::OutputCheckFailed {
+                operation,
+                checkpoint,
+            } => write!(
+                f,
+                "output failed: {operation}; source check also failed: {checkpoint}"
+            ),
             Self::InputCheckFailed {
                 operation,
                 checkpoint,
@@ -185,16 +200,24 @@ impl Display for MediaError {
             Self::RetainedOutput { path, cause } => {
                 write!(f, "media output {} was retained: {cause}", path.display())
             }
-            Self::Io { path, source } => {
-                write!(f, "media I/O at {}: {source}", path.display())
-            }
-            Self::Destination(detail) => {
-                write!(f, "invalid media export destination: {detail}")
-            }
+            Self::Io { path, source } => write!(f, "media I/O at {}: {source}", path.display()),
+            Self::Destination(detail) => write!(f, "invalid media export destination: {detail}"),
             Self::Contract(detail) => write!(f, "invalid media provider result: {detail}"),
             Self::Json(cause) => write!(f, "media JSON error: {cause}"),
         }
     }
+}
+
+fn write_output(
+    cause: &MediaError,
+    callback: Option<&MediaError>,
+    f: &mut Formatter<'_>,
+) -> fmt::Result {
+    write!(f, "converted output failed: {cause}")?;
+    if let Some(callback) = callback {
+        write!(f, "; encoder also failed: {callback}")?;
+    }
+    Ok(())
 }
 
 impl Error for MediaError {
@@ -211,7 +234,9 @@ impl Error for MediaError {
             Self::Protected(cause) => cause.source(),
             Self::Cleanup(cause) => cause.source(),
             Self::OwnedOutput(cause) => cause.source(),
-            Self::InputCheckFailed { operation, .. } => Some(operation.as_ref()),
+            Self::Output { cause, .. } => Some(cause.as_ref()),
+            Self::OutputCheckFailed { operation, .. }
+            | Self::InputCheckFailed { operation, .. } => Some(operation.as_ref()),
             Self::CleanupFailed { primary, .. } => Some(primary.as_ref()),
             Self::Io { source, .. } => Some(source),
             Self::Json(cause) => Some(cause),

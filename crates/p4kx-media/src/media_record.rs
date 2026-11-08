@@ -8,6 +8,7 @@ use serde::Serialize;
 use crate::artifact::BoundedLine;
 use crate::checkpoint::Checkpoint;
 use crate::finite_serializer::Finite;
+use crate::json_output;
 use crate::observed_write::ObservedWrite;
 use crate::{MediaError, MediaIssue, MediaKind, Source, Status, Subresource};
 
@@ -64,8 +65,7 @@ pub(crate) fn line<T: Serialize>(
         &mut serde_json::Serializer::new(ObservedWrite::new(&mut line, checkpoint)),
         depth,
     ));
-    checkpoint.check()?;
-    serialised?;
+    json_output::finish(serialised, *checkpoint)?;
     line.write_all(b"\n").map_err(|_| MediaError::Limit {
         budget: "record_bytes",
         limit,

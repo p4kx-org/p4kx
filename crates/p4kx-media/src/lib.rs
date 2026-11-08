@@ -20,10 +20,14 @@ mod archive_sections_read;
 mod archive_table;
 mod archive_tables_read;
 mod artifact;
+mod artifact_extension;
+mod artifact_placement;
 mod checkpoint;
 mod chunk;
 mod chunk_copy;
 mod contract;
+mod converted_artifact;
+mod converted_sink;
 mod directory_context;
 mod directory_index;
 mod directory_inputs;
@@ -47,6 +51,7 @@ mod input_budget;
 mod input_lookup;
 mod input_receipt;
 mod integrity;
+mod json_output;
 mod kind;
 mod limits;
 mod lock_namespace;
@@ -64,6 +69,7 @@ mod metadata_input;
 mod metadata_input_tests;
 mod numeric;
 mod observed_write;
+mod output_operation;
 mod output_path;
 #[cfg(test)]
 mod owned_output_tests;
@@ -110,6 +116,7 @@ pub use archive_table::{
     ArchiveFreeRange, ArchiveFreeState, ArchiveInstallation, ArchiveProgressBound,
     ArchiveReservedState,
 };
+pub use artifact_extension::ArtifactExtension;
 pub use chunk::{
     ByteOrder, ChunkLayout, ChunkReference, DataOrder, DataType, OffsetBasis, SourceRange,
 };

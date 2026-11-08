@@ -181,3 +181,59 @@ fn cancellation_at_index_replacement_cleans_the_temporary_index_and_keeps_the_co
     assert!(expected.iter().all(|name| output.join(name).exists()));
     Ok(())
 }
+
+#[derive(Clone, Copy, Debug)]
+enum HashFailureCase {
+    Limit,
+    Cancelled,
+}
+
+#[test]
+fn generation_hash_failures_restore_both_original_index_fields() -> TestResult {
+    for case in [HashFailureCase::Limit, HashFailureCase::Cancelled] {
+        let folder = tempfile::tempdir()?;
+        let archive = named_archive(folder.path(), "hash")?;
+        let output = folder.path().join("media");
+        let options = ExportOptions::default();
+        crate::export(&archive, &output, &options)?;
+        let mut index: crate::Index =
+            serde_json::from_slice(&fs::read(output.join("media-index.json"))?)?;
+        let generation = index.generation.clone();
+        let artifact_base = index.artifact_base.clone();
+        let watch = ArchiveWatch::new(&archive);
+        let protection = ArchiveWriteProtection::new(archive.path(), options.cancel.flag())?;
+        let checkpoint = Checkpoint {
+            cancel: &options.cancel,
+            watch: &watch,
+            protection: &protection,
+        };
+        match case {
+            HashFailureCase::Limit => index.limits.record_bytes = 1,
+            HashFailureCase::Cancelled => options.cancel.cancel(),
+        }
+        let failure = crate::hashing::generation(&mut index, &checkpoint)
+            .expect_err("generation hashing must retain the actual failure");
+        assert_eq!(index.generation, generation, "{case:?} restores generation");
+        assert_eq!(
+            index.artifact_base, artifact_base,
+            "{case:?} restores artifact base"
+        );
+        match case {
+            HashFailureCase::Limit => assert!(
+                matches!(
+                    failure,
+                    MediaError::Limit {
+                        budget: "index_bytes",
+                        limit: 1
+                    }
+                ),
+                "hashing retains the original configured index limit: {failure:?}"
+            ),
+            HashFailureCase::Cancelled => assert!(
+                matches!(failure, MediaError::Cancelled),
+                "one actual guarded cancellation stays one typed stop: {failure:?}"
+            ),
+        }
+    }
+    Ok(())
+}
