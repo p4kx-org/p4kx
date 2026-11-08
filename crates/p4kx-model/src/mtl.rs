@@ -265,7 +265,7 @@ pub struct MaterialLibrary {
     /// [`Material::engine_default`] so that the IDs after them keep their position.
     pub unknown_entries: usize,
     /// The paths of the layer files of the materials that are missing or unreadable, as the
-    /// layers name them; their layers keep no [`LayerSurface`]. Set by
+    /// layers name them; their layers keep no [`LayerSurface`](crate::LayerSurface). Set by
     /// [`MaterialStatus::load`], empty after [`Self::parse`] and a plain read.
     pub unresolved_layers: Vec<String>,
     /// The sub-materials in material ID order; one material when [`Self::single`].

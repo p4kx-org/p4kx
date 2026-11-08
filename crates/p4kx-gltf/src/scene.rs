@@ -185,8 +185,8 @@ impl<'m> Scene<'m> {
     }
 }
 
-/// Writes the models of `scene` as one GLB file to `out`, like [`write_glb`]; `out` should be
-/// buffered.
+/// Writes the models of `scene` as one GLB file to `out`, like [`write_glb`](crate::write_glb);
+/// `out` should be buffered.
 ///
 /// Every scene node becomes a glTF node with its transform, and the nodes of its model hang below
 /// it. The materials are plain colours whatever [`GlbOptions::materials`] says, and the models are
