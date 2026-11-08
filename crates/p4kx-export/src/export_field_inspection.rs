@@ -19,6 +19,8 @@ pub(crate) struct FieldInspection {
     pub(crate) role: ExportSourceRole,
     pub(crate) complete: bool,
     pub(crate) diagnostics: Vec<ExportDiagnostic>,
+    /// Conditional failures until the exact physical source has an emitted lossless row.
+    pub(crate) resource_number_diagnostics: Vec<ExportDiagnostic>,
     pub(crate) unresolved_references: Vec<ExportUnresolvedReference>,
     pub(crate) catalog_references: Vec<CatalogReference>,
 }
@@ -28,7 +30,11 @@ impl FieldInspection {
     pub(crate) fn contextualize(&mut self, kind: Option<Kind>, role: ExportSourceRole) {
         self.kind = kind;
         self.role = role;
-        for diagnostic in &mut self.diagnostics {
+        for diagnostic in self
+            .diagnostics
+            .iter_mut()
+            .chain(&mut self.resource_number_diagnostics)
+        {
             diagnostic.kind = kind;
             diagnostic.source_role = Some(role);
         }

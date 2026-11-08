@@ -21,8 +21,15 @@ const CONTROL_TYPES: &[&str] = &[
     "ExportSourceMode",
     "ExportSourceRole",
     "ExportStageStatus",
+    "InputScope",
     "OwnedReferenceStatus",
     "PropertyReferenceStatus",
+    "ResourceAvailability",
+    "SourceDeclarationKind",
+    "SourceEncryptionState",
+    "SourceRecordFormat",
+    "SourceUseRole",
+    "SourceValueState",
 ];
 const OPEN_TYPES: &[&str] = &[
     "ArchiveKeyState",
@@ -230,5 +237,26 @@ fn a_new_source_annotation_value_is_additive() -> TestResult {
         !validator.is_valid(&layer_number),
         "a fact layer stays a string"
     );
+    Ok(())
+}
+
+#[test]
+fn every_control_vocabulary_rejects_unknown_and_non_string_values() -> TestResult {
+    let schema = p4kx_export::catalog_schema();
+    for name in CONTROL_TYPES {
+        let validator = jsonschema::validator_for(&schema["$defs"][name])?;
+        for invalid in [
+            json!("futureControlState"),
+            json!(0),
+            json!(null),
+            json!({}),
+            json!([]),
+        ] {
+            assert!(
+                !validator.is_valid(&invalid),
+                "{name} rejects an invalid control: {invalid}"
+            );
+        }
+    }
     Ok(())
 }

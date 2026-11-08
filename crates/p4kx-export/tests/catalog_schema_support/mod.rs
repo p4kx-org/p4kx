@@ -19,6 +19,7 @@ mod npc_spawns;
 mod objective_properties;
 mod recovery;
 mod reputation;
+mod resources;
 mod slugs;
 mod spawns;
 
@@ -192,25 +193,9 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
                 "tierIndex": 0
             }
         }],
-        "resourceTypes": [{
-            "guid": "00000000-0000-0000-0000-000000007001",
-            "className": "FixtureResource",
-            "recordPath": "libs/foundry/records/resourcetypedatabase/fixture_resource",
-            "name": {"key": null, "en": null, "de": null},
-            "description": {"key": null, "en": null, "de": null},
-            "groupGuids": [],
-            "refinedVersion": null,
-            "density": null,
-            "defaultThumbnailPath": null,
-            "defaultThumbnailPathSVG": null,
-            "rttThumbnailEntityClass": null,
-            "validateDefaultCargoBox": false,
-            "defaultCargoContainers": null,
-            "properties": [null, {
-                "sourceType": "ResourceTypeVolatility", "name": "",
-                "payload": {"type": "volatility", "volatility": 0.0, "healthDecayPerSecond": 0.0}
-            }]
-        }],
+        "definitions": resources::definitions(),
+        "texts": {"publicNames": [], "gameTexts": []},
+        "provenance": {"sources": [], "uses": []},
         "resourceGroups": [{
             "guid": "b1000000-0000-4000-8000-000000000001",
             "className": "Metal",

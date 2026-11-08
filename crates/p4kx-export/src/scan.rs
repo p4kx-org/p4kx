@@ -11,6 +11,7 @@ use p4kx_extraction::{
 use rayon::prelude::*;
 
 use crate::catalog_crafting::CraftingKinds;
+use crate::catalog_projection::CatalogProjection;
 use crate::contract_recipe::CostLine;
 use crate::entity_selection::{Selected, select};
 use crate::export_diagnostic::ExportSourceRole;
@@ -63,6 +64,7 @@ pub(crate) struct Scan<'o, 'a, 'f> {
     ships: ShipPool<'f>,
     options: &'o CatalogOptions<'a>,
     texts: &'o Texts<'f>,
+    projection: &'o CatalogProjection<'o, 'f>,
     placements: &'o Placements,
     types: TypeNames<'f>,
     links: Links<'f>,
@@ -82,7 +84,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         files: &'f ArchiveFiles<'f>,
         entities: Arc<Entities<'f>>,
         options: &'o CatalogOptions<'a>,
-        texts: &'o Texts<'f>,
+        projection: &'o CatalogProjection<'o, 'f>,
         crafting: &CraftingKinds<'f>,
         placements: &'o Placements,
     ) -> Result<ScanRead<'f>, CatalogError> {
@@ -100,7 +102,8 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             forge,
             ships: ShipPool::new(entities, files),
             options,
-            texts,
+            texts: projection.legacy_texts(),
+            projection,
             placements,
             types: TypeNames::default(),
             links: Links::default(),

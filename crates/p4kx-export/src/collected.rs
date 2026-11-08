@@ -176,7 +176,7 @@ impl<'f> Collected<'f> {
             }
             Picked::Commodity(entity) => self.commodities.push(entity),
             Picked::ResourceGroup(entity) => self.resource_groups.push(entity),
-            Picked::ResourceType(entity) => self.resource_types.push(entity),
+            Picked::ResourceType(entity) => self.resource_types.push(*entity),
             Picked::BlueprintCategory(entity) => self.blueprint_categories.push(entity),
             Picked::Starmap(entity) => self.starmap_objects.push(entity),
             Picked::Mineable(entity) => self.mineable_elements.push(entity),

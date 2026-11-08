@@ -6,84 +6,135 @@ use std::collections::HashMap;
 use p4kx_extraction::{Guid, RecordTree, Value};
 
 use crate::guid_text::CatalogGuid;
-use crate::record_fields::elements;
 
-/// What the `ResourceTypeGroup` Records of the `resourceGroups` kind list: the group of each
-/// `ResourceType` and the direct parent of each group.
-///
-/// Only the listings of the groups the kind selects are added, so every group it names is an entry
-/// of `resourceGroups`. The parents form the lists as the game stores them; a cycle is kept, not
-/// broken.
-#[derive(Debug, Default)]
+/// Selected direct memberships and the physical authored selectors that establish them.
+#[derive(Debug)]
 pub(crate) struct Groups {
     by_resource: HashMap<Guid, CatalogGuid>,
-    all_by_resource: HashMap<Guid, Vec<CatalogGuid>>,
+    all_by_resource: HashMap<Guid, Vec<ResourceMembership>>,
     parents: HashMap<Guid, CatalogGuid>,
+    complete: bool,
+}
+
+impl Default for Groups {
+    fn default() -> Self {
+        Self {
+            by_resource: HashMap::new(),
+            all_by_resource: HashMap::new(),
+            parents: HashMap::new(),
+            complete: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct MembershipSource {
+    pub(crate) record_index: u32,
+    pub(crate) position: usize,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ResourceMembership {
+    pub(crate) group: CatalogGuid,
+    pub(crate) sources: Vec<MembershipSource>,
+}
+
+pub(crate) struct ResourceMemberships {
+    pub(crate) members: Vec<ResourceMembership>,
+    pub(crate) complete: bool,
 }
 
 impl Groups {
-    /// Records what `listing` lists; the first group to list a `ResourceType` or a group wins.
     pub(crate) fn add(&mut self, listing: Listing) {
+        self.complete &= listing.complete;
         let group = CatalogGuid(listing.group);
-        for resource in listing.resources {
+        for (position, resource) in listing.resources {
             self.by_resource.entry(resource).or_insert(group);
             let memberships = self.all_by_resource.entry(resource).or_default();
-            if !memberships.contains(&group) {
-                memberships.push(group);
+            let source = MembershipSource {
+                record_index: listing.record_index,
+                position,
+            };
+            if let Some(member) = memberships.iter_mut().find(|member| member.group == group) {
+                member.sources.push(source);
+            } else {
+                memberships.push(ResourceMembership {
+                    group,
+                    sources: vec![source],
+                });
             }
         }
-        for child in listing.children {
+        for (_, child) in listing.children {
             if child != listing.group {
                 self.parents.entry(child).or_insert(group);
             }
         }
     }
 
-    /// Returns the group that directly lists the `ResourceType` `resource`.
+    pub(crate) const fn mark_incomplete(&mut self) {
+        self.complete = false;
+    }
+
     pub(crate) fn of_resource(&self, resource: &Guid) -> Option<CatalogGuid> {
         self.by_resource.get(resource).copied()
     }
 
-    /// Returns every selected group that directly lists the resource, distinct and GUID-ordered.
-    pub(crate) fn all_of_resource(&self, resource: &Guid) -> Vec<CatalogGuid> {
-        let mut groups = self
+    pub(crate) fn all_of_resource(&self, resource: &Guid) -> ResourceMemberships {
+        let mut members = self
             .all_by_resource
             .get(resource)
             .cloned()
             .unwrap_or_default();
-        groups.sort_by_cached_key(|group| group.text());
-        groups
+        members.sort_by_cached_key(|member| member.group.text());
+        ResourceMemberships {
+            members,
+            complete: self.complete,
+        }
     }
 
-    /// Returns the group that lists the group `group`.
     pub(crate) fn parent_of(&self, group: &Guid) -> Option<CatalogGuid> {
         self.parents.get(group).copied()
     }
 }
 
-/// The `ResourceType` Records and the groups one `ResourceTypeGroup` lists.
+/// One selected group with its actual Record and ordered member positions.
 #[derive(Debug)]
 pub(crate) struct Listing {
     group: Guid,
-    resources: Vec<Guid>,
-    children: Vec<Guid>,
+    record_index: u32,
+    resources: Vec<(usize, Guid)>,
+    children: Vec<(usize, Guid)>,
+    complete: bool,
 }
 
-/// Returns what the `ResourceTypeGroup` tree `tree` lists in `resources` and `groups`.
 pub(crate) fn listing(tree: &RecordTree<'_>) -> Listing {
+    let (resources, complete) = listed(tree, "resources");
+    let (children, _) = listed(tree, "groups");
     Listing {
         group: tree.guid(),
-        resources: listed(tree, "resources"),
-        children: listed(tree, "groups"),
+        record_index: tree.record_index(),
+        resources,
+        children,
+        complete,
     }
 }
 
-fn listed(tree: &RecordTree<'_>, field: &str) -> Vec<Guid> {
-    elements(Some(tree.root()), field)
-        .iter()
-        .filter_map(|entry| match entry {
-            Value::Reference(entry) if entry.location().is_none() => Some(entry.guid()),
-            _ => None,
-        })
-        .collect()
+fn listed(tree: &RecordTree<'_>, field: &str) -> (Vec<(usize, Guid)>, bool) {
+    let values = match tree.root().field(field) {
+        None | Some(Value::Null) => return (Vec::new(), true),
+        Some(Value::Array(values)) => values,
+        _ => return (Vec::new(), false),
+    };
+    let mut complete = true;
+    let mut listed = Vec::new();
+    for (position, value) in values.iter().enumerate() {
+        match value {
+            Value::Reference(entry) if entry.location().is_none() => {
+                listed.push((position, entry.guid()));
+            }
+            Value::Null => {}
+            _ => complete = false,
+        }
+    }
+    (listed, complete)
 }

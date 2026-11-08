@@ -39,7 +39,7 @@ pub(crate) enum Picked<'f> {
     /// A resource group.
     ResourceGroup(ResourceGroup<'f>),
     /// A resource definition with its authored source properties.
-    ResourceType(ResourceType<'f>),
+    ResourceType(Box<ResourceType<'f>>),
     /// A blueprint category.
     BlueprintCategory(BlueprintCategory<'f>),
     /// A starmap object.

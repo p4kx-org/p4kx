@@ -8,7 +8,7 @@ use p4kx_extraction::{
 
 use crate::CatalogError;
 use crate::export_diagnostic::{ExportDiagnosticCode, ExportDiagnosticSeverity, ExportSourceRole};
-use crate::export_field_collect::FieldCollector;
+use crate::export_field_collect::{FieldCollector, NonFiniteEncoding};
 use crate::export_ledger::{ExportAccountingError, ExportLedger};
 use crate::selection::Kind;
 
@@ -29,6 +29,7 @@ pub(crate) fn inspect(
     let mut walker = Walker {
         collector: FieldCollector::new(tree, record.index(), kind, role),
         visited: 0,
+        resource_raw_values: tree.type_name() == "ResourceType",
         cancel,
     };
     walker.structure(tree.root(), &mut String::new(), 0, None)?;
@@ -40,6 +41,7 @@ pub(crate) fn inspect(
 struct Walker<'t, 'f, 'c> {
     collector: FieldCollector<'t, 'f>,
     visited: usize,
+    resource_raw_values: bool,
     cancel: Option<&'c CancelToken>,
 }
 
@@ -61,12 +63,16 @@ impl Walker<'_, '_, '_> {
                 path.push('.');
             }
             path.push_str(field.name());
+            let raw_float = self.resource_raw_values
+                && crate::resource_raw_policy::field_contract(structure.type_name(), field.name())
+                    .is_some_and(|contract| contract.captures(field.value()));
             let complete = self.value(
                 field.value(),
                 path,
                 structure.type_name(),
                 depth,
                 parent_type,
+                raw_float,
             )?;
             path.truncate(length);
             if !complete {
@@ -83,6 +89,7 @@ impl Walker<'_, '_, '_> {
         source_type: &str,
         depth: usize,
         parent_type: Option<&str>,
+        raw_float: bool,
     ) -> Result<bool, CatalogError> {
         if self.cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
@@ -123,10 +130,12 @@ impl Walker<'_, '_, '_> {
                 );
             }
             Value::Single(value) if !value.is_finite() => {
-                self.collector.non_finite(path, source_type);
+                self.collector
+                    .non_finite(path, source_type, encoding(raw_float));
             }
             Value::Double(value) if !value.is_finite() => {
-                self.collector.non_finite(path, source_type);
+                self.collector
+                    .non_finite(path, source_type, encoding(raw_float));
             }
             Value::Error(error) => {
                 crate::export_field_error::record(&mut self.collector, path, source_type, *error);
@@ -189,12 +198,20 @@ impl Walker<'_, '_, '_> {
             write!(path, "[{index}]").map_err(|error| {
                 CatalogError::Accounting(ExportAccountingError::FieldPath(error))
             })?;
-            let complete = self.value(value, path, source_type, depth, parent_type)?;
+            let complete = self.value(value, path, source_type, depth, parent_type, false)?;
             path.truncate(length);
             if !complete {
                 return Ok(false);
             }
         }
         Ok(true)
+    }
+}
+
+const fn encoding(raw_float: bool) -> NonFiniteEncoding {
+    if raw_float {
+        NonFiniteEncoding::ResourceBits
+    } else {
+        NonFiniteEncoding::FiniteOnly
     }
 }

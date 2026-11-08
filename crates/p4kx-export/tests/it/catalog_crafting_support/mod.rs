@@ -3,6 +3,8 @@
 
 //! Building and reading the catalog of a synthetic Archive for the crafting catalog tests.
 
+mod resource_v3_view;
+
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
@@ -51,7 +53,7 @@ pub(crate) fn build_from(
     filter: Option<&Filter>,
 ) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let built = build_with(forge, filter, None)?;
-    let json = serde_json::from_slice(built.json())?;
+    let json = resource_v3_view::project(serde_json::from_slice(built.json())?)?;
     Ok((built, json))
 }
 
@@ -67,7 +69,7 @@ pub(crate) fn build_with_entries(
         p4kx_export::CatalogPublicationMode::Normal,
         entries,
     )?;
-    let json = serde_json::from_slice(built.json())?;
+    let json = resource_v3_view::project(serde_json::from_slice(built.json())?)?;
     Ok((built, json))
 }
 
@@ -83,7 +85,7 @@ pub(crate) fn diagnostic_from(
         p4kx_export::CatalogPublicationMode::DiagnosticPartial,
         Vec::new(),
     )?;
-    let json = serde_json::from_slice(built.json())?;
+    let json = resource_v3_view::project(serde_json::from_slice(built.json())?)?;
     Ok((built, json))
 }
 
@@ -119,7 +121,7 @@ pub(crate) fn build_from_data(
     publication_mode: p4kx_export::CatalogPublicationMode,
 ) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let built = build_data(data, filter, None, publication_mode, Vec::new())?;
-    let json = serde_json::from_slice(built.json())?;
+    let json = resource_v3_view::project(serde_json::from_slice(built.json())?)?;
     Ok((built, json))
 }
 

@@ -1,125 +1,268 @@
 # Resource catalog contract
 
-The catalog uses schema version 3; the additional ResourceTypes kind is independently additive. See [ADR-0352](adr/0352-resources-preserve-authored-facts-and-physical-reference-provenance.md) for the ownership, identity and source-health decisions.
+The catalog uses schema version 3. This implemented step moves the ResourceType family to
+`definitions.resourceTypes.rows`, with immediate source origin on every source-backed field and
+nested list element. Its localized names and descriptions use canonical text tables. Other catalog
+families still have their existing shapes; the complete canonical migration and origin coverage of
+the 45 tool-output carrier families remain open work under [#1125](https://github.com/p4kx-org/p4kx/issues/1125).
+[ADR-0356](adr/0356-catalog-v3-uses-canonical-source-typed-tables.md) defines the full target;
+[ADR-0357](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md) defines source origin.
+Those targets do not imply that every family is already migrated.
 
 ## Commodity identity and resource joins
 
-`commodities[].guid` identifies a commodity Record. `subtypeGuid` is a nullable, non-unique ResourceType GUID. Multiple commodity Records can share one ResourceType. Consumers join ingredients and other `resourceGuid` fields to `resourceTypes[].guid` for resource facts, and to every matching `commodities[].subtypeGuid` when they need commodity alternatives. They must not index commodities uniquely by subtypeGuid or assume a resource has a commodity.
+`commodities[].guid` identifies a commodity Record. `subtypeGuid` is a nullable, non-unique
+ResourceType GUID. Several commodity Records can share it, and a ResourceType can have no commodity.
+Join ingredient `resourceGuid` values to `definitions.resourceTypes.rows[].guid.value` for resource
+facts and to every matching `commodities[].subtypeGuid` for commodity alternatives. Read the field's
+state before using its value. There is no additional root `resourceTypes` view in the v3 output.
 
-The commodity ResourceType is the first non-null `entry` in the first ResourceContainer's ordered `defaultComposition`. An explicitly configured dangling first GUID is retained; a later valid link does not replace it. A resolved link uses its actual physical target Record, even when another Record has the same persistent GUID. `typeGuid` remains the first selected, readable, non-leftover group in source Record order that directly lists that ResourceType. This existing singular field does not describe every group membership.
+The commodity ResourceType is the first non-null `entry` in the first ResourceContainer's ordered
+`defaultComposition`. A dangling first GUID stays configured; a later valid link does not replace
+it. A resolved link uses the actual physical target Record, even if another Record has the same
+GUID. `typeGuid` stays the first selected, readable, non-leftover group in source Record order that
+directly lists that resource; it is not the list of all group memberships.
 
-The existing ResourceType-backed commodity fallback remains limited to otherwise unrepresented resources used by blueprint costs or kept quality quantizations. It preserves the resource GUID as both `guid` and `subtypeGuid`. It does not determine which ResourceTypes are exported independently. `densityGramsPerCubicCentimetre` remains null for authored kg/m³ or molar-mass sources; no implicit unit conversion changes its meaning.
+The existing ResourceType-backed commodity fallback remains limited to otherwise unrepresented
+resources used by blueprint costs or kept quality quantizations. It uses the resource GUID for
+both `guid` and `subtypeGuid`. This does not limit independent ResourceType selection.
+`densityGramsPerCubicCentimetre` retains its existing finite g/cm³ meaning; other units are not
+converted into it. Its legacy nullable shape has not acquired the ResourceType field carrier.
 
 ## ResourceTypes
 
-`resourceTypes` contains every selected, readable ResourceType Record under `resourcetypedatabase`, excluding the declared development-leftover policy, in canonical GUID order. A ResourceType needs no commodity or recipe to qualify.
+`definitions.resourceTypes` contains a closed `availability` state and `rows`. `available` means
+the source family is declared, independently of its selected row count; `absent` means it is not
+declared; `unavailable` means the family cannot be established from unreadable declarations. Rows
+are selected, readable ResourceType Records under `resourcetypedatabase`, excluding the declared
+development-leftover policy, in canonical GUID order. A row needs no commodity or recipe.
 
-| Field | Source and contract |
+Every source-backed field below is a `SourcedValue<T>`; the table describes its `value` payload.
+The same carrier surrounds nested fields and authored list elements. Object tags such as `type`,
+reference `status` and table availability remain typed control metadata.
+
+| Field | Source and value contract |
 | --- | --- |
-| `guid`, `className`, `recordPath` | The ResourceType's persistent GUID, unprefixed Record name and normalized Record path. |
-| `name`, `description` | `displayName` and `description` as LocalisedText. Description is game text (`x-gameText`). |
-| `groupGuids` | All distinct selected groups that directly list this resource, sorted by GUID. Does not infer transitive membership. |
-| `refinedVersion` | The authored ResourceType Record reference, including its configured GUID and source resolution status. |
-| `density` | The actual `ResourceTypeDensityType` struct with its `sourceType` and tagged `payload`. |
-| `defaultThumbnailPath`, `defaultThumbnailPathSVG` | Raw source strings, preserving empty strings. These fields describe asset paths; cataloging does not extract the images. |
-| `rttThumbnailEntityClass` | The authored EntityClassDefinition reference used for the RTT thumbnail. The source Entity need not be a catalog row. |
-| `validateDefaultCargoBox` | The nullable authored Bool. `false` is retained. |
-| `defaultCargoContainers` | Every named field of the cargo-container source as `{slot, entityClass}`, in source declaration order, including null slots. |
-| `properties` | Nullable ordered list of nullable authored properties, retaining duplicate names and values. |
+| `guid`, `className`, `recordPath` | Persistent GUID, unprefixed Record name and normalized Record path. These are sourced data too. |
+| `name`, `description` | Authored `displayName`/`description` keys projected to a `PublicNameRef`/`GameTextRef`; description carries `x-gameText`. |
+| `groupGuids` | All distinct selected groups directly listing the resource, sorted by GUID; no inferred transitive membership. Each GUID has its own carrier. |
+| `refinedVersion` | Authored ResourceType reference with sourced GUID, physical target index, path and type, plus source-resolution status. |
+| `density` | Actual `ResourceTypeDensityType` struct with sourced `sourceType` and tagged `payload`. |
+| `defaultThumbnailPath`, `defaultThumbnailPathSVG` | Raw strings, including empty strings; cataloging does not extract their images. |
+| `rttThumbnailEntityClass` | Authored EntityClassDefinition reference; its source target need not be a catalog row. |
+| `validateDefaultCargoBox` | Authored Bool; `false` is a present value. |
+| `defaultCargoContainers` | Named source slots in declaration order, each with sourced `slot` and `entityClass`, including explicitly null references. |
+| `properties` | Ordered authored properties, preserving null positions, repeated names and repeated values. |
 
-A property holds `sourceType`, nullable raw `name`, and a tagged `payload`: `base`, `volatility`, `craftingData` or `unsupported`. Volatility keeps raw nullable `volatility` and `healthDecayPerSecond`; no clamping, simulation or choice of one property is applied. CraftingData retains three independent nullable sources: `qualityDistribution`, `qualityLocationOverride`, `qualityQuantization`.
+A property carries sourced `sourceType`, `name` and `payload`. Present payload tags are `base`,
+`volatility` and `craftingData`. An unknown shape has `payload.state: "unsupported"` and a null
+payload value, with blocking health evidence; it is not a fabricated successful tagged variant.
+Volatility retains `volatility` and `healthDecayPerSecond` without clamping or simulation.
+CraftingData retains independent `qualityDistribution`, `qualityLocationOverride` and
+`qualityQuantization` source values.
 
-The exact cargo slot names are `one_eighthSCU`, `one_quarterSCU`, `one_halfSCU`, `oneSCU`, `twoSCU`, `fourSCU`, `eightSCU`, `sixteenSCU`, `twentyFourSCU` and `thirtyTwoSCU`. The slot label is a source name. It does not assert a container's measured capacity or derive one from mesh or component data.
+The exact cargo slot names are `one_eighthSCU`, `one_quarterSCU`, `one_halfSCU`, `oneSCU`, `twoSCU`,
+`fourSCU`, `eightSCU`, `sixteenSCU`, `twentyFourSCU` and `thirtyTwoSCU`. A slot label does not assert
+measured capacity or derive it from mesh/component data.
 
-Density payloads distinguish `density`, `molarMass`, `emptyBase` and `unsupported`. A density's nullable `densityUnit` independently carries its actual `sourceType` and a payload of `gramsPerCubicCentimeter`, `kilogramsPerCubicMeter`, `emptyBase` or `unsupported`. Each concrete unit keeps a raw nullable finite `value`. Molar mass keeps nullable finite `molarMass`; the source declaration supplies no unit label, so no unit is invented. Missing and null values remain null, and authored zeros remain zero.
+Density payload tags are `density`, `molarMass` and `emptyBase`. A density's `densityUnit` retains
+its sourced concrete type and a payload tagged `gramsPerCubicCentimeter`, `kilogramsPerCubicMeter`
+or `emptyBase`. Unknown density or unit shapes use the unsupported state. Concrete unit values
+and molar mass preserve Single bits; the source supplies no molar-mass unit label, so none is
+invented.
+
+## Immediate value and origin carrier
+
+Every applicable carrier has all five keys, including explicit nulls:
+
+| Key | Contract |
+| --- | --- |
+| `state` | Closed interpretation state: `present`, `absent`, `null`, `unreadable`, `unsupported` or `invalid`. |
+| `value` | Typed payload when present; null for every other state. A present payload may itself be nullable only when its declared type allows it. |
+| `containsEncryptedSource` | `true`, `false` or null, derived from this value's actual contributing sources and ancestors. |
+| `sourceUsesRefs` | Sorted, distinct references to the contributing entries in `provenance.uses`. Treat identifiers as opaque and document-local. |
+| `sourceSetComplete` | Completeness of this value's contribution set, independently of selection and export health. |
+
+`absent` means the source did not declare the field; `null` means it explicitly declared null.
+`unreadable` means reading the declared value failed; `unsupported` means its concrete shape has
+no typed payload; `invalid` means its value does not fit that field's contract. False, zero, empty
+strings, empty arrays and legal nonfinite IEEE payloads remain present values. These states do not
+replace the existing publication-health checks.
+
+`containsEncryptedSource` is true if any actual contributor or containing Entry is proven encrypted,
+even if another contribution is unknown. It is false only for a complete contribution set whose
+contributors and ancestors are all proven unencrypted. Otherwise it is null. Thus a complete set
+can still have unknown encryption, and an incomplete set can still contain a known encrypted
+contributor. A tool-authored value with a complete empty physical-input set can be false.
+A standalone DCB file without original P4K lineage stays unknown; a supplied localization Archive
+does not make that DCB an Archive-derived input. Global `source.archiveKey` and unread-entry counts
+are not substitutes for this field marker.
+
+`provenance.sources` retains physical input identity, container ancestry and stored encryption
+declarations. `provenance.uses` identifies each observed source, its payload/directory/file-metadata
+scope, logical position and role. Only actual `payload`, `selector` and `conversion` contributions
+enter a field's `sourceUsesRefs`; `attempted` reads and untouched `reference` targets remain
+separate observations. A root Entry's directory metadata is not tainted by that Entry's payload
+encryption, while encrypted container ancestors do affect nested directory metadata. DataForge
+Record headers are payload facts. Local source metadata does not publish absolute host paths or keys.
 
 ## Quality source wrappers and exact curves
 
-Each resource quality source retains its actual `sourceType` and a tagged payload: `inline` with a shared `value`, `recordRef` with a nullable `reference`, `emptyBase` for an explicitly known fieldless base, or `unsupported` with blocking health evidence. The wrapper retains ownership and storage form instead of copying a linked Record's values into the owner.
+Fixed Single fields use `{ "rawBits": "7fc00001", "finite": null }` as an illustrative payload.
+`rawBits` is exactly eight lowercase hexadecimal digits for f32 and sixteen for f64. `finite` is
+the finite numeric projection or null; negative zero and NaN payload bits are preserved. The outer
+carrier stays `present` for infinity and NaN; null in `finite` does not mean an absent source value.
 
-Inline and top-level quality distributions share one QualityCurve. Its nullable `min` and `max` are exact signed 32-bit integers; `mean` and `stddev` are nullable finite 32-bit floats. Every confirmed Normal/Uniform source declaration uses Int32 bounds. A wrong stored bound type fails projection with its exact source type and field path. A nonfinite float, or a finite Double that cannot be represented by a finite f32, also fails projection; it is never silently replaced with null. Known fieldless distribution bases retain their source kind and null parameters; unknown shapes remain unsupported or erroneous with explicit health evidence.
+Numeric fields supporting several source widths use a `type` tag: `int8`, `int16`, `int32`,
+`int64`, `uint8`, `uint16`, `uint32`, `uint64`, `f32` or `f64`. Integer variants hold `value`;
+Int64 and UInt64 use bounded canonical decimal strings, for example
+`{ "type": "uint64", "value": "18446744073709551615" }`. Narrow integers remain exact JSON
+numbers. Float variants hold the same `rawBits` and `finite` members as the fixed Single payload.
+No generic-number path narrows a Double to Single or a 64-bit integer to a JSON number.
 
-Location overrides preserve nullable ordered `locationOverrideList` entries, repeated locations and null positions. Each entry carries its actual source type and either entry fields (`location`, `qualityDistribution`), `emptyBase`, or `unsupported`. Inline quantizations preserve nullable ordered bands and reuse exact integer `start`, `end`, `mappedValue` payloads. The LIVE concrete-entry and PTU base-entry declarations are both read using the actual owned concrete entry type.
+Resource quality sources retain sourced `sourceType` and `payload`. Present ownership tags are
+`inline`, `recordRef` and `emptyBase`. Inline payloads carry a sourced `value`; a record reference
+retains sourced target-header facts without copying or reading its target payload. Unknown shapes
+are explicitly unsupported. Inline curves use sourced Int32 `min`/`max` and exact-width
+ResourceNumber `mean`/`stddev`. Location overrides retain ordered nullable entries, concrete source
+types, locations and nested distributions. Quantization bands preserve sourced Int32 `start`,
+`end` and `mappedValue`.
 
-The public Rust QualityCurve API exposes `Option<i32>` bounds and the same shared payload from both existing reexport paths. JSON integer spelling follows the exact bound contract. Schema validation enforces the inclusive range −2147483648 to 2147483647 through explicit minimum and maximum constraints. Frozen schema-v2 compatibility fixtures remain unchanged.
+The separate top-level `qualityDistributions` and public Rust QualityCurve API still use their
+existing finite f32 projection and exact `Option<i32>` bounds. They are not migrated by this
+ResourceType step. Their wrong numeric types and nonfinite values still fail projection. A
+ResourceType's captured nonfinite numbers avoid a projection-loss failure only when that exact
+physical source has a successfully emitted lossless ResourceType row; a filtered source or a
+same-GUID alias cannot satisfy that proof.
+
+## Canonical names and protected texts
+
+A resource name references `texts.publicNames`; a description references `texts.gameTexts`.
+Each canonical text row has sourced `id`, original `key` and `translations`. The latter's `value`
+is a language-code map whose individual values have the same five-key carrier. All supported
+languages with an available source Entry are included, using the actual winning Entry for each.
+An absent language Entry produces no language-map member. Existing duplicate-key and duplicate-
+Entry selection rules remain unchanged.
+
+Texts decode escaped newlines and trim outer whitespace. An explicitly empty or whitespace-only
+winning translation remains `state: "present", value: ""`; a missing key is `absent`. Placeholder
+keys remain authored keys and produce absent translations without reading locale values. Bare
+keys keep the existing lookup rules; an unmatched bare string is not emitted as a literal fallback.
+Lookup provenance uses the exact localization Entry plus a reference to the DataForge key selector,
+so a protected key or possible literal does not leak through global location strings or use IDs.
+
+`x-gameText` and encryption origin are independent. The description reference, GameTextRef type
+and complete `texts.gameTexts` table are protected even when every source is unencrypted. The same
+key used as both a short name and a description has separate references and canonical rows in the
+two domains. A consumer stripping game text must follow that protection through references and
+retain closure of public-name references. An unencrypted marker does not grant publication rights.
 
 ## ResourceGroups
 
-ResourceGroups retain their existing `name` and first-parent `parentGuid`, and add `description`, `defaultThumbnailPath`, `defaultThumbnailPathSVG`, `groups` and `resources`. The two source reference lists are nullable, ordered and preserve repeats and null entries. They retain cycles instead of recursively expanding them. Only selected groups affect legacy `parentGuid`, commodity `typeGuid`, and ResourceType `groupGuids`; additional reads made solely for health diagnostics do not affect these joins.
+ResourceGroups still have their existing shape: `name`, first-parent `parentGuid`, `description`,
+thumbnail paths, and nullable ordered `groups`/`resources` references. These lists preserve repeats,
+null entries and cycles without recursive expansion. Only selected groups affect legacy
+`parentGuid`, commodity `typeGuid`, and ResourceType `groupGuids`; extra health-only reads do not
+change those joins. ResourceGroups have not yet acquired complete per-field origin carriers.
 
-## Reference source availability and catalog materialization
+## Reference availability and catalog materialization
 
-A DefinitionReference's `present` status means the source reference resolved to a physical Record. It does not promise that a catalog row for that Record exists. Source-only Entity links used by packaging and thumbnails do not create a missing catalog row error.
+A reference's `present` status means it resolves to a physical Record, not that a catalog row was
+emitted. Source-only Entity links for packaging and thumbnails do not require an Entity catalog
+row. Target-header values keep their own sources; an untouched target payload is not a contributor.
 
-The existing bounded, cancellable source field inspection captures only required resolved target metadata. Final catalog rows and the existing source observations determine materialization using the actual target Record index. A projected source alone does not prove that a row was emitted. A different emitted Record with the same GUID does not satisfy the link.
+Bounded, cancellable inspection captures required resolved target metadata. Final rows and source
+observations determine materialization using the physical target Record index. A different emitted
+Record with the same GUID does not satisfy the link. Health distinguishes `outsideCatalogSelection`,
+`excludedByFilter`, `excludedByPolicy`, `targetReadFailed`, `targetProjectionFailed`,
+`targetNotEmitted`, `ambiguousIdentity` and `unexpectedTargetType`. Expected selection exclusions
+are informational; read/projection failures, unexplained missing output, wrong target families and
+ambiguous emitted identities block normal publication. Diagnostic mode retains readable data and
+the failure evidence.
 
-Reference health distinguishes `outsideCatalogSelection`, `excludedByFilter`, `excludedByPolicy`, `targetReadFailed`, `targetProjectionFailed`, `targetNotEmitted`, `ambiguousIdentity` and `unexpectedTargetType`. Expected selection exclusions are informational. Read and projection failures retain the existing blocking source failure. Unexplained missing output, wrong target families and ambiguous emitted identities block normal publication. Diagnostic partial publication retains readable rows and the exact evidence.
+Resolved-reference metadata is limited to 4096 references and 1 MiB of logical metadata per physical
+source Record. Exhaustion produces `fieldWalkLimit` and incomplete field inventory. An unreadable
+Record type remains an unknown selection candidate; a readable path excluded by a Filter is
+excluded before generic type classification.
 
-The additional resolved-reference metadata is limited to 4096 references and 1 MiB of logical metadata per physical source Record. Limit exhaustion produces `fieldWalkLimit` and incomplete field inventory. A limited walk cannot claim a complete empty reference inventory. No extra Record traversal or separate provenance ledger is introduced.
+The internal crafting scope reads unfiltered ResourceType reverse links when a selected
+non-leftover quantization target needs them; uncertain target metadata is conservative. Otherwise
+it reads selected ResourceType inputs for the existing link counter. The public `read_crafting`
+API keeps its unfiltered link semantics, and needed out-of-filter failures still block publication.
 
-An unreadable Record type is an unknown selection candidate, including under the prefix shared by ResourceTypes and ResourceGroups. It cannot be guessed as the first kind of that prefix. A readable record path excluded by an explicit Filter is excluded before generic type classification.
+## Source coverage and verification
 
-The internal catalog crafting scope reads unfiltered ResourceType reverse links when a selected non-leftover quantization target needs them; uncertain target metadata is conservative. Without such a target it reads only selected ResourceType inputs for the existing link counter. It does not claim unused out-of-filter resources as dependencies. The public `read_crafting` API keeps its unfiltered ResourceType-link semantics, and a needed out-of-filter dependency failure still blocks healthy catalog publication.
+The declaration inventory below covers 29 types and 52 declared ResourceType/ResourceTypeGroup
+fields. Its LIVE/PTU distinction concerns the location-override-list pointer target, from
+CraftingQualityLocationOverrideEntry to CraftingQualityLocationOverrideEntry_Base; it asserts no
+populated Record counts or gameplay values.
 
-## Source coverage and synthetic verification
-
-The declaration-only ResourceType/ResourceTypeGroup ownership closure has 29 types and 52 declared fields. Every declared field has an explicit owning path and export mapping in the inventory below. The only LIVE/PTU declaration difference in that closure is the location-override-list pointer target changing from CraftingQualityLocationOverrideEntry to CraftingQualityLocationOverrideEntry_Base. These observations concern declarations only and imply no populated Record counts or gameplay values.
-
-The synthetic verification matrix covers both declaration targets, standalone resources and commodity n:1 cardinality, raw units, all cargo slots, zero/false/empty/null preservation, source-only Entity references, exact integer curves, inline and linked quality sources, group repeats/cycles, selected group isolation, physical GUID aliases, dangling-first and null-first composition links, failed dependencies, and bounded metadata. Test pass counts are recorded separately after the corresponding commands run.
+Synthetic tests cover both pointer declarations, independent resources, commodity n:1 joins,
+physical GUID aliases, ordered/null cargo and quality values, direct origin/reference closure,
+all available supported languages, protected/public text separation, exact IEEE and integer
+payloads, filtered nonfinite sources, and shared plain/compressed serialization. Execution evidence
+is recorded with the corresponding integration checks; the contract is not a full milestone or
+real-game acceptance claim.
 
 ## Declaration field inventory
 
+The Export mapping column uses logical paths: follow `.value` at each sourced field or authored
+list element. For example, a molar mass is
+`definitions.resourceTypes.rows[i].density.value.payload.value.molarMass.value`.
+ResourceGroup mappings still refer to that family's existing shape.
+
+
 | Declaring type.field | Stored type | LIVE target | PTU target | Owning paths | Export mapping |
 | --- | --- | --- | --- | --- | --- |
-| CraftingQualityDistributionNormal.min | Int32 |  |  | ResourceType.properties[].qualityDistribution.min OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.min | shared QualityCurve.min (one authoritative exact nullable i32; inline.value.min for resource sources) |
-| CraftingQualityDistributionNormal.max | Int32 |  |  | ResourceType.properties[].qualityDistribution.max OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.max | shared QualityCurve.max (one authoritative exact nullable i32; inline.value.max for resource sources) |
-| CraftingQualityDistributionNormal.mean | Single |  |  | ResourceType.properties[].qualityDistribution.mean OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.mean | shared QualityCurve.mean (raw finite Single) |
-| CraftingQualityDistributionNormal.stddev | Single |  |  | ResourceType.properties[].qualityDistribution.stddev OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.stddev | shared QualityCurve.stddev (raw finite Single) |
-| CraftingQualityDistributionUniform.min | Int32 |  |  | ResourceType.properties[].qualityDistribution.min OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.min | shared QualityCurve.min (one authoritative exact nullable i32; inline.value.min for resource sources) |
-| CraftingQualityDistributionUniform.max | Int32 |  |  | ResourceType.properties[].qualityDistribution.max OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.max | shared QualityCurve.max (one authoritative exact nullable i32; inline.value.max for resource sources) |
+| CraftingQualityDistributionNormal.min | Int32 |  |  | ResourceType.properties[].qualityDistribution.min OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.min | inline ResourceQualityCurve.min (SourcedValue<i32>) |
+| CraftingQualityDistributionNormal.max | Int32 |  |  | ResourceType.properties[].qualityDistribution.max OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.max | inline ResourceQualityCurve.max (SourcedValue<i32>) |
+| CraftingQualityDistributionNormal.mean | Single |  |  | ResourceType.properties[].qualityDistribution.mean OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.mean | inline ResourceQualityCurve.mean (SourcedValue<ResourceNumber>; exact source width) |
+| CraftingQualityDistributionNormal.stddev | Single |  |  | ResourceType.properties[].qualityDistribution.stddev OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.stddev | inline ResourceQualityCurve.stddev (SourcedValue<ResourceNumber>; exact source width) |
+| CraftingQualityDistributionUniform.min | Int32 |  |  | ResourceType.properties[].qualityDistribution.min OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.min | inline ResourceQualityCurve.min (SourcedValue<i32>) |
+| CraftingQualityDistributionUniform.max | Int32 |  |  | ResourceType.properties[].qualityDistribution.max OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.max | inline ResourceQualityCurve.max (SourcedValue<i32>) |
 | CraftingQualityDistribution_RecordRef.qualityDistributionRecord | Reference | CraftingQualityDistributionRecord | CraftingQualityDistributionRecord | ResourceType.properties[].qualityDistribution.qualityDistributionRecord OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.qualityDistributionRecord | qualityDistribution.payload.reference (target qualityDistributions; retain GUID/status) |
 | CraftingQualityLocationOverride.locationOverrideList | StrongPointer[] | CraftingQualityLocationOverrideEntry | CraftingQualityLocationOverrideEntry_Base | ResourceType.properties[].qualityLocationOverride.locationOverrideList | qualityLocationOverride.payload.value.locationOverrideList (ordered nullable entry sources; LIVE/PTU base widening accepted) |
 | CraftingQualityLocationOverrideEntry.location | Reference | StarMapObject | StarMapObject | ResourceType.properties[].qualityLocationOverride.locationOverrideList[].location | qualityLocationOverride.payload.value.locationOverrideList[].payload.location (StarMapObject Reference) |
-| CraftingQualityLocationOverrideEntry.qualityDistribution | StrongPointer | CraftingQualityDistribution_Base | CraftingQualityDistribution_Base | ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution | qualityLocationOverride.payload.value.locationOverrideList[].payload.qualityDistribution (shared QualityCurve inline-or-RecordRef source wrapper) |
+| CraftingQualityLocationOverrideEntry.qualityDistribution | StrongPointer | CraftingQualityDistribution_Base | CraftingQualityDistribution_Base | ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution | qualityLocationOverride.payload.value.locationOverrideList[].payload.qualityDistribution (ResourceQualityCurve inline-or-RecordRef source wrapper) |
 | CraftingQualityLocationOverride_RecordRef.locationOverrideRecord | Reference | CraftingQualityLocationOverrideRecord | CraftingQualityLocationOverrideRecord | ResourceType.properties[].qualityLocationOverride.locationOverrideRecord | qualityLocationOverride.payload.reference (target qualityDistributions override row) |
 | CraftingQualityQuantization.bands | Class[] | CraftingQualityQuantizationBand | CraftingQualityQuantizationBand | ResourceType.properties[].qualityQuantization.bands | qualityQuantization.payload.value.bands (ordered shared QuantizationBand payloads) |
-| CraftingQualityQuantizationBand.start | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].start | shared QuantizationBand.start (exact integer; existing i64 DTO) |
-| CraftingQualityQuantizationBand.end | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].end | shared QuantizationBand.end (exact integer; existing i64 DTO) |
-| CraftingQualityQuantizationBand.mappedValue | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].mappedValue | shared QuantizationBand.mappedValue (exact integer; existing i64 DTO) |
+| CraftingQualityQuantizationBand.start | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].start | ResourceQuantizationBand.start (SourcedValue<i32>) |
+| CraftingQualityQuantizationBand.end | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].end | ResourceQuantizationBand.end (SourcedValue<i32>) |
+| CraftingQualityQuantizationBand.mappedValue | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].mappedValue | ResourceQuantizationBand.mappedValue (SourcedValue<i32>) |
 | CraftingQualityQuantization_RecordRef.qualityQuantizationRecord | Reference | CraftingQualityQuantizationRecord | CraftingQualityQuantizationRecord | ResourceType.properties[].qualityQuantization.qualityQuantizationRecord | qualityQuantization.payload.reference (target qualityQuantizations) |
-| GramsPerCubicCentimeter.gramsPerCubicCentimeter | Single |  |  | ResourceType.densityType.densityUnit.gramsPerCubicCentimeter | resourceTypes[].density.payload.densityUnit.payload.value (raw g/cm3) |
-| KilogramsPerCubicMeter.kilogramsPerCubicMeter | Single |  |  | ResourceType.densityType.densityUnit.kilogramsPerCubicMeter | resourceTypes[].density.payload.densityUnit.payload.value (raw kg/m3) |
-| ResourceType.displayName | Locale |  |  | ResourceType.displayName | resourceTypes[].name (LocalisedText) |
-| ResourceType.description | Locale |  |  | ResourceType.description | resourceTypes[].description (LocalisedText; x-gameText) |
-| ResourceType.densityType | StrongPointer | ResourceTypeDensityType | ResourceTypeDensityType | ResourceType.densityType | resourceTypes[].density (actual sourceType + tagged payload) |
-| ResourceType.defaultThumbnailPath | String |  |  | ResourceType.defaultThumbnailPath | resourceTypes[].defaultThumbnailPath (raw String) |
-| ResourceType.defaultThumbnailPathSVG | String |  |  | ResourceType.defaultThumbnailPathSVG | resourceTypes[].defaultThumbnailPathSVG (raw String) |
-| ResourceType.rttThumbnailEntityClass | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.rttThumbnailEntityClass | resourceTypes[].rttThumbnailEntityClass (Record Reference) |
-| ResourceType.properties | StrongPointer[] | ResourceTypeProperties | ResourceTypeProperties | ResourceType.properties | resourceTypes[].properties (ordered nullable list, no deduplication) |
-| ResourceType.refinedVersion | Reference | ResourceType | ResourceType | ResourceType.refinedVersion | resourceTypes[].refinedVersion (ResourceType Reference) |
-| ResourceType.validateDefaultCargoBox | Bool |  |  | ResourceType.validateDefaultCargoBox | resourceTypes[].validateDefaultCargoBox (nullable Bool) |
-| ResourceType.defaultCargoContainers | StrongPointer | SResourceTypeDefaultCargoContainers | SResourceTypeDefaultCargoContainers | ResourceType.defaultCargoContainers | resourceTypes[].defaultCargoContainers (ordered named slots) |
-| ResourceTypeCraftingData.qualityDistribution | StrongPointer | CraftingQualityDistribution_Base | CraftingQualityDistribution_Base | ResourceType.properties[].qualityDistribution | resourceTypes[].properties[].payload.qualityDistribution (inline-or-RecordRef source wrapper) |
-| ResourceTypeCraftingData.qualityLocationOverride | StrongPointer | CraftingQualityLocationOverride_Base | CraftingQualityLocationOverride_Base | ResourceType.properties[].qualityLocationOverride | resourceTypes[].properties[].payload.qualityLocationOverride (inline-or-RecordRef source wrapper) |
-| ResourceTypeCraftingData.qualityQuantization | StrongPointer | CraftingQualityQuantization_Base | CraftingQualityQuantization_Base | ResourceType.properties[].qualityQuantization | resourceTypes[].properties[].payload.qualityQuantization (inline-or-RecordRef source wrapper) |
-| ResourceTypeDensity.densityUnit | StrongPointer | BaseDensityUnit | BaseDensityUnit | ResourceType.densityType.densityUnit | resourceTypes[].density.payload.densityUnit (actual sourceType + tagged value/unit) |
+| GramsPerCubicCentimeter.gramsPerCubicCentimeter | Single |  |  | ResourceType.densityType.densityUnit.gramsPerCubicCentimeter | definitions.resourceTypes.rows[].density.payload.densityUnit.payload.value (raw g/cm3) |
+| KilogramsPerCubicMeter.kilogramsPerCubicMeter | Single |  |  | ResourceType.densityType.densityUnit.kilogramsPerCubicMeter | definitions.resourceTypes.rows[].density.payload.densityUnit.payload.value (raw kg/m3) |
+| ResourceType.displayName | Locale |  |  | ResourceType.displayName | definitions.resourceTypes.rows[].name (PublicNameRef) |
+| ResourceType.description | Locale |  |  | ResourceType.description | definitions.resourceTypes.rows[].description (GameTextRef; x-gameText) |
+| ResourceType.densityType | StrongPointer | ResourceTypeDensityType | ResourceTypeDensityType | ResourceType.densityType | definitions.resourceTypes.rows[].density (actual sourceType + tagged payload) |
+| ResourceType.defaultThumbnailPath | String |  |  | ResourceType.defaultThumbnailPath | definitions.resourceTypes.rows[].defaultThumbnailPath (raw String) |
+| ResourceType.defaultThumbnailPathSVG | String |  |  | ResourceType.defaultThumbnailPathSVG | definitions.resourceTypes.rows[].defaultThumbnailPathSVG (raw String) |
+| ResourceType.rttThumbnailEntityClass | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.rttThumbnailEntityClass | definitions.resourceTypes.rows[].rttThumbnailEntityClass (Record Reference) |
+| ResourceType.properties | StrongPointer[] | ResourceTypeProperties | ResourceTypeProperties | ResourceType.properties | definitions.resourceTypes.rows[].properties (ordered nullable list, no deduplication) |
+| ResourceType.refinedVersion | Reference | ResourceType | ResourceType | ResourceType.refinedVersion | definitions.resourceTypes.rows[].refinedVersion (ResourceType Reference) |
+| ResourceType.validateDefaultCargoBox | Bool |  |  | ResourceType.validateDefaultCargoBox | definitions.resourceTypes.rows[].validateDefaultCargoBox (nullable Bool) |
+| ResourceType.defaultCargoContainers | StrongPointer | SResourceTypeDefaultCargoContainers | SResourceTypeDefaultCargoContainers | ResourceType.defaultCargoContainers | definitions.resourceTypes.rows[].defaultCargoContainers (ordered named slots) |
+| ResourceTypeCraftingData.qualityDistribution | StrongPointer | CraftingQualityDistribution_Base | CraftingQualityDistribution_Base | ResourceType.properties[].qualityDistribution | definitions.resourceTypes.rows[].properties[].payload.qualityDistribution (inline-or-RecordRef source wrapper) |
+| ResourceTypeCraftingData.qualityLocationOverride | StrongPointer | CraftingQualityLocationOverride_Base | CraftingQualityLocationOverride_Base | ResourceType.properties[].qualityLocationOverride | definitions.resourceTypes.rows[].properties[].payload.qualityLocationOverride (inline-or-RecordRef source wrapper) |
+| ResourceTypeCraftingData.qualityQuantization | StrongPointer | CraftingQualityQuantization_Base | CraftingQualityQuantization_Base | ResourceType.properties[].qualityQuantization | definitions.resourceTypes.rows[].properties[].payload.qualityQuantization (inline-or-RecordRef source wrapper) |
+| ResourceTypeDensity.densityUnit | StrongPointer | BaseDensityUnit | BaseDensityUnit | ResourceType.densityType.densityUnit | definitions.resourceTypes.rows[].density.payload.densityUnit (actual sourceType + tagged value/unit) |
 | ResourceTypeGroup.displayName | Locale |  |  | ResourceTypeGroup.displayName | resourceGroups[].name (existing LocalisedText) |
 | ResourceTypeGroup.description | Locale |  |  | ResourceTypeGroup.description | resourceGroups[].description (LocalisedText; x-gameText) |
 | ResourceTypeGroup.defaultThumbnailPath | String |  |  | ResourceTypeGroup.defaultThumbnailPath | resourceGroups[].defaultThumbnailPath (raw String) |
 | ResourceTypeGroup.defaultThumbnailPathSVG | String |  |  | ResourceTypeGroup.defaultThumbnailPathSVG | resourceGroups[].defaultThumbnailPathSVG (raw String) |
 | ResourceTypeGroup.groups | Reference[] | ResourceTypeGroup | ResourceTypeGroup | ResourceTypeGroup.groups | resourceGroups[].groups (ordered nullable Record References) |
 | ResourceTypeGroup.resources | Reference[] | ResourceType | ResourceType | ResourceTypeGroup.resources | resourceGroups[].resources (ordered nullable Record References) |
-| ResourceTypeMolarMass.molarMass | Single |  |  | ResourceType.densityType.molarMass | resourceTypes[].density.payload.molarMass (raw Single, no invented unit) |
-| ResourceTypeProperties.name | String |  |  | ResourceType.properties[].name | resourceTypes[].properties[].name (raw String, inherited) |
-| ResourceTypeVolatility.volatility | Single |  |  | ResourceType.properties[].volatility | resourceTypes[].properties[].payload.volatility (raw Single) |
-| ResourceTypeVolatility.healthDecayPerSecond | Single |  |  | ResourceType.properties[].healthDecayPerSecond | resourceTypes[].properties[].payload.healthDecayPerSecond (raw Single; source name describes rate) |
-| SResourceTypeDefaultCargoContainers.one_eighthSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.one_eighthSCU | resourceTypes[].defaultCargoContainers[{slot=one_eighthSCU}].entityClass (exact slot, nullable Entity Reference) |
-| SResourceTypeDefaultCargoContainers.one_quarterSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.one_quarterSCU | resourceTypes[].defaultCargoContainers[{slot=one_quarterSCU}].entityClass (exact slot, nullable Entity Reference) |
-| SResourceTypeDefaultCargoContainers.one_halfSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.one_halfSCU | resourceTypes[].defaultCargoContainers[{slot=one_halfSCU}].entityClass (exact slot, nullable Entity Reference) |
-| SResourceTypeDefaultCargoContainers.oneSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.oneSCU | resourceTypes[].defaultCargoContainers[{slot=oneSCU}].entityClass (exact slot, nullable Entity Reference) |
-| SResourceTypeDefaultCargoContainers.twoSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.twoSCU | resourceTypes[].defaultCargoContainers[{slot=twoSCU}].entityClass (exact slot, nullable Entity Reference) |
-| SResourceTypeDefaultCargoContainers.fourSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.fourSCU | resourceTypes[].defaultCargoContainers[{slot=fourSCU}].entityClass (exact slot, nullable Entity Reference) |
-| SResourceTypeDefaultCargoContainers.eightSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.eightSCU | resourceTypes[].defaultCargoContainers[{slot=eightSCU}].entityClass (exact slot, nullable Entity Reference) |
-| SResourceTypeDefaultCargoContainers.sixteenSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.sixteenSCU | resourceTypes[].defaultCargoContainers[{slot=sixteenSCU}].entityClass (exact slot, nullable Entity Reference) |
-| SResourceTypeDefaultCargoContainers.twentyFourSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.twentyFourSCU | resourceTypes[].defaultCargoContainers[{slot=twentyFourSCU}].entityClass (exact slot, nullable Entity Reference) |
-| SResourceTypeDefaultCargoContainers.thirtyTwoSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.thirtyTwoSCU | resourceTypes[].defaultCargoContainers[{slot=thirtyTwoSCU}].entityClass (exact slot, nullable Entity Reference) |
+| ResourceTypeMolarMass.molarMass | Single |  |  | ResourceType.densityType.molarMass | definitions.resourceTypes.rows[].density.payload.molarMass (raw Single, no invented unit) |
+| ResourceTypeProperties.name | String |  |  | ResourceType.properties[].name | definitions.resourceTypes.rows[].properties[].name (raw String, inherited) |
+| ResourceTypeVolatility.volatility | Single |  |  | ResourceType.properties[].volatility | definitions.resourceTypes.rows[].properties[].payload.volatility (raw Single) |
+| ResourceTypeVolatility.healthDecayPerSecond | Single |  |  | ResourceType.properties[].healthDecayPerSecond | definitions.resourceTypes.rows[].properties[].payload.healthDecayPerSecond (raw Single; source name describes rate) |
+| SResourceTypeDefaultCargoContainers.one_eighthSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.one_eighthSCU | definitions.resourceTypes.rows[].defaultCargoContainers[{slot=one_eighthSCU}].entityClass (exact slot, nullable Entity Reference) |
+| SResourceTypeDefaultCargoContainers.one_quarterSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.one_quarterSCU | definitions.resourceTypes.rows[].defaultCargoContainers[{slot=one_quarterSCU}].entityClass (exact slot, nullable Entity Reference) |
+| SResourceTypeDefaultCargoContainers.one_halfSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.one_halfSCU | definitions.resourceTypes.rows[].defaultCargoContainers[{slot=one_halfSCU}].entityClass (exact slot, nullable Entity Reference) |
+| SResourceTypeDefaultCargoContainers.oneSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.oneSCU | definitions.resourceTypes.rows[].defaultCargoContainers[{slot=oneSCU}].entityClass (exact slot, nullable Entity Reference) |
+| SResourceTypeDefaultCargoContainers.twoSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.twoSCU | definitions.resourceTypes.rows[].defaultCargoContainers[{slot=twoSCU}].entityClass (exact slot, nullable Entity Reference) |
+| SResourceTypeDefaultCargoContainers.fourSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.fourSCU | definitions.resourceTypes.rows[].defaultCargoContainers[{slot=fourSCU}].entityClass (exact slot, nullable Entity Reference) |
+| SResourceTypeDefaultCargoContainers.eightSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.eightSCU | definitions.resourceTypes.rows[].defaultCargoContainers[{slot=eightSCU}].entityClass (exact slot, nullable Entity Reference) |
+| SResourceTypeDefaultCargoContainers.sixteenSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.sixteenSCU | definitions.resourceTypes.rows[].defaultCargoContainers[{slot=sixteenSCU}].entityClass (exact slot, nullable Entity Reference) |
+| SResourceTypeDefaultCargoContainers.twentyFourSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.twentyFourSCU | definitions.resourceTypes.rows[].defaultCargoContainers[{slot=twentyFourSCU}].entityClass (exact slot, nullable Entity Reference) |
+| SResourceTypeDefaultCargoContainers.thirtyTwoSCU | Reference | EntityClassDefinition | EntityClassDefinition | ResourceType.defaultCargoContainers.thirtyTwoSCU | definitions.resourceTypes.rows[].defaultCargoContainers[{slot=thirtyTwoSCU}].entityClass (exact slot, nullable Entity Reference) |

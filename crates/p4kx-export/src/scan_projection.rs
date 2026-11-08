@@ -69,10 +69,10 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::ResourceTypes => {
                 let read = crate::resource_read::read(
                     tree,
-                    self.texts,
+                    self.projection,
                     self.groups.all_of_resource(&tree.guid()),
                 )?;
-                (Picked::ResourceType(read.value), read.notes)
+                (Picked::ResourceType(Box::new(read.value)), read.notes)
             }
             Kind::ResourceGroups => {
                 let read = crate::resource_group_read::read(

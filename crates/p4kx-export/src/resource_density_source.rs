@@ -1,84 +1,69 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract;
+use crate::resource_float::ResourceFloat32;
+use crate::schema_fields;
 
 /// A resource's authored density or molar-mass source.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = contract::every_field_required)]
+#[schemars(transform = schema_fields::every_field_required)]
 pub(crate) struct ResourceDensitySource<'source> {
-    /// The concrete `ResourceTypeDensityType` source struct.
-    pub(crate) source_type: &'source str,
-    /// The corresponding stored payload.
-    pub(crate) payload: ResourceDensityPayload<'source>,
+    pub(crate) source_type: SourcedValue<&'source str>,
+    pub(crate) payload: SourcedValue<ResourceDensityPayload<'source>>,
 }
 
-/// The distinct physical quantities the source can declare.
+/// The closed physical quantity shapes accepted from the source.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum ResourceDensityPayload<'source> {
-    /// A mass density with its authored unit.
     Density(ResourceDensity<'source>),
-    /// A molar mass whose source declaration gives no unit label.
     MolarMass(ResourceMolarMass),
-    /// The source is the known fieldless density base.
     EmptyBase,
-    /// The source has an unsupported concrete subtype and blocking Export health.
-    Unsupported,
 }
 
-/// The unit-bearing density payload of a `ResourceTypeDensity`.
+/// A density retaining its authored unit without conversion.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = contract::every_field_required)]
+#[schemars(transform = schema_fields::every_field_required)]
 pub(crate) struct ResourceDensity<'source> {
-    /// The authored `densityUnit`, without unit conversion.
-    pub(crate) density_unit: Option<ResourceDensityUnit<'source>>,
+    pub(crate) density_unit: SourcedValue<ResourceDensityUnit<'source>>,
 }
 
-/// A concrete authored density unit and its raw value.
+/// A concrete authored density unit and its corresponding source value.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = contract::every_field_required)]
+#[schemars(transform = schema_fields::every_field_required)]
 pub(crate) struct ResourceDensityUnit<'source> {
-    /// The concrete source unit struct.
-    pub(crate) source_type: &'source str,
-    /// The source unit and its corresponding value.
-    pub(crate) payload: ResourceDensityUnitPayload,
+    pub(crate) source_type: SourcedValue<&'source str>,
+    pub(crate) payload: SourcedValue<ResourceDensityUnitPayload>,
 }
 
-/// Density values in their authored units.
+/// The closed density-unit shapes preserve their declared quantities.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum ResourceDensityUnitPayload {
-    /// A value in grams per cubic centimetre.
     GramsPerCubicCentimeter(ResourceDensityValue),
-    /// A value in kilograms per cubic metre.
     KilogramsPerCubicMeter(ResourceDensityValue),
-    /// The source is the known fieldless density-unit base.
     EmptyBase,
-    /// The source has an unsupported concrete unit and blocking Export health.
-    Unsupported,
 }
 
-/// An authored finite density value without normalization.
+/// An exact authored Single density without normalization.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = contract::every_field_required)]
+#[schemars(transform = schema_fields::every_field_required)]
 pub(crate) struct ResourceDensityValue {
-    /// The raw density, null only for an absent or null source field.
-    pub(crate) value: Option<f32>,
+    pub(crate) value: SourcedValue<ResourceFloat32>,
 }
 
-/// An authored molar mass without an inferred unit.
+/// An exact authored molar mass without an inferred unit.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = contract::every_field_required)]
+#[schemars(transform = schema_fields::every_field_required)]
 pub(crate) struct ResourceMolarMass {
-    /// The raw `molarMass`, null only for an absent or null source field.
-    pub(crate) molar_mass: Option<f32>,
+    pub(crate) molar_mass: SourcedValue<ResourceFloat32>,
 }

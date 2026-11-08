@@ -10,6 +10,12 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CatalogError {
+    /// Shared field-origin evidence was interrupted during mutation.
+    #[error(transparent)]
+    SourceEvidence(#[from] p4kx_extraction::SourceEvidenceError),
+    /// An Archive-backed DataForge belongs to another observed input or container.
+    #[error("the DataForge origin does not match the supplied Archive input")]
+    SourceOriginMismatch,
     /// An unpublished catalog could not be removed after its original failure.
     #[error("catalog output cleanup failed: {cleanup}")]
     CleanupFailed {
@@ -58,4 +64,22 @@ pub enum CatalogError {
     /// The build was cancelled.
     #[error("the catalog build was cancelled")]
     Cancelled,
+}
+
+#[cfg(test)]
+mod source_evidence_tests {
+    #[test]
+    fn source_evidence_failure_remains_a_fatal_typed_catalog_error() {
+        let error =
+            super::CatalogError::from(p4kx_extraction::SourceEvidenceError::PoisonedEvidence);
+        assert!(
+            matches!(
+                error,
+                super::CatalogError::SourceEvidence(
+                    p4kx_extraction::SourceEvidenceError::PoisonedEvidence
+                )
+            ),
+            "source evidence must not become a field warning or substitute origin"
+        );
+    }
 }

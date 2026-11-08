@@ -3,10 +3,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::catalog_target_index::TargetIndex;
 use crate::export_diagnostic::{ExportDiagnostic, ExportDiagnosticSeverity, FailedExportRecord};
 use crate::export_field_inspection::FieldInspection;
 use crate::export_ledger::{ExportAccountingError, SourceObservation};
 use crate::export_reference_issue::ExportUnresolvedReference;
+use crate::{ExportSourceRole, Kind};
 
 /// Source inspections resolved onto each actual successful production read.
 pub(crate) struct Fields {
@@ -23,20 +25,10 @@ pub(crate) fn resolve(
     rows: Option<&crate::catalog_row::CatalogRows>,
     excluded: &[crate::catalog_row::ExcludedCatalogRow],
 ) -> Result<Fields, ExportAccountingError> {
-    let mut canonical = BTreeMap::<u32, FieldInspection>::new();
-    for mut inspection in inspections {
-        inspection.contextualize(None, crate::ExportSourceRole::Dependency);
-        match canonical.entry(inspection.record_index) {
-            std::collections::btree_map::Entry::Vacant(entry) => {
-                entry.insert(inspection);
-            }
-            std::collections::btree_map::Entry::Occupied(entry) => {
-                if entry.get() != &inspection {
-                    return Err(ExportAccountingError::ConflictingFieldInspection);
-                }
-            }
-        }
-    }
+    let canonical = canonical_inspections(inspections)?;
+    let targets = rows
+        .map(|rows| TargetIndex::new(&rows.emitted, excluded, sources, &canonical))
+        .transpose()?;
     let mut fields = Fields {
         incomplete_kinds: BTreeSet::new(),
         failed: Vec::new(),
@@ -59,6 +51,19 @@ pub(crate) fn resolve(
         {
             return Err(ExportAccountingError::ConflictingFieldInspection);
         }
+        let resource_captured = targets.as_ref().is_some_and(|targets| {
+            targets
+                .emitted
+                .contains(&(Kind::ResourceTypes, source.record_index))
+                && !targets
+                    .ambiguous
+                    .contains(&(Kind::ResourceTypes, source.guid))
+        });
+        if !resource_captured {
+            inspection
+                .diagnostics
+                .append(&mut inspection.resource_number_diagnostics);
+        }
         inspection.contextualize(source.kind, source.role);
         if !inspection.complete
             && let Some(kind) = source.kind
@@ -68,11 +73,37 @@ pub(crate) fn resolve(
         retain(&inspection, &mut fields);
     }
     let reference_diagnostics = fields.diagnostics.len();
-    crate::catalog_reference_health::resolve(&canonical, sources, rows, excluded, &mut fields)?;
+    crate::catalog_reference_health::resolve(
+        &canonical,
+        sources,
+        rows,
+        targets.as_ref(),
+        &mut fields,
+    )?;
     fields.failed.extend(failed_diagnostics(
         fields.diagnostics.iter().skip(reference_diagnostics),
     ));
     Ok(fields)
+}
+
+fn canonical_inspections(
+    inspections: Vec<FieldInspection>,
+) -> Result<BTreeMap<u32, FieldInspection>, ExportAccountingError> {
+    let mut canonical = BTreeMap::<u32, FieldInspection>::new();
+    for mut inspection in inspections {
+        inspection.contextualize(None, ExportSourceRole::Dependency);
+        match canonical.entry(inspection.record_index) {
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                entry.insert(inspection);
+            }
+            std::collections::btree_map::Entry::Occupied(entry) => {
+                if entry.get() != &inspection {
+                    return Err(ExportAccountingError::ConflictingFieldInspection);
+                }
+            }
+        }
+    }
+    Ok(canonical)
 }
 
 fn retain(inspection: &FieldInspection, fields: &mut Fields) {
@@ -119,3 +150,7 @@ pub(crate) fn failed_diagnostics<'diagnostic>(
         })
         .collect()
 }
+
+#[cfg(test)]
+#[path = "export_health_fields/numeric_capture_tests.rs"]
+mod numeric_capture_tests;

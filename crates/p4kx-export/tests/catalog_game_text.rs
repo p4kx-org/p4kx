@@ -5,8 +5,9 @@
 
 use serde_json::json;
 
-const GAME_TEXT: [&str; 26] = [
+const GAME_TEXT: [&str; 27] = [
     "description",
+    "gameTexts",
     "displayName",
     "displayType",
     "title",
@@ -85,7 +86,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 48,
+        marked, 49,
         "the expected resource, mission, name and option game-text fields"
     );
     let mut starmap_properties = Vec::new();

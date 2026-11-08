@@ -66,4 +66,4 @@ ships variants: 0 in 0 groups
 quality quantizations: 0 used by no ResourceType, 0 links reach no quantization
 en: 14 texts resolved, 1 unresolved, 0 placeholders
 de: 2 texts resolved, 13 unresolved, 0 placeholders
-wrote [DIR]/basetool-catalog.json: 45061 bytes, 1 Records skipped, 0 failed
+wrote [DIR]/basetool-catalog.json: 63947 bytes, 1 Records skipped, 0 failed

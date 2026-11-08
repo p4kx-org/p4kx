@@ -15,7 +15,10 @@ use crate::build_harvest::add_harvest_locations;
 use crate::build_loot::add_loot_containers;
 use crate::build_starmap::add_starmap;
 use crate::catalog_crafting::{CraftingKinds, kinds};
+use crate::catalog_definitions::{CatalogDefinitions, ResourceTable};
+use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_output::{Compression, emit};
+use crate::catalog_projection::CatalogProjection;
 use crate::collected::Collected;
 use crate::contract::{
     BuildSource, Catalog, Completeness, KindCompleteness, SCHEMA_VERSION, Source,
@@ -34,33 +37,15 @@ use crate::{BuiltCatalog, CatalogError, CatalogOptions, CatalogSummary};
 mod parts;
 use parts::Parts;
 
-/// Builds the Basetool catalog of the DataForge in `archive`.
+/// Builds a deterministic Basetool catalog from the DataForge and available localization inputs.
 ///
-/// Every Record is checked in parallel: a kind takes the Records under one of its record-path
-/// prefixes whose struct is its type and, with a Filter, whose record path the Filter matches;
-/// of those, development leftovers ([`EXCLUDED_TOKENS`](crate::EXCLUDED_TOKENS), and for ships
-/// [`SHIP_EXCLUDED_TOKENS`](crate::SHIP_EXCLUDED_TOKENS)) are counted as
-/// skipped. Names and descriptions resolve in the English and German `global.ini`; a key or a
-/// language the Archive lacks leaves that text `null` and is counted in the summary. An item's
-/// class is read from the `Class:` line of its English description, a commodity's missing texts
-/// from its `ResourceType` Record, and a blueprint's ingredients from the costs of its first
-/// tier. A ship's and an item's [`Playability`](crate::Playability) is decided by structural
-/// rules (`docs/basetool-catalog.md`). A `ResourceType` Record that a cost of any tier or a kept
-/// quality quantization uses and no commodity Record carries becomes a commodity of its own. A
-/// resource group takes its parent from
-/// the group that lists it, a blueprint category only its Record. Entities are ordered by the
-/// text of their GUID, so equal input and export time give byte-identical JSON. A selected
-/// Record that cannot be read is listed in [`CatalogSummary::failures`] and the artifact's
-/// export health. Normal mode refuses incomplete health; explicit diagnostic mode retains the
-/// available rows and their incomplete status.
+/// Resource definitions retain per-value source origins and canonical text references.
+/// Normal publication requires complete export health; diagnostic mode retains available rows.
 ///
 /// # Errors
 ///
-/// Returns [`CatalogError::Load`] or [`CatalogError::DataForge`] when the DataForge cannot be
-/// read, [`CatalogError::LoadTexts`] or [`CatalogError::Texts`] when a `global.ini` the Archive
-/// holds cannot be read, and [`CatalogError::Cancelled`] once the [`CancelToken`] of `options`
-/// is cancelled. Returns [`CatalogError::IncompleteExport`] when normal publication is unsafe,
-/// or [`CatalogError::Accounting`] when production evidence is missing or inconsistent.
+/// Returns an input, projection, accounting or cancellation error when the catalog cannot be built.
+/// Returns [`CatalogError::IncompleteExport`] when normal publication is unsafe.
 pub fn build_catalog(
     archive: &Archive,
     options: &CatalogOptions<'_>,
@@ -161,6 +146,8 @@ fn assemble<R>(
     let forge = entry.open().map_err(CatalogError::DataForge)?;
     let sources = TextSources::read(archive)?;
     let texts = Texts::parse(&sources)?;
+    let origins = CatalogOrigins::new(archive, entry, &sources)?;
+    let projection = CatalogProjection::new(&texts, &origins);
     let crafting = kinds(
         read_with_progress(&forge, options.filter, options.cancel, options.progress)?,
         &texts,
@@ -169,7 +156,13 @@ fn assemble<R>(
     let files = ArchiveFiles::new(archive);
     let entities = Arc::new(Entities::new(&forge));
     let (mut collected, placements) = scan(
-        archive, &forge, &files, &entities, options, &texts, crafting,
+        archive,
+        &forge,
+        &files,
+        &entities,
+        options,
+        &projection,
+        crafting,
     )?;
     collected.ledger.archive_inventory_problem = crate::export_archive_health::inventory(archive);
     let paint_summary = add_paints(&forge, &mut collected, options.cancel)?;
@@ -239,7 +232,11 @@ fn assemble<R>(
         commodities: collected.commodities,
         blueprints: collected.blueprints,
         resource_groups: collected.resource_groups,
-        resource_types: collected.resource_types,
+        definitions: CatalogDefinitions {
+            resource_types: ResourceTable::new(&forge, collected.resource_types),
+        },
+        texts: projection.finish()?,
+        provenance: origins.uses.freeze()?,
         blueprint_categories: collected.blueprint_categories,
         gameplay_properties: collected.gameplay_properties,
         quality_distributions: collected.quality_distributions,
@@ -319,7 +316,7 @@ fn scan<'f>(
     files: &'f ArchiveFiles<'f>,
     entities: &Arc<Entities<'f>>,
     options: &CatalogOptions<'_>,
-    texts: &Texts<'f>,
+    projection: &CatalogProjection<'_, 'f>,
     crafting: CraftingKinds<'f>,
 ) -> Result<(Collected<'f>, Placements), CatalogError> {
     let rules = [
@@ -342,7 +339,7 @@ fn scan<'f>(
         files,
         Arc::clone(entities),
         options,
-        texts,
+        projection,
         &crafting,
         &placements,
     )?;

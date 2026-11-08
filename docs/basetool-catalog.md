@@ -13,10 +13,15 @@ Version 3 is the catalog contract for 0.5.0 (ADR-0339). Consumers must accept ve
 importing it. Tagged payload unions are closed: a new variant requires a version decision, unlike
 an unknown additive field or kind. The schema describes serialization, so emitted nullable payload
 fields are required even when their value is null. The previous released schema is retained as a
-compatibility-test fixture; ResourceType alone remains an additive extension.
+compatibility-test fixture. Moving ResourceTypes to their canonical table and adding typed value
+carriers is part of the breaking v3 migration, not an additive change to the released v2 shape.
 
 Every catalog kind and the shared CLI/GUI JSON and compressed catalog writers use version 3.
-Other exported formats retain their independently documented contract versions.
+The implemented canonical-table/per-value-origin step currently covers ResourceTypes and their
+nested values and text rows. Other catalog families retain their current shapes, and migration of
+all families and all 45 output-carrier families remains in progress. The complete target is
+[ADR-0356](adr/0356-catalog-v3-uses-canonical-source-typed-tables.md); it is not a claim of complete
+implementation. Other exported formats retain their independently documented versions.
 
 
 The rule is ADR-0054 (amending ADR-0002):
@@ -95,7 +100,11 @@ identifiers, short names or fact values. The catalog keeps the `description` fie
 Basetool's logged-in members; the Basetool keeps them, `displayType` and the contract texts away
 from third parties. Every such field carries
 `"x-gameText": true` in the JSON Schema, and no other field does; a test checks this.
-Every game text is trimmed of leading and trailing white space; see Texts.
+Every game text is trimmed of leading and trailing white space; see Texts. ResourceTypes use
+`texts.publicNames` and `texts.gameTexts` instead of inline `key`/`en`/`de` objects. Their description
+reference, GameTextRef type and complete gameTexts table carry the protection through the reference.
+A shared key used as both a name and a description has separate rows in the two domains.
+An unencrypted source marker does not remove `x-gameText` protection.
 
 An extensible source vocabulary derived from a Rust enum is a definition of `"type": "string"`
 with the known values in `x-values`, one `{"value", "description"}` entry per value (`description`
@@ -110,10 +119,11 @@ Entry-operation identifiers, diagnostic codes and unresolved-reference reasons r
 An unknown annotation does not establish a new precedence or positive resolution. Archive-key
 state is explanatory metadata; successful decryption and export health are separate evidence.
 
-The fixed control definitions are `CatalogPublicationMode`, `ExportHealthStatus`,
+The fixed control definitions include `CatalogPublicationMode`, `ExportHealthStatus`,
 `ExportStageStatus`, `ExportSourceMode`, `ExportDiagnosticSeverity`, `ExportDiagnosticStage`,
 `ExportDiagnosticUnit`, `ExportSourceRole`, `DefinitionStatus`, `OwnedReferenceStatus` and
-`PropertyReferenceStatus`. They retain the finite string alternatives generated from their
+`PropertyReferenceStatus`. Resource origin adds `SourceValueState`, `SourceUseRole`, `InputScope`,
+`SourceEncryptionState`, `SourceRecordFormat`, `SourceDeclarationKind` and `ResourceAvailability`. They retain the finite string alternatives generated from their
 serializers and carry `x-p4kx-vocabularyClass: "control"`. New alternatives require contract review
 and a version decision when they change interpretation. The schema-policy tests require an
 explicit class, preserve unknown strings for open vocabularies and reject unknown control states.
@@ -157,7 +167,8 @@ uncompressed size, the compressed size (`null` for plain JSON) and the warnings 
 ## Shape
 
 The file is UTF-8 JSON in one line, ending in a newline. Field names are camelCase and mean the
-same in every kind. Every field is always present; one that has no value is `null`.
+same in every kind. Listed fields are always present. Existing family shapes use nullable values;
+ResourceType source fields instead have the explicit state/value/origin carrier described below.
 
 | Field | Meaning |
 |-------|---------|
@@ -177,7 +188,9 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `items` | The items, ordered by GUID |
 | `ships` | The ships and ground vehicles, ordered by GUID |
 | `commodities` | The commodities, ordered by GUID |
-| `resourceTypes` | Independently selected resource definitions, with density, packaging, authored properties and quality sources, ordered by GUID ([contract](catalog-resource-types.md)) |
+| `definitions.resourceTypes` | Closed source-family `availability` and canonical `rows`, independently selected and ordered by GUID; every source-backed field uses the typed value carrier ([contract](catalog-resource-types.md)) |
+| `texts.publicNames`, `texts.gameTexts` | Canonical ResourceType name and protected-description rows, each with sourced `id`, `key` and per-language `translations` |
+| `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the ResourceType carriers |
 | `blueprints` | The crafting blueprints with their ingredients, all tiers, default availability and dismantle link, ordered by GUID |
 | `resourceGroups` | The groups of resource types, the targets of `typeGuid`, ordered by GUID |
 | `blueprintCategories` | The blueprint categories, the targets of `categoryGuid`, ordered by GUID |
@@ -231,6 +244,44 @@ so an import can use absence as removal evidence within that kind's selection po
 kind lists only what the Filter selected. Incomplete health, including global blocking diagnostics,
 cannot establish removal even when a kind's Filter scope is complete.
 
+### Per-value source origin for ResourceTypes
+
+`definitions.resourceTypes.rows` replaces the root `resourceTypes` array; there is no duplicate
+legacy view. Its source-backed members and nested authored list elements carry five required keys:
+
+| Key | Meaning |
+| --- | --- |
+| `state` | `present`, `absent`, `null`, `unreadable`, `unsupported` or `invalid` |
+| `value` | Typed present payload, otherwise null; false, zero and empty values stay present |
+| `containsEncryptedSource` | True for any proven encrypted contributor/ancestor; false only for a complete all-unencrypted set; null otherwise |
+| `sourceUsesRefs` | Opaque document-local references to actual contributing `provenance.uses` rows |
+| `sourceSetComplete` | Completeness of this value's input set, independent of Filter and export health |
+
+A complete input set may have unknown encryption, and an incomplete set may contain a known
+encrypted contributor. Successful decoding, an Archive key or a plaintext standalone DCB does not
+prove an unencrypted original source. Payload, selector and conversion uses contribute; attempted
+reads and untouched reference targets do not. Sources keep distinct physical identity even when
+paths, GUIDs or decoded bytes are equal. Nested container ancestry affects the result. Directory
+metadata and Entry payload are separate scopes.
+
+Fixed Single resource numbers retain `rawBits` (eight lowercase hexadecimal digits) plus nullable
+`finite`; Double payloads use sixteen digits. Infinity and NaN remain present, including their
+original bits. Generic numeric fields add the source-width `type` tag; Int64/UInt64 values use
+bounded canonical decimal strings. The exact payloads, states and reference contracts are in the
+[ResourceType contract](catalog-resource-types.md#immediate-value-and-origin-carrier).
+
+Name and description values reference separate canonical text tables. Their `translations.value`
+maps every actually available supported language to another five-key value. Existing empty or
+whitespace-only translations stay present empty strings after display normalization; absent keys
+remain absent. The game-text protection axis remains independent of source encryption, including
+through canonical references. Consumers cannot infer this per-value proof from the global
+`source.archiveKey` or unread-entry counts.
+
+This coverage is implemented for ResourceTypes and their canonical text rows. Other families and
+structured/raw tool outputs still require their own migration under
+[#1125](https://github.com/p4kx-org/p4kx/issues/1125); the presence of `provenance` is not proof that
+all current output fields have origin metadata.
+
 ### Ordering Builds
 
 `source.build.changeNumber` is the Perforce change number the Build was made from
@@ -265,7 +316,8 @@ lower number than the last applied one.
 
 ### Entities
 
-Every entity carries:
+The existing entity shapes below carry these fields. ResourceTypes use the canonical table and
+sourced carriers above instead of the inline text shape:
 
 | Field | Meaning |
 |-------|---------|
@@ -702,7 +754,7 @@ from the entity:
 |-------|--------|
 | `name` | `SCItemPurchasableParams.displayName` |
 | `description` | `EntityUIDisplayParams.displayDescription` in `StaticEntityClassData` |
-| `typeGuid` | The first selected, readable, non-leftover `ResourceTypeGroup` in source Record order that directly lists this ResourceType; `null` without one. All direct memberships are in `resourceTypes[].groupGuids` |
+| `typeGuid` | The first selected, readable, non-leftover `ResourceTypeGroup` in source Record order that directly lists this ResourceType; `null` without one. All direct memberships are in `definitions.resourceTypes.rows[].groupGuids.value` |
 | `subtypeGuid` | The ResourceType GUID of the first non-null `entry` of the first `ResourceContainer.defaultComposition`; nullable and non-unique. A configured dangling first GUID is retained rather than replaced by a later link |
 | `displayType` | A text: `SCItemPurchasableParams.displayType`, e.g. `@items_commodities_type_metal` |
 | `densityGramsPerCubicCentimetre` | The number `densityType.densityUnit.gramsPerCubicCentimeter` of the `ResourceType` holds (a fact, no game text); `null` without a `ResourceType`, a density or a density in another unit |
@@ -731,9 +783,9 @@ path matches.
 
 `commodities[].guid` is the commodity identity. Several commodities can share one nullable
 `subtypeGuid`; a ResourceType can also have no commodity. Join an ingredient's `resourceGuid` to
-`resourceTypes[].guid` for resource facts and to every matching `commodities[].subtypeGuid` for
+`definitions.resourceTypes.rows[].guid.value` for resource facts and to every matching `commodities[].subtypeGuid` for
 commodity alternatives. Never index commodities uniquely by `subtypeGuid`. The independent
-[`resourceTypes` contract](catalog-resource-types.md) retains every selected resource even when
+[`ResourceType` contract](catalog-resource-types.md) retains every selected resource even when
 the existing commodity fallback does not apply.
 
 A blueprint (`CraftingBlueprintRecord`) takes its fields from `blueprint`:
@@ -791,7 +843,7 @@ Groups nest one level on LIVE: Metal lists Alloy and UnrefinedOres, Mineral list
 Nonmetal lists Halogen, Organic lists Food, ProcessedGoods lists SyntheticMaterials, Vice and
 Bulk_Supplies. A commodity points at the group that lists its `ResourceType` directly, so a
 commodity of Alloy has the child as `typeGuid`, not Metal. `resources` and `groups` preserve the
-authored lists independently of these singular convenience fields. `resourceTypes[].groupGuids`
+authored lists independently of these singular convenience fields. `definitions.resourceTypes.rows[].groupGuids.value`
 contains all distinct selected direct memberships, sorted by GUID. The descriptions and raw
 thumbnail paths are exported as source facts; cataloging does not extract the media. The source
 Record path is retained, and `className` and `guid` distinguish Records that share one file.
@@ -874,11 +926,12 @@ without a chance or with one outside 0 to 1, a pool without a positive weight an
 weight of zero or less give none. The quality distributions carry no link to a blueprint or source:
 the Records do not hold one, so the catalog lists them as they are. Resource-owned inline and
 linked forms preserve their source ownership in
-[`resourceTypes[].properties`](catalog-resource-types.md#quality-source-wrappers-and-exact-curves).
-Wrong numeric source types, nonfinite parameters and values outside finite f32 representation
-produce explicit projection failures; they do not silently become null. Known fieldless curve
-bases retain their `kind` with null numeric fields. The public Rust QualityCurve shares exact
-`Option<i32>` bounds through both existing reexport paths.
+[`definitions.resourceTypes.rows[].properties`](catalog-resource-types.md#quality-source-wrappers-and-exact-curves).
+Their inline ResourceQualityCurve uses sourced exact-width numeric payloads. The top-level
+`qualityDistributions` and public Rust QualityCurve still use the existing finite-f32 contract:
+wrong numeric source types, nonfinite parameters and values outside finite f32 representation
+produce explicit projection failures. Known fieldless curve bases retain `kind` and null numbers;
+exact `Option<i32>` bounds remain shared through both existing public reexport paths.
 
 #### Quality quantizations
 
@@ -2473,6 +2526,16 @@ aUEC next to it is `insurance.expediteFee`. The catalog therefore exports no cla
 formula over the exported facts is documented as one (ADR-0218).
 
 ### Texts
+
+The inline `key`/`en`/`de` rules below describe the existing non-migrated family shapes.
+ResourceTypes use canonical `texts.publicNames`/`texts.gameTexts` rows and all supported languages
+whose Entries are available. Each row retains its authored key, even if empty. Its language values
+use the state/value/origin carrier: missing key means `absent`, while an existing empty or
+whitespace-only winner is `present` with an empty normalized string. Placeholders retain their
+key and have absent language values without locale contributions. Bare keys still use existing
+lookup rules; unmatched strings are not literal text fallbacks. Locale provenance references the
+DataForge selector and actual winning language Entry, without putting protected key text in global
+source-use IDs. This canonical path retains the display normalization and duplicate winner rules.
 
 `key` is the localisation key as the Record holds it, e.g. `@manufacturer_NameACAS`; an empty key
 is `null`. `en` and `de` are its texts from the Archive's `global.ini` of that language:

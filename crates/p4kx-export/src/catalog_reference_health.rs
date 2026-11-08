@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use crate::catalog_reference;
 use crate::catalog_reference::CatalogReference;
-use crate::catalog_row::{CatalogRowExclusion, CatalogRows, ExcludedCatalogRow};
+use crate::catalog_row::{CatalogRowExclusion, CatalogRows};
 use crate::catalog_target_index::TargetIndex;
 use crate::export_diagnostic::{
     ExportDiagnostic, ExportDiagnosticCode, ExportDiagnosticExample, ExportDiagnosticSeverity,
@@ -21,10 +21,10 @@ pub(crate) fn resolve(
     canonical: &BTreeMap<u32, FieldInspection>,
     sources: &[SourceObservation],
     rows: Option<&CatalogRows>,
-    excluded: &[ExcludedCatalogRow],
+    targets: Option<&TargetIndex>,
     fields: &mut Fields,
 ) -> Result<(), ExportAccountingError> {
-    let Some(rows) = rows else {
+    let (Some(rows), Some(targets)) = (rows, targets) else {
         if canonical
             .values()
             .any(|proof| !proof.catalog_references.is_empty())
@@ -33,8 +33,7 @@ pub(crate) fn resolve(
         }
         return Ok(());
     };
-    let targets = TargetIndex::new(&rows.emitted, excluded, sources, canonical)?;
-    ambiguous_rows(&targets, canonical, fields)?;
+    ambiguous_rows(targets, canonical, fields)?;
     let mut by_target = BTreeMap::<u32, Vec<&SourceObservation>>::new();
     for source in sources {
         by_target
@@ -53,7 +52,7 @@ pub(crate) fn resolve(
             let target_sources = by_target
                 .get(&reference.target_record_index)
                 .map_or(&[][..], Vec::as_slice);
-            if let Some(status) = status(reference, rows, &targets, target_sources) {
+            if let Some(status) = status(reference, rows, targets, target_sources) {
                 record(source, proof, reference, status, fields);
             }
         }

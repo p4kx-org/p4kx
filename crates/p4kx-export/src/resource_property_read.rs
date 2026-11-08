@@ -1,55 +1,59 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::StructValue;
+use p4kx_extraction::{SourceValue, StructValue};
 
-use crate::resource_quality_read;
-use crate::resource_type_contract::{
+use crate::CatalogError;
+use crate::resource_property_contract::{
     ResourceCraftingData, ResourceProperty, ResourcePropertyPayload, ResourceVolatility,
 };
-use crate::source_fields::{FieldError, Fields};
+use crate::resource_quality_read;
+use crate::resource_value_read::{ResourceContext, ResourceFields};
+use crate::source_fields::FieldError;
 
-/// Projects every authored resource-property subtype without deduplication.
-pub(crate) fn read<'source>(
-    source: &StructValue<'source>,
+/// Projects a concrete property without collapsing nulls or reordering members.
+pub(crate) fn read<'f>(
+    source: &StructValue<'f>,
     path: &str,
+    context: &ResourceContext<'_>,
     notes: &mut Vec<FieldError>,
-) -> Result<ResourceProperty<'source>, FieldError> {
-    let fields = Fields::new(source, path);
-    let name = fields.text("name")?;
+) -> Result<ResourceProperty<'f>, CatalogError> {
+    let fields = ResourceFields::new(source, path, context);
+    let name = fields.text("name", notes)?;
     let payload = match source.type_name() {
         "ResourceTypeProperties" => {
             fields.check(&["name"], notes);
-            ResourcePropertyPayload::Base
+            Some(ResourcePropertyPayload::Base)
         }
         "ResourceTypeVolatility" => {
             fields.check(&["name", "volatility", "healthDecayPerSecond"], notes);
-            ResourcePropertyPayload::Volatility(ResourceVolatility {
-                volatility: fields.single("volatility")?,
-                health_decay_per_second: fields.single("healthDecayPerSecond")?,
-            })
+            Some(ResourcePropertyPayload::Volatility(ResourceVolatility {
+                volatility: fields.single("volatility", notes)?,
+                health_decay_per_second: fields.single("healthDecayPerSecond", notes)?,
+            }))
         }
-        "ResourceTypeCraftingData" => {
-            ResourcePropertyPayload::CraftingData(Box::new(crafting(source, path, notes)?))
-        }
-        _ => {
-            notes.push(fields.unsupported(""));
-            ResourcePropertyPayload::Unsupported
-        }
+        "ResourceTypeCraftingData" => Some(ResourcePropertyPayload::CraftingData(Box::new(
+            crafting(source, path, context, notes)?,
+        ))),
+        _ => None,
     };
     Ok(ResourceProperty {
-        source_type: source.type_name(),
+        source_type: fields.source_type()?,
         name,
-        payload,
+        payload: payload.map_or_else(
+            || fields.unsupported(notes),
+            |payload| context.selector(&format!("{path}.$type"), SourceValue::Present(payload)),
+        )?,
     })
 }
 
-fn crafting<'source>(
-    source: &StructValue<'source>,
+fn crafting<'f>(
+    source: &StructValue<'f>,
     path: &str,
+    context: &ResourceContext<'_>,
     notes: &mut Vec<FieldError>,
-) -> Result<ResourceCraftingData<'source>, FieldError> {
-    let fields = Fields::new(source, path);
+) -> Result<ResourceCraftingData<'f>, CatalogError> {
+    let fields = ResourceFields::new(source, path, context);
     fields.check(
         &[
             "name",
@@ -59,39 +63,39 @@ fn crafting<'source>(
         ],
         notes,
     );
-    let quality_distribution = fields
-        .structure("qualityDistribution")?
-        .map(|value| {
+    let distribution = fields
+        .structure("qualityDistribution", notes)?
+        .try_map(|value| {
             resource_quality_read::distribution(
                 value,
                 &format!("{path}.qualityDistribution"),
+                context,
                 notes,
             )
-        })
-        .transpose()?;
-    let quality_location_override = fields
-        .structure("qualityLocationOverride")?
-        .map(|value| {
+        })?;
+    let location_override = fields
+        .structure("qualityLocationOverride", notes)?
+        .try_map(|value| {
             resource_quality_read::overrides(
                 value,
                 &format!("{path}.qualityLocationOverride"),
+                context,
                 notes,
             )
-        })
-        .transpose()?;
-    let quality_quantization = fields
-        .structure("qualityQuantization")?
-        .map(|value| {
+        })?;
+    let quantization = fields
+        .structure("qualityQuantization", notes)?
+        .try_map(|value| {
             resource_quality_read::quantization(
                 value,
                 &format!("{path}.qualityQuantization"),
+                context,
                 notes,
             )
-        })
-        .transpose()?;
+        })?;
     Ok(ResourceCraftingData {
-        distribution: quality_distribution,
-        location_override: quality_location_override,
-        quantization: quality_quantization,
+        distribution,
+        location_override,
+        quantization,
     })
 }

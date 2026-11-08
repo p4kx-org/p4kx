@@ -6,7 +6,10 @@ use std::borrow::Cow;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::catalog_definitions::CatalogDefinitions;
+use crate::catalog_text_contract::CatalogTexts;
 use crate::guid_text::CatalogGuid;
+use p4kx_extraction::SourceInventory;
 
 pub(crate) use crate::broker_entry::BrokerEntry;
 pub(crate) use crate::contract_cargo::CargoManifest;
@@ -44,6 +47,7 @@ pub(crate) use crate::entity_spawn_model::EntitySpawnPool;
 pub(crate) use crate::location_template::MissionLocationTemplate;
 pub(crate) use crate::mission_property_set::MissionPropertySet;
 pub(crate) use crate::npc_spawn_model::NpcSpawnPool;
+
 pub(crate) use crate::resource_type_contract::ResourceType;
 pub(crate) use crate::schema_fields::every_field_required;
 pub(crate) use crate::spawn_model::{LocationQuery, ShipSpawnPool};
@@ -78,8 +82,12 @@ pub(crate) struct Catalog<'a> {
     pub(crate) blueprints: Vec<Blueprint<'a>>,
     /// The resource groups, ordered by GUID.
     pub(crate) resource_groups: Vec<ResourceGroup<'a>>,
-    /// The resource definitions, independently of commodity packaging, ordered by GUID.
-    pub(crate) resource_types: Vec<ResourceType<'a>>,
+    /// Canonical resource definition rows, independently of commodity packaging.
+    pub(crate) definitions: CatalogDefinitions<'a>,
+    /// Physical source observations and actual contribution uses.
+    pub(crate) provenance: SourceInventory,
+    /// Public short-name and protected game-text tables.
+    pub(crate) texts: CatalogTexts<'a>,
     /// The blueprint categories, ordered by GUID.
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'a>>,
     /// The gameplay property definitions the quality modifiers refer to, ordered by GUID.

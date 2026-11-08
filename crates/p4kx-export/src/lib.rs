@@ -87,6 +87,7 @@ mod catalog_reference_health;
 mod catalog_row;
 mod catalog_rows;
 mod catalog_target_index;
+mod catalog_v3;
 mod collected;
 #[cfg(test)]
 mod collected_tests;
@@ -266,15 +267,6 @@ mod record_read;
 mod record_summary;
 mod recovery;
 mod reputation;
-mod resource_density_read;
-mod resource_density_source;
-mod resource_group;
-mod resource_group_read;
-mod resource_property_read;
-mod resource_quality_read;
-mod resource_quality_source;
-mod resource_read;
-mod resource_type_contract;
 mod scan;
 mod scan_health;
 mod scan_signature;
@@ -340,6 +332,16 @@ mod template_property_read;
 mod texts;
 mod variant_groups;
 mod variants;
+
+pub(crate) use catalog_v3::{
+    catalog_definitions, catalog_origins, catalog_projection, catalog_text_contract,
+    resource_density_read, resource_density_source, resource_float, resource_group,
+    resource_group_read, resource_integer, resource_memberships, resource_number,
+    resource_property_contract, resource_property_read, resource_quality_curve,
+    resource_quality_read, resource_quality_source, resource_quantization_read,
+    resource_raw_policy, resource_read, resource_reference, resource_type_contract,
+    resource_value_read,
+};
 
 pub use action_map::{
     ACTION_MAP_PROFILE_PATH, Action, ActionMap, ActionMapError, ActionMaps, Binding, Device,
