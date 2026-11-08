@@ -39,6 +39,7 @@ mod real_archive_property_sets;
 mod real_archive_quantization;
 mod real_archive_records;
 mod real_archive_reputation;
+mod real_archive_resource_oracles;
 mod real_archive_ship_base;
 mod real_archive_ship_matrix;
 mod real_archive_shop_items;
@@ -54,3 +55,18 @@ mod real_archive_variant_keys;
 mod real_archive_variants;
 mod real_archive_verification;
 mod ship_matrix_compare;
+
+#[path = "../it/resource_density_schema_fixture.rs"]
+mod resource_density_schema_fixture;
+
+#[path = "../it/resource_fixture.rs"]
+mod resource_fixture;
+
+#[path = "../it/resource_fixture_values.rs"]
+mod resource_fixture_values;
+
+#[path = "../it/resource_quality_schema_fixture.rs"]
+mod resource_quality_schema_fixture;
+
+#[path = "../it/resource_schema_fixture.rs"]
+mod resource_schema_fixture;

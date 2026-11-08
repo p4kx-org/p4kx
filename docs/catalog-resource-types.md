@@ -204,6 +204,9 @@ payloads, filtered nonfinite sources, and shared plain/compressed serialization.
 is recorded with the corresponding integration checks; the contract is not a full milestone or
 real-game acceptance claim.
 
+The [source verification guide](resource-source-verification.md) describes the independent
+raw-value oracle, its bounds and the missing historical cardinality baseline.
+
 ## Declaration field inventory
 
 The Export mapping column uses logical paths: follow `.value` at each sourced field or authored
