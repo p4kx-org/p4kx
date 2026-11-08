@@ -41,6 +41,8 @@ mod dds_source_info;
 mod decimal_u64;
 mod dependent;
 mod disk_case;
+mod disk_parts;
+mod disk_textures;
 mod entry_content;
 mod entry_metadata_info;
 mod entry_path;
@@ -107,7 +109,6 @@ mod source_protection;
 mod target;
 pub mod text_line;
 mod text_window;
-mod texture;
 mod texture_conversion_error;
 mod texture_convert;
 mod texture_exr;
@@ -124,6 +125,7 @@ mod texture_png;
 mod texture_preview;
 mod texture_preview_png;
 mod texture_siblings;
+mod textures;
 mod tracker;
 mod ui_disk_path;
 mod ui_external;
@@ -173,6 +175,7 @@ pub use dds_source_info::{
     DDS_SOURCE_INFO_VERSION, DdsBlockLayoutInfo, DdsNormalizedInfo, DdsRawHeaderInfo, DdsSourceInfo,
 };
 pub use decimal_u64::DecimalU64;
+pub use disk_textures::DiskTextures;
 pub use entry_content::{
     EntryBytes, EntryReadError, EntryText, MIN_TEXT_LEN, TextEncoding, find_entry, read_bytes,
     read_text,
@@ -310,7 +313,6 @@ pub use sound::{MAX_SOUND_LEN, Sound};
 pub use target::{
     create_default_target, create_default_target_protected, default_target_name, utc_rfc3339,
 };
-pub use texture::Texture;
 pub use texture_exr::ExrReport;
 pub use texture_grey::{TextureVerdicts, probe_saturation};
 pub use texture_groups::{TextureGroup, TextureGroups};
@@ -319,6 +321,7 @@ pub use texture_image_plan::{
 };
 pub use texture_png::{CUBE_FACE_NAMES, CubemapLayout, PngReport};
 pub use texture_preview_png::PreviewPng;
+pub use textures::Texture;
 pub use ui_extract::{UiAssetFailure, UiAssetKind, UiExtraction, WrittenUiAsset};
 pub use ui_images::{ArchiveImages, MAX_SCREEN_TEXTURE_PIXELS};
 pub use ui_imports::{

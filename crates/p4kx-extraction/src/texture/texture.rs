@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
@@ -11,23 +10,31 @@ use p4kx_texture::{
     read_mip,
 };
 
+use crate::disk_parts::DiskParts;
 use crate::output_file::{read_error, write_replacing_protected};
 use crate::path_index::PathIndex;
 use crate::source_protection::SourceProtection;
-use crate::texture_parts::{Found, PartReader, Parts, is_same_file};
+use crate::texture_parts::{Found, Parts};
 use crate::{ConversionError, DdsSourceInfo, ExtractionError, UnknownEntries, texture_header};
 
 /// A DDS texture whose header is an Entry of an Archive or a file on disk, with its sibling parts
-/// `.1` … `.N` and any alpha tail `.a` with its parts `.1a` … `.Na` next to it.
+/// `.1` . `.N` and any alpha tail `.a` with its parts `.1a` . `.Na` next to it.
 #[derive(Debug)]
 pub struct Texture<'a> {
-    protection: SourceProtection,
+    pub(super) protection: SourceProtection,
     name: String,
     header_size: u64,
     header: DdsHeader,
     raw_header: DdsRawHeader,
-    parts: Parts<'a>,
-    alpha: Option<Parts<'a>>,
+    pub(super) parts: Parts<'a>,
+    pub(super) alpha: AlphaTail<'a>,
+}
+
+#[derive(Debug)]
+pub(super) enum AlphaTail<'a> {
+    Absent,
+    Present(Parts<'a>),
+    LookupFailed(DiskParts),
 }
 
 impl<'a> Texture<'a> {
@@ -68,7 +75,7 @@ impl<'a> Texture<'a> {
     ) -> Result<Self, ConversionError> {
         let protection = SourceProtection::new(match &parts {
             Parts::Source { header, .. } => header.archive_path(),
-            Parts::Files { .. } => None,
+            Parts::Files(_) => None,
         });
         let (name, header_size, header) = match &parts {
             Parts::Source { header, .. } => {
@@ -79,9 +86,12 @@ impl<'a> Texture<'a> {
                     .map_err(|error| conversion_error(error, &name))?;
                 (name.clone(), size, texture_header::read(reader, &name)?)
             }
-            Parts::Files { header: path, .. } => {
-                let name = path.display().to_string();
-                let file = File::open(path).map_err(|source| read_error(path, source))?;
+            Parts::Files(parts) => {
+                let path = parts.header();
+                let name = parts.name().display().to_string();
+                let file = parts
+                    .open_header()
+                    .map_err(|source| read_error(path, source))?;
                 let size = file
                     .metadata()
                     .map_err(|source| read_error(path, source))?
@@ -96,7 +106,7 @@ impl<'a> Texture<'a> {
             header: header.normalized,
             raw_header: header.raw,
             parts,
-            alpha,
+            alpha: alpha.map_or(AlphaTail::Absent, AlphaTail::Present),
         })
     }
 
@@ -118,10 +128,12 @@ impl<'a> Texture<'a> {
         DdsSourceInfo::of_parts(&self.raw_header, &self.header, self.header_size)
     }
 
-    /// Returns whether the texture has an alpha or smoothness tail, without reading it.
+    /// Returns whether an alpha or smoothness header was found, without reading it.
+    ///
+    /// A failed disk lookup is reported by [`Self::alpha_tail`] when alpha is used.
     #[must_use]
     pub const fn has_alpha_tail(&self) -> bool {
-        self.alpha.is_some()
+        matches!(self.alpha, AlphaTail::Present(_))
     }
 
     /// Opens the alpha or smoothness tail as a texture of its own, or returns `None` when there
@@ -133,12 +145,15 @@ impl<'a> Texture<'a> {
     /// no DDS header; the texture itself stays usable.
     #[must_use]
     pub fn alpha_tail(&self) -> Option<Result<Self, ConversionError>> {
-        self.alpha.clone().map(|parts| {
-            Self::from_parts(parts, None).map(|mut texture| {
-                texture.protection = self.protection.clone();
-                texture
-            })
-        })
+        let parts = match &self.alpha {
+            AlphaTail::Absent => return None,
+            AlphaTail::Present(parts) => parts.clone(),
+            AlphaTail::LookupFailed(parts) => Parts::Files(parts.clone()),
+        };
+        Some(Self::from_parts(parts, None).map(|mut texture| {
+            texture.protection = self.protection.clone();
+            texture
+        }))
     }
 
     /// Returns the number of sibling parts the header needs.
@@ -169,7 +184,10 @@ impl<'a> Texture<'a> {
     /// # Errors
     ///
     /// Returns [`ConversionError::OutputIsInput`] when `out` is the header or one of its parts,
-    /// [`ConversionError::Write`] when the file cannot be written, and the errors of
+    /// [`ConversionError::Read`] when a disk input cannot be resolved, opened or inspected,
+    /// [`ConversionError::Texture`] wrapping [`TextureError::ReadHeader`] when a disk input header
+    /// cannot be read for overwrite protection, [`ConversionError::Write`] when the file cannot
+    /// be written, and the errors of
     /// [`Texture::merge_into`].
     pub fn merge_to_file(&self, out: &Path) -> Result<MergeReport, ConversionError> {
         self.refuse_input(out)?;
@@ -313,72 +331,10 @@ impl<'a> Texture<'a> {
             ))
         }
     }
-
-    pub(crate) fn refuse_input(&self, out: &Path) -> Result<(), ConversionError> {
-        if is_same_file(out, self.input_files()) {
-            return Err(ConversionError::OutputIsInput {
-                path: out.to_path_buf(),
-            });
-        }
-        Ok(())
-    }
-
-    /// Opens the header's data from its start.
-    pub(crate) fn open_header(&self) -> Result<PartReader<'_>, ConversionError> {
-        match &self.parts {
-            Parts::Source { header, verify, .. } => header
-                .open(*verify)
-                .map(PartReader::Source)
-                .map_err(|error| conversion_error(error, header.path())),
-            Parts::Files { header, .. } => File::open(header)
-                .map(PartReader::File)
-                .map_err(|source| read_error(header, source)),
-        }
-    }
-
-    fn input_files(&self) -> Vec<PathBuf> {
-        let own = match &self.parts {
-            Parts::Source { .. } => Vec::new(),
-            Parts::Files { header, .. } => {
-                let count = self.part_count().unwrap_or(0);
-                std::iter::once(header.clone())
-                    .chain((1..=count).filter_map(|index| self.parts.file_of(index)))
-                    .collect()
-            }
-        };
-        let alpha = match (self.alpha_tail(), &self.alpha) {
-            (Some(Ok(tail)), _) => tail.input_files(),
-            (Some(Err(_)), Some(Parts::Files { header, .. })) => vec![header.clone()],
-            _ => Vec::new(),
-        };
-        own.into_iter().chain(alpha).collect()
-    }
-}
-
-impl Texture<'static> {
-    /// Opens the texture whose header is the file at `path`, with its parts `<path>.1` … and any
-    /// alpha tail `<path>.a` next to it; a path ending in `.a` opens an alpha tail on its own.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ConversionError::NoSuchFile`] when the file does not exist, and another
-    /// [`ConversionError`] when it cannot be read or holds no DDS header.
-    pub fn from_file(path: &Path) -> Result<Self, ConversionError> {
-        if let Err(source) = std::fs::metadata(path) {
-            return Err(if source.kind() == io::ErrorKind::NotFound {
-                ConversionError::NoSuchFile {
-                    path: path.to_path_buf(),
-                }
-            } else {
-                read_error(path, source)
-            });
-        }
-        Self::from_found(Parts::on_disk(path))
-    }
 }
 
 /// Returns `error` of opening the data of the file `name` as a [`ConversionError`].
-fn conversion_error(error: ExtractionError, name: &str) -> ConversionError {
+pub(super) fn conversion_error(error: ExtractionError, name: &str) -> ConversionError {
     match error {
         ExtractionError::Archive(error) => ConversionError::Archive(error),
         other => ConversionError::Read {

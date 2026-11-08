@@ -46,6 +46,8 @@ mod texture;
 mod texture_artifact_sets;
 mod texture_conversion;
 mod texture_cubemap;
+mod texture_disk_case;
+mod texture_disk_ui;
 mod texture_exr;
 mod texture_groups;
 mod texture_image_plan;

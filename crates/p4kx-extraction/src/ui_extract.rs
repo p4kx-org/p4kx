@@ -10,7 +10,7 @@ use rayon::prelude::*;
 use crate::budget::Budget;
 use crate::output_file::write_error;
 use crate::ui_jobs::{Job, Outcome, jobs};
-use crate::{ConversionError, UiMovie};
+use crate::{ConversionError, DiskTextures, UiMovie};
 
 /// The pixels the parallel bitmap jobs of one extraction may hold decoded at the same time.
 const PIXEL_BUDGET: u64 = 2 * MAX_BITMAP_PIXELS;
@@ -107,10 +107,11 @@ impl UiMovie<'_> {
         fs::create_dir_all(folder).map_err(|source| write_error(folder, source))?;
         let mut assets = self.movie().assets();
         let budget = Budget::new(PIXEL_BUDGET);
+        let files = DiskTextures::default();
         let mut outcomes: Vec<Outcome> = {
             let jobs = jobs(&assets);
             jobs.par_iter()
-                .flat_map_iter(|job| self.run_job(&assets, job, folder, &budget))
+                .flat_map_iter(|job| self.run_job(&assets, job, folder, &budget, &files))
                 .collect()
         };
         outcomes.sort_by_key(|outcome| outcome.order);
@@ -143,6 +144,7 @@ impl UiMovie<'_> {
         job: &Job<'_, '_>,
         folder: &Path,
         budget: &Budget,
+        files: &DiskTextures,
     ) -> Vec<Outcome> {
         match job {
             Job::Shape(order, shape) => {
@@ -162,7 +164,9 @@ impl UiMovie<'_> {
             Job::MissingBase(order, sub) => {
                 vec![Outcome::bitmap(*order, sub.id, Err(self.cut_error(sub)))]
             }
-            Job::Bitmaps { base, cuts } => self.write_bitmaps(assets, *base, cuts, folder, budget),
+            Job::Bitmaps { base, cuts } => {
+                self.write_bitmaps(assets, *base, cuts, folder, budget, files)
+            }
         }
     }
 

@@ -163,6 +163,20 @@ jobs:
         run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-export --test record_json_schema
       - name: Basetool catalog schema is current
         run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-export --test catalog_schema
+      - name: Native Linux disk texture permission failures remain errors
+        if: runner.os == 'Linux'
+        run: |
+          $permissionRunnerIdentityLines = @(& id -u)
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read the native permission runner user ID.' }
+          [uint32]$permissionRunnerUserId = 0
+          if ($permissionRunnerIdentityLines.Count -ne 1 -or
+              [string]$permissionRunnerIdentityLines[0] -cnotmatch '\A[0-9]+\z' -or
+              -not [uint32]::TryParse([string]$permissionRunnerIdentityLines[0], [ref]$permissionRunnerUserId) -or
+              $permissionRunnerUserId -eq 0) {
+            throw 'Native permission tests require one valid non-root user ID.'
+          }
+          cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-extraction --lib --run-ignored ignored-only --no-tests fail -E 'test(/^disk_textures::tests::native_/)'
+          if ($LASTEXITCODE -ne 0) { throw 'Native Linux disk texture permission tests failed.' }
       - name: DataForge lazy indexes survive concurrent lookups
         run: cargo nextest run --cargo-profile concurrency --target $env:P4KX_TARGET --locked -p p4kx-dataforge --test lazy_indexes
       - name: Audio index survives concurrent first use

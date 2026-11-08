@@ -10,8 +10,8 @@ use p4kx_gfx::{Assets, Bitmap, BitmapSource, GfxError, MorphShape, RgbaImage, Sh
 
 use crate::budget::{Budget, Lease};
 use crate::output_file::{write_error, write_replacing_protected};
-use crate::ui_external::open_external;
-use crate::{ConversionError, Texture, UiAssetKind, UiMovie, WrittenUiAsset};
+use crate::ui_external;
+use crate::{ConversionError, DiskTextures, Texture, UiAssetKind, UiMovie, WrittenUiAsset};
 
 /// A definition, or a bitmap with the sub-images that cut it, written by one parallel job.
 pub(crate) enum Job<'b, 'c> {
@@ -140,6 +140,7 @@ impl UiMovie<'_> {
         cuts: &[(usize, &Bitmap<'_>)],
         folder: &Path,
         budget: &Budget,
+        files: &DiskTextures,
     ) -> Vec<Outcome> {
         let png = |order, id, image: &RgbaImage| {
             self.write_file(order, folder, UiAssetKind::Bitmap, id, |out| {
@@ -147,7 +148,7 @@ impl UiMovie<'_> {
             })
         };
         let (image, _lease) =
-            match self.decode_bitmap(assets, base, budget) {
+            match self.decode_bitmap(assets, base, budget, files) {
                 Ok(decoded) => decoded,
                 Err(error) => {
                     let mut outcomes = vec![Outcome::bitmap(order, base.id, Err(error))];
@@ -194,11 +195,12 @@ impl UiMovie<'_> {
         assets: &Assets<'_>,
         bitmap: &Bitmap<'_>,
         budget: &'b Budget,
+        files: &DiskTextures,
     ) -> Result<(RgbaImage, Lease<'b>), ConversionError> {
         let gfx = |source| self.asset_error(bitmap.id, source);
         match &bitmap.source {
             BitmapSource::External(image) => {
-                let texture = open_external(self, bitmap.id, image)?;
+                let texture = ui_external::open_external(self, bitmap.id, image, files)?;
                 let header = texture.header();
                 let lease = budget.take(u64::from(header.width()) * u64::from(header.height()));
                 Ok((self.texture_image(bitmap.id, &texture)?, lease))

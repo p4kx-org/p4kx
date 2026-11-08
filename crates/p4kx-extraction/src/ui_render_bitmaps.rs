@@ -7,8 +7,10 @@ use p4kx_gfx::{Assets, Bitmap, BitmapSource, RgbaImage, SubImage};
 use rayon::prelude::*;
 
 use crate::budget::Budget;
-use crate::ui_external::open_external;
-use crate::{ConversionError, MAX_UI_RENDER_BITMAP_PIXELS, Texture, UiBitmapFailure, UiMovie};
+use crate::ui_external;
+use crate::{
+    ConversionError, DiskTextures, MAX_UI_RENDER_BITMAP_PIXELS, Texture, UiBitmapFailure, UiMovie,
+};
 
 /// A bitmap the frame needs and the bitmaps of the frame cut from it, in ascending ID order.
 struct Base<'b, 'c> {
@@ -40,7 +42,8 @@ impl<'a> UiMovie<'a> {
     pub(crate) fn frame_bitmaps(&self, assets: &Assets<'_>, ids: &[u16]) -> FrameBitmaps {
         let mut failures = Vec::new();
         let bases = self.group(assets, ids, &mut failures);
-        let granted = self.grant(assets, bases, &mut failures);
+        let files = DiskTextures::default();
+        let granted = self.grant(assets, bases, &mut failures, &files);
         let budget = Budget::new(MAX_UI_RENDER_BITMAP_PIXELS);
         let decoded: Vec<Decoded> = granted
             .into_par_iter()
@@ -109,13 +112,14 @@ impl<'a> UiMovie<'a> {
         assets: &Assets<'_>,
         bases: BTreeMap<u16, Base<'b, 'c>>,
         failures: &mut Vec<UiBitmapFailure>,
+        files: &DiskTextures,
     ) -> Vec<Granted<'a, 'b, 'c>> {
         let opened: Vec<(Base<'b, 'c>, Result<_, ConversionError>)> = bases
             .into_values()
             .collect::<Vec<_>>()
             .into_par_iter()
             .map(|base| {
-                let source = self.open(assets, base.bitmap);
+                let source = self.open(assets, base.bitmap, files);
                 (base, source)
             })
             .collect();
@@ -174,9 +178,10 @@ impl<'a> UiMovie<'a> {
         &self,
         assets: &Assets<'_>,
         bitmap: &'b Bitmap<'c>,
+        files: &DiskTextures,
     ) -> Result<(Source<'a, 'b, 'c>, u64), ConversionError> {
         if let BitmapSource::External(image) = &bitmap.source {
-            let texture = open_external(self, bitmap.id, image)?;
+            let texture = ui_external::open_external(self, bitmap.id, image, files)?;
             let header = texture.header();
             let pixels = u64::from(header.width()) * u64::from(header.height());
             return Ok((Source::External(Box::new(texture)), pixels));
