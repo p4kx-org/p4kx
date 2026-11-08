@@ -4,6 +4,7 @@
 use std::ffi::OsString;
 use std::io::{self, Read};
 use std::path::{MAIN_SEPARATOR_STR, Path, PathBuf};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use p4kx_foundation::ArchiveKey;
@@ -16,12 +17,13 @@ use crate::issue::{Directory, IssueLog};
 use crate::key_slot::KeySlot;
 use crate::source::Source;
 use crate::{
-    ArchiveError, Build, Entry, EntryIssue, EntryReader, InstallationStatus, OpenOptions,
-    entry_reader, layout,
+    ArchiveError, ArchiveInputOrigin, Build, Entry, EntryIssue, EntryOriginStep, EntryReader,
+    InstallationStatus, OpenOptions, entry_reader, layout,
 };
 
 mod key;
 mod metadata;
+mod origin;
 
 /// The most decoded bytes [`Archive::open_entry_at`] skips in a compressed Entry to reach an offset.
 pub const MAX_DECODED_SKIP: u64 = 1 << 30;
@@ -32,6 +34,8 @@ pub struct Archive {
     path: PathBuf,
     location: PathBuf,
     container_chain: ContainerChain,
+    origin_ancestors: Arc<[Option<Arc<EntryOriginStep>>]>,
+    input_origin: ArchiveInputOrigin,
     file_len: u64,
     file_modified: Option<SystemTime>,
     depth: usize,
@@ -101,6 +105,8 @@ impl Archive {
             path: path.to_path_buf(),
             location: path.to_path_buf(),
             container_chain: ContainerChain::default(),
+            origin_ancestors: Arc::default(),
+            input_origin: ArchiveInputOrigin::new(),
             file_len: source.len(),
             file_modified: source.modified(),
             depth: 0,
@@ -150,6 +156,8 @@ impl Archive {
                 path: self.path.clone(),
                 location,
                 container_chain: self.container_chain.child(entry.index),
+                origin_ancestors: self.child_origins(entry),
+                input_origin: self.input_origin.clone(),
                 file_len: self.file_len,
                 file_modified: self.file_modified,
                 depth: self.depth + 1,

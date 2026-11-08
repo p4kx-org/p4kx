@@ -10,6 +10,7 @@
 //! that is itself a plain ZIP archive, such as a socpak container, opens as an Archive of its own.
 
 mod archive;
+mod archive_input_origin;
 mod archive_metadata;
 mod available_metadata_span;
 mod build;
@@ -32,6 +33,8 @@ mod entry;
 mod entry_decoder;
 mod entry_identity;
 mod entry_metadata;
+mod entry_origin;
+mod entry_origin_step;
 mod entry_reader;
 mod entry_record_format;
 mod error;
@@ -65,6 +68,7 @@ mod metadata_zip_record;
 mod open_options;
 mod recovery;
 mod source;
+mod source_encryption;
 mod stored_hash;
 mod v2_directory_metadata;
 mod verify;
@@ -75,6 +79,7 @@ mod zip_end_metadata;
 mod zip_header_metadata;
 
 pub use archive::{Archive, MAX_DECODED_SKIP};
+pub use archive_input_origin::ArchiveInputOrigin;
 pub use archive_metadata::{ArchiveLayoutKind, ArchiveMetadata, ArchiveMetadataStatus};
 pub use available_metadata_span::AvailableMetadataSpan;
 pub use build::{Build, BuildError};
@@ -94,6 +99,8 @@ pub use encryption_declarations::{
 };
 pub use entry::Entry;
 pub use entry_metadata::EntryMetadata;
+pub use entry_origin::EntryOrigin;
+pub use entry_origin_step::EntryOriginStep;
 pub use entry_reader::EntryReader;
 pub use entry_record_format::EntryRecordFormat;
 pub use error::ArchiveError;
@@ -122,6 +129,7 @@ pub use metadata_tables::{MetadataTableProblem, MetadataTables};
 pub use metadata_view::MetadataView;
 pub use open_options::OpenOptions;
 pub use recovery::{MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN};
+pub use source_encryption::SourceEncryption;
 pub use v2_directory_metadata::V2DirectoryMetadata;
 pub use zip_directory_metadata::ZipDirectoryMetadata;
 pub use zip_end_metadata::ZipEndMetadata;

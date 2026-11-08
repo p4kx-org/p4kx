@@ -144,3 +144,7 @@ Keys and failed payload reads do not change the retained declarations.
 The shared frontend DTO described above does not yet include these newly captured declarations.
 Per-data-value origin marking and complete source propagation are the separate implementation
 contract in [ADR-0357](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md).
+
+## Retained input context
+
+Archive::entry_origin retains this Entry metadata together with every containing Entry and an opaque actual-input binding. DataForge readers and workers keep that same context. See [DataForge input origin](dataforge-input-origin.md) for ownership, encryption interpretation and external-file rules. The parser declarations above remain independent of decoder policy.

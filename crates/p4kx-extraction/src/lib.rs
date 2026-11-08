@@ -34,6 +34,8 @@ mod coverage_run;
 mod dataforge;
 mod dataforge_convert;
 mod dataforge_file;
+mod dataforge_file_origin;
+mod dataforge_origin;
 mod dataforge_pick;
 mod dataforge_source;
 mod dds_raw_info;
@@ -171,6 +173,8 @@ pub use coverage::{
 };
 pub use dataforge::{DATAFORGE_ENTRIES, DataForgeEntry, DataForgeLoadError, MAX_DATAFORGE_SIZE};
 pub use dataforge_file::is_dataforge_file;
+pub use dataforge_file_origin::DataForgeFileOrigin;
+pub use dataforge_origin::DataForgeOrigin;
 pub use dataforge_source::DataForgeSource;
 pub use dds_raw_info::{DdsDx10Info, DdsLegacyInfo, DdsPixelFormatInfo};
 pub use dds_source_info::{
@@ -223,11 +227,12 @@ pub use output_file::{
 };
 pub use owned_output_failure::owned_output_failure;
 pub use p4kx_archive::{
-    Archive, ArchiveError, Build, BuildError, Checksum, Compression, DemandScope, DosCalendar,
-    DosTimestamp, EffectiveEncoding, Entry, EntryIssue, EntryMetadata, EntryReader,
-    EntryRecordFormat, InstallationStatus, KeyCheck, KeyDemand, KeyDemandSnapshot,
-    MAX_COMPRESSION_RATIO, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN,
-    MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN, OpenOptions, UnreadEntries, ZipHeaderMetadata,
+    Archive, ArchiveError, ArchiveInputOrigin, Build, BuildError, Checksum, Compression,
+    DemandScope, DosCalendar, DosTimestamp, EffectiveEncoding, Entry, EntryIssue, EntryMetadata,
+    EntryOrigin, EntryOriginStep, EntryReader, EntryRecordFormat, InstallationStatus, KeyCheck,
+    KeyDemand, KeyDemandSnapshot, MAX_COMPRESSION_RATIO, MAX_CONTAINER_DEPTH,
+    MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN, MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN,
+    OpenOptions, SourceEncryption, UnreadEntries, ZipHeaderMetadata,
 };
 pub use p4kx_archive::{
     ArchiveLayoutKind, ArchiveMetadata, ArchiveMetadataStatus, AvailableMetadataSpan,

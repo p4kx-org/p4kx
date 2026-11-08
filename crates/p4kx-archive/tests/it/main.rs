@@ -12,6 +12,7 @@ mod decoding;
 mod effective_encoding;
 mod encryption_declaration;
 mod entry_metadata;
+mod entry_origin;
 mod hash_block;
 mod installation_v2;
 mod key_demand;
