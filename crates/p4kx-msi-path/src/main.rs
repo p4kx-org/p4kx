@@ -7,6 +7,8 @@
 use p4kx_msi_path::notification;
 
 #[cfg(any(windows, test))]
+mod notification_recipient;
+#[cfg(any(windows, test))]
 mod notification_status;
 #[cfg(windows)]
 mod notification_windows;

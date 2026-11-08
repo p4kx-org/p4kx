@@ -41,7 +41,7 @@ diagnostics use the same callback result, without another send or a change to ro
 | --- | --- |
 | `0x20000000..=0x3fffffff` | Exact native error `status XOR 0x20000000`, including native zero |
 | `0x60000001` | Invalid clock |
-| `0x60000002` | Current-thread recipient |
+| `0x60000002` | Current-thread recipient without proven helper-process ownership |
 | `0x60000003` | Unrecognised failure kind |
 | `0x60000004` | Native error outside the exact payload range; no truncated value is reported |
 | `0x60000101` | Complete enumeration with a timeout |
@@ -55,6 +55,12 @@ Decode only the helper's actual process status in the MSI log, such as
 that the log retains the full status. A native error does not identify its originating window
 or native call. The status does not encode delivery counts or out-of-range native values;
 the original typed error remains intact.
+
+Proven windows of the current helper process are excluded before sending and counted separately
+in `Report.excluded_own_process`. They are not acknowledgements or vanished windows, and this
+count alone does not fail the operation. Unknown and foreign ownership retain the original error
+handling; enumeration and delivery still share the same bounds. Pure tests establish classification
+and counting, while actual AMD64/ARM64 package jobs must establish the native lifecycle result.
 
 ## Commands and evidence
 

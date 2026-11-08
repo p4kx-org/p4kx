@@ -101,8 +101,21 @@ copy. ADR-0006's DWM exception remains independently scoped.
 
 The leaf sends only `WM_SETTINGCHANGE` with wParam zero and a static NUL-terminated UTF16
 `Environment` payload. At most 1024 observed top-level windows share one 1500-ms deadline,
-including enumeration. Each send uses the remaining deadline, never `HWND_BROADCAST`; a recipient
-on the current thread is rejected. Native errors, zero without a native detail, destroyed windows,
+including enumeration. Each send uses the remaining deadline, never `HWND_BROADCAST`. The existing
+`GetWindowThreadProcessId` call also captures its optional process identifier. A successful nonzero
+thread lookup and a matching nonzero current helper PID from safe `std::process::id` identify an
+own-process window. The short-lived notifier has no need to refresh its own environment: such a
+window receives no message and increments only `Report.excluded_own_process`, separately from
+acknowledged, vanished and timed-out recipients. The owner chose this targeted exclusion; other
+notification failures remain errors.
+
+Failed lookups retain their immediate native error and cannot authenticate an unchanged PID output.
+Unknown or foreign ownership never authorises exclusion; an unproven current-thread recipient is
+still rejected. Own-process observations consume the same bounded inventory and deadline. The PID
+output uses a live writable local value in the already approved leaf, with no additional direct
+Win32 function, unsafe leaf or invocation-ownership authority.
+
+Native errors, zero without a native detail, destroyed windows,
 timeouts and incomplete enumeration remain distinct. A partial notification is an error, not a
 success claim. The synchronous enumeration callback borrows only a live exclusive bounded
 collection for the duration of `EnumWindows`.

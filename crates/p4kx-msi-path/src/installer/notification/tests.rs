@@ -23,6 +23,7 @@ struct FakeTransport<'a> {
     stop: Stop,
     windows: usize,
     failure: Option<FailureKind>,
+    own_process: Option<usize>,
     timeouts: Vec<u32>,
 }
 
@@ -46,6 +47,9 @@ impl Transport for FakeTransport<'_> {
     }
     fn send(&mut self, window: usize, timeout_ms: u32) -> Result<Delivery, FailureKind> {
         self.timeouts.push(timeout_ms);
+        if self.own_process == Some(window) {
+            return Ok(Delivery::OwnProcess);
+        }
         if let Some(error) = self.failure {
             return Err(error);
         }
@@ -66,6 +70,7 @@ fn transport(elapsed: &Cell<u64>) -> FakeTransport<'_> {
         stop: Stop::Complete,
         windows: 9,
         failure: None,
+        own_process: None,
         timeouts: Vec::new(),
     }
 }
@@ -231,5 +236,114 @@ fn zero_thread_lookup_without_a_last_error_remains_a_generic_failure() {
         notification::thread_lookup(0, 0, INVALID_WINDOW_HANDLE),
         Err(FailureKind::Native(0)),
         "missing native error detail is preserved without invented meaning"
+    );
+}
+
+#[test]
+fn helper_windows_are_counted_separately_without_claiming_delivery() {
+    let elapsed = Cell::new(0);
+    let clock = FakeClock {
+        start: Instant::now(),
+        elapsed: &elapsed,
+    };
+    let mut transport = transport(&elapsed);
+    transport.windows = 2;
+    transport.own_process = Some(1);
+    let result = notification::notify(&mut transport, &clock);
+    assert!(
+        matches!(result, Ok(ref report) if report.stop == Stop::Complete && report.acknowledged == 1 && report.excluded_own_process == 1 && report.vanished == 0 && report.timed_out == 0),
+        "the helper exclusion is neither an acknowledgement nor a disappeared window"
+    );
+    assert_eq!(
+        transport.timeouts,
+        [1500, 900],
+        "own-recipient classification does not reset the shared deadline"
+    );
+    assert_eq!(elapsed.get(), 600, "only the foreign simulated send waits");
+}
+
+#[test]
+fn excluding_a_helper_does_not_swallow_foreign_native_or_thread_failures() {
+    for kind in [
+        FailureKind::Native(0),
+        FailureKind::Native(5),
+        FailureKind::CurrentThread,
+    ] {
+        let elapsed = Cell::new(0);
+        let clock = FakeClock {
+            start: Instant::now(),
+            elapsed: &elapsed,
+        };
+        let mut transport = transport(&elapsed);
+        transport.windows = 2;
+        transport.own_process = Some(0);
+        transport.failure = Some(kind);
+        let result = notification::notify(&mut transport, &clock);
+        assert!(
+            matches!(result, Err(ref error) if error.kind == kind && error.progress.excluded_own_process == 1 && error.progress.acknowledged == 0 && error.progress.timed_out == 0 && error.progress.vanished == 0),
+            "an excluded helper does not turn a later foreign failure into successful notification"
+        );
+        assert_eq!(
+            transport.timeouts.len(),
+            2,
+            "the actual foreign recipient is still inspected"
+        );
+    }
+}
+
+#[test]
+fn exhausted_enumeration_does_not_invent_observed_helper_exclusions() {
+    let elapsed = Cell::new(0);
+    let clock = FakeClock {
+        start: Instant::now(),
+        elapsed: &elapsed,
+    };
+    let mut transport = transport(&elapsed);
+    transport.windows = 1;
+    transport.own_process = Some(0);
+    transport.enumeration_cost = 1500;
+    let result = notification::notify(&mut transport, &clock);
+    assert!(
+        matches!(result, Ok(ref report) if report.stop == Stop::Deadline && report.excluded_own_process == 0),
+        "uninspected recipient identities cannot be stamped as excluded"
+    );
+    assert!(
+        transport.timeouts.is_empty(),
+        "the deadline still stops every per-window operation"
+    );
+}
+
+#[test]
+fn observed_helper_exclusions_do_not_hide_the_enumeration_count_limit() {
+    let elapsed = Cell::new(0);
+    let clock = FakeClock {
+        start: Instant::now(),
+        elapsed: &elapsed,
+    };
+    let mut transport = transport(&elapsed);
+    transport.windows = 1;
+    transport.own_process = Some(0);
+    transport.stop = Stop::WindowLimit;
+    let result = notification::notify(&mut transport, &clock);
+    assert!(
+        matches!(result, Ok(ref report) if report.stop == Stop::WindowLimit && report.excluded_own_process == 1 && report.acknowledged == 0),
+        "excluded observations do not establish that unvisited windows are all helper-owned"
+    );
+}
+
+#[test]
+fn a_foreign_timeout_stays_separate_from_an_excluded_helper() {
+    let elapsed = Cell::new(0);
+    let clock = FakeClock {
+        start: Instant::now(),
+        elapsed: &elapsed,
+    };
+    let mut transport = transport(&elapsed);
+    transport.windows = 2;
+    transport.own_process = Some(0);
+    let result = notification::notify(&mut transport, &clock);
+    assert!(
+        matches!(result, Ok(ref report) if report.stop == Stop::Complete && report.excluded_own_process == 1 && report.timed_out == 1 && report.acknowledged == 0 && report.vanished == 0),
+        "own-process exclusion cannot turn an external timeout into successful delivery"
     );
 }

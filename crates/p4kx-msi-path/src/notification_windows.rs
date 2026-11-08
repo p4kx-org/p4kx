@@ -7,6 +7,7 @@
     reason = "ADR-0354: the fixed bounded environment notification is approved"
 )]
 
+use std::process;
 use std::time::Instant;
 
 use windows_sys::Win32::Foundation::{self, HWND, LPARAM};
@@ -16,6 +17,7 @@ use windows_sys::core::BOOL;
 
 use crate::notification;
 use crate::notification::{Delivery, Enumeration, FailureKind, Stop, Transport};
+use crate::notification_recipient::{self, Owner, Recipient};
 
 struct SystemClock;
 
@@ -70,21 +72,11 @@ impl Transport for Windows {
     }
 
     fn send(&mut self, window: HWND, timeout_ms: u32) -> Result<Delivery, FailureKind> {
-        // SAFETY: The handles originate from EnumWindows; no native output pointer is required.
-        let (thread, error) = unsafe {
-            Foundation::SetLastError(0);
-            let thread =
-                WindowsAndMessaging::GetWindowThreadProcessId(window, std::ptr::null_mut());
-            (thread, Foundation::GetLastError())
-        };
-        let Some(thread) =
-            notification::thread_lookup(thread, error, Foundation::ERROR_INVALID_WINDOW_HANDLE)?
-        else {
+        let Some(recipient) = classify_window(window)? else {
             return Ok(Delivery::WindowGone);
         };
-        // SAFETY: GetCurrentThreadId has no pointer or handle preconditions.
-        if thread == unsafe { Threading::GetCurrentThreadId() } {
-            return Err(FailureKind::CurrentThread);
+        if recipient == Recipient::OwnProcess {
+            return Ok(Delivery::OwnProcess);
         }
         // SAFETY: Environment is static NUL-terminated UTF16; the system marshals WM_SETTINGCHANGE.
         let result = unsafe {
@@ -111,6 +103,32 @@ impl Transport for Windows {
             code => Err(FailureKind::Native(code)),
         }
     }
+}
+
+fn classify_window(window: HWND) -> Result<Option<Recipient>, FailureKind> {
+    let mut owner_process = 0;
+    // SAFETY: The HWND is observed; owner_process is writable for this synchronous call.
+    let (thread, error) = unsafe {
+        Foundation::SetLastError(0);
+        let thread = WindowsAndMessaging::GetWindowThreadProcessId(window, &raw mut owner_process);
+        (thread, Foundation::GetLastError())
+    };
+    let Some(thread) =
+        notification::thread_lookup(thread, error, Foundation::ERROR_INVALID_WINDOW_HANDLE)?
+    else {
+        return Ok(None);
+    };
+    let owner = Owner {
+        thread,
+        process: owner_process,
+    };
+    // SAFETY: GetCurrentThreadId has no pointer or handle preconditions.
+    let helper_thread = unsafe { Threading::GetCurrentThreadId() };
+    let helper = Owner {
+        thread: helper_thread,
+        process: process::id(),
+    };
+    notification_recipient::classify(owner, helper).map(Some)
 }
 
 unsafe extern "system" fn collect(window: HWND, parameter: LPARAM) -> BOOL {

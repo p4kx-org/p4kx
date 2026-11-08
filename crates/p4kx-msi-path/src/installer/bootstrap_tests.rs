@@ -28,6 +28,7 @@ const fn complete() -> Report {
         stop: Stop::Complete,
         acknowledged: 1,
         vanished: 0,
+        excluded_own_process: 0,
         timed_out: 0,
     }
 }

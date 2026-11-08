@@ -110,6 +110,29 @@ fn report(stop: Stop, timed_out: u32) -> Report {
         acknowledged: 0,
         timed_out,
         vanished: 0,
+        excluded_own_process: 0,
         stop,
     }
+}
+
+#[test]
+fn counted_helper_exclusions_do_not_become_an_unrelated_notification_fault() {
+    let mut observed = report(Stop::Complete, 0);
+    observed.excluded_own_process = 2;
+    assert_eq!(
+        super::of(&Ok(observed)),
+        None,
+        "a complete report retains own-process exclusions without changing status policy"
+    );
+}
+
+#[test]
+fn helper_exclusions_do_not_hide_an_external_timeout_status() {
+    let mut observed = report(Stop::Complete, 1);
+    observed.excluded_own_process = 1;
+    assert_eq!(
+        super::of(&Ok(observed)),
+        Some(0x6000_0101),
+        "the unchanged status mapper still exposes the genuine external timeout"
+    );
 }

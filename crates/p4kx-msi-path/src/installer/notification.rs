@@ -26,7 +26,7 @@ pub enum Stop {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-/// The result of one synchronous native delivery.
+/// The observed outcome for one enumerated recipient.
 pub enum Delivery {
     /// The target completed the system-message call.
     Acknowledged,
@@ -34,10 +34,12 @@ pub enum Delivery {
     TimedOut,
     /// The native API explicitly reported a destroyed window.
     WindowGone,
+    /// The observed window belongs to this helper process and receives no message.
+    OwnProcess,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// Actual delivery counts and any incomplete inventory boundary.
+/// Observed recipient outcomes and any incomplete inventory boundary.
 pub struct Report {
     /// Completed native recipient calls.
     pub acknowledged: u32,
@@ -45,6 +47,8 @@ pub struct Report {
     pub timed_out: u32,
     /// Recipients explicitly classified as destroyed.
     pub vanished: u32,
+    /// Observed helper-process windows intentionally excluded without sending.
+    pub excluded_own_process: u32,
     /// The operation's completion boundary.
     pub stop: Stop,
 }
@@ -144,6 +148,7 @@ pub fn notify(transport: &mut impl Transport, clock: &impl Clock) -> Result<Repo
         acknowledged: 0,
         timed_out: 0,
         vanished: 0,
+        excluded_own_process: 0,
         stop: Stop::Complete,
     };
     let deadline = clock
@@ -178,6 +183,7 @@ pub fn notify(transport: &mut impl Transport, clock: &impl Clock) -> Result<Repo
             Delivery::Acknowledged => report.acknowledged += 1,
             Delivery::TimedOut => report.timed_out += 1,
             Delivery::WindowGone => report.vanished += 1,
+            Delivery::OwnProcess => report.excluded_own_process += 1,
         }
     }
     Ok(report)
