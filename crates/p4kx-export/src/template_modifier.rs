@@ -32,7 +32,7 @@ pub(crate) struct ModifierHeader {
 /// not know is `null`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum Reaction {
     /// Friendly.
     Friendly,
@@ -57,7 +57,7 @@ impl Reaction {
 /// The licence a `LawLicense` modifier asks for. A value the catalog does not know is `null`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum LicenseType {
     /// `IllegalGoodsLicense_ClassA`.
     IllegalGoodsLicenseClassA,

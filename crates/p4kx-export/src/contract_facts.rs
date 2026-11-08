@@ -12,7 +12,7 @@ use crate::guid_text::CatalogGuid;
 /// farthest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum FactLayer {
     /// The parameter overrides of the sub contract.
     SubContract,

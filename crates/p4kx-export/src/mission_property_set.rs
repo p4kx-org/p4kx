@@ -16,7 +16,7 @@ use crate::template_property::PropertyValue;
 /// The authored source level of a Generator property array.
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum MissionPropertyLevel {
     /// The handler's `contractParams`.
     Handler,

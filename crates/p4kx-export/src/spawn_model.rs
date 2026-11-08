@@ -15,7 +15,7 @@ use crate::guid_text::CatalogGuid;
 /// The level of a contract that states a property or a prerequisite.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum SpawnLevel {
     /// The overrides of the sub contract.
     SubContract,
@@ -211,7 +211,7 @@ pub(crate) enum LocationCondition {
 /// Whether a location property holds one location or several.
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum LocationCount {
     /// `MissionPropertyValue_Location`.
     One,

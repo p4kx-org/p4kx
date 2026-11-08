@@ -32,11 +32,14 @@ The rule is ADR-0054 (amending ADR-0002):
 - **Guarantees the Basetool relies on;** breaking one is a breaking change: an existing field never
   changes its type, its meaning or whether it can be `null`; a new kind never changes the
   selection or the ordering of an existing kind; the meaning of `completeness` stays.
-- **A new value in an existing closed value set is additive,** e.g. a new playability value or a
-  new `itemClass`. A reader maps an unknown value to `null`. The schema documents such a set but
-  keeps the type a string, so an older schema accepts the new value. A set derived from a Rust
-  enum lists its known values in the `x-values` annotation of the definition (`value` and
-  `description` per entry); a schema test rejects any `enum` or `oneOf` of constants.
+- **A new source-vocabulary value is additive,** e.g. a new playability value or a new
+  `itemClass`. A reader preserves it as unknown or maps it to `null`; it does not infer a known
+  meaning or precedence. A vocabulary derived from a Rust enum stays a string with documented
+  `x-values` (`value` and optional `description`) and `x-p4kx-vocabularyClass: "open"`.
+- **Fixed control states are closed in schema 3** (ADR-0339): publication mode, export/stage
+  health, source mode, diagnostic severity/stage/unit, source role and positive Reference-result
+  status types reject unknown values. Their definitions carry `x-p4kx-vocabularyClass: "control"`.
+  Unknown controls never become successful reads, resolved links or import/deletion permission.
 - **Loadouts (#393), paints, item stats and the starmap are kinds of the one catalog;** the size is
   handled by compression (`.json.zst`), not by a second Export. The Basetool accepts `.json`,
   `.json.gz` and `.json.zst`; the 64 MB limit applies to the compressed upload, the decompressed
@@ -94,17 +97,28 @@ from third parties. Every such field carries
 `"x-gameText": true` in the JSON Schema, and no other field does; a test checks this.
 Every game text is trimmed of leading and trailing white space; see Texts.
 
-A closed value set that the schema derives from a Rust enum is a definition of `"type": "string"`
+An extensible source vocabulary derived from a Rust enum is a definition of `"type": "string"`
 with the known values in `x-values`, one `{"value", "description"}` entry per value (`description`
 only where the value has one), e.g. for `FactLayer`:
 
 ```json
-{"type": "string", "x-values": [{"value": "subContract", "description": "The parameter overrides of the sub contract."}, {"value": "contract"}]}
+{"type": "string", "x-values": [{"value": "subContract", "description": "The parameter overrides of the sub contract."}, {"value": "contract"}], "x-p4kx-vocabularyClass": "open"}
 ```
 
-`x-values` documents the set; it does not validate. A reader treats a value it does not know as
-additive: it maps it to `null` or ignores it. A schema test rejects any `enum` or any `oneOf` or
-`anyOf` of constants.
+`x-values` documents the set; it does not validate. Unknown source labels, kind identifiers,
+Entry-operation identifiers, diagnostic codes and unresolved-reference reasons remain extensible.
+An unknown annotation does not establish a new precedence or positive resolution. Archive-key
+state is explanatory metadata; successful decryption and export health are separate evidence.
+
+The fixed control definitions are `CatalogPublicationMode`, `ExportHealthStatus`,
+`ExportStageStatus`, `ExportSourceMode`, `ExportDiagnosticSeverity`, `ExportDiagnosticStage`,
+`ExportDiagnosticUnit`, `ExportSourceRole`, `DefinitionStatus`, `OwnedReferenceStatus` and
+`PropertyReferenceStatus`. They retain the finite string alternatives generated from their
+serializers and carry `x-p4kx-vocabularyClass: "control"`. New alternatives require contract review
+and a version decision when they change interpretation. The schema-policy tests require an
+explicit class, preserve unknown strings for open vocabularies and reject unknown control states.
+This class annotation does not replace counter reconciliation, physical target ownership,
+selection completeness or publication checks.
 
 ```powershell
 p4kx catalog <archive> --out basetool-catalog.json [--filter <filter>] [--exported-at <seconds>]

@@ -21,7 +21,7 @@ use crate::spawn_model::{LocationCondition, TagPaths};
 /// not know is `null`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum PropertyKind {
     /// The objective refers to a property of the template's `contractProperties`.
     Referenced,

@@ -12,7 +12,7 @@ use crate::export_ledger::{SourceDiagnosis, SourceDisposition};
 /// The required operation performed on a physical Archive Entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub enum EntryOperation {
     /// Enumerating the selected Entry within a bounded source walk.
     Enumeration,

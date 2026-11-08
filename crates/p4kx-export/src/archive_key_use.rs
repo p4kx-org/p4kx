@@ -10,7 +10,7 @@ use crate::{BuiltShipBase, CatalogSummary};
 /// Whether the Archive key was there for the encrypted Entries an export asked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub enum ArchiveKeyState {
     /// A key was set and no encrypted Entry failed because it did not fit.
     Given,

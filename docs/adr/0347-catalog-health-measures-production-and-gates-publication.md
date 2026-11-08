@@ -102,3 +102,8 @@ Resolved source links retain the actual physical target Record index when known.
 ownership compares that target index with the owning tree index and canonical location; GUID
 equality cannot establish ownership in the presence of aliases. The indices describe this Build's
 provenance and do not change Record JSON/XML or persistent domain identities.
+
+Publication, health, diagnostic accounting and positive source-link states use the fixed control
+vocabularies of ADR-0339. Schema validation rejects unknown control strings before a consumer
+interprets their success or counter dimension. Diagnostic codes and negative-only unresolved
+reasons remain extensible labels; they do not override measured severity or overall health.

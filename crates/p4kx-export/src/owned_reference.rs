@@ -33,7 +33,7 @@ pub(crate) struct OwnedReference {
 /// The source availability of an owner-local weak link.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub(crate) enum OwnedReferenceStatus {
     /// The original owner contains the target node.
     Resolved,

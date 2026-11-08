@@ -27,7 +27,7 @@ pub(crate) struct DefinitionReference {
 /// Source availability of a Record Reference, independently of catalog selection.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub(crate) enum DefinitionStatus {
     /// The `DataForge` identifies the target Record.
     Present,

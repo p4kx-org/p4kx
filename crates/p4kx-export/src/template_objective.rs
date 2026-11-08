@@ -13,7 +13,7 @@ use crate::template_property::ObjectiveProperty;
 /// notifications and the flow actions name it. A value the catalog does not know is `null`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum ObjectiveState {
     /// The objective is running.
     Active,
@@ -41,7 +41,7 @@ impl ObjectiveState {
 /// The category of an objective display. A value the catalog does not know is `null`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum ObjectiveCategory {
     /// A primary objective.
     Primary,
@@ -58,7 +58,7 @@ impl ObjectiveCategory {
 /// does not know is `null`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum CommsTiming {
     /// Both at once.
     Simultaneous,

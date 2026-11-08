@@ -38,7 +38,7 @@ pub(crate) struct PropertyReference {
 /// The result of resolving a weak link within its original owner.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub(crate) enum PropertyReferenceStatus {
     /// The original owner contains the linked mission property.
     Resolved,

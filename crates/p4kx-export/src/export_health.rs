@@ -12,7 +12,7 @@ use crate::selection::Kind;
 /// Whether a catalog is intended for normal import or explicit partial diagnosis.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum CatalogPublicationMode {
     /// Publishes only a successfully read and projected catalog without source warnings.
     #[default]
@@ -24,7 +24,7 @@ pub enum CatalogPublicationMode {
 /// Whether all required source reads and projections completed without a blocking diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum ExportHealthStatus {
     /// No source read, projection or source warning makes the result incomplete.
     Complete,
@@ -35,7 +35,7 @@ pub enum ExportHealthStatus {
 /// The result of one export stage, independently of Filter selection scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum ExportStageStatus {
     /// Every required operation of the stage completed.
     Complete,
@@ -46,7 +46,7 @@ pub enum ExportStageStatus {
 /// The primary selected source unit of a kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum ExportSourceMode {
     /// Records selected by the kind's own source rule.
     Records,

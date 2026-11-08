@@ -28,7 +28,7 @@ pub const SHIP_EXCLUDED_TOKENS: [&str; 3] = ["temp", "display", "hijacked"];
 /// A kind of entity in the Basetool catalog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 #[non_exhaustive]
 pub enum Kind {
     /// Manufacturers: `SCItemManufacturer` Records.

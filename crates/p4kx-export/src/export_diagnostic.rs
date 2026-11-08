@@ -14,7 +14,7 @@ pub const EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT: usize = 8;
 /// The source or projection stage described by a diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum ExportDiagnosticStage {
     /// Deciding whether unreadable metadata belongs to the selection.
     Selection,
@@ -31,7 +31,7 @@ pub enum ExportDiagnosticStage {
 /// The stable semantic category of a source diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub enum ExportDiagnosticCode {
     /// Optional source data is absent.
     OptionalAbsent,
@@ -70,7 +70,7 @@ pub enum ExportDiagnosticCode {
 /// Whether a diagnostic blocks normal publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum ExportDiagnosticSeverity {
     /// A represented source state that does not make the export incomplete.
     Information,
@@ -83,7 +83,7 @@ pub enum ExportDiagnosticSeverity {
 /// The relationship of a source identity to the affected kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum ExportSourceRole {
     /// A source selected by the affected kind.
     Selected,
@@ -98,7 +98,7 @@ pub enum ExportSourceRole {
 /// The unit counted by an aggregate diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum ExportDiagnosticUnit {
     /// Distinct source Record identities.
     Records,

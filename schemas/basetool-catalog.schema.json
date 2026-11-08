@@ -190,6 +190,7 @@
     "ArchiveKeyState": {
       "description": "Whether the Archive key was there for the encrypted Entries an export asked for.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "A key was set and no encrypted Entry failed because it did not fit.",
@@ -902,6 +903,7 @@
     "BlueprintSource": {
       "description": "The struct that states a blueprint reward.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "A `BlueprintRewards` result that fires on success.",
@@ -1441,6 +1443,7 @@
     "CargoFillType": {
       "description": "How a cargo manifest shares the capacity among its resources.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "`CargoFillCapacityValue_Even`: the capacity is split evenly.",
@@ -1583,6 +1586,7 @@
     "CargoSpawnKind": {
       "description": "What a spawn rule of a cargo manifest lists.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "`CargoSpawnEntityDef`: entities.",
@@ -1660,17 +1664,19 @@
     },
     "CatalogPublicationMode": {
       "description": "Whether a catalog is intended for normal import or explicit partial diagnosis.",
-      "type": "string",
-      "x-values": [
+      "oneOf": [
         {
+          "const": "normal",
           "description": "Publishes only a successfully read and projected catalog without source warnings.",
-          "value": "normal"
+          "type": "string"
         },
         {
+          "const": "diagnosticPartial",
           "description": "Explicitly publishes diagnostic data with its incomplete health attached.",
-          "value": "diagnosticPartial"
+          "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "CategoryRule": {
       "description": "A polymorphic struct that names blueprint categories: the condition of a modifier or the\navailability of a queue.",
@@ -2091,6 +2097,7 @@
     "CommsTiming": {
       "description": "When a comms notification is shown relative to its HUD notification. A value the catalog\ndoes not know is `null`.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "Both at once.",
@@ -2109,6 +2116,7 @@
     "Comparison": {
       "description": "How a reputation requirement compares the standing of the player with the one it names.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "The standing equals it (`EqualTo`).",
@@ -3879,21 +3887,24 @@
     },
     "DefinitionStatus": {
       "description": "Source availability of a Record Reference, independently of catalog selection.",
-      "type": "string",
-      "x-values": [
+      "oneOf": [
         {
+          "const": "present",
           "description": "The `DataForge` identifies the target Record.",
-          "value": "present"
+          "type": "string"
         },
         {
+          "const": "dangling",
           "description": "The declared target GUID has no Record.",
-          "value": "dangling"
+          "type": "string"
         },
         {
+          "const": "unexpectedTargetType",
           "description": "The target does not derive from the field's declared Record type.",
-          "value": "unexpectedTargetType"
+          "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "DependentProperty": {
       "description": "A dependent mission property and the exact option nodes it names.",
@@ -4014,6 +4025,7 @@
     "EndReason": {
       "description": "How a contract ended.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "The player completed it (`Complete`).",
@@ -4151,6 +4163,7 @@
     "EntryOperation": {
       "description": "The required operation performed on a physical Archive Entry.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "Enumerating the selected Entry within a bounded source walk.",
@@ -4378,6 +4391,7 @@
     "ExportDiagnosticCode": {
       "description": "The stable semantic category of a source diagnostic.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "Optional source data is absent.",
@@ -4513,81 +4527,96 @@
     },
     "ExportDiagnosticSeverity": {
       "description": "Whether a diagnostic blocks normal publication.",
-      "type": "string",
-      "x-values": [
+      "oneOf": [
         {
+          "const": "information",
           "description": "A represented source state that does not make the export incomplete.",
-          "value": "information"
+          "type": "string"
         },
         {
+          "const": "warning",
           "description": "A source warning that makes the export incomplete.",
-          "value": "warning"
+          "type": "string"
         },
         {
+          "const": "error",
           "description": "A failed required operation.",
-          "value": "error"
+          "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "ExportDiagnosticStage": {
       "description": "The source or projection stage described by a diagnostic.",
-      "type": "string",
-      "x-values": [
+      "oneOf": [
         {
+          "const": "selection",
           "description": "Deciding whether unreadable metadata belongs to the selection.",
-          "value": "selection"
+          "type": "string"
         },
         {
+          "const": "sourceRead",
           "description": "Reading the canonical Record tree or a required Archive Entry.",
-          "value": "sourceRead"
+          "type": "string"
         },
         {
+          "const": "projection",
           "description": "Mapping a readable source into typed catalog rows.",
-          "value": "projection"
+          "type": "string"
         },
         {
+          "const": "derivedProjection",
           "description": "Deriving secondary data while the original row may remain present.",
-          "value": "derivedProjection"
+          "type": "string"
         },
         {
+          "const": "sourceField",
           "description": "Interpreting one optional field or configured Reference.",
-          "value": "sourceField"
+          "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "ExportDiagnosticUnit": {
       "description": "The unit counted by an aggregate diagnostic.",
-      "type": "string",
-      "x-values": [
+      "oneOf": [
         {
+          "const": "records",
           "description": "Distinct source Record identities.",
-          "value": "records"
+          "type": "string"
         },
         {
+          "const": "archiveEntries",
           "description": "Distinct Archive Entries identified by the producing warning.",
-          "value": "archiveEntries"
+          "type": "string"
         },
         {
+          "const": "entryOperations",
           "description": "Distinct required operations on Archive Entries.",
-          "value": "entryOperations"
+          "type": "string"
         },
         {
+          "const": "values",
           "description": "Stored fields or values.",
-          "value": "values"
+          "type": "string"
         },
         {
+          "const": "projections",
           "description": "Derived projection operations.",
-          "value": "projections"
+          "type": "string"
         },
         {
+          "const": "rows",
           "description": "Emitted or intentionally skipped rows.",
-          "value": "rows"
+          "type": "string"
         },
         {
+          "const": "occurrences",
           "description": "Warning occurrences whose source has no more specific count.",
-          "value": "occurrences"
+          "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "ExportEntryCounts": {
       "description": "Actual required Entry operations, independently of retained partial output rows.",
@@ -4751,21 +4780,24 @@
     },
     "ExportHealthStatus": {
       "description": "Whether all required source reads and projections completed without a blocking diagnostic.",
-      "type": "string",
-      "x-values": [
+      "oneOf": [
         {
+          "const": "complete",
           "description": "No source read, projection or source warning makes the result incomplete.",
-          "value": "complete"
+          "type": "string"
         },
         {
+          "const": "incomplete",
           "description": "At least one required operation failed or produced a source warning.",
-          "value": "incomplete"
+          "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "ExportReferenceStatus": {
       "description": "The retained source state of a Reference or instance pointer that cannot be followed.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "A declared GUID names no source Record.",
@@ -4890,21 +4922,24 @@
     },
     "ExportSourceMode": {
       "description": "The primary selected source unit of a kind.",
-      "type": "string",
-      "x-values": [
+      "oneOf": [
         {
+          "const": "records",
           "description": "Records selected by the kind's own source rule.",
-          "value": "records"
+          "type": "string"
         },
         {
+          "const": "recordInputs",
           "description": "Original Records selected as inputs to a derived kind.",
-          "value": "recordInputs"
+          "type": "string"
         },
         {
+          "const": "archiveEntries",
           "description": "Archive Entries rather than DataForge Records.",
-          "value": "archiveEntries"
+          "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "ExportSourcePointer": {
       "description": "Available raw source coordinates of an unresolved instance pointer.",
@@ -4946,39 +4981,45 @@
     },
     "ExportSourceRole": {
       "description": "The relationship of a source identity to the affected kind.",
-      "type": "string",
-      "x-values": [
+      "oneOf": [
         {
+          "const": "selected",
           "description": "A source selected by the affected kind.",
-          "value": "selected"
+          "type": "string"
         },
         {
+          "const": "derivedInput",
           "description": "An original source selected as a derived kind's input.",
-          "value": "derivedInput"
+          "type": "string"
         },
         {
+          "const": "dependency",
           "description": "A required source that is not a selected output row of the affected kind.",
-          "value": "dependency"
+          "type": "string"
         },
         {
+          "const": "selectionCandidate",
           "description": "Unreadable metadata prevented a definitive selection decision.",
-          "value": "selectionCandidate"
+          "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "ExportStageStatus": {
       "description": "The result of one export stage, independently of Filter selection scope.",
-      "type": "string",
-      "x-values": [
+      "oneOf": [
         {
+          "const": "complete",
           "description": "Every required operation of the stage completed.",
-          "value": "complete"
+          "type": "string"
         },
         {
+          "const": "incomplete",
           "description": "At least one required operation of the stage failed.",
-          "value": "incomplete"
+          "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "ExportUnresolvedReference": {
       "description": "One unresolved source link with its exact owner and field identity, without sampling.",
@@ -5098,6 +5139,7 @@
     "FactLayer": {
       "description": "The level that states a value of a contract; the variants run from the nearest level to the\nfarthest.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "The parameter overrides of the sub contract.",
@@ -6265,6 +6307,7 @@
     "GiverSource": {
       "description": "Where the faction of a contract was found.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "The `factionReputation` of the handler.",
@@ -6656,6 +6699,7 @@
     "HaulingItemKind": {
       "description": "What a hauling item stands for.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "A commodity in SCU (`…_Resource`, `…_ResourceUnlimitedDropOff`).",
@@ -6858,6 +6902,7 @@
     "HaulingSource": {
       "description": "The level of the contract that states a hauling order. Of the property levels the nearest one\nwins per `variableName`; the objective orders are those of the template, else of the broker\nentry.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "A hauling orders property in the overrides of the sub contract.",
@@ -8145,6 +8190,7 @@
     "Kind": {
       "description": "A kind of entity in the Basetool catalog.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "Manufacturers: `SCItemManufacturer` Records.",
@@ -8784,6 +8830,7 @@
     "LicenseType": {
       "description": "The licence a `LawLicense` modifier asks for. A value the catalog does not know is `null`.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "`IllegalGoodsLicense_ClassA`.",
@@ -9274,6 +9321,7 @@
     "LocationCount": {
       "description": "Whether a location property holds one location or several.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "`MissionPropertyValue_Location`.",
@@ -10948,6 +10996,7 @@
     "MissionPropertyLevel": {
       "description": "The authored source level of a Generator property array.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "The handler's `contractParams`.",
@@ -11102,6 +11151,7 @@
     "Month": {
       "description": "A calendar month of an availability schedule.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "January.",
@@ -11309,6 +11359,7 @@
     "ObjectiveCategory": {
       "description": "The category of an objective display. A value the catalog does not know is `null`.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "A primary objective.",
@@ -11679,6 +11730,7 @@
     "ObjectiveState": {
       "description": "The state of an objective token or of the mission, as the mission flow, the comms\nnotifications and the flow actions name it. A value the catalog does not know is `null`.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "The objective is running.",
@@ -11875,21 +11927,24 @@
     },
     "OwnedReferenceStatus": {
       "description": "The source availability of an owner-local weak link.",
-      "type": "string",
-      "x-values": [
+      "oneOf": [
         {
+          "const": "resolved",
           "description": "The original owner contains the target node.",
-          "value": "resolved"
+          "type": "string"
         },
         {
+          "const": "missingTarget",
           "description": "The declared target is absent.",
-          "value": "missingTarget"
+          "type": "string"
         },
         {
+          "const": "outsideOwner",
           "description": "The target lies outside the original physical owner.",
-          "value": "outsideOwner"
+          "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "Paint": {
       "description": "A paint: an item of the type `Paints` and the ships it fits.",
@@ -12190,6 +12245,7 @@
     "PropertyKind": {
       "description": "How an objective holds a mission property (`ObjectiveProperty_*`). A struct the catalog does\nnot know is `null`.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "The objective refers to a property of the template's `contractProperties`.",
@@ -12326,29 +12382,34 @@
     },
     "PropertyReferenceStatus": {
       "description": "The result of resolving a weak link within its original owner.",
-      "type": "string",
-      "x-values": [
+      "oneOf": [
         {
+          "const": "resolved",
           "description": "The original owner contains the linked mission property.",
-          "value": "resolved"
+          "type": "string"
         },
         {
+          "const": "missingTarget",
           "description": "The declared target cannot be located.",
-          "value": "missingTarget"
+          "type": "string"
         },
         {
+          "const": "outsideOwner",
           "description": "The target belongs outside the original owner.",
-          "value": "outsideOwner"
+          "type": "string"
         },
         {
+          "const": "unsupportedTargetType",
           "description": "The linked instance has an unsupported target struct.",
-          "value": "unsupportedTargetType"
+          "type": "string"
         },
         {
+          "const": "unreadableTarget",
           "description": "The target property's variable cannot be read.",
-          "value": "unreadableTarget"
+          "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "PropertyTarget": {
       "description": "One declared weak link to a mission property.",
@@ -13328,6 +13389,7 @@
     "Reaction": {
       "description": "How a faction reacts to the other in a `FactionHostility` modifier. A value the catalog does\nnot know is `null`.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "Friendly.",
@@ -13581,6 +13643,7 @@
     "RepeatType": {
       "description": "How an availability schedule repeats.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "The window repeats every year until the repeat end (`RepeatYearly`).",
@@ -16458,6 +16521,7 @@
     "SpawnLevel": {
       "description": "The level of a contract that states a property or a prerequisite.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "The overrides of the sub contract.",
@@ -16618,6 +16682,7 @@
     "StandingLevel": {
       "description": "The level at which a prerequisite is stated.",
       "type": "string",
+      "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
           "description": "The `defaultAvailability` of the handler.",

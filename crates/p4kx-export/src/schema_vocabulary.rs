@@ -1,19 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Schema transform for the closed value sets of the catalog.
+//! Serialization-schema transform for extensible string vocabularies.
 
 use schemars::Schema;
 use serde_json::{Map, Value, json};
 
-/// Rewrites the string constants schemars derives for a unit-variant enum into a plain string
-/// schema.
-///
-/// schemars writes a `oneOf` of `const` variants when a variant has a doc comment, else an `enum`
-/// array. A closed value set the game may extend stays a string, so a catalog with a new value
-/// still validates; the known values are listed in `x-values` as `{value, description}` entries
-/// (`description` only where the variant has one). A schema of any other shape stays untouched.
-pub(crate) fn closed_string_set(schema: &mut Schema) {
+/// Describes a string vocabulary with documented values and accepts unknown strings.
+pub(crate) fn open_string_vocabulary(schema: &mut Schema) {
     let Some(object) = schema.as_object_mut() else {
         return;
     };
@@ -24,9 +18,10 @@ pub(crate) fn closed_string_set(schema: &mut Schema) {
     object.remove("enum");
     object.insert("type".to_owned(), json!("string"));
     object.insert("x-values".to_owned(), Value::Array(values));
+    object.insert("x-p4kx-vocabularyClass".to_owned(), json!("open"));
 }
 
-/// The `x-values` entries of a schema made only of string constants, `None` for any other shape.
+/// Extracts documented string constants from a unit-variant enum schema.
 fn known_values(object: &Map<String, Value>) -> Option<Vec<Value>> {
     if let Some(Value::Array(variants)) = object.get("oneOf") {
         return variants.iter().map(variant_entry).collect();
@@ -40,7 +35,7 @@ fn known_values(object: &Map<String, Value>) -> Option<Vec<Value>> {
         .collect()
 }
 
-/// The entry of one `oneOf` variant, `None` unless it carries a string `const`.
+/// Extracts one documented string constant.
 fn variant_entry(variant: &Value) -> Option<Value> {
     let value = variant.get("const").filter(|value| value.is_string())?;
     let mut entry = Map::new();
@@ -57,12 +52,12 @@ mod tests {
 
     fn transformed(schema: Value) -> Value {
         let mut schema = Schema::try_from(schema).expect("an object schema");
-        closed_string_set(&mut schema);
+        open_string_vocabulary(&mut schema);
         schema.to_value()
     }
 
     #[test]
-    fn a_oneof_of_documented_constants_becomes_a_string_with_its_values() {
+    fn documented_constants_form_an_open_vocabulary() {
         let schema = transformed(json!({
             "description": "Set.",
             "oneOf": [
@@ -75,22 +70,26 @@ mod tests {
             json!({
                 "description": "Set.",
                 "type": "string",
-                "x-values": [{"value": "a", "description": "The a."}, {"value": "b"}]
+                "x-values": [{"value": "a", "description": "The a."}, {"value": "b"}],
+                "x-p4kx-vocabularyClass": "open"
             })
         );
     }
 
     #[test]
-    fn an_enum_array_becomes_a_string_with_its_values() {
+    fn enum_values_form_an_open_vocabulary() {
         let schema = transformed(json!({"type": "string", "enum": ["a", "b"]}));
         assert_eq!(
             schema,
-            json!({"type": "string", "x-values": [{"value": "a"}, {"value": "b"}]})
+            json!({
+                "type": "string", "x-values": [{"value": "a"}, {"value": "b"}],
+                "x-p4kx-vocabularyClass": "open"
+            })
         );
     }
 
     #[test]
-    fn a_mixed_oneof_stays_untouched() {
+    fn a_payload_union_stays_untouched() {
         let mixed = json!({
             "oneOf": [
                 {"const": "a", "type": "string"},
@@ -101,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn a_non_string_constant_stays_untouched() {
+    fn non_string_constants_stay_untouched() {
         let numbers = json!({"oneOf": [{"const": 1}, {"const": 2}]});
         assert_eq!(transformed(numbers.clone()), numbers);
         let enum_numbers = json!({"enum": [1, 2]});

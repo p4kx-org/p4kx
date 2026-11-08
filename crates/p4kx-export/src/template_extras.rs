@@ -86,7 +86,7 @@ pub(crate) struct EndComms {
 /// How a contract ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum EndReason {
     /// The player completed it (`Complete`).
     Complete,

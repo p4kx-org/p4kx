@@ -87,7 +87,6 @@ mod catalog_reference_health;
 mod catalog_row;
 mod catalog_rows;
 mod catalog_target_index;
-mod closed_set;
 mod collected;
 #[cfg(test)]
 mod collected_tests;
@@ -279,7 +278,10 @@ mod resource_type_contract;
 mod scan;
 mod scan_health;
 mod scan_signature;
+#[cfg(test)]
+mod schema_control_tests;
 mod schema_fields;
+mod schema_vocabulary;
 mod scoped_location;
 mod scoped_location_fields;
 mod scoped_location_link;

@@ -12,7 +12,7 @@ use crate::selection::Kind;
 /// The retained source state of a Reference or instance pointer that cannot be followed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub enum ExportReferenceStatus {
     /// A declared GUID names no source Record.
     Dangling,
