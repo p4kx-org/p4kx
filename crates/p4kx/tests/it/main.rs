@@ -126,6 +126,7 @@ mod texture;
 mod texture_cubemap;
 mod texture_hdr;
 mod texture_png;
+mod texture_source_info;
 mod ui;
 mod ui_hologram;
 mod ui_panel;

@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use p4kx_archive::Archive;
 use p4kx_texture::{
-    DdsHeader, MAX_HEADER_LEN, MergeReport, Mip, RgbaImage, TextureError, merge, merge_alpha,
+    DdsHeader, DdsRawHeader, MergeReport, Mip, RgbaImage, TextureError, merge, merge_alpha,
     read_mip,
 };
 
@@ -15,7 +15,7 @@ use crate::output_file::{read_error, write_replacing_protected};
 use crate::path_index::PathIndex;
 use crate::source_protection::SourceProtection;
 use crate::texture_parts::{Found, PartReader, Parts, is_same_file};
-use crate::{ConversionError, ExtractionError, UnknownEntries};
+use crate::{ConversionError, DdsSourceInfo, ExtractionError, UnknownEntries, texture_header};
 
 /// A DDS texture whose header is an Entry of an Archive or a file on disk, with its sibling parts
 /// `.1` … `.N` and any alpha tail `.a` with its parts `.1a` … `.Na` next to it.
@@ -25,6 +25,7 @@ pub struct Texture<'a> {
     name: String,
     header_size: u64,
     header: DdsHeader,
+    raw_header: DdsRawHeader,
     parts: Parts<'a>,
     alpha: Option<Parts<'a>>,
 }
@@ -76,7 +77,7 @@ impl<'a> Texture<'a> {
                 let reader = header
                     .open(false)
                     .map_err(|error| conversion_error(error, &name))?;
-                (name.clone(), size, parse_start(reader, &name)?)
+                (name.clone(), size, texture_header::read(reader, &name)?)
             }
             Parts::Files { header: path, .. } => {
                 let name = path.display().to_string();
@@ -85,14 +86,15 @@ impl<'a> Texture<'a> {
                     .metadata()
                     .map_err(|source| read_error(path, source))?
                     .len();
-                (name.clone(), size, parse_start(file, &name)?)
+                (name.clone(), size, texture_header::read(file, &name)?)
             }
         };
         Ok(Self {
             protection,
             name,
             header_size,
-            header,
+            header: header.normalized,
+            raw_header: header.raw,
             parts,
             alpha,
         })
@@ -108,6 +110,12 @@ impl<'a> Texture<'a> {
     #[must_use]
     pub const fn header(&self) -> &DdsHeader {
         &self.header
+    }
+
+    /// Returns all captured source header words and separate normalized topology without I/O.
+    #[must_use]
+    pub fn source_metadata(&self) -> DdsSourceInfo {
+        DdsSourceInfo::of_parts(&self.raw_header, &self.header, self.header_size)
     }
 
     /// Returns whether the texture has an alpha or smoothness tail, without reading it.
@@ -378,13 +386,4 @@ fn conversion_error(error: ExtractionError, name: &str) -> ConversionError {
             source: io::Error::other(other),
         },
     }
-}
-
-fn parse_start(reader: impl Read, name: &str) -> Result<DdsHeader, ConversionError> {
-    let mut start = Vec::with_capacity(MAX_HEADER_LEN);
-    reader
-        .take(MAX_HEADER_LEN as u64)
-        .read_to_end(&mut start)
-        .map_err(|source| ConversionError::of_texture(name, TextureError::ReadHeader(source)))?;
-    DdsHeader::parse(&start).map_err(|error| ConversionError::of_texture(name, error))
 }

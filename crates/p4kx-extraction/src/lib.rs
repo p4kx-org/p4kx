@@ -36,6 +36,8 @@ mod dataforge_convert;
 mod dataforge_file;
 mod dataforge_pick;
 mod dataforge_source;
+mod dds_raw_info;
+mod dds_source_info;
 mod decimal_u64;
 mod dependent;
 mod disk_case;
@@ -111,6 +113,7 @@ mod texture_convert;
 mod texture_exr;
 mod texture_grey;
 mod texture_groups;
+mod texture_header;
 mod texture_image_plan;
 mod texture_images;
 mod texture_job;
@@ -165,6 +168,10 @@ pub use coverage::{
 pub use dataforge::{DATAFORGE_ENTRIES, DataForgeEntry, DataForgeLoadError, MAX_DATAFORGE_SIZE};
 pub use dataforge_file::is_dataforge_file;
 pub use dataforge_source::DataForgeSource;
+pub use dds_raw_info::{DdsDx10Info, DdsLegacyInfo, DdsPixelFormatInfo};
+pub use dds_source_info::{
+    DDS_SOURCE_INFO_VERSION, DdsBlockLayoutInfo, DdsNormalizedInfo, DdsRawHeaderInfo, DdsSourceInfo,
+};
 pub use decimal_u64::DecimalU64;
 pub use entry_content::{
     EntryBytes, EntryReadError, EntryText, MIN_TEXT_LEN, TextEncoding, find_entry, read_bytes,
@@ -273,9 +280,10 @@ pub use p4kx_localization::{
     decode_line_breaks, display_text, is_placeholder_key,
 };
 pub use p4kx_model as model;
+pub use p4kx_texture::MAX_HEADER_LEN as MAX_DDS_HEADER_LEN;
 pub use p4kx_texture::{
-    BlockLayout, DdsHeader, DxgiFormat, HdrImage, MergeReport, Mip, RgbaImage, TextureError,
-    TextureFormat,
+    BlockLayout, DdsDx10Fields, DdsHeader, DdsLegacyFields, DdsPixelFormatFields, DdsRawHeader,
+    DxgiFormat, HdrImage, MergeReport, Mip, RgbaImage, TextureError, TextureFormat,
 };
 pub use part_escape::escape_part;
 pub use path_index::{PathIndex, PathKeys};

@@ -3720,6 +3720,7 @@ dependencies = [
  "crc32c",
  "crc32fast",
  "exr",
+ "jsonschema",
  "lewton",
  "p4kx-archive",
  "p4kx-audio",

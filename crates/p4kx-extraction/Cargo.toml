@@ -33,6 +33,7 @@ thiserror.workspace = true
 [dev-dependencies]
 crc32fast.workspace = true
 exr.workspace = true
+jsonschema.workspace = true
 lewton = { workspace = true, features = ["ogg"] }
 p4kx-testkit.workspace = true
 png.workspace = true

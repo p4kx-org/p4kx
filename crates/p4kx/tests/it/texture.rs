@@ -117,7 +117,16 @@ fn info_of_a_file_prints_json() -> TestResult {
         .output()?;
 
     assert_eq!(output.status.code(), Some(0), "success");
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let mut json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let metadata = json
+        .as_object_mut()
+        .ok_or("info JSON object")?
+        .remove("source_metadata")
+        .ok_or("additive source metadata")?;
+    assert!(
+        metadata.is_object(),
+        "the shared additive source projection is present"
+    );
     assert_eq!(
         json,
         serde_json::json!({

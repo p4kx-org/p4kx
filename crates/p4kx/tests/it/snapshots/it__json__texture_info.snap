@@ -1,5 +1,5 @@
 ---
-source: crates/p4kx/tests/json.rs
+source: crates/p4kx/tests/it/json.rs
 expression: json
 ---
 {
@@ -12,6 +12,79 @@ expression: json
   "height": 32,
   "mip_count": 7,
   "parts": 4,
+  "source_metadata": {
+    "header_source_bytes": "196",
+    "normalized": {
+      "array_size": 1,
+      "block_layout": {
+        "block_height": 4,
+        "block_width": 4,
+        "bytes_per_block": 16
+      },
+      "cubemap": false,
+      "depth": 1,
+      "faces": 1,
+      "format": "BC7_UNORM_SRGB",
+      "height": 32,
+      "mip_count": 7,
+      "reader_high_range": false,
+      "width": 64
+    },
+    "raw": {
+      "dx10": {
+        "array_size": 1,
+        "dxgi_format": 99,
+        "misc_flag": 0,
+        "misc_flags2": 0,
+        "resource_dimension": 3
+      },
+      "header_length": 148,
+      "legacy": {
+        "caps": 4198408,
+        "caps2": 0,
+        "caps3": 0,
+        "caps4": 0,
+        "depth": 0,
+        "flags": 135175,
+        "height": 32,
+        "mip_map_count": 7,
+        "pitch_or_linear_size": 0,
+        "pixel_format": {
+          "a_bit_mask": 0,
+          "b_bit_mask": 0,
+          "flags": 4,
+          "four_cc": [
+            68,
+            88,
+            49,
+            48
+          ],
+          "g_bit_mask": 0,
+          "r_bit_mask": 0,
+          "rgb_bit_count": 0,
+          "size": 32
+        },
+        "reserved1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "reserved2": 0,
+        "size": 124,
+        "width": 64
+      },
+      "magic_present": true
+    },
+    "schema_version": 1
+  },
   "texture": "Data\\Textures\\hull_ddna.dds",
   "width": 64
 }

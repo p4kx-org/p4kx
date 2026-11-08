@@ -18,6 +18,8 @@ mod bc6h_modes;
 mod bc7;
 mod bc7_tables;
 mod cube;
+mod dds_raw_fields;
+mod dds_raw_header;
 mod dxgi;
 mod error;
 mod exr_export;
@@ -36,6 +38,8 @@ mod tone_map;
 
 pub use alpha::merge_alpha;
 pub use cube::{cube_cross, cube_cross_hdr};
+pub use dds_raw_fields::{DdsDx10Fields, DdsLegacyFields, DdsPixelFormatFields};
+pub use dds_raw_header::DdsRawHeader;
 pub use dxgi::DxgiFormat;
 pub use error::TextureError;
 pub use exr_export::write_exr;

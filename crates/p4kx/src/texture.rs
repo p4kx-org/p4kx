@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use anyhow::Result;
-use p4kx_extraction::{ConversionError, CubemapLayout, Texture, TextureError};
+use p4kx_extraction::{ConversionError, CubemapLayout, DdsSourceInfo, Texture, TextureError};
 use serde::Serialize;
 
 use crate::cli::{TextureAction, TextureArgs, TextureSource};
@@ -28,6 +28,7 @@ struct InfoJson<'a> {
     cubemap: bool,
     parts: Option<u32>,
     alpha_tail: Option<AlphaTailJson>,
+    source_metadata: DdsSourceInfo,
 }
 
 #[derive(Serialize)]
@@ -138,6 +139,7 @@ fn info(texture: &Texture<'_>, as_json: bool) -> Result<()> {
         cubemap: header.is_cubemap(),
         parts: texture.part_count().ok(),
         alpha_tail: texture.alpha_tail().map(AlphaTailJson::of),
+        source_metadata: texture.source_metadata(),
     };
     if as_json {
         json::print(&info)?;

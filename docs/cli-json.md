@@ -1431,6 +1431,8 @@ absolute path stored in the settings. `p4kx channels remove <path> --json` print
 
 Also `p4kx texture info <file> --json` for a header file on disk.
 
+The example below shows the compatible fields; successful output also includes `source_metadata`.
+
 ```json
 {"texture": "Data\\Textures\\hull_ddna.dds", "format": "BC7_UNORM_SRGB", "width": 64,
  "height": 32, "depth": 1, "mip_count": 7, "array_size": 1, "faces": 1, "cubemap": false,
@@ -1446,6 +1448,13 @@ of mip parts `.1` … `.N` the header needs, or `null` when the format's size is
 `alpha_tail` is `null` without an alpha or smoothness tail `.a`; otherwise it gives the tail's
 `format` and its number of `parts` `.1a` … `.Na`. A tail that cannot be read keeps the command
 working: `format` and `parts` are then `null` and `error` says what is wrong.
+
+`source_metadata` version 1 preserves the authored legacy and DX10 header words, including flags,
+reserved words, pitch, pixel masks and `miscFlags2`. Its `raw` fields retain source zeros and unknown
+bits; `normalized` describes the current reader's defaults and layout separately. Header-source byte
+lengths use canonical unsigned 64-bit decimal strings. Unknown format identifiers and absent DX10/layout
+values stay explicit; no image decode or material-specific alpha meaning is implied. See
+[DDS source metadata](dds-source-metadata.md) for the exact boundary and types.
 
 ## `p4kx texture merge <archive> <entry> --out <file> --json`
 

@@ -15,3 +15,4 @@ mod header;
 mod images;
 mod merge;
 mod mip;
+mod raw_header;
