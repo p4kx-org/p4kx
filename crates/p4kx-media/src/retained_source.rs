@@ -3,13 +3,15 @@
 
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::{Archive, ConflictPolicy, Entry, ExtractOptions, ExtractionReport};
+use p4kx_extraction::{
+    Archive, ConflictPolicy, Entry, ExtractOptions, ExtractionReport, OwnedDirectoryPermit,
+};
 
 use crate::hashing;
 use crate::output_path;
 use crate::raw_output;
 use crate::staged_directory::StagedDirectory;
-use crate::{ByteScope, ExtractionCounts, MediaError, MediaWriter, RawReference};
+use crate::{ByteScope, Digest, ExtractionCounts, MediaError, MediaWriter, RawReference};
 
 const PAYLOAD_FILE: &str = "payload";
 
@@ -22,6 +24,36 @@ pub(crate) fn retain(
     entry: &Entry,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(RawReference, PathBuf), MediaError> {
+    materialize(archive, entry, writer, |payload, permit, digest, writer| {
+        raw_output::place(payload, permit, digest, entry.uncompressed_size(), writer)
+    })
+}
+
+pub(crate) fn with_private<T>(
+    archive: &Archive,
+    entry: &Entry,
+    writer: &mut MediaWriter<'_>,
+    consume: impl FnOnce(Digest, &Path, &mut MediaWriter<'_>) -> Result<T, MediaError>,
+) -> Result<T, MediaError> {
+    materialize(
+        archive,
+        entry,
+        writer,
+        |payload, _permit, digest, writer| consume(digest, payload, writer),
+    )
+}
+
+fn materialize<T>(
+    archive: &Archive,
+    entry: &Entry,
+    writer: &mut MediaWriter<'_>,
+    consume: impl FnOnce(
+        &Path,
+        &OwnedDirectoryPermit,
+        Digest,
+        &mut MediaWriter<'_>,
+    ) -> Result<T, MediaError>,
+) -> Result<T, MediaError> {
     writer.checkpoint()?;
     let size = entry.uncompressed_size();
     if size > writer.limits.entry_bytes {
@@ -45,7 +77,7 @@ pub(crate) fn retain(
         let payload = temporary.path().join(PAYLOAD_FILE);
         if !output_path::file(&payload)? {
             return Err(MediaError::Destination(
-                "retained Entry payload is missing".into(),
+                "required Entry payload is missing".into(),
             ));
         }
         let (digest, actual) = hashing::file(
@@ -59,7 +91,7 @@ pub(crate) fn retain(
                 "decoded source length disagrees with its Entry".into(),
             ));
         }
-        raw_output::place(&payload, temporary.permit(), digest, size, writer)
+        consume(&payload, temporary.permit(), digest, writer)
     })();
     temporary.finish(result)
 }
@@ -115,3 +147,7 @@ fn finish_extraction(report: ExtractionReport, writer: &MediaWriter<'_>) -> Resu
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "retained_source_fault_tests.rs"]
+mod fault_tests;

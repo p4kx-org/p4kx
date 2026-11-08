@@ -3,8 +3,10 @@
 
 use rayon::prelude::*;
 
+use crate::entry_path;
 use crate::filter::{Filter, FilterError};
-use crate::texture_job::{Role, role};
+use crate::texture_job;
+use crate::texture_job::{Member, Role};
 
 /// The most exclusion Filters [`Exclusion::parse`] accepts.
 pub const MAX_EXCLUSIONS: usize = 64;
@@ -84,6 +86,30 @@ impl Exclusion {
         self.filters.iter().any(|filter| filter.matches(path))
     }
 
+    /// Returns whether the Entry or its valid texture header is excluded.
+    #[must_use]
+    pub fn leaves_out(&self, path: &str) -> bool {
+        !matches!(self.verdict(path), Verdict::Keep)
+    }
+
+    /// Returns whether `path` belongs to the unexcluded texture header or alpha header.
+    #[must_use]
+    pub fn is_part_of_kept_texture(&self, header: &str, path: &str) -> bool {
+        if self.matches(header) {
+            return false;
+        }
+        match (texture_job::role(header), texture_job::role(path)) {
+            (Some(Role::Header), Some(Role::Member(owner, _))) => {
+                entry_path::same_entry_path(header, owner)
+            }
+            (
+                Some(Role::Member(owner, Member::AlphaHeader)),
+                Some(Role::Member(target, Member::AlphaPart(_))),
+            ) => !self.matches(owner) && entry_path::same_entry_path(owner, target),
+            _ => false,
+        }
+    }
+
     /// Leaves the items out of `items` whose Entry path this exclusion matches, keeping the order
     /// of the rest; `path` returns the Entry path of an item, an Entry or a handle to one.
     #[must_use]
@@ -124,7 +150,7 @@ impl Exclusion {
     }
 
     fn verdict(&self, path: &str) -> Verdict {
-        match role(path) {
+        match texture_job::role(path) {
             Some(Role::Member(header, _)) if self.matches(header) => Verdict::Drop,
             Some(Role::Member(..)) if self.matches(path) => Verdict::DropPart,
             Some(Role::Member(..)) => Verdict::Keep,

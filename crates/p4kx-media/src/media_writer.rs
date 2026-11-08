@@ -223,6 +223,20 @@ impl<'a> MediaWriter<'a> {
             .any(|stream| stream.capability.kind == kind)
     }
 
+    pub(crate) fn require_source(&self, expected: &Source) -> Result<(), MediaError> {
+        self.checkpoint()?;
+        if self.active.is_none()
+            || !self.source.as_ref().is_some_and(|source| {
+                source.root == expected.root && source.identity == expected.identity
+            })
+        {
+            return Err(MediaError::Contract(
+                "required input outside its active source callback".into(),
+            ));
+        }
+        Ok(())
+    }
+
     pub(crate) fn reference_root(&self) -> Result<&crate::Digest, MediaError> {
         self.source
             .as_ref()

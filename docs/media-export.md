@@ -60,6 +60,14 @@ The independent source inventory has one exact identity and usable raw reference
 selected retained Entry. Even when every selected domain provider skips an unsupported payload,
 this source mapping and its bytes remain available without inventing a successful typed projection.
 
+Actual required inputs outside the include selection may also have retained source rows. These
+additional rows do not change normal traversal selection, physical/provider callback order or
+`source_entries.written/skipped` meanings. Source-manifest row count therefore need not equal the
+normal written tally. Each such RawReference still has actual verified bytes and an artifact-manifest
+entry; repeated input use and its later normal visit share one source receipt. Excluded private inputs
+have explicit use receipts instead and never gain a retained-source row. Existing source/record and
+artifact admission bounds apply to these outputs, including during validated skip.
+
 Every metadata record contains `kind`, `source`, `subresource`, `status`, `data` and `issues`.
 `media schema --record` validates built-in payloads within their owned namespaces; custom provider
 namespaces retain the generic record data contract. The library's `record_schema()` remains the
@@ -82,8 +90,26 @@ Candidate order and duplicate declarations are retained with full container/phys
 Only a complete enumeration can prove a missing or unique target. Count or byte limits instead
 produce `unavailable`, with observed candidate counts and an explicitly incomplete bounded list;
 counts are lower bounds when iteration stops early. Classification performs no Archive path
-lookup or additional read. The initial provider context exposes the retained source, not an
-unbounded Archive handle; later companion readers require an explicit shared-budget read interface.
+lookup or additional read. The provider context exposes the retained source and source-bound physical candidate lookup.
+`lookup_input` additionally lends a token only for a complete, unique, lossless candidate.
+`SourceContext::with_required_input` uses that token through a checked Read/Seek callback under the
+same physical source admission, source-byte/work limits, ArchiveWatch and actual cancellation.
+
+Required access does not select the target or create its provider callback. Selected Entry sources
+still retain complete usable raw bytes independently of projection. Necessary include-unmatched
+inputs may be retained without selection promotion. An individually excluded part of a selected
+texture remains readable for Conversion, but receives no own published RawReference. Its receipt
+names the measured decoded-payload digest, exact physical identity and an explicit omission reason;
+a digest-only receipt does not claim usable raw preservation. Private input bytes are cleaned
+before callback return and never enter a published generation. Excluded containers and descendants
+remain unopened; excluded texture header families remain unselected.
+
+Retained input payloads are reused; every actual reader pass and Seek consumes shared work, and
+actual read bytes consume the source-byte allowance. Reusing a released excluded input requires
+another charged materialisation. Input slots are fallible and their simultaneously live count is
+bounded by `--max-sources`; this is an input-bookkeeping bound, not image working-memory capacity.
+This interface does not add image conversion, an encoded-artifact sink or durable I/O-failure
+diagnostics. Source/Extraction I/O remains a typed terminal failure even with `--diagnostic`.
 
 The root SHA-256 covers every byte read from the root Archive file, including when a Filter selects
 only a few Entries. It is a computed fingerprint, not a checksum supplied by the game or a

@@ -6,23 +6,21 @@ use std::cell::Cell;
 use p4kx_extraction::{Archive, Entry, Exclusion, Filter};
 
 use crate::directory_index::DirectoryIndex;
+use crate::directory_inputs::DirectoryInputs;
 use crate::directory_lookup::DirectoryLookup;
+use crate::input_budget::InputBudget;
 use crate::source_selection::{EntrySelection, SourceSelection};
+use crate::{ContainerIdentity, Digest, MediaError, MediaWriter, Provider, SourceContext, Tally};
+use crate::{required_input, source};
 
-use crate::contract::Tally;
-use crate::retained_source;
-use crate::source;
-use crate::{ContainerIdentity, Digest, MediaError, MediaWriter, Provider, SourceContext};
-
-pub(crate) struct Traversal<'a> {
-    pub(crate) root: &'a Digest,
-    pub(crate) providers: &'a [&'a dyn Provider],
-    pub(crate) include: &'a Filter,
-    pub(crate) exclude: &'a Exclusion,
+pub(crate) struct Traversal<'run> {
+    pub(crate) root: &'run Digest,
+    pub(crate) providers: &'run [&'run dyn Provider],
+    pub(crate) include: &'run Filter,
+    pub(crate) exclude: &'run Exclusion,
     pub(crate) entries: Tally,
-    pub(crate) bytes: u64,
-    pub(crate) metadata_work: &'a Cell<u64>,
-    pub(crate) index_keys: &'a Cell<u64>,
+    pub(crate) budget: &'run InputBudget,
+    pub(crate) index_keys: &'run Cell<u64>,
 }
 
 impl Traversal<'_> {
@@ -33,93 +31,42 @@ impl Traversal<'_> {
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
         let index = DirectoryIndex::new(archive, self.index_keys);
-        let lookup = DirectoryLookup::new(
-            &index,
-            self.root,
-            chain,
-            SourceSelection {
-                include: self.include,
-                exclude: self.exclude,
-            },
-            self.metadata_work,
-            writer
-                .limits
-                .sources
-                .saturating_sub(self.entries.enumerated),
-        );
-        crate::directory_run::run(
-            archive,
-            &lookup,
-            self.providers,
-            &mut self.bytes,
-            self.metadata_work,
-            writer,
-        )?;
+        let inputs = DirectoryInputs::try_new(archive.entries().len(), self.budget, writer)?;
+        let selection = SourceSelection {
+            include: self.include,
+            exclude: self.exclude,
+        };
+        {
+            let lookup =
+                DirectoryLookup::new_with_inputs(&index, self.root, chain, selection, &inputs);
+            crate::directory_run::run(archive, &lookup, self.providers, self.budget, writer)?;
+        }
         for (position, entry) in archive.entries().iter().enumerate() {
-            writer.checkpoint()?;
-            self.entries.enumerated += 1;
-            if self.entries.enumerated > writer.limits.sources {
-                return Err(MediaError::Limit {
-                    budget: "sources",
-                    limit: writer.limits.sources,
-                });
-            }
-            let selection = SourceSelection {
-                include: self.include,
-                exclude: self.exclude,
-            }
-            .classify(chain, entry.path());
-            if selection == EntrySelection::Included {
-                let allowance = writer.limits.sources - self.entries.enumerated
-                    + u64::try_from(position)
-                        .map_err(|_| MediaError::Contract("source position exceeds u64".into()))?
-                    + 1;
-                self.project(archive, entry, chain, &index, allowance, writer)?;
+            inputs.admit(position, writer)?;
+            self.entries.enumerated = self.budget.sources.get();
+            let selected = selection.classify(chain, entry.path());
+            if selected == EntrySelection::Included {
+                let lookup =
+                    DirectoryLookup::new_with_inputs(&index, self.root, chain, selection, &inputs);
+                self.project(entry, &lookup, writer)?;
             } else {
                 self.entries.skipped += 1;
             }
-            if selection != EntrySelection::Excluded && is_container(entry.path()) {
+            if selected != EntrySelection::Excluded && is_container(entry.path()) {
                 self.container(archive, entry, chain, writer)?;
             }
         }
+        self.entries.enumerated = self.budget.sources.get();
         Ok(())
     }
 
     fn project(
         &mut self,
-        archive: &Archive,
         entry: &Entry,
-        chain: &[ContainerIdentity],
-        index: &DirectoryIndex<'_>,
-        source_allowance: u64,
+        lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
-        let mut source = source::entry(self.root, archive, entry, chain)?;
-        let size = entry.uncompressed_size();
-        if size > writer.limits.source_bytes.saturating_sub(self.bytes) {
-            return Err(MediaError::Limit {
-                budget: "source_bytes",
-                limit: writer.limits.source_bytes,
-            });
-        }
-        self.bytes += size;
-        let (raw, payload) = retained_source::retain(archive, entry, writer)
-            .map_err(|cause| crate::error::at(&source, cause))?;
-        source::retained(&mut source, entry, raw);
-        writer
-            .retained(&source)
-            .map_err(|cause| crate::error::at(&source, cause))?;
-        let lookup = DirectoryLookup::new(
-            index,
-            self.root,
-            chain,
-            SourceSelection {
-                include: self.include,
-                exclude: self.exclude,
-            },
-            self.metadata_work,
-            source_allowance,
-        );
+        let (source, payload) = required_input::retain(lookup, entry, writer)?;
         for (index, provider) in self.providers.iter().enumerate() {
             writer.begin(index, source.clone())?;
             let result = provider
@@ -128,7 +75,7 @@ impl Traversal<'_> {
                         source: &source,
                         entry,
                         payload: &payload,
-                        directory: &lookup,
+                        directory: lookup,
                     },
                     writer,
                 )
@@ -161,13 +108,8 @@ impl Traversal<'_> {
                 limit: writer.limits.entry_bytes,
             });
         }
-        if entry.uncompressed_size() > writer.limits.source_bytes.saturating_sub(self.bytes) {
-            return Err(MediaError::Limit {
-                budget: "source_bytes",
-                limit: writer.limits.source_bytes,
-            });
-        }
-        self.bytes += entry.uncompressed_size();
+        self.budget
+            .bytes(entry.uncompressed_size(), writer.limits())?;
         let container = archive.open_container(entry).map_err(|cause| {
             let failure = MediaError::Archive(Box::new(cause));
             source::entry(self.root, archive, entry, chain)

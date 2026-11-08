@@ -6,13 +6,14 @@ use std::cell::Cell;
 use p4kx_extraction::Entry;
 
 use crate::directory_index::{self, DirectoryIndex};
+use crate::directory_inputs::DirectoryInputs;
 use crate::lookup_work::LookupWork;
 use crate::source;
 use crate::source_selection::{EntrySelection, SourceSelection};
 use crate::{
-    CandidateState, ContainerIdentity, Digest, Identity, MediaError, MediaKind, MediaWriter,
-    NotSelectedReason, OriginalIdentifier, Reference, ReferenceCandidate, ReferenceTarget,
-    ReferenceUnavailable, Source, Verification,
+    CandidateState, ContainerIdentity, Digest, EntryInput, Identity, InputLookup, MediaError,
+    MediaKind, MediaWriter, NotSelectedReason, OriginalIdentifier, Reference, ReferenceCandidate,
+    ReferenceResolution, ReferenceTarget, ReferenceUnavailable, Source, Verification,
 };
 
 /// Source-bound candidate identities without opening or decoding target Entries.
@@ -23,9 +24,11 @@ pub struct DirectoryLookup<'a> {
     pub(crate) selection: SourceSelection<'a>,
     pub(crate) work: &'a Cell<u64>,
     pub(crate) source_allowance: u64,
+    inputs: Option<&'a DirectoryInputs<'a>>,
 }
 
 impl<'a> DirectoryLookup<'a> {
+    #[cfg(test)]
     pub(crate) const fn new(
         index: &'a DirectoryIndex<'a>,
         root: &'a Digest,
@@ -41,8 +44,32 @@ impl<'a> DirectoryLookup<'a> {
             selection,
             work,
             source_allowance,
+            inputs: None,
         }
     }
+    pub(crate) const fn new_with_inputs(
+        index: &'a DirectoryIndex<'a>,
+        root: &'a Digest,
+        chain: &'a [ContainerIdentity],
+        selection: SourceSelection<'a>,
+        inputs: &'a DirectoryInputs<'a>,
+    ) -> Self {
+        Self {
+            index,
+            root,
+            chain,
+            selection,
+            work: &inputs.budget.work,
+            source_allowance: 0,
+            inputs: Some(inputs),
+        }
+    }
+
+    pub(crate) fn input_state(&self) -> Result<&DirectoryInputs<'_>, MediaError> {
+        self.inputs
+            .ok_or_else(|| MediaError::Contract("required input access is unavailable".into()))
+    }
+
     /// Resolves a domain-validated Entry path in the immediately owning Archive.
     ///
     /// Resolved proves physical identity only; target readability and projection are separate.
@@ -56,25 +83,61 @@ impl<'a> DirectoryLookup<'a> {
         kind: Option<MediaKind>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<Reference, MediaError> {
+        Ok(self.lookup_input(original, path, kind, writer)?.reference)
+    }
+
+    /// Classifies an exact path and lends a unique physical input without reading it.
+    ///
+    /// # Errors
+    /// Returns original lookup, work, cancellation or source-change failures.
+    pub fn lookup_input(
+        &self,
+        original: OriginalIdentifier,
+        path: &str,
+        kind: Option<MediaKind>,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<InputLookup<'_>, MediaError> {
+        let source_allowance = self.inputs.map_or(self.source_allowance, |inputs| {
+            inputs.source_allowance(writer.limits().sources)
+        });
         let work = LookupWork {
             checkpoint: writer.checkpoint,
             limits: writer.limits(),
             current: self.work,
-            source_allowance: self.source_allowance,
+            source_allowance,
         };
         let index = self.index.index(&work)?;
         work.charge(1)?;
         let requested = kind.is_none_or(|kind| writer.has_kind(kind));
+        let mut position = None;
+        let mut observed = 0_u64;
         let candidates = index
             .matching_entries_with(path, |count| work.charge(count))
             .map_err(directory_index::error)?
             .map(|entry| {
-                entry
-                    .map(|entry| self.candidate(entry, kind, requested))
-                    .map_err(directory_index::error)
+                let entry = entry.map_err(directory_index::error)?;
+                observed += 1;
+                position = Some(entry.index());
+                Ok(self.candidate(entry, kind, requested))
             });
-        let inventory = self.index.inventory();
-        writer.try_resolve_reference(original, candidates, inventory)
+        let reference =
+            writer.try_resolve_reference(original, candidates, self.index.inventory())?;
+        let usable = reference.candidates_complete
+            && observed == 1
+            && matches!(
+                &reference.resolution,
+                ReferenceResolution::Resolved { .. } | ReferenceResolution::NotSelected { .. }
+            );
+        let input = if usable {
+            position.map(|position| EntryInput {
+                root: self.root,
+                chain: self.chain,
+                position,
+            })
+        } else {
+            None
+        };
+        Ok(InputLookup { reference, input })
     }
 
     fn candidate(

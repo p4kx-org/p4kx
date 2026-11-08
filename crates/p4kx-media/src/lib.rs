@@ -26,6 +26,7 @@ mod chunk_copy;
 mod contract;
 mod directory_context;
 mod directory_index;
+mod directory_inputs;
 mod directory_issue;
 mod directory_lookup;
 mod directory_run;
@@ -42,6 +43,9 @@ mod hashing;
 mod identifier;
 mod index_destination;
 mod index_file;
+mod input_budget;
+mod input_lookup;
+mod input_receipt;
 mod integrity;
 mod kind;
 mod limits;
@@ -68,6 +72,10 @@ mod publication;
 mod raw_output;
 mod reference;
 mod reference_resolve;
+mod required_input;
+#[cfg(test)]
+mod required_input_fault_support;
+mod required_reader;
 mod retained_payload;
 mod retained_source;
 mod schema;
@@ -114,6 +122,8 @@ pub use directory_lookup::DirectoryLookup;
 pub use error::{ExtractionCounts, MediaError};
 pub use export::{ExportOptions, ExportOutcome, export, export_with};
 pub use identifier::{IntegerWidth, OriginalIdentifier};
+pub use input_lookup::{EntryInput, InputLookup};
+pub use input_receipt::{InputOmission, InputReceipt};
 pub use integrity::{Algorithm, ByteScope, Verification};
 pub use kind::MediaKind;
 pub use limits::Limits;
@@ -138,6 +148,7 @@ pub use reference::{
     CandidateInventory, CandidateState, NotSelectedReason, Reference, ReferenceCandidate,
     ReferenceResolution, ReferenceTarget, ReferenceUnavailable,
 };
+pub use required_input::RequiredInput;
 pub use schema::{
     MediaFormat, MediaVersion, builtin_record_schema, index_schema, record_schema,
     reference_schema, source_schema,

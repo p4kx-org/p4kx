@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -28,19 +30,15 @@ pub struct ExtractionCounts {
 }
 
 /// A failure that prevents publishing a complete generation.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum MediaError {
     /// Source enumeration is already known to be incomplete before retention starts.
-    #[error("{} has an incomplete Entry inventory; use diagnostic export to retain an explicitly incomplete generation", archive.display())]
     IncompleteInventory {
         /// Root Archive with global inventory uncertainty, without an invented Entry identity.
         archive: PathBuf,
     },
     /// Normal publication encountered diagnosed projection loss.
-    #[error(
-        "media provider {kind} reported projection loss; request diagnostic export to retain it"
-    )]
     ProjectionLoss {
         /// Provider whose record could not be complete.
         kind: MediaKind,
@@ -48,40 +46,31 @@ pub enum MediaError {
         issues: Vec<crate::MediaIssue>,
     },
     /// One exact source Entry could not be retained.
-    #[error("cannot retain media Entry: {cause}")]
     Extraction {
         /// Original typed failure without another decode.
-        #[source]
         cause: Box<ExtractionError>,
         /// Counts observed before consuming the extractor report.
         report: ExtractionCounts,
     },
     /// One-Entry Extraction stopped without an Entry failure.
-    #[error("media Entry retention stopped: {cause}")]
     ExtractionInterrupted {
         /// Original cancellation or Archive-change failure.
-        #[source]
         cause: Box<Self>,
         /// Counts actually returned by the interrupted extractor.
         report: ExtractionCounts,
     },
     /// A failure with the exact physical source at which it occurred.
-    #[error("media source operation failed: {cause}")]
     Source {
         /// Root identity, ordered containers and leaf physical Entry.
         entry: Box<crate::Source>,
         /// Original typed operation failure.
-        #[source]
         cause: Box<Self>,
     },
     /// A container could not be enumerated.
-    #[error("cannot enumerate media container: {0}")]
-    Archive(#[source] Box<ArchiveError>),
+    Archive(Box<ArchiveError>),
     /// Source-bound layout access retained its original parser or I/O cause.
-    #[error("cannot read Archive source metadata: {0}")]
-    Metadata(#[source] Box<p4kx_extraction::MetadataReadError>),
+    Metadata(Box<p4kx_extraction::MetadataReadError>),
     /// A requested provider is absent or unavailable.
-    #[error("media capability {kind} is unavailable: {detail}")]
     Unsupported {
         /// Requested kind.
         kind: MediaKind,
@@ -89,10 +78,8 @@ pub enum MediaError {
         detail: String,
     },
     /// Physical candidate inventory could not be indexed completely.
-    #[error("media reference index failed: {0}")]
-    ReferenceIndex(#[source] PathIndexError),
+    ReferenceIndex(PathIndexError),
     /// A declared limit was exhausted.
-    #[error("media budget {budget} exceeded its limit {limit}")]
     Limit {
         /// Budget name.
         budget: &'static str,
@@ -100,56 +87,155 @@ pub enum MediaError {
         limit: u64,
     },
     /// The caller cancelled the generation.
-    #[error("media export cancelled")]
     Cancelled,
     /// The source changed during the generation.
-    #[error(transparent)]
-    Changed(#[from] ArchiveChanged),
+    Changed(ArchiveChanged),
     /// Installation protection or source/target identity prevents writing.
-    #[error(transparent)]
     Protected(WriteProtectionError),
     /// Cleanup stopped at an uncertain or inaccessible owned output.
-    #[error(transparent)]
     Cleanup(OwnedOutputCleanupError),
     /// An exclusively created output or its cleanup retained a typed failure.
-    #[error(transparent)]
     OwnedOutput(OwnedOutputError),
+    /// Both a required-input operation and its post-operation source check failed.
+    InputCheckFailed {
+        /// Original typed operation failure.
+        operation: Box<Self>,
+        /// Original typed post-operation cancellation or source-change failure.
+        checkpoint: Box<Self>,
+    },
     /// Both the primary operation and its explicit cleanup failed.
-    #[error("media operation failed: {primary}; cleanup also failed: {cleanup}")]
     CleanupFailed {
         /// The original operation failure.
-        #[source]
         primary: Box<Self>,
         /// The failure that prevented complete cleanup.
         cleanup: Box<Self>,
     },
     /// A successful rename could not authenticate its new output spelling.
-    #[error("media output {} was retained: {cause}", path.display())]
     RetainedOutput {
         /// The renamed output kept for recovery.
         path: PathBuf,
         /// The original post-rename failure.
-        #[source]
         cause: Box<Self>,
     },
     /// A file operation failed.
-    #[error("media I/O at {}: {source}", path.display())]
     Io {
         /// File or directory being accessed.
         path: PathBuf,
         /// Underlying failure.
-        #[source]
         source: io::Error,
     },
     /// The output is not a compatible completed media export.
-    #[error("invalid media export destination: {0}")]
     Destination(String),
     /// A provider or extracted source violated its contract.
-    #[error("invalid media provider result: {0}")]
     Contract(String),
     /// Serialisation failed before an artifact could be committed.
-    #[error("media JSON error: {0}")]
-    Json(#[from] serde_json::Error),
+    Json(serde_json::Error),
+}
+
+impl Display for MediaError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::IncompleteInventory { archive } => write!(
+                f,
+                "{} has an incomplete Entry inventory; use diagnostic export to retain an explicitly incomplete generation",
+                archive.display()
+            ),
+            Self::ProjectionLoss { kind, .. } => write!(
+                f,
+                "media provider {kind} reported projection loss; request diagnostic export to retain it"
+            ),
+            Self::Extraction { cause, .. } => {
+                write!(f, "cannot retain media Entry: {cause}")
+            }
+            Self::ExtractionInterrupted { cause, .. } => {
+                write!(f, "media Entry retention stopped: {cause}")
+            }
+            Self::Source { cause, .. } => {
+                write!(f, "media source operation failed: {cause}")
+            }
+            Self::Archive(cause) => write!(f, "cannot enumerate media container: {cause}"),
+            Self::Metadata(cause) => {
+                write!(f, "cannot read Archive source metadata: {cause}")
+            }
+            Self::Unsupported { kind, detail } => {
+                write!(f, "media capability {kind} is unavailable: {detail}")
+            }
+            Self::ReferenceIndex(cause) => {
+                write!(f, "media reference index failed: {cause}")
+            }
+            Self::Limit { budget, limit } => {
+                write!(f, "media budget {budget} exceeded its limit {limit}")
+            }
+            Self::Cancelled => f.write_str("media export cancelled"),
+            Self::Changed(cause) => Display::fmt(cause, f),
+            Self::Protected(cause) => Display::fmt(cause, f),
+            Self::Cleanup(cause) => Display::fmt(cause, f),
+            Self::OwnedOutput(cause) => Display::fmt(cause, f),
+            Self::InputCheckFailed {
+                operation,
+                checkpoint,
+            } => write!(
+                f,
+                "required input failed: {operation}; source check also failed: {checkpoint}"
+            ),
+            Self::CleanupFailed { primary, cleanup } => write!(
+                f,
+                "media operation failed: {primary}; cleanup also failed: {cleanup}"
+            ),
+            Self::RetainedOutput { path, cause } => {
+                write!(f, "media output {} was retained: {cause}", path.display())
+            }
+            Self::Io { path, source } => {
+                write!(f, "media I/O at {}: {source}", path.display())
+            }
+            Self::Destination(detail) => {
+                write!(f, "invalid media export destination: {detail}")
+            }
+            Self::Contract(detail) => write!(f, "invalid media provider result: {detail}"),
+            Self::Json(cause) => write!(f, "media JSON error: {cause}"),
+        }
+    }
+}
+
+impl Error for MediaError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Extraction { cause, .. } => Some(cause.as_ref()),
+            Self::ExtractionInterrupted { cause, .. }
+            | Self::Source { cause, .. }
+            | Self::RetainedOutput { cause, .. } => Some(cause.as_ref()),
+            Self::Archive(cause) => Some(cause.as_ref()),
+            Self::Metadata(cause) => Some(cause.as_ref()),
+            Self::ReferenceIndex(cause) => Some(cause),
+            Self::Changed(cause) => cause.source(),
+            Self::Protected(cause) => cause.source(),
+            Self::Cleanup(cause) => cause.source(),
+            Self::OwnedOutput(cause) => cause.source(),
+            Self::InputCheckFailed { operation, .. } => Some(operation.as_ref()),
+            Self::CleanupFailed { primary, .. } => Some(primary.as_ref()),
+            Self::Io { source, .. } => Some(source),
+            Self::Json(cause) => Some(cause),
+            Self::IncompleteInventory { .. }
+            | Self::ProjectionLoss { .. }
+            | Self::Unsupported { .. }
+            | Self::Limit { .. }
+            | Self::Cancelled
+            | Self::Destination(_)
+            | Self::Contract(_) => None,
+        }
+    }
+}
+
+impl From<ArchiveChanged> for MediaError {
+    fn from(cause: ArchiveChanged) -> Self {
+        Self::Changed(cause)
+    }
+}
+
+impl From<serde_json::Error> for MediaError {
+    fn from(cause: serde_json::Error) -> Self {
+        Self::Json(cause)
+    }
 }
 
 impl From<WriteProtectionError> for MediaError {
@@ -231,5 +317,24 @@ pub(crate) fn at(entry: &crate::Source, cause: MediaError) -> MediaError {
     MediaError::Source {
         entry: Box::new(entry.clone()),
         cause: Box::new(cause),
+    }
+}
+
+#[must_use]
+pub(crate) fn input(cause: MediaError) -> MediaError {
+    match cause {
+        MediaError::Io { path, source } => match source.downcast::<MediaError>() {
+            Ok(cause) => input(cause),
+            Err(source) => MediaError::Io { path, source },
+        },
+        MediaError::Source { entry, cause } => MediaError::Source {
+            entry,
+            cause: Box::new(input(*cause)),
+        },
+        MediaError::ExtractionInterrupted { cause, report } => MediaError::ExtractionInterrupted {
+            cause: Box::new(input(*cause)),
+            report,
+        },
+        cause => cause,
     }
 }

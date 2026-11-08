@@ -116,8 +116,13 @@ fn code(error: &MediaError) -> Option<u8> {
         | MediaError::Cleanup(_)
         | MediaError::OwnedOutput(_)
         | MediaError::CleanupFailed { .. }
+        | MediaError::InputCheckFailed { .. }
         | MediaError::RetainedOutput { .. }
         | MediaError::Json(_) => Some(exit::PARTIAL_FAILURE),
         _ => None,
     }
 }
+
+#[cfg(test)]
+#[path = "media_input_tests.rs"]
+mod input_tests;

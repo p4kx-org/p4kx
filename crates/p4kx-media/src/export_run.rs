@@ -8,6 +8,7 @@ use std::cell::Cell;
 use crate::archive_provider;
 use crate::checkpoint::Checkpoint;
 use crate::hashing;
+use crate::input_budget::InputBudget;
 use crate::source;
 use crate::traversal::Traversal;
 use crate::{
@@ -82,7 +83,7 @@ fn collect(
             Cow::Owned(Filter::parse("*").map_err(|error| MediaError::Contract(error.to_string()))?)
         }
     };
-    let metadata_work = Cell::new(0);
+    let budget = InputBudget::default();
     let index_keys = Cell::new(0);
     let mut traversal = Traversal {
         root: &root.digest,
@@ -90,8 +91,7 @@ fn collect(
         include: &include,
         exclude: &options.exclude,
         entries: Tally::default(),
-        bytes: 0,
-        metadata_work: &metadata_work,
+        budget: &budget,
         index_keys: &index_keys,
     };
     traversal.walk(archive, &mut Vec::new(), writer)?;

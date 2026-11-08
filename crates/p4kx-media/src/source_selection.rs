@@ -21,24 +21,13 @@ pub(crate) enum EntrySelection {
 impl SourceSelection<'_> {
     pub(crate) fn classify(&self, chain: &[ContainerIdentity], path: &str) -> EntrySelection {
         let qualified = qualified_path(chain, path);
-        if self.excluded(path) || self.exclude.matches(&qualified) {
+        if self.exclude.leaves_out(path) || self.exclude.leaves_out(&qualified) {
             EntrySelection::Excluded
         } else if self.include.matches(path) || self.include.matches(&qualified) {
             EntrySelection::Included
         } else {
             EntrySelection::Unmatched
         }
-    }
-
-    fn excluded(&self, path: &str) -> bool {
-        if self.exclude.matches(path) {
-            return true;
-        }
-        let lower = path.to_ascii_lowercase();
-        if let Some(end) = lower.find(".dds.") {
-            return self.exclude.matches(path.get(..end + 4).unwrap_or(path));
-        }
-        false
     }
 }
 

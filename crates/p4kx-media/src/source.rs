@@ -251,6 +251,11 @@ pub(crate) fn entry(
 }
 
 pub(crate) fn retained(source: &mut Source, entry: &Entry, raw: RawReference) {
+    verified(source, entry);
+    source.raw = Some(raw);
+}
+
+pub(crate) const fn verified(source: &mut Source, entry: &Entry) {
     source.verification = if matches!(entry.checksum(), p4kx_extraction::Checksum::Sha256(_))
         && !entry.is_sha256_verified()
     {
@@ -258,5 +263,4 @@ pub(crate) fn retained(source: &mut Source, entry: &Entry, raw: RawReference) {
     } else {
         Verification::Verified
     };
-    source.raw = Some(raw);
 }
