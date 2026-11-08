@@ -34,9 +34,9 @@ pub(crate) use crate::extract_outcome::{Ended, EntryEnded};
 /// as one texture as [`TextureConversion`](crate::TextureConversion) says, its parts read from
 /// the Archive whether requested or not. A texture that cannot be converted is reported among
 /// the [`unconverted`](ExtractionReport::unconverted) ones and its raw Entries are written. The
-/// DataForge Entry, the one [`DataForgeEntry::locate`] finds, is written as one Record XML file
-/// per Record below its folder after the other Entries, each file under the Conflict policy; its
-/// Records are reported in [`records`](ExtractionReport::records).
+/// DataForge Entry, the one [`DataForgeEntry::locate`](crate::DataForgeEntry::locate) finds, is
+/// written as one Record XML file per Record below its folder after the other Entries, each file
+/// under the Conflict policy; its Records are reported in [`records`](ExtractionReport::records).
 ///
 /// With Conversion on, WEM sounds and the WEMs of soundbanks are written as
 /// [`AudioConversion`](crate::AudioConversion) says, each soundbank also unchanged; a sound that
