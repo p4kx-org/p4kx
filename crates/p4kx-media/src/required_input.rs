@@ -92,6 +92,60 @@ impl SourceContext<'_> {
     }
 }
 
+/// Reads a proved selected reference target without publishing another source callback.
+pub(crate) fn with_reference_input<T>(
+    lookup: &DirectoryLookup<'_>,
+    entry: &Entry,
+    use_at: &Subresource,
+    writer: &mut MediaWriter<'_>,
+    consume: impl FnOnce(&mut RequiredInput<'_>, &mut MediaWriter<'_>) -> Result<T, MediaError>,
+) -> Result<T, MediaError> {
+    writer.require_output_callback()?;
+    if use_at.namespace.is_empty()
+        || writer.reference_root()? != lookup.root
+        || lookup.index.archive.entry_origin(entry).is_none()
+    {
+        return Err(MediaError::Contract(
+            "reference input is outside its active observed source scope".into(),
+        ));
+    }
+    if lookup.selection.classify(lookup.chain, entry.path()) != EntrySelection::Included {
+        return Err(MediaError::Contract(
+            "reference lookup cannot read an unselected target".into(),
+        ));
+    }
+    let declared = source::entry(lookup.root, lookup.index.archive, entry, lookup.chain)?;
+    let result = (|| {
+        lookup
+            .input_state()?
+            .budget
+            .bytes(entry.uncompressed_size(), writer.limits())?;
+        retained_source::with_private(
+            lookup.index.archive,
+            entry,
+            writer,
+            |digest, payload, writer| {
+                let mut verified = declared.clone();
+                source::verified(&mut verified, entry);
+                use_payload(
+                    lookup,
+                    entry,
+                    payload,
+                    InputReceipt {
+                        source: verified,
+                        digest,
+                        omission: Some(InputOmission::ReferenceLookup),
+                        use_at: use_at.clone(),
+                    },
+                    writer,
+                    consume,
+                )
+            },
+        )
+    })();
+    result.map_err(|cause| error::at(&declared, cause))
+}
+
 fn with_private_input<T>(
     lookup: &DirectoryLookup<'_>,
     entry: &Entry,

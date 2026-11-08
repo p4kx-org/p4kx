@@ -61,6 +61,8 @@ mod material_projection;
 mod material_provider;
 mod material_reference;
 mod material_schema;
+mod material_shader_reference;
+mod material_shader_tokens;
 mod material_surface;
 mod media_record;
 mod media_writer;
@@ -90,6 +92,10 @@ mod schema_merge;
 mod schema_merge_tests;
 mod shader_declaration;
 mod shader_diagnostic;
+mod shader_flags;
+mod shader_index;
+mod shader_input;
+mod shader_lookup;
 mod shader_mask;
 mod shader_payload;
 mod shader_projection;
@@ -104,6 +110,9 @@ mod source_selection;
 mod staged_directory;
 mod temporary_file;
 mod traversal;
+mod traversal_container;
+mod traversal_projection;
+mod traversal_visit;
 #[cfg(test)]
 mod write_context_tests;
 
@@ -141,6 +150,7 @@ pub use material_payload::{
 pub use material_provider::MaterialProvider;
 pub use material_reference::{MaterialReference, MaterialReferenceRole};
 pub use material_schema::{material_payload_schema, material_record_schema};
+pub use material_shader_reference::{MaterialShaderReference, MaterialShaderRole};
 pub use material_surface::{MaterialPalette, MaterialSurface, MaterialSurfaceBasis};
 pub use media_writer::MediaWriter;
 pub use numeric::{Float32, Float64, ValueOrigin};

@@ -85,6 +85,15 @@ fn collect(
     };
     let budget = InputBudget::default();
     let index_keys = Cell::new(0);
+    let shader_lookup = crate::shader_lookup::ShaderLookup::new(
+        archive,
+        &root.digest,
+        crate::source_selection::SourceSelection {
+            include: &include,
+            exclude: &options.exclude,
+        },
+        &budget,
+    );
     let mut traversal = Traversal {
         root: &root.digest,
         providers,
@@ -93,6 +102,7 @@ fn collect(
         entries: Tally::default(),
         budget: &budget,
         index_keys: &index_keys,
+        shaders: Some(&shader_lookup),
     };
     traversal.walk(archive, &mut Vec::new(), writer)?;
     Ok(traversal.entries)

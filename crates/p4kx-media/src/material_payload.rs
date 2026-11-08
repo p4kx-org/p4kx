@@ -21,7 +21,7 @@ pub enum MaterialPayload<'source> {
     Failure(MaterialProjectionFailure),
 }
 
-/// Metadata from one physical material source without geometry conversion or companion reads.
+/// One physical material source with explicit shader-input receipts and no geometry conversion.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(extend("allOf" = [{"required": ["default_palette"]}]))]
 #[non_exhaustive]
@@ -40,6 +40,8 @@ pub struct MaterialLibraryMetadata<'source> {
     pub materials: Vec<MaterialMetadata<'source>>,
     /// Ordered declared dependencies and honest common resolution states.
     pub references: Vec<MaterialReference>,
+    /// Original shader/flag tokens and source-bound declaration links.
+    pub shader_references: Vec<crate::material_shader_reference::MaterialShaderReference>,
     /// Whether every advertised structured field group was projected completely.
     pub projection_complete: bool,
 }

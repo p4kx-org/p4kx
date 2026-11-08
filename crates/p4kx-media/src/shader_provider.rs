@@ -27,7 +27,7 @@ impl Provider for ShaderProvider {
         let mut capability = Capability::new(
             MediaKind::Shader,
             "p4kx.shader.extension",
-            "1.0.0",
+            "1.1.0",
             "centrally retained exact decoded Entry bytes; original Entry-relative byte spans; no shader execution or compiled-cache semantic decoding",
         );
         capability.field_groups = vec![
@@ -55,9 +55,9 @@ impl Provider for ShaderProvider {
                 "compiled-cache-semantics",
                 "compiled payloads are inventoried with semantic_decode=unsupported; no definition or Property is inferred",
             ),
-            FieldGroup::new_with_unsupported_projection(
-                "material-definition-links",
-                "material links require a separate bounded complete-inventory lookup",
+            FieldGroup::new(
+                "definition-identities-for-material-links",
+                "file-stem and Property ordinal identities consumed by the material provider; shader-only export does not emit material records",
             ),
         ];
         capability

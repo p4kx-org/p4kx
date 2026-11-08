@@ -90,7 +90,7 @@ fn checked(base: &Path, artifact: &Artifact, maximum: u64) -> TestResult<Vec<u8>
     )
 }
 
-fn check_payload(
+pub(super) fn check_payload(
     base: &Path,
     path: &str,
     size: u64,

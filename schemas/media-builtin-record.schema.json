@@ -2125,6 +2125,56 @@
         }
       ]
     },
+    "InputOmission": {
+      "description": "Why required input bytes have no published raw reference.",
+      "oneOf": [
+        {
+          "const": "explicit-exclusion",
+          "description": "The individual required texture part is explicitly excluded from output.",
+          "type": "string"
+        },
+        {
+          "const": "reference-lookup",
+          "description": "Private read used only to establish an exported reference target.",
+          "type": "string"
+        }
+      ]
+    },
+    "InputReceipt": {
+      "description": "Verified physical input evidence, independent of callback selection.",
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/Digest",
+          "description": "Measured complete materialised-payload digest, independent of reader-use ranges."
+        },
+        "omission": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InputOmission"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicit omission reason, or null for a retained payload."
+        },
+        "source": {
+          "$ref": "#/$defs/Source",
+          "description": "Physical source with a raw reference only when its bytes are published."
+        },
+        "use_at": {
+          "$ref": "#/$defs/Subresource",
+          "description": "Source-local declaration that actually requires this input."
+        }
+      },
+      "required": [
+        "source",
+        "digest",
+        "omission",
+        "use_at"
+      ],
+      "type": "object"
+    },
     "IntegerWidth": {
       "description": "Source integer width, independent of JSON or JavaScript numeric precision.",
       "oneOf": [
@@ -2709,7 +2759,7 @@
           ]
         }
       ],
-      "description": "Metadata from one physical material source without geometry conversion or companion reads.",
+      "description": "One physical material source with explicit shader-input receipts and no geometry conversion.",
       "properties": {
         "authored": {
           "$ref": "#/$defs/MaterialLibrarySourceInfo",
@@ -2744,6 +2794,13 @@
           },
           "type": "array"
         },
+        "shader_references": {
+          "description": "Original shader/flag tokens and source-bound declaration links.",
+          "items": {
+            "$ref": "#/$defs/MaterialShaderReference"
+          },
+          "type": "array"
+        },
         "single": {
           "description": "Existing single-material versus submaterial-list meaning.",
           "type": "boolean"
@@ -2762,6 +2819,7 @@
         "authored",
         "materials",
         "references",
+        "shader_references",
         "projection_complete"
       ],
       "type": "object"
@@ -3016,6 +3074,130 @@
         {
           "const": "default-palette",
           "description": "A default-palette Record-path declaration.",
+          "type": "string"
+        }
+      ]
+    },
+    "MaterialShaderReference": {
+      "allOf": [
+        {
+          "required": [
+            "token_index",
+            "shader",
+            "input"
+          ]
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "shader"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "shader": {
+                "type": "string"
+              },
+              "token_index": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "flag"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "token_index": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A source-preserving MTL link to a physical shader declaration or local Property.",
+      "properties": {
+        "attribute_index": {
+          "description": "Original attribute position in the material's authored attribute list.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InputReceipt"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Actual verified lookup input; absent when no target bytes were consumed."
+        },
+        "material": {
+          "description": "Original material index in the MTL library.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reference": {
+          "$ref": "#/$defs/Reference",
+          "description": "Original token and central resolution classification."
+        },
+        "role": {
+          "$ref": "#/$defs/MaterialShaderRole",
+          "description": "Token role, separate from the target's resolution state."
+        },
+        "shader": {
+          "description": "The sole original shader name, null when no unique authored scope exists.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "token_index": {
+          "description": "Original selected-token position, null for the shader name.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "material",
+        "attribute_index",
+        "role",
+        "reference"
+      ],
+      "type": "object"
+    },
+    "MaterialShaderRole": {
+      "description": "Original MTL token role, without assigning a rendered material effect.",
+      "oneOf": [
+        {
+          "const": "shader",
+          "description": "The material's original shader-name attribute.",
+          "type": "string"
+        },
+        {
+          "const": "flag",
+          "description": "One selected `StringGenMask` token in original order.",
           "type": "string"
         }
       ]

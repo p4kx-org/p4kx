@@ -13,6 +13,12 @@ use sha2::Sha256;
 mod manifests;
 mod preservation_provider;
 mod privacy;
+mod shader_accounting;
+mod shader_artifacts;
+mod shader_expected;
+mod shader_inventory;
+mod shader_record_accounting;
+mod shader_records;
 
 use preservation_provider::PreservationProvider;
 

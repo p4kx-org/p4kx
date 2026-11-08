@@ -13,6 +13,8 @@ use crate::{Digest, Source, Subresource};
 pub enum InputOmission {
     /// The individual required texture part is explicitly excluded from output.
     ExplicitExclusion,
+    /// Private read used only to establish an exported reference target.
+    ReferenceLookup,
 }
 
 /// Verified physical input evidence, independent of callback selection.

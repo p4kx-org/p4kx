@@ -27,8 +27,8 @@ impl Provider for MaterialProvider {
         let mut capability = Capability::new(
             MediaKind::Material,
             "p4kx.material.library",
-            "1.0.0",
-            "Exact original decoded MTL bytes remain solely in the common RawReference; bounded UTF8/CryXml authored root syntax and existing interpreted surfaces are separate projections, without geometry conversion or implicit companion reads.",
+            "1.1.0",
+            "Exact original decoded MTL bytes remain solely in the common RawReference; bounded UTF8/CryXml authored root syntax and existing interpreted surfaces are separate projections, without geometry conversion; selected shader-reference inputs are read explicitly with their own receipts.",
         );
         capability.field_groups = vec![
             FieldGroup::new(
@@ -54,6 +54,10 @@ impl Provider for MaterialProvider {
             FieldGroup::new(
                 "physical-dependency-identities",
                 "complete owning-source inventories classify original layer/texture file references with duplicate physical candidates and selection; readability and raw projection remain target-owned",
+            ),
+            FieldGroup::new(
+                "shader-definition-links",
+                "original shader and selected flag tokens resolve through the bounded complete root inventory and local Property declarations; references retain actual input receipts without runtime shader evaluation",
             ),
             FieldGroup::new_with_unsupported_projection(
                 "runtime-placeholder-and-palette-bindings",

@@ -3,7 +3,7 @@
 `p4kx media export ARCHIVE --out DIR --kind shader` exports source extension declarations and
 opaque compiled-cache inventory. The default registry includes the permanent Archive provider and
 `ShaderProvider`; the library also accepts an explicit `ProviderRegistry` through `export_with`.
-Material-to-definition lookup remains separate work.
+The material provider adds source-bound shader/flag references when material output is selected.
 
 The stateless provider reads only the retained payload supplied in `SourceContext`; it has no
 Archive handle, companion lookup or host-path fallback. Shared traversal supplies ordered nested
@@ -63,7 +63,53 @@ The existing `record_schema()` remains the generic library envelope. The checked
 [built-in record schema](../schemas/media-builtin-record.schema.json) describes the CLI output;
 the [generic record schema](../schemas/media-record.schema.json) remains available independently.
 
-Material tokens and declaration links require the planned bounded complete-inventory lookup.
-This backend does not execute shaders, decode compiled caches, add `.dpsi`/`.fx` grammars, change
-MTL/Blender/catalog output, or claim appearance parity. Real-source accounting and the remaining
-issue #1109 acceptance work remain separate.
+## Material declaration links
+
+With `--kind material --kind shader`, each material-library payload adds `shader_references`.
+The ordinary layer/texture/palette `references` array remains unchanged. Each new reference retains
+its original material index, authored attribute position, optional selected-token position, role,
+original shader name and original token. Absent Shader attributes and engine-default placeholder
+slots create no invented empty declaration. Repeated or case-distinct Shader attributes are kept;
+without one unique authored shader scope, selected flags are explicitly unavailable.
+
+The export-local lookup uses the same bounded traversal and container-opening rules as projection.
+It inventories physical `.ext` names across the root and nested containers, independently of
+encounter order. Matching ignores ASCII case while preserving every original spelling and physical
+candidate. Duplicate filenames, case collisions and identical inner paths in separate containers
+stay ambiguous. Explicitly excluded targets are never read; an unscanned container or damaged
+inventory prevents a Missing or unique-resolution claim. Targets outside selection or an unrequested
+shader kind stay NotSelected and are not automatically added to the export.
+
+A unique selected definition is read through the existing verified private-input path and the same
+shader parser. Target identity uses the opaque observed Archive input plus the existing serialized
+Root/container/Entry identity. Successfully read direct Property Name occurrences point to the
+exported `shader-property` namespace and original declaration ordinal, including repeated names.
+Quoted simple names are matched without their delimiters; unsupported expressions and escapes
+remain raw in the shader output and make lookup availability explicit. Local Property matching does
+not evaluate masks or execute dependencies. Missing local flags under UsesCommonGlobalFlags remain
+unavailable rather than assuming undocumented global inheritance.
+
+Every actual lookup read carries an `InputReceipt` with complete measured decoded digest, physical
+source and exact use location. Its `reference-lookup` omission means these private lookup bytes are
+not published by that read. A separately selected source still receives its ordinary raw artifact;
+this receipt does not assert another retained source callback or grant publication authority.
+Repeated references reuse one immutable parsed definition within the export. Inventory work,
+container bytes, input reads, query/candidate counts and record size share their existing bounds.
+
+Shader and material provider versions are 1.1.0 within the media 1.0 envelope. Shader-only output
+keeps the same source/Property payloads and requires neither material parsing nor lookup. The
+new material field is additive; existing MTL, Blender package, catalog and rendering contracts
+are unchanged. No shader compilation/execution, numeric GenMask interpretation, `.dpsi`/`.fx`
+grammar or in-game appearance equivalence is implied.
+
+## Verification boundary
+
+Synthetic production-export fixtures cover nested and duplicate/case-colliding definitions,
+repeated Property names, selected/unselected/excluded scopes, missing and unsupported names,
+source receipts, limits, schema and unchanged selected-source accounting. The ignored
+`shader_accounting::nested_shader_sources_properties_and_raw_artifacts_reconcile` test discovers a
+bounded available nested `.pak` shader family without private hardcoded names and reconciles actual
+source/Property/JSONL/raw/index accounting. Its `.socpak` exclusion is explicit test scope; production
+supports both container types. A missing or incomplete family is not a successful empty test.
+Installed LIVE/PTU execution and any applicable native/consumer acceptance must be recorded
+separately; adding or compiling the ignored test does not prove those runs occurred.

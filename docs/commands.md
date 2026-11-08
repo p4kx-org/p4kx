@@ -399,6 +399,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   declarations and inventories `.cfib`/`.cfxb`/`.shcb` caches without semantic decoding.
   The material stream includes standalone/unused .mtl libraries without geometry conversion;
   [material source metadata](media-material-metadata.md) describes its exact retained fields.
+  Selecting both `--kind material --kind shader` adds original MTL shader/flag references with
+  explicit physical-target resolution and actual read receipts; filtered targets stay unselected.
   A known kind without a provider
   fails explicitly. Incomplete diagnostic generations remain separate from the complete root
   index. Byte, count, nesting and reference limits are exposed as `--max-*` options; their defaults,

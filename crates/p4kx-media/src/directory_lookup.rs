@@ -26,6 +26,7 @@ pub struct DirectoryLookup<'a> {
     pub(crate) work: &'a Cell<u64>,
     pub(crate) source_allowance: u64,
     inputs: Option<&'a DirectoryInputs<'a>>,
+    pub(crate) shaders: Option<&'a crate::shader_lookup::ShaderLookup<'a>>,
 }
 
 impl<'a> DirectoryLookup<'a> {
@@ -46,6 +47,7 @@ impl<'a> DirectoryLookup<'a> {
             work,
             source_allowance,
             inputs: None,
+            shaders: None,
         }
     }
     pub(crate) const fn new_with_inputs(
@@ -63,9 +65,17 @@ impl<'a> DirectoryLookup<'a> {
             work: &inputs.budget.work,
             source_allowance: 0,
             inputs: Some(inputs),
+            shaders: None,
         }
     }
 
+    pub(crate) const fn with_shaders(
+        mut self,
+        shaders: Option<&'a crate::shader_lookup::ShaderLookup<'a>>,
+    ) -> Self {
+        self.shaders = shaders;
+        self
+    }
     pub(crate) fn input_state(&self) -> Result<&DirectoryInputs<'_>, MediaError> {
         self.inputs
             .ok_or_else(|| MediaError::Contract("required input access is unavailable".into()))

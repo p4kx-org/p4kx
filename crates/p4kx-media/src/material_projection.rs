@@ -58,6 +58,7 @@ pub(crate) fn project(
             .all(|material| material.authored.is_complete());
     let issues = diagnoses(&library, complete);
     let references = material_reference::project(&library, context, writer)?;
+    let shader_references = crate::material_shader_reference::project(&library, context, writer)?;
     let metadata = MaterialLibraryMetadata {
         path: Cow::Borrowed(&library.path),
         single: library.single,
@@ -66,6 +67,7 @@ pub(crate) fn project(
         authored,
         materials,
         references,
+        shader_references,
         projection_complete: complete,
     };
     let payload = MaterialPayload::Library(&metadata);

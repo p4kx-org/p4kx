@@ -28,7 +28,7 @@ Cached path-index work shares the generation-wide metadata_work bound with metad
 
 ## Consumers and versions
 
-The material provider starts at version 1.0.0 within the existing media 1.0 envelope. Its owned library/failure namespaces have typed schema constraints; custom provider namespaces retain their generic contract. `model info --json` keeps all existing fields and adds shared authored metadata under library/material descriptions.
+The material provider is version 1.1.0 within the existing media 1.0 envelope. Its owned library/failure namespaces have typed schema constraints; custom provider namespaces retain their generic contract. `model info --json` keeps all existing fields and adds shared authored metadata under library/material descriptions.
 
 Blender package format 1.9 adds `material_libraries`, once per distinct retained reader path/authored root, and each material's `source_library` link. Existing material index/single semantics, graph inputs, palettes, GLB values and older raw fields keep their meaning. Equal source-object pointers are only a private deduplication shortcut backed by retained ownership; separate objects require complete path/content equality. Different authored roots with one renderer identity both survive and are diagnosed as ambiguous. These are source descriptions, not physical Archive identity proofs; media records carry physical provenance. Older manifests omit the new fields and remain readable. The repository importer recognises minor 1.9 and leaves rendering behavior on the established fields.
 
@@ -37,3 +37,24 @@ Blender package format 1.9 adds `material_libraries`, once per distinct retained
 Independent synthetic cases cover roots, unknown submaterial slots, ordered case-distinct/namespaced attributes, mixed text/CDATA/comments/PI including endtag-like data, layers/TexMod/placeholders, strict UTF8 and true CryXml repair, truncation, original ordinals, raw bytes/digests, cancellation/publication and schemas. The ignored aggregate census compares every selected material reader's retained fields with the same shared exported wire shape entirely in memory, preserving original errors behind static console diagnostics. It writes no source dump and does not replace provider/provenance tests.
 
 Blender import/render success alone does not prove source completeness or game semantics. Source-built Blender 5.2 verification must inspect unchanged supported node groups/links/color spaces/inputs and warnings, after exact metadata and raw-digest checks.
+
+## Shader-name and selected-flag references
+
+`shader_references` is an additive material-library field. Its shader and flag roles are separate
+from existing layer/texture/palette references. Original authored attribute positions and selected
+token positions survive, including duplicates, empty Shader attributes and unresolved names. No
+reference is fabricated from an absent Shader attribute or an engine-default material slot.
+Each reference retains a common explicit resolution plus an optional actual `InputReceipt`.
+
+Selecting both material and shader enables unique source/Property matches across nested containers.
+Filter and kind exclusion remain explicit NotSelected states; excluded source bytes are never
+opened. Incomplete lookup scope remains Unavailable, not Missing. The same-name candidates from
+multiple physical sources are retained rather than choosing first or preferring exact case.
+A cached parsed source is bound to its observed root input, and receipts identify the specific MTL
+attribute/token use. `reference-lookup` denotes a private verified read, not another raw publication.
+See [shader source projection](media-shader-backend.md#material-declaration-links) for the bounded
+matching rules, unknown global-flag scope and the exact verification boundary.
+
+These links do not change MTL loading, GLB conversion, Blender shader groups, numeric GenMask
+interpretation or rendered appearance. Missing/ambiguous/unavailable links preserve source facts
+rather than selecting a shader at runtime.
