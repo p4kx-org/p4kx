@@ -276,13 +276,17 @@ impl PoseInfo {
 }
 
 /// One chunk of a model's files.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
+#[schemars(transform = crate::projection_schema::require_properties)]
 pub struct ChunkInfo {
     file: Cow<'static, str>,
+    #[schemars(range(max = u32::MAX))]
     index: usize,
     #[serde(rename = "type")]
     type_name: Option<&'static str>,
+    #[schemars(range(max = u32::MAX))]
     type_id: u32,
+    #[schemars(extend("enum" = ["read", "skipped", "unknown"]))]
     usage: &'static str,
 }
 

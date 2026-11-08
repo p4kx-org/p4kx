@@ -54,6 +54,7 @@ mod lod_skeleton_origin;
 mod material;
 mod mesh;
 mod model;
+mod model_chunk_layout;
 mod model_options;
 mod mtl;
 mod mtl_error;
@@ -120,6 +121,7 @@ pub use included::{
 };
 pub use lod_skeleton_origin::LodSkeletonOrigin;
 pub use model::{ChunkUsage, Lod, LodSelection, Mesh, Model, ModelChunk, ModelFile, Node, Submesh};
+pub use model_chunk_layout::ModelChunkLayout;
 pub use model_options::{ModelIssue, PositionBox};
 pub use mtl::{
     MAX_SUB_MATERIALS, MAX_TEXTURE_SLOTS, Material, MaterialFlags, MaterialLibrary, MaterialStatus,

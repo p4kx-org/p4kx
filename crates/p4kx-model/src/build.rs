@@ -14,8 +14,8 @@ use crate::skeleton::{read_bones, read_compact_bones};
 use crate::skin::read_skin;
 use crate::{
     Bone, ChunkUsage, CompanionPath, CompanionResolver, CorruptChunk, LayerCache, Lod,
-    LodSelection, LodSkeletonOrigin, MaterialReading, Mesh, Model, ModelChunk, ModelError,
-    ModelFile, ModelIssue, Node, PositionBox, RigLogicBytes, Transform,
+    LodSelection, LodSkeletonOrigin, MaterialReading, Mesh, Model, ModelChunk, ModelChunkLayout,
+    ModelError, ModelFile, ModelIssue, Node, PositionBox, RigLogicBytes, Transform,
 };
 
 const MATERIAL_TYPES: [ChunkType; 2] = [ivo::MTL_NAME_320, ivo::MTL_NAME];
@@ -364,6 +364,7 @@ pub(crate) fn usage<B: AsRef<[u8]>>(
                 index,
                 chunk_type,
                 usage,
+                layout: ModelChunkLayout::of(chunk),
             }
         })
         .collect()

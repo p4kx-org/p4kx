@@ -23,6 +23,7 @@ mod material_authored_limits;
 mod material_library_lookup;
 mod material_raw;
 mod materials;
+mod model_chunk_layout;
 mod palettes;
 mod prefab;
 mod relief_decals;

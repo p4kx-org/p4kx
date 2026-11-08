@@ -7,7 +7,7 @@ use crate::build::build;
 use crate::crch::build as build_crch;
 use crate::{
     Bone, CompanionResolver, Influences, LodSkeletonOrigin, MaterialReading, MaterialStatus,
-    ModelError, ModelIssue, PositionBox, RigLogicBytes, Transform,
+    ModelChunkLayout, ModelError, ModelIssue, PositionBox, RigLogicBytes, Transform,
 };
 
 /// A model read from a chunk file and its companions, in `CryEngine` coordinates: Z up, metres.
@@ -251,6 +251,8 @@ pub struct ModelChunk {
     pub chunk_type: ChunkType,
     /// How the model used it.
     pub usage: ChunkUsage,
+    /// Parsed physical table fields, including the container's byte-span convention.
+    pub layout: ModelChunkLayout,
 }
 
 impl Model {

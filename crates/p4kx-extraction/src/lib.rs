@@ -67,6 +67,7 @@ mod material_source_info;
 mod material_source_mapping;
 mod material_source_owned;
 mod material_xml_info;
+mod model_chunk_source_info;
 mod model_companions;
 pub mod model_info;
 mod model_info_animations;
@@ -204,6 +205,9 @@ pub use material_source_info::{
 pub use material_xml_info::{
     MaterialAttributeInfo, MaterialAttributeKindInfo, MaterialContentInfo, MaterialElementInfo,
     MaterialElementSyntaxInfo, MaterialParameterInfo,
+};
+pub use model_chunk_source_info::{
+    MODEL_CHUNK_SOURCE_INFO_VERSION, ModelChunkLayoutInfo, ModelChunkSourceInfo, ModelChunkSpanInfo,
 };
 pub use model_info::{BoneInfo, ChunkInfo, ChunkJson, LodInfo, MeshInfo, ModelInfo, NodeInfo};
 pub use model_info_animations::{AnimationInfo, UnreadInfo};
