@@ -6,7 +6,7 @@ use std::error::Error;
 use std::io::Read;
 use std::net::Shutdown;
 use std::sync::atomic::AtomicBool;
-use std::sync::mpsc::{self, Receiver};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -19,8 +19,16 @@ use zbus::{Guid, Message};
 use crate::portal_alias::{AliasUncertainty, UnknownAlias};
 use crate::{portal_deadline, portal_reply};
 
+use self::fixture_failure::FixtureFailure;
+
+mod fixture_failure;
+
 type TestError = Box<dyn Error + Send + Sync>;
 type TestResult = Result<(), TestError>;
+
+const CLIENT_DEADLINE: Duration = Duration::from_secs(2);
+const SERVICE_DEADLINE: Duration = Duration::from_secs(3);
+const METHOD_TIMEOUT: Duration = Duration::from_millis(200);
 
 #[derive(Clone, Copy)]
 enum Scenario {
@@ -29,6 +37,7 @@ enum Scenario {
     VersionFour,
     Denied,
     SilentCall,
+    ClosedCall,
     ChangedOwner,
 }
 
@@ -54,11 +63,13 @@ fn builder(stream: TestSocket) -> Builder<'static> {
 fn serve(
     stream: TestSocket,
     scenario: Scenario,
+    ready: &Sender<()>,
     finished: &Receiver<()>,
 ) -> Result<usize, TestError> {
     let stop = stream.try_clone()?;
+    let deadline = Instant::now() + SERVICE_DEADLINE;
     let result = portal_deadline::with_socket_deadline(
-        Instant::now() + Duration::from_secs(3),
+        deadline,
         &AtomicBool::new(false),
         move || stop.shutdown(Shutdown::Both),
         || {
@@ -71,6 +82,10 @@ fn serve(
                 .build()
                 .map_err(portal_reply::call_error)?;
             let mut incoming = MessageIterator::from(&connection);
+            // The receiver must be active before the client can send its first method.
+            ready
+                .send(())
+                .map_err(|error| UnknownAlias::with_source(AliasUncertainty::SessionBus, error))?;
             let mut calls = 0;
             for index in 0..5 {
                 let request = incoming
@@ -79,8 +94,13 @@ fn serve(
                     .map_err(portal_reply::call_error)?;
                 calls = index + 1;
                 if matches!(scenario, Scenario::SilentCall) {
-                    thread::sleep(Duration::from_millis(350));
                     break;
+                }
+                if matches!(scenario, Scenario::ClosedCall) {
+                    drop(incoming);
+                    connection.close().map_err(portal_reply::call_error)?;
+                    wait_finished(finished, deadline)?;
+                    return Ok(calls);
                 }
                 let response =
                     response(&request, scenario, index).map_err(portal_reply::call_error)?;
@@ -93,15 +113,23 @@ fn serve(
                     break;
                 }
             }
-            finished
-                .recv_timeout(Duration::from_secs(2))
-                .map_err(|error| UnknownAlias::with_source(AliasUncertainty::Timeout, error))?;
+            wait_finished(finished, deadline)?;
             drop(incoming);
             connection.close().map_err(portal_reply::call_error)?;
             Ok(calls)
         },
     );
     Ok(result?)
+}
+
+fn wait_finished(finished: &Receiver<()>, deadline: Instant) -> Result<(), UnknownAlias> {
+    finished
+        .recv_timeout(
+            deadline
+                .saturating_duration_since(Instant::now())
+                .min(CLIENT_DEADLINE),
+        )
+        .map_err(|error| UnknownAlias::with_source(AliasUncertainty::SessionBus, error))
 }
 
 fn response(request: &Message, scenario: Scenario, index: usize) -> zbus::Result<Message> {
@@ -168,34 +196,53 @@ fn query(
     scenario: Scenario,
 ) -> Result<(Result<super::DocumentsReply, UnknownAlias>, usize), TestError> {
     let (client, server) = sockets()?;
-    let peer_lifetime = (client.try_clone()?, server.try_clone()?);
-    let (finished, observed) = mpsc::channel();
-    let service = thread::spawn(move || serve(server, scenario, &observed));
     let shutdown = client.try_clone()?;
-    let result = portal_deadline::with_socket_deadline(
-        Instant::now() + Duration::from_secs(2),
-        &AtomicBool::new(false),
-        move || shutdown.shutdown(Shutdown::Both),
-        || {
-            let connection = builder(client)
-                .p2p()
-                .auth_mechanism(AuthMechanism::Anonymous)
-                .max_queued(1)
-                .method_timeout(Duration::from_millis(200))
-                .build()
-                .map_err(portal_reply::call_error)?;
-            let document = (!matches!(scenario, Scenario::Probe)).then_some("aabbccdd");
-            let result = super::query_on(&connection, document, &AtomicBool::new(false));
-            finished
-                .send(())
-                .map_err(|error| UnknownAlias::with_source(AliasUncertainty::SessionBus, error))?;
-            let closed = connection.close().map_err(portal_reply::call_error);
-            result.and_then(|reply| closed.map(|()| reply))
-        },
-    );
-    let calls = service.join().map_err(|_| "fake service failed")??;
-    drop(peer_lifetime);
-    Ok((result, calls))
+    let (finished, observed) = mpsc::channel();
+    let (ready, started) = mpsc::channel();
+    thread::scope(|scope| {
+        let deadline = Instant::now() + CLIENT_DEADLINE;
+        let service = scope.spawn(move || serve(server, scenario, &ready, &observed));
+        let (result, peer_outcome, closed) = portal_deadline::with_socket_deadline(
+            deadline,
+            &AtomicBool::new(false),
+            move || shutdown.shutdown(Shutdown::Both),
+            move || {
+                let connection = builder(client)
+                    .p2p()
+                    .auth_mechanism(AuthMechanism::Anonymous)
+                    .max_queued(1)
+                    .method_timeout(METHOD_TIMEOUT)
+                    .build()
+                    .map_err(portal_reply::call_error)?;
+                started
+                    .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+                    .map_err(|error| {
+                        UnknownAlias::with_source(AliasUncertainty::SessionBus, error)
+                    })?;
+                let document = (!matches!(scenario, Scenario::Probe)).then_some("aabbccdd");
+                let result = super::query_on(&connection, document, &AtomicBool::new(false));
+                finished.send(()).map_err(|error| {
+                    UnknownAlias::with_source(AliasUncertainty::SessionBus, error)
+                })?;
+                let peer_outcome = service
+                    .join()
+                    .unwrap_or_else(|_| Err("fake service failed".into()));
+                let closed = connection.close().map_err(portal_reply::call_error);
+                Ok((result, peer_outcome, closed))
+            },
+        )?;
+        match (peer_outcome, closed) {
+            (Ok(calls), Ok(())) => Ok((result, calls)),
+            (peer_outcome, closed) => {
+                let failure: TestError = Box::new(FixtureFailure {
+                    client: result.err(),
+                    service: peer_outcome.err(),
+                    close: closed.err(),
+                });
+                Err(failure)
+            }
+        }
+    })
 }
 
 #[test]
@@ -263,6 +310,17 @@ fn a_silent_authenticated_fake_bus_hits_the_actual_method_timeout() -> TestResul
     assert!(
         matches!(result, Err(failure) if failure.reason() == AliasUncertainty::Timeout),
         "the blocking client enforces its configured method deadline"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_peer_closed_after_the_first_call_remains_a_session_bus_failure() -> TestResult {
+    let (result, calls) = query(Scenario::ClosedCall)?;
+    assert_eq!(calls, 1, "the authenticated peer observed the first method");
+    assert!(
+        matches!(result, Err(failure) if failure.reason() == AliasUncertainty::SessionBus),
+        "an actual transport failure is not promoted to a method timeout"
     );
     Ok(())
 }
