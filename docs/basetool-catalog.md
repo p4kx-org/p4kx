@@ -15,6 +15,9 @@ an unknown additive field or kind. The schema describes serialization, so emitte
 fields are required even when their value is null. The previous released schema is retained as a
 compatibility-test fixture; ResourceType alone remains an additive extension.
 
+Every catalog kind and the shared CLI/GUI JSON and compressed catalog writers use version 3.
+Other exported formats retain their independently documented contract versions.
+
 
 The rule is ADR-0054 (amending ADR-0002):
 
@@ -1394,7 +1397,7 @@ the template (53) and the sub contract (18); the items are 2,587 resources, 647 
 
 ### Factions, reputation and missions
 
-Seven kinds (ADR-0237, schema version 2, no bump) hold what the contracts refer to. Each is the
+Seven kinds (ADR-0237) hold what the contracts refer to. Each is the
 Records of one type under one folder (see "Selection"), ordered by GUID, with `guid`, `className`
 (the Record name without its type) and `recordPath`. Facts only: identifiers, short names, numbers
 and links. A Reference to no Record is left out (`null`, or missing from the list); a GUID of an existing Record that the catalog does not list is kept, so `missionLocalities[].starmapObjectGuids` may name an object missing from `starmapObjects` under a Filter.
@@ -1444,7 +1447,7 @@ and entity spawns in "NPC and entity spawns".
 
 ### Ship spawns and location queries
 
-Three kinds and three contract fields (#902, ADR-0266, additive, schema version 2, no bump) state
+Three kinds and three contract fields (#902, ADR-0266) state
 what a contract spawns and where it can take place, as the Archive stores it. The catalog never
 resolves what the game picks when the mission starts.
 
@@ -1712,7 +1715,7 @@ limit is 64,000,000 bytes.
 ### NPC and entity spawns
 
 Two kinds and the fields `npcSpawns` and `entitySpawns` of a contract, a contract template and a
-mission broker entry (#815, ADR-0324, additive, schema version 2, no bump) state the people and the
+mission broker entry (#815, ADR-0324) state the people and the
 objects a contract spawns, as the Archive stores them. The catalog never resolves which NPC or
 entity the game picks. The Archive has no Record for these descriptions: a
 `MissionPropertyValue_NPCSpawnDescriptions` or `_EntitySpawnDescriptions` sits in the properties of
@@ -2155,8 +2158,9 @@ blueprint categories it applies to.
 | `condition` | A rule for `modifierCondition`: `kind` is `blueprintCategory` for a `CraftingModifierCondition_BlueprintCategory`, whose `categories` are the blueprint categories the modifier applies to; `none` when the Record stores no condition; `unknown` for any other struct |
 
 A new modifier type adds a `type` value and its value fields, a new condition adds a `kind`; both
-are additive and keep `schemaVersion` 2 (ADR-0054). A reader treats an unknown `type` or `kind`
-as "not understood" and does not apply the modifier; nothing unknown is dropped from the list.
+are additive and keep the active `schemaVersion` 3 (ADR-0054, ADR-0339). A reader treats an unknown
+`type` or `kind` as "not understood" and does not apply the modifier; nothing unknown is dropped
+from the list.
 
 #### Ports for crafters
 
