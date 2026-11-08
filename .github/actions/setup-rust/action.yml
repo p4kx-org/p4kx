@@ -42,8 +42,8 @@ runs:
       env:
         NATIVE_TARGET: ${{ steps.toolchain.outputs.target }}
       run: .github/scripts/check-build-tools.ps1 -Target $env:NATIVE_TARGET -SelectEnvironment linker
-    - name: Mount a ReFS Dev Drive as the target directory
-      if: runner.os == 'Windows'
+    - name: Mount a ReFS Dev Drive as the Windows AMD64 target directory
+      if: runner.os == 'Windows' && runner.arch == 'X64'
       uses: samypr100/setup-dev-drive@562171fe8df7401fdf582d766cd3b6ab80d5b1a0 # v4.1.0
       with:
         drive-size: 60GB
