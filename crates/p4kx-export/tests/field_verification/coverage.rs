@@ -89,7 +89,7 @@ pub(crate) fn run(
     let schema = Schema::read(forge, &inventory.roots, cancelled)?;
     let observations = observations(forge, &schema, inventory, cancelled)?;
     let groups = projections(catalog, inventory, cancelled)?;
-    accounting::account(
+    accounting::count_fields(
         &schema,
         &observations,
         inventory,

@@ -86,7 +86,7 @@ fn declared(
     }
 }
 
-pub(crate) fn account(
+pub(crate) fn count_fields(
     schema: &Schema,
     observations: &Observations,
     inventory: &Inventory,

@@ -210,7 +210,7 @@ fn generic_readability_and_a_real_typed_mapper_rejection_are_counted_separately(
             },
         }],
     };
-    let counts = accounting::account(
+    let counts = accounting::count_fields(
         &tagged.schema,
         &tagged.observations,
         &inventory,
