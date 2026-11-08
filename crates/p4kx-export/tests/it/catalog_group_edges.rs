@@ -3,6 +3,7 @@
 
 //! Edge cases of resource groups and blueprint categories: leftovers, unreadable groups, cycles.
 
+use crate::catalog_crafting_support::commodity;
 use crate::crafting_fixture;
 
 use std::collections::HashSet;
@@ -316,15 +317,17 @@ fn a_resource_type_listed_only_by_a_leftover_group_gives_its_commodity_no_type_g
         .record(commodity)
         .record(leftover);
     let (_, catalog) = build_from(&forge, None)?;
-    let zinc = catalog["commodities"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|commodity| commodity["className"] == "zinc")
-        .ok_or("the zinc commodity")?;
-    assert_eq!(zinc["typeGuid"], Value::Null);
+    let definition = commodity::definitions(&catalog)?
+        .iter()
+        .find(|definition| definition["className"]["value"] == "zinc")
+        .ok_or("the zinc Commodity definition")?;
+    let guid = definition["guid"]["value"]
+        .as_str()
+        .ok_or("the zinc Commodity GUID")?;
+    let zinc = commodity::presentation(&catalog, guid)?;
+    assert_eq!(zinc["typeGuid"]["value"], Value::Null);
     assert!(
-        zinc["subtypeGuid"].is_string(),
+        zinc["subtypeGuid"]["value"].is_string(),
         "the ResourceType is still linked"
     );
     Ok(())

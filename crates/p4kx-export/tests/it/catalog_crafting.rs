@@ -3,31 +3,15 @@
 
 //! Commodities and blueprints of the Basetool catalog, through the public API.
 
-use crate::crafting_fixture;
+use crate::catalog_crafting_build;
+use crate::catalog_crafting_support::commodity::{self, TextDomain};
 
 use std::error::Error;
-use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, Filter, Kind, build_catalog};
-use p4kx_extraction::Archive;
+use p4kx_export::{Filter, Kind};
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
-
-fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let archive = Archive::open_with_key(
-        crafting_fixture::write_archive(dir.path())?,
-        Some(p4kx_testkit::test_key()),
-    )?;
-    let options = CatalogOptions {
-        filter,
-        ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
-    };
-    let built = build_catalog(&archive, &options)?;
-    let json = serde_json::from_slice(built.json())?;
-    Ok((built, json))
-}
 
 fn class_names<'a>(catalog: &'a Value, kind: &str) -> Vec<&'a str> {
     catalog[kind]
@@ -41,67 +25,8 @@ fn class_names<'a>(catalog: &'a Value, kind: &str) -> Vec<&'a str> {
 }
 
 #[test]
-fn commodities_are_selected_by_prefix_and_type_without_leftovers_ordered_by_guid() -> TestResult {
-    let (built, catalog) = build(None)?;
-    assert_eq!(
-        class_names(&catalog, "commodities"),
-        ["gold", "dopple", "ember", "iron"],
-        "under entities/commodities, without the test commodity and the carryable, then the used ResourceType no commodity Record carries"
-    );
-    let kind = built.summary().kind(Kind::Commodities);
-    assert_eq!(
-        kind.map(|kind| (kind.count, kind.skipped, kind.complete)),
-        Some((4, 1, true)),
-        "counts"
-    );
-    Ok(())
-}
-
-#[test]
-fn a_commodity_carries_its_guids_texts_and_display_type() -> TestResult {
-    let (_, catalog) = build(None)?;
-    assert_eq!(
-        catalog["commodities"][0],
-        json!({
-            "guid": "a1000000-0000-4000-8000-000000000001",
-            "className": "gold",
-            "recordPath": "libs/foundry/records/entities/commodities/metals/gold",
-            "name": {"key": "@items_commodities_gold", "en": "Gold", "de": "Gold"},
-            "description": {
-                "key": "@items_commodities_gold_desc",
-                "en": "A precious metal.",
-                "de": "Ein Edelmetall.",
-            },
-            "typeGuid": "c1000000-0000-4000-8000-000000000001",
-            "subtypeGuid": "b1000000-0000-4000-8000-000000000001",
-            "displayType": {"key": "@items_commodities_type_metal", "en": "Metal", "de": "Metall"},
-            "densityGramsPerCubicCentimetre": 19.25,
-            "refinedSubtypeGuid": null,
-        }),
-        "the type is the group, the subtype the ResourceType; the description of a placeholder comes from the ResourceType"
-    );
-    Ok(())
-}
-
-#[test]
-fn a_commodity_keeps_its_own_description_and_may_lack_a_resource_type() -> TestResult {
-    let (_, catalog) = build(None)?;
-    assert_eq!(
-        catalog["commodities"][1]["description"],
-        json!({"key": "@items_commodities_dopple_desc", "en": "A vice.", "de": null}),
-        "own description"
-    );
-    assert_eq!(
-        catalog["commodities"][1]["typeGuid"],
-        Value::Null,
-        "no type"
-    );
-    Ok(())
-}
-
-#[test]
 fn blueprints_are_selected_by_prefix_and_type_without_leftovers_ordered_by_guid() -> TestResult {
-    let (built, catalog) = build(None)?;
+    let (built, catalog) = catalog_crafting_build::build(None)?;
     assert_eq!(
         class_names(&catalog, "blueprints"),
         [
@@ -124,7 +49,7 @@ fn blueprints_are_selected_by_prefix_and_type_without_leftovers_ordered_by_guid(
 
 #[test]
 fn a_blueprint_carries_key_category_product_and_craft_time() -> TestResult {
-    let (_, catalog) = build(None)?;
+    let (_, catalog) = catalog_crafting_build::build(None)?;
     let blueprint = &catalog["blueprints"][1];
     assert_eq!(
         (
@@ -165,7 +90,7 @@ fn a_blueprint_carries_key_category_product_and_craft_time() -> TestResult {
 
 #[test]
 fn ingredients_with_resources_and_items_keep_quantity_quality_and_slot() -> TestResult {
-    let (_, catalog) = build(None)?;
+    let (_, catalog) = catalog_crafting_build::build(None)?;
     assert_eq!(
         catalog["blueprints"][0]["ingredients"],
         json!([
@@ -202,7 +127,7 @@ fn ingredients_with_resources_and_items_keep_quantity_quality_and_slot() -> Test
 
 #[test]
 fn a_slot_is_inherited_through_unnamed_nested_selections() -> TestResult {
-    let (_, catalog) = build(None)?;
+    let (_, catalog) = catalog_crafting_build::build(None)?;
     let nested = &catalog["blueprints"][4];
     assert_eq!(nested["className"], "BP_CRAFT_nested", "the blueprint");
     assert_eq!(
@@ -219,7 +144,7 @@ fn a_slot_is_inherited_through_unnamed_nested_selections() -> TestResult {
 
 #[test]
 fn optional_costs_follow_the_mandatory_ones() -> TestResult {
-    let (_, catalog) = build(None)?;
+    let (_, catalog) = catalog_crafting_build::build(None)?;
     let ingredients = &catalog["blueprints"][4]["ingredients"];
     assert_eq!(
         ingredients.as_array().map(Vec::len),
@@ -248,31 +173,43 @@ fn optional_costs_follow_the_mandatory_ones() -> TestResult {
 
 #[test]
 fn a_placeholder_name_and_description_fall_back_to_the_resource_type() -> TestResult {
-    let (_, catalog) = build(None)?;
-    let ember = &catalog["commodities"][2];
-    assert_eq!(ember["className"], "ember", "the commodity");
-    assert_eq!(
-        (&ember["name"], &ember["description"]),
-        (
-            &json!({"key": "@items_commodities_ember", "en": "Ember", "de": null}),
-            &json!({"key": "@items_commodities_ember_desc", "en": "A glowing mineral.", "de": null}),
-        ),
-        "the texts of the ResourceType"
-    );
+    let (_, catalog) = catalog_crafting_build::build(None)?;
+    let definition = &commodity::definitions(&catalog)?[2];
+    let presentation = &commodity::presentations(&catalog)?[2];
+    assert_eq!(definition["className"]["value"], "ember", "the commodity");
+    commodity::assert_text(
+        &catalog,
+        &presentation["name"],
+        TextDomain::PublicName,
+        Some("@items_commodities_ember"),
+        Some("Ember"),
+        None,
+    )?;
+    commodity::assert_text(
+        &catalog,
+        &presentation["description"],
+        TextDomain::GameText,
+        Some("@items_commodities_ember_desc"),
+        Some("A glowing mineral."),
+        None,
+    )?;
     Ok(())
 }
 
 #[test]
 fn a_commodity_carries_the_density_and_the_refined_version_of_its_resource_type() -> TestResult {
-    let (_, catalog) = build(None)?;
-    let ember = &catalog["commodities"][2];
-    assert_eq!(ember["densityGramsPerCubicCentimetre"], 2.5, "density");
+    let (_, catalog) = catalog_crafting_build::build(None)?;
+    let ember = &commodity::presentations(&catalog)?[2];
     assert_eq!(
-        ember["refinedSubtypeGuid"], "b4000000-0000-4000-8000-000000000004",
+        ember["densityGramsPerCubicCentimetre"]["value"], 2.5,
+        "density"
+    );
+    assert_eq!(
+        ember["refinedSubtypeGuid"]["value"], "b4000000-0000-4000-8000-000000000004",
         "the refined ResourceType"
     );
     assert_eq!(
-        catalog["commodities"][1]["densityGramsPerCubicCentimetre"],
+        commodity::presentations(&catalog)?[1]["densityGramsPerCubicCentimetre"]["value"],
         Value::Null,
         "no ResourceType, no density"
     );
@@ -281,25 +218,47 @@ fn a_commodity_carries_the_density_and_the_refined_version_of_its_resource_type(
 
 #[test]
 fn a_used_resource_type_without_a_commodity_record_is_a_commodity_of_its_group() -> TestResult {
-    let (_, catalog) = build(None)?;
+    let (_, catalog) = catalog_crafting_build::build(None)?;
+    let definition = commodity::definitions(&catalog)?
+        .get(3)
+        .ok_or("the fourth Commodity is the resource-only fallback")?;
+    let presentation = commodity::presentations(&catalog)?
+        .get(3)
+        .ok_or("the fourth Commodity has a canonical presentation")?;
     assert_eq!(
-        catalog["commodities"][3],
-        json!({
-            "guid": "b2000000-0000-4000-8000-000000000002",
-            "className": "iron",
-            "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
-            "name": {"key": "@items_commodities_iron", "en": null, "de": null},
-            "description": {"key": "@items_commodities_iron_desc", "en": null, "de": null},
-            "typeGuid": "c1000000-0000-4000-8000-000000000001",
-            "subtypeGuid": "b2000000-0000-4000-8000-000000000002",
-            "displayType": {"key": null, "en": null, "de": null},
-            "densityGramsPerCubicCentimetre": 7.5,
-            "refinedSubtypeGuid": "b1000000-0000-4000-8000-000000000001",
-        }),
-        "the ResourceType and its group"
+        (
+            &definition["guid"]["value"],
+            &definition["className"]["value"],
+            &definition["recordPath"]["value"]
+        ),
+        (
+            &json!("b2000000-0000-4000-8000-000000000002"),
+            &json!("iron"),
+            &json!("libs/foundry/records/resourcetypedatabase/resourcetypedatabase")
+        )
     );
+    assert_eq!(definition["selection"]["value"], "resourceFallback");
+    assert_eq!(
+        presentation["commodityGuid"]["value"],
+        definition["guid"]["value"]
+    );
+    assert_eq!(
+        (
+            &presentation["typeGuid"]["value"],
+            &presentation["subtypeGuid"]["value"],
+            &presentation["densityGramsPerCubicCentimetre"]["value"],
+            &presentation["refinedSubtypeGuid"]["value"]
+        ),
+        (
+            &json!("c1000000-0000-4000-8000-000000000001"),
+            &json!("b2000000-0000-4000-8000-000000000002"),
+            &json!(7.5),
+            &json!("b1000000-0000-4000-8000-000000000001")
+        )
+    );
+    assert_backfilled_iron_texts(&catalog, presentation)?;
     assert!(
-        !class_names(&catalog, "commodities").contains(&"copper"),
+        !commodity::class_names(&catalog)?.contains(&"copper"),
         "an unused ResourceType stays out"
     );
     Ok(())
@@ -307,15 +266,11 @@ fn a_used_resource_type_without_a_commodity_record_is_a_commodity_of_its_group()
 
 #[test]
 fn every_resource_ingredient_joins_exactly_one_commodity() -> TestResult {
-    let (_, catalog) = build(None)?;
-    let subtypes: Vec<&Value> = catalog["commodities"]
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .map(|commodity| &commodity["subtypeGuid"])
-                .collect()
-        })
-        .unwrap_or_default();
+    let (_, catalog) = catalog_crafting_build::build(None)?;
+    let subtypes: Vec<&Value> = commodity::presentations(&catalog)?
+        .iter()
+        .map(|presentation| &presentation["subtypeGuid"]["value"])
+        .collect();
     let blueprints = catalog["blueprints"].as_array().ok_or("blueprints")?;
     for ingredient in blueprints
         .iter()
@@ -333,7 +288,7 @@ fn every_resource_ingredient_joins_exactly_one_commodity() -> TestResult {
 
 #[test]
 fn a_product_the_database_lacks_is_null() -> TestResult {
-    let (_, catalog) = build(None)?;
+    let (_, catalog) = catalog_crafting_build::build(None)?;
     assert_eq!(
         catalog["blueprints"][2]["producedItemGuid"],
         Value::Null,
@@ -350,8 +305,8 @@ fn a_product_the_database_lacks_is_null() -> TestResult {
 #[test]
 fn a_filter_marks_both_kinds_partial_and_selects_by_record_path() -> TestResult {
     let filter = Filter::new("*/metals/*");
-    let (built, catalog) = build(Some(&filter))?;
-    assert_eq!(class_names(&catalog, "commodities"), ["gold"], "filtered");
+    let (built, catalog) = catalog_crafting_build::build(Some(&filter))?;
+    assert_eq!(commodity::class_names(&catalog)?, ["gold"], "filtered");
     assert!(class_names(&catalog, "blueprints").is_empty(), "filtered");
     for kind in ["commodities", "blueprints"] {
         assert_eq!(
@@ -369,7 +324,7 @@ fn a_filter_marks_both_kinds_partial_and_selects_by_record_path() -> TestResult 
 
 #[test]
 fn without_a_filter_both_kinds_are_complete() -> TestResult {
-    let (_, catalog) = build(None)?;
+    let (_, catalog) = catalog_crafting_build::build(None)?;
     for kind in ["commodities", "blueprints"] {
         assert_eq!(
             catalog["completeness"][kind],
@@ -387,4 +342,36 @@ fn the_blueprint_kind_selects_crafting_blueprint_records() {
         Some("CraftingBlueprintRecord"),
         "type"
     );
+}
+
+fn assert_backfilled_iron_texts(catalog: &Value, presentation: &Value) -> TestResult {
+    commodity::assert_text(
+        catalog,
+        presentation.get("name").ok_or("backfilled name carrier")?,
+        TextDomain::PublicName,
+        Some("@items_commodities_iron"),
+        None,
+        None,
+    )?;
+    commodity::assert_text(
+        catalog,
+        presentation
+            .get("description")
+            .ok_or("backfilled description carrier")?,
+        TextDomain::GameText,
+        Some("@items_commodities_iron_desc"),
+        None,
+        None,
+    )?;
+    commodity::assert_text(
+        catalog,
+        presentation
+            .get("displayType")
+            .ok_or("backfilled display-type carrier")?,
+        TextDomain::GameText,
+        None,
+        None,
+        None,
+    )?;
+    Ok(())
 }

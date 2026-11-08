@@ -9,6 +9,8 @@ use crate::catalog_schema_support::minimal_catalog;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+const RELEASED_V2_CATALOG: &str = include_str!("../fixtures/catalog-v2-union.synthetic.json");
+
 fn mission_item(catalog: &mut Value) -> Result<&mut Value, Box<dyn Error>> {
     catalog
         .get_mut("contractTemplates")
@@ -56,13 +58,22 @@ fn nullable_tagged_payload_fields_are_present_even_when_null() -> TestResult {
 }
 
 #[test]
+fn the_static_v2_catalog_validates_without_mutation() -> TestResult {
+    let released: Value =
+        serde_json::from_str(include_str!("../fixtures/catalog-v0.4.2.schema.json"))?;
+    let catalog: Value = serde_json::from_str(RELEASED_V2_CATALOG)?;
+    assert!(
+        jsonschema::validator_for(&released)?.is_valid(&catalog),
+        "the independent synthetic v2 document satisfies the released contract"
+    );
+    Ok(())
+}
+#[test]
 fn a_tagged_union_extension_is_not_an_additive_property() -> TestResult {
     let released: Value =
         serde_json::from_str(include_str!("../fixtures/catalog-v0.4.2.schema.json"))?;
     let validator = jsonschema::validator_for(&released)?;
-    let mut catalog = minimal_catalog();
-    catalog["schemaVersion"] = json!(2);
-    catalog["contractTemplates"][0]["objectives"][0]["objectiveProperties"] = json!([]);
+    let mut catalog: Value = serde_json::from_str(RELEASED_V2_CATALOG)?;
     assert!(validator.is_valid(&catalog), "unchanged v2 fields validate");
 
     catalog["resourceTypes"] = json!([]);

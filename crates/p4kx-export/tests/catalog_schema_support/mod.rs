@@ -7,6 +7,7 @@ use serde_json::json;
 
 mod blueprints;
 mod brokers;
+mod commodities;
 mod contract_properties;
 mod contracts;
 mod crafters;
@@ -21,6 +22,7 @@ mod recovery;
 mod reputation;
 mod resources;
 mod slugs;
+mod source_values;
 mod spawns;
 
 use recovery::item_recovery;
@@ -145,18 +147,6 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
                 "expediteFee": 3200
             }
         }],
-        "commodities": [{
-            "guid": "a1000000-0000-4000-8000-000000000001",
-            "className": "gold",
-            "recordPath": "libs/foundry/records/entities/commodities/metals/gold",
-            "name": {"key": "@items_commodities_gold", "en": "Gold", "de": null},
-            "description": {"key": null, "en": null, "de": null},
-            "typeGuid": "b1000000-0000-4000-8000-000000000001",
-            "subtypeGuid": null,
-            "displayType": {"key": null, "en": null, "de": null},
-            "densityGramsPerCubicCentimetre": null,
-            "refinedSubtypeGuid": null
-        }],
         "blueprints": [{
             "guid": "11000000-0000-4000-8000-000000000001",
             "className": "BP_CRAFT_core",
@@ -193,8 +183,9 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
                 "tierIndex": 0
             }
         }],
-        "definitions": resources::definitions(),
-        "texts": {"publicNames": [], "gameTexts": []},
+        "definitions": {"resourceTypes": resources::table(), "commodities": commodities::definitions()},
+        "texts": {"publicNames": commodities::public_names(), "gameTexts": []},
+        "projections": {"commodityPresentation": commodities::presentation()},
         "provenance": {"sources": [], "uses": []},
         "resourceGroups": [{
             "guid": "b1000000-0000-4000-8000-000000000001",

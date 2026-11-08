@@ -6,6 +6,7 @@
 #![recursion_limit = "256"]
 
 mod catalog_broker_entries;
+mod catalog_commodity;
 mod catalog_compression;
 mod catalog_contract_property_values;
 mod catalog_contract_template_parts;
@@ -21,6 +22,7 @@ mod catalog_contracts_standing;
 mod catalog_crafters;
 mod catalog_crafters_types;
 mod catalog_crafting;
+mod catalog_crafting_build;
 mod catalog_crafting_followups;
 mod catalog_crafting_support;
 mod catalog_crafting_tiers;
@@ -69,6 +71,19 @@ mod catalog_text_exchange;
 mod catalog_text_exchange_support;
 mod catalog_texts;
 mod catalog_variants;
+mod commodity_v3;
+mod commodity_v3_fixture;
+mod commodity_v3_fixture_records;
+mod commodity_v3_fixture_schema;
+mod commodity_v3_group_choice;
+mod commodity_v3_group_choice_fixture;
+mod commodity_v3_origin_limit;
+mod commodity_v3_origin_limit_fixture;
+mod commodity_v3_origin_payload;
+mod commodity_v3_presentation;
+mod commodity_v3_schema;
+mod commodity_v3_source;
+mod commodity_v3_source_inventory;
 mod common;
 mod contracts_fixture;
 mod crafters_fixture;

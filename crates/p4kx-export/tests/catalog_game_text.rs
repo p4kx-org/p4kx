@@ -3,10 +3,13 @@
 
 //! Exactly the game-text fields of the catalog carry `x-gameText` in its JSON Schema.
 
-use serde_json::json;
+use std::collections::BTreeSet;
 
-const GAME_TEXT: [&str; 27] = [
+use serde_json::{Value, json};
+
+const GAME_TEXT: [&str; 28] = [
     "description",
+    "displayDescription",
     "gameTexts",
     "displayName",
     "displayType",
@@ -35,13 +38,10 @@ const GAME_TEXT: [&str; 27] = [
     "causeOfDeath",
 ];
 
-fn collect_properties<'s>(
-    node: &'s serde_json::Value,
-    found: &mut Vec<(&'s str, &'s serde_json::Value)>,
-) {
+fn collect_properties<'s>(node: &'s Value, found: &mut Vec<(&'s str, &'s Value)>) {
     match node {
-        serde_json::Value::Object(map) => {
-            if let Some(properties) = map.get("properties").and_then(serde_json::Value::as_object) {
+        Value::Object(map) => {
+            if let Some(properties) = map.get("properties").and_then(Value::as_object) {
                 found.extend(
                     properties
                         .iter()
@@ -57,7 +57,7 @@ fn collect_properties<'s>(
                 }
             }
         }
-        serde_json::Value::Array(items) => {
+        Value::Array(items) => {
             for value in items {
                 collect_properties(value, found);
             }
@@ -80,13 +80,13 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         let carries = value.get("x-gameText") == Some(&json!(true));
         assert_eq!(
             carries,
-            GAME_TEXT.contains(&name),
+            GAME_TEXT.contains(&name) && !is_only_public_name(&schema, value),
             "x-gameText on {name}: {value}"
         );
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 49,
+        marked, 51,
         "the expected resource, mission, name and option game-text fields"
     );
     let mut starmap_properties = Vec::new();
@@ -94,5 +94,39 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
     for (name, value) in starmap_properties {
         let carries = value.get("x-gameText") == Some(&json!(true));
         assert_eq!(carries, name == "name", "x-gameText on the starmap {name}");
+    }
+}
+
+fn is_only_public_name(schema: &Value, field: &Value) -> bool {
+    references(field, schema, "#/$defs/PublicNameRef", &mut BTreeSet::new())
+        && !references(field, schema, "#/$defs/GameTextRef", &mut BTreeSet::new())
+}
+
+fn references<'schema>(
+    node: &'schema Value,
+    schema: &'schema Value,
+    target: &str,
+    seen: &mut BTreeSet<&'schema str>,
+) -> bool {
+    if let Some(reference) = node.get("$ref").and_then(Value::as_str) {
+        if reference == target {
+            return true;
+        }
+        if seen.insert(reference)
+            && let Some(pointer) = reference.strip_prefix('#')
+            && let Some(referred) = schema.pointer(pointer)
+            && references(referred, schema, target, seen)
+        {
+            return true;
+        }
+    }
+    match node {
+        Value::Object(fields) => fields
+            .values()
+            .any(|value| references(value, schema, target, seen)),
+        Value::Array(values) => values
+            .iter()
+            .any(|value| references(value, schema, target, seen)),
+        _ => false,
     }
 }

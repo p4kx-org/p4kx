@@ -4,6 +4,7 @@
 use p4kx_extraction::{Guid, RecordTree, StructValue, Value};
 
 use crate::blueprint::{as_struct, craft_time};
+use crate::commodity_backfill_input::CommodityInputCapture;
 use crate::crafting_tier::{TooDeep, tiers};
 use crate::crafting_types::{
     BlueprintPool, BlueprintTiers, DismantleProcess, GameplayProperty, GlobalParams,
@@ -40,10 +41,13 @@ pub(crate) fn is_crafting_path(record_path: &str) -> bool {
 /// # Errors
 ///
 /// Returns [`TooDeep`] when a selection of a tier is nested deeper than the reader follows.
-pub(crate) fn blueprint<'f>(tree: &RecordTree<'f>) -> Result<BlueprintTiers<'f>, TooDeep> {
+pub(crate) fn blueprint<'f>(
+    tree: &RecordTree<'f>,
+    capture: &mut CommodityInputCapture,
+) -> Result<BlueprintTiers<'f>, TooDeep> {
     let blueprint = structure(Some(tree.root()), "blueprint");
     let mut unknown_range_types = Vec::new();
-    let tiers = tiers(blueprint, &mut unknown_range_types)?;
+    let tiers = tiers(blueprint, &mut unknown_range_types, capture)?;
     Ok(BlueprintTiers {
         guid: tree.guid(),
         class_name: class_name(tree),

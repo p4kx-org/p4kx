@@ -10,6 +10,7 @@ use p4kx_testkit::TestEntry;
 use serde_json::{Value, json};
 
 use crate::catalog_crafting_support;
+use crate::catalog_crafting_support::commodity;
 use crate::resource_fixture as fixture;
 use crate::resource_quality_schema_fixture::OverrideEntryTarget;
 
@@ -49,7 +50,7 @@ fn commodity_identity_and_resource_cardinality_are_independent() -> TestResult {
             .map(|kind| (kind.count, kind.complete)),
         Some((3, true))
     );
-    let commodities = catalog["commodities"].as_array().ok_or("the commodities")?;
+    let commodities = commodity::presentations(&catalog)?;
     assert_eq!(
         commodities.len(),
         4,
@@ -59,22 +60,43 @@ fn commodity_identity_and_resource_cardinality_are_independent() -> TestResult {
     assert_eq!(
         commodities
             .iter()
-            .filter(|row| row["subtypeGuid"] == subtype)
+            .filter(|row| row["subtypeGuid"]["value"] == subtype)
             .count(),
         2
     );
     assert_ne!(
-        row(&catalog, "commodities", fixture::COMMODITY_ALPHA)?["guid"],
-        row(&catalog, "commodities", fixture::COMMODITY_BETA)?["guid"]
+        commodity::presentation(
+            &catalog,
+            &catalog_crafting_support::text(fixture::COMMODITY_ALPHA)
+        )?["commodityGuid"]["value"],
+        commodity::presentation(
+            &catalog,
+            &catalog_crafting_support::text(fixture::COMMODITY_BETA)
+        )?["commodityGuid"]["value"]
     );
     assert_eq!(
-        row(&catalog, "commodities", fixture::COMMODITY_NULL)?["subtypeGuid"],
+        commodity::presentation(
+            &catalog,
+            &catalog_crafting_support::text(fixture::COMMODITY_NULL)
+        )?["subtypeGuid"]["value"],
         Value::Null
     );
-    let fallback = row(&catalog, "commodities", fixture::RESOURCE_BETA)?;
-    assert_eq!(fallback["guid"], fallback["subtypeGuid"]);
+    let fallback = commodity::presentation(
+        &catalog,
+        &catalog_crafting_support::text(fixture::RESOURCE_BETA),
+    )?;
+    assert_eq!(
+        fallback["commodityGuid"]["value"],
+        fallback["subtypeGuid"]["value"]
+    );
     assert!(row(&catalog, "resourceTypes", fixture::RESOURCE_UNUSED).is_ok());
-    assert!(row(&catalog, "commodities", fixture::RESOURCE_UNUSED).is_err());
+    assert!(
+        commodity::definition(
+            &catalog,
+            &catalog_crafting_support::text(fixture::RESOURCE_UNUSED)
+        )
+        .is_err()
+    );
     Ok(())
 }
 
@@ -94,7 +116,7 @@ fn concrete_and_base_declared_override_entries_produce_the_same_catalog() -> Tes
 }
 
 #[test]
-fn source_units_molar_mass_and_legacy_commodity_density_stay_distinct() -> TestResult {
+fn source_units_molar_mass_and_commodity_presentation_density_stay_distinct() -> TestResult {
     let (_, catalog) = build(OverrideEntryTarget::Base)?;
     let alpha = row(&catalog, "resourceTypes", fixture::RESOURCE_ALPHA)?;
     assert_eq!(
@@ -111,11 +133,17 @@ fn source_units_molar_mass_and_legacy_commodity_density_stay_distinct() -> TestR
         json!({"type": "molarMass", "molarMass": 6.75})
     );
     assert_eq!(
-        row(&catalog, "commodities", fixture::COMMODITY_ALPHA)?["densityGramsPerCubicCentimetre"],
+        commodity::presentation(
+            &catalog,
+            &catalog_crafting_support::text(fixture::COMMODITY_ALPHA)
+        )?["densityGramsPerCubicCentimetre"]["value"],
         3.25
     );
     assert_eq!(
-        row(&catalog, "commodities", fixture::RESOURCE_BETA)?["densityGramsPerCubicCentimetre"],
+        commodity::presentation(
+            &catalog,
+            &catalog_crafting_support::text(fixture::RESOURCE_BETA)
+        )?["densityGramsPerCubicCentimetre"]["value"],
         Value::Null
     );
     Ok(())
@@ -230,7 +258,10 @@ fn group_source_memberships_keep_duplicates_nulls_and_cycles() -> TestResult {
         catalog_crafting_support::text(fixture::GROUP_BETA)
     );
     assert_eq!(
-        row(&catalog, "commodities", fixture::COMMODITY_ALPHA)?["typeGuid"],
+        commodity::presentation(
+            &catalog,
+            &catalog_crafting_support::text(fixture::COMMODITY_ALPHA)
+        )?["typeGuid"]["value"],
         catalog_crafting_support::text(fixture::GROUP_ALPHA)
     );
     Ok(())

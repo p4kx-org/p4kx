@@ -181,15 +181,25 @@ fn emitted_resource_bits_cover_the_same_physical_commodity_dependency() -> TestR
         "7fc01234"
     );
     assert_eq!(
-        catalog["commodities"].as_array().map(Vec::len),
+        catalog["definitions"]["commodities"]["rows"]
+            .as_array()
+            .map(Vec::len),
         Some(1),
-        "the legacy dependency is actually projected"
+        "the physical Commodity definition is actually projected"
     );
+    assert_eq!(
+        catalog["projections"]["commodityPresentation"]["rows"]
+            .as_array()
+            .map(Vec::len),
+        Some(1),
+        "the same dependency has its canonical Commodity presentation"
+    );
+    assert!(catalog.get("commodities").is_none());
     Ok(())
 }
 
 #[test]
-fn filtered_resource_bits_cannot_cover_a_legacy_only_commodity_dependency() -> TestResult {
+fn filtered_resource_bits_cannot_cover_an_unexported_commodity_dependency() -> TestResult {
     let (_directory, archive) = open(&database(false))?;
     let filter = Filter::new("included");
     let options = CatalogOptions {
@@ -201,7 +211,7 @@ fn filtered_resource_bits_cannot_cover_a_legacy_only_commodity_dependency() -> T
             crate::build_catalog(&archive, &options),
             Err(CatalogError::IncompleteExport { .. })
         ),
-        "an unexported raw value cannot excuse the legacy null projection"
+        "an unexported raw value cannot excuse the finite-only Commodity presentation"
     );
     assert_missing_capture(&archive, options)
 }
@@ -230,13 +240,27 @@ fn assert_missing_capture(archive: &Archive, mut options: CatalogOptions<'_>) ->
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(catalog["exportHealth"]["status"], "incomplete");
     assert_eq!(
-        catalog["commodities"].as_array().map(Vec::len),
+        catalog["definitions"]["commodities"]["rows"]
+            .as_array()
+            .map(Vec::len),
         Some(1),
-        "the legacy commodity survives diagnostic publication"
+        "the physical Commodity definition survives diagnostic publication"
     );
+    assert_eq!(
+        catalog["projections"]["commodityPresentation"]["rows"]
+            .as_array()
+            .map(Vec::len),
+        Some(1),
+        "the presentation survives with its nullable derived density"
+    );
+    assert!(catalog.get("commodities").is_none());
+    let density = catalog
+        .pointer("/projections/commodityPresentation/rows/0/densityGramsPerCubicCentimetre")
+        .ok_or("canonical Commodity density carrier missing")?;
+    assert_eq!(density["state"], "present");
     assert!(
-        catalog["commodities"][0]["densityGramsPerCubicCentimetre"].is_null(),
-        "the unrepresentable legacy field is null"
+        density.get("value").is_some_and(Value::is_null),
+        "the unrepresentable derived density has an explicit nullable value"
     );
     assert!(
         catalog["exportHealth"]["diagnostics"]

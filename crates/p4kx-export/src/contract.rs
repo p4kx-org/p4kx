@@ -7,16 +7,18 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::catalog_definitions::CatalogDefinitions;
+use crate::catalog_projections::CatalogProjections;
 use crate::catalog_text_contract::CatalogTexts;
 use crate::guid_text::CatalogGuid;
 use p4kx_extraction::SourceInventory;
 
 pub(crate) use crate::broker_entry::BrokerEntry;
+pub(crate) use crate::commodity_contract::Commodity;
 pub(crate) use crate::contract_cargo::CargoManifest;
 pub(crate) use crate::contract_completeness::{Completeness, KindCompleteness};
 pub(crate) use crate::contract_crafter::Crafter;
 pub(crate) use crate::contract_crafting::{
-    Blueprint, BlueprintCategory, Commodity, Ingredient, ResourceGroup,
+    Blueprint, BlueprintCategory, Ingredient, ResourceGroup,
 };
 pub(crate) use crate::contract_entities::{Item, Paint, Ship};
 pub(crate) use crate::contract_harvest::{HarvestableLocation, HarvestableProviderPreset};
@@ -76,14 +78,14 @@ pub(crate) struct Catalog<'a> {
     pub(crate) items: Vec<Item<'a>>,
     /// The ships, ordered by GUID.
     pub(crate) ships: Vec<Ship<'a>>,
-    /// The commodities, ordered by GUID.
-    pub(crate) commodities: Vec<Commodity<'a>>,
     /// The blueprints, ordered by GUID.
     pub(crate) blueprints: Vec<Blueprint<'a>>,
     /// The resource groups, ordered by GUID.
     pub(crate) resource_groups: Vec<ResourceGroup<'a>>,
     /// Canonical resource definition rows, independently of commodity packaging.
     pub(crate) definitions: CatalogDefinitions<'a>,
+    /// Explicit derived choices using the canonical definitions' source facts.
+    pub(crate) projections: CatalogProjections,
     /// Physical source observations and actual contribution uses.
     pub(crate) provenance: SourceInventory,
     /// Public short-name and protected game-text tables.

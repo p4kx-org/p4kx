@@ -51,10 +51,13 @@ fn kind_health(kind: Kind, catalog: &Value) -> KindExportHealth {
         projection: ExportStageStatus::Incomplete,
         source_records: ExportSourceCounts::default(),
         source_entries: ExportEntryCounts::default(),
-        written_rows: catalog
-            .get(kind.name())
-            .and_then(Value::as_array)
-            .map_or(0, Vec::len),
+        written_rows: match kind {
+            Kind::Commodities => catalog.pointer("/definitions/commodities/rows"),
+            Kind::ResourceTypes => catalog.pointer("/definitions/resourceTypes/rows"),
+            _ => catalog.get(kind.name()),
+        }
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len),
         intentionally_skipped_rows: 0,
         failed_derived_projections: 0,
         failed_records: Vec::new(),

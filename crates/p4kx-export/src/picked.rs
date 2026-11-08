@@ -35,7 +35,7 @@ pub(crate) enum Picked<'f> {
     /// A ship and the vehicle facts its paints are derived from.
     Ship(Ship<'f>, VehicleFacts),
     /// A commodity.
-    Commodity(Commodity<'f>),
+    Commodity(Box<Commodity<'f>>),
     /// A resource group.
     ResourceGroup(ResourceGroup<'f>),
     /// A resource definition with its authored source properties.

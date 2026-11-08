@@ -38,22 +38,42 @@ pub(crate) struct Provenance {
     pub(crate) dcb_sha256: Availability,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum Family {
     Items,
     Ships,
     Commodities,
+    CommodityPresentation,
     MineableElements,
     Placements,
 }
 
 impl Family {
+    pub(crate) const fn rows_pointer(self) -> &'static str {
+        match self {
+            Self::Items => "/items",
+            Self::Ships => "/ships",
+            Self::Commodities => "/definitions/commodities/rows",
+            Self::CommodityPresentation => "/projections/commodityPresentation/rows",
+            Self::MineableElements => "/mineableElements",
+            Self::Placements => "/starmapObjects",
+        }
+    }
+
+    pub(crate) const fn identity_fields(self) -> &'static [&'static str] {
+        match self {
+            Self::Commodities => &["guid", "value"],
+            Self::CommodityPresentation => &["commodityGuid", "value"],
+            _ => &["guid"],
+        }
+    }
+
     pub(crate) const fn group(self) -> &'static str {
         match self {
             Self::Items => "items",
             Self::Ships => "ships",
-            Self::Commodities => "commodities",
+            Self::Commodities | Self::CommodityPresentation => "commodities",
             Self::MineableElements => "mineableElements",
             Self::Placements => "starmapObjects",
         }

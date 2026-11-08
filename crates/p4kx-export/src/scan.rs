@@ -6,13 +6,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{
-    CancelToken, DataForge, DataForgeError, Filter, Guid, PointerProbe, Record, TreeBuilder,
+    CancelToken, DataForge, DataForgeError, Filter, PointerProbe, Record, TreeBuilder,
 };
 use rayon::prelude::*;
 
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_projection::CatalogProjection;
-use crate::contract_recipe::CostLine;
 use crate::entity_selection::{Selected, select};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
@@ -48,14 +47,6 @@ fn selects_group(record: &Record<'_>, filter: Option<&Filter>) -> bool {
         select(record, filter),
         Ok(Some(Selected::Entity(Kind::ResourceGroups)))
     )
-}
-
-/// Appends to `out` the `ResourceType` GUID of every resource line of `line`, selections opened.
-fn resources_of(line: &CostLine<'_>, out: &mut Vec<Guid>) {
-    out.extend(line.resource_guid.map(|guid| guid.0));
-    for option in &line.options {
-        resources_of(option, out);
-    }
 }
 
 /// The parallel check of every Record, with its progress.
@@ -148,12 +139,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             ledger.merge(checked.ledger);
         }
         picked.extend(failures.into_iter().map(Picked::Failed));
-        let resources = self.resource_commodities(
-            &picked,
-            &crafting.blueprints,
-            &crafting.quantizations,
-            &ledger.sources,
-        )?;
+        let resources = self.resource_commodities(&picked, crafting, &ledger)?;
         picked.extend(resources.picked);
         ledger.merge(resources.ledger);
         picked.extend(self.links.warning().map(Picked::Warned));
@@ -310,6 +296,3 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

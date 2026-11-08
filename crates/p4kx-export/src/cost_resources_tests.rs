@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use super::*;
+use p4kx_extraction::Guid;
+
+use crate::contract_recipe::CostLine;
+use crate::cost_resources;
 use crate::guid_text::CatalogGuid;
 
 fn line(resource: Option<&str>, options: Vec<CostLine<'static>>) -> CostLine<'static> {
@@ -34,7 +37,7 @@ fn the_resources_of_a_line_include_those_inside_selections() {
         ],
     );
     let mut found = Vec::new();
-    resources_of(&nested, &mut found);
+    cost_resources::collect(&nested, &mut found);
     let expected: Vec<Guid> = [first, second]
         .iter()
         .filter_map(|text| text.parse().ok())

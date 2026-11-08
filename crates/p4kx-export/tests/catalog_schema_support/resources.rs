@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{SourceUses, SourceValue};
+use p4kx_extraction::SourceValue;
 use serde_json::{Value, json};
 
-pub(super) fn definitions() -> Value {
+use super::source_values::{present, source};
+
+pub(super) fn table() -> Value {
     json!({
-        "resourceTypes": {
             "availability": "available",
             "rows": [{
                 "guid": present(json!("00000000-0000-0000-0000-000000007001")),
@@ -35,14 +36,5 @@ pub(super) fn definitions() -> Value {
                     }))
                 ]))
             }]
-        }
     })
-}
-
-fn present(value: Value) -> Value {
-    source(SourceValue::Present(value))
-}
-
-fn source(value: SourceValue<Value>) -> Value {
-    json!(SourceUses::new().value(value, &[], false))
 }

@@ -3,6 +3,7 @@
 
 //! The crafting stations in the Basetool catalog, through the public API.
 
+use crate::catalog_crafting_support::commodity;
 use crate::crafters_fixture::{
     BENCH, BROKEN, CATEGORY_A, CATEGORY_B, FABRICATOR, HOST_SHIP, MODIFIED, MOUNTED, ODD,
     SELF_SHIP, write_archive,
@@ -73,7 +74,7 @@ fn every_entity_with_a_crafter_component_is_a_crafter_whatever_its_kind() -> Tes
         "a crafting item stays an item"
     );
     assert!(
-        class_names(&catalog, "commodities").contains(&"crafting_commodity"),
+        commodity::class_names(&catalog)?.contains(&"crafting_commodity"),
         "a crafting commodity stays a commodity"
     );
     let kind = built.summary().kind(Kind::Crafters);

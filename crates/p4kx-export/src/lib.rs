@@ -91,8 +91,6 @@ mod catalog_v3;
 mod collected;
 #[cfg(test)]
 mod collected_tests;
-mod commodity;
-mod commodity_resource;
 mod condition_schema;
 mod container_read;
 mod contract;
@@ -129,6 +127,7 @@ mod contract_stats_mining;
 mod contract_store_slugs;
 mod contract_template;
 mod contract_template_read;
+mod cost_resources;
 mod crafter;
 mod crafter_attach;
 mod crafter_fields;
@@ -334,13 +333,17 @@ mod variant_groups;
 mod variants;
 
 pub(crate) use catalog_v3::{
-    catalog_definitions, catalog_origins, catalog_projection, catalog_text_contract,
-    resource_density_read, resource_density_source, resource_float, resource_group,
-    resource_group_read, resource_integer, resource_memberships, resource_number,
+    catalog_definitions, catalog_origins, catalog_projection, catalog_projections, catalog_table,
+    catalog_text_contract, commodity, commodity_authoring_contract, commodity_authoring_inputs,
+    commodity_authoring_read, commodity_backfill, commodity_backfill_input, commodity_binding_read,
+    commodity_composition_read, commodity_contract, commodity_inputs, commodity_presentation,
+    commodity_resource, commodity_resource_presentation, commodity_source, commodity_text_choice,
+    commodity_text_input, resource_density_read, resource_density_source, resource_float,
+    resource_group, resource_group_read, resource_integer, resource_memberships, resource_number,
     resource_property_contract, resource_property_read, resource_quality_curve,
     resource_quality_read, resource_quality_source, resource_quantization_read,
     resource_raw_policy, resource_read, resource_reference, resource_type_contract,
-    resource_value_read,
+    resource_value_read, source_header,
 };
 
 pub use action_map::{

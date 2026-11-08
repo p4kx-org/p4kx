@@ -76,10 +76,12 @@ fn catalog<'a>(
     family: Family,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<Index<'a>> {
-    let rows = catalog.get(family.group()).and_then(Value::as_array);
+    let rows = catalog
+        .pointer(family.rows_pointer())
+        .and_then(Value::as_array);
     joins::index(
         rows.into_iter().flatten(),
-        &Path::fields(&["guid"]),
+        &Path::fields(family.identity_fields()),
         if family == Family::Placements {
             Multiplicity::Many
         } else {
@@ -243,7 +245,7 @@ pub(crate) fn verify(
         error::check(cancelled)?;
         let left = reference(dataset, field.family, cancelled)?;
         let right = catalog(catalog_value, field.family, cancelled)?;
-        if counted.insert(field.family.group()) {
+        if counted.insert(field.family) {
             observed_guids.extend(joins::union(&left, &right));
             membership(&mut report, &left, &right, &selected, &excluded);
         }

@@ -147,11 +147,11 @@ fn every_type_guid_and_category_guid_resolves_to_an_entry() -> TestResult {
     };
     let groups = guids("resourceGroups");
     let categories = guids("blueprintCategories");
-    let types: Vec<&str> = catalog["commodities"]
+    let types: Vec<&str> = catalog["projections"]["commodityPresentation"]["rows"]
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|entry| entry["typeGuid"].as_str())
+        .filter_map(|entry| entry["typeGuid"]["value"].as_str())
         .collect();
     assert!(!types.is_empty(), "the fixture has typed commodities");
     for guid in types {

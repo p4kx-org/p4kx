@@ -196,19 +196,32 @@ fn a_filter_selects_by_record_path_but_the_links_stay_complete() -> TestResult {
     Ok(())
 }
 
-fn commodity_subtypes(catalog: &Value) -> Vec<&str> {
-    catalog["commodities"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|entry| entry["subtypeGuid"].as_str())
-        .collect()
+fn commodity_subtypes(catalog: &Value) -> Result<Vec<&str>, Box<dyn Error>> {
+    let rows = catalog
+        .pointer("/projections/commodityPresentation/rows")
+        .and_then(Value::as_array)
+        .ok_or("canonical Commodity presentations")?;
+    let mut subtypes = Vec::new();
+    for row in rows {
+        let carrier = row.get("subtypeGuid").ok_or("canonical subtype carrier")?;
+        if carrier.get("state").and_then(Value::as_str) != Some("present") {
+            return Err("derived subtype must be present even when its payload is null".into());
+        }
+        match carrier
+            .get("value")
+            .ok_or("explicit nullable subtype payload")?
+        {
+            Value::Null => {}
+            Value::String(guid) => subtypes.push(guid.as_str()),
+            _ => return Err("subtype payload must be a GUID string or explicit null".into()),
+        }
+    }
+    Ok(subtypes)
 }
-
 #[test]
 fn every_resource_type_a_quantization_links_to_resolves_to_a_commodity() -> TestResult {
     let (_, catalog) = build(None)?;
-    let subtypes = commodity_subtypes(&catalog);
+    let subtypes = commodity_subtypes(&catalog)?;
     for entry in entries(&catalog) {
         for linked in entry["resourceTypeGuids"].as_array().into_iter().flatten() {
             let linked = linked.as_str().ok_or("a GUID")?;
@@ -235,7 +248,7 @@ fn every_resource_type_a_quantization_links_to_resolves_to_a_commodity() -> Test
 fn a_filter_lists_a_backfilled_commodity_only_when_its_record_path_matches() -> TestResult {
     let filter = Filter::new("*/quantization_gold");
     let (_, catalog) = build(Some(&filter))?;
-    assert_eq!(commodity_subtypes(&catalog), [] as [&str; 0]);
+    assert_eq!(commodity_subtypes(&catalog)?, [] as [&str; 0]);
     Ok(())
 }
 
@@ -245,7 +258,7 @@ fn a_filter_matching_both_paths_lists_the_quantizations_and_their_backfilled_com
     let filter = Filter::new("libs/foundry/records/*");
     let (_, catalog) = build(Some(&filter))?;
     assert_eq!(class_names(&catalog).len(), 4);
-    let mut found = commodity_subtypes(&catalog);
+    let mut found = commodity_subtypes(&catalog)?;
     found.sort_unstable();
     let mut expected = [ORE_GOLD, SHARED_GOLD, TWO_PROPERTIES, ORE_IRON].map(guid);
     expected.sort_unstable();

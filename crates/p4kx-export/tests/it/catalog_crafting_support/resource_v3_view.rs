@@ -24,8 +24,11 @@ pub(super) fn project(mut catalog: Value) -> ViewResult<Value> {
         .map(|row| resource(row, texts))
         .collect::<ViewResult<Vec<_>>>()?;
     let object = catalog.as_object_mut().ok_or("catalog is not an object")?;
-    object.remove("definitions");
-    object.remove("texts");
+    object
+        .get_mut("definitions")
+        .and_then(Value::as_object_mut)
+        .ok_or("catalog definitions are not an object")?
+        .remove("resourceTypes");
     object.remove("provenance");
     object.insert("resourceTypes".to_owned(), Value::Array(rows));
     Ok(catalog)
@@ -263,7 +266,9 @@ mod tests {
             "translations": sourced(&json!({"en": sourced(&json!(translation))}))})
         };
         let actual = json!({"schemaVersion": 3,
-            "definitions": {"resourceTypes": {"availability": "available", "rows": [row]}},
+            "definitions": {"resourceTypes": {"availability": "available", "rows": [row]},
+                "commodities": {"availability": "available", "rows": [{"guid": sourced(&json!("commodity"))}]}},
+            "projections": {"commodityPresentation": {"availability": "available", "rows": [{"commodityGuid": sourced(&json!("commodity"))}]}},
             "texts": {"publicNames": [text("name:4:@key", "Public")], "gameTexts": [text("text:4:@key", "Protected")]},
             "provenance": {"sources": [], "uses": []}});
         let comparison = project(actual.clone())?;
@@ -279,6 +284,13 @@ mod tests {
             comparison.get("provenance").is_none(),
             "the semantic view excludes physical evidence"
         );
+        assert_eq!(
+            comparison["definitions"]["commodities"],
+            actual["definitions"]["commodities"]
+        );
+        assert_eq!(comparison["projections"], actual["projections"]);
+        assert_eq!(comparison["texts"], actual["texts"]);
+        assert!(comparison.pointer("/definitions/resourceTypes").is_none());
         assert!(
             actual.get("resourceTypes").is_none(),
             "the actual product artifact keeps only the canonical table"

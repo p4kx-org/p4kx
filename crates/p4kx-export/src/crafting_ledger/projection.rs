@@ -4,6 +4,7 @@
 use p4kx_extraction::{Guid, RecordTree};
 
 use crate::CatalogFailure;
+use crate::commodity_backfill_input::CommodityInputCapture;
 use crate::crafting_quantization::{self, Malformed};
 use crate::crafting_records;
 use crate::crafting_tier::TooDeep;
@@ -88,8 +89,12 @@ pub(super) fn project<'f>(
     role: ExportSourceRole,
     ledger: &mut ExportLedger,
 ) -> Result<Option<Piece<'f>>, ProjectionError> {
+    let mut capture = CommodityInputCapture::new(tree.record_index());
     let piece = match action {
-        Action::Blueprint => Some(Piece::Blueprint(crafting_records::blueprint(tree)?)),
+        Action::Blueprint => Some(Piece::Blueprint(crafting_records::blueprint(
+            tree,
+            &mut capture,
+        )?)),
         Action::Property => Some(Piece::Property(crafting_records::property(tree))),
         Action::Distribution => {
             let read = crafting_records::distribution(tree)?;
@@ -109,12 +114,15 @@ pub(super) fn project<'f>(
         Action::Dismantle => crafting_records::dismantle(tree).map(Piece::Dismantle),
         Action::Globals => Some(Piece::Globals(crafting_records::globals(tree))),
         Action::ResourceLinks => {
-            let quantizations = crafting_quantization::linked_quantizations(tree);
+            let quantizations = crafting_quantization::linked_quantizations(tree, &mut capture);
             (!quantizations.is_empty()).then(|| Piece::ResourceLinks {
                 resource_type: tree.guid(),
                 quantizations,
             })
         }
     };
+    let captured = capture.finish();
+    ledger.commodity_backfill_inputs.extend(captured.inputs);
+    ledger.commodity_input_limits.extend(captured.limits);
     Ok(piece)
 }

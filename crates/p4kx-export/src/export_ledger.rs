@@ -4,6 +4,7 @@
 use p4kx_extraction::{Guid, Record};
 
 use crate::catalog_row::{CatalogRows, ExcludedCatalogRow};
+use crate::commodity_backfill_input::{CommodityBackfillInput, CommodityInputLimit};
 use crate::export_diagnostic::{ExportDiagnostic, ExportDiagnosticCode, ExportSourceRole};
 use crate::export_field_inspection::FieldInspection;
 use crate::selection::Kind;
@@ -145,6 +146,8 @@ pub(crate) struct ExportLedger {
     pub(crate) derived_failures: Vec<DerivedFailure>,
     pub(crate) field_diagnostics: Vec<ExportDiagnostic>,
     pub(crate) field_inspections: Vec<FieldInspection>,
+    pub(crate) commodity_backfill_inputs: Vec<CommodityBackfillInput>,
+    pub(crate) commodity_input_limits: Vec<CommodityInputLimit>,
     pub(crate) skipped_rows: Vec<(Kind, usize)>,
     pub(crate) catalog_rows: Option<CatalogRows>,
     pub(crate) conflicting_catalog_rows: bool,
@@ -227,6 +230,10 @@ impl ExportLedger {
         self.derived_failures.extend(other.derived_failures);
         self.field_diagnostics.extend(other.field_diagnostics);
         self.field_inspections.extend(other.field_inspections);
+        self.commodity_backfill_inputs
+            .extend(other.commodity_backfill_inputs);
+        self.commodity_input_limits
+            .extend(other.commodity_input_limits);
         self.skipped_rows.extend(other.skipped_rows);
         self.excluded_catalog_rows
             .extend(other.excluded_catalog_rows);

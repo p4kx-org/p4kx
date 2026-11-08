@@ -1,9 +1,9 @@
 # Resource catalog contract
 
-The catalog uses schema version 3. This implemented step moves the ResourceType family to
+The catalog uses schema version 3. The ResourceType family is published at
 `definitions.resourceTypes.rows`, with immediate source origin on every source-backed field and
-nested list element. Its localized names and descriptions use canonical text tables. Other catalog
-families still have their existing shapes; the complete canonical migration and origin coverage of
+nested list element. Its localized names and descriptions use canonical text tables. Commodities
+also use canonical definitions and presentation as described below. Other catalog families still have their existing shapes; the complete canonical migration and origin coverage of
 the 45 tool-output carrier families remain open work under [#1125](https://github.com/p4kx-org/p4kx/issues/1125).
 [ADR-0356](adr/0356-catalog-v3-uses-canonical-source-typed-tables.md) defines the full target;
 [ADR-0357](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md) defines source origin.
@@ -11,10 +11,10 @@ Those targets do not imply that every family is already migrated.
 
 ## Commodity identity and resource joins
 
-`commodities[].guid` identifies a commodity Record. `subtypeGuid` is a nullable, non-unique
+`definitions.commodities.rows[].guid.value` identifies a commodity Record. `subtypeGuid` is a nullable, non-unique
 ResourceType GUID. Several commodity Records can share it, and a ResourceType can have no commodity.
 Join ingredient `resourceGuid` values to `definitions.resourceTypes.rows[].guid.value` for resource
-facts and to every matching `commodities[].subtypeGuid` for commodity alternatives. Read the field's
+facts and to every matching `projections.commodityPresentation.rows[].subtypeGuid.value` for commodity alternatives. Read the field's
 state before using its value. There is no additional root `resourceTypes` view in the v3 output.
 
 The commodity ResourceType is the first non-null `entry` in the first ResourceContainer's ordered
@@ -27,7 +27,8 @@ The existing ResourceType-backed commodity fallback remains limited to otherwise
 resources used by blueprint costs or kept quality quantizations. It uses the resource GUID for
 both `guid` and `subtypeGuid`. This does not limit independent ResourceType selection.
 `densityGramsPerCubicCentimetre` retains its existing finite g/cm³ meaning; other units are not
-converted into it. Its legacy nullable shape has not acquired the ResourceType field carrier.
+converted into it. The derived nullable value now uses its own direct field carrier in `projections.commodityPresentation`.
+The [Commodity contract](catalog-commodity-types.md) documents the separate authored definitions, exact old-value reconstruction and precise selection origins.
 
 ## ResourceTypes
 

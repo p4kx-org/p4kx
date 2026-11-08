@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use serde_json::json;
+use p4kx_extraction::{SourceUses, SourceValue};
+use serde_json::{Value, json};
 
 use super::compare::Class;
 use super::fixtures::{self, GUID, PublishedFixture};
+use super::path::Path;
 use super::published_model::Family;
 
 #[test]
@@ -140,11 +142,15 @@ fn selected_guids_from_two_families_are_reconciled_in_their_own_source_sets() ->
     fixture.snapshot.selection = vec![GUID.to_owned(), fixtures::OTHER.to_owned()];
     let mut field = fixtures::field();
     field.family = Family::Commodities;
+    field.catalog = Path::fields(&["recordIndex", "value"]);
     fixture.snapshot.fields.push(field);
     fixture.save()?;
     let catalog = json!({
         "items": [fixtures::item(GUID, json!(1))],
-        "commodities": [fixtures::item(fixtures::OTHER, json!(2))]
+        "definitions": {"commodities": {"availability": "available", "rows": [{
+            "guid": sourced(json!(fixtures::OTHER)), "recordIndex": sourced(json!(2))
+        }]}},
+        "commodities": [fixtures::item(fixtures::OTHER, json!(9))]
     });
     let report = super::published::verify(
         &fixture.load()?,
@@ -170,5 +176,133 @@ fn selected_guids_from_two_families_are_reconciled_in_their_own_source_sets() ->
         report.succeeds(),
         "independent selected kinds do not create false missing-source failures"
     );
+    Ok(())
+}
+
+fn sourced(value: Value) -> Value {
+    json!(SourceUses::new().value(SourceValue::Present(value), &[], false))
+}
+
+#[test]
+fn canonical_commodity_presentation_uses_its_sourced_identity_and_explicit_field_path()
+-> super::Result<()> {
+    let mut fixture = PublishedFixture::new(vec![fixtures::row(GUID, json!(2))])?;
+    fixture
+        .snapshot
+        .files
+        .first_mut()
+        .ok_or("file mapping absent")?
+        .family = Family::CommodityPresentation;
+    let field = fixture
+        .snapshot
+        .fields
+        .first_mut()
+        .ok_or("field mapping absent")?;
+    field.family = Family::CommodityPresentation;
+    field.catalog = Path::fields(&["densityGramsPerCubicCentimetre", "value"]);
+    fixture.save()?;
+    let mut catalog = json!({
+        "projections": {"commodityPresentation": {"availability": "available", "rows": [{
+            "commodityGuid": sourced(json!(GUID)),
+            "densityGramsPerCubicCentimetre": sourced(json!(2))
+        }]}},
+        "commodities": [fixtures::item(GUID, json!(9))]
+    });
+    let verify = |catalog: &Value| {
+        super::published::verify(
+            &fixture.load()?,
+            catalog,
+            &fixtures::build(),
+            &[fixtures::PUBLICATION],
+            &|| false,
+        )
+    };
+    let report = verify(&catalog)?;
+    assert_eq!(report.matched_guids, 1);
+    assert!(
+        report.succeeds(),
+        "only the canonical presentation owns this comparison"
+    );
+    catalog["projections"]["commodityPresentation"]["rows"][0]["densityGramsPerCubicCentimetre"]
+        ["value"] = json!(3);
+    let report = verify(&catalog)?;
+    assert_eq!(
+        report
+            .fields
+            .values()
+            .map(|summary| summary.count(Class::Different))
+            .sum::<u64>(),
+        1
+    );
+    assert!(
+        !report.succeeds(),
+        "a legacy root row cannot mask a changed canonical value"
+    );
+    catalog["projections"]["commodityPresentation"]["rows"][0]["commodityGuid"]["value"] =
+        json!(fixtures::OTHER);
+    assert!(
+        !verify(&catalog)?.succeeds(),
+        "an unrelated canonical identity cannot satisfy the source GUID"
+    );
+    Ok(())
+}
+
+#[test]
+fn commodity_definition_and_presentation_reconcile_independent_sources_in_one_audit_scope()
+-> super::Result<()> {
+    let mut fixture = PublishedFixture::new(vec![fixtures::row(GUID, json!(1))])?;
+    fixture
+        .snapshot
+        .files
+        .first_mut()
+        .ok_or("file mapping absent")?
+        .family = Family::Commodities;
+    let definition = fixture
+        .snapshot
+        .fields
+        .first_mut()
+        .ok_or("field mapping absent")?;
+    definition.family = Family::Commodities;
+    definition.catalog = Path::fields(&["recordIndex", "value"]);
+    fixture.add_file(
+        "presentation.json",
+        Family::CommodityPresentation,
+        vec![fixtures::row(fixtures::OTHER, json!(2))],
+    )?;
+    let mut presentation = fixtures::field();
+    presentation.family = Family::CommodityPresentation;
+    presentation.catalog = Path::fields(&["densityGramsPerCubicCentimetre", "value"]);
+    fixture.snapshot.fields.push(presentation);
+    fixture.snapshot.selection = vec![GUID.to_owned(), fixtures::OTHER.to_owned()];
+    fixture.save()?;
+    let catalog = json!({
+        "definitions": {"commodities": {"availability": "available", "rows": [{
+            "guid": sourced(json!(GUID)), "recordIndex": sourced(json!(1))
+        }]}},
+        "projections": {"commodityPresentation": {"availability": "available", "rows": [{
+            "commodityGuid": sourced(json!(fixtures::OTHER)),
+            "densityGramsPerCubicCentimetre": sourced(json!(2))
+        }]}}
+    });
+    let report = super::published::verify(
+        &fixture.load()?,
+        &catalog,
+        &fixtures::build(),
+        &[fixtures::PUBLICATION],
+        &|| false,
+    )?;
+    assert_eq!(
+        Family::Commodities.group(),
+        Family::CommodityPresentation.group()
+    );
+    assert_eq!(
+        report.matched_guids, 2,
+        "both source datasets contribute their own membership"
+    );
+    assert_eq!(
+        report.missing_both_guids, 0,
+        "a shared audit scope cannot hide the second dataset"
+    );
+    assert!(report.succeeds());
     Ok(())
 }

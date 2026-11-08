@@ -9,6 +9,7 @@ use p4kx_export::{CatalogError, Filter};
 use serde_json::{Value, json};
 
 use crate::catalog_crafting_support;
+use crate::catalog_crafting_support::commodity::{self, TextDomain};
 use crate::resource_edges_fixture as fixture;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -28,9 +29,12 @@ fn row<'catalog>(
 #[test]
 fn a_dangling_first_resource_is_not_promoted_to_a_later_valid_resource() -> TestResult {
     let (_, catalog) = catalog_crafting_support::build_from(&fixture::dangling_first(), None)?;
-    let commodity = row(&catalog, "commodities", fixture::COMMODITY)?;
+    let commodity = commodity::presentation(
+        &catalog,
+        &catalog_crafting_support::text(fixture::COMMODITY),
+    )?;
     assert_eq!(
-        commodity["subtypeGuid"],
+        commodity["subtypeGuid"]["value"],
         catalog_crafting_support::text(fixture::MISSING)
     );
     assert_eq!(catalog["exportHealth"]["status"], "complete");
@@ -41,7 +45,10 @@ fn a_dangling_first_resource_is_not_promoted_to_a_later_valid_resource() -> Test
 fn a_null_composition_link_still_allows_the_first_non_null_resource() -> TestResult {
     let (_, catalog) = catalog_crafting_support::build_from(&fixture::null_first(), None)?;
     assert_eq!(
-        row(&catalog, "commodities", fixture::COMMODITY)?["subtypeGuid"],
+        commodity::presentation(
+            &catalog,
+            &catalog_crafting_support::text(fixture::COMMODITY)
+        )?["subtypeGuid"]["value"],
         catalog_crafting_support::text(fixture::RESOURCE)
     );
     Ok(())
@@ -54,10 +61,17 @@ fn a_weak_record_link_keeps_its_actual_second_alias_target() -> TestResult {
         &fixture::aliases(fixture::LinkStorage::WeakRecordPointer),
         Some(&filter),
     )?;
-    assert_eq!(
-        row(&catalog, "commodities", fixture::COMMODITY)?["name"]["key"],
-        "@fixture_emitted"
-    );
+    commodity::assert_text(
+        &catalog,
+        &commodity::presentation(
+            &catalog,
+            &catalog_crafting_support::text(fixture::COMMODITY),
+        )?["name"],
+        TextDomain::PublicName,
+        Some("@fixture_emitted"),
+        None,
+        None,
+    )?;
     assert_eq!(
         row(&catalog, "resourceTypes", fixture::RESOURCE)?["name"]["key"],
         "@fixture_emitted"
@@ -87,10 +101,17 @@ fn another_emitted_guid_alias_cannot_stand_in_for_the_actual_filtered_target() -
             .any(|reference| reference["status"] == "ambiguousIdentity"
                 && reference["targetRecordIndex"] == 0)
     );
-    assert_eq!(
-        row(&catalog, "commodities", fixture::COMMODITY)?["name"]["key"],
-        "@fixture_original"
-    );
+    commodity::assert_text(
+        &catalog,
+        &commodity::presentation(
+            &catalog,
+            &catalog_crafting_support::text(fixture::COMMODITY),
+        )?["name"],
+        TextDomain::PublicName,
+        Some("@fixture_original"),
+        None,
+        None,
+    )?;
     Ok(())
 }
 
@@ -101,7 +122,10 @@ fn unselected_earlier_groups_cannot_own_selected_legacy_or_all_membership_links(
         catalog_crafting_support::build_from(&fixture::group_filter(), Some(&filter))?;
     let selected = catalog_crafting_support::text(fixture::SECOND_GROUP);
     assert_eq!(
-        row(&catalog, "commodities", fixture::COMMODITY)?["typeGuid"],
+        commodity::presentation(
+            &catalog,
+            &catalog_crafting_support::text(fixture::COMMODITY)
+        )?["typeGuid"]["value"],
         selected
     );
     assert_eq!(
@@ -120,7 +144,10 @@ fn a_failed_resource_dependency_retains_the_readable_commodity_and_exact_failure
     let (_, catalog) =
         catalog_crafting_support::diagnostic_from(&fixture::unreadable_resource(), None)?;
     assert_eq!(
-        row(&catalog, "commodities", fixture::COMMODITY)?["subtypeGuid"],
+        commodity::presentation(
+            &catalog,
+            &catalog_crafting_support::text(fixture::COMMODITY)
+        )?["subtypeGuid"]["value"],
         catalog_crafting_support::text(fixture::RESOURCE)
     );
     assert_eq!(catalog["resourceTypes"], json!([]));

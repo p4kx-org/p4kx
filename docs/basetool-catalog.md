@@ -187,7 +187,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `manufacturers` | The manufacturers, ordered by GUID |
 | `items` | The items, ordered by GUID |
 | `ships` | The ships and ground vehicles, ordered by GUID |
-| `commodities` | The commodities, ordered by GUID |
+| `definitions.commodities`, `projections.commodityPresentation` | Commodity source identities/authored bindings and explicit derived choices, paired in existing GUID order; see [Commodity contract](catalog-commodity-types.md) |
 | `definitions.resourceTypes` | Closed source-family `availability` and canonical `rows`, independently selected and ordered by GUID; every source-backed field uses the typed value carrier ([contract](catalog-resource-types.md)) |
 | `texts.publicNames`, `texts.gameTexts` | Canonical ResourceType name and protected-description rows, each with sourced `id`, `key` and per-language `translations` |
 | `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the ResourceType carriers |
@@ -244,10 +244,11 @@ so an import can use absence as removal evidence within that kind's selection po
 kind lists only what the Filter selected. Incomplete health, including global blocking diagnostics,
 cannot establish removal even when a kind's Filter scope is complete.
 
-### Per-value source origin for ResourceTypes
+### Per-value source origin for canonical definitions
 
-`definitions.resourceTypes.rows` replaces the root `resourceTypes` array; there is no duplicate
-legacy view. Its source-backed members and nested authored list elements carry five required keys:
+`definitions.resourceTypes.rows` replaces the root `resourceTypes` array. Commodity facts and choices
+use `definitions.commodities.rows` and `projections.commodityPresentation.rows`; the old root
+`commodities` view is removed. See [Commodity mapping](catalog-commodity-types.md). There is no duplicate legacy view. Its source-backed members and nested authored list elements carry five required keys:
 
 | Key | Meaning |
 | --- | --- |
@@ -746,48 +747,22 @@ to the same class (Mole editions, Carrack w/C8X) hides a base entry that is not.
 when a name-table class is no catalog ship and when a catalog ship or store slug entry cannot be
 read.
 
-A commodity is an `EntityClassDefinition` under `entities/commodities` or a `ResourceType` Record that
-a cost of any tier or a kept quality quantization uses and no commodity Record carries (see below). A commodity Record takes its fields
-from the entity:
+Commodity identity and authored facts are in `definitions.commodities.rows`; explicitly derived
+choices are in `projections.commodityPresentation.rows`. The root `commodities` array is removed.
+Both tables keep the existing Commodity selection, GUID identity, resource-only fallback and
+canonical ordering. Every source-backed value, including identity, text references, links and
+nested authored members, has its own immediate origin carrier.
 
-| Field | Source |
-|-------|--------|
-| `name` | `SCItemPurchasableParams.displayName` |
-| `description` | `EntityUIDisplayParams.displayDescription` in `StaticEntityClassData` |
-| `typeGuid` | The first selected, readable, non-leftover `ResourceTypeGroup` in source Record order that directly lists this ResourceType; `null` without one. All direct memberships are in `definitions.resourceTypes.rows[].groupGuids.value` |
-| `subtypeGuid` | The ResourceType GUID of the first non-null `entry` of the first `ResourceContainer.defaultComposition`; nullable and non-unique. A configured dangling first GUID is retained rather than replaced by a later link |
-| `displayType` | A text: `SCItemPurchasableParams.displayType`, e.g. `@items_commodities_type_metal` |
-| `densityGramsPerCubicCentimetre` | The number `densityType.densityUnit.gramsPerCubicCentimeter` of the `ResourceType` holds (a fact, no game text); `null` without a `ResourceType`, a density or a density in another unit |
-| `refinedSubtypeGuid` | The GUID `refinedVersion` of the `ResourceType` links to; `null` without a `ResourceType` or a `refinedVersion`. It equals the `subtypeGuid` of the refined commodity only when the catalog has that commodity |
+`guid.value` in the definition remains the unique Commodity key. Nullable, non-unique
+`subtypeGuid.value` in the presentation is a ResourceType relationship. A `resourceGuid` join can
+return zero, one or several Commodity alternatives; never use `subtypeGuid` as a primary key.
+Independent resource facts join `definitions.resourceTypes.rows[].guid.value`.
 
-The refining fields are described in [commodity-refining.md](commodity-refining.md), with what the
-DataForge does not hold (instability per commodity, yields, counting in SCU or units). The refined
-`ResourceType` may have no commodity of its own; then `refinedSubtypeGuid` matches no `subtypeGuid`.
-
-A name or description that is missing or a placeholder key is taken from the `ResourceType` Record
-`subtypeGuid` links to (`displayName`, `description`) instead. The game holds no field named type
-or subtype for a commodity; the groups of `ResourceType` Records are the types, the `ResourceType`
-is the subtype.
-
-A `ResourceType` Record that the costs of a blueprint use in any tier (LIVE has one tier per
-blueprint: Aslarite, Ouratite, Iron, Stileron, Lindinium, Riccite, Tin, Torite, Savrilium and
-Pressurized Ice), selections opened, or that a kept quality quantization links to
-(`resourceTypeGuids`), and that no commodity Record carries is listed as a commodity as well, so
-that every resource of a cost and every `resourceTypeGuids` entry points at a catalog entry. A
-development leftover `ResourceType` never links to a quantization, so none is backfilled for one.
-These entries fall under the game-text policy above like every commodity: `name` is a short name,
-`description` is a game text (`x-gameText`). Its `guid` is the GUID of the `ResourceType`, `className`, `recordPath`, `name`
-and `description` are those of the `ResourceType`, `typeGuid` is its group, `subtypeGuid` is its own
-GUID and `displayType` has no key. With a `--filter`, such an entry is listed only when its record
-path matches.
-
-`commodities[].guid` is the commodity identity. Several commodities can share one nullable
-`subtypeGuid`; a ResourceType can also have no commodity. Join an ingredient's `resourceGuid` to
-`definitions.resourceTypes.rows[].guid.value` for resource facts and to every matching `commodities[].subtypeGuid` for
-commodity alternatives. Never index commodities uniquely by `subtypeGuid`. The independent
-[`ResourceType` contract](catalog-resource-types.md) retains every selected resource even when
-the existing commodity fallback does not apply.
-
+The [Commodity contract](catalog-commodity-types.md) defines the authored bindings, canonical
+text domains, exact first-resource/first-group/name/density/refinement recipes and reconstruction
+of old nullable values. Its selection-origin diagnostics are separate from payload/catalog health.
+The [source verification guide](resource-source-verification.md) records the unavailable historical
+Build baseline and the independently deferred real-Archive acceptance.
 A blueprint (`CraftingBlueprintRecord`) takes its fields from `blueprint`:
 
 | Field | Source |
@@ -1601,8 +1576,8 @@ and ADR-0345. Template and broker property fields keep their existing meanings.
 
 ### Contract templates
 
-`contractTemplates` lists the `ContractTemplate` Records (#812, ADR-0313, additive, schema version
-2, no bump), ordered by GUID. `contracts[].templateGuid` is the `guid` of an entry; every one
+`contractTemplates` lists the `ContractTemplate` Records (#812, ADR-0313) in Catalog schema 3,
+ordered by GUID. `contracts[].templateGuid` is the `guid` of an entry; every one
 resolves. A template is the structure a contract lays the overrides of its handler, itself and its
 sub contract over. The Records are selected by the struct, in any folder: on LIVE (2026-10-31)
 496 Records, 488 of them under `contracts/contracttemplates`, 335 named by a contract, none left
@@ -1731,8 +1706,8 @@ failure, so consumers preserve the affected stored data rather than infer remova
 
 ### Mission broker entries
 
-`missionBrokerEntries` lists the `MissionBrokerEntry` Records (#813, ADR-0320, additive, schema
-version 2, no bump), ordered by GUID: the offers of the mission board. `contracts[].brokerEntryGuid`
+`missionBrokerEntries` lists the `MissionBrokerEntry` Records (#813, ADR-0320) in Catalog schema 3,
+ordered by GUID: the offers of the mission board. `contracts[].brokerEntryGuid`
 is the `guid` of an entry. The Records are selected by the struct, in any folder (on LIVE
 2026-10-31 all 2,584 lie under `missionbroker`); the 156 whose path or name holds a word of the
 usual leftover rule are left out, so 2,428 entries remain, 419 of them named by a contract, every
@@ -1854,8 +1829,8 @@ Records) have no commodity in the catalog, and 2 spawn rules, both of one manife
 
 ### Starmap objects
 
-A starmap object (`starmapObjects`) is a `StarMapObject` Record under `starmap/pu` (ADR-0054: a
-new kind, so `schemaVersion` stays 1). The kind is facts only: no description, no lore, no media.
+A starmap object (`starmapObjects`) is a `StarMapObject` Record under `starmap/pu` in Catalog
+schema 3 (ADR-0054). The kind is facts only: no description, no lore, no media.
 The `name` is a game text, the localisation key with its English and German text, and carries
 `"x-gameText": true` like a description; the Basetool keeps it from third parties.
 
@@ -2255,7 +2230,7 @@ by folder, so a crafter fitted to a ship or vehicle or part of a building is fou
 
 A shop (`shops`) is one `ShopBackup` entry of the shop registry `Data\Libs\CosmoTools\
 LayerRecovery\LayerBackups.xml` (a CryXml file), one placement of an `SCShop` Entity in the world
-(ADR-0069; a new kind, so `schemaVersion` stays 1). The kind is facts only: identifiers, internal
+(Catalog schema 3, ADR-0069). The kind is facts only: identifiers, internal
 names and places. It carries no price, no stock and no description; the item GUIDs of a shop come only from an
 inventory file that its containers name (below). The names in it
 are names of containers and entities, not localisation keys, so no field is a game text.
@@ -2585,7 +2560,7 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `manufacturers` | `libs/foundry/records/scitemmanufacturer/` | `SCItemManufacturer` |
 | `items` | `libs/foundry/records/entities/scitem/`, `libs/foundry/records/entities/legacyitems/` | `EntityClassDefinition` |
 | `ships` | `libs/foundry/records/entities/spaceships/`, `libs/foundry/records/entities/groundvehicles/` | `EntityClassDefinition` |
-| `commodities` | `libs/foundry/records/entities/commodities/` | `EntityClassDefinition` |
+| `definitions.commodities`, `projections.commodityPresentation` | Commodity source identities/authored bindings and explicit derived choices, paired in existing GUID order; see [Commodity contract](catalog-commodity-types.md) |
 | `blueprints` | `libs/foundry/records/crafting/blueprints/crafting/` | `CraftingBlueprintRecord` |
 | `resourceGroups` | `libs/foundry/records/resourcetypedatabase/` | `ResourceTypeGroup` |
 | `blueprintCategories` | `libs/foundry/records/crafting/blueprintcategories/` | `BlueprintCategoryRecord` |

@@ -151,6 +151,12 @@ Owning raw components are under `Raw/Entity/Components/<OwnerType>`. `Item/stdIt
 normalized, rounded, derived and sometimes curated values. Nested magazine/manufacturer/ammunition
 GUIDs are different identities.
 
+Catalog-v3 verification reads Commodity definitions from `definitions.commodities.rows`, using
+`guid.value` as the owner identity, and presentation recipes from
+`projections.commodityPresentation.rows`, using `commodityGuid.value`. Each family is required and
+validated independently even though both use the `commodities` audit group. A root-level
+`commodities` property cannot supply either family. Text references resolve through the canonical
+text tables; a missing translation remains distinct from an authored empty string.
 GUID multimaps preserve commodity Entity, shared ResourceType, MineableElement and placement
 relationships. A resource join declares both ResourceType selectors and retains every member.
 A single shared raw fact may compare against several members. Ambiguous many-to-many facts are

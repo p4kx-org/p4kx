@@ -144,22 +144,38 @@ impl<'f> Scan<'_, '_, 'f> {
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Picked<'f>, ScanError> {
-        let link = commodity_resource::first(tree)?;
-        let subtype = link.as_ref().map(|link| link.reference.guid);
-        let resource_type = link
+        let selected = commodity_resource::first(tree)?;
+        let resource_type = selected
+            .link
             .as_ref()
             .map(|link| self.resource_type(trees, tree, link, ledger))
             .transpose()?
             .flatten();
-        Ok(Picked::Commodity(crate::commodity::commodity(
+        let read = crate::commodity::commodity(
             tree,
-            self.texts,
+            self.projection,
             resource_type.as_ref(),
             &self.groups,
-            subtype,
-        )))
+            &selected,
+        )?;
+        crate::source_projection_notes::record(
+            Kind::Commodities,
+            ExportSourceRole::Selected,
+            tree,
+            read.notes,
+            ledger,
+        );
+        if let Some(resource) = &resource_type {
+            crate::source_projection_notes::record(
+                Kind::Commodities,
+                ExportSourceRole::Dependency,
+                resource,
+                read.resource_notes,
+                ledger,
+            );
+        }
+        Ok(Picked::Commodity(Box::new(read.value)))
     }
-
     fn resource_type(
         &self,
         trees: &mut TreeBuilder<'f>,

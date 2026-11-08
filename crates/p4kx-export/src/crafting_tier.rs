@@ -4,6 +4,7 @@
 use p4kx_extraction::{StructValue, is_placeholder_key};
 
 use crate::blueprint::{as_struct, craft_time, whole};
+use crate::commodity_backfill_input::CommodityInputCapture;
 use crate::crafting_types::{
     Cost, CostContext, ItemCost, ModifierKind, PropertyModifier, ResourceCost, Selection, Tier,
     ValueRange,
@@ -36,24 +37,61 @@ pub(crate) struct TooDeep;
 pub(crate) fn tiers<'f>(
     blueprint: Option<&StructValue<'f>>,
     unknown: &mut Vec<&'f str>,
+    capture: &mut CommodityInputCapture,
 ) -> Result<Vec<Tier<'f>>, TooDeep> {
     elements(blueprint, "tiers")
         .iter()
-        .filter_map(as_struct)
-        .map(|item| tier(item, unknown))
+        .enumerate()
+        .filter_map(|(index, value)| as_struct(value).map(|item| (index, item)))
+        .map(|(index, item)| tier(item, &format!("blueprint.tiers[{index}]"), unknown, capture))
         .collect()
 }
 
-fn tier<'f>(tier: &StructValue<'f>, unknown: &mut Vec<&'f str>) -> Result<Tier<'f>, TooDeep> {
+fn tier<'f>(
+    tier: &StructValue<'f>,
+    path: &str,
+    unknown: &mut Vec<&'f str>,
+    capture: &mut CommodityInputCapture,
+) -> Result<Tier<'f>, TooDeep> {
     let costs = structure(structure(Some(tier), "recipe"), "costs");
+    let base = format!("{path}.recipe.costs");
+    let mut selectors = vec![
+        "blueprint".to_owned(),
+        "blueprint.$type".to_owned(),
+        "blueprint.tiers".to_owned(),
+        format!("{path}.$type"),
+        format!("{path}.recipe"),
+        format!("{path}.recipe.$type"),
+        base.clone(),
+        format!("{base}.$type"),
+    ];
     let mandatory = match structure(costs, "mandatoryCost") {
-        Some(cost) => cost_of(cost, 0, unknown)?,
+        Some(cost) => cost_of(
+            cost,
+            &format!("{base}.mandatoryCost"),
+            0,
+            unknown,
+            capture,
+            &mut selectors,
+        )?,
         None => None,
     };
+    selectors.push(format!("{base}.optionalCosts"));
     let optional = elements(costs, "optionalCosts")
         .iter()
-        .filter_map(as_struct)
-        .filter_map(|cost| cost_of(cost, 0, unknown).transpose())
+        .enumerate()
+        .filter_map(|(index, value)| as_struct(value).map(|cost| (index, cost)))
+        .filter_map(|(index, cost)| {
+            cost_of(
+                cost,
+                &format!("{base}.optionalCosts[{index}]"),
+                0,
+                unknown,
+                capture,
+                &mut selectors,
+            )
+            .transpose()
+        })
         .collect::<Result<_, _>>()?;
     Ok(Tier {
         craft_time_seconds: craft_time(structure(costs, "craftTime")),
@@ -64,13 +102,33 @@ fn tier<'f>(tier: &StructValue<'f>, unknown: &mut Vec<&'f str>) -> Result<Tier<'
 
 fn cost_of<'f>(
     cost: &StructValue<'f>,
+    path: &str,
     depth: usize,
     unknown: &mut Vec<&'f str>,
+    capture: &mut CommodityInputCapture,
+    selectors: &mut Vec<String>,
 ) -> Result<Option<Cost<'f>>, TooDeep> {
     let kind = cost.type_name();
     if kind == SELECT && depth >= MAX_DEPTH {
         return Err(TooDeep);
     }
+    selectors.push(path.to_owned());
+    selectors.push(format!("{path}.$type"));
+    let result = cost_value(cost, path, depth, unknown, capture, selectors);
+    selectors.pop();
+    selectors.pop();
+    result
+}
+
+fn cost_value<'f>(
+    cost: &StructValue<'f>,
+    path: &str,
+    depth: usize,
+    unknown: &mut Vec<&'f str>,
+    capture: &mut CommodityInputCapture,
+    selectors: &mut Vec<String>,
+) -> Result<Option<Cost<'f>>, TooDeep> {
+    let kind = cost.type_name();
     let context = context(cost, unknown);
     Ok(match kind {
         SELECT => {
@@ -80,21 +138,21 @@ fn cost_of<'f>(
                 slot: text(info, "debugName"),
                 slot_key: locale_key(info, "displayName").filter(|key| !is_placeholder_key(key)),
                 context,
-                options: elements(Some(cost), "options")
-                    .iter()
-                    .filter_map(as_struct)
-                    .filter_map(|option| {
-                        cost_of(option, depth.saturating_add(1), unknown).transpose()
-                    })
-                    .collect::<Result<_, _>>()?,
+                options: selection_options(cost, path, depth, unknown, capture, selectors)?,
             }))
         }
-        RESOURCE => Some(Cost::Resource(ResourceCost {
-            resource: reference(Some(cost), "resource").map(|guid| guid.0),
-            quantity_scu: single(structure(Some(cost), "quantity"), "standardCargoUnits"),
-            min_quality: integer(Some(cost), "minQuality"),
-            context,
-        })),
+        RESOURCE => {
+            let resource = reference(Some(cost), "resource").map(|guid| guid.0);
+            if let Some(resource) = resource {
+                capture.observe(resource, None, &format!("{path}.resource"), selectors);
+            }
+            Some(Cost::Resource(ResourceCost {
+                resource,
+                quantity_scu: single(structure(Some(cost), "quantity"), "standardCargoUnits"),
+                min_quality: integer(Some(cost), "minQuality"),
+                context,
+            }))
+        }
         ITEM => Some(Cost::Item(ItemCost {
             item: reference(Some(cost), "entityClass").map(|guid| guid.0),
             quantity: integer(Some(cost), "quantity"),
@@ -105,6 +163,34 @@ fn cost_of<'f>(
     })
 }
 
+fn selection_options<'f>(
+    cost: &StructValue<'f>,
+    path: &str,
+    depth: usize,
+    unknown: &mut Vec<&'f str>,
+    capture: &mut CommodityInputCapture,
+    selectors: &mut Vec<String>,
+) -> Result<Vec<Cost<'f>>, TooDeep> {
+    selectors.push(format!("{path}.options"));
+    let options = elements(Some(cost), "options")
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| as_struct(value).map(|option| (index, option)))
+        .filter_map(|(index, option)| {
+            cost_of(
+                option,
+                &format!("{path}.options[{index}]"),
+                depth.saturating_add(1),
+                unknown,
+                capture,
+                selectors,
+            )
+            .transpose()
+        })
+        .collect();
+    selectors.pop();
+    options
+}
 fn context<'f>(cost: &StructValue<'f>, unknown: &mut Vec<&'f str>) -> CostContext<'f> {
     let mut context = CostContext::default();
     for part in elements(Some(cost), "context").iter().filter_map(as_struct) {

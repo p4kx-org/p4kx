@@ -9,45 +9,6 @@ use crate::contract_recipe::{BlueprintDismantle, BlueprintTier};
 use crate::definition_reference::DefinitionReference;
 use crate::guid_text::CatalogGuid;
 
-/// A commodity: an `EntityClassDefinition` Record under `entities/commodities` or a
-/// `ResourceType` Record that a blueprint cost or a quality quantization uses and no commodity
-/// Record carries.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct Commodity<'a> {
-    /// The unique row identity: the Entity GUID or the resource-only `ResourceType` GUID.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `Gold`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The name, from `SCItemPurchasableParams.displayName`.
-    pub(crate) name: LocalisedText<'a>,
-    /// The description, from the entity's display parameters or, without one, from the
-    /// `ResourceType` Record of the commodity.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) description: LocalisedText<'a>,
-    /// The GUID of the `ResourceTypeGroup` Record that directly lists the `ResourceType`, the
-    /// `guid` of a `resourceGroups` entry; `null` without a `ResourceType` or a group.
-    pub(crate) type_guid: Option<CatalogGuid>,
-    /// The nullable `ResourceType` link from the first non-null default-composition Reference.
-    /// Several commodities can share it; reverse joins return zero, one or many commodities.
-    pub(crate) subtype_guid: Option<CatalogGuid>,
-    /// The display type of the purchasable parameters, e.g. `@items_commodities_type_metal`;
-    /// without a key for a `ResourceType` entry.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) display_type: LocalisedText<'a>,
-    /// The density of the `ResourceType` in grams per cubic centimetre (game field
-    /// `gramsPerCubicCentimeter`), `null` without a `ResourceType`, a density or a density in
-    /// another unit.
-    pub(crate) density_grams_per_cubic_centimetre: Option<f32>,
-    /// The GUID of the `ResourceType` Record `refinedVersion` of the `ResourceType` links to; `null`
-    /// without a `ResourceType` or a `refinedVersion`. It equals the `subtypeGuid` of the refined
-    /// commodity only when the catalog has that commodity.
-    pub(crate) refined_subtype_guid: Option<CatalogGuid>,
-}
-
 /// A crafting blueprint: a `CraftingBlueprintRecord` Record under `crafting/blueprints/crafting`.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

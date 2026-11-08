@@ -19,7 +19,8 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use catalog_schema_support::minimal_catalog;
-use serde_json::json;
+use jsonschema::Validator;
+use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -53,7 +54,7 @@ fn the_checked_in_catalog_schema_is_current() -> TestResult {
 fn the_catalog_schema_is_draft_2020_12() {
     let schema = p4kx_export::catalog_schema();
     assert_eq!(
-        schema.get("$schema").and_then(serde_json::Value::as_str),
+        schema.get("$schema").and_then(Value::as_str),
         Some("https://json-schema.org/draft/2020-12/schema"),
         "draft 2020-12"
     );
@@ -134,7 +135,10 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
 
     let mut version_one = catalog.clone();
     version_one["schemaVersion"] = json!(1);
-    assert!(!validator.is_valid(&version_one), "only version 2");
+    assert!(
+        !validator.is_valid(&version_one),
+        "only the current schema version"
+    );
 
     let mut upper_case = catalog.clone();
     upper_case["manufacturers"][0]["guid"] = json!("CFC0122D-5275-415A-A656-3DCB3346FEB5");
@@ -144,7 +148,6 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         "manufacturers",
         "items",
         "ships",
-        "commodities",
         "blueprints",
         "resourceGroups",
         "blueprintCategories",
@@ -161,6 +164,8 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         unknown[kind][0]["extra"] = json!(true);
         assert!(validator.is_valid(&unknown), "unknown fields in {kind}");
     }
+
+    assert_unknown_commodity_fields(&validator, &catalog)?;
 
     let mut unknown_kind = catalog.clone();
     unknown_kind["starmap"] = json!([{"guid": "x"}]);
@@ -359,6 +364,23 @@ fn the_crafting_fields_accept_additions_and_new_closed_values_but_stay_required(
         validator.is_valid(&new_kind_value),
         "a new line or range kind is additive: the closed sets stay strings"
     );
+
+    Ok(())
+}
+
+fn assert_unknown_commodity_fields(validator: &Validator, catalog: &Value) -> TestResult {
+    for pointer in [
+        "/definitions/commodities/rows/0",
+        "/projections/commodityPresentation/rows/0",
+    ] {
+        let mut unknown = catalog.clone();
+        unknown
+            .pointer_mut(pointer)
+            .and_then(Value::as_object_mut)
+            .ok_or("the canonical Commodity row")?
+            .insert("extra".to_owned(), json!(true));
+        assert!(validator.is_valid(&unknown), "unknown fields in {pointer}");
+    }
 
     Ok(())
 }

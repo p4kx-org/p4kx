@@ -15,10 +15,12 @@ use crate::build_harvest::add_harvest_locations;
 use crate::build_loot::add_loot_containers;
 use crate::build_starmap::add_starmap;
 use crate::catalog_crafting::{CraftingKinds, kinds};
-use crate::catalog_definitions::{CatalogDefinitions, ResourceTable};
+use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_output::{Compression, emit};
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_projections::CatalogProjections;
+use crate::catalog_table::CatalogTable;
 use crate::collected::Collected;
 use crate::contract::{
     BuildSource, Catalog, Completeness, KindCompleteness, SCHEMA_VERSION, Source,
@@ -216,6 +218,17 @@ fn assemble<R>(
             .map(|ship| (ship.guid.0, ship.class_name)),
         options.filter.is_some(),
     );
+    let (commodity_definitions, commodity_presentation) =
+        crate::commodity::split(collected.commodities);
+    let commodities = CatalogTable::new(
+        &forge,
+        &["EntityClassDefinition", "ResourceType"],
+        commodity_definitions,
+    );
+    let commodity_presentation = CatalogTable {
+        availability: commodities.availability,
+        rows: commodity_presentation,
+    };
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
         source: source(
@@ -229,11 +242,14 @@ fn assemble<R>(
         manufacturers: collected.manufacturers,
         items: collected.items,
         ships: collected.ships,
-        commodities: collected.commodities,
         blueprints: collected.blueprints,
         resource_groups: collected.resource_groups,
         definitions: CatalogDefinitions {
-            resource_types: ResourceTable::new(&forge, collected.resource_types),
+            resource_types: CatalogTable::new(&forge, &["ResourceType"], collected.resource_types),
+            commodities,
+        },
+        projections: CatalogProjections {
+            commodity_presentation,
         },
         texts: projection.finish()?,
         provenance: origins.uses.freeze()?,

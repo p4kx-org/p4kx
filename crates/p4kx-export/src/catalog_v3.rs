@@ -47,3 +47,60 @@ pub(crate) mod resource_reference;
 pub(crate) mod resource_type_contract;
 #[path = "resource_value_read.rs"]
 pub(crate) mod resource_value_read;
+
+#[path = "catalog_projections.rs"]
+pub(crate) mod catalog_projections;
+
+#[path = "catalog_table.rs"]
+pub(crate) mod catalog_table;
+
+#[path = "commodity.rs"]
+pub(crate) mod commodity;
+
+#[path = "commodity_authoring_contract.rs"]
+pub(crate) mod commodity_authoring_contract;
+
+#[path = "commodity_authoring_inputs.rs"]
+pub(crate) mod commodity_authoring_inputs;
+
+#[path = "commodity_authoring_read.rs"]
+pub(crate) mod commodity_authoring_read;
+
+#[path = "commodity_backfill.rs"]
+pub(crate) mod commodity_backfill;
+
+#[path = "commodity_backfill_input.rs"]
+pub(crate) mod commodity_backfill_input;
+
+#[path = "commodity_binding_read.rs"]
+pub(crate) mod commodity_binding_read;
+
+#[path = "commodity_composition_read.rs"]
+pub(crate) mod commodity_composition_read;
+
+#[path = "commodity_contract.rs"]
+pub(crate) mod commodity_contract;
+
+#[path = "commodity_inputs.rs"]
+pub(crate) mod commodity_inputs;
+
+#[path = "commodity_presentation.rs"]
+pub(crate) mod commodity_presentation;
+
+#[path = "commodity_resource.rs"]
+pub(crate) mod commodity_resource;
+
+#[path = "commodity_resource_presentation.rs"]
+pub(crate) mod commodity_resource_presentation;
+
+#[path = "commodity_source.rs"]
+pub(crate) mod commodity_source;
+
+#[path = "commodity_text_choice.rs"]
+pub(crate) mod commodity_text_choice;
+
+#[path = "commodity_text_input.rs"]
+pub(crate) mod commodity_text_input;
+
+#[path = "source_header.rs"]
+pub(crate) mod source_header;

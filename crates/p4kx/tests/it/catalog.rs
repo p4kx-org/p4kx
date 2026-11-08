@@ -171,6 +171,25 @@ fn catalog_with_a_filter_marks_the_kind_partial_and_prints_json() -> TestResult 
         serde_json::json!({"status": "partial", "filter": "*/acas"}),
         "partial with the Filter"
     );
+    assert_eq!(
+        catalog.get("schemaVersion"),
+        Some(&serde_json::json!(3)),
+        "filtered output uses the current catalog version"
+    );
+    assert!(
+        catalog.get("commodities").is_none(),
+        "filtered output has no legacy commodity array"
+    );
+    for pointer in [
+        "/definitions/commodities/rows",
+        "/projections/commodityPresentation/rows",
+    ] {
+        assert_eq!(
+            catalog.pointer(pointer),
+            Some(&serde_json::json!([])),
+            "the manufacturer filter excludes commodity rows at {pointer}"
+        );
+    }
     insta::assert_snapshot!("catalog_filter_json", summary);
     Ok(())
 }

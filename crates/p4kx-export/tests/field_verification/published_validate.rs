@@ -61,7 +61,7 @@ fn selection(snapshot: &Snapshot) -> super::Result<()> {
 fn fields(fields: &[Field]) -> super::Result<()> {
     let mut identities = BTreeSet::new();
     for field in fields {
-        if !identities.insert((field.family.group(), &field.source)) {
+        if !identities.insert((field.family, &field.source)) {
             return Err(Error::new(Kind::Mapping, "duplicate comparison field mapping").into());
         }
         if field.source.owner.is_empty()

@@ -5,26 +5,33 @@ use std::collections::{BTreeSet, HashSet};
 
 use p4kx_extraction::{CancelToken, Guid, Record, TreeBuilder};
 
-use super::{RESOURCE_TYPE, Scan, resources_of};
-use crate::commodity::resource_commodity;
+use super::{RESOURCE_TYPE, Scan};
+use crate::catalog_crafting::CraftingKinds;
+use crate::commodity;
 use crate::contract::{Blueprint, QualityQuantization};
+use crate::cost_resources;
 use crate::export_diagnostic::ExportSourceRole;
-use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
+use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::picked::Picked;
 use crate::scan_health::{ScanError, ScanRead, SourceTrace};
 use crate::{CatalogError, Kind};
 
+struct BackfillContext<'context, 'source> {
+    picked: &'context [Picked<'source>],
+    crafting: &'context CraftingKinds<'source>,
+    scanned: &'context ExportLedger,
+}
 impl<'f> Scan<'_, '_, 'f> {
     /// Reads the used additional resource definitions at their actual projection boundary.
     pub(super) fn resource_commodities(
         &self,
         picked: &[Picked<'f>],
-        blueprints: &[Blueprint<'f>],
-        quantizations: &[QualityQuantization<'f>],
-        sources: &[SourceObservation],
+        crafting: &CraftingKinds<'f>,
+        scanned: &ExportLedger,
     ) -> Result<ScanRead<'f>, CatalogError> {
-        let used = unrepresented_resources(picked, blueprints, quantizations);
-        let physical: BTreeSet<_> = sources
+        let used = unrepresented_resources(picked, &crafting.blueprints, &crafting.quantizations);
+        let physical: BTreeSet<_> = scanned
+            .sources
             .iter()
             .filter(|source| {
                 source.kind == Some(Kind::ResourceTypes)
@@ -39,6 +46,11 @@ impl<'f> Scan<'_, '_, 'f> {
             })
             .map(|source| source.record_index)
             .collect();
+        let context = BackfillContext {
+            picked,
+            crafting,
+            scanned,
+        };
         let mut trees = TreeBuilder::new();
         let mut read = ScanRead {
             picked: Vec::new(),
@@ -54,7 +66,7 @@ impl<'f> Scan<'_, '_, 'f> {
             let mut trace = SourceTrace::new(&record);
             trace.candidate(Kind::Commodities);
             let mut ledger = ExportLedger::default();
-            let result = self.resource(&mut trees, &record, &mut trace, &mut ledger);
+            let result = self.resource(&mut trees, &record, &mut trace, &mut ledger, &context);
             if let Some(found) = crate::scan_health::finish(&record, &trace, result, ledger)? {
                 read.picked.extend(found.picked);
                 read.ledger.merge(found.ledger);
@@ -69,6 +81,7 @@ impl<'f> Scan<'_, '_, 'f> {
         record: &Record<'f>,
         trace: &mut SourceTrace,
         ledger: &mut ExportLedger,
+        context: &BackfillContext<'_, 'f>,
     ) -> Result<Option<Picked<'f>>, ScanError> {
         if record.type_name()? != RESOURCE_TYPE {
             return Ok(None);
@@ -94,11 +107,22 @@ impl<'f> Scan<'_, '_, 'f> {
             ExportSourceRole::Selected,
             self.options.cancel,
         )?);
-        Ok(Some(Picked::Commodity(resource_commodity(
+        let evidence = crate::commodity_backfill::for_resource(
             &tree,
-            self.texts,
-            &self.groups,
-        ))))
+            context.picked,
+            context.crafting,
+            context.scanned,
+            self.projection.origins(),
+        )?;
+        let read = commodity::resource_commodity(&tree, self.projection, &self.groups, evidence)?;
+        crate::source_projection_notes::record(
+            Kind::Commodities,
+            ExportSourceRole::Selected,
+            &tree,
+            read.resource_notes,
+            ledger,
+        );
+        Ok(Some(Picked::Commodity(Box::new(read.value))))
     }
 }
 
@@ -116,7 +140,7 @@ fn unrepresented_resources(
     let mut used = Vec::new();
     for tier in blueprints.iter().flat_map(|blueprint| &blueprint.tiers) {
         for line in tier.mandatory.iter().chain(&tier.optional) {
-            resources_of(line, &mut used);
+            cost_resources::collect(line, &mut used);
         }
     }
     used.extend(

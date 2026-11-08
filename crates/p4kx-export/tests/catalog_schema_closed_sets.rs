@@ -13,6 +13,8 @@ use serde_json::{Map, Value, json};
 const VOCABULARY_CLASS: &str = "x-p4kx-vocabularyClass";
 const CONTROL_TYPES: &[&str] = &[
     "CatalogPublicationMode",
+    "CommoditySelection",
+    "DatasetAvailability",
     "DefinitionStatus",
     "ExportDiagnosticSeverity",
     "ExportDiagnosticStage",
@@ -24,7 +26,6 @@ const CONTROL_TYPES: &[&str] = &[
     "InputScope",
     "OwnedReferenceStatus",
     "PropertyReferenceStatus",
-    "ResourceAvailability",
     "SourceDeclarationKind",
     "SourceEncryptionState",
     "SourceRecordFormat",

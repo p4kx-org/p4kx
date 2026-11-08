@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{
-    RecordTree, SourceLocation, SourceUseRole, SourceValue, SourcedValue, StructValue,
-};
+use p4kx_extraction::{RecordTree, SourceValue, SourcedValue, StructValue};
 
 use crate::CatalogError;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::guid_text::CatalogGuid;
-use crate::record_fields;
 use crate::resource_density_read;
 use crate::resource_group::ResourceMemberships;
 use crate::resource_memberships;
@@ -74,7 +70,7 @@ fn definition<'source>(
     let properties = properties(tree, &fields, &context, notes)?;
     Ok(ResourceDefinition {
         guid: context.value("$guid", SourceValue::Present(CatalogGuid(tree.guid())))?,
-        class_name: class_name(tree, origins)?,
+        class_name: crate::source_header::class_name(tree, origins)?,
         record_path: context.value("$recordPath", SourceValue::Present(tree.record_path()))?,
         name: projection.name(
             fields.locale("displayName", notes)?,
@@ -96,29 +92,6 @@ fn definition<'source>(
         default_cargo_containers: containers,
         properties,
     })
-}
-
-fn class_name<'source>(
-    tree: &RecordTree<'source>,
-    origins: &CatalogOrigins,
-) -> Result<SourcedValue<&'source str>, CatalogError> {
-    let location = |field: &str| SourceLocation::DataForge {
-        record_index: tree.record_index(),
-        field: field.to_owned(),
-    };
-    let sources = [
-        origins
-            .dataforge
-            .at(location("$name"), SourceUseRole::Conversion)?,
-        origins
-            .dataforge
-            .at(location("$type"), SourceUseRole::Selector)?,
-    ];
-    Ok(origins.uses.value(
-        SourceValue::Present(record_fields::class_name(tree)),
-        &sources,
-        true,
-    ))
 }
 
 fn properties<'source>(
