@@ -182,7 +182,7 @@ pub(crate) fn resource_commodity<'source>(
     evidence: BackfillEvidence<'_>,
 ) -> Result<CommodityRead<'source>, CatalogError> {
     let origins = projection.origins();
-    let context = origins.resource(tree.record_index());
+    let context = origins.record(tree.record_index());
     let mut links = CommodityInputs::new(origins);
     links.at(tree.record_index(), "$guid", SourceUseRole::Selector)?;
     let (links, _) = links.into_evidence();

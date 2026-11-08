@@ -4,18 +4,18 @@
 use p4kx_extraction::{SourceValue, StructValue, Value};
 
 use crate::CatalogError;
+use crate::catalog_read::{CatalogFields, CatalogRecordContext};
 use crate::resource_quality_source::{ResourceQualityQuantization, ResourceQuantizationBand};
-use crate::resource_value_read::{ResourceContext, ResourceFields};
 use crate::source_fields::FieldError;
 
 /// Reads every band in its authored position, including null or unsupported members.
 pub(crate) fn read<'f>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceQualityQuantization<'f>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     fields.check(&["bands"], notes);
     let bands = fields.array("bands", notes)?.try_map(|values| {
         values
@@ -42,10 +42,10 @@ pub(crate) fn read<'f>(
 fn band<'f>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceQuantizationBand<'f>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     if source.type_name() != "CraftingQualityQuantizationBand" {
         notes.push(crate::source_fields::Fields::new(source, path).unsupported(""));
         return Ok(ResourceQuantizationBand {

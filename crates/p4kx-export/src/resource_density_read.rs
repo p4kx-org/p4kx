@@ -4,21 +4,22 @@
 use p4kx_extraction::{SourceValue, StructValue};
 
 use crate::CatalogError;
+use crate::catalog_read::{CatalogFields, CatalogRecordContext};
 use crate::resource_density_source::{
     ResourceDensity, ResourceDensityPayload, ResourceDensitySource, ResourceDensityUnit,
     ResourceDensityUnitPayload, ResourceDensityValue, ResourceMolarMass,
 };
-use crate::resource_value_read::{ResourceContext, ResourceFields};
+use crate::resource_value_read;
 use crate::source_fields::FieldError;
 
 /// Projects the owned density shape without changing its unit or IEEE values.
 pub(crate) fn read<'f>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceDensitySource<'f>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     let payload = match source.type_name() {
         "ResourceTypeDensityType" => {
             fields.check(&[], notes);
@@ -36,7 +37,7 @@ pub(crate) fn read<'f>(
         "ResourceTypeMolarMass" => {
             fields.check(&["molarMass"], notes);
             Some(ResourceDensityPayload::MolarMass(ResourceMolarMass {
-                molar_mass: fields.single("molarMass", notes)?,
+                molar_mass: resource_value_read::single(&fields, "molarMass", notes)?,
             }))
         }
         _ => None,
@@ -53,10 +54,10 @@ pub(crate) fn read<'f>(
 fn read_unit<'f>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceDensityUnit<'f>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     let payload = match source.type_name() {
         "BaseDensityUnit" => {
             fields.check(&[], notes);
@@ -66,7 +67,7 @@ fn read_unit<'f>(
             fields.check(&["gramsPerCubicCentimeter"], notes);
             Some(ResourceDensityUnitPayload::GramsPerCubicCentimeter(
                 ResourceDensityValue {
-                    value: fields.single("gramsPerCubicCentimeter", notes)?,
+                    value: resource_value_read::single(&fields, "gramsPerCubicCentimeter", notes)?,
                 },
             ))
         }
@@ -74,7 +75,7 @@ fn read_unit<'f>(
             fields.check(&["kilogramsPerCubicMeter"], notes);
             Some(ResourceDensityUnitPayload::KilogramsPerCubicMeter(
                 ResourceDensityValue {
-                    value: fields.single("kilogramsPerCubicMeter", notes)?,
+                    value: resource_value_read::single(&fields, "kilogramsPerCubicMeter", notes)?,
                 },
             ))
         }

@@ -4,8 +4,8 @@
 use p4kx_extraction::{SourceValue, SourceValueState, SourcedValue};
 
 use crate::CatalogError;
+use crate::catalog_read::CatalogRecordContext;
 use crate::commodity_authoring_inputs;
-use crate::resource_value_read::ResourceContext;
 
 /// A raw text key and the original selectors used to find its component.
 #[derive(Debug, Clone)]
@@ -39,7 +39,7 @@ impl<'source> CommodityTextInput<'source> {
     }
 
     pub(crate) fn parent(
-        context: &ResourceContext<'_>,
+        context: &CatalogRecordContext<'_>,
         record_index: u32,
         field: &str,
         state: SourceValueState,

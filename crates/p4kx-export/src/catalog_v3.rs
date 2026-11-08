@@ -7,6 +7,8 @@ pub(crate) mod catalog_definitions;
 pub(crate) mod catalog_origins;
 #[path = "catalog_projection.rs"]
 pub(crate) mod catalog_projection;
+#[path = "catalog_read.rs"]
+pub(crate) mod catalog_read;
 #[path = "catalog_text_contract.rs"]
 pub(crate) mod catalog_text_contract;
 #[path = "resource_density_read.rs"]

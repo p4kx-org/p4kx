@@ -8,10 +8,10 @@ use p4kx_extraction::{
 
 use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_read::CatalogFields;
 use crate::commodity_authoring_inputs;
 use crate::commodity_inputs::CommodityInputs;
 use crate::commodity_text_input::CommodityTextInput;
-use crate::resource_value_read::ResourceFields;
 use crate::source_fields::FieldError;
 
 /// One classified owning array, shared by its independently typed binding families.
@@ -34,8 +34,8 @@ impl<'tree, 'source> BindingArray<'tree, 'source> {
         name: &'static str,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
-        let context = origins.resource(tree.record_index());
-        let value = ResourceFields::new(tree.root(), "", &context)
+        let context = origins.record(tree.record_index());
+        let value = CatalogFields::new(tree.root(), "", &context)
             .array(name, notes)?
             .map(|_| ());
         let mut entries = Vec::new();
@@ -150,7 +150,7 @@ pub(crate) fn collect<'source, T, I>(
         &mut Vec<FieldError>,
     ) -> Result<(BindingFacts<T>, I), CatalogError>,
 ) -> Result<BindingRead<'source, T, I>, CatalogError> {
-    let context = origins.resource(tree.record_index());
+    let context = origins.record(tree.record_index());
     let state = array.value.state();
     let mut selection = Selection::new(array.name, state);
     let mut inputs = CommodityInputs::new(origins);

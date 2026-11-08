@@ -5,6 +5,7 @@ use p4kx_extraction::{RecordTree, SourceValue, SourcedValue, StructValue};
 
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::{CatalogFields, CatalogRecordContext};
 use crate::guid_text::CatalogGuid;
 use crate::resource_density_read;
 use crate::resource_group::ResourceMemberships;
@@ -12,7 +13,7 @@ use crate::resource_memberships;
 use crate::resource_property_contract::{ResourceCargoSlot, ResourceProperty};
 use crate::resource_property_read;
 use crate::resource_type_contract::{ResourceDefinition, ResourceType};
-use crate::resource_value_read::{ResourceContext, ResourceFields};
+use crate::resource_value_read;
 use crate::source_fields::FieldError;
 
 const RESOURCE_FIELDS: &[&str] = &[
@@ -58,8 +59,8 @@ fn definition<'source>(
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceDefinition<'source>, CatalogError> {
     let origins = projection.origins();
-    let context = origins.resource(tree.record_index());
-    let fields = ResourceFields::new(tree.root(), "", &context);
+    let context = origins.record(tree.record_index());
+    let fields = CatalogFields::new(tree.root(), "", &context);
     fields.check(RESOURCE_FIELDS, notes);
     let density = fields
         .structure("densityType", notes)?
@@ -83,11 +84,15 @@ fn definition<'source>(
             "description",
         )?,
         group_guids: resource_memberships::values(memberships, origins, tree.record_index())?,
-        refined_version: fields.reference("refinedVersion", notes)?,
+        refined_version: resource_value_read::reference(&fields, "refinedVersion", notes)?,
         density,
         default_thumbnail_path: fields.text("defaultThumbnailPath", notes)?,
         default_thumbnail_path_svg: fields.text("defaultThumbnailPathSVG", notes)?,
-        rtt_thumbnail_entity_class: fields.reference("rttThumbnailEntityClass", notes)?,
+        rtt_thumbnail_entity_class: resource_value_read::reference(
+            &fields,
+            "rttThumbnailEntityClass",
+            notes,
+        )?,
         validate_default_cargo_box: fields.boolean("validateDefaultCargoBox", notes)?,
         default_cargo_containers: containers,
         properties,
@@ -96,8 +101,8 @@ fn definition<'source>(
 
 fn properties<'source>(
     tree: &RecordTree<'source>,
-    fields: &ResourceFields<'_, 'source, '_>,
-    context: &ResourceContext<'_>,
+    fields: &CatalogFields<'_, 'source, '_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<SourcedValue<Vec<SourcedValue<ResourceProperty<'source>>>>, CatalogError> {
     fields.array("properties", notes)?.try_map(|values| {
@@ -116,10 +121,10 @@ fn properties<'source>(
 
 fn cargo_slots<'source>(
     source: &StructValue<'source>,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<Vec<SourcedValue<ResourceCargoSlot<'source>>>, CatalogError> {
-    let fields = ResourceFields::new(source, "defaultCargoContainers", context);
+    let fields = CatalogFields::new(source, "defaultCargoContainers", context);
     source
         .fields()
         .iter()
@@ -130,7 +135,7 @@ fn cargo_slots<'source>(
                     &format!("{path}.$fieldName"),
                     SourceValue::Present(field.name()),
                 )?,
-                entity_class: fields.reference(field.name(), notes)?,
+                entity_class: resource_value_read::reference(&fields, field.name(), notes)?,
             };
             context.value(&path, SourceValue::Present(value))
         })

@@ -4,6 +4,7 @@
 use p4kx_extraction::{SourceValue, StructValue};
 
 use crate::CatalogError;
+use crate::catalog_read::{CatalogFields, CatalogRecordContext};
 use crate::resource_quality_curve;
 use crate::resource_quality_source::{
     InlineQuality, QualityRecordReference, ResourceQualityCurve, ResourceQualityOverride,
@@ -11,17 +12,17 @@ use crate::resource_quality_source::{
     ResourceQualityPayload, ResourceQualityQuantization, ResourceQualitySource,
 };
 use crate::resource_quantization_read;
-use crate::resource_value_read::{ResourceContext, ResourceFields};
+use crate::resource_value_read;
 use crate::source_fields::FieldError;
 
 /// Projects an authored distribution without following its Record Reference.
 pub(crate) fn distribution<'f>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceQualitySource<'f, ResourceQualityCurve<'f>>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     let payload = match source.type_name() {
         "CraftingQualityDistributionNormal" | "CraftingQualityDistributionUniform" => {
             Some(ResourceQualityPayload::Inline(InlineQuality {
@@ -49,10 +50,10 @@ pub(crate) fn distribution<'f>(
 pub(crate) fn overrides<'f>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceQualitySource<'f, ResourceQualityOverrides<'f>>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     let payload = match source.type_name() {
         "CraftingQualityLocationOverride" => {
             fields.check(&["locationOverrideList"], notes);
@@ -78,10 +79,10 @@ pub(crate) fn overrides<'f>(
 fn override_list<'f>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceQualityOverrides<'f>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     let location_override_list =
         fields
             .array("locationOverrideList", notes)?
@@ -105,10 +106,10 @@ fn override_list<'f>(
 fn override_entry<'f>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceQualityOverride<'f>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     let payload = match source.type_name() {
         "CraftingQualityLocationOverrideEntry" => {
             fields.check(&["location", "qualityDistribution"], notes);
@@ -125,7 +126,7 @@ fn override_entry<'f>(
                     })?;
             Some(ResourceQualityOverridePayload::Entry(Box::new(
                 ResourceQualityOverrideFields {
-                    location: fields.reference("location", notes)?,
+                    location: resource_value_read::reference(&fields, "location", notes)?,
                     quality_distribution,
                 },
             )))
@@ -150,10 +151,10 @@ fn override_entry<'f>(
 pub(crate) fn quantization<'f>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceQualitySource<'f, ResourceQualityQuantization<'f>>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     let payload = match source.type_name() {
         "CraftingQualityQuantization" => Some(ResourceQualityPayload::Inline(InlineQuality {
             value: context.value(
@@ -176,24 +177,24 @@ pub(crate) fn quantization<'f>(
 }
 
 fn record_ref<T>(
-    fields: &ResourceFields<'_, '_, '_>,
+    fields: &CatalogFields<'_, '_, '_>,
     field: &str,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceQualityPayload<T>, CatalogError> {
     fields.check(&[field], notes);
     Ok(ResourceQualityPayload::RecordRef(QualityRecordReference {
-        reference: fields.reference(field, notes)?,
+        reference: resource_value_read::reference(fields, field, notes)?,
     }))
 }
 
 fn wrap<'f, T>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
     payload: Option<ResourceQualityPayload<T>>,
 ) -> Result<ResourceQualitySource<'f, T>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     Ok(ResourceQualitySource {
         source_type: fields.source_type()?,
         payload: payload.map_or_else(

@@ -7,6 +7,7 @@ use p4kx_extraction::{
 
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::{CatalogFields, CatalogRecordContext};
 use crate::commodity_authoring_contract::{
     CommodityAuthoring, CommodityContainer, CommodityDisplay, CommodityPurchasable,
 };
@@ -14,7 +15,6 @@ use crate::commodity_authoring_inputs;
 use crate::commodity_binding_read::{self, BindingArray, BindingAt, BindingFacts, BindingRead};
 use crate::commodity_inputs::CommodityInputs;
 use crate::commodity_text_input::CommodityTextInput;
-use crate::resource_value_read::{ResourceContext, ResourceFields};
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -36,7 +36,7 @@ pub(crate) fn entity<'source>(
     notes: &mut Vec<FieldError>,
 ) -> Result<CommodityAuthoringRead<'source>, CatalogError> {
     let origins = projection.origins();
-    let context = origins.resource(tree.record_index());
+    let context = origins.record(tree.record_index());
     let components = BindingArray::new(tree, origins, "Components", notes)?;
     let (crafter_inputs, crafter_complete) =
         components.first_type_inputs(tree.record_index(), origins, "CrafterComponentParams")?;
@@ -146,7 +146,7 @@ fn purchasable<'source>(
     at: &BindingAt<'_>,
     record_index: u32,
     projection: &CatalogProjection<'_, 'source>,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<
     (
@@ -155,7 +155,7 @@ fn purchasable<'source>(
     ),
     CatalogError,
 > {
-    let fields = ResourceFields::new(source, at.path, context);
+    let fields = CatalogFields::new(source, at.path, context);
     let name_path = format!("{}.displayName", at.path);
     let type_path = format!("{}.displayType", at.path);
     let name = fields.locale("displayName", notes)?;
@@ -185,7 +185,7 @@ fn display<'source>(
     at: &BindingAt<'_>,
     record_index: u32,
     projection: &CatalogProjection<'_, 'source>,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<
     (
@@ -194,7 +194,7 @@ fn display<'source>(
     ),
     CatalogError,
 > {
-    let fields = ResourceFields::new(source, at.path, context);
+    let fields = CatalogFields::new(source, at.path, context);
     let field = format!("{}.displayDescription", at.path);
     let key = fields.locale("displayDescription", notes)?;
     let input = CommodityTextInput::new(key.clone(), record_index, field.clone());
@@ -213,10 +213,10 @@ fn container<'source>(
     at: &BindingAt<'_>,
     record_index: u32,
     projection: &CatalogProjection<'_, 'source>,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<BindingFacts<CommodityContainer<'source>>, CatalogError> {
-    let fields = ResourceFields::new(source, at.path, context);
+    let fields = CatalogFields::new(source, at.path, context);
     let composition = crate::commodity_composition_read::read(
         source,
         at.path,
@@ -253,7 +253,7 @@ fn binding_inputs<'context>(
 }
 
 fn position(
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     at: &BindingAt<'_>,
 ) -> Result<SourcedValue<u32>, CatalogError> {
     let position = u32::try_from(at.position)

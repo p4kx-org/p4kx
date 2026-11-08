@@ -6,9 +6,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::CatalogError;
+use crate::catalog_read::CatalogRecordContext;
 use crate::definition_reference::DefinitionStatus;
 use crate::guid_text::CatalogGuid;
-use crate::resource_value_read::ResourceContext;
 use crate::schema_fields;
 
 /// An authored link with independently sourced target-header fields.
@@ -25,7 +25,7 @@ pub(crate) struct ResourceReference {
 
 impl ResourceReference {
     pub(crate) fn resolved(
-        context: &ResourceContext<'_>,
+        context: &CatalogRecordContext<'_>,
         path: &str,
         index: u32,
         guid: CatalogGuid,
@@ -45,7 +45,7 @@ impl ResourceReference {
     }
 
     pub(crate) fn unresolved(
-        context: &ResourceContext<'_>,
+        context: &CatalogRecordContext<'_>,
         path: &str,
         guid: CatalogGuid,
         status: DefinitionStatus,

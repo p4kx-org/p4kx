@@ -4,21 +4,22 @@
 use p4kx_extraction::{SourceValue, StructValue};
 
 use crate::CatalogError;
+use crate::catalog_read::{CatalogFields, CatalogRecordContext};
 use crate::resource_property_contract::{
     ResourceCraftingData, ResourceProperty, ResourcePropertyPayload, ResourceVolatility,
 };
 use crate::resource_quality_read;
-use crate::resource_value_read::{ResourceContext, ResourceFields};
+use crate::resource_value_read;
 use crate::source_fields::FieldError;
 
 /// Projects a concrete property without collapsing nulls or reordering members.
 pub(crate) fn read<'f>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceProperty<'f>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     let name = fields.text("name", notes)?;
     let payload = match source.type_name() {
         "ResourceTypeProperties" => {
@@ -28,8 +29,12 @@ pub(crate) fn read<'f>(
         "ResourceTypeVolatility" => {
             fields.check(&["name", "volatility", "healthDecayPerSecond"], notes);
             Some(ResourcePropertyPayload::Volatility(ResourceVolatility {
-                volatility: fields.single("volatility", notes)?,
-                health_decay_per_second: fields.single("healthDecayPerSecond", notes)?,
+                volatility: resource_value_read::single(&fields, "volatility", notes)?,
+                health_decay_per_second: resource_value_read::single(
+                    &fields,
+                    "healthDecayPerSecond",
+                    notes,
+                )?,
             }))
         }
         "ResourceTypeCraftingData" => Some(ResourcePropertyPayload::CraftingData(Box::new(
@@ -50,10 +55,10 @@ pub(crate) fn read<'f>(
 fn crafting<'f>(
     source: &StructValue<'f>,
     path: &str,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceCraftingData<'f>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
+    let fields = CatalogFields::new(source, path, context);
     fields.check(
         &[
             "name",

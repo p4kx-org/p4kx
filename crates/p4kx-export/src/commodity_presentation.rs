@@ -106,7 +106,7 @@ impl<'read, 'context, 'source> CommodityPresentationContext<'read, 'context, 'so
         let subtype = subtype_guid.value().copied().flatten();
         Ok(CommodityPresentation {
             commodity_guid: origins
-                .resource(tree.record_index())
+                .record(tree.record_index())
                 .value("$guid", SourceValue::Present(CatalogGuid(tree.guid())))?,
             name: texts.name,
             description: texts.description,

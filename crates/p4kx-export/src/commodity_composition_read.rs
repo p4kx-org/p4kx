@@ -4,11 +4,12 @@
 use p4kx_extraction::{SourceUseRole, SourceValue, SourceValueState, SourcedValue, StructValue};
 
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_read::{CatalogFields, CatalogRecordContext};
 use crate::commodity_authoring_contract::CommodityComposition;
 use crate::commodity_authoring_inputs;
 use crate::commodity_binding_read::BindingFacts;
 use crate::commodity_inputs::CommodityInputs;
-use crate::resource_value_read::{ResourceContext, ResourceFields};
+use crate::resource_value_read;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -17,13 +18,13 @@ pub(crate) fn read<'source>(
     container: &str,
     record_index: u32,
     origins: &CatalogOrigins,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<
     BindingFacts<SourcedValue<Vec<SourcedValue<CommodityComposition<'source>>>>>,
     CatalogError,
 > {
-    let fields = ResourceFields::new(source, container, context);
+    let fields = CatalogFields::new(source, container, context);
     let values = fields.array("defaultComposition", notes)?;
     let path = format!("{container}.defaultComposition");
     let mut inputs = CommodityInputs::new(origins);
@@ -82,11 +83,11 @@ fn composition<'source>(
     path: &str,
     record_index: u32,
     origins: &CatalogOrigins,
-    context: &ResourceContext<'_>,
+    context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<BindingFacts<CommodityComposition<'source>>, CatalogError> {
-    let fields = ResourceFields::new(source, path, context);
-    let entry = fields.reference("entry", notes)?;
+    let fields = CatalogFields::new(source, path, context);
+    let entry = resource_value_read::reference(&fields, "entry", notes)?;
     let mut inputs = CommodityInputs::new(origins);
     inputs.at(record_index, path, SourceUseRole::Selector)?;
     inputs.at(

@@ -216,7 +216,7 @@ fn limits(
             continue;
         }
         let record_index = origins
-            .resource(limit.record_index)
+            .record(limit.record_index)
             .selector("$recordIndex", SourceValue::Present(limit.record_index))?;
         diagnostics.push(CommoditySelectionDiagnostic {
             code: if limit.target.is_some() {

@@ -6,6 +6,7 @@ use p4kx_extraction::{RecordTree, SourceUse, SourceUseRole, SourceValue, Sourced
 use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::CatalogFields;
 use crate::commodity_authoring_contract::CommodityAuthoring;
 use crate::commodity_contract::{
     CommodityDefinition, CommoditySelection, CommoditySelectionDiagnostic,
@@ -14,7 +15,6 @@ use crate::commodity_inputs::CommodityInputs;
 use crate::commodity_resource::CommodityResourceSelection;
 use crate::commodity_text_input::CommodityTextInput;
 use crate::guid_text::CatalogGuid;
-use crate::resource_value_read::ResourceFields;
 use crate::source_fields::FieldError;
 
 /// Captures only the original first-resource selectors for one Commodity choice.
@@ -54,8 +54,8 @@ pub(crate) fn resource_text<'source>(
     projection: &CatalogProjection<'_, 'source>,
     notes: &mut Vec<FieldError>,
 ) -> Result<CommodityTextInput<'source>, CatalogError> {
-    let context = projection.origins().resource(tree.record_index());
-    let key = ResourceFields::new(tree.root(), "", &context).locale(field, notes)?;
+    let context = projection.origins().record(tree.record_index());
+    let key = CatalogFields::new(tree.root(), "", &context).locale(field, notes)?;
     let mut input = CommodityTextInput::new(key, tree.record_index(), field.to_owned());
     input.selectors.push("$type".to_owned());
     Ok(input)
@@ -69,7 +69,7 @@ pub(crate) fn definition<'source>(
     selection_diagnostics: Vec<CommoditySelectionDiagnostic>,
     origins: &CatalogOrigins,
 ) -> Result<CommodityDefinition<'source>, CatalogError> {
-    let context = origins.resource(tree.record_index());
+    let context = origins.record(tree.record_index());
     Ok(CommodityDefinition {
         guid: context.value("$guid", SourceValue::Present(CatalogGuid(tree.guid())))?,
         class_name: crate::source_header::class_name(tree, origins)?,

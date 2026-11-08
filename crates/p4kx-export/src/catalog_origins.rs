@@ -9,7 +9,7 @@ use p4kx_extraction::{
 };
 
 use crate::CatalogError;
-use crate::resource_value_read::ResourceContext;
+use crate::catalog_read::CatalogRecordContext;
 use crate::texts::TextSources;
 
 /// Source scopes captured from the actual successfully read catalog inputs.
@@ -53,8 +53,8 @@ impl CatalogOrigins {
         })
     }
 
-    pub(crate) const fn resource(&self, record_index: u32) -> ResourceContext<'_> {
-        ResourceContext::new(&self.uses, &self.dataforge, record_index)
+    pub(crate) const fn record(&self, record_index: u32) -> CatalogRecordContext<'_> {
+        CatalogRecordContext::new(&self.uses, &self.dataforge, record_index)
     }
 
     pub(crate) fn locale(&self, language: Language) -> Option<&SourceScope> {
