@@ -15,6 +15,7 @@ struct Node {
     children: BTreeMap<String, Self>,
     contribution: Option<OriginContributions>,
     visited: Cell<bool>,
+    subtree: bool,
 }
 
 /// Prefix-sharing exact addresses retaining immutable original contribution sets.
@@ -29,6 +30,26 @@ impl OriginAddresses {
         path: &FieldPath,
         contribution: OriginContributions,
     ) -> Result<(), MediaError> {
+        let node = self.insert_at(path, contribution)?;
+        node.subtree = false;
+        Ok(())
+    }
+
+    pub(crate) fn insert_subtree(
+        &mut self,
+        path: &FieldPath,
+        contribution: OriginContributions,
+    ) -> Result<(), MediaError> {
+        let node = self.insert_at(path, contribution)?;
+        node.subtree = true;
+        Ok(())
+    }
+
+    fn insert_at(
+        &mut self,
+        path: &FieldPath,
+        contribution: OriginContributions,
+    ) -> Result<&mut Node, MediaError> {
         let mut node = &mut self.root;
         for segment in segments(path.as_str()) {
             node = node.children.entry(segment.to_owned()).or_default();
@@ -39,16 +60,22 @@ impl OriginAddresses {
             ));
         }
         node.contribution = Some(contribution);
-        Ok(())
+        Ok(node)
     }
 
     pub(crate) fn visit(&self, path: &str) -> Option<&OriginContributions> {
         let mut node = &self.root;
+        let mut inherited = node.subtree.then_some(node);
         for segment in segments(path) {
-            node = node.children.get(segment)?;
+            let Some(child) = node.children.get(segment) else {
+                return inherited.and_then(visit_contribution);
+            };
+            node = child;
+            if node.subtree {
+                inherited = Some(node);
+            }
         }
-        node.visited.set(true);
-        node.contribution.as_ref()
+        visit_contribution(node).or_else(|| inherited.and_then(visit_contribution))
     }
 
     pub(crate) fn has_known_descendants(&self, prefix: &str) -> bool {
@@ -84,6 +111,11 @@ impl OriginAddresses {
             ))
         }
     }
+}
+
+fn visit_contribution(node: &Node) -> Option<&OriginContributions> {
+    node.visited.set(true);
+    node.contribution.as_ref()
 }
 
 fn segments(pointer: &str) -> impl Iterator<Item = &str> {

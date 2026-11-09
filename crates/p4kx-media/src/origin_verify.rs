@@ -141,6 +141,15 @@ fn verify_profile(stream: OriginStream, profile: OriginProfile) -> Result<(), Me
         (_, OriginProfile::Unmigrated)
             | (
                 OriginStream::Records {
+                    kind: MediaKind::Material
+                },
+                OriginProfile::MaterialLibrary
+                    | OriginProfile::MaterialFailure
+                    | OriginProfile::MaterialSourceLimit
+                    | OriginProfile::MaterialConfigurationFailure
+            )
+            | (
+                OriginStream::Records {
                     kind: MediaKind::Archive
                 },
                 OriginProfile::ArchiveEntry | OriginProfile::ArchiveLayout,

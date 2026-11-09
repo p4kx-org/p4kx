@@ -34,72 +34,121 @@ impl MediaWriter<'_> {
         candidates: impl IntoIterator<Item = Result<ReferenceCandidate, MediaError>>,
         inventory: CandidateInventory,
     ) -> Result<Reference, MediaError> {
+        self.try_resolve_with(original, candidates, inventory, |candidate| (candidate, ()))
+            .map(|(reference, _)| reference)
+    }
+
+    /// Retains caller-owned evidence for the admitted candidate prefix and one cutoff item.
+    ///
+    /// # Errors
+    /// Returns the original scan error, invalid target provenance or reference-work failure.
+    pub(crate) fn try_resolve_reference_observed<E>(
+        &mut self,
+        original: OriginalIdentifier,
+        candidates: impl IntoIterator<Item = Result<(ReferenceCandidate, E), MediaError>>,
+        inventory: CandidateInventory,
+    ) -> Result<(Reference, ReferenceObservations<E>), MediaError> {
+        self.try_resolve_with(original, candidates, inventory, |candidate| candidate)
+    }
+
+    fn try_resolve_with<E, C>(
+        &mut self,
+        original: OriginalIdentifier,
+        candidates: impl IntoIterator<Item = Result<C, MediaError>>,
+        inventory: CandidateInventory,
+        split: impl Fn(C) -> (ReferenceCandidate, E),
+    ) -> Result<(Reference, ReferenceObservations<E>), MediaError> {
         self.start_reference()?;
         let mut counter = Counter {
             remaining: self.limits().record_bytes,
             exceeded: false,
         };
         if !counter.include(&original)? {
-            return Ok(unavailable(
-                original,
-                ReferenceUnavailable::CandidateBytes {
-                    limit: self.limits().record_bytes,
-                },
-                Vec::new(),
-                0,
+            return Ok((
+                unavailable(
+                    original,
+                    ReferenceUnavailable::CandidateBytes {
+                        limit: self.limits().record_bytes,
+                    },
+                    Vec::new(),
+                    0,
+                ),
+                ReferenceObservations::empty(),
             ));
         }
-        let observed = collect(self, candidates, &mut counter)?;
+        let observed = collect(self, candidates, &mut counter, split)?;
         if let Some(reason) = observed.unavailable {
-            return Ok(unavailable(
-                original,
-                reason,
-                observed.known,
-                observed.count,
+            return Ok((
+                unavailable(original, reason, observed.known, observed.count),
+                observed.evidence,
             ));
         }
-        if let CandidateInventory::Unavailable(reason) = inventory {
-            return Ok(unavailable(
+        let mut evidence = observed.evidence;
+        evidence.inventory_used = true;
+        let reference = match inventory {
+            CandidateInventory::Unavailable(reason) => {
+                unavailable(original, reason, observed.known, observed.count)
+            }
+            CandidateInventory::Complete => Reference {
                 original,
-                reason,
-                observed.known,
-                observed.count,
-            ));
-        }
-        Ok(Reference {
-            original,
-            resolution: classify(observed.known),
-            observed_candidates: observed.count,
-            candidates_complete: true,
-        })
+                resolution: classify(observed.known),
+                observed_candidates: observed.count,
+                candidates_complete: true,
+            },
+        };
+        Ok((reference, evidence))
     }
 }
 
-struct Observed {
+/// Evidence admitted with candidate descriptors, without serialized-identity reconstruction.
+pub(crate) struct ReferenceObservations<E> {
+    /// Evidence in the same order as the retained candidate prefix.
+    pub(crate) retained: Vec<E>,
+    /// Evidence for the single observed candidate refused by a count or byte cutoff.
+    pub(crate) discarded: Option<E>,
+    /// Whether complete scanning reached the supplied inventory disposition.
+    pub(crate) inventory_used: bool,
+}
+
+impl<E> ReferenceObservations<E> {
+    const fn empty() -> Self {
+        Self {
+            retained: Vec::new(),
+            discarded: None,
+            inventory_used: false,
+        }
+    }
+}
+
+struct Observed<E> {
     known: Vec<ReferenceCandidate>,
     count: u64,
     unavailable: Option<ReferenceUnavailable>,
+    evidence: ReferenceObservations<E>,
 }
 
-fn collect(
+fn collect<E, C>(
     writer: &MediaWriter<'_>,
-    candidates: impl IntoIterator<Item = Result<ReferenceCandidate, MediaError>>,
+    candidates: impl IntoIterator<Item = Result<C, MediaError>>,
     counter: &mut Counter,
-) -> Result<Observed, MediaError> {
+    split: impl Fn(C) -> (ReferenceCandidate, E),
+) -> Result<Observed<E>, MediaError> {
     let limits = writer.limits();
     let mut observed = Observed {
         known: Vec::new(),
         count: 0,
         unavailable: None,
+        evidence: ReferenceObservations::empty(),
     };
     for candidate in candidates {
-        let candidate = candidate?;
+        let (candidate, evidence) = split(candidate?);
         writer.checkpoint()?;
         observed.count += 1;
         if observed.count > u64::from(limits.reference_candidates) {
             observed.unavailable = Some(ReferenceUnavailable::CandidateLimit {
                 limit: limits.reference_candidates,
             });
+            observed.evidence.discarded = Some(evidence);
             break;
         }
         if &candidate.target.root != writer.reference_root()? {
@@ -112,13 +161,14 @@ fn collect(
             observed.unavailable = Some(ReferenceUnavailable::CandidateBytes {
                 limit: limits.record_bytes,
             });
+            observed.evidence.discarded = Some(evidence);
             break;
         }
         observed.known.push(candidate);
+        observed.evidence.retained.push(evidence);
     }
     Ok(observed)
 }
-
 fn validate_target(target: &ReferenceTarget, depth: u32) -> Result<(), MediaError> {
     if target.subresource.is_some() && target.kind.is_none() {
         return Err(MediaError::Contract(
@@ -227,3 +277,14 @@ impl Write for Counter {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "reference_admission_controls.rs"]
+mod admission_controls;
+#[cfg(test)]
+#[path = "reference_admission_support.rs"]
+mod test_support;
+
+#[cfg(test)]
+#[path = "reference_admission_observed_tests.rs"]
+mod observed_tests;

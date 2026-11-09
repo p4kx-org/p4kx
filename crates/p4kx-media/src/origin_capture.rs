@@ -123,6 +123,29 @@ impl OriginCapture {
         .map_err(origin_error::evidence)?;
         self.retain(actual, self.limit)
     }
+    /// Retains an actual use when optional source-site storage was not admitted.
+    pub(crate) fn add_opaque(
+        &mut self,
+        input: &MediaOriginInput,
+        scope: InputScope,
+        role: SourceUseRole,
+        cut: OriginCut,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        self.require_owner(&input.owner, writer)?;
+        self.complete = false;
+        self.cut(cut);
+        if input.details_limited {
+            self.cut(OriginCut::InputMetadata);
+        }
+        let actual = input
+            .scope
+            .for_scope(scope)
+            .at_opaque(role, SourceCoordinateOmission::CaptureLimit)
+            .map_err(origin_error::evidence)?;
+        self.retain(actual, self.limit)
+    }
+
     pub(crate) fn include(
         &mut self,
         contribution: &OriginContributions,

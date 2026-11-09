@@ -4,7 +4,7 @@
 use p4kx_extraction::EntryMetadata;
 
 use p4kx_extraction::{
-    Archive, Entry, InputScope, SourceDetails, SourceInput, SourceScope, SourceUses,
+    Archive, Entry, EntryOrigin, InputScope, SourceDetails, SourceInput, SourceScope, SourceUses,
 };
 
 use crate::origin_error;
@@ -28,16 +28,51 @@ impl MediaOriginInput {
         let observed = archive
             .observed_entry(entry)
             .ok_or_else(origin_error::foreign)?;
-        let input = SourceInput::ArchiveView(observed);
+        Self::observe_entry(
+            owner,
+            SourceInput::ArchiveView(observed),
+            entry.path(),
+            entry.metadata(),
+            observed
+                .ancestors()
+                .map(|ancestor| ancestor.map(|entry| (entry.path(), entry.metadata()))),
+            detail_bytes,
+        )
+    }
+
+    pub(crate) fn observe_origin(
+        owner: &SourceUses,
+        origin: &EntryOrigin,
+        detail_bytes: u64,
+    ) -> Result<Self, MediaError> {
+        Self::observe_entry(
+            owner,
+            SourceInput::Archive(origin),
+            origin.entry().path(),
+            origin.entry().metadata(),
+            origin
+                .ancestors()
+                .map(|ancestor| ancestor.map(|entry| (entry.path(), entry.metadata()))),
+            detail_bytes,
+        )
+    }
+
+    fn observe_entry<'a>(
+        owner: &SourceUses,
+        input: SourceInput<'_>,
+        path: &str,
+        metadata: &EntryMetadata,
+        mut ancestors: impl Iterator<Item = Option<(&'a str, &'a EntryMetadata)>>,
+        detail_bytes: u64,
+    ) -> Result<Self, MediaError> {
         let mut scope = owner
             .observe_with_details(input, InputScope::Payload, SourceDetails::CaptureLimited)
             .map_err(origin_error::evidence)?;
         let mut remaining = detail_bytes;
-        let full = charge_details(entry.path(), entry.metadata(), &mut remaining)
-            && observed.ancestors().all(|ancestor| {
-                ancestor.is_none_or(|ancestor| {
-                    charge_details(ancestor.path(), ancestor.metadata(), &mut remaining)
-                })
+        let full = charge_details(path, metadata, &mut remaining)
+            && ancestors.all(|ancestor| {
+                ancestor
+                    .is_none_or(|(path, metadata)| charge_details(path, metadata, &mut remaining))
             });
         if full {
             scope = owner

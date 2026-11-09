@@ -29,6 +29,7 @@ pub(crate) struct ShaderTarget {
 pub(crate) struct ShaderIndex {
     pub(crate) targets: Vec<ShaderTarget>,
     pub(crate) inventory: CandidateInventory,
+    pub(crate) inventory_origins: crate::origin_contributions::OriginContributions,
 }
 
 impl ShaderIndex {
@@ -40,8 +41,12 @@ impl ShaderIndex {
             index: Self {
                 targets: Vec::new(),
                 inventory: CandidateInventory::Complete,
+                inventory_origins: crate::origin_contributions::OriginContributions::independent(
+                    &writer.origins.owner,
+                ),
             },
             requested: writer.has_kind(MediaKind::Shader),
+            inventory_capture: writer.capture_origins(),
         };
         let keys = Cell::new(0);
         let mut traversal = Traversal {
@@ -55,6 +60,7 @@ impl ShaderIndex {
             shaders: None,
         };
         traversal.visit(lookup.archive, &mut Vec::new(), writer, &mut collector)?;
+        collector.index.inventory_origins = collector.inventory_capture.finish();
         Ok(collector.index)
     }
 
@@ -62,7 +68,8 @@ impl ShaderIndex {
         &self,
         positions: &[usize],
         writer: &MediaWriter<'_>,
-    ) -> Result<Vec<ReferenceCandidate>, MediaError> {
+    ) -> Result<Vec<crate::shader_origins::ShaderCandidate>, MediaError> {
+        let observer = writer.origins.observer()?;
         let mut candidates = Vec::new();
         candidates
             .try_reserve_exact(positions.len())
@@ -71,7 +78,14 @@ impl ShaderIndex {
             let target = self.targets.get(*position).ok_or_else(|| {
                 MediaError::Contract("shader candidate is outside its physical index".into())
             })?;
-            candidates.push(target.candidate());
+            candidates.push(crate::shader_origins::ShaderCandidate {
+                value: target.candidate(),
+                evidence: crate::shader_origins::ShaderCandidateInput {
+                    input: observer.original(&target.origin)?,
+                    property: None,
+                    site: None,
+                },
+            });
         }
         Ok(candidates)
     }
@@ -112,6 +126,7 @@ impl ShaderTarget {
 struct Collector {
     index: ShaderIndex,
     requested: bool,
+    inventory_capture: crate::origin_capture::OriginCapture,
 }
 
 impl TraversalVisit for Collector {
@@ -125,6 +140,13 @@ impl TraversalVisit for Collector {
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
+        let input = if lookup.chain.is_empty() {
+            writer.origins.root.as_ref()
+        } else {
+            writer.origins.directory()
+        };
+        self.inventory_capture
+            .include(&crate::origin_lookup::directory(input, writer)?, writer)?;
         for (_, issue) in archive.issues() {
             lookup
                 .input_state()?

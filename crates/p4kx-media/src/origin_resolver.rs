@@ -66,30 +66,39 @@ impl OriginResolver<'_> {
         if let Some(actual) = origin_source::resolve(self, pointer)? {
             return Ok(actual);
         }
-        if let Some(builtin) = self.builtin
-            && origin_data::independent(builtin.profile, pointer)
-        {
+        if let Some(builtin) = self.builtin {
+            return self.builtin_field(pointer, builtin);
+        }
+        Ok(OriginContributions::unknown(self.owner))
+    }
+
+    fn builtin_field(
+        &self,
+        pointer: &str,
+        builtin: &BuiltinOrigins,
+    ) -> Result<OriginContributions, MediaError> {
+        if origin_data::independent(builtin.profile, pointer) {
             return Ok(OriginContributions::independent(self.owner));
         }
-        if let Some(builtin) = self.builtin {
-            let scope = match origin_data::scope(builtin.profile, pointer) {
-                origin_data::ScopeMapping::Unmapped => None,
-                origin_data::ScopeMapping::BuiltinScope => Some(builtin.scope),
-                origin_data::ScopeMapping::SpecificScope(scope) => Some(scope),
-            };
-            if let Some(scope) = scope {
-                return self.capture_input(
-                    &builtin.input,
-                    scope,
-                    pointer,
-                    origin_data::role(builtin.profile, pointer),
-                );
-            }
-        }
-        if let Some(builtin) = self.builtin
-            && within(pointer, "/subresource")
-            && pointer != "/subresource/namespace"
+        if builtin.profile == OriginProfile::MaterialLibrary
+            && crate::origin_material_profile::authored(pointer)
         {
+            return self.material_authored(pointer, builtin);
+        }
+        let scope = match origin_data::scope(builtin.profile, pointer) {
+            origin_data::ScopeMapping::Unmapped => None,
+            origin_data::ScopeMapping::BuiltinScope => Some(builtin.scope),
+            origin_data::ScopeMapping::SpecificScope(scope) => Some(scope),
+        };
+        if let Some(scope) = scope {
+            return self.capture_input(
+                &builtin.input,
+                scope,
+                pointer,
+                origin_data::role(builtin.profile, pointer),
+            );
+        }
+        if within(pointer, "/subresource") && pointer != "/subresource/namespace" {
             return self.capture_input(
                 &builtin.input,
                 builtin.scope,
@@ -97,12 +106,49 @@ impl OriginResolver<'_> {
                 SourceUseRole::Conversion,
             );
         }
-        if self.builtin.is_some() && is_record_control(pointer) {
+        if crate::origin_material_profile::owns(builtin.profile) && within(pointer, "/issues") {
+            if crate::origin_material_profile::issue_independent(builtin.profile, pointer) {
+                return Ok(OriginContributions::independent(self.owner));
+            }
+            return self.capture_input(
+                &builtin.input,
+                builtin.scope,
+                pointer,
+                SourceUseRole::Conversion,
+            );
+        }
+        if is_record_control(pointer) {
             return Ok(OriginContributions::independent(self.owner));
         }
         Ok(OriginContributions::unknown(self.owner))
     }
-
+    fn material_authored(
+        &self,
+        pointer: &str,
+        builtin: &BuiltinOrigins,
+    ) -> Result<OriginContributions, MediaError> {
+        let mut capture = OriginCapture::with_limit(self.owner, self.detail_bytes);
+        for role in [SourceUseRole::Conversion, SourceUseRole::Selector] {
+            capture.include_original(&self.capture_input(
+                &builtin.input,
+                InputScope::Payload,
+                pointer,
+                role,
+            )?)?;
+        }
+        if ["/lexeme", "/binary_text", "/namespace"]
+            .iter()
+            .any(|suffix| pointer.ends_with(suffix))
+        {
+            capture.include_original(&self.capture_input(
+                &builtin.input,
+                InputScope::Payload,
+                "/data/payload/authored/encoding",
+                SourceUseRole::Selector,
+            )?)?;
+        }
+        Ok(capture.finish())
+    }
     pub(crate) fn capture_input(
         &self,
         input: &MediaOriginInput,

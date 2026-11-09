@@ -61,6 +61,20 @@ impl PreparedRecordOrigins {
         self.addresses.insert(path, contributions)
     }
 
+    /// Shares one actual typed source value's contributions across its serialized components.
+    pub(crate) fn insert_subtree(
+        &mut self,
+        path: &FieldPath,
+        contributions: OriginContributions,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        self.require_writer(writer)?;
+        if !self.owner.is_same_inventory(&contributions.owner) {
+            return Err(origin_error::foreign());
+        }
+        self.addresses.insert_subtree(path, contributions)
+    }
+
     pub(crate) fn set_builtin(&mut self, builtin: BuiltinOrigins) -> Result<(), MediaError> {
         if !self.owner.is_same_inventory(&builtin.input.owner) {
             return Err(origin_error::foreign());

@@ -4,7 +4,8 @@
 use std::borrow::Cow;
 
 use p4kx_extraction::model::{
-    MaterialError, MaterialLibrary, MaterialReadError, MaterialSourceLimits,
+    MaterialError, MaterialLibrary, MaterialReadError, MaterialReadObservation,
+    MaterialSourceLimits,
 };
 use p4kx_extraction::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
 
@@ -26,21 +27,54 @@ pub(crate) fn project(
     limits: MaterialSourceLimits,
     writer: &mut MediaWriter<'_>,
 ) -> Result<Projection, MediaError> {
+    project_observed(context, limits, writer, |_| Ok(()))
+}
+
+pub(crate) fn project_observed(
+    context: &SourceContext<'_>,
+    limits: MaterialSourceLimits,
+    writer: &mut MediaWriter<'_>,
+    mut before_capture: impl FnMut(MaterialReadObservation<'_>) -> Result<(), MediaError>,
+) -> Result<Projection, MediaError> {
     let bound = count(limits.source_bytes)?;
     if context.source.size > bound {
-        return failed(MaterialFailureReason::SourceBytes { limit: bound }, writer);
+        return failed(
+            context,
+            MaterialFailureReason::SourceBytes { limit: bound },
+            writer,
+        );
     }
     let bytes = retained_payload::read(context, writer)?;
-    let library = match MaterialLibrary::parse_with(context.entry.path(), &bytes, limits, || {
-        writer.checkpoint()
-    }) {
+    let mut reads = crate::material_read_origins::MaterialReadOrigins::default();
+    let detail_bytes = writer.limits().record_bytes;
+    let library = match MaterialLibrary::parse_with_observer(
+        context.entry.path(),
+        &bytes,
+        limits,
+        || writer.checkpoint(),
+        |observation| {
+            before_capture(observation)?;
+            writer.checkpoint()?;
+            reads.observe(observation, detail_bytes);
+            Ok(())
+        },
+    ) {
         Ok(library) => library,
         Err(MaterialReadError::Interrupted(error)) => return Err(error),
-        Err(MaterialReadError::Material(error)) => return failed(reason(&error)?, writer),
-        Err(_) => return failed(MaterialFailureReason::UnsupportedReader, writer),
+        Err(MaterialReadError::Material(error)) => return failed(context, reason(&error)?, writer),
+        Err(_) => return failed(context, MaterialFailureReason::UnsupportedReader, writer),
     };
+    write_library(context, &library, reads, writer)
+}
+
+fn write_library(
+    context: &SourceContext<'_>,
+    library: &MaterialLibrary,
+    reads: crate::material_read_origins::MaterialReadOrigins,
+    writer: &mut MediaWriter<'_>,
+) -> Result<Projection, MediaError> {
     writer.checkpoint()?;
-    let authored = MaterialLibrarySourceInfo::of(&library);
+    let authored = MaterialLibrarySourceInfo::of(library);
     let materials: Vec<_> = library
         .materials
         .iter()
@@ -56,9 +90,11 @@ pub(crate) fn project(
         && materials
             .iter()
             .all(|material| material.authored.is_complete());
-    let issues = diagnoses(&library, complete);
-    let references = material_reference::project(&library, context, writer)?;
-    let shader_references = crate::material_shader_reference::project(&library, context, writer)?;
+    let issues = diagnoses(library, complete);
+    let mut origins = crate::origin_material::library(context, library, reads, writer)?;
+    let references = material_reference::project(library, context, &mut origins, writer)?;
+    let shader_references =
+        crate::material_shader_reference::project(library, context, &mut origins, writer)?;
     let metadata = MaterialLibraryMetadata {
         path: Cow::Borrowed(&library.path),
         single: library.single,
@@ -71,7 +107,7 @@ pub(crate) fn project(
         projection_complete: complete,
     };
     let payload = MaterialPayload::Library(&metadata);
-    writer.record(
+    writer.record_with_origins(
         &Subresource::new(LIBRARY_NAMESPACE, Vec::new()),
         if complete {
             Status::Complete
@@ -80,6 +116,7 @@ pub(crate) fn project(
         },
         &payload,
         &issues,
+        origins,
     )?;
     Ok(Projection::Written)
 }
@@ -132,11 +169,13 @@ fn count(value: usize) -> Result<u64, MediaError> {
 }
 
 fn failed(
+    context: &SourceContext<'_>,
     reason: MaterialFailureReason,
     writer: &mut MediaWriter<'_>,
 ) -> Result<Projection, MediaError> {
+    let origins = crate::origin_material::failure(context, &reason, writer)?;
     let data = MaterialPayload::Failure(MaterialProjectionFailure { reason });
-    writer.record(&Subresource::new(FAILURE_NAMESPACE, Vec::new()), Status::Failed, &data,
-        &[MediaIssue::new("material.source.failed", "material", Severity::Error, "Structured material projection failed; the common source envelope identifies the independently retained original decoded bytes.")])?;
+    writer.record_with_origins(&Subresource::new(FAILURE_NAMESPACE, Vec::new()), Status::Failed, &data,
+        &[MediaIssue::new("material.source.failed", "material", Severity::Error, "Structured material projection failed; the common source envelope identifies the independently retained original decoded bytes.")], origins)?;
     Ok(Projection::Written)
 }

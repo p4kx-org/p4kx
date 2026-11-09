@@ -56,11 +56,18 @@ mod kind;
 mod limits;
 mod lock_namespace;
 mod lookup_work;
+#[cfg(test)]
+mod material_observer_support;
+#[cfg(test)]
+mod material_observer_tests;
 mod material_payload;
 mod material_projection;
 mod material_provider;
+mod material_read_origins;
 mod material_reference;
+mod material_reference_origins;
 mod material_schema;
+mod material_shader_origins;
 mod material_shader_reference;
 mod material_shader_tokens;
 mod material_surface;
@@ -100,10 +107,17 @@ mod origin_inventory_tests;
 mod origin_inventory_wire;
 mod origin_json;
 mod origin_line_reader;
+mod origin_lookup;
+mod origin_material;
+mod origin_material_profile;
+#[cfg(test)]
+mod origin_material_tests;
+mod origin_observer;
 mod origin_payload_read;
 #[cfg(test)]
 mod origin_pipeline_tests;
 mod origin_prepared;
+mod origin_prepared_source;
 #[cfg(test)]
 mod origin_profile_tests;
 mod origin_read_policy;
@@ -113,6 +127,7 @@ mod origin_read_support;
 mod origin_record_aggregate_tests;
 #[cfg(test)]
 mod origin_record_budget_tests;
+mod origin_reference;
 mod origin_resolver;
 mod origin_rows_read;
 #[cfg(test)]
@@ -157,10 +172,13 @@ mod shader_flags;
 mod shader_index;
 mod shader_input;
 mod shader_lookup;
+mod shader_lookup_flags;
 mod shader_mask;
+mod shader_origins;
 mod shader_payload;
 mod shader_projection;
 mod shader_provider;
+mod shader_read_origins;
 mod shader_schema;
 mod shader_source;
 mod shader_span;

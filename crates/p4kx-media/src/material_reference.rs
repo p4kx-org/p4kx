@@ -45,22 +45,34 @@ pub struct MaterialReference {
 pub(crate) fn project(
     library: &MaterialLibrary,
     context: &SourceContext<'_>,
+    origins: &mut crate::origin_prepared::PreparedRecordOrigins,
     writer: &mut MediaWriter<'_>,
 ) -> Result<Vec<MaterialReference>, MediaError> {
     let mut references = Vec::new();
     if let Some(palette) = &library.default_palette {
-        references.push(declaration(
-            MaterialReferenceRole::DefaultPalette,
-            None,
-            None,
-            None,
-            palette,
+        append(
+            &mut references,
+            Declaration {
+                role: MaterialReferenceRole::DefaultPalette,
+                material: None,
+                slot: None,
+                submaterial: None,
+                token: palette,
+            },
             context,
+            origins,
             writer,
-        )?);
+        )?;
     }
     for (material_index, material) in library.materials.iter().enumerate() {
-        append_material(&mut references, material_index, material, context, writer)?;
+        append_material(
+            &mut references,
+            material_index,
+            material,
+            context,
+            origins,
+            writer,
+        )?;
     }
     Ok(references)
 }
@@ -70,20 +82,25 @@ fn append_material(
     material_index: usize,
     material: &Material,
     context: &SourceContext<'_>,
+    origins: &mut crate::origin_prepared::PreparedRecordOrigins,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     for (layer_index, layer) in material.layers.iter().enumerate() {
         writer.checkpoint()?;
         if let Some(path) = layer.attribute("Path") {
-            references.push(declaration(
-                MaterialReferenceRole::LayerLibrary,
-                Some(material_index),
-                Some(layer_index),
-                layer.attribute("Submtl"),
-                path,
+            append(
+                references,
+                Declaration {
+                    role: MaterialReferenceRole::LayerLibrary,
+                    material: Some(material_index),
+                    slot: Some(layer_index),
+                    submaterial: layer.attribute("Submtl"),
+                    token: path,
+                },
                 context,
+                origins,
                 writer,
-            )?);
+            )?;
         }
     }
     for (texture_index, texture) in material.textures.iter().enumerate() {
@@ -93,40 +110,70 @@ fn append_material(
         } else {
             MaterialReferenceRole::Texture
         };
-        references.push(declaration(
-            role,
-            Some(material_index),
-            Some(texture_index),
-            None,
-            &texture.file,
+        append(
+            references,
+            Declaration {
+                role,
+                material: Some(material_index),
+                slot: Some(texture_index),
+                submaterial: None,
+                token: &texture.file,
+            },
             context,
+            origins,
             writer,
-        )?);
+        )?;
     }
     Ok(())
 }
-fn declaration(
+
+struct Declaration<'a> {
     role: MaterialReferenceRole,
     material: Option<usize>,
     slot: Option<usize>,
-    submaterial: Option<&str>,
-    token: &str,
+    submaterial: Option<&'a str>,
+    token: &'a str,
+}
+
+fn append(
+    references: &mut Vec<MaterialReference>,
+    declaration: Declaration<'_>,
     context: &SourceContext<'_>,
+    origins: &mut crate::origin_prepared::PreparedRecordOrigins,
     writer: &mut MediaWriter<'_>,
-) -> Result<MaterialReference, MediaError> {
-    let original = if matches!(&role, MaterialReferenceRole::EnginePlaceholder) {
-        OriginalIdentifier::try_new_with_text("p4kx.material.engine-placeholder", token)?
+) -> Result<(), MediaError> {
+    let original = if matches!(declaration.role, MaterialReferenceRole::EnginePlaceholder) {
+        OriginalIdentifier::try_new_with_text(
+            "p4kx.material.engine-placeholder",
+            declaration.token,
+        )?
     } else {
-        OriginalIdentifier::new_with_path(token)
+        OriginalIdentifier::new_with_path(declaration.token)
     };
-    let reference = resolve(&role, token, original, context, writer)?;
-    Ok(MaterialReference {
-        role,
-        material,
-        slot,
-        submaterial: submaterial.map(str::to_owned),
-        reference,
-    })
+    let resolution = resolve(
+        &declaration.role,
+        declaration.token,
+        original,
+        context,
+        writer,
+    )?;
+    let reference = MaterialReference {
+        role: declaration.role,
+        material: declaration.material,
+        slot: declaration.slot,
+        submaterial: declaration.submaterial.map(str::to_owned),
+        reference: resolution.reference,
+    };
+    crate::material_reference_origins::write(
+        references.len(),
+        &reference,
+        &resolution.origins,
+        context,
+        origins,
+        writer,
+    )?;
+    references.push(reference);
+    Ok(())
 }
 
 fn resolve(
@@ -135,7 +182,7 @@ fn resolve(
     original: OriginalIdentifier,
     context: &SourceContext<'_>,
     writer: &mut MediaWriter<'_>,
-) -> Result<Reference, MediaError> {
+) -> Result<crate::material_reference_origins::MaterialResolution, MediaError> {
     let (path, kind) = match role {
         MaterialReferenceRole::LayerLibrary => (
             p4kx_extraction::model::material_library_path(token)
@@ -148,21 +195,42 @@ fn resolve(
             None,
         ),
         MaterialReferenceRole::EnginePlaceholder | MaterialReferenceRole::DefaultPalette => {
-            return writer.resolve_reference(
-                original,
-                std::iter::empty(),
-                CandidateInventory::Unavailable(ReferenceUnavailable::TargetNotRead),
-            );
+            return unavailable(original, ReferenceUnavailable::TargetNotRead, writer);
         }
     };
-    match path {
-        Some(path) => context
-            .directory
-            .resolve_path(original, &path, kind, writer),
-        None => writer.resolve_reference(
+    let Some(path) = path else {
+        return unavailable(original, ReferenceUnavailable::InvalidIdentifier, writer);
+    };
+    let observed = context
+        .directory
+        .lookup_input_observed(original, &path, kind, writer)?;
+    Ok(crate::material_reference_origins::MaterialResolution {
+        reference: observed.lookup.reference,
+        origins: crate::material_reference_origins::MaterialReferenceProof {
+            evidence: observed.evidence,
+            inventory: observed.inventory,
+        },
+    })
+}
+
+fn unavailable(
+    original: OriginalIdentifier,
+    reason: ReferenceUnavailable,
+    writer: &mut MediaWriter<'_>,
+) -> Result<crate::material_reference_origins::MaterialResolution, MediaError> {
+    let (reference, evidence) = writer
+        .try_resolve_reference_observed::<crate::origin_input::MediaOriginInput>(
             original,
             std::iter::empty(),
-            CandidateInventory::Unavailable(ReferenceUnavailable::InvalidIdentifier),
-        ),
-    }
+            CandidateInventory::Unavailable(reason),
+        )?;
+    Ok(crate::material_reference_origins::MaterialResolution {
+        reference,
+        origins: crate::material_reference_origins::MaterialReferenceProof {
+            evidence,
+            inventory: crate::origin_contributions::OriginContributions::independent(
+                &writer.origins.owner,
+            ),
+        },
+    })
 }

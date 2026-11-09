@@ -31,6 +31,12 @@ pub(crate) fn scope(profile: OriginProfile, pointer: &str) -> ScopeMapping {
         OriginProfile::ShaderFailure
         | OriginProfile::ShaderSourceLimit
         | OriginProfile::ShaderConfigurationFailure => failure_scope(profile, data),
+        OriginProfile::MaterialLibrary
+        | OriginProfile::MaterialFailure
+        | OriginProfile::MaterialSourceLimit
+        | OriginProfile::MaterialConfigurationFailure => {
+            crate::origin_material_profile::scope(profile, data)
+        }
         OriginProfile::Unmigrated => ScopeMapping::Unmapped,
     }
 }
@@ -103,6 +109,12 @@ pub(crate) fn independent(profile: OriginProfile, pointer: &str) -> bool {
                 || pointer == "/data/payload/name_origin"
                 || failure_control(profile, pointer)
         }
+        OriginProfile::MaterialLibrary
+        | OriginProfile::MaterialFailure
+        | OriginProfile::MaterialSourceLimit
+        | OriginProfile::MaterialConfigurationFailure => {
+            crate::origin_material_profile::independent(profile, pointer)
+        }
         OriginProfile::ArchiveEntry | OriginProfile::Unmigrated => false,
     }
 }
@@ -127,6 +139,9 @@ fn failure_control(profile: OriginProfile, pointer: &str) -> bool {
 }
 
 pub(crate) fn role(profile: OriginProfile, pointer: &str) -> SourceUseRole {
+    if crate::origin_material_profile::owns(profile) {
+        return crate::origin_material_profile::role(profile, pointer);
+    }
     let converted = match profile {
         OriginProfile::ArchiveLayout => pointer.contains("/artifact/digest"),
         OriginProfile::ShaderFailure

@@ -93,7 +93,11 @@ impl MediaWriter<'_> {
             | OriginProfile::ShaderFailure => InputScope::Payload,
             OriginProfile::ArchiveEntry
             | OriginProfile::ArchiveLayout
-            | OriginProfile::Unmigrated => {
+            | OriginProfile::Unmigrated
+            | OriginProfile::MaterialLibrary
+            | OriginProfile::MaterialFailure
+            | OriginProfile::MaterialSourceLimit
+            | OriginProfile::MaterialConfigurationFailure => {
                 return Err(MediaError::Contract(
                     "shader producer used a foreign origin profile".into(),
                 ));

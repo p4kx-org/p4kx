@@ -108,6 +108,52 @@ impl<'a> DirectoryLookup<'a> {
         kind: Option<MediaKind>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<InputLookup<'_>, MediaError> {
+        self.lookup_observed(original, path, kind, writer, |_| Ok(()))
+            .map(|(lookup, _)| lookup)
+    }
+
+    pub(crate) fn lookup_input_observed(
+        &self,
+        original: OriginalIdentifier,
+        path: &str,
+        kind: Option<MediaKind>,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<crate::origin_lookup::ObservedInputLookup<'_>, MediaError> {
+        let observer = writer.origins.observer()?;
+        let (lookup, evidence) = self.lookup_observed(original, path, kind, writer, |entry| {
+            observer.entry(self.index.archive, entry)
+        })?;
+        let inventory = if evidence.inventory_used {
+            let input = if self.chain.is_empty() {
+                writer.origins.root.as_ref()
+            } else {
+                writer.origins.directory()
+            };
+            crate::origin_lookup::directory(input, writer)?
+        } else {
+            crate::origin_contributions::OriginContributions::independent(&writer.origins.owner)
+        };
+        Ok(crate::origin_lookup::ObservedInputLookup {
+            lookup,
+            evidence,
+            inventory,
+        })
+    }
+
+    fn lookup_observed<E>(
+        &self,
+        original: OriginalIdentifier,
+        path: &str,
+        kind: Option<MediaKind>,
+        writer: &mut MediaWriter<'_>,
+        mut observe: impl FnMut(&Entry) -> Result<E, MediaError>,
+    ) -> Result<
+        (
+            InputLookup<'_>,
+            crate::reference_resolve::ReferenceObservations<E>,
+        ),
+        MediaError,
+    > {
         let source_allowance = self.allowance(writer.limits().sources);
         let work = LookupWork {
             checkpoint: writer.checkpoint,
@@ -127,10 +173,11 @@ impl<'a> DirectoryLookup<'a> {
                 let entry = entry.map_err(directory_index::error)?;
                 observed += 1;
                 position = Some(entry.index());
-                Ok(self.candidate(entry, kind, requested))
+                let evidence = observe(entry)?;
+                Ok((self.candidate(entry, kind, requested), evidence))
             });
-        let reference =
-            writer.try_resolve_reference(original, candidates, self.index.inventory())?;
+        let (reference, evidence) =
+            writer.try_resolve_reference_observed(original, candidates, self.index.inventory())?;
         let usable = reference.candidates_complete
             && observed == 1
             && matches!(
@@ -146,7 +193,7 @@ impl<'a> DirectoryLookup<'a> {
         } else {
             None
         };
-        Ok(InputLookup { reference, input })
+        Ok((InputLookup { reference, input }, evidence))
     }
 
     /// Visits all physical texture-family candidates without reading or resolving any target.

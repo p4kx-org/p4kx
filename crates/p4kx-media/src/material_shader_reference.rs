@@ -8,8 +8,8 @@ use serde::Serialize;
 use crate::material_shader_tokens::{self, Tokens};
 use crate::shader_lookup::ShaderBinding;
 use crate::{
-    CandidateInventory, InputReceipt, MediaError, MediaWriter, OriginalIdentifier, Reference,
-    ReferenceUnavailable, SourceContext, Subresource,
+    InputReceipt, MediaError, MediaWriter, OriginalIdentifier, Reference, ReferenceUnavailable,
+    SourceContext, Subresource,
 };
 
 /// Original MTL token role, without assigning a rendered material effect.
@@ -51,93 +51,141 @@ pub struct MaterialShaderReference {
 pub(crate) fn project(
     library: &MaterialLibrary,
     context: &SourceContext<'_>,
+    origins: &mut crate::origin_prepared::PreparedRecordOrigins,
     writer: &mut MediaWriter<'_>,
 ) -> Result<Vec<MaterialShaderReference>, MediaError> {
     let mut references = Vec::new();
     let mut remaining = writer.limits().record_bytes;
+    let mut buffer = ReferenceBuffer {
+        references: &mut references,
+        remaining: &mut remaining,
+        origins,
+    };
     for index in 0..library.materials.len() {
         writer.checkpoint()?;
         if let Some(node) = material_shader_tokens::node(library, index) {
-            project_node(
-                index,
-                node,
-                context,
-                &mut references,
-                &mut remaining,
-                writer,
-            )?;
+            project_node(index, node, context, &mut buffer, writer)?;
         }
     }
     Ok(references)
+}
+
+struct ReferenceBuffer<'a> {
+    references: &'a mut Vec<MaterialShaderReference>,
+    remaining: &'a mut u64,
+    origins: &'a mut crate::origin_prepared::PreparedRecordOrigins,
+}
+
+impl ReferenceBuffer<'_> {
+    fn emit(
+        &mut self,
+        reference: MaterialShaderReference,
+        shader_attribute: Option<usize>,
+        origins: &crate::shader_origins::ShaderReferenceOrigins,
+        context: &SourceContext<'_>,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        let position = self.references.len();
+        append(self.references, self.remaining, reference, writer)?;
+        let reference = self.references.get(position).ok_or_else(|| {
+            MediaError::Contract("appended material shader reference disappeared".into())
+        })?;
+        crate::material_shader_origins::write(
+            position,
+            reference,
+            shader_attribute,
+            origins,
+            context,
+            self.origins,
+            writer,
+        )
+    }
 }
 
 fn project_node(
     index: usize,
     node: &RawElement,
     context: &SourceContext<'_>,
-    references: &mut Vec<MaterialShaderReference>,
-    remaining: &mut u64,
+    buffer: &mut ReferenceBuffer<'_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let mut shader = None;
     let unique = material_shader_tokens::attributes(node, "Shader").count() == 1;
-    let mut binding = None;
+    let mut scope = FlagScope {
+        shader: None,
+        shader_attribute: None,
+        binding: None,
+    };
     for (attribute_index, attribute) in material_shader_tokens::attributes(node, "Shader") {
-        let use_at = use_at(index, attribute_index, None)?;
-        let resolved = context
-            .directory
-            .shaders
-            .map(|lookup| lookup.shader(&attribute.value, &use_at, writer))
-            .transpose()?;
-        let (reference, input) = if let Some(resolved) = &resolved {
-            (resolved.reference.clone(), resolved.input.clone())
-        } else {
-            (
-                unavailable(
-                    "p4kx.shader.name",
-                    &attribute.value,
-                    ReferenceUnavailable::TargetNotRead,
-                    writer,
-                )?,
-                None,
-            )
-        };
-        append(
-            references,
-            remaining,
+        let resolved = project_shader(index, attribute_index, attribute, context, buffer, writer)?;
+        if unique {
+            scope.shader = Some(attribute.value.as_str());
+            scope.shader_attribute = Some(attribute_index);
+            scope.binding = resolved;
+        }
+    }
+    project_flags(index, node, context, &scope, buffer, writer)
+}
+
+fn project_shader<'lookup>(
+    index: usize,
+    attribute_index: usize,
+    attribute: &p4kx_extraction::model::AuthoredAttribute,
+    context: &SourceContext<'lookup>,
+    buffer: &mut ReferenceBuffer<'_>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<Option<ShaderBinding<'lookup>>, MediaError> {
+    let use_at = use_at(index, attribute_index, None)?;
+    let resolved = context
+        .directory
+        .shaders
+        .map(|lookup| lookup.shader(&attribute.value, &use_at, writer))
+        .transpose()?;
+    if let Some(value) = &resolved {
+        buffer.emit(
             MaterialShaderReference {
                 material: index,
                 attribute_index,
                 token_index: None,
                 role: MaterialShaderRole::Shader,
                 shader: Some(attribute.value.clone()),
-                reference,
-                input,
+                reference: value.reference.clone(),
+                input: value.input.clone(),
             },
+            Some(attribute_index),
+            &value.origins,
+            context,
             writer,
         )?;
-        if unique {
-            shader = Some(attribute.value.as_str());
-            binding = resolved;
-        }
+    } else {
+        let value = unavailable(
+            "p4kx.shader.name",
+            &attribute.value,
+            ReferenceUnavailable::TargetNotRead,
+            writer,
+        )?;
+        buffer.emit(
+            MaterialShaderReference {
+                material: index,
+                attribute_index,
+                token_index: None,
+                role: MaterialShaderRole::Shader,
+                shader: Some(attribute.value.clone()),
+                reference: value.reference,
+                input: value.input,
+            },
+            Some(attribute_index),
+            &value.origins,
+            context,
+            writer,
+        )?;
     }
-    project_flags(
-        index,
-        node,
-        context,
-        &FlagScope {
-            shader,
-            binding: binding.as_ref(),
-        },
-        references,
-        remaining,
-        writer,
-    )
+    Ok(resolved)
 }
 
-struct FlagScope<'a, 'lookup> {
-    shader: Option<&'a str>,
-    binding: Option<&'a ShaderBinding<'lookup>>,
+struct FlagScope<'source, 'lookup> {
+    shader: Option<&'source str>,
+    shader_attribute: Option<usize>,
+    binding: Option<ShaderBinding<'lookup>>,
 }
 
 fn project_flags(
@@ -145,45 +193,41 @@ fn project_flags(
     node: &RawElement,
     context: &SourceContext<'_>,
     scope: &FlagScope<'_, '_>,
-    references: &mut Vec<MaterialShaderReference>,
-    remaining: &mut u64,
+    buffer: &mut ReferenceBuffer<'_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     for (attribute_index, attribute) in material_shader_tokens::attributes(node, "StringGenMask") {
         for (ordinal, token) in Tokens::new(&attribute.value).enumerate() {
             let ordinal = crate::shader_values::count(ordinal)?;
             let location = use_at(index, attribute_index, Some(ordinal))?;
-            let (reference, input) = match (context.directory.shaders, scope.binding) {
+            let resolved = match (context.directory.shaders, scope.binding.as_ref()) {
                 (Some(lookup), Some(binding)) => lookup.flag(binding, token, &location, writer)?,
-                _ => (
-                    unavailable(
-                        "p4kx.shader.flag",
-                        token,
-                        ReferenceUnavailable::UnsupportedLayout,
-                        writer,
-                    )?,
-                    None,
-                ),
+                _ => unavailable(
+                    "p4kx.shader.flag",
+                    token,
+                    ReferenceUnavailable::UnsupportedLayout,
+                    writer,
+                )?,
             };
-            append(
-                references,
-                remaining,
+            buffer.emit(
                 MaterialShaderReference {
                     material: index,
                     attribute_index,
                     token_index: Some(ordinal),
                     role: MaterialShaderRole::Flag,
                     shader: scope.shader.map(str::to_owned),
-                    reference,
-                    input,
+                    reference: resolved.reference,
+                    input: resolved.input,
                 },
+                scope.shader_attribute,
+                &resolved.origins,
+                context,
                 writer,
             )?;
         }
     }
     Ok(())
 }
-
 fn use_at(
     material: usize,
     attribute: usize,
@@ -204,11 +248,11 @@ fn unavailable(
     token: &str,
     reason: ReferenceUnavailable,
     writer: &mut MediaWriter<'_>,
-) -> Result<Reference, MediaError> {
-    writer.resolve_reference(
+) -> Result<crate::shader_origins::ShaderFlagBinding, MediaError> {
+    crate::shader_origins::unavailable(
         OriginalIdentifier::try_new_with_text(namespace, token)?,
-        std::iter::empty(),
-        CandidateInventory::Unavailable(reason),
+        reason,
+        writer,
     )
 }
 

@@ -63,6 +63,18 @@ impl OriginState {
         MediaOriginInput::observe(&self.owner, archive, entry, self.detail_bytes)
     }
 
+    pub(crate) fn observer(&self) -> Result<crate::origin_observer::OriginObserver, MediaError> {
+        Ok(crate::origin_observer::OriginObserver {
+            owner: self.owner.clone(),
+            root: self
+                .root_input
+                .get()
+                .ok_or_else(origin_error::foreign)?
+                .clone(),
+            detail_bytes: self.detail_bytes,
+        })
+    }
+
     pub(crate) fn directory(&self) -> Option<&MediaOriginInput> {
         self.directories.last()
     }

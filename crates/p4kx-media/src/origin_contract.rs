@@ -66,6 +66,14 @@ pub enum OriginProfile {
     ShaderSourceLimit,
     /// Reader configuration refusal before source-content inspection.
     ShaderConfigurationFailure,
+    /// Successfully parsed material library and its actually used companions.
+    MaterialLibrary,
+    /// Material parser failure after actual source-content inspection.
+    MaterialFailure,
+    /// Material source-size refusal before content inspection.
+    MaterialSourceLimit,
+    /// Invalid material reader configuration without a content contribution.
+    MaterialConfigurationFailure,
 }
 
 /// Exact occurrence and field counts for one payload stream.

@@ -185,3 +185,61 @@ Verification lives in the Extraction field-origin, reader-admission, runtime-han
 ancestor and path-index observer tests. Whole-file hash-seam integration and actual
 per-field Media emission require their owning producer tests; the shared foundation
 alone is not evidence that those output carriers are complete.
+## Material Media origins
+
+The owning Material provider selects the closed `materialLibrary`, `materialFailure`,
+`materialSourceLimit` or `materialConfigurationFailure` profile. These profiles extend
+`p4kx.field-origins/1` for the unreleased 0.5.0 contract; Material payload versions and
+serialized payload bytes remain unchanged. A public provider's matching capability or
+namespace does not grant a built-in profile.
+
+Every emitted Material JSON node has its own immediate origin. Container nodes combine
+actual retained children and applicable structure selectors. A source-derived default
+retains the source field/disposition selector even when its result equals a literal.
+Fixed surface basis, unapplied tint/decal controls, namespace tags and configured failure
+bounds remain independent tool values. Parse failures retain content contributions;
+source-size refusals use directory metadata, and invalid configuration adds no content
+contribution. Observations from a wholly failed typed parse do not become successful
+field inputs.
+
+The Model observer reports the actual chosen branch during its single parse. Neutral
+observations are staged until success, then bound to the original MTL input. A
+`material.xml` site's indices are original XML child ordinals from the library root;
+its field names identify actual queried attributes or structure selectors. Authored
+syntax uses logical retained-projection coordinates and Conversion/Selector roles;
+nullable lexical, namespace and binary-text facts additionally retain the actual
+encoding selector. A generated null never claims a stored source-null payload. Palette
+origins retain consulted predecessors and the chosen branch, including absence/default
+selectors, and exclude unused later layers and unused fallback branches. Typed scalar,
+vector and float wrapper children share that field's actual interpretation inputs.
+An independently cut authored tree cannot erase these observations.
+
+Material layer/texture reference sites use declaration coordinates instead of XML byte
+positions: `material-layer-declaration` and `material-texture-declaration` indices are
+material and retained typed slot ordinals. `material-shader-reference` indices are
+material, original authored attribute and optional selected-token ordinals. These
+coordinates never claim an XML attribute or byte offset.
+
+Reference origins use observations from the original candidate enumeration and central
+admission loop. Retained candidates preserve order and duplicate occurrences. A bounded
+cut retains the first observed discarded candidate without consulting the remaining
+tail. Copied target Entry paths use their actual metadata and current MTL selector;
+resolution, completeness and uniqueness additionally use the original directory
+inventory when that inventory contributes. A whole Archive-file inventory has unknown
+encryption; it cannot certify a plain root. Nested directory inventory uses the actual
+containing Entry payload. Merely mentioning a target never contributes its payload.
+
+Shader reads keep the original private input handle through cache reuse. Each Material
+binding supplies fresh current-token selectors without replaying a parse, lookup or
+hash. `shader-property` coordinates retain original Property declaration and Name-field
+ordinals. Only admitted candidate prefixes and consulted Name/flag predicates contribute
+to Property resolution. An input receipt's digest separately uses its actually completed
+whole-payload hash. Source descriptions, digests, identifiers and rewritten `use_at`
+values cannot recreate original evidence.
+
+Optional site capture is bounded independently per typed field by the existing record
+metadata allowance. A cut emits incomplete provenance and keeps an opaque original
+source witness, including known encryption. It does not alter payload admission,
+projection status or reference counters, and it does not consume a different field's
+capture allowance. Receipt validation and generation reuse bind the same original
+source/use inventories and exact occurrence bytes as the other Media profiles.

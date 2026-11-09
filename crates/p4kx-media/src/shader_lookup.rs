@@ -10,9 +10,8 @@ use crate::shader_flags::{self, ShaderRead};
 use crate::shader_index::ShaderIndex;
 use crate::source_selection::SourceSelection;
 use crate::{
-    CandidateInventory, CandidateState, Digest, InputReceipt, MediaError, MediaKind, MediaWriter,
-    OriginalIdentifier, Reference, ReferenceCandidate, ReferenceTarget, ReferenceUnavailable,
-    Subresource,
+    CandidateInventory, CandidateState, Digest, InputReceipt, MediaError, MediaWriter,
+    OriginalIdentifier, Reference, ReferenceUnavailable, Subresource,
 };
 
 pub(crate) struct ShaderLookup<'run> {
@@ -27,7 +26,8 @@ pub(crate) struct ShaderLookup<'run> {
 pub(crate) struct ShaderBinding<'lookup> {
     pub(crate) reference: Reference,
     pub(crate) input: Option<InputReceipt>,
-    candidates: Vec<ReferenceCandidate>,
+    candidates: Vec<crate::shader_origins::ShaderCandidate>,
+    pub(crate) origins: crate::shader_origins::ShaderReferenceOrigins,
     inventory: CandidateInventory,
     read: Option<&'lookup ShaderRead>,
 }
@@ -86,23 +86,42 @@ impl<'run> ShaderLookup<'run> {
         let read = self.unique_read(index, &matches, use_at, writer)?;
         if let (Some(value), Some(candidate)) = (read, candidates.first_mut()) {
             if value.supported {
-                candidate.target.subresource = Some(Subresource::new(
+                candidate.value.target.subresource = Some(Subresource::new(
                     crate::shader_projection::DEFINITION_NAMESPACE,
                     Vec::new(),
                 ));
             } else {
-                candidate.state = CandidateState::Unavailable {
+                candidate.value.state = CandidateState::Unavailable {
                     reason: ReferenceUnavailable::UnsupportedLayout,
                 };
             }
         }
-        let reference =
-            writer.resolve_reference(original, candidates.iter().cloned(), index.inventory)?;
+        let (reference, evidence) = writer.try_resolve_reference_observed(
+            original,
+            candidates
+                .iter()
+                .map(|candidate| Ok((candidate.value.clone(), candidate.evidence.clone()))),
+            index.inventory,
+        )?;
+        let semantic = if evidence.inventory_used
+            || !evidence.retained.is_empty()
+            || evidence.discarded.is_some()
+        {
+            crate::shader_read_origins::layout(read, &candidates, writer)?
+        } else {
+            crate::origin_contributions::OriginContributions::independent(&writer.origins.owner)
+        };
         Ok(ShaderBinding {
             reference,
             input: receipt(read, use_at),
             candidates,
             inventory: index.inventory,
+            origins: crate::shader_origins::ShaderReferenceOrigins {
+                candidates: evidence,
+                inventory: index.inventory_origins.clone(),
+                semantic,
+                read_selected: read.is_some(),
+            },
             read,
         })
     }
@@ -141,76 +160,69 @@ impl<'run> ShaderLookup<'run> {
         token: &str,
         use_at: &Subresource,
         writer: &mut MediaWriter<'_>,
-    ) -> Result<(Reference, Option<InputReceipt>), MediaError> {
+    ) -> Result<crate::shader_origins::ShaderFlagBinding, MediaError> {
         let original = OriginalIdentifier::try_new_with_text("p4kx.shader.flag", token)?;
         let Some(name) =
             shader_flags::symbol(token).filter(|name| name.len() <= self.limits.token_bytes)
         else {
             let result =
                 self.unavailable(original, ReferenceUnavailable::InvalidIdentifier, writer)?;
-            return Ok((result.reference, None));
+            return Ok(crate::shader_origins::ShaderFlagBinding {
+                reference: result.reference,
+                input: None,
+                origins: result.origins,
+            });
         };
         let Some(read) = binding.read.filter(|read| read.supported) else {
-            return Ok((
-                writer.resolve_reference(
-                    original,
-                    binding.candidates.iter().cloned(),
-                    binding.inventory,
-                )?,
-                receipt(binding.read, use_at),
-            ));
+            let (reference, evidence) = writer.try_resolve_reference_observed(
+                original,
+                binding
+                    .candidates
+                    .iter()
+                    .map(|candidate| Ok((candidate.value.clone(), candidate.evidence.clone()))),
+                binding.inventory,
+            )?;
+            let semantic = if evidence.inventory_used
+                || !evidence.retained.is_empty()
+                || evidence.discarded.is_some()
+            {
+                crate::shader_read_origins::layout(binding.read, &binding.candidates, writer)?
+            } else {
+                crate::origin_contributions::OriginContributions::independent(&writer.origins.owner)
+            };
+            return Ok(crate::shader_origins::ShaderFlagBinding {
+                reference,
+                input: receipt(binding.read, use_at),
+                origins: crate::shader_origins::ShaderReferenceOrigins {
+                    candidates: evidence,
+                    inventory: binding.origins.inventory.clone(),
+                    semantic,
+                    read_selected: binding.read.is_some(),
+                },
+            });
         };
-        let (candidates, inventory) = self.flag_candidates(read, name, writer)?;
-        Ok((
-            writer.resolve_reference(original, candidates, inventory)?,
-            receipt(Some(read), use_at),
-        ))
+        let (candidates, inventory) =
+            crate::shader_lookup_flags::candidates(self, read, name, writer)?;
+        let (reference, evidence) = writer.try_resolve_reference_observed(
+            original,
+            candidates
+                .into_iter()
+                .map(|candidate| Ok((candidate.value, candidate.evidence))),
+            inventory,
+        )?;
+        let semantic = crate::shader_read_origins::flag(read, &evidence, writer)?;
+        Ok(crate::shader_origins::ShaderFlagBinding {
+            reference,
+            input: receipt(Some(read), use_at),
+            origins: crate::shader_origins::ShaderReferenceOrigins {
+                candidates: evidence,
+                inventory: binding.origins.inventory.clone(),
+                semantic,
+                read_selected: binding.read.is_some(),
+            },
+        })
     }
 
-    fn flag_candidates(
-        &self,
-        read: &ShaderRead,
-        name: &str,
-        writer: &MediaWriter<'_>,
-    ) -> Result<(Vec<ReferenceCandidate>, CandidateInventory), MediaError> {
-        let source = &read
-            .receipt
-            .as_ref()
-            .ok_or_else(|| MediaError::Contract("parsed shader has no input receipt".into()))?
-            .source;
-        let mut candidates = Vec::new();
-        for property in &read.properties {
-            self.work(
-                property.name.len().min(name.len()).saturating_add(1),
-                writer,
-            )?;
-            if property.name.eq_ignore_ascii_case(name) {
-                candidates.try_reserve(1).map_err(|cause| MediaError::Io {
-                    path: writer.root.clone(),
-                    source: std::io::Error::new(std::io::ErrorKind::OutOfMemory, cause),
-                })?;
-                candidates.push(ReferenceCandidate::new(
-                    ReferenceTarget::new_with_subresource(
-                        source,
-                        MediaKind::Shader,
-                        property.target.clone(),
-                    ),
-                    CandidateState::Selected,
-                ));
-                if crate::shader_values::count(candidates.len())?
-                    > u64::from(writer.limits().reference_candidates)
-                {
-                    break;
-                }
-            }
-        }
-        let inventory = if read.unknown_names || (read.common_flags && candidates.is_empty()) {
-            CandidateInventory::Unavailable(ReferenceUnavailable::UnsupportedLayout)
-        } else {
-            CandidateInventory::Complete
-        };
-        Ok((candidates, inventory))
-    }
     fn unavailable(
         &self,
         original: OriginalIdentifier,
@@ -219,8 +231,24 @@ impl<'run> ShaderLookup<'run> {
     ) -> Result<ShaderBinding<'_>, MediaError> {
         self.work(0, writer)?;
         let inventory = CandidateInventory::Unavailable(reason);
+        let (reference, evidence) = writer
+            .try_resolve_reference_observed::<crate::shader_origins::ShaderCandidateInput>(
+                original,
+                std::iter::empty(),
+                inventory,
+            )?;
         Ok(ShaderBinding {
-            reference: writer.resolve_reference(original, std::iter::empty(), inventory)?,
+            reference,
+            origins: crate::shader_origins::ShaderReferenceOrigins {
+                candidates: evidence,
+                inventory: crate::origin_contributions::OriginContributions::independent(
+                    &writer.origins.owner,
+                ),
+                semantic: crate::origin_contributions::OriginContributions::independent(
+                    &writer.origins.owner,
+                ),
+                read_selected: false,
+            },
             input: None,
             candidates: Vec::new(),
             inventory,

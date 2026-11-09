@@ -9,6 +9,7 @@ use crate::{InputReceipt, MediaError, MediaWriter, Subresource};
 pub(crate) struct NamedProperty {
     pub(crate) name: String,
     pub(crate) target: Subresource,
+    pub(crate) name_ordinal: u64,
 }
 
 pub(crate) struct ShaderRead {
@@ -43,7 +44,11 @@ pub(crate) fn project(
         else {
             continue;
         };
-        for name in property.fields_of(PropertyFieldKind::Name) {
+        for (name_ordinal, name) in property
+            .fields()
+            .enumerate()
+            .filter(|(_, field)| field.property_kind() == Some(PropertyFieldKind::Name))
+        {
             let Some(name) = name.literal().and_then(symbol) else {
                 read.unknown_names = true;
                 continue;
@@ -57,6 +62,7 @@ pub(crate) fn project(
                 })?;
             read.properties.push(NamedProperty {
                 name: name.to_owned(),
+                name_ordinal: crate::shader_values::count(name_ordinal)?,
                 target: Subresource::new(
                     crate::shader_projection::PROPERTY_NAMESPACE,
                     vec![crate::shader_values::count(index)?],

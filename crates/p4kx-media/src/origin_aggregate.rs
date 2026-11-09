@@ -22,7 +22,9 @@ pub(crate) fn resolve(
         OriginSubject::Artifact if pointer.is_empty() || pointer == "/digest" => {
             artifact(resolver, pointer).map(Some)
         }
-        _ if pointer == "/data" || (pointer == "/data/payload" && shader(resolver)) => {
+        _ if pointer == "/data"
+            || (pointer == "/data/payload" && (shader(resolver) || material(resolver))) =>
+        {
             data(resolver, prepared).map(Some)
         }
         _ if pointer.starts_with("/data/")
@@ -47,7 +49,11 @@ fn record(
     if let Some(prepared) = prepared {
         prepared.include_known("", &mut capture)?;
     }
-    capture.include_original(&OriginContributions::unknown(resolver.owner))?;
+    if material(resolver) {
+        capture.include_original(&resolver.resolve("/issues", None)?)?;
+    } else {
+        capture.include_original(&OriginContributions::unknown(resolver.owner))?;
+    }
     Ok(capture.finish())
 }
 
@@ -85,11 +91,15 @@ fn data(
             )?)?;
         } else if builtin.profile != OriginProfile::ArchiveEntry || prepared.is_none() {
             for member in known_members(builtin.profile) {
-                capture.include_original(&resolver.resolve(member, None)?)?;
+                capture.include_original(
+                    &resolver.resolve(member, if material(resolver) { prepared } else { None })?,
+                )?;
             }
         }
     }
-    capture.include_original(&OriginContributions::unknown(resolver.owner))?;
+    if !material(resolver) {
+        capture.include_original(&OriginContributions::unknown(resolver.owner))?;
+    }
     Ok(capture.finish())
 }
 
@@ -122,6 +132,21 @@ const fn known_members(profile: OriginProfile) -> &'static [&'static str] {
             "/data/payload/span",
             "/data/payload/counts",
         ],
+        OriginProfile::MaterialLibrary => &[
+            "/data/payload/path",
+            "/data/payload/single",
+            "/data/payload/default_palette",
+            "/data/payload/unknown_entries",
+            "/data/payload/authored",
+            "/data/payload/materials",
+            "/data/payload/references",
+            "/data/payload/shader_references",
+            "/data/payload/projection_complete",
+        ],
+        OriginProfile::MaterialFailure | OriginProfile::MaterialSourceLimit => {
+            &["/data/payload/reason"]
+        }
+        OriginProfile::MaterialConfigurationFailure => &["/data/record_type"],
         OriginProfile::ArchiveLayout | OriginProfile::Unmigrated => &[],
     }
 }
@@ -139,16 +164,25 @@ fn shader(resolver: &OriginResolver<'_>) -> bool {
         )
     })
 }
+fn material(resolver: &OriginResolver<'_>) -> bool {
+    resolver
+        .builtin
+        .is_some_and(|builtin| crate::origin_material_profile::owns(builtin.profile))
+}
 fn known_data(
     resolver: &OriginResolver<'_>,
     pointer: &str,
     prepared: Option<&PreparedRecordOrigins>,
 ) -> Result<OriginContributions, MediaError> {
     let mut capture = OriginCapture::with_limit(resolver.owner, resolver.detail_bytes);
-    capture.include_original(&resolver.direct(pointer, None)?)?;
+    capture.include_original(
+        &resolver.direct(pointer, material(resolver).then_some(prepared).flatten())?,
+    )?;
     if let Some(prepared) = prepared {
         prepared.include_known(pointer, &mut capture)?;
     }
-    capture.include_original(&OriginContributions::unknown(resolver.owner))?;
+    if !material(resolver) {
+        capture.include_original(&OriginContributions::unknown(resolver.owner))?;
+    }
     Ok(capture.finish())
 }
