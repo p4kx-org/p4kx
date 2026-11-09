@@ -31,6 +31,11 @@ function Test-FeedbackParentCase([string]$Mode) {
     catch{$failure=$_.Exception}
     $diagnostics=Join-Path $output 'diagnostics'
     $result=Get-Content -Raw -LiteralPath (Join-Path $diagnostics 'diagnostic-result.json') | ConvertFrom-Json -AsHashtable
+    $start=Get-Content -Raw -LiteralPath (Join-Path $diagnostics 'diagnostic-start.json') | ConvertFrom-Json -AsHashtable
+    Assert-FeedbackParent ($start.role -ceq 'native-msi-diagnostic-start' -and $start.completed_success -eq $false -and
+        $start.native_completion_unproven -eq $true -and $start.mutation_authority -eq $false) 'Actual parent-start receipt invented completion or mutation authority.'
+    Assert-FeedbackParent ($start.target -ceq $target -and $start.deadline_utc -ceq $result.deadline_utc -and $start.budget_ms -eq $result.budget_ms -and
+        $start.worker_script -ceq 'msi-feedback-worker-fixture.ps1' -and $start.worker_sha256 -ceq (Get-FileHash -LiteralPath (Join-Path $SourceDirectory 'msi-feedback-worker-fixture.ps1') -Algorithm SHA256).Hash.ToLowerInvariant()) 'Actual parent-start receipt lost original budget, target or worker source binding.'
     $journal=Read-P4kxMsiPhaseJournal (Join-Path $diagnostics 'phase-journal.jsonl')
     Assert-FeedbackParent ($result.mutation_authority -eq $false -and $result.journal_invalid -eq $false) 'Actual diagnostic result claimed mutation authority or lost valid journal inspection.'
     Assert-FeedbackParent ($result.worker.started -eq $true -and $result.worker.exited -eq $true -and $result.worker.signal_contract -ceq 'direct-process-only') 'Actual parent did not retain directly owned child completion.'

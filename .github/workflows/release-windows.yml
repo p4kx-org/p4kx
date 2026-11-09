@@ -181,6 +181,7 @@ jobs:
         run: |
           .github/scripts/test-msi-feedback-workflow.ps1
           .github/scripts/test-msi-feedback-budget.ps1
+          .github/scripts/test-msi-feedback-chain-workflow.ps1
           .github/scripts/test-msi-phase-journal-encoding.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-phase-journal-encoding')
           .github/scripts/test-msi-feedback-parent.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-feedback-parent')
           .github/scripts/test-msi-diagnostics.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-diagnostics')
@@ -198,7 +199,21 @@ jobs:
       - name: Prepare the independent installer step allowance
         id: msi-budget
         timeout-minutes: 1
-        run: .github/scripts/prepare-msi-feedback.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/feedback')
+        run: |
+          .github/scripts/prepare-msi-feedback.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/feedback')
+          . .github/scripts/msi-diagnostic-runner.ps1
+          Write-P4kxMsiDiagnosticSources @{Target=$env:P4KX_TARGET} .github/scripts (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/feedback')
+      - name: Preserve prepared allowance and executed parent controls
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        timeout-minutes: 1
+        with:
+          name: windows-msi-preflight-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/feedback/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/contracts/msi-feedback-parent/**/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/contracts/msi-feedback-parent/**/*.jsonl
+            ${{ env.P4KX_PACKAGE_TASK }}/contracts/msi-feedback-parent/**/*.log
+          if-no-files-found: error
       - name: Installer metadata, upgrade, downgrade, rollback, CPU replacement and preservation
         timeout-minutes: ${{ fromJSON(steps.msi-budget.outputs.minutes) }}
         run: |
@@ -235,6 +250,9 @@ jobs:
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/**/*.jsonl
             ${{ env.P4KX_PACKAGE_TASK }}/portable-check/**/*.log
             ${{ env.P4KX_PACKAGE_TASK }}/portable-check/smoke/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/contracts/msi-feedback-parent/**/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/contracts/msi-feedback-parent/**/*.jsonl
+            ${{ env.P4KX_PACKAGE_TASK }}/contracts/msi-feedback-parent/**/*.log
           if-no-files-found: ignore
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

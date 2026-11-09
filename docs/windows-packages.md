@@ -207,3 +207,37 @@ MSI lifecycle. Both capture readers use one bounded byte reader and strict UTF-8
 a UTF-8 byte order mark is accepted. The journal keeps its 1-MiB bound and diagnostic JSON its
 64-KiB bound. Their contract tests preserve exact-limit inputs, incomplete journal rows and
 original writer output while rejecting invalid UTF-8 and UTF-16 byte order marks.
+
+
+### Dynamic parent-chain feedback experiment
+
+The separate `MSI dynamic parent-chain probe` workflow exercises the actual preparation output,
+`fromJSON` step limit, unchanged admission and hidden parent/Portal path on native AMD64 and ARM64.
+It runs no installer or Registry adapter. Its complete, inner-watchdog and outer-runner cases are
+separate from the literal runner-fuse probe and from real MSI release acceptance.
+
+Each case prepares a 90-second absolute fixture deadline, yielding one whole minute for the
+runner step. The original prepared receipt and exact source hashes upload before the risky step.
+Admission still rejects a preparation made stale by upload latency; a refused case cannot count
+as a successful timeout experiment. The complete and outer cases retain that original deadline.
+Only the inner fixture subcase explicitly uses a new three-second child deadline after admission,
+records both deadlines and restores the original environment; the production budget helper and
+`check-msi.ps1` have no override. The outer fixture waits longer than the admitted runner step and
+requires the parent-start receipt to prove an inner budget greater than one minute.
+
+The independent verifier requires each successful control, the exact one-minute service annotation
+for the failed dynamic outer step, original early/late receipt equality, source/run/revision/CPU
+bindings, valid admission and original phase closure or active scopes. A job-level timeout, stale
+admission, absent active phase or invented start-receipt success is refused. It also rejects targeted
+mutations of the actual downloaded artifacts. Any outer interruption leaves native completion
+unproven, whether a final parent result exists or not. The fixture can establish cancellation and
+feedback behavior; it cannot establish the cause of an MSI timeout or permit external cleanup.
+
+The real consumer preserves the actual prepared allowance, source hashes and already executed
+parent-contract artifacts in a one-minute bounded upload after preparation and before installer
+work. That upload does not refresh the original deadline or allowance; admission remains the next
+installer entry guard. The later cancellation-aware capture also includes the parent controls.
+`diagnostic-start.json` is written before worker launch, records the original worker source and
+budget, and always declares completion unproven and no mutation authority. It is not evidence that
+the child started, exited or left the Windows Installer service idle. All real installer cases,
+45-minute job, 35-minute deadline and 600000-ms worker maximum remain required.

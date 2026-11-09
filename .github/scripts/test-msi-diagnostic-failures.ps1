@@ -9,6 +9,8 @@ if (Test-Path -LiteralPath $Directory) { throw 'MSI diagnostic failure test dire
 New-Item -ItemType Directory -Path $Directory -Force | Out-Null
 $root=[IO.Path]::GetFullPath($Directory)
 $target=if([Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq 'Arm64'){'aarch64-pc-windows-msvc'}else{'x86_64-pc-windows-msvc'}
+$stub=Join-Path $root 'never-executed-stub.ps1'
+"throw 'The diagnostic control must never execute its stub.'" | Set-Content -LiteralPath $stub -Encoding utf8NoBOM
 
 function Read-DiagnosticSource([string]$Name) {
     $tokens=$null;$errors=$null
@@ -53,15 +55,37 @@ function Test-SummaryPersistence([bool]$PortalFails,[string]$Name) {
     function Read-P4kxMsiPhaseJournal { throw $journalFailure }
     function Set-Content {
         param([Parameter(ValueFromPipeline)]$Value,[string]$LiteralPath,[string]$Encoding)
-        process { throw $writeFailure }
+        process {
+            if([IO.Path]::GetFileName($LiteralPath) -ceq 'diagnostic-result.json'){throw $writeFailure}
+            Microsoft.PowerShell.Management\Set-Content -Value $Value -LiteralPath $LiteralPath -Encoding $Encoding
+        }
     }
     $parameters=@{Target=$target;OutputDirectory=(Join-Path $root $Name)}
     $observed=$null
-    try { Invoke-P4kxMsiDiagnosticWorker (Join-Path $root 'never-executed-stub.ps1') $parameters } catch { $observed=$_.Exception }
+    try { Invoke-P4kxMsiDiagnosticWorker $stub $parameters } catch { $observed=$_.Exception }
     Assert-FailureControl ($null -ne $observed) 'Controlled actual output failure was accepted.'
     Assert-FailureControl (Contains-DiagnosticException $observed $journalFailure) 'Result persistence replaced the original actual journal failure.'
     Assert-FailureControl (Contains-DiagnosticException $observed $writeFailure) 'Result persistence failure was swallowed.'
     if($PortalFails){Assert-FailureControl (Contains-DiagnosticException $observed $workerFailure) 'Result persistence replaced the original actual worker failure.'}
+}
+
+function Test-ActualStartPersistence {
+    . $actualWorker
+    $startFailure=[IO.IOException]::new('synthetic actual start-receipt persistence failure')
+    $evidence=@{portal=0}
+    function Invoke-P4kxPortalProcess { $evidence.portal++; throw 'Unexpected worker launch.' }
+    function Set-Content {
+        param([Parameter(ValueFromPipeline)]$Value,[string]$LiteralPath,[string]$Encoding)
+        process {
+            if([IO.Path]::GetFileName($LiteralPath) -ceq 'diagnostic-start.json'){throw $startFailure}
+            Microsoft.PowerShell.Management\Set-Content -Value $Value -LiteralPath $LiteralPath -Encoding $Encoding
+        }
+    }
+    $parameters=@{Target=$target;OutputDirectory=(Join-Path $root 'start-receipt-failure')}
+    $observed=$null
+    try{Invoke-P4kxMsiDiagnosticWorker $stub $parameters}catch{$observed=$_.Exception}
+    Assert-FailureControl (Contains-DiagnosticException $observed $startFailure) 'Actual start persistence lost its original failure.'
+    Assert-FailureControl ($evidence.portal -eq 0) 'Actual parent launched a worker after its initial evidence failed.'
 }
 
 function Test-ActualCleanupFinally {
@@ -143,6 +167,7 @@ try {
     foreach($case in @(
         @{name='worker-journal-write';action={Test-SummaryPersistence $true 'worker-journal-write'}},
         @{name='journal-write';action={Test-SummaryPersistence $false 'journal-write'}},
+        @{name='actual-start-persistence';action={Test-ActualStartPersistence}},
         @{name='actual-cleanup-finally';action={Test-ActualCleanupFinally}},
         @{name='actual-cleanup-error';action={Test-ActualCleanupFinally -CleanupFails}},
         @{name='actual-preconditions-telemetry';action={Test-ActualPreconditionTelemetryFailure}}
@@ -154,4 +179,4 @@ try {
     $env:GITHUB_ACTIONS=$savedActions;$env:RUNNER_ENVIRONMENT=$savedRunner;$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC=$savedDeadline
 }
 if($failures.Count){throw [AggregateException]::new('Actual MSI diagnostic control-flow infrastructure checks failed.',$failures)}
-'PASS: five actual diagnostic failure-control paths; all native adapters mocked, no installer/Registry/product GUI, not the original timeout reproduction.'
+'PASS: six actual diagnostic failure-control paths; all native adapters mocked, no installer/Registry/product GUI, not the original timeout reproduction.'

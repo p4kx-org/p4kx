@@ -5,7 +5,7 @@ param(
     [switch]$LifecycleWorker,[string]$WorkerLocation,[string]$WorkerProcessDirectory
 )
 $ErrorActionPreference='Stop'
-if(-not $LifecycleWorker -or $Msi -cnotin @('complete','timeout')){throw 'Invalid diagnostic-only fixture invocation.'}
+if(-not $LifecycleWorker -or $Msi -cnotin @('complete','timeout','outer-runner')){throw 'Invalid diagnostic-only fixture invocation.'}
 [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false,$true)
 Set-Location -LiteralPath $WorkerLocation
 [IO.Directory]::SetCurrentDirectory($WorkerProcessDirectory)
@@ -18,5 +18,6 @@ $wait=Start-P4kxMsiPhase $context 'fixture/wait'
 [Console]::Error.WriteLine('feedback-fixture-stderr')
 [Console]::Error.Flush()
 if($Msi -ceq 'timeout'){Start-Sleep -Seconds 20}
+elseif($Msi -ceq 'outer-runner'){Start-Sleep -Seconds 120}
 Stop-P4kxMsiPhase $context $wait
 Stop-P4kxMsiPhase $context $worker

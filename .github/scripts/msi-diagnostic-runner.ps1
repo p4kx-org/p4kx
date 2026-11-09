@@ -50,6 +50,12 @@ function Invoke-P4kxMsiDiagnosticWorker {
     $observation = @{}
     $timer = [Diagnostics.Stopwatch]::StartNew()
     $result=$null; $failure=$null; $journal=$null; $inspectionFailure=$null
+    @{schema=1;role='native-msi-diagnostic-start';revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;
+        target=$Parameters['Target'];process_arch=[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString();
+        deadline_utc=$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC;budget_ms=$milliseconds;parent_pid=$PID;
+        worker_script=[IO.Path]::GetFileName($Script);worker_sha256=(Get-FileHash -LiteralPath $Script -Algorithm SHA256).Hash.ToLowerInvariant();
+        completed_success=$false;native_completion_unproven=$true;mutation_authority=$false} |
+        ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $directory 'diagnostic-start.json') -Encoding utf8NoBOM
     [Console]::Out.WriteLine('[P4KX-MSI-WORKER] launch-begin')
     [Console]::Out.Flush()
     try {
