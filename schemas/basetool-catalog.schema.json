@@ -191,7 +191,7 @@
       "description": "Physical Archive Entry facts, retaining all stored declaration occurrences.",
       "properties": {
         "declarations": {
-          "$ref": "#/$defs/SourcedValue50"
+          "$ref": "#/$defs/SourcedValue51"
         },
         "entryIndex": {
           "format": "uint",
@@ -223,7 +223,7 @@
           "type": "object"
         },
         "zipFlags": {
-          "$ref": "#/$defs/SourcedValue49"
+          "$ref": "#/$defs/SourcedValue50"
         }
       },
       "required": [
@@ -240,7 +240,7 @@
       "description": "Measured whole-Archive file facts independently of its stored Entry declarations.",
       "properties": {
         "byteLength": {
-          "$ref": "#/$defs/SourcedValue53"
+          "$ref": "#/$defs/SourcedValue54"
         }
       },
       "required": [
@@ -1511,7 +1511,7 @@
           "$ref": "#/$defs/SourcedValue2"
         },
         "translations": {
-          "$ref": "#/$defs/SourcedValue54"
+          "$ref": "#/$defs/SourcedValue55"
         }
       },
       "required": [
@@ -1531,7 +1531,7 @@
           "$ref": "#/$defs/SourcedValue2"
         },
         "translations": {
-          "$ref": "#/$defs/SourcedValue54"
+          "$ref": "#/$defs/SourcedValue55"
         }
       },
       "required": [
@@ -1769,12 +1769,16 @@
         "commodities": {
           "$ref": "#/$defs/CatalogTable2"
         },
+        "manufacturers": {
+          "$ref": "#/$defs/CatalogTable3"
+        },
         "resourceTypes": {
           "$ref": "#/$defs/CatalogTable"
         }
       },
       "required": [
         "commodities",
+        "manufacturers",
         "resourceTypes"
       ],
       "type": "object"
@@ -1783,7 +1787,7 @@
       "description": "Explicit choices and derived values, separate from authored definitions.",
       "properties": {
         "commodityPresentation": {
-          "$ref": "#/$defs/CatalogTable3"
+          "$ref": "#/$defs/CatalogTable4"
         }
       },
       "required": [
@@ -1846,6 +1850,25 @@
       "type": "object"
     },
     "CatalogTable3": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ManufacturerDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTable4": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
         "availability": {
@@ -2345,27 +2368,27 @@
           "$ref": "#/$defs/SourcedValue"
         },
         "densityGramsPerCubicCentimetre": {
-          "$ref": "#/$defs/SourcedValue48"
+          "$ref": "#/$defs/SourcedValue49"
         },
         "description": {
-          "$ref": "#/$defs/SourcedValue46",
+          "$ref": "#/$defs/SourcedValue47",
           "x-gameText": true
         },
         "displayType": {
-          "$ref": "#/$defs/SourcedValue46",
+          "$ref": "#/$defs/SourcedValue47",
           "x-gameText": true
         },
         "name": {
-          "$ref": "#/$defs/SourcedValue45"
+          "$ref": "#/$defs/SourcedValue46"
         },
         "refinedSubtypeGuid": {
-          "$ref": "#/$defs/SourcedValue47"
+          "$ref": "#/$defs/SourcedValue48"
         },
         "subtypeGuid": {
-          "$ref": "#/$defs/SourcedValue47"
+          "$ref": "#/$defs/SourcedValue48"
         },
         "typeGuid": {
-          "$ref": "#/$defs/SourcedValue47"
+          "$ref": "#/$defs/SourcedValue48"
         }
       },
       "required": [
@@ -5789,7 +5812,7 @@
       "description": "Observed standalone-file facts without a claim of original P4K lineage.",
       "properties": {
         "byteLength": {
-          "$ref": "#/$defs/SourcedValue53"
+          "$ref": "#/$defs/SourcedValue54"
         },
         "name": {
           "$ref": "#/$defs/SourcedValue2"
@@ -10321,45 +10344,64 @@
       ],
       "type": "object"
     },
-    "Manufacturer": {
-      "description": "A manufacturer: an `SCItemManufacturer` Record.",
+    "ManufacturerDefinition": {
+      "description": "One physical Manufacturer definition with directly sourced authored facts.",
       "properties": {
         "className": {
-          "description": "The Record name without its type, e.g. `ACAS` for `SCItemManufacturer.ACAS`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValue2"
         },
         "code": {
-          "description": "The manufacturer code, e.g. `ACAS`, `null` when it cannot be read.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "description": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The description.",
-          "x-gameText": true
+          "$ref": "#/$defs/SourcedValue2"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValue"
         },
-        "name": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The name."
+        "localization": {
+          "$ref": "#/$defs/SourcedValue45"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValue7"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValue2"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValue2"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValue2"
         }
       },
       "required": [
         "className",
         "code",
-        "description",
         "guid",
+        "localization",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "ManufacturerLocalization": {
+      "description": "The Manufacturer's owned localization declaration and its canonical text links.",
+      "properties": {
+        "description": {
+          "$ref": "#/$defs/SourcedValue4",
+          "x-gameText": true
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValue3"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValue2"
+        }
+      },
+      "required": [
+        "description",
         "name",
-        "recordPath"
+        "sourceType"
       ],
       "type": "object"
     },
@@ -16852,16 +16894,16 @@
       "description": "An observed encryption declaration whose values originate in directory metadata.",
       "properties": {
         "declaredBlockLength": {
-          "$ref": "#/$defs/SourcedValue49"
+          "$ref": "#/$defs/SourcedValue50"
         },
         "kind": {
           "$ref": "#/$defs/SourceDeclarationKind"
         },
         "rawBytes": {
-          "$ref": "#/$defs/SourcedValue52"
+          "$ref": "#/$defs/SourcedValue53"
         },
         "rawWord": {
-          "$ref": "#/$defs/SourcedValue49"
+          "$ref": "#/$defs/SourcedValue50"
         },
         "valueOffset": {
           "$ref": "#/$defs/DecimalU64"
@@ -20337,14 +20379,7 @@
           "then": {
             "properties": {
               "value": {
-                "anyOf": [
-                  {
-                    "$ref": "#/$defs/PublicNameRef"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "$ref": "#/$defs/ManufacturerLocalization"
               }
             }
           }
@@ -20425,7 +20460,7 @@
               "value": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/GameTextRef"
+                    "$ref": "#/$defs/PublicNameRef"
                   },
                   {
                     "type": "null"
@@ -20511,7 +20546,7 @@
               "value": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/Guid"
+                    "$ref": "#/$defs/GameTextRef"
                   },
                   {
                     "type": "null"
@@ -20595,10 +20630,13 @@
           "then": {
             "properties": {
               "value": {
-                "format": "float",
-                "type": [
-                  "number",
-                  "null"
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Guid"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               }
             }
@@ -20678,10 +20716,11 @@
           "then": {
             "properties": {
               "value": {
-                "format": "uint16",
-                "maximum": 65535,
-                "minimum": 0,
-                "type": "integer"
+                "format": "float",
+                "type": [
+                  "number",
+                  "null"
+                ]
               }
             }
           }
@@ -20842,10 +20881,10 @@
           "then": {
             "properties": {
               "value": {
-                "items": {
-                  "$ref": "#/$defs/SourcedValue51"
-                },
-                "type": "array"
+                "format": "uint16",
+                "maximum": 65535,
+                "minimum": 0,
+                "type": "integer"
               }
             }
           }
@@ -20924,7 +20963,10 @@
           "then": {
             "properties": {
               "value": {
-                "$ref": "#/$defs/SourceEncryptionDeclaration"
+                "items": {
+                  "$ref": "#/$defs/SourcedValue52"
+                },
+                "type": "array"
               }
             }
           }
@@ -20962,6 +21004,85 @@
       "type": "object"
     },
     "SourcedValue52": {
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "containsEncryptedSource": {
+                "const": false
+              }
+            },
+            "required": [
+              "containsEncryptedSource"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sourceSetComplete": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SourceEncryptionDeclaration"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValue53": {
       "allOf": [
         {
           "if": {
@@ -21046,7 +21167,7 @@
       ],
       "type": "object"
     },
-    "SourcedValue53": {
+    "SourcedValue54": {
       "allOf": [
         {
           "if": {
@@ -21125,7 +21246,7 @@
       ],
       "type": "object"
     },
-    "SourcedValue54": {
+    "SourcedValue55": {
       "allOf": [
         {
           "if": {
@@ -23614,13 +23735,6 @@
       },
       "type": "array"
     },
-    "manufacturers": {
-      "description": "The manufacturers, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/Manufacturer"
-      },
-      "type": "array"
-    },
     "mineableCompositions": {
       "description": "The mineable compositions, the elements a rock or deposit is made of, ordered by GUID.",
       "items": {
@@ -23830,7 +23944,6 @@
     "lootContainers",
     "lootPoolFilters",
     "lootTables",
-    "manufacturers",
     "mineableCompositions",
     "mineableElements",
     "mineableEntities",

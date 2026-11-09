@@ -162,17 +162,20 @@ pub(crate) fn many(count: u32) -> ArchiveBuilder {
     archive(&forge, &texts, &texts)
 }
 
-/// `count` manufacturers sharing a description of `length` characters in both languages.
+/// `count` manufacturers with distinct description keys and `length` characters per language.
 pub(crate) fn wordy(count: u32, length: usize) -> ArchiveBuilder {
-    let forge = (0..count).fold(structures(), |builder, number| {
-        builder.record(manufacturer(
+    let mut forge = structures();
+    let mut texts = GlobalIniBuilder::new();
+    let long = "x".repeat(length);
+    for number in 0..count {
+        let key = format!("manufacturer_Desc{number:05}");
+        forge = forge.record(manufacturer(
             number,
             &format!("W{number:05}"),
-            "@manufacturer_Desc",
-        ))
-    });
-    let long = "x".repeat(length);
-    let texts = GlobalIniBuilder::new().text("manufacturer_Desc", &long);
+            &format!("@{key}"),
+        ));
+        texts = texts.text(&key, &long);
+    }
     archive(&forge, &texts, &texts)
 }
 

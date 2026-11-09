@@ -130,3 +130,28 @@ fn references<'schema>(
         _ => false,
     }
 }
+
+#[test]
+fn manufacturer_localization_uses_separate_public_and_protected_text_domains() {
+    let schema = p4kx_export::catalog_schema();
+    let localization = &schema["$defs"]["ManufacturerLocalization"];
+    let properties = &localization["properties"];
+    assert!(is_only_public_name(&schema, &properties["name"]));
+    assert!(references(
+        &properties["description"],
+        &schema,
+        "#/$defs/GameTextRef",
+        &mut BTreeSet::new()
+    ));
+    assert_eq!(properties["description"]["x-gameText"], true);
+    assert!(properties["name"].get("x-gameText").is_none());
+    for field in ["sourceType", "name", "description"] {
+        assert!(
+            localization["required"]
+                .as_array()
+                .expect("required localization fields")
+                .iter()
+                .any(|required| required == field)
+        );
+    }
+}

@@ -39,10 +39,10 @@ pub(super) fn presentation() -> Value {
     }]})
 }
 
-pub(super) fn public_names() -> Value {
-    json!([{
+pub(super) fn public_names() -> Vec<Value> {
+    vec![json!({
         "id": present(json!(NAME_ID)),
         "key": present(json!("@items_commodities_gold")),
         "translations": present(json!({"en": present(json!("Gold"))}))
-    }])
+    })]
 }

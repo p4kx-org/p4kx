@@ -59,10 +59,12 @@ fn builds_items_and_ships_of_a_real_archive() -> TestResult {
         assert!(counts.count >= min, "plausible {kind} count: {counts:?}");
         assert!(counts.complete, "{kind} complete without a Filter");
     }
-    let manufacturers: HashSet<&str> = list(&catalog, "manufacturers")?
+    let manufacturers: HashSet<&str> = catalog["definitions"]["manufacturers"]["rows"]
+        .as_array()
+        .ok_or("manufacturer rows")?
         .iter()
-        .filter_map(|m| m["guid"].as_str())
-        .collect();
+        .map(|m| m["guid"]["value"].as_str().ok_or("manufacturer GUID"))
+        .collect::<Result<_, _>>()?;
     for kind in ["items", "ships"] {
         let entities = list(&catalog, kind)?;
         let guids: Vec<&str> = entities.iter().filter_map(|e| e["guid"].as_str()).collect();

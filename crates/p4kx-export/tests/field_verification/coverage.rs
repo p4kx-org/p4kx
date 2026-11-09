@@ -6,6 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use p4kx_extraction::{DataForge, Guid, TreeBuilder};
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+
 use super::accounting::{self, Counts, Projection};
 use super::audit_scope;
 use super::error::{self, Error, Kind};
@@ -47,7 +49,7 @@ fn observations(
     Ok(observations)
 }
 
-fn projections<'a>(
+pub(super) fn projections<'a>(
     catalog: &'a Value,
     inventory: &Inventory,
     cancelled: &impl Fn() -> bool,
@@ -56,20 +58,23 @@ fn projections<'a>(
     let kinds = audit_scope::kinds(inventory)?;
     for kind in kinds {
         let group = kind.name();
-        let rows = catalog
-            .get(group)
-            .and_then(Value::as_array)
-            .ok_or_else(|| {
-                Error::new(
-                    Kind::Input,
-                    "mapped catalog group is absent or not an array",
-                )
-            })?;
+        let rows = catalog_v3_consumer::rows(catalog, kind)?;
         projections.insert(
             group.to_owned(),
             joins::index(
                 rows,
-                &Path::fields(&["guid"]),
+                &Path::fields(
+                    if matches!(
+                        kind,
+                        p4kx_export::Kind::Manufacturers
+                            | p4kx_export::Kind::Commodities
+                            | p4kx_export::Kind::ResourceTypes
+                    ) {
+                        &["guid", "value"]
+                    } else {
+                        &["guid"]
+                    },
+                ),
                 Multiplicity::Unique,
                 cancelled,
             )?,

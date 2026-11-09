@@ -141,11 +141,11 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
     );
 
     let mut upper_case = catalog.clone();
-    upper_case["manufacturers"][0]["guid"] = json!("CFC0122D-5275-415A-A656-3DCB3346FEB5");
+    upper_case["definitions"]["manufacturers"]["rows"][0]["guid"]["value"] =
+        json!("CFC0122D-5275-415A-A656-3DCB3346FEB5");
     assert!(!validator.is_valid(&upper_case), "lower-case GUIDs only");
 
     for kind in [
-        "manufacturers",
         "items",
         "ships",
         "blueprints",
@@ -165,6 +165,12 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         assert!(validator.is_valid(&unknown), "unknown fields in {kind}");
     }
 
+    let mut unknown_manufacturer = catalog.clone();
+    unknown_manufacturer["definitions"]["manufacturers"]["rows"][0]["extra"] = json!(true);
+    assert!(
+        validator.is_valid(&unknown_manufacturer),
+        "unknown manufacturer fields"
+    );
     assert_unknown_commodity_fields(&validator, &catalog)?;
 
     let mut unknown_kind = catalog.clone();

@@ -57,6 +57,7 @@ pub(crate) fn target_kind(
 /// Returns the known catalog target family of a concrete source Record type.
 pub(crate) fn actual_kind(type_name: &str) -> Option<Kind> {
     match type_name {
+        "SCItemManufacturer" => Some(Kind::Manufacturers),
         "ResourceType" => Some(Kind::ResourceTypes),
         "ResourceTypeGroup" => Some(Kind::ResourceGroups),
         "CraftingQualityDistributionRecord" | "CraftingQualityLocationOverrideRecord" => {

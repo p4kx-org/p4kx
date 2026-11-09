@@ -9,7 +9,6 @@ use serde::Serialize;
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_text_contract::CatalogTexts;
-use crate::guid_text::CatalogGuid;
 use p4kx_extraction::SourceInventory;
 
 pub(crate) use crate::broker_entry::BrokerEntry;
@@ -72,8 +71,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) completeness: Completeness<'a>,
     /// The measured source-read and projection health, separately from Filter selection scope.
     pub(crate) export_health: crate::ExportHealth,
-    /// The manufacturers, ordered by GUID.
-    pub(crate) manufacturers: Vec<Manufacturer<'a>>,
     /// The items, ordered by GUID.
     pub(crate) items: Vec<Item<'a>>,
     /// The ships, ordered by GUID.
@@ -189,26 +186,6 @@ pub(crate) struct Catalog<'a> {
     /// The item recovery rules, the multipliers the game applies to claims, `null` when the
     /// Archive has no such Record. Not a kind.
     pub(crate) item_recovery: Option<ItemRecovery<'a>>,
-}
-
-/// A manufacturer: an `SCItemManufacturer` Record.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct Manufacturer<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `ACAS` for `SCItemManufacturer.ACAS`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The manufacturer code, e.g. `ACAS`, `null` when it cannot be read.
-    pub(crate) code: Option<&'a str>,
-    /// The name.
-    pub(crate) name: LocalisedText<'a>,
-    /// The description.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) description: LocalisedText<'a>,
 }
 
 /// A text the game localises: its localisation key and the resolved English and German texts,

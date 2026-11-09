@@ -6,8 +6,11 @@
 mod accounting;
 mod audit_scope;
 mod baseline;
+#[path = "../real_archive/catalog_v3_consumer.rs"]
+mod catalog_v3_consumer;
 mod compare;
 mod coverage;
+mod coverage_v3_tests;
 mod error;
 mod fixtures;
 mod inventory;

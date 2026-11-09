@@ -50,15 +50,23 @@ impl Oracle {
                     let text = lines
                         .plain
                         .filter(|text| !text.is_empty())
-                        .or(lines.suffixed)?;
+                        .or(lines.suffixed)
+                        .or(lines.plain)?;
                     let shown = text.replace("\\n", "\n").trim().to_owned();
-                    (!shown.is_empty()).then_some((key, shown))
+                    Some((key, shown))
                 })
                 .collect(),
         )
     }
 
     pub(crate) fn text(&self, key: &str) -> Option<&str> {
+        let key = key.strip_prefix('@').unwrap_or(key).to_ascii_lowercase();
+        self.0
+            .get(&key)
+            .map(String::as_str)
+            .filter(|text| !text.is_empty())
+    }
+    pub(crate) fn canonical_text(&self, key: &str) -> Option<&str> {
         let key = key.strip_prefix('@').unwrap_or(key).to_ascii_lowercase();
         self.0.get(&key).map(String::as_str)
     }

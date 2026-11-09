@@ -18,6 +18,8 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_b_path, real_archive_path};
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const LMG_MAGAZINE: &str = "BP_CRAFT_behr_lmg_ballistic_01_mag";
@@ -27,11 +29,12 @@ const CREATURE_DEFAULT: &str = "1dcde125-1275-474f-b0d7-d6682e9e521f";
 const PYRO: &str = "286cb603-b4ae-4279-80a1-d4505fee1916";
 const COVALEX_POOL: &str = "907989eb-9ee8-46a8-b794-032da6bd8a5d";
 const COVALEX_BLUEPRINT: &str = "33be7f1a-3f75-4627-bb8b-88e6d6b42f4e";
-const KINDS: [&str; 12] = [
+const KINDS: [&str; 13] = [
     "manufacturers",
     "items",
     "ships",
     "commodities",
+    "resourceTypes",
     "blueprints",
     "resourceGroups",
     "blueprintCategories",
@@ -43,9 +46,7 @@ const KINDS: [&str; 12] = [
 ];
 
 fn list<'c>(catalog: &'c Value, kind: &str) -> Result<&'c Vec<Value>, String> {
-    catalog[kind]
-        .as_array()
-        .ok_or_else(|| format!("the {kind} array"))
+    catalog_v3_consumer::named_rows(catalog, kind).map_err(|error| error.to_string())
 }
 
 fn named<'c>(catalog: &'c Value, class_name: &str) -> Result<&'c Value, String> {
@@ -91,23 +92,34 @@ fn choose_fewer(line: &Value) -> bool {
     clippy::print_stdout,
     reason = "the sizes are the measurement the upload limit is sized from"
 )]
-fn report(path: &Path, size: usize, catalog: &Value) {
+fn report(path: &Path, size: usize, catalog: &Value) -> TestResult {
     println!(
         "{}: catalog size {size} bytes, upload limit {UPLOAD_LIMIT}",
         path.display()
     );
     for kind in KINDS {
-        let bytes = serde_json::to_vec(&catalog[kind]).map_or(0, |bytes| bytes.len());
-        let count = catalog[kind].as_array().map_or(0, Vec::len);
+        let rows = list(catalog, kind)?;
+        let bytes = serde_json::to_vec(rows)?.len();
+        let count = rows.len();
         println!("  {kind}: {count} entries, {bytes} bytes");
     }
+    for domain in ["publicNames", "gameTexts"] {
+        let value = catalog
+            .get("texts")
+            .and_then(|texts| texts.get(domain))
+            .ok_or("required canonical text table")?;
+        let count = value.as_array().ok_or("canonical text table")?.len();
+        let bytes = serde_json::to_vec(value)?.len();
+        println!("  texts.{domain}: {count} entries, {bytes} shared bytes");
+    }
+    Ok(())
 }
 
 fn verify(path: &Path) -> TestResult {
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::real_archive_key()?))?;
     let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    report(path, built.json().len(), &catalog);
+    report(path, built.json().len(), &catalog)?;
     assert!(
         crate::real_archive::is_complete_but_known_defects(built.summary()),
         "no failure, no warning but a known defect: {:?} {:?}",

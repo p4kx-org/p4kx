@@ -13,6 +13,8 @@ use p4kx_extraction::{Archive, DataForgeEntry, Guid};
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const MIN_RECORDS: usize = 60;
@@ -26,9 +28,7 @@ fn print_line(line: &str) {
 }
 
 fn list<'c>(catalog: &'c Value, kind: &str) -> Result<&'c Vec<Value>, String> {
-    catalog[kind]
-        .as_array()
-        .ok_or_else(|| format!("the {kind} array"))
+    catalog_v3_consumer::named_rows(catalog, kind).map_err(|error| error.to_string())
 }
 
 #[test]
@@ -55,10 +55,16 @@ fn the_quality_quantizations_of_a_real_archive_link_to_resource_types() -> TestR
         "every Record is readable"
     );
 
-    let commodities: HashSet<&str> = list(&catalog, "commodities")?
-        .iter()
-        .filter_map(|commodity| commodity["subtypeGuid"].as_str())
-        .collect();
+    let mut commodities = HashSet::new();
+    for choice in catalog_v3_consumer::presentations(&catalog)? {
+        if let Some(guid) = catalog_v3_consumer::nullable_guid(
+            choice
+                .get("subtypeGuid")
+                .ok_or("Commodity subtype carrier")?,
+        )? {
+            commodities.insert(guid);
+        }
+    }
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let mut unlinked = Vec::new();

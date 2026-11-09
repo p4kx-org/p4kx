@@ -4,8 +4,11 @@
 //! Tests of `p4kx-export` on a real Archive, built as one test binary; they run with `--ignored`
 //! when `P4KX_DATA_P4K` names one.
 
+mod catalog_v3_consumer;
 mod real_archive;
 mod real_archive_broker_entries;
+mod real_archive_canonical_texts;
+mod real_archive_catalog_links;
 mod real_archive_catalog_ships;
 mod real_archive_commodity_refining;
 mod real_archive_compression;
@@ -70,3 +73,12 @@ mod resource_quality_schema_fixture;
 
 #[path = "../it/resource_schema_fixture.rs"]
 mod resource_schema_fixture;
+
+mod catalog_v3_consumer_origins_tests;
+mod catalog_v3_consumer_tests;
+#[path = "../it/commodity_v3_fixture.rs"]
+mod commodity_v3_fixture;
+#[path = "../it/commodity_v3_fixture_records.rs"]
+mod commodity_v3_fixture_records;
+#[path = "../it/commodity_v3_fixture_schema.rs"]
+mod commodity_v3_fixture_schema;

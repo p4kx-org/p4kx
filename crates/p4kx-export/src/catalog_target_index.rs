@@ -133,7 +133,8 @@ fn origins<'source>(
         let Some(kind) = source.kind else { continue };
         if !matches!(
             kind,
-            Kind::Commodities
+            Kind::Manufacturers
+                | Kind::Commodities
                 | Kind::ResourceTypes
                 | Kind::ResourceGroups
                 | Kind::QualityDistributions

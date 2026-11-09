@@ -50,36 +50,30 @@ fn builds_a_valid_catalog_of_a_real_archive() -> TestResult {
         "under the decompressed limit"
     );
 
-    let list = catalog["manufacturers"]
+    assert!(catalog.get("manufacturers").is_none(), "no legacy array");
+    let list = catalog["definitions"]["manufacturers"]["rows"]
         .as_array()
-        .ok_or("the manufacturers array")?;
-    let guids: Vec<&str> = list.iter().filter_map(|m| m["guid"].as_str()).collect();
+        .ok_or("canonical manufacturers")?;
+    let guids = list
+        .iter()
+        .map(|row| row["guid"]["value"].as_str().ok_or("manufacturer GUID"))
+        .collect::<Result<Vec<_>, _>>()?;
     assert!(guids.is_sorted(), "ordered by GUID");
-    let codes: Vec<&str> = list.iter().filter_map(|m| m["code"].as_str()).collect();
-    for code in ["RSI", "ANVL", "DRAK", "ACAS"] {
-        assert!(codes.contains(&code), "manufacturer {code} is present");
-        let named = list.iter().any(|m| {
-            m["code"] == code
-                && m["name"]["key"]
-                    .as_str()
-                    .is_some_and(|key| key.starts_with('@'))
-        });
-        assert!(named, "manufacturer {code} has a localisation key");
-    }
-    check_texts(summary, list)?;
+    check_texts(summary, &catalog, list)?;
     crate::real_archive_texts::check_texts(&archive, &catalog, true)?;
-    assert!(
-        list.iter()
-            .filter_map(|m| m["recordPath"].as_str())
-            .all(|path| !path.contains("_test_")),
-        "no test leftovers"
-    );
-    assert!(
-        list.iter()
-            .filter_map(|m| m["className"].as_str())
-            .all(|class| !class.is_empty() && !class.starts_with("SCItemManufacturer.")),
-        "class names without the type"
-    );
+    for row in list {
+        let path = row["recordPath"]["value"]
+            .as_str()
+            .ok_or("manufacturer recordPath")?;
+        let class = row["className"]["value"]
+            .as_str()
+            .ok_or("manufacturer className")?;
+        assert!(!path.contains("_test_"), "no test leftovers");
+        assert!(
+            !class.is_empty() && !class.starts_with("SCItemManufacturer."),
+            "class names without the type"
+        );
+    }
     Ok(())
 }
 
@@ -123,20 +117,28 @@ fn report_size(size: u64) {
     println!("catalog size: {size} bytes, upload limit {UPLOAD_LIMIT} bytes");
 }
 
-fn check_texts(summary: &CatalogSummary, list: &[Value]) -> TestResult {
+fn check_texts(summary: &CatalogSummary, catalog: &Value, list: &[Value]) -> TestResult {
     for code in ["RSI", "ANVL", "DRAK", "ACAS"] {
-        let resolved = list.iter().any(|m| {
-            m["code"] == code
-                && ["/name/en", "/name/de"].into_iter().all(|text| {
-                    m.pointer(text)
-                        .and_then(Value::as_str)
-                        .is_some_and(|text| !text.is_empty())
-                })
-        });
+        let row = list
+            .iter()
+            .find(|row| row.pointer("/code/value").and_then(Value::as_str) == Some(code))
+            .ok_or_else(|| format!("manufacturer {code}"))?;
+        let name = crate::real_archive_texts::manufacturer_text(catalog, row, "name")?
+            .ok_or("known manufacturer name")?;
         assert!(
-            resolved,
-            "manufacturer {code} has an English and a German name"
+            name.pointer("/key/value")
+                .and_then(Value::as_str)
+                .is_some_and(|key| key.starts_with('@')),
+            "manufacturer {code} retains its authored key"
         );
+        for language in ["en", "de"] {
+            assert!(
+                name.pointer(&format!("/translations/value/{language}/value"))
+                    .and_then(Value::as_str)
+                    .is_some_and(|text| !text.is_empty()),
+                "manufacturer {code} has a {language} name"
+            );
+        }
     }
     for language in [Language::English, Language::German] {
         let texts = summary.text(language).ok_or("a text summary")?;

@@ -115,36 +115,105 @@ fn catalog(entries: Vec<TestEntry>) -> Result<(Value, Vec<TextSummary>), Box<dyn
     Ok((json, built.summary().texts().to_vec()))
 }
 
-fn texts(catalog: &Value, index: usize) -> (Value, Value) {
-    let entity = catalog["manufacturers"].get(index).unwrap_or(&Value::Null);
-    (entity["name"].clone(), entity["description"].clone())
+fn text<'c>(catalog: &'c Value, index: usize, field: &str) -> Result<&'c Value, Box<dyn Error>> {
+    let row = catalog
+        .pointer("/definitions/manufacturers/rows")
+        .and_then(|rows| rows.get(index))
+        .ok_or("manufacturer")?;
+    let localization = row.get("localization").ok_or("localization carrier")?;
+    assert_eq!(
+        localization.get("state"),
+        Some(&json!("present")),
+        "localization is present"
+    );
+    let reference = localization
+        .get("value")
+        .and_then(|value| value.get(field))
+        .ok_or("text reference carrier")?;
+    assert_eq!(
+        reference.get("state"),
+        Some(&json!("present")),
+        "the authored text reference is present"
+    );
+    let target = reference
+        .get("value")
+        .and_then(Value::as_str)
+        .ok_or("text reference")?;
+    let domain = match field {
+        "name" => "publicNames",
+        "description" => "gameTexts",
+        _ => return Err("unknown text domain".into()),
+    };
+    let rows = catalog
+        .get("texts")
+        .and_then(|tables| tables.get(domain))
+        .and_then(Value::as_array)
+        .ok_or("canonical text table")?;
+    let mut matching = rows
+        .iter()
+        .filter(|text| text.pointer("/id/value").and_then(Value::as_str) == Some(target));
+    let text = matching.next().ok_or("canonical text reference")?;
+    assert!(matching.next().is_none(), "unique text identity");
+    assert_eq!(
+        text.pointer("/key/state"),
+        Some(&json!("present")),
+        "the canonical text key is present"
+    );
+    Ok(text)
 }
 
-#[test]
-fn names_and_descriptions_hold_the_key_and_both_resolved_texts() -> TestResult {
-    let (catalog, _) = catalog(vec![english(), german()])?;
+fn translation(text: &Value, language: &str, state: &str, expected: &Value) -> TestResult {
     assert_eq!(
-        texts(&catalog, 0),
-        (
-            json!({"key": "@manufacturer_NameACAS", "en": "Ace Astrogation", "de": "Ace Astrogation"}),
-            json!({"key": "@manufacturer_DescACAS", "en": "Power plants.", "de": "Kraftwerke."}),
-        ),
-        "ACAS in both languages"
+        text.pointer("/translations/state"),
+        Some(&json!("present")),
+        "the language map is present"
+    );
+    let value = text
+        .pointer("/translations/value")
+        .and_then(|languages| languages.get(language))
+        .ok_or("language carrier")?;
+    assert_eq!(
+        value.get("state"),
+        Some(&json!(state)),
+        "the translation state matches the authored lookup"
+    );
+    assert_eq!(
+        value.get("value"),
+        Some(expected),
+        "required nullable value"
     );
     Ok(())
 }
 
 #[test]
-fn a_missing_key_leaves_its_text_null_keeps_the_key_and_is_counted() -> TestResult {
+fn names_and_descriptions_hold_canonical_keys_and_both_resolved_texts() -> TestResult {
+    let (catalog, _) = catalog(vec![english(), german()])?;
+    assert!(catalog.get("manufacturers").is_none());
+    let name = text(&catalog, 0, "name")?;
+    assert_eq!(name["key"]["value"], "@manufacturer_NameACAS");
+    translation(name, "en", "present", &json!("Ace Astrogation"))?;
+    translation(name, "de", "present", &json!("Ace Astrogation"))?;
+    let description = text(&catalog, 0, "description")?;
+    assert_eq!(description["key"]["value"], "@manufacturer_DescACAS");
+    translation(description, "en", "present", &json!("Power plants."))?;
+    translation(description, "de", "present", &json!("Kraftwerke."))?;
+    Ok(())
+}
+
+#[test]
+fn missing_keys_keep_canonical_keys_and_explicit_absent_translations() -> TestResult {
     let (catalog, summary) = catalog(vec![english(), german()])?;
+    let name = text(&catalog, 1, "name")?;
+    assert_eq!(name["key"]["value"], "@manufacturer_NameDRAK");
+    translation(name, "en", "present", &json!("Drake Interplanetary"))?;
+    translation(name, "de", "absent", &Value::Null)?;
+    let description = text(&catalog, 1, "description")?;
     assert_eq!(
-        texts(&catalog, 1),
-        (
-            json!({"key": "@manufacturer_NameDRAK", "en": "Drake Interplanetary", "de": null}),
-            json!({"key": null, "en": null, "de": null}),
-        ),
-        "DRAK has no German name and no description"
+        description["key"]["value"], "",
+        "authored empty Locale is retained"
     );
+    translation(description, "en", "absent", &Value::Null)?;
+    translation(description, "de", "absent", &Value::Null)?;
     assert_eq!(
         summary,
         [
@@ -152,29 +221,29 @@ fn a_missing_key_leaves_its_text_null_keeps_the_key_and_is_counted() -> TestResu
                 language: Language::English,
                 available: true,
                 resolved: 4,
-                unresolved: 0,
-                placeholder: 1,
+                unresolved: 1,
+                placeholder: 1
             },
             TextSummary {
                 language: Language::German,
                 available: true,
                 resolved: 2,
-                unresolved: 2,
-                placeholder: 1,
+                unresolved: 3,
+                placeholder: 1
             },
-        ],
-        "four keys and a placeholder; one key not in German, one empty"
+        ]
     );
     Ok(())
 }
 
 #[test]
-fn a_missing_language_leaves_its_texts_null_and_counts_every_key() -> TestResult {
+fn a_missing_language_has_no_fabricated_translation_carrier_and_counts_every_key() -> TestResult {
     let (catalog, summary) = catalog(vec![english()])?;
-    assert_eq!(
-        texts(&catalog, 0).0,
-        json!({"key": "@manufacturer_NameACAS", "en": "Ace Astrogation", "de": null}),
-        "English only"
+    let name = text(&catalog, 0, "name")?;
+    translation(name, "en", "present", &json!("Ace Astrogation"))?;
+    assert!(
+        name["translations"]["value"].get("de").is_none(),
+        "no German input"
     );
     assert_eq!(
         summary.get(1),
@@ -182,49 +251,44 @@ fn a_missing_language_leaves_its_texts_null_and_counts_every_key() -> TestResult
             language: Language::German,
             available: false,
             resolved: 0,
-            unresolved: 4,
+            unresolved: 5,
             placeholder: 1,
-        }),
-        "German is missing"
+        })
     );
     Ok(())
 }
 
 #[test]
-fn a_placeholder_key_keeps_the_key_has_no_texts_and_is_counted_apart() -> TestResult {
+fn a_placeholder_key_is_retained_without_lookup_and_counted_apart() -> TestResult {
     let (catalog, summary) = catalog(vec![english(), german()])?;
-    assert_eq!(
-        texts(&catalog, 2).0,
-        json!({"key": "@loc_placeholder", "en": null, "de": null}),
-        "LOC_PLACEHOLDER=<= PLACEHOLDER => is not a name"
-    );
-    assert!(
-        summary.iter().all(|texts| texts.placeholder == 1),
-        "one placeholder in every language: {summary:?}"
-    );
+    let name = text(&catalog, 2, "name")?;
+    assert_eq!(name["key"]["value"], "@loc_placeholder");
+    translation(name, "en", "absent", &Value::Null)?;
+    translation(name, "de", "absent", &Value::Null)?;
+    assert!(summary.iter().all(|texts| texts.placeholder == 1));
     Ok(())
 }
 
 #[test]
-fn an_empty_text_is_null_and_unresolved() -> TestResult {
+fn an_authored_empty_translation_is_present_and_unresolved() -> TestResult {
     let (catalog, _) = catalog(vec![english(), german()])?;
-    assert_eq!(
-        texts(&catalog, 2).1["de"],
-        Value::Null,
-        "manufacturer_DescMISC= in German"
-    );
-    Ok(())
+    translation(
+        text(&catalog, 2, "description")?,
+        "de",
+        "present",
+        &json!(""),
+    )
 }
 
 #[test]
 fn the_line_break_escape_becomes_a_line_feed_and_a_lone_cr_stays() -> TestResult {
     let (catalog, _) = catalog(vec![english(), german()])?;
-    assert_eq!(
-        texts(&catalog, 2).1["en"],
-        "Line one\nLine two\rkept",
-        "\\n decoded in a CRLF file, the lone CR kept"
-    );
-    Ok(())
+    translation(
+        text(&catalog, 2, "description")?,
+        "en",
+        "present",
+        &json!("Line one\nLine two\rkept"),
+    )
 }
 
 #[test]
@@ -257,25 +321,29 @@ fn texts_are_trimmed_in_the_catalog_and_stay_padded_in_the_raw_resolver() -> Tes
         .build();
     let entry = TestEntry::zstd(Language::English.global_ini_path(), padded.clone());
     let (catalog, summary) = catalog(vec![entry])?;
-    assert_eq!(
-        texts(&catalog, 0),
-        (
-            json!({"key": "@manufacturer_NameACAS", "en": "Ace Astrogation", "de": null}),
-            json!({"key": "@manufacturer_DescACAS", "en": null, "de": null}),
-        ),
-        "padding removed, white space only is unresolved"
-    );
-    assert_eq!(
-        texts(&catalog, 1).0["en"],
-        json!("Drake\nInterplanetary"),
-        "inner line break kept"
-    );
+    translation(
+        text(&catalog, 0, "name")?,
+        "en",
+        "present",
+        &json!("Ace Astrogation"),
+    )?;
+    translation(
+        text(&catalog, 0, "description")?,
+        "en",
+        "present",
+        &json!(""),
+    )?;
+    translation(
+        text(&catalog, 1, "name")?,
+        "en",
+        "present",
+        &json!("Drake\nInterplanetary"),
+    )?;
     assert_eq!(
         summary.first().map(|texts| texts.unresolved),
-        Some(2),
-        "white-space-only texts count as unresolved"
+        Some(3),
+        "empty authored key and white-space-only/missing texts remain unresolved"
     );
-
     let text = IniText::decode(&padded)?;
     let set = TextSet::new([(Language::English, text.index()?)]);
     let raw = LanguageTexts::new(&set, Language::English);

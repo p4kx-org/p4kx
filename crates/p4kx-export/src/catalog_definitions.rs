@@ -6,6 +6,7 @@ use serde::Serialize;
 
 use crate::catalog_table::CatalogTable;
 use crate::commodity_contract::CommodityDefinition;
+use crate::manufacturer::ManufacturerDefinition;
 use crate::resource_type_contract::ResourceType;
 use crate::schema_fields::every_field_required;
 
@@ -16,4 +17,5 @@ use crate::schema_fields::every_field_required;
 pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) resource_types: CatalogTable<ResourceType<'source>>,
     pub(crate) commodities: CatalogTable<CommodityDefinition<'source>>,
+    pub(crate) manufacturers: CatalogTable<ManufacturerDefinition<'source>>,
 }

@@ -184,13 +184,13 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `source.exportedAt` | When the catalog was written, UTC in RFC 3339 form |
 | `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "…"}` when a Filter selected the Records |
 | `exportHealth` | Measured source-read and projection health, exact affected identities, separate Record/Archive Entry counters and bounded diagnostics; independent of Filter completeness ([contract](catalog-export-health.md)) |
-| `manufacturers` | The manufacturers, ordered by GUID |
+| `definitions.manufacturers` | Source-family availability and directly sourced Manufacturer rows in GUID order, including typed Localization and canonical text references ([contract](catalog-manufacturer-types.md)) |
 | `items` | The items, ordered by GUID |
 | `ships` | The ships and ground vehicles, ordered by GUID |
 | `definitions.commodities`, `projections.commodityPresentation` | Commodity source identities/authored bindings and explicit derived choices, paired in existing GUID order; see [Commodity contract](catalog-commodity-types.md) |
 | `definitions.resourceTypes` | Closed source-family `availability` and canonical `rows`, independently selected and ordered by GUID; every source-backed field uses the typed value carrier ([contract](catalog-resource-types.md)) |
-| `texts.publicNames`, `texts.gameTexts` | Canonical ResourceType name and protected-description rows, each with sourced `id`, `key` and per-language `translations` |
-| `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the ResourceType carriers |
+| `texts.publicNames`, `texts.gameTexts` | Canonical sourced-definition short-name and protected-description rows, each with sourced `id`, `key` and per-language `translations` |
+| `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the sourced definition carriers |
 | `blueprints` | The crafting blueprints with their ingredients, all tiers, default availability and dismantle link, ordered by GUID |
 | `resourceGroups` | The groups of resource types, the targets of `typeGuid`, ordered by GUID |
 | `blueprintCategories` | The blueprint categories, the targets of `categoryGuid`, ordered by GUID |
@@ -317,8 +317,8 @@ lower number than the last applied one.
 
 ### Entities
 
-The existing entity shapes below carry these fields. ResourceTypes use the canonical table and
-sourced carriers above instead of the inline text shape:
+The existing entity shapes below carry these fields. Manufacturers, ResourceTypes and Commodities
+use their canonical tables and sourced carriers instead of the inline text shape:
 
 | Field | Meaning |
 |-------|---------|
@@ -329,7 +329,8 @@ sourced carriers above instead of the inline text shape:
 
 A resource group and a blueprint category carry `name` and no `description`.
 
-A manufacturer adds `code`, e.g. `ACAS`.
+Manufacturers use [their canonical definition contract](catalog-manufacturer-types.md). The authored
+`Code` string and owned `Localization` retain their source states independently of resolved text.
 
 An item takes its fields from the components of its `EntityClassDefinition`:
 
@@ -2503,7 +2504,8 @@ formula over the exported facts is documented as one (ADR-0218).
 ### Texts
 
 The inline `key`/`en`/`de` rules below describe the existing non-migrated family shapes.
-ResourceTypes use canonical `texts.publicNames`/`texts.gameTexts` rows and all supported languages
+Manufacturers, ResourceTypes and Commodity text fields use canonical `texts.publicNames`/`texts.gameTexts`
+rows and all supported languages
 whose Entries are available. Each row retains its authored key, even if empty. Its language values
 use the state/value/origin carrier: missing key means `absent`, while an existing empty or
 whitespace-only winner is `present` with an empty normalized string. Placeholders retain their

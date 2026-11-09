@@ -72,7 +72,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 
 | Existing root field(s) | Proposed owning contract | Preserved distinction |
 |---|---|---|
-| manufacturers | D.manufacturers | Record identity, code/text and provenance |
+| manufacturers | D.manufacturers | Sourced raw header/code and owned Localization states; canonical public Name/protected Description; physical target-row joins |
 | items | D.items | Entity identity, AttachDef classification/word tags, source text; component links |
 | ships | D.ships; V.shipBaseFacts | Entity identity/playability/role/career; existing mass/hull/cargo/size/crew projections remain defined, raw configs separate |
 | commodities | D.commodities; V.commodityPresentation | Entity vs resource fallback, GUID identity, existing first Resource/group/name/density meaning |

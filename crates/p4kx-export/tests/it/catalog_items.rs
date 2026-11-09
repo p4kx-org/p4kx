@@ -60,15 +60,13 @@ fn manufacturer_guids<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c Value> {
 #[test]
 fn a_manufacturer_given_by_reference_is_its_guid() -> TestResult {
     let catalog = catalog_of(Maker::Reference)?;
+    assert!(catalog.get("manufacturers").is_none());
+    let maker = &catalog["definitions"]["manufacturers"]["rows"][0]["guid"]["value"];
+    assert_eq!(maker, "10000000-0000-4000-8000-000000000001");
     for kind in ["items", "ships"] {
         let guids = manufacturer_guids(&catalog, kind);
         assert!(!guids.is_empty(), "{kind} present");
-        assert!(
-            guids
-                .iter()
-                .all(|guid| **guid == "10000000-0000-4000-8000-000000000001"),
-            "{kind}: {guids:?}"
-        );
+        assert!(guids.iter().all(|guid| *guid == maker), "{kind}: {guids:?}");
     }
     Ok(())
 }

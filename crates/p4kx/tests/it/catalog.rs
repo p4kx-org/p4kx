@@ -57,6 +57,45 @@ fn redact_version(text: &str) -> String {
     )
 }
 
+fn manufacturer_name(
+    catalog: &serde_json::Value,
+    index: usize,
+) -> Result<&serde_json::Value, Box<dyn Error>> {
+    let row = catalog
+        .pointer("/definitions/manufacturers/rows")
+        .and_then(|rows| rows.get(index))
+        .ok_or("manufacturer")?;
+    assert_eq!(
+        row.pointer("/localization/state")
+            .and_then(serde_json::Value::as_str),
+        Some("present"),
+        "the selected Manufacturer has an authored localization"
+    );
+    let reference = row
+        .pointer("/localization/value/name")
+        .ok_or("name carrier")?;
+    assert_eq!(
+        reference.get("state").and_then(serde_json::Value::as_str),
+        Some("present"),
+        "the Manufacturer name has a canonical reference"
+    );
+    let target = reference
+        .get("value")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("name reference")?;
+    catalog
+        .pointer("/texts/publicNames")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("public names")?
+        .iter()
+        .find(|text| {
+            text.pointer("/id/value")
+                .and_then(serde_json::Value::as_str)
+                == Some(target)
+        })
+        .ok_or_else(|| "canonical manufacturer name".into())
+}
+
 #[test]
 fn catalog_schema_prints_the_checked_in_schema() -> TestResult {
     let checked_in = fs::read_to_string(
@@ -87,6 +126,15 @@ fn catalog_writes_a_catalog_that_the_schema_accepts() -> TestResult {
         .map(|error| error.to_string())
         .collect();
     assert!(errors.is_empty(), "valid against the schema: {errors:?}");
+    assert!(instance.get("manufacturers").is_none());
+    assert_eq!(
+        instance["definitions"]["manufacturers"]["availability"],
+        "available"
+    );
+    assert_eq!(
+        manufacturer_name(&instance, 1)?["key"]["value"],
+        "@manufacturer_NameACAS"
+    );
     insta::assert_snapshot!("catalog_file", redact_version(&text));
     insta::assert_snapshot!("catalog_summary", summary);
     Ok(())
@@ -177,7 +225,7 @@ fn catalog_with_a_filter_marks_the_kind_partial_and_prints_json() -> TestResult 
         "filtered output uses the current catalog version"
     );
     assert!(
-        catalog.get("commodities").is_none(),
+        catalog.get("commodities").is_none() && catalog.get("manufacturers").is_none(),
         "filtered output has no legacy commodity array"
     );
     for pointer in [
@@ -246,10 +294,15 @@ fn catalog_without_a_german_global_ini_leaves_german_null_and_counts_it() -> Tes
     let summary = catalog(&archive, &out, &[])?;
 
     let catalog: serde_json::Value = serde_json::from_str(&fs::read_to_string(&out)?)?;
+    let name = manufacturer_name(&catalog, 1)?;
+    assert_eq!(name["key"]["value"], "@manufacturer_NameACAS");
     assert_eq!(
-        catalog["manufacturers"][1]["name"],
-        serde_json::json!({"key": "@manufacturer_NameACAS", "en": "Ace Astrogation", "de": null}),
-        "English only"
+        name["translations"]["value"]["en"]["value"],
+        "Ace Astrogation"
+    );
+    assert!(
+        name["translations"]["value"].get("de").is_none(),
+        "no German input"
     );
     insta::assert_snapshot!("catalog_summary_without_german", summary);
     Ok(())
@@ -283,7 +336,8 @@ fn catalog_reads_a_german_global_ini_with_invalid_bytes_lossily() -> TestResult 
     );
     let catalog: serde_json::Value = serde_json::from_str(&fs::read_to_string(out)?)?;
     assert_eq!(
-        catalog["manufacturers"][1]["name"]["de"], "Ace\u{fffd}",
+        manufacturer_name(&catalog, 1)?["translations"]["value"]["de"]["value"],
+        "Ace\u{fffd}",
         "the bad byte is replaced, the text kept"
     );
     Ok(())

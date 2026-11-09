@@ -10,9 +10,9 @@ use crate::catalog_crafting::CraftingKinds;
 use crate::contract::{
     Blueprint, BlueprintCategory, BlueprintPool, BrokerEntry, Commodity, ContractEntry, Crafter,
     CraftingGlobal, DismantleProcess, GameplayProperty, HarvestableLocation,
-    HarvestableProviderPreset, Item, Loadout, LootContainer, Manufacturer, MineableComposition,
-    MineableElement, MineableEntity, MiningGlobalParams, Paint, QualityDistribution,
-    QualityQuantization, RefiningProcess, ResourceGroup, ResourceType, Ship, Shop, StarmapObject,
+    HarvestableProviderPreset, Item, Loadout, LootContainer, MineableComposition, MineableElement,
+    MineableEntity, MiningGlobalParams, Paint, QualityDistribution, QualityQuantization,
+    RefiningProcess, ResourceGroup, ResourceType, Ship, Shop, StarmapObject,
     SubHarvestableMultiConfig,
 };
 use crate::contract_template::ContractTemplate;
@@ -22,6 +22,7 @@ use crate::export_ledger::ExportLedger;
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::location_template::{LocationTemplates, MissionLocationTemplate};
 use crate::loot_kinds::LootKinds;
+use crate::manufacturer::Manufacturer;
 use crate::mission_kinds::MissionKinds;
 use crate::mission_property_set::MissionPropertySet;
 use crate::npc_spawn_model::NpcSpawnPool;
@@ -156,7 +157,7 @@ impl<'f> Collected<'f> {
     /// `missing_categories`.
     fn take(&mut self, pick: Picked<'f>, missing_categories: &mut HashSet<Guid>) {
         match pick {
-            Picked::Manufacturer(entity) => self.manufacturers.push(entity),
+            Picked::Manufacturer(entity) => self.manufacturers.push(*entity),
             Picked::Item(entity, line, ports) => {
                 self.item_classes.count(line);
                 if ports {

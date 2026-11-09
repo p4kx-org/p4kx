@@ -3,7 +3,8 @@
 
 //! A minimal catalog that holds one entity of every kind and every field the schema lists.
 
-use serde_json::json;
+use p4kx_extraction::SourceValue;
+use serde_json::{Value, json};
 
 mod blueprints;
 mod brokers;
@@ -27,7 +28,7 @@ mod spawns;
 
 use recovery::item_recovery;
 
-pub(crate) fn minimal_catalog() -> serde_json::Value {
+pub(crate) fn minimal_catalog() -> Value {
     let mut catalog = json!({
         "schemaVersion": p4kx_export::SCHEMA_VERSION,
         "source": {
@@ -92,14 +93,6 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "cargoManifests": {"status": "complete"},
             "shipStoreSlugs": {"status": "complete"}
         },
-        "manufacturers": [{
-            "guid": "cfc0122d-5275-415a-a656-3dcb3346feb5",
-            "className": "ACAS",
-            "recordPath": "libs/foundry/records/scitemmanufacturer/acas",
-            "code": "ACAS",
-            "name": {"key": "@manufacturer_NameACAS", "en": "Ace Astrogation", "de": null},
-            "description": {"key": null, "en": null, "de": null}
-        }],
         "items": [{
             "guid": "30000000-0000-4000-8000-000000000001",
             "className": "POWR_ACAS_S01",
@@ -183,8 +176,9 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
                 "tierIndex": 0
             }
         }],
-        "definitions": {"resourceTypes": resources::table(), "commodities": commodities::definitions()},
-        "texts": {"publicNames": commodities::public_names(), "gameTexts": []},
+        "definitions": {"resourceTypes": resources::table(),
+            "commodities": commodities::definitions(), "manufacturers": manufacturer()},
+        "texts": {"publicNames": public_names(), "gameTexts": []},
         "projections": {"commodityPresentation": commodities::presentation()},
         "provenance": {"sources": [], "uses": []},
         "resourceGroups": [{
@@ -325,9 +319,38 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
         "itemRecovery": item_recovery()
     });
     let export_health = health::fixture(&catalog);
-    let serde_json::Value::Object(fields) = &mut catalog else {
+    let Value::Object(fields) = &mut catalog else {
         unreachable!("the authored catalog fixture is a JSON object");
     };
     fields.insert("exportHealth".to_owned(), export_health);
     catalog
+}
+
+fn manufacturer() -> Value {
+    json!({"availability": "available", "rows": [{
+        "guid": source_values::present(json!("cfc0122d-5275-415a-a656-3dcb3346feb5")),
+        "recordName": source_values::present(json!("SCItemManufacturer.ACAS")),
+        "className": source_values::present(json!("ACAS")),
+        "recordPath": source_values::present(json!("libs/foundry/records/scitemmanufacturer/acas")),
+        "recordIndex": source_values::present(json!(0)),
+        "sourceType": source_values::present(json!("SCItemManufacturer")),
+        "code": source_values::present(json!("ACAS")),
+        "localization": source_values::present(json!({
+            "sourceType": source_values::present(json!("SCItemLocalization")),
+            "name": source_values::present(json!("name:22:@manufacturer_NameACAS")),
+            "description": source_values::source(SourceValue::Null)
+        }))
+    }]})
+}
+
+fn public_names() -> Vec<Value> {
+    let mut rows = commodities::public_names();
+    rows.push(json!({
+        "id": source_values::present(json!("name:22:@manufacturer_NameACAS")),
+        "key": source_values::present(json!("@manufacturer_NameACAS")),
+        "translations": source_values::present(json!({
+            "en": source_values::present(json!("Ace Astrogation"))
+        }))
+    }));
+    rows
 }

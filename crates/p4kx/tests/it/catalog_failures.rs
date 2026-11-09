@@ -187,7 +187,9 @@ fn explicit_diagnostic_output_marks_the_file_and_retains_failed_source_identity(
                 "full failed-source identity"
             );
             assert_eq!(
-                artifact["manufacturers"].as_array().map(Vec::len),
+                artifact["definitions"]["manufacturers"]["rows"]
+                    .as_array()
+                    .map(Vec::len),
                 Some(1),
                 "readable data survives"
             );

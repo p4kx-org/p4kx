@@ -4,96 +4,30 @@
 //! Source field faults survive retained rows and normal publication refuses them before creation.
 
 use std::cell::Cell;
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fs;
-use std::time::{Duration, UNIX_EPOCH};
 
 use p4kx_export::{
     CatalogError, CatalogFile, CatalogOptions, CatalogPublicationMode, Compression,
-    ExportDiagnosticCode, Kind, build_catalog, write_catalog_from,
+    ExportDiagnosticCode, ExportDiagnosticStage, ExportHealth, ExportSourceRole, Kind,
+    build_catalog, write_catalog_from,
 };
 use p4kx_extraction::{Archive, DataForgeEntry, Filter};
-use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, TestRecord, TestStruct, TestType,
-    TestValue, entity_schema,
-};
+use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, entity_schema};
 use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-const MISSING: u128 = 0x9900_0000_0000_4000_8000_0000_0000_0001;
-
-fn options() -> CatalogOptions<'static> {
-    CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
-}
-
-fn archive(fault: bool) -> Result<(tempfile::TempDir, Archive), Box<dyn Error>> {
-    let root = tempfile::tempdir()?;
-    let path = root.path().join("Data.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database(fault)))
-        .write_to(&path)?;
-    Ok((root, Archive::open(&path)?))
-}
-
-fn database(fault: bool) -> Vec<u8> {
-    let builder = DataForgeBuilder::new()
-        .version(8)
-        .structure(TestStruct::new("Leaf"))
-        .structure(TestStruct::new("EntityClassDefinition"))
-        .structure(
-            TestStruct::new("SCItemManufacturer")
-                .field("Code", TestType::String)
-                .field("fault", TestType::Bool)
-                .field("optional", TestType::StrongPointer("Leaf".to_owned()))
-                .field("empty", TestType::String)
-                .field("link", TestType::Reference),
-        )
-        .record(
-            TestRecord::new(
-                1,
-                "SCItemManufacturer",
-                "SCItemManufacturer.Healthy",
-                "libs/foundry/records/scitemmanufacturer/healthy.xml",
-            )
-            .value("Code", TestValue::text("OK")),
-        )
-        .record(inspected(fault))
-        .record(TestRecord::new(
-            3,
-            "EntityClassDefinition",
-            "EntityClassDefinition.DebugNoCrafter",
-            "libs/foundry/records/entities/props/debug_no_crafter.xml",
-        ));
-    builder.build()
-}
-
-fn inspected(fault: bool) -> TestRecord {
-    TestRecord::new(
-        2,
-        "SCItemManufacturer",
-        "SCItemManufacturer.Inspected",
-        "libs/foundry/records/scitemmanufacturer/inspected.xml",
-    )
-    .value("Code", TestValue::text("CHECK"))
-    .value("empty", TestValue::text(""))
-    .value(
-        "fault",
-        if fault {
-            TestValue::Raw(vec![2])
-        } else {
-            TestValue::Bool(true)
-        },
-    )
-    .value("link", TestValue::Reference(MISSING))
-}
+#[path = "export_health_fixture.rs"]
+mod fixture;
 
 #[test]
 fn retained_rows_keep_actual_field_failures_in_the_artifact() -> TestResult {
-    let (_root, archive) = archive(true)?;
+    let (_root, archive) = fixture::archive(true)?;
     let options = CatalogOptions {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..options()
+        ..fixture::options()
     };
     let built = build_catalog(&archive, &options)?;
     let summary = built.summary();
@@ -118,20 +52,7 @@ fn retained_rows_keep_actual_field_failures_in_the_artifact() -> TestResult {
         kind.source_records.omitted_after_read_failure, 0,
         "a retained field fault is not an omitted Record"
     );
-    assert_eq!(
-        health.failed_records.len(),
-        1,
-        "the exact physical source identity is retained without sampling"
-    );
-    assert!(
-        health.diagnostics.iter().any(|diagnostic| diagnostic.code
-            == ExportDiagnosticCode::UnreadableSource
-            && diagnostic
-                .examples
-                .iter()
-                .any(|example| example.field.as_deref() == Some("fault"))),
-        "the failed field path is available from the artifact alone"
-    );
+    assert_failed_identity(health);
     let document: Value = serde_json::from_slice(built.json())?;
     assert_eq!(
         document.get("exportHealth"),
@@ -141,10 +62,64 @@ fn retained_rows_keep_actual_field_failures_in_the_artifact() -> TestResult {
     Ok(())
 }
 
+fn assert_failed_identity(health: &ExportHealth) {
+    let identities: BTreeSet<_> = health
+        .failed_records
+        .iter()
+        .map(|failed| {
+            (
+                failed.record_index,
+                failed.guid.as_str(),
+                failed.record_path.as_deref(),
+                failed.kind.map(Kind::name),
+                failed.role,
+            )
+        })
+        .collect();
+    assert_eq!(
+        identities.len(),
+        1,
+        "exactly one physical identity failed; stage entries are not extra Records"
+    );
+    let expected = (
+        1,
+        "00000000-0000-0000-0000-000000000002",
+        Some("libs/foundry/records/scitemmanufacturer/inspected"),
+        Some(Kind::Manufacturers.name()),
+        ExportSourceRole::Selected,
+    );
+    assert!(
+        identities.contains(&expected),
+        "the one actual failed Record retains exact path/kind/role"
+    );
+    for stage in [
+        ExportDiagnosticStage::SourceField,
+        ExportDiagnosticStage::Projection,
+    ] {
+        assert!(
+            health
+                .failed_records
+                .iter()
+                .any(|failed| failed.stage == stage
+                    && failed.code == ExportDiagnosticCode::UnreadableSource),
+            "both actual source and typed projection failure stages are retained"
+        );
+    }
+    assert!(
+        health.diagnostics.iter().any(|diagnostic| diagnostic.code
+            == ExportDiagnosticCode::UnreadableSource
+            && diagnostic
+                .examples
+                .iter()
+                .any(|example| example.field.as_deref() == Some("Code"))),
+        "the failed field path is available from the artifact alone"
+    );
+}
+
 #[test]
 fn represented_optional_empty_and_dangling_states_do_not_invent_a_read_failure() -> TestResult {
-    let (_root, archive) = archive(false)?;
-    let built = build_catalog(&archive, &options())?;
+    let (_root, archive) = fixture::archive(false)?;
+    let built = build_catalog(&archive, &fixture::options())?;
     let health = built.summary().export_health();
     assert!(
         health.is_complete(),
@@ -176,11 +151,11 @@ fn represented_optional_empty_and_dangling_states_do_not_invent_a_read_failure()
 
 #[test]
 fn healthy_filtered_selection_and_enumerated_empty_kinds_publish_normally() -> TestResult {
-    let (_root, archive) = archive(true)?;
+    let (_root, archive) = fixture::archive(true)?;
     let filter = Filter::new("*healthy*");
     let options = CatalogOptions {
         filter: Some(&filter),
-        ..options()
+        ..fixture::options()
     };
     let built = build_catalog(&archive, &options)?;
     let health = built.summary().export_health();
@@ -217,10 +192,10 @@ fn healthy_filtered_selection_and_enumerated_empty_kinds_publish_normally() -> T
 
 #[test]
 fn normal_mode_refuses_memory_and_fresh_or_existing_files_before_creation() -> TestResult {
-    let (root, archive) = archive(true)?;
+    let (root, archive) = fixture::archive(true)?;
     assert!(
         matches!(
-            build_catalog(&archive, &options()),
+            build_catalog(&archive, &fixture::options()),
             Err(CatalogError::IncompleteExport { .. })
         ),
         "normal in-memory publication also refuses incomplete bytes"
@@ -235,10 +210,11 @@ fn normal_mode_refuses_memory_and_fresh_or_existing_files_before_creation() -> T
                 fs::write(&output, b"previous complete output")?;
             }
             let called = Cell::new(false);
-            let result = write_catalog_from(&archive, &entry, &options(), compression, || {
-                called.set(true);
-                CatalogFile::create(&output)
-            });
+            let result =
+                write_catalog_from(&archive, &entry, &fixture::options(), compression, || {
+                    called.set(true);
+                    CatalogFile::create(&output)
+                });
             assert!(
                 matches!(result, Err(CatalogError::IncompleteExport { .. })),
                 "normal output refuses the same measured source fault"
@@ -260,8 +236,8 @@ fn normal_mode_refuses_memory_and_fresh_or_existing_files_before_creation() -> T
 
 #[test]
 fn a_leftover_entity_without_a_crafter_component_does_not_invent_a_successful_read() -> TestResult {
-    let (_root, archive) = archive(false)?;
-    let built = build_catalog(&archive, &options())?;
+    let (_root, archive) = fixture::archive(false)?;
+    let built = build_catalog(&archive, &fixture::options())?;
     let crafters = built
         .summary()
         .export_health()
@@ -288,11 +264,11 @@ fn a_leftover_entity_without_a_crafter_component_does_not_invent_a_successful_re
 
 #[test]
 fn explicit_diagnostic_memory_plain_and_zstd_outputs_share_the_same_health() -> TestResult {
-    let (_root, archive) = archive(true)?;
+    let (_root, archive) = fixture::archive(true)?;
     let entry = DataForgeEntry::read(&archive)?;
     let options = CatalogOptions {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..options()
+        ..fixture::options()
     };
     let memory = build_catalog(&archive, &options)?;
     for compression in [Compression::None, Compression::ZSTD] {
@@ -346,7 +322,7 @@ fn a_non_paint_physical_alias_does_not_become_a_selected_paint_input() -> TestRe
         .entry(TestEntry::zstd("Data\\Game2.dcb", database))
         .write_to(&path)?;
     let archive = Archive::open(&path)?;
-    let built = build_catalog(&archive, &options())?;
+    let built = build_catalog(&archive, &fixture::options())?;
     let health = built.summary().export_health();
     let items = health.kind(Kind::Items).ok_or("item health")?;
     let paints = health.kind(Kind::Paints).ok_or("paint health")?;

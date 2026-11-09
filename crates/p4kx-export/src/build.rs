@@ -239,7 +239,6 @@ fn assemble<R>(
         ),
         completeness: Completeness::of_every_kind(completeness_of(options)),
         export_health: health.clone(),
-        manufacturers: collected.manufacturers,
         items: collected.items,
         ships: collected.ships,
         blueprints: collected.blueprints,
@@ -247,6 +246,7 @@ fn assemble<R>(
         definitions: CatalogDefinitions {
             resource_types: CatalogTable::new(&forge, &["ResourceType"], collected.resource_types),
             commodities,
+            manufacturers: crate::manufacturer::table(&forge, collected.manufacturers),
         },
         projections: CatalogProjections {
             commodity_presentation,

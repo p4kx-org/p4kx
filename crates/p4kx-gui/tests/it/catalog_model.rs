@@ -81,10 +81,30 @@ fn the_catalog_is_written_and_summarised() -> TestResult {
         "a Basetool catalog"
     );
     assert_eq!(
-        json["manufacturers"].as_array().map(Vec::len),
+        json["definitions"]["manufacturers"]["rows"]
+            .as_array()
+            .map(Vec::len),
         Some(2),
         "two"
     );
+    assert!(json.get("manufacturers").is_none(), "no legacy array");
+    assert_eq!(
+        json["definitions"]["manufacturers"]["availability"],
+        "available"
+    );
+    let row = &json["definitions"]["manufacturers"]["rows"][0];
+    for (field, domain) in [("name", "publicNames"), ("description", "gameTexts")] {
+        let reference = &row["localization"]["value"][field];
+        assert_eq!(reference["state"], "present");
+        let texts = json["texts"][domain]
+            .as_array()
+            .ok_or("canonical text table")?;
+        assert!(
+            texts
+                .iter()
+                .any(|text| text["id"]["value"] == reference["value"])
+        );
+    }
     assert_eq!(
         files_in(&out)?,
         ["basetool-catalog.json"],

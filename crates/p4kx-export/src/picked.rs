@@ -5,9 +5,9 @@ use p4kx_extraction::{Guid, RecordTree};
 
 use crate::blueprint_category::blueprint_category;
 use crate::contract::{
-    BlueprintCategory, Commodity, Crafter, HarvestableProviderPreset, Item, Manufacturer,
-    MineableComposition, MineableElement, MineableEntity, MiningGlobalParams, RefiningProcess,
-    ResourceGroup, ResourceType, Ship, StarmapObject, SubHarvestableMultiConfig,
+    BlueprintCategory, Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition,
+    MineableElement, MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup,
+    ResourceType, Ship, StarmapObject, SubHarvestableMultiConfig,
 };
 use crate::crafter::crafter;
 use crate::crafting_warning::CraftingWarning;
@@ -15,7 +15,7 @@ use crate::item::item;
 use crate::item_class::ClassLine;
 use crate::loadout::carries_ports;
 use crate::loot_kinds::LootPick;
-use crate::manufacturer::manufacturer;
+use crate::manufacturer::Manufacturer;
 use crate::mining::{mineable_composition, mineable_element, refining_process};
 use crate::mining_params::mining_global_params;
 use crate::mission_kinds::MissionPick;
@@ -29,7 +29,7 @@ use crate::{CatalogFailure, Kind};
 /// The kinds that [`read_crafting`](crate::read_crafting) fills are not picked.
 pub(crate) enum Picked<'f> {
     /// A manufacturer.
-    Manufacturer(Manufacturer<'f>),
+    Manufacturer(Box<Manufacturer<'f>>),
     /// An item, the `Class:` line of its English description and whether it may have ports.
     Item(Item<'f>, ClassLine, bool),
     /// A ship and the vehicle facts its paints are derived from.
@@ -81,7 +81,6 @@ impl<'f> Picked<'f> {
     /// `texts`. `None` for a kind whose dedicated reader supplies its rows.
     pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>, texts: &Texts<'f>) -> Option<Self> {
         Some(match kind {
-            Kind::Manufacturers => Self::Manufacturer(manufacturer(tree, texts)),
             Kind::Items => {
                 let (item, line) = item(tree, texts);
                 Self::Item(item, line, carries_ports(tree))
@@ -109,7 +108,8 @@ impl<'f> Picked<'f> {
             | Kind::LegacyLootArchetypes => {
                 return LootPick::entity(kind, tree).map(Self::Loot);
             }
-            Kind::Ships
+            Kind::Manufacturers
+            | Kind::Ships
             | Kind::Commodities
             | Kind::ResourceGroups
             | Kind::ResourceTypes

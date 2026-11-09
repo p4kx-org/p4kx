@@ -24,7 +24,7 @@ impl<'f> Scan<'_, '_, 'f> {
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
-        if let Some(picked) = self.resource_kind(kind, tree, ledger)? {
+        if let Some(picked) = self.definition_kind(kind, tree, ledger)? {
             return Ok(Some(picked));
         }
         if let Some(picked) = self.harvestable(kind, trees, tree) {
@@ -59,13 +59,17 @@ impl<'f> Scan<'_, '_, 'f> {
         Ok(picked.map(|picked| picked.crafted(tree)))
     }
 
-    fn resource_kind(
+    fn definition_kind(
         &self,
         kind: Kind,
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
         let (picked, notes) = match kind {
+            Kind::Manufacturers => {
+                let read = crate::manufacturer::read(tree, self.projection)?;
+                (Picked::Manufacturer(Box::new(read.value)), read.notes)
+            }
             Kind::ResourceTypes => {
                 let read = crate::resource_read::read(
                     tree,

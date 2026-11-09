@@ -90,7 +90,9 @@ fn an_unreadable_record_is_left_out_and_the_catalog_is_still_built() -> TestResu
     let (built, catalog) = built()?;
 
     assert_eq!(
-        catalog["manufacturers"].as_array().map(Vec::len),
+        catalog["definitions"]["manufacturers"]["rows"]
+            .as_array()
+            .map(Vec::len),
         Some(1),
         "the readable manufacturer is written"
     );
