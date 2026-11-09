@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 
 use crate::catalog_crafting_support;
 use crate::catalog_crafting_support::commodity::{self, TextDomain};
+use crate::catalog_crafting_support::groups;
 use crate::resource_edges_fixture as fixture;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -129,7 +130,10 @@ fn unselected_earlier_groups_cannot_own_selected_legacy_or_all_membership_links(
         selected
     );
     assert_eq!(
-        row(&catalog, "resourceGroups", fixture::CHILD_GROUP)?["parentGuid"],
+        *groups::parent_guid(
+            &catalog,
+            &catalog_crafting_support::text(fixture::CHILD_GROUP)
+        )?,
         selected
     );
     assert_eq!(
@@ -168,8 +172,14 @@ fn a_failed_resource_dependency_retains_the_readable_commodity_and_exact_failure
 fn the_reference_metadata_budget_never_claims_a_complete_empty_inventory() -> TestResult {
     let (_, catalog) =
         catalog_crafting_support::diagnostic_from(&fixture::reference_budget(), None)?;
-    let group = row(&catalog, "resourceGroups", fixture::FIRST_GROUP)?;
-    assert_eq!(group["resources"].as_array().map(Vec::len), Some(6000));
+    let group = groups::members(
+        &catalog,
+        &catalog_crafting_support::text(fixture::FIRST_GROUP),
+    )?;
+    assert_eq!(
+        group["resources"]["value"].as_array().map(Vec::len),
+        Some(6000)
+    );
     let kinds = catalog["exportHealth"]["kinds"]
         .as_array()
         .ok_or("the kind health")?;

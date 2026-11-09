@@ -15,4 +15,6 @@ use crate::schema_fields::every_field_required;
 pub(crate) struct CatalogProjections {
     pub(crate) tag_paths: CatalogTable<super::tag_catalog::TagPath>,
     pub(crate) commodity_presentation: CatalogTable<CommodityPresentation>,
+    pub(crate) resource_group_parents:
+        CatalogTable<super::resource_group_catalog::ResourceGroupParent>,
 }

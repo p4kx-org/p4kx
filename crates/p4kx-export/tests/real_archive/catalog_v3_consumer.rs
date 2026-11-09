@@ -28,6 +28,7 @@ pub(crate) fn named_rows<'catalog>(
         Kind::Manufacturers => checked_table(catalog, kind, "/definitions/manufacturers"),
         Kind::Tags => checked_table(catalog, kind, "/definitions/tags"),
         Kind::ResourceTypes => checked_table(catalog, kind, "/definitions/resourceTypes"),
+        Kind::ResourceGroups => checked_table(catalog, kind, "/definitions/resourceGroups"),
         Kind::Commodities => {
             presentations(catalog)?;
             table(catalog, "/definitions/commodities")
@@ -127,7 +128,11 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
         .ok_or_else(|| format!("required {kind} field {name}"))?;
     if matches!(
         kind,
-        Kind::Manufacturers | Kind::Commodities | Kind::ResourceTypes | Kind::Tags
+        Kind::Manufacturers
+            | Kind::Commodities
+            | Kind::ResourceTypes
+            | Kind::ResourceGroups
+            | Kind::Tags
     ) {
         present(value)
     } else {

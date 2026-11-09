@@ -3,7 +3,9 @@
 The catalog uses schema version 3. The ResourceType family is published at
 `definitions.resourceTypes.rows`, with immediate source origin on every source-backed field and
 nested list element. Its localized names and descriptions use canonical text tables. Commodities
-also use canonical definitions and presentation as described below. Other catalog families still have their existing shapes; the complete canonical migration and origin coverage of
+also use canonical definitions and presentation as described below. ResourceGroups have canonical
+definition, membership and parent-projection tables with the same per-value origin contract.
+Other catalog families still have their existing shapes; the complete canonical migration and origin coverage of
 the 45 tool-output carrier families remain open work under [#1125](https://github.com/p4kx-org/p4kx/issues/1125).
 [ADR-0356](adr/0356-catalog-v3-uses-canonical-source-typed-tables.md) defines the full target;
 [ADR-0357](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md) defines source origin.
@@ -26,7 +28,7 @@ directly lists that resource; it is not the list of all group memberships.
 The existing ResourceType-backed commodity fallback remains limited to otherwise unrepresented
 resources used by blueprint costs or kept quality quantizations. It uses the resource GUID for
 both `guid` and `subtypeGuid`. This does not limit independent ResourceType selection.
-`densityGramsPerCubicCentimetre` retains its existing finite g/cm³ meaning; other units are not
+`densityGramsPerCubicCentimetre` retains its existing finite g/cmÃ‚Â³ meaning; other units are not
 converted into it. The derived nullable value now uses its own direct field carrier in `projections.commodityPresentation`.
 The [Commodity contract](catalog-commodity-types.md) documents the separate authored definitions, exact old-value reconstruction and precise selection origins.
 
@@ -160,11 +162,11 @@ retain closure of public-name references. An unencrypted marker does not grant p
 
 ## ResourceGroups
 
-ResourceGroups still have their existing shape: `name`, first-parent `parentGuid`, `description`,
-thumbnail paths, and nullable ordered `groups`/`resources` references. These lists preserve repeats,
-null entries and cycles without recursive expansion. Only selected groups affect legacy
-`parentGuid`, commodity `typeGuid`, and ResourceType `groupGuids`; extra health-only reads do not
-change those joins. ResourceGroups have not yet acquired complete per-field origin carriers.
+ResourceGroups use `definitions.resourceGroups`, `declarations.resourceGroupMembers` and
+`projections.resourceGroupParents`. Direct scalar facts, every original ordered membership and the
+existing first-selected parent choice have separate canonical owners and full immediate per-value
+origins. Only selected groups affect commodity `typeGuid` and ResourceType `groupGuids`; extra
+health-only reads do not change those joins. See [the ResourceGroup contract](catalog-resource-groups.md).
 
 ## Reference availability and catalog materialization
 
@@ -213,7 +215,7 @@ raw-value oracle, its bounds and the missing historical cardinality baseline.
 The Export mapping column uses logical paths: follow `.value` at each sourced field or authored
 list element. For example, a molar mass is
 `definitions.resourceTypes.rows[i].density.value.payload.value.molarMass.value`.
-ResourceGroup mappings still refer to that family's existing shape.
+ResourceGroup mappings use the canonical definition and membership tables described above.
 
 
 | Declaring type.field | Stored type | LIVE target | PTU target | Owning paths | Export mapping |
@@ -250,12 +252,12 @@ ResourceGroup mappings still refer to that family's existing shape.
 | ResourceTypeCraftingData.qualityLocationOverride | StrongPointer | CraftingQualityLocationOverride_Base | CraftingQualityLocationOverride_Base | ResourceType.properties[].qualityLocationOverride | definitions.resourceTypes.rows[].properties[].payload.qualityLocationOverride (inline-or-RecordRef source wrapper) |
 | ResourceTypeCraftingData.qualityQuantization | StrongPointer | CraftingQualityQuantization_Base | CraftingQualityQuantization_Base | ResourceType.properties[].qualityQuantization | definitions.resourceTypes.rows[].properties[].payload.qualityQuantization (inline-or-RecordRef source wrapper) |
 | ResourceTypeDensity.densityUnit | StrongPointer | BaseDensityUnit | BaseDensityUnit | ResourceType.densityType.densityUnit | definitions.resourceTypes.rows[].density.payload.densityUnit (actual sourceType + tagged value/unit) |
-| ResourceTypeGroup.displayName | Locale |  |  | ResourceTypeGroup.displayName | resourceGroups[].name (existing LocalisedText) |
-| ResourceTypeGroup.description | Locale |  |  | ResourceTypeGroup.description | resourceGroups[].description (LocalisedText; x-gameText) |
-| ResourceTypeGroup.defaultThumbnailPath | String |  |  | ResourceTypeGroup.defaultThumbnailPath | resourceGroups[].defaultThumbnailPath (raw String) |
-| ResourceTypeGroup.defaultThumbnailPathSVG | String |  |  | ResourceTypeGroup.defaultThumbnailPathSVG | resourceGroups[].defaultThumbnailPathSVG (raw String) |
-| ResourceTypeGroup.groups | Reference[] | ResourceTypeGroup | ResourceTypeGroup | ResourceTypeGroup.groups | resourceGroups[].groups (ordered nullable Record References) |
-| ResourceTypeGroup.resources | Reference[] | ResourceType | ResourceType | ResourceTypeGroup.resources | resourceGroups[].resources (ordered nullable Record References) |
+| ResourceTypeGroup.displayName | Locale |  |  | ResourceTypeGroup.displayName | definitions.resourceGroups.rows[].name (PublicNameRef) |
+| ResourceTypeGroup.description | Locale |  |  | ResourceTypeGroup.description | definitions.resourceGroups.rows[].description (GameTextRef; x-gameText) |
+| ResourceTypeGroup.defaultThumbnailPath | String |  |  | ResourceTypeGroup.defaultThumbnailPath | definitions.resourceGroups.rows[].defaultThumbnailPath (sourced raw String) |
+| ResourceTypeGroup.defaultThumbnailPathSVG | String |  |  | ResourceTypeGroup.defaultThumbnailPathSVG | definitions.resourceGroups.rows[].defaultThumbnailPathSVG (sourced raw String) |
+| ResourceTypeGroup.groups | Reference[] | ResourceTypeGroup | ResourceTypeGroup | ResourceTypeGroup.groups | declarations.resourceGroupMembers.rows[].groups (ordered sourced Record References) |
+| ResourceTypeGroup.resources | Reference[] | ResourceType | ResourceType | ResourceTypeGroup.resources | declarations.resourceGroupMembers.rows[].resources (ordered sourced Record References) |
 | ResourceTypeMolarMass.molarMass | Single |  |  | ResourceType.densityType.molarMass | definitions.resourceTypes.rows[].density.payload.molarMass (raw Single, no invented unit) |
 | ResourceTypeProperties.name | String |  |  | ResourceType.properties[].name | definitions.resourceTypes.rows[].properties[].name (raw String, inherited) |
 | ResourceTypeVolatility.volatility | Single |  |  | ResourceType.properties[].volatility | definitions.resourceTypes.rows[].properties[].payload.volatility (raw Single) |

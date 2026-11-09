@@ -3,7 +3,19 @@
 
 use std::collections::HashMap;
 
-use p4kx_extraction::{Guid, RecordTree, SourceUseRole, Value};
+use p4kx_extraction::{CancelToken, Guid, RecordTree, SourceUseRole, Value};
+
+use crate::CatalogError;
+use crate::catalog_origins::CatalogOrigins;
+
+#[path = "resource_group_parent_index.rs"]
+mod parent_index;
+#[path = "resource_group_parent_source.rs"]
+mod parent_source;
+
+pub(crate) use parent_index::ParentChoice;
+use parent_index::Parents;
+pub(crate) use parent_source::ParentSource;
 
 use crate::guid_text::CatalogGuid;
 
@@ -12,7 +24,7 @@ use crate::guid_text::CatalogGuid;
 pub(crate) struct Groups {
     by_resource: HashMap<Guid, CatalogGuid>,
     all_by_resource: HashMap<Guid, Vec<ResourceMembership>>,
-    parents: HashMap<Guid, CatalogGuid>,
+    parents: Parents,
     selection_sources: Vec<GroupSelectionSource>,
     complete: bool,
 }
@@ -22,7 +34,7 @@ impl Default for Groups {
         Self {
             by_resource: HashMap::new(),
             all_by_resource: HashMap::new(),
-            parents: HashMap::new(),
+            parents: Parents::default(),
             selection_sources: Vec::new(),
             complete: true,
         }
@@ -73,7 +85,11 @@ impl ResourceGroupChoice<'_> {
     }
 }
 impl Groups {
-    pub(crate) fn add(&mut self, listing: Listing) {
+    pub(crate) fn add(
+        &mut self,
+        listing: Listing,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
         let prior_complete = self.complete;
         self.complete &= listing.complete;
         let group = CatalogGuid(listing.group);
@@ -83,6 +99,9 @@ impl Groups {
             prior_complete,
         });
         for (position, resource) in listing.resources {
+            if cancel.is_some_and(CancelToken::is_cancelled) {
+                return Err(CatalogError::Cancelled);
+            }
             self.by_resource.entry(resource).or_insert(group);
             let memberships = self.all_by_resource.entry(resource).or_default();
             let source = MembershipSource {
@@ -98,11 +117,9 @@ impl Groups {
                 });
             }
         }
-        for (_, child) in listing.children {
-            if child != listing.group {
-                self.parents.entry(child).or_insert(group);
-            }
-        }
+        self.parents
+            .add(listing.parent_source, listing.children, cancel)?;
+        Ok(())
     }
 
     pub(crate) const fn mark_incomplete(&mut self) {
@@ -147,8 +164,16 @@ impl Groups {
         }
     }
 
-    pub(crate) fn parent_of(&self, group: &Guid) -> Option<CatalogGuid> {
-        self.parents.get(group).copied()
+    pub(crate) fn parent_choice(
+        &self,
+        group: &Guid,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ParentChoice<'_>, CatalogError> {
+        self.parents.choice(group, cancel)
+    }
+
+    pub(crate) fn parent_failure(&mut self, source: ParentSource) {
+        self.parents.failed(source);
     }
 }
 
@@ -159,36 +184,49 @@ pub(crate) struct Listing {
     record_index: u32,
     resources: Vec<(usize, Guid)>,
     children: Vec<(usize, Guid)>,
+    parent_source: ParentSource,
     resources_role: SourceUseRole,
     complete: bool,
 }
 
-pub(crate) fn listing(tree: &RecordTree<'_>) -> Listing {
-    let (resources, complete) = listed(tree, "resources");
-    let (children, _) = listed(tree, "groups");
-    Listing {
+pub(crate) fn listing(
+    tree: &RecordTree<'_>,
+    origins: &CatalogOrigins,
+    cancel: Option<&CancelToken>,
+) -> Result<Listing, CatalogError> {
+    let (resources, complete) = listed(tree, "resources", cancel)?;
+    let (parent_source, children) = ParentSource::read(tree, origins, cancel)?;
+    Ok(Listing {
         group: tree.guid(),
         record_index: tree.record_index(),
         resources,
         children,
+        parent_source,
         resources_role: if matches!(tree.field("resources"), Some(Value::Error(_))) {
             SourceUseRole::Attempted
         } else {
             SourceUseRole::Selector
         },
         complete,
-    }
+    })
 }
 
-fn listed(tree: &RecordTree<'_>, field: &str) -> (Vec<(usize, Guid)>, bool) {
+fn listed(
+    tree: &RecordTree<'_>,
+    field: &str,
+    cancel: Option<&CancelToken>,
+) -> Result<(Vec<(usize, Guid)>, bool), CatalogError> {
     let values = match tree.root().field(field) {
-        None | Some(Value::Null) => return (Vec::new(), true),
+        None | Some(Value::Null) => return Ok((Vec::new(), true)),
         Some(Value::Array(values)) => values,
-        _ => return (Vec::new(), false),
+        _ => return Ok((Vec::new(), false)),
     };
     let mut complete = true;
     let mut listed = Vec::new();
     for (position, value) in values.iter().enumerate() {
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
+        }
         match value {
             Value::Reference(entry) if entry.location().is_none() => {
                 listed.push((position, entry.guid()));
@@ -197,5 +235,5 @@ fn listed(tree: &RecordTree<'_>, field: &str) -> (Vec<(usize, Guid)>, bool) {
             _ => complete = false,
         }
     }
-    (listed, complete)
+    Ok((listed, complete))
 }

@@ -82,9 +82,15 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         let records: Vec<Record<'f>> = forge.records().collect();
         let groups::GroupRead {
             groups,
+            members,
             failures: group_failures,
             ledger: group_ledger,
-        } = Self::groups(&records, options.filter, options.cancel)?;
+        } = Self::groups(
+            &records,
+            options.filter,
+            projection.origins(),
+            options.cancel,
+        )?;
         let (evidence, evidence_failures, evidence_ledger) =
             Evidence::read_catalog(&records, options.cancel)?;
         let (signature_slot, slot_failures, slot_problem, slot_ledger) =
@@ -113,7 +119,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         let mut ledger = group_ledger;
         ledger.merge(evidence_ledger);
         ledger.merge(slot_ledger);
-        scan.complete(
+        let mut read = scan.complete(
             checked,
             ledger,
             group_failures
@@ -122,7 +128,9 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
                 .chain(slot_failures),
             slot_problem,
             crafting,
-        )
+        )?;
+        read.resource_group_members = members;
+        Ok(read)
     }
 
     fn complete(
@@ -161,6 +169,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         Ok(ScanRead {
             picked,
             entity_tags,
+            resource_group_members: Vec::new(),
             ledger,
         })
     }

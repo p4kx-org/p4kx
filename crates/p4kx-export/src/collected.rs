@@ -49,6 +49,8 @@ pub(crate) struct Collected<'f> {
     pub(crate) commodities: Vec<Commodity<'f>>,
     pub(crate) blueprints: Vec<Blueprint<'f>>,
     pub(crate) resource_groups: Vec<ResourceGroup<'f>>,
+    pub(crate) resource_group_members:
+        Vec<crate::catalog_v3::resource_group_catalog::ResourceGroupMembers>,
     pub(crate) resource_types: Vec<ResourceType<'f>>,
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayProperty<'f>>,
@@ -93,11 +95,22 @@ pub(crate) struct Collected<'f> {
 }
 
 impl<'f> Collected<'f> {
-    /// Sorts `picked` into the kinds and orders every kind by the text of the GUID; `crafting`
-    /// fills the kinds [`read_crafting`](crate::read_crafting) reads.
+    /// Collects picked Records and crafting rows in GUID order.
     pub(crate) fn new(picked: Vec<Picked<'f>>, crafting: CraftingKinds<'f>) -> Self {
+        let mut collected = Self::from_crafting(crafting);
+        let mut missing_categories = HashSet::new();
+        for pick in picked {
+            collected.take(pick, &mut missing_categories);
+        }
+        missing_categories.extend(collected.failures.iter().map(|failure| failure.guid));
+        unlink_categories(&mut collected.blueprints, &missing_categories);
+        collected.order();
+        collected
+    }
+
+    fn from_crafting(crafting: CraftingKinds<'f>) -> Self {
         let skipped = Self::crafting_skipped(&crafting);
-        let mut collected = Self {
+        Self {
             ledger: crafting.ledger,
             tags: crate::catalog_v3::tag_catalog::TagRows::default(),
             manufacturers: Vec::new(),
@@ -106,6 +119,7 @@ impl<'f> Collected<'f> {
             commodities: Vec::new(),
             blueprints: crafting.blueprints,
             resource_groups: Vec::new(),
+            resource_group_members: Vec::new(),
             resource_types: Vec::new(),
             blueprint_categories: Vec::new(),
             gameplay_properties: crafting.properties,
@@ -147,15 +161,7 @@ impl<'f> Collected<'f> {
             failures: crafting.failures,
             warnings: crafting.warnings,
             skipped,
-        };
-        let mut missing_categories = HashSet::new();
-        for pick in picked {
-            collected.take(pick, &mut missing_categories);
         }
-        missing_categories.extend(collected.failures.iter().map(|failure| failure.guid));
-        unlink_categories(&mut collected.blueprints, &missing_categories);
-        collected.order();
-        collected
     }
 
     /// Files `pick` under its kind; the GUIDs of the skipped blueprint categories go to

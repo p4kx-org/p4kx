@@ -6,7 +6,6 @@ use serde::Serialize;
 
 use crate::contract::{LocalisedText, every_field_required};
 use crate::contract_recipe::{BlueprintDismantle, BlueprintTier};
-use crate::definition_reference::DefinitionReference;
 use crate::guid_text::CatalogGuid;
 
 /// A crafting blueprint: a `CraftingBlueprintRecord` Record under `crafting/blueprints/crafting`.
@@ -66,38 +65,6 @@ pub(crate) struct Ingredient<'a> {
     pub(crate) slot: Option<&'a str>,
     /// The localisation key of the slot name, `null` without one or for a placeholder.
     pub(crate) slot_key: Option<&'a str>,
-}
-
-/// A resource group: a `ResourceTypeGroup` Record under `resourcetypedatabase`, the type the
-/// `typeGuid` of a commodity points at.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct ResourceGroup<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `Metal`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The name, from `displayName`; a placeholder key leaves `en` and `de` `null`.
-    pub(crate) name: LocalisedText<'a>,
-    /// The GUID of the group that lists this group in its `groups`, the `guid` of another
-    /// `resourceGroups` entry; `null` when no selected group lists it. The first selected listing
-    /// wins; raw `groups` retain all memberships, and parent traversal requires a cycle guard.
-    pub(crate) parent_guid: Option<CatalogGuid>,
-    /// The localised source description.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) description: LocalisedText<'a>,
-    /// The raw source thumbnail path, including an empty string.
-    pub(crate) default_thumbnail_path: Option<&'a str>,
-    /// The raw source SVG thumbnail path, including an empty string.
-    #[serde(rename = "defaultThumbnailPathSVG")]
-    pub(crate) default_thumbnail_path_svg: Option<&'a str>,
-    /// Every authored child-group Reference in stored order, including nulls and repetitions.
-    pub(crate) groups: Option<Vec<Option<DefinitionReference>>>,
-    /// Every authored resource Reference in stored order, including nulls and repetitions.
-    pub(crate) resources: Option<Vec<Option<DefinitionReference>>>,
 }
 
 /// A blueprint category: a `BlueprintCategoryRecord` Record under `crafting/blueprintcategories`,

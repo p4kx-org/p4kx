@@ -21,6 +21,7 @@ mod npc_spawns;
 mod objective_properties;
 mod recovery;
 mod reputation;
+mod resource_groups;
 mod resources;
 mod slugs;
 mod source_values;
@@ -178,25 +179,13 @@ pub(crate) fn minimal_catalog() -> Value {
                 "tierIndex": 0
             }
         }],
-        "definitions": {"resourceTypes": resources::table(),
+        "definitions": {"resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
             "tags": tags::definitions()},
-        "declarations": {"tagRoots": tags::roots(), "entityTags": tags::entities()},
+        "declarations": {"tagRoots": tags::roots(), "entityTags": tags::entities(), "resourceGroupMembers": resource_groups::members()},
         "texts": {"publicNames": public_names(), "gameTexts": []},
-        "projections": {"commodityPresentation": commodities::presentation(), "tagPaths": tags::paths()},
+        "projections": {"commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents()},
         "provenance": {"sources": [], "uses": []},
-        "resourceGroups": [{
-            "guid": "b1000000-0000-4000-8000-000000000001",
-            "className": "Metal",
-            "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
-            "name": {"key": "@items_commodities_type_metal", "en": "Metal", "de": null},
-            "parentGuid": null,
-            "description": {"key": null, "en": null, "de": null},
-            "defaultThumbnailPath": null,
-            "defaultThumbnailPathSVG": null,
-            "groups": [],
-            "resources": [null]
-        }],
         "blueprintCategories": [{
             "guid": "d1000000-0000-4000-8000-000000000001",
             "className": "Ammo",

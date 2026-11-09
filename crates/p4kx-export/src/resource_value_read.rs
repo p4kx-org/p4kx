@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{SourceValue, SourcedValue, Value, ValueError};
+use p4kx_extraction::{SourcedValue, Value};
 
 use crate::CatalogError;
 use crate::catalog_read::CatalogFields;
 use crate::catalog_record_reference::CatalogRecordReference;
-use crate::definition_reference::DefinitionStatus;
-use crate::guid_text::CatalogGuid;
 use crate::resource_float::ResourceFloat32;
 use crate::resource_number::ResourceNumber;
 use crate::resource_raw_policy::{self, ResourceNumberContract};
@@ -50,38 +48,11 @@ pub(crate) fn reference(
     name: &str,
     notes: &mut Vec<FieldError>,
 ) -> Result<SourcedValue<CatalogRecordReference>, CatalogError> {
-    let path = fields.location(name);
-    let value = match fields.source().field(name) {
-        Some(Value::Reference(target)) if target.location().is_none() => {
-            Some(CatalogRecordReference::resolved(
-                fields.context(),
-                &path,
-                target.record_index(),
-                CatalogGuid(target.guid()),
-                target.record_path(),
-                target.type_name(),
-            )?)
-        }
-        Some(Value::Error(ValueError::DanglingReference { guid })) => {
-            Some(CatalogRecordReference::unresolved(
-                fields.context(),
-                &path,
-                CatalogGuid(*guid),
-                DefinitionStatus::Dangling,
-            )?)
-        }
-        Some(Value::Error(ValueError::UnexpectedReferenceType { guid, .. })) => {
-            Some(CatalogRecordReference::unresolved(
-                fields.context(),
-                &path,
-                CatalogGuid(*guid),
-                DefinitionStatus::UnexpectedTargetType,
-            )?)
-        }
-        _ => None,
-    };
-    value.map_or_else(
-        || fields.read(name, "a nullable Record Reference", notes, |_| None),
-        |value| fields.context().value(&path, SourceValue::Present(value)),
+    crate::catalog_read::reference_value(
+        fields.context(),
+        fields.source().field(name),
+        fields.source().type_name(),
+        &fields.location(name),
+        notes,
     )
 }

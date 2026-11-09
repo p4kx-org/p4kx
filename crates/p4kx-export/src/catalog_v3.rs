@@ -26,6 +26,8 @@ pub(crate) mod resource_density_source;
 pub(crate) mod resource_float;
 #[path = "resource_group.rs"]
 pub(crate) mod resource_group;
+#[path = "resource_group_catalog.rs"]
+pub(crate) mod resource_group_catalog;
 #[path = "resource_group_read.rs"]
 pub(crate) mod resource_group_read;
 #[path = "resource_integer.rs"]

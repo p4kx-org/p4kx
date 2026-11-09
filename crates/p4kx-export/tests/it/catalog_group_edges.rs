@@ -3,7 +3,7 @@
 
 //! Edge cases of resource groups and blueprint categories: leftovers, unreadable groups, cycles.
 
-use crate::catalog_crafting_support::commodity;
+use crate::catalog_crafting_support::{commodity, groups};
 use crate::crafting_fixture;
 
 use std::collections::HashSet;
@@ -102,20 +102,12 @@ fn groups_only(records: Vec<TestRecord>) -> DataForgeBuilder {
     )
 }
 
-fn parent_of(catalog: &Value, guid: &str) -> Option<Value> {
-    catalog["resourceGroups"]
-        .as_array()?
-        .iter()
-        .find(|group| group["guid"] == guid)
-        .map(|group| group["parentGuid"].clone())
-}
-
 #[test]
 fn a_group_that_lists_itself_has_no_parent() -> TestResult {
     let (_, catalog) = build_from(&groups_only(vec![group(FIRST, "Loop", &[FIRST])]), None)?;
     assert_eq!(
-        parent_of(&catalog, "10000000-0000-4000-8000-000000000001"),
-        Some(Value::Null),
+        *groups::parent_guid(&catalog, "10000000-0000-4000-8000-000000000001")?,
+        Value::Null,
         "a self-list is no parent"
     );
     Ok(())
@@ -132,16 +124,16 @@ fn two_groups_that_list_each_other_are_each_others_parent_and_the_build_ends() -
         None,
     )?;
     assert_eq!(
-        parent_of(&catalog, "10000000-0000-4000-8000-000000000001"),
-        Some(json!("20000000-0000-4000-8000-000000000002"))
+        *groups::parent_guid(&catalog, "10000000-0000-4000-8000-000000000001")?,
+        json!("20000000-0000-4000-8000-000000000002")
     );
     assert_eq!(
-        parent_of(&catalog, "20000000-0000-4000-8000-000000000002"),
-        Some(json!("10000000-0000-4000-8000-000000000001"))
+        *groups::parent_guid(&catalog, "20000000-0000-4000-8000-000000000002")?,
+        json!("10000000-0000-4000-8000-000000000001")
     );
     assert_eq!(
-        parent_of(&catalog, "30000000-0000-4000-8000-000000000003"),
-        Some(Value::Null)
+        *groups::parent_guid(&catalog, "30000000-0000-4000-8000-000000000003")?,
+        Value::Null
     );
     assert!(built.summary().is_complete(), "a cycle is no failure");
     Ok(())
@@ -158,20 +150,19 @@ fn a_leftover_group_names_no_parent_and_every_parent_resolves() -> TestResult {
         ]),
         None,
     )?;
-    let guids: HashSet<&str> = catalog["resourceGroups"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|group| group["guid"].as_str())
-        .collect();
+    let guids = groups::guids(&catalog)?;
     assert_eq!(guids.len(), 3, "the leftover group is left out");
     assert_eq!(
-        parent_of(&catalog, "30000000-0000-4000-8000-000000000003"),
-        Some(Value::Null),
+        *groups::parent_guid(&catalog, "30000000-0000-4000-8000-000000000003")?,
+        Value::Null,
         "a leftover lists it, so it names no parent"
     );
-    for group in catalog["resourceGroups"].as_array().into_iter().flatten() {
-        if let Some(parent) = group["parentGuid"].as_str() {
+    for group in groups::definitions(&catalog)? {
+        let guid = group
+            .pointer("/guid/value")
+            .and_then(Value::as_str)
+            .ok_or("required group GUID")?;
+        if let Some(parent) = groups::parent_guid(&catalog, guid)?.as_str() {
             assert!(guids.contains(parent), "parent {parent}");
         }
     }

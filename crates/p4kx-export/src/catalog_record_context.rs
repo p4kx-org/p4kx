@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    SourceLocation, SourceScope, SourceUseRole, SourceUses, SourceValue, SourcedValue, StructValue,
-    Value,
+    SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
+    StructValue, Value,
 };
 
 use crate::CatalogError;
@@ -58,6 +58,15 @@ impl<'a> CatalogRecordContext<'a> {
         value: SourceValue<T>,
     ) -> Result<SourcedValue<T>, CatalogError> {
         self.bind(path, value, SourceUseRole::Selector, true)
+    }
+
+    /// Observes an actual operation through this original physical Record context.
+    pub(crate) fn observe(
+        &self,
+        path: &str,
+        role: SourceUseRole,
+    ) -> Result<SourceUse, CatalogError> {
+        Ok(self.dataforge.at(self.location(path), role)?)
     }
 
     pub(crate) fn reference_observation(&self, path: &str) -> Result<(), CatalogError> {

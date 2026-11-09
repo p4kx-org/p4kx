@@ -12,7 +12,8 @@ impl Collected<'_> {
         sort_by_guid(&mut self.items, |entity| entity.guid);
         sort_by_guid(&mut self.ships, |entity| entity.guid);
         sort_by_guid(&mut self.commodities, |entity| entity.guid);
-        sort_by_guid(&mut self.resource_groups, |entity| entity.guid);
+        self.resource_groups
+            .sort_by_cached_key(|row| (row.guid.text(), row.record_index));
         sort_by_guid(&mut self.resource_types, |entity| entity.guid);
         sort_by_guid(&mut self.blueprint_categories, |entity| entity.guid);
         sort_by_guid(&mut self.starmap_objects, |entity| entity.guid);

@@ -15,4 +15,6 @@ use crate::schema_fields::every_field_required;
 pub(crate) struct CatalogDeclarations<'source> {
     pub(crate) tag_roots: CatalogTable<TagRoots<'source>>,
     pub(crate) entity_tags: CatalogTable<EntityTags<'source>>,
+    pub(crate) resource_group_members:
+        CatalogTable<super::resource_group_catalog::ResourceGroupMembers>,
 }

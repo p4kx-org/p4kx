@@ -12,6 +12,8 @@ mod catalog_schema_support;
 mod health;
 #[path = "catalog_schema/mission_values.rs"]
 mod mission_values;
+#[path = "catalog_schema/resource_groups.rs"]
+mod resource_groups;
 #[path = "catalog_schema/revision.rs"]
 mod revision;
 
@@ -149,7 +151,6 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         "items",
         "ships",
         "blueprints",
-        "resourceGroups",
         "blueprintCategories",
         "gameplayProperties",
         "qualityDistributions",
@@ -265,7 +266,6 @@ fn every_field_the_schema_lists_is_required() -> TestResult {
             "dismantle",
             "a blueprint states its dismantle",
         ),
-        ("resourceGroups", "parentGuid", "a resource group"),
         ("ships", "crewSize", "a ship"),
         ("ships", "variantOf", "a ship states its variant base"),
         ("items", "variantOf", "an item states its variant base"),

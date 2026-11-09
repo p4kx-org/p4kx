@@ -17,7 +17,7 @@ historical version-boundary fixture. Moving ResourceTypes to their canonical tab
 carriers is part of the breaking v3 migration, not an additive change to the released v2 shape.
 
 Every catalog kind and the shared CLI/GUI JSON and compressed catalog writers use version 3.
-The implemented canonical-table/per-value-origin step covers ResourceTypes, Commodities,
+The implemented canonical-table/per-value-origin step covers ResourceTypes, ResourceGroups, Commodities,
 Manufacturers, global Tag definitions/root declarations, owning Entity GUID-tag declarations,
 and their documented nested values, convenience paths, presentation and text rows. Other catalog
 families retain their current shapes; migration of all families and tool-output carriers remains
@@ -184,7 +184,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `source.encryptedEntriesUnread` | How many distinct encrypted Entries the export asked for and could not read because the key was missing or wrong; `0` when none was needed ([ADR-0353](adr/0353-exports-state-whether-the-archive-key-was-there.md)) |
 | `source.toolVersion` | The version of P4KX that wrote the catalog |
 | `source.exportedAt` | When the catalog was written, UTC in RFC 3339 form |
-| `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "…"}` when a Filter selected the Records; global `tags` remains complete independently of that Filter |
+| `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "Ã¢â‚¬Â¦"}` when a Filter selected the Records; global `tags` remains complete independently of that Filter |
 | `exportHealth` | Measured source-read and projection health, exact affected identities, separate Record/Archive Entry counters and bounded diagnostics; independent of Filter completeness ([contract](catalog-export-health.md)) |
 | `definitions.tags`, `declarations.tagRoots`, `declarations.entityTags`, `projections.tagPaths` | Global physical Tag definitions, original root/child/Entity GUID arrays, and separately named first-selected tree paths with exact per-value origin; the taxonomy stays complete under an Entity Filter ([contract](catalog-tags.md)) |
 | `definitions.manufacturers` | Source-family availability and directly sourced Manufacturer rows in GUID order, including typed Localization and canonical text references ([contract](catalog-manufacturer-types.md)) |
@@ -195,7 +195,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `texts.publicNames`, `texts.gameTexts` | Canonical sourced-definition short-name and protected-description rows, each with sourced `id`, `key` and per-language `translations` |
 | `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the sourced definition carriers |
 | `blueprints` | The crafting blueprints with their ingredients, all tiers, default availability and dismantle link, ordered by GUID |
-| `resourceGroups` | The groups of resource types, the targets of `typeGuid`, ordered by GUID |
+| `definitions.resourceGroups`, `declarations.resourceGroupMembers`, `projections.resourceGroupParents` | Physical group definitions, every ordered authored membership and the first-selected parent with direct per-value origins ([contract](catalog-resource-groups.md)) |
 | `blueprintCategories` | The blueprint categories, the targets of `categoryGuid`, ordered by GUID |
 | `gameplayProperties` | The gameplay properties the quality modifiers refer to, ordered by GUID |
 | `qualityDistributions` | The quality distributions and their location overrides, ordered by GUID |
@@ -807,31 +807,28 @@ An ingredient is one `CraftingCost_Resource` or `CraftingCost_Item` leaf of `man
 | `minQuality` | `minQuality` |
 | `slot`, `slotKey` | `debugName` and `displayName` of the nearest enclosing selection that has a name; a placeholder `slotKey` is `null` |
 
-A resource group (`ResourceTypeGroup`, 19 on LIVE: Metal, Mineral, Gas, …) is the type of a
-commodity; a commodity's `typeGuid` is the `guid` of the group that lists its `ResourceType`. It
-takes its fields from the Record:
+A resource group (`ResourceTypeGroup`) is the type of a commodity: the commodity's `typeGuid`
+keeps the existing first selected group that lists its `ResourceType` directly. Schema v3 separates
+these source facts and choices:
 
-| Field | Source |
-|-------|--------|
-| `className` | The Record name without its type, e.g. `Metal` |
-| `name` | `displayName`, e.g. `@items_commodities_type_metal`; a placeholder key (`@LOC_PLACEHOLDER`, 7 groups on LIVE) leaves `en` and `de` `null`, and the Basetool falls back to `className` |
-| `description` | `description` as LocalisedText, marked as game text (`x-gameText`) |
-| `defaultThumbnailPath`, `defaultThumbnailPathSVG` | Raw source asset-path strings, preserving an empty string |
-| `resources`, `groups` | Nullable ordered source Record-reference lists, retaining repeated links and null positions |
-| `parentGuid` | The GUID of the group that lists this group in its `groups`, the `guid` of another `resourceGroups` entry; `null` for a top-level group; the first group in Record order wins when several list it. Only the groups of the kind list: a group left out as a development leftover or unreadable names no parent and no `ResourceType` |
+| Dataset | Fields and source |
+| --- | --- |
+| `definitions.resourceGroups` | Original physical header, declared `recordName`, className, recordPath, recordIndex and sourceType; name references from displayName, protected description references and exact thumbnail paths |
+| `declarations.resourceGroupMembers` | Each selected physical owner's original groups/resources arrays, retaining nulls, repetitions, wrong/missing targets, all parent edges and cycles in authored order |
+| `projections.resourceGroupParents` | The first selected parent with a different GUID in physical Record order; nominal child-GUID matching retains duplicate child definitions' shared choice and excludes same-GUID edges even across different physical Records |
 
-`parentGuid` retains the first direct parent among selected groups. Importers must guard against
-cycles and must not assume a fixed depth or a forest. The source lists preserve repeated parents,
-self-links and cycles; the legacy singular `parentGuid` excludes a group's own self-link.
+Every source-backed datum has its immediate encryption marker and actual source-use references.
+Names use `texts.publicNames`; descriptions and their references use protected `texts.gameTexts`.
+Missing/null/empty/unreadable/invalid facts stay distinct. Equal GUIDs do not merge physical Records.
+The parent choice retains its actual earlier selection inputs and original chosen slot; later unused
+parents do not taint it. Importers must guard cycles and must not assume a fixed depth or a forest.
+The authoritative membership arrays remain separate from singular convenience choices.
 
-Groups nest one level on LIVE: Metal lists Alloy and UnrefinedOres, Mineral lists Raw_Minerals,
-Nonmetal lists Halogen, Organic lists Food, ProcessedGoods lists SyntheticMaterials, Vice and
-Bulk_Supplies. A commodity points at the group that lists its `ResourceType` directly, so a
-commodity of Alloy has the child as `typeGuid`, not Metal. `resources` and `groups` preserve the
-authored lists independently of these singular convenience fields. `definitions.resourceTypes.rows[].groupGuids.value`
-contains all distinct selected direct memberships, sorted by GUID. The descriptions and raw
-thumbnail paths are exported as source facts; cataloging does not extract the media. The source
-Record path is retained, and `className` and `guid` distinguish Records that share one file.
+Only selected groups affect these choices and `definitions.resourceTypes.rows[].groupGuids.value`;
+additional health-only reads do not create group rows or memberships. ResourceType group GUIDs keep
+all distinct selected direct memberships sorted by GUID. Thumbnail paths remain source facts;
+cataloging does not extract the media. No parallel root resourceGroups array is emitted. See the
+[ResourceGroup contract](catalog-resource-groups.md) for identity, provenance and health details.
 
 A blueprint category (`BlueprintCategoryRecord`, 21 on LIVE) is the target of the `categoryGuid` of
 a blueprint. The Record holds no field at all, so the category has `guid`, `className` (e.g.
@@ -843,7 +840,7 @@ carry no blueprint on LIVE (`FuseBattery`, `Medical`, `Utility`, and the example
 Record.
 
 Every `typeGuid` of a commodity and every `categoryGuid` of a blueprint resolves to a `guid` of
-`resourceGroups` or `blueprintCategories` (checked against LIVE; a commodity without a
+`definitions.resourceGroups` or `blueprintCategories` (checked against LIVE; a commodity without a
 `ResourceType` or group, 1 on LIVE, and a blueprint without a category or whose category is a
 left-out leftover or unreadable have `null`; a commodity whose `ResourceType` only a leftover or
 unreadable group lists has a `null` `typeGuid`). Only selected groups affect group and commodity
@@ -1242,14 +1239,14 @@ replaced, in each language, by what the first layer (sub contract, contract, han
 - anything else, a token no layer states and a text the language lacks: the token in upper case in
   brackets, e.g. `[CARGO]`.
 
-A replacement that itself holds a `~mission(…)` is expanded up to three levels deep; below that,
+A replacement that itself holds a `~mission(Ã¢â‚¬Â¦)` is expanded up to three levels deep; below that,
 and past 64 replacements or about 4 KiB in one title, a token becomes `[TOKEN]`. Leading and
 trailing blanks are removed from the result; the `key` is that of the title text. The tokens are free text of the game, not facts of the Archive;
 the placeholders are the catalog's own convention.
 
 **Description (ADR-0264).** The `Description` string parameter of the first layer (sub contract,
 contract, handler), else the `description` of the broker entry; the template states none, its
-`displayString` slots carry no label. `~mission(…)` tokens, limits and trimming are those of the
+`displayString` slots carry no label. `~mission(Ã¢â‚¬Â¦)` tokens, limits and trimming are those of the
 title. It is a game text (`x-gameText`) like the title, and like every game text it must not be
 passed on to third parties: the Basetool keeps it for its logged-in members.
 
@@ -2440,8 +2437,8 @@ The mapping is made by name, manufacturer and variant against the ships of the `
 - the store name and the catalog `name` are compared after dropping the manufacturer, punctuation,
   case and the word "Edition";
 - when several player ships share the name, the one whose `className` carries none of the
-  suffixes of a display, test, event or reward variant (`_BIS…`, `_Display`, `_TEMP…`, `_Unmanned`,
-  `_AI_Super`, `_Tutorial`, `_Collector_…`, `_Prison`, `_NoInterior`, `_Hijacked…`, `_Exec_…` and the
+  suffixes of a display, test, event or reward variant (`_BISÃ¢â‚¬Â¦`, `_Display`, `_TEMPÃ¢â‚¬Â¦`, `_Unmanned`,
+  `_AI_Super`, `_Tutorial`, `_Collector_Ã¢â‚¬Â¦`, `_Prison`, `_NoInterior`, `_HijackedÃ¢â‚¬Â¦`, `_Exec_Ã¢â‚¬Â¦` and the
   like) is taken; if more than one is left, the slug stays unmapped;
 - a store name that is a part of exactly one catalog name (`M50` for "Origin M50 Interceptor", `C2
   Hercules`, `Mercury`, `Ares Ion`, `85X`, `C8R Pisces`) is accepted after review of each such slug,
@@ -2749,8 +2746,9 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   decision.
 - Every `manufacturerGuid` of an item or ship, every `producedItemGuid`, every ingredient
   `resourceGuid` and `itemGuid` resolves to a catalog entry; no GUID occurs twice.
-- Every commodity `typeGuid` resolves to a `resourceGroups` entry, every `parentGuid` of a group to
-  another one, and every blueprint `categoryGuid` to a `blueprintCategories` entry. On LIVE the
+- Every commodity `typeGuid` resolves to a `definitions.resourceGroups` entry, every chosen group
+  parent in `projections.resourceGroupParents` to another one, and every blueprint `categoryGuid`
+  to a `blueprintCategories` entry. On LIVE the
   catalog holds 19 groups (8 of them nested) and 21 categories, 14 of which carry blueprints.
 - Texts that carry a key (placeholder keys excluded), checked per kind against the Archive's own
   `global.ini` files (ADR-0270): a key a file holds resolves in the catalog, a key it lacks is
@@ -2780,7 +2778,7 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   | contractTemplates | 6,765 | 12 | 6,651 |
   | missionBrokerEntries | 17,733 | 566 | 17,636 |
 
-  A contract text that holds a `~mission(…)` token is rewritten by the exporter, so the
+  A contract text that holds a `~mission(Ã¢â‚¬Â¦)` token is rewritten by the exporter, so the
   verification only checks that such a text is present. The location templates have 3,297 name
   variants; 86 of them carry a placeholder key or none, which is not counted as a keyed text, so the
   German file lacks 3,246 of the 3,297 variants and 3,160 of the 3,211 keyed texts.

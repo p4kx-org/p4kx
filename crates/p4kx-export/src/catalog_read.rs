@@ -8,5 +8,9 @@ mod catalog_fields;
 #[path = "catalog_record_context.rs"]
 mod catalog_record_context;
 
+#[path = "catalog_reference_read.rs"]
+mod catalog_reference_read;
+
 pub(crate) use catalog_fields::CatalogFields;
 pub(crate) use catalog_record_context::CatalogRecordContext;
+pub(crate) use catalog_reference_read::reference_value;

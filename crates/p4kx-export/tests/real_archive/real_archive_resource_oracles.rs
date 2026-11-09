@@ -16,6 +16,8 @@ mod carriers;
 mod compare;
 #[path = "resource_oracle/fixture.rs"]
 mod fixture;
+#[path = "resource_oracle/groups.rs"]
+mod groups;
 #[path = "resource_oracle/values.rs"]
 mod values;
 

@@ -81,8 +81,9 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::ResourceGroups => {
                 let read = crate::resource_group_read::read(
                     tree,
-                    self.texts,
-                    self.groups.parent_of(&tree.guid()),
+                    self.projection,
+                    self.groups
+                        .parent_choice(&tree.guid(), self.options.cancel)?,
                 )?;
                 (Picked::ResourceGroup(read.value), read.notes)
             }

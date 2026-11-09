@@ -19,6 +19,8 @@ pub(crate) struct RecordScan<'f> {
 pub(crate) struct ScanRead<'f> {
     pub(crate) picked: Vec<Picked<'f>>,
     pub(crate) entity_tags: Vec<crate::catalog_v3::tag_catalog::EntityTags<'f>>,
+    pub(crate) resource_group_members:
+        Vec<crate::catalog_v3::resource_group_catalog::ResourceGroupMembers>,
     pub(crate) ledger: ExportLedger,
 }
 

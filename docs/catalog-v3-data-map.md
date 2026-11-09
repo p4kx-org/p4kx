@@ -77,7 +77,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | ships | D.ships; V.shipBaseFacts | Entity identity/playability/role/career; existing mass/hull/cargo/size/crew projections remain defined, raw configs separate |
 | commodities | D.commodities; V.commodityPresentation | Entity vs resource fallback, GUID identity, existing first Resource/group/name/density meaning |
 | resourceTypes | D.resourceTypes | complete resource source fact owner |
-| resourceGroups | D.resourceGroups; A.resourceGroupMembers | all direct ordered memberships, repeats/nulls/cycles; first-selected-group remains projection |
+| resourceGroups | D.resourceGroups; A.resourceGroupMembers; V.resourceGroupParents | all direct ordered memberships, repeats/nulls/cycles; first-selected parent retains actual physical/slot provenance ([contract](catalog-resource-groups.md)) |
 | blueprints | D.blueprints; C.blueprintTiers | tiers, first-tier ingredients, costs/quality/outputs, research separate |
 | blueprintCategories | D.blueprintCategories | category rules and identity |
 | gameplayProperties | D.gameplayProperties | quality-property targets, no guessed stat link |

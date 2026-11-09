@@ -13,7 +13,7 @@ use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry};
 use serde::Serialize;
 use serde_json::Value;
 
-use super::{Failure, Result, build, cardinality, values};
+use super::{Failure, Result, build, cardinality, groups, values};
 
 const MAX_RECORDS: usize = 2_000_000;
 
@@ -47,6 +47,7 @@ struct Report {
     exact_cardinality_pin: build::Pin,
     commodities: cardinality::Counts,
     resources: values::Coverage,
+    resource_groups: usize,
 }
 
 pub(super) fn verify(path: &Path, channel: &'static str) -> Result<()> {
@@ -75,6 +76,7 @@ pub(super) fn verify(path: &Path, channel: &'static str) -> Result<()> {
     let counts = cardinality::check(&catalog)?;
     let pin = build::check(&identity, &counts)?;
     let resources = values::check(&forge, entry.origin(), &catalog, &watch)?;
+    let resource_groups = groups::check(&forge, entry.origin(), &catalog, &watch)?;
     watch
         .check()
         .map_err(|error| Failure::source("archive-source-changed", error))?;
@@ -84,6 +86,7 @@ pub(super) fn verify(path: &Path, channel: &'static str) -> Result<()> {
         exact_cardinality_pin: pin,
         commodities: counts,
         resources,
+        resource_groups,
     })
 }
 
@@ -102,7 +105,7 @@ fn production_catalog(archive: &Archive, entry: &DataForgeEntry) -> Result<Value
 }
 
 fn complete_sources(summary: &CatalogSummary) -> Result<()> {
-    for kind in [Kind::Commodities, Kind::ResourceTypes] {
+    for kind in [Kind::Commodities, Kind::ResourceTypes, Kind::ResourceGroups] {
         let health = summary
             .export_health()
             .kind(kind)

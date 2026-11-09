@@ -3,6 +3,9 @@
 
 //! Resource groups and blueprint categories of the Basetool catalog, through the public API.
 
+use crate::catalog_crafting_support::commodity::{self, TextDomain};
+use crate::catalog_crafting_support::groups;
+use crate::commodity_v3_fixture::at;
 use crate::crafting_fixture;
 
 use std::collections::HashSet;
@@ -30,32 +33,83 @@ fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error
     Ok((built, json))
 }
 
-fn class_names<'a>(catalog: &'a Value, kind: &str) -> Vec<&'a str> {
-    catalog[kind]
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .filter_map(|entry| entry["className"].as_str())
-                .collect()
+fn class_names<'a>(catalog: &'a Value, kind: &str) -> Result<Vec<&'a str>, Box<dyn Error>> {
+    let entries = if kind == "resourceGroups" {
+        groups::definitions(catalog)?
+    } else {
+        catalog
+            .get(kind)
+            .and_then(Value::as_array)
+            .map(Vec::as_slice)
+            .ok_or("required fixture kind")?
+    };
+    let path = if kind == "resourceGroups" {
+        "/className/value"
+    } else {
+        "/className"
+    };
+    entries
+        .iter()
+        .map(|entry| {
+            entry
+                .pointer(path)
+                .and_then(Value::as_str)
+                .ok_or_else(|| "required fixture class name".into())
         })
-        .unwrap_or_default()
+        .collect()
 }
 
-fn reference(guid: &str, target_record_index: u32, target_type: &str) -> Value {
-    json!({
-        "guid": guid,
-        "targetRecordIndex": target_record_index,
-        "targetType": target_type,
-        "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
-        "status": "present"
-    })
+fn assert_reference(reference: &Value, guid: &str, index: u32, kind: &str) -> TestResult {
+    assert_eq!(
+        reference
+            .pointer("/state")
+            .ok_or("required reference /state")?,
+        &json!("present"),
+        "the membership is present"
+    );
+    assert_eq!(
+        reference
+            .pointer("/value/guid/value")
+            .ok_or("required reference /value/guid/value")?,
+        &json!(guid),
+        "the authored GUID stays intact"
+    );
+    assert_eq!(
+        reference
+            .pointer("/value/targetRecordIndex/value")
+            .ok_or("required reference /value/targetRecordIndex/value")?,
+        &json!(index),
+        "the physical target stays intact"
+    );
+    assert_eq!(
+        reference
+            .pointer("/value/targetType/value")
+            .ok_or("required reference /value/targetType/value")?,
+        &json!(kind),
+        "the target family stays intact"
+    );
+    assert_eq!(
+        reference
+            .pointer("/value/recordPath/value")
+            .ok_or("required reference /value/recordPath/value")?,
+        &json!("libs/foundry/records/resourcetypedatabase/resourcetypedatabase"),
+        "the original canonical target path stays intact"
+    );
+    assert_eq!(
+        reference
+            .pointer("/value/status")
+            .ok_or("required reference /value/status")?,
+        &json!("present"),
+        "source resolution stays explicit"
+    );
+    Ok(())
 }
 
 #[test]
 fn resource_groups_are_the_group_records_ordered_by_guid_not_the_resource_types() -> TestResult {
     let (built, catalog) = build(None)?;
     assert_eq!(
-        class_names(&catalog, "resourceGroups"),
+        class_names(&catalog, "resourceGroups")?,
         ["Metal", "Mineral", "Alloy"],
         "ResourceTypeGroup only, not the ResourceType Records or the database beside them"
     );
@@ -71,39 +125,9 @@ fn resource_groups_are_the_group_records_ordered_by_guid_not_the_resource_types(
 #[test]
 fn a_resource_group_carries_its_name_and_the_group_that_lists_it() -> TestResult {
     let (_, catalog) = build(None)?;
-    assert_eq!(
-        catalog["resourceGroups"][0],
-        json!({
-            "guid": "c1000000-0000-4000-8000-000000000001",
-            "className": "Metal",
-            "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
-            "name": {"key": "@items_commodities_type_metal", "en": "Metal", "de": "Metall"},
-            "description": {"key": null, "en": null, "de": null},
-            "defaultThumbnailPath": null,
-            "defaultThumbnailPathSVG": null,
-            "groups": [reference("c3000000-0000-4000-8000-000000000003", 6, "ResourceTypeGroup")],
-            "resources": [
-                reference("b1000000-0000-4000-8000-000000000001", 0, "ResourceType"),
-                reference("b2000000-0000-4000-8000-000000000002", 1, "ResourceType")
-            ],
-            "parentGuid": null,
-        }),
-        "a top-level group"
-    );
-    assert_eq!(
-        catalog["resourceGroups"][1]["name"],
-        json!({"key": "@LOC_PLACEHOLDER", "en": null, "de": null}),
-        "a placeholder name keeps the key and has no text"
-    );
-    assert_eq!(
-        catalog["resourceGroups"][2]["parentGuid"], "c1000000-0000-4000-8000-000000000001",
-        "Metal lists Alloy in its groups"
-    );
-    assert_eq!(
-        catalog["resourceGroups"][2]["name"],
-        json!({"key": "@items_commodities_type_alloy", "en": null, "de": null}),
-        "a key the language files lack"
-    );
+    assert_metal_definition(&catalog)?;
+    assert_metal_members(&catalog)?;
+    assert_other_group_texts(&catalog)?;
     Ok(())
 }
 
@@ -111,7 +135,7 @@ fn a_resource_group_carries_its_name_and_the_group_that_lists_it() -> TestResult
 fn blueprint_categories_are_the_category_records_without_leftovers() -> TestResult {
     let (built, catalog) = build(None)?;
     assert_eq!(
-        class_names(&catalog, "blueprintCategories"),
+        class_names(&catalog, "blueprintCategories")?,
         ["Ammo", "FPSArmours"],
         "BlueprintCategoryRecord only, not the database, and not the leftover"
     );
@@ -145,7 +169,7 @@ fn every_type_guid_and_category_guid_resolves_to_an_entry() -> TestResult {
             .filter_map(|entry| entry["guid"].as_str())
             .collect()
     };
-    let groups = guids("resourceGroups");
+    let groups = groups::guids(&catalog)?;
     let categories = guids("blueprintCategories");
     let types: Vec<&str> = catalog["projections"]["commodityPresentation"]["rows"]
         .as_array()
@@ -169,12 +193,12 @@ fn a_filter_marks_both_kinds_partial_and_selects_by_record_path() -> TestResult 
     let filter = Filter::new("*/blueprintcategories/*");
     let (built, catalog) = build(Some(&filter))?;
     assert_eq!(
-        class_names(&catalog, "blueprintCategories"),
+        class_names(&catalog, "blueprintCategories")?,
         ["Ammo", "FPSArmours"],
         "filtered by record path"
     );
     assert!(
-        class_names(&catalog, "resourceGroups").is_empty(),
+        class_names(&catalog, "resourceGroups")?.is_empty(),
         "filtered"
     );
     for kind in ["resourceGroups", "blueprintCategories"] {
@@ -267,4 +291,107 @@ fn the_kinds_follow_the_existing_ones_in_the_catalog_order() {
         (Some("ResourceTypeGroup"), Some("BlueprintCategoryRecord")),
         "types"
     );
+}
+
+fn assert_metal_definition(catalog: &Value) -> TestResult {
+    let metal = groups::definition(catalog, "c1000000-0000-4000-8000-000000000001")?;
+    assert_eq!(
+        at(metal, "/className/value")?,
+        "Metal",
+        "the original class name remains"
+    );
+    assert_eq!(
+        at(metal, "/recordPath/value")?,
+        "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
+        "the original owner path remains"
+    );
+    assert!(
+        at(metal, "/defaultThumbnailPath/value")?.is_null(),
+        "the undeclared thumbnail remains without payload"
+    );
+    assert!(
+        at(metal, "/defaultThumbnailPathSVG/value")?.is_null(),
+        "the undeclared SVG remains without payload"
+    );
+    commodity::assert_text(
+        catalog,
+        at(metal, "/name")?,
+        TextDomain::PublicName,
+        Some("@items_commodities_type_metal"),
+        Some("Metal"),
+        Some("Metall"),
+    )?;
+    commodity::assert_text(
+        catalog,
+        at(metal, "/description")?,
+        TextDomain::GameText,
+        None,
+        None,
+        None,
+    )?;
+    Ok(())
+}
+
+fn assert_metal_members(catalog: &Value) -> TestResult {
+    let members = groups::members(catalog, "c1000000-0000-4000-8000-000000000001")?;
+    assert_reference(
+        at(members, "/groups/value/0")?,
+        "c3000000-0000-4000-8000-000000000003",
+        6,
+        "ResourceTypeGroup",
+    )?;
+    assert_reference(
+        at(members, "/resources/value/0")?,
+        "b1000000-0000-4000-8000-000000000001",
+        0,
+        "ResourceType",
+    )?;
+    assert_reference(
+        at(members, "/resources/value/1")?,
+        "b2000000-0000-4000-8000-000000000002",
+        1,
+        "ResourceType",
+    )?;
+    assert_eq!(
+        at(members, "/groups/value")?.as_array().map(Vec::len),
+        Some(1),
+        "one original child occurrence"
+    );
+    assert_eq!(
+        at(members, "/resources/value")?.as_array().map(Vec::len),
+        Some(2),
+        "two original resource occurrences"
+    );
+    assert!(
+        groups::parent_guid(catalog, "c1000000-0000-4000-8000-000000000001")?.is_null(),
+        "the root has no selected non-self parent"
+    );
+    Ok(())
+}
+
+fn assert_other_group_texts(catalog: &Value) -> TestResult {
+    let mineral = groups::definition(catalog, "c2000000-0000-4000-8000-000000000002")?;
+    commodity::assert_text(
+        catalog,
+        at(mineral, "/name")?,
+        TextDomain::PublicName,
+        Some("@LOC_PLACEHOLDER"),
+        None,
+        None,
+    )?;
+    let alloy = groups::definition(catalog, "c3000000-0000-4000-8000-000000000003")?;
+    assert_eq!(
+        groups::parent_guid(catalog, "c3000000-0000-4000-8000-000000000003")?,
+        "c1000000-0000-4000-8000-000000000001",
+        "Metal is the selected Alloy parent"
+    );
+    commodity::assert_text(
+        catalog,
+        at(alloy, "/name")?,
+        TextDomain::PublicName,
+        Some("@items_commodities_type_alloy"),
+        None,
+        None,
+    )?;
+    Ok(())
 }

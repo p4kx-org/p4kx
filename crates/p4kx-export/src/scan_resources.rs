@@ -55,6 +55,7 @@ impl<'f> Scan<'_, '_, 'f> {
         let mut read = ScanRead {
             picked: Vec::new(),
             entity_tags: Vec::new(),
+            resource_group_members: Vec::new(),
             ledger: ExportLedger::default(),
         };
         for index in physical {

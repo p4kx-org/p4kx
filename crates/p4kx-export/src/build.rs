@@ -5,29 +5,26 @@ use std::io::{self, Write};
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
-use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
 use crate::archive_key_use::ArchiveKeyUse;
 use crate::build_derived::{add_contracts, add_loadouts, add_paints};
 use crate::build_harvest::add_harvest_locations;
 use crate::build_loot::add_loot_containers;
 use crate::build_starmap::add_starmap;
-use crate::catalog_crafting::{CraftingKinds, kinds};
+use crate::catalog_crafting::kinds;
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_output::{Compression, emit};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
-use crate::collected::Collected;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
 use crate::mission_data::link_scenario_factions;
 use crate::recovery::{Recovery, read_recovery};
-use crate::scan::Scan;
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
-use crate::starmap_containers::Placements;
 use crate::texts::{TextSources, Texts};
 use crate::{BuiltCatalog, CatalogError, CatalogOptions, CatalogSummary};
 
@@ -38,6 +35,10 @@ use parts::Parts;
 #[path = "build_source.rs"]
 mod metadata;
 pub(crate) use metadata::source;
+
+#[path = "build_scan.rs"]
+mod scanning;
+use scanning::scan;
 
 /// Builds a deterministic Basetool catalog from the DataForge and available localization inputs.
 ///
@@ -234,6 +235,11 @@ fn assemble<R>(
         availability: commodities.availability,
         rows: commodity_presentation,
     };
+    let group_tables = crate::catalog_v3::resource_group_catalog::tables(
+        &forge,
+        collected.resource_groups,
+        collected.resource_group_members,
+    );
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
         source: source(
@@ -247,8 +253,8 @@ fn assemble<R>(
         items: collected.items,
         ships: collected.ships,
         blueprints: collected.blueprints,
-        resource_groups: collected.resource_groups,
         declarations: crate::catalog_v3::catalog_declarations::CatalogDeclarations {
+            resource_group_members: group_tables.members,
             tag_roots: CatalogTable::new(&forge, &["TagDatabase"], collected.tags.roots),
             entity_tags: CatalogTable::new(
                 &forge,
@@ -257,12 +263,14 @@ fn assemble<R>(
             ),
         },
         definitions: CatalogDefinitions {
+            resource_groups: group_tables.definitions,
             tags: CatalogTable::new(&forge, &["Tag"], collected.tags.definitions),
             resource_types: CatalogTable::new(&forge, &["ResourceType"], collected.resource_types),
             commodities,
             manufacturers: crate::manufacturer::table(&forge, collected.manufacturers),
         },
         projections: CatalogProjections {
+            resource_group_parents: group_tables.parents,
             tag_paths: CatalogTable::new(&forge, &["Tag"], collected.tags.paths),
             commodity_presentation,
         },
@@ -337,52 +345,6 @@ fn assemble<R>(
         },
         output,
     ))
-}
-
-/// Reads the system containers, checks every Record of `forge` and sorts what the kinds selected;
-/// the containers are read when a starmap object or a provider preset is wanted.
-fn scan<'f>(
-    archive: &Archive,
-    forge: &'f DataForge<'f>,
-    files: &'f ArchiveFiles<'f>,
-    entities: &Arc<Entities<'f>>,
-    options: &CatalogOptions<'_>,
-    projection: &CatalogProjection<'_, 'f>,
-    crafting: CraftingKinds<'f>,
-) -> Result<(Collected<'f>, Placements), CatalogError> {
-    let rules = [
-        crate::Kind::StarmapObjects.records(),
-        crate::Kind::HarvestableProviderPresets.records(),
-    ];
-    let wanted = forge.records().any(|record| {
-        record.record_path().is_ok_and(|path| {
-            rules.iter().any(|rule| rule.matches_path(path))
-                && options.filter.is_none_or(|filter| filter.matches(path))
-        })
-    });
-    let placements = if wanted {
-        Placements::read(archive, options.cancel)?
-    } else {
-        Placements::default()
-    };
-    let scanned = Scan::run(
-        forge,
-        files,
-        Arc::clone(entities),
-        options,
-        projection,
-        &crafting,
-        &placements,
-    )?;
-    if options.cancel.is_some_and(CancelToken::is_cancelled) {
-        return Err(CatalogError::Cancelled);
-    }
-    let mut collected = Collected::new(scanned.picked, crafting);
-    collected.tags.entity_tags = scanned.entity_tags;
-    collected.tags.order_entities();
-    collected.ledger.merge(scanned.ledger);
-    collected.ledger.merge(placements.ledger.clone());
-    Ok((collected, placements))
 }
 
 fn completeness_of<'o>(options: &'o CatalogOptions<'_>) -> KindCompleteness<'o> {

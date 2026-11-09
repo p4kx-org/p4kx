@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 
 use crate::catalog_crafting_support;
 use crate::catalog_crafting_support::commodity;
+use crate::catalog_crafting_support::groups;
 use crate::resource_fixture as fixture;
 use crate::resource_quality_schema_fixture::OverrideEntryTarget;
 
@@ -248,13 +249,21 @@ fn group_source_memberships_keep_duplicates_nulls_and_cycles() -> TestResult {
             catalog_crafting_support::text(fixture::GROUP_BETA)
         ])
     );
-    let group = row(&catalog, "resourceGroups", fixture::GROUP_ALPHA)?;
-    assert_eq!(group["defaultThumbnailPathSVG"], "");
-    assert_eq!(group["resources"].as_array().map(Vec::len), Some(4));
-    assert_eq!(group["resources"][1], Value::Null);
-    assert_eq!(group["resources"][0], group["resources"][2]);
+    let group_guid = catalog_crafting_support::text(fixture::GROUP_ALPHA);
+    let group = groups::definition(&catalog, &group_guid)?;
+    let members = groups::members(&catalog, &group_guid)?;
+    assert_eq!(group["defaultThumbnailPathSVG"]["value"], "");
     assert_eq!(
-        group["parentGuid"],
+        members["resources"]["value"].as_array().map(Vec::len),
+        Some(4)
+    );
+    assert_eq!(members["resources"]["value"][1]["state"], "null");
+    assert_eq!(
+        members["resources"]["value"][0]["value"]["guid"]["value"],
+        members["resources"]["value"][2]["value"]["guid"]["value"]
+    );
+    assert_eq!(
+        *groups::parent_guid(&catalog, &group_guid)?,
         catalog_crafting_support::text(fixture::GROUP_BETA)
     );
     assert_eq!(

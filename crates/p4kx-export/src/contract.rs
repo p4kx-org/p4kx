@@ -12,13 +12,12 @@ use crate::catalog_text_contract::CatalogTexts;
 use p4kx_extraction::SourceInventory;
 
 pub(crate) use crate::broker_entry::BrokerEntry;
+pub(crate) use crate::catalog_v3::resource_group_catalog::ResourceGroup;
 pub(crate) use crate::commodity_contract::Commodity;
 pub(crate) use crate::contract_cargo::CargoManifest;
 pub(crate) use crate::contract_completeness::{Completeness, KindCompleteness};
 pub(crate) use crate::contract_crafter::Crafter;
-pub(crate) use crate::contract_crafting::{
-    Blueprint, BlueprintCategory, Ingredient, ResourceGroup,
-};
+pub(crate) use crate::contract_crafting::{Blueprint, BlueprintCategory, Ingredient};
 pub(crate) use crate::contract_entities::{Item, Paint, Ship};
 pub(crate) use crate::contract_harvest::{HarvestableLocation, HarvestableProviderPreset};
 pub(crate) use crate::contract_harvest_config::SubHarvestableMultiConfig;
@@ -77,11 +76,9 @@ pub(crate) struct Catalog<'a> {
     pub(crate) ships: Vec<Ship<'a>>,
     /// The blueprints, ordered by GUID.
     pub(crate) blueprints: Vec<Blueprint<'a>>,
-    /// The resource groups, ordered by GUID.
-    pub(crate) resource_groups: Vec<ResourceGroup<'a>>,
-    /// Canonical resource definition rows, independently of commodity packaging.
+    /// Canonical source-owned definition rows.
     pub(crate) definitions: CatalogDefinitions<'a>,
-    /// Ordered authored tag uses and root listings.
+    /// Ordered authored declarations from selected physical Records.
     pub(crate) declarations: crate::catalog_v3::catalog_declarations::CatalogDeclarations<'a>,
     /// Explicit derived choices using the canonical definitions' source facts.
     pub(crate) projections: CatalogProjections,

@@ -1786,12 +1786,16 @@
         "entityTags": {
           "$ref": "#/$defs/CatalogTableOfEntityTags"
         },
+        "resourceGroupMembers": {
+          "$ref": "#/$defs/CatalogTableOfResourceGroupMembers"
+        },
         "tagRoots": {
           "$ref": "#/$defs/CatalogTableOfTagRoots"
         }
       },
       "required": [
         "entityTags",
+        "resourceGroupMembers",
         "tagRoots"
       ],
       "type": "object"
@@ -1805,6 +1809,9 @@
         "manufacturers": {
           "$ref": "#/$defs/CatalogTableOfManufacturerDefinition"
         },
+        "resourceGroups": {
+          "$ref": "#/$defs/CatalogTableOfResourceGroupDefinition"
+        },
         "resourceTypes": {
           "$ref": "#/$defs/CatalogTableOfResourceType"
         },
@@ -1815,6 +1822,7 @@
       "required": [
         "commodities",
         "manufacturers",
+        "resourceGroups",
         "resourceTypes",
         "tags"
       ],
@@ -1826,12 +1834,16 @@
         "commodityPresentation": {
           "$ref": "#/$defs/CatalogTableOfCommodityPresentation"
         },
+        "resourceGroupParents": {
+          "$ref": "#/$defs/CatalogTableOfResourceGroupParent"
+        },
         "tagPaths": {
           "$ref": "#/$defs/CatalogTableOfTagPath"
         }
       },
       "required": [
         "commodityPresentation",
+        "resourceGroupParents",
         "tagPaths"
       ],
       "type": "object"
@@ -1853,7 +1865,7 @@
       "x-p4kx-vocabularyClass": "control"
     },
     "CatalogRecordReference": {
-      "description": "An authored link with independently sourced target-header fields.",
+      "description": "A Record link with independently sourced target-header fields.",
       "properties": {
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -1946,6 +1958,63 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ManufacturerDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfResourceGroupDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ResourceGroupDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfResourceGroupMembers": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ResourceGroupMembers"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfResourceGroupParent": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ResourceGroupParent"
           },
           "type": "array"
         }
@@ -15011,88 +15080,39 @@
       ],
       "type": "object"
     },
-    "ResourceGroup": {
-      "description": "A resource group: a `ResourceTypeGroup` Record under `resourcetypedatabase`, the type the\n`typeGuid` of a commodity points at.",
+    "ResourceGroupDefinition": {
+      "description": "Direct scalar facts of one physical `ResourceTypeGroup` Record.",
       "properties": {
         "className": {
-          "description": "The Record name without its type, e.g. `Metal`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "defaultThumbnailPath": {
-          "description": "The raw source thumbnail path, including an empty string.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "defaultThumbnailPathSVG": {
-          "description": "The raw source SVG thumbnail path, including an empty string.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "description": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The localised source description.",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "x-gameText": true
         },
-        "groups": {
-          "description": "Every authored child-group Reference in stored order, including nulls and repetitions.",
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/DefinitionReference"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "type": [
-            "array",
-            "null"
-          ]
-        },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
         },
         "name": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The name, from `displayName`; a placeholder key leaves `en` and `de` `null`."
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
         },
-        "parentGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the group that lists this group in its `groups`, the `guid` of another\n`resourceGroups` entry; `null` when no selected group lists it. The first selected listing\nwins; raw `groups` retain all memberships, and parent traversal requires a cycle guard."
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "resources": {
-          "description": "Every authored resource Reference in stored order, including nulls and repetitions.",
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/DefinitionReference"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "type": [
-            "array",
-            "null"
-          ]
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
@@ -15100,12 +15120,56 @@
         "defaultThumbnailPath",
         "defaultThumbnailPathSVG",
         "description",
-        "groups",
         "guid",
         "name",
-        "parentGuid",
+        "recordIndex",
+        "recordName",
         "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "ResourceGroupMembers": {
+      "description": "The original ordered membership arrays of one selected physical group.",
+      "properties": {
+        "groups": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "resources": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "groups",
+        "guid",
+        "recordIndex",
         "resources"
+      ],
+      "type": "object"
+    },
+    "ResourceGroupParent": {
+      "description": "The first selected parent with a different GUID, separate from raw memberships.",
+      "properties": {
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "parent": {
+          "$ref": "#/$defs/SourcedValueOfNullable_CatalogRecordReference"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "guid",
+        "parent",
+        "recordIndex"
       ],
       "type": "object"
     },
@@ -20582,6 +20646,143 @@
                   "$ref": "#/$defs/SourcedValueOfstring"
                 },
                 "type": "object"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfNullable_CatalogRecordReference": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/CatalogRecordReference"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             }
           }
@@ -27070,11 +27271,11 @@
     },
     "declarations": {
       "$ref": "#/$defs/CatalogDeclarations",
-      "description": "Ordered authored tag uses and root listings."
+      "description": "Ordered authored declarations from selected physical Records."
     },
     "definitions": {
       "$ref": "#/$defs/CatalogDefinitions",
-      "description": "Canonical resource definition rows, independently of commodity packaging."
+      "description": "Canonical source-owned definition rows."
     },
     "dismantleProcesses": {
       "description": "The dismantle processes, ordered by GUID.",
@@ -27302,13 +27503,6 @@
       },
       "type": "array"
     },
-    "resourceGroups": {
-      "description": "The resource groups, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/ResourceGroup"
-      },
-      "type": "array"
-    },
     "schemaVersion": {
       "const": 3,
       "description": "The version of the catalog shape; an import rejects a version it does not know.",
@@ -27410,7 +27604,6 @@
     "reputationContexts",
     "reputationScopes",
     "reputationStandings",
-    "resourceGroups",
     "schemaVersion",
     "shipStoreSlugs",
     "ships",

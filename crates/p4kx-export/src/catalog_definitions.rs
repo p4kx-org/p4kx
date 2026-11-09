@@ -16,6 +16,8 @@ use crate::schema_fields::every_field_required;
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) tags: CatalogTable<super::tag_catalog::TagDefinition<'source>>,
+    pub(crate) resource_groups:
+        CatalogTable<super::resource_group_catalog::ResourceGroupDefinition<'source>>,
     pub(crate) resource_types: CatalogTable<ResourceType<'source>>,
     pub(crate) commodities: CatalogTable<CommodityDefinition<'source>>,
     pub(crate) manufacturers: CatalogTable<ManufacturerDefinition<'source>>,

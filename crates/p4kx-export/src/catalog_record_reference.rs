@@ -11,7 +11,7 @@ use crate::definition_reference::DefinitionStatus;
 use crate::guid_text::CatalogGuid;
 use crate::schema_fields;
 
-/// An authored link with independently sourced target-header fields.
+/// A Record link with independently sourced target-header fields.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
