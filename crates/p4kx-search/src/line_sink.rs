@@ -3,66 +3,58 @@
 
 use std::io::{self, Write};
 
-use crate::excerpt::Excerpt;
+use crate::line_match::{LineError, LineMatch};
 use crate::{EntryHit, Needle};
 
-const MAX_LINE_LEN: usize = 1 << 20;
-const STOP_POLL_MASK: u64 = 0x3FF;
+const STOP_POLL_BYTES: usize = 64 << 10;
 
 /// Why a [`LineSink`] stopped taking data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Halt {
     Binary,
+    Unreadable,
     Done,
     Cancelled,
 }
 
-/// What kind of text a [`LineSink`] takes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy)]
 enum Kind {
     Text,
     ConvertedXml,
 }
 
-/// Searches the lines of the text written to it, without holding more than one line.
-///
-/// A line ends at a line feed, a carriage return and line feed, or a lone carriage return; one
-/// longer than a mebibyte is searched up to that length. The sink refuses further data once
-/// it has found enough, met data that is no text, or been told to stop; [`LineSink::halt`] says
-/// which.
-pub(crate) struct LineSink<'a> {
-    needle: &'a Needle,
-    path: &'a str,
+/// Searches complete source lines with bounded literal and excerpt state.
+pub(crate) struct LineSink<'search> {
+    matcher: LineMatch<'search>,
+    path: &'search str,
     per_item: usize,
     kind: Kind,
     after_cr: bool,
-    stop: &'a (dyn Fn() -> bool + Sync),
-    pending: Vec<u8>,
-    overlong: bool,
-    pending_len: u64,
+    held_cr: bool,
+    stop: &'search (dyn Fn() -> bool + Sync),
+    line_len: u64,
     line_start: u64,
     line: u64,
     hits: Vec<EntryHit>,
     halt: Option<Halt>,
 }
 
-impl<'a> LineSink<'a> {
-    pub(crate) const fn new(
-        needle: &'a Needle,
-        path: &'a str,
+impl<'search> LineSink<'search> {
+    pub(crate) fn new(
+        needle: &'search Needle,
+        path: &'search str,
         per_item: usize,
-        stop: &'a (dyn Fn() -> bool + Sync),
+        stop: &'search (dyn Fn() -> bool + Sync),
     ) -> Self {
         Self {
-            needle,
+            matcher: LineMatch::new(needle),
             path,
             per_item,
             kind: Kind::Text,
             after_cr: false,
+            held_cr: false,
             stop,
-            pending: Vec::new(),
-            overlong: false,
-            pending_len: 0,
+            line_len: 0,
             line_start: 0,
             line: 0,
             hits: Vec::new(),
@@ -70,8 +62,7 @@ impl<'a> LineSink<'a> {
         }
     }
 
-    /// Takes text from `CryXml` converted to XML: control characters are no sign of binary data,
-    /// and only a line feed ends a line, as in the XML view.
+    /// Accepts converted XML controls and treats only line feed as a line boundary.
     pub(crate) const fn accepting_controls(mut self) -> Self {
         self.kind = Kind::ConvertedXml;
         self
@@ -81,9 +72,8 @@ impl<'a> LineSink<'a> {
         self.halt
     }
 
-    /// Searches the last line when the text does not end with a line break and returns the hits.
     pub(crate) fn finish(mut self) -> (Vec<EntryHit>, Option<Halt>) {
-        if self.halt.is_none() && !self.pending.is_empty() {
+        if self.halt.is_none() && self.line_len != 0 {
             let _ended = self.complete();
         }
         (self.hits, self.halt)
@@ -94,64 +84,60 @@ impl<'a> LineSink<'a> {
         io::Error::other("the search of the Entry ended")
     }
 
-    fn append(&mut self, bytes: &[u8]) {
-        self.pending_len += bytes.len() as u64;
-        let room = MAX_LINE_LEN.saturating_sub(self.pending.len());
-        if bytes.len() > room {
-            self.overlong = true;
+    fn append(&mut self, bytes: &[u8]) -> io::Result<()> {
+        if matches!(self.kind, Kind::Text) && bytes.iter().copied().any(is_binary) {
+            return Err(self.stopped(Halt::Binary));
         }
-        self.pending
-            .extend_from_slice(bytes.get(..room.min(bytes.len())).unwrap_or_default());
+        self.line_len += bytes.len() as u64;
+        if bytes.is_empty() {
+            return Ok(());
+        }
+        if self.held_cr {
+            self.matcher
+                .write(b"\r")
+                .map_err(|error| self.failed(error))?;
+            self.held_cr = false;
+        }
+        let bytes = if matches!(self.kind, Kind::ConvertedXml) {
+            bytes.strip_suffix(b"\r").map_or(bytes, |head| {
+                self.held_cr = true;
+                head
+            })
+        } else {
+            bytes
+        };
+        self.matcher
+            .write(bytes)
+            .map_err(|error| self.failed(error))
+    }
+
+    fn failed(&mut self, error: LineError) -> io::Error {
+        self.stopped(match error {
+            LineError::Binary => Halt::Binary,
+            LineError::MissingMatchRange => Halt::Unreadable,
+        })
     }
 
     fn complete(&mut self) -> io::Result<()> {
-        let pending = std::mem::take(&mut self.pending);
-        let result = self.search(&pending, self.overlong);
-        self.pending = pending;
-        self.pending.clear();
-        self.pending_len = 0;
-        self.overlong = false;
-        result
-    }
-
-    fn search(&mut self, bytes: &[u8], truncated: bool) -> io::Result<()> {
-        let bytes = bytes.strip_suffix(b"\r").unwrap_or(bytes);
-        if self.kind == Kind::Text && bytes.iter().any(|&byte| is_binary(byte)) {
-            return Err(self.stopped(Halt::Binary));
-        }
-        let text = match std::str::from_utf8(bytes) {
-            Ok(text) => text,
-            Err(error) if truncated && error.error_len().is_none() => {
-                std::str::from_utf8(bytes.get(..error.valid_up_to()).unwrap_or_default())
-                    .unwrap_or_default()
-            }
-            Err(_) => return Err(self.stopped(Halt::Binary)),
-        };
+        self.held_cr = false;
+        let excerpt = self.matcher.finish().map_err(|error| self.failed(error))?;
+        self.matcher.reset();
         self.line += 1;
-        if let Some(matched) = self.needle.find(text) {
+        if let Some(excerpt) = excerpt {
             self.hits.push(EntryHit {
                 path: self.path.to_owned(),
                 line: self.line,
                 offset: self.line_start,
-                excerpt: Excerpt::around(text, matched),
+                excerpt,
             });
             if self.hits.len() >= self.per_item {
                 return Err(self.stopped(Halt::Done));
             }
         }
-        if self.line & STOP_POLL_MASK == 0 && (self.stop)() {
-            return Err(self.stopped(Halt::Cancelled));
-        }
         Ok(())
     }
-}
 
-impl Write for LineSink<'_> {
-    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
-        if let Some(halt) = self.halt {
-            return Err(self.stopped(halt));
-        }
-        let mut rest = buffer;
+    fn block(&mut self, mut rest: &[u8]) -> io::Result<()> {
         if self.after_cr {
             self.after_cr = false;
             if let Some(tail) = rest.strip_prefix(b"\n") {
@@ -159,7 +145,7 @@ impl Write for LineSink<'_> {
                 self.line_start += 1;
             }
         }
-        let cr_breaks = self.kind == Kind::Text;
+        let cr_breaks = matches!(self.kind, Kind::Text);
         while let Some(newline) = rest
             .iter()
             .position(|&byte| byte == b'\n' || (cr_breaks && byte == b'\r'))
@@ -174,17 +160,26 @@ impl Write for LineSink<'_> {
                 }
             }
             rest = after.get(taken..).unwrap_or_default();
-            let length = line.len() as u64 + self.pending_len;
-            let searched = if self.pending.is_empty() {
-                self.search(line, false)
-            } else {
-                self.append(line);
-                self.complete()
-            };
-            self.line_start += length + taken as u64;
-            searched?;
+            self.append(line)?;
+            self.complete()?;
+            self.line_start += self.line_len + taken as u64;
+            self.line_len = 0;
         }
-        self.append(rest);
+        self.append(rest)
+    }
+}
+
+impl Write for LineSink<'_> {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        if let Some(halt) = self.halt {
+            return Err(self.stopped(halt));
+        }
+        for block in buffer.chunks(STOP_POLL_BYTES) {
+            if (self.stop)() {
+                return Err(self.stopped(Halt::Cancelled));
+            }
+            self.block(block)?;
+        }
         Ok(buffer.len())
     }
 
@@ -193,7 +188,7 @@ impl Write for LineSink<'_> {
     }
 }
 
-/// Returns whether `byte` is a control character that text does not hold.
+/// Returns whether a byte is a control character absent from plain text.
 pub(crate) const fn is_binary(byte: u8) -> bool {
     (byte < 0x20 && !matches!(byte, b'\t' | b'\n' | 0x0C | b'\r')) || byte == 0x7F
 }

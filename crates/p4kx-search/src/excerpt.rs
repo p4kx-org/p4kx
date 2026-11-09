@@ -4,11 +4,20 @@
 use std::borrow::Cow;
 use std::ops::Range;
 
-const CONTEXT_BEFORE: usize = 32;
-const CONTEXT_AFTER: usize = 64;
-const MAX_MATCH_CHARS: usize = 96;
+pub(crate) const CONTEXT_BEFORE: usize = 32;
+pub(crate) const CONTEXT_AFTER: usize = 64;
+pub(crate) const MAX_MATCH_CHARS: usize = 96;
 const ELLIPSIS: char = '\u{2026}';
 const REPLACEMENT: char = '\u{fffd}';
+
+/// Borrowed original text and boundary cuts for one excerpt.
+pub(crate) struct ExcerptParts<'text> {
+    pub(crate) head: &'text str,
+    pub(crate) found: &'text str,
+    pub(crate) tail: &'text str,
+    pub(crate) head_cut: bool,
+    pub(crate) tail_cut: bool,
+}
 
 /// A short piece of text around a match, safe to print: control characters and bidirectional
 /// controls are replaced, and a cut at either end is marked with an ellipsis.
@@ -60,6 +69,23 @@ impl Excerpt {
         } else {
             leading(tail, CONTEXT_AFTER)
         };
+        Self::from_parts(&ExcerptParts {
+            head,
+            found,
+            tail,
+            head_cut,
+            tail_cut: found_cut || tail_cut,
+        })
+    }
+
+    pub(crate) fn from_parts(parts: &ExcerptParts<'_>) -> Self {
+        let ExcerptParts {
+            head,
+            found,
+            tail,
+            head_cut,
+            tail_cut,
+        } = *parts;
         let mut text = String::with_capacity(head.len() + found.len() + tail.len() + 6);
         if head_cut {
             text.push(ELLIPSIS);
@@ -69,7 +95,7 @@ impl Excerpt {
         push_safe(&mut text, found);
         let end = text.len();
         push_safe(&mut text, tail);
-        if found_cut || tail_cut {
+        if tail_cut {
             text.push(ELLIPSIS);
         }
         Self {
