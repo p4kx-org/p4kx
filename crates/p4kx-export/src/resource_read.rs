@@ -127,18 +127,25 @@ fn cargo_slots<'source>(
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<Vec<SourcedValue<ResourceCargoSlot<'source>>>, CatalogError> {
-    let fields = CatalogFields::new(source, "defaultCargoContainers", context);
     source
         .fields()
         .iter()
-        .map(|field| {
+        .zip(0_u64..)
+        .map(|(field, ordinal)| {
+            let context = context.cargo_slot(ordinal);
             let path = format!("defaultCargoContainers.{}", field.name());
             let value = ResourceCargoSlot {
                 slot: context.selector(
                     &format!("{path}.$fieldName"),
                     SourceValue::Present(field.name()),
                 )?,
-                entity_class: resource_value_read::reference(&fields, field.name(), notes)?,
+                entity_class: crate::catalog_read::reference_value(
+                    &context,
+                    Some(field.value()),
+                    source.type_name(),
+                    &path,
+                    notes,
+                )?,
             };
             context.value(&path, SourceValue::Present(value))
         })

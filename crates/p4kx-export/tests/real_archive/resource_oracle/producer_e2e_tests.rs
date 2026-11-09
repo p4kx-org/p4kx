@@ -5,7 +5,7 @@ use std::time::UNIX_EPOCH;
 
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, Compression, write_catalog_from};
 use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry};
-use p4kx_testkit::{ArchiveBuilder, TestEntry};
+use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry};
 use serde_json::{Value, json};
 
 use crate::resource_fixture;
@@ -30,14 +30,18 @@ struct Written {
 
 impl Written {
     fn new(target: OverrideEntryTarget) -> Result<Self> {
+        Self::from_database(&resource_fixture::database(target), |_| Ok(()))
+    }
+
+    fn from_database(
+        database: &DataForgeBuilder,
+        original_check: impl FnOnce(&DataForgeEntry) -> Result<()>,
+    ) -> Result<Self> {
         let folder =
             tempfile::tempdir().map_err(|error| Failure::source("synthetic-folder", error))?;
         let path = folder.path().join("source.p4k");
         ArchiveBuilder::new()
-            .entry(TestEntry::stored(
-                "Data/Game2.dcb",
-                resource_fixture::database(target).build(),
-            ))
+            .entry(TestEntry::stored("Data/Game2.dcb", database.build()))
             .entry(TestEntry::stored(
                 "Data/Libs/CosmoTools/LayerRecovery/LayerBackups.xml",
                 b"<LayerBackups/>",
@@ -48,6 +52,7 @@ impl Written {
             Archive::open(path).map_err(|error| Failure::source("synthetic-open", error))?;
         let entry = DataForgeEntry::read(&archive)
             .map_err(|error| Failure::source("synthetic-dataforge", error))?;
+        original_check(&entry)?;
         let options = CatalogOptions {
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..CatalogOptions::new(UNIX_EPOCH)
@@ -220,9 +225,9 @@ fn expected_slots(alpha: &Value, carriers: &Carriers<'_>) -> Result<()> {
         names.len(),
         "every declared source slot retains its position"
     );
-    for (slot, name) in slots.iter().zip(names) {
+    for ((slot, name), ordinal) in slots.iter().zip(names).zip(0_u64..) {
         let path = format!("defaultCargoContainers.{name}");
-        carriers.require(slot, &path)?;
+        carriers.require_cargo_slot(slot, ordinal, &path)?;
         assert_eq!(
             slot["state"], "present",
             "the named slot retains its carrier"
@@ -230,7 +235,7 @@ fn expected_slots(alpha: &Value, carriers: &Carriers<'_>) -> Result<()> {
         let label = slot
             .pointer("/value/slot")
             .ok_or_else(|| Failure::check("synthetic-slot-label"))?;
-        carriers.require(label, &format!("{path}.$fieldName"))?;
+        carriers.require_cargo_slot(label, ordinal, &format!("{path}.$fieldName"))?;
         assert_eq!(
             label["state"], "present",
             "the authored slot name is present"
@@ -239,7 +244,7 @@ fn expected_slots(alpha: &Value, carriers: &Carriers<'_>) -> Result<()> {
         let entity = slot
             .pointer("/value/entityClass")
             .ok_or_else(|| Failure::check("synthetic-slot-reference"))?;
-        carriers.require(entity, &path)?;
+        carriers.require_cargo_slot(entity, ordinal, &path)?;
         if matches!(name, "one_eighthSCU" | "twoSCU") {
             expected_box(entity);
         } else {
@@ -368,3 +373,9 @@ fn original_filename_and_metadata_tag_states_are_checked_independently_of_normal
     }
     Ok(())
 }
+
+#[path = "cargo_origin_tests.rs"]
+mod cargo_origins;
+
+#[path = "cargo_empty_name_tests.rs"]
+mod cargo_empty_names;

@@ -209,33 +209,47 @@ impl<'catalog> Carriers<'catalog> {
     }
 
     pub(super) fn require_at(&self, carrier: &Value, owner: u32, path: &str) -> Result<()> {
-        if self
-            .fields
-            .get(&(owner, Coordinate::Body(path)))
-            .is_some_and(|values| {
-                values
-                    .iter()
-                    .any(|candidate| std::ptr::eq(*candidate, carrier))
-            })
-        {
-            return Ok(());
-        }
-        Err(Failure::check("bound-field-origin"))
+        self.require_coordinate(carrier, owner, Coordinate::Body(path), "bound-field-origin")
     }
 
     pub(super) fn require_header_at(&self, carrier: &Value, owner: u32, field: &str) -> Result<()> {
-        if self
-            .fields
-            .get(&(owner, Coordinate::Header(field)))
-            .is_some_and(|values| {
-                values
-                    .iter()
-                    .any(|candidate| std::ptr::eq(*candidate, carrier))
-            })
-        {
+        self.require_coordinate(
+            carrier,
+            owner,
+            Coordinate::Header(field),
+            "bound-header-origin",
+        )
+    }
+
+    pub(super) fn require_cargo_slot(
+        &self,
+        carrier: &Value,
+        ordinal: u64,
+        field: &str,
+    ) -> Result<()> {
+        self.require_coordinate(
+            carrier,
+            self.owner,
+            Coordinate::CargoSlot { ordinal, field },
+            "bound-cargo-slot-origin",
+        )
+    }
+
+    fn require_coordinate(
+        &self,
+        carrier: &Value,
+        owner: u32,
+        coordinate: Coordinate<'_>,
+        stage: &'static str,
+    ) -> Result<()> {
+        if self.fields.get(&(owner, coordinate)).is_some_and(|values| {
+            values
+                .iter()
+                .any(|candidate| std::ptr::eq(*candidate, carrier))
+        }) {
             return Ok(());
         }
-        Err(Failure::check("bound-header-origin"))
+        Err(Failure::check(stage))
     }
 
     pub(super) fn child(

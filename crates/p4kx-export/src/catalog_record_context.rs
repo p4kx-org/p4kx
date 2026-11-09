@@ -12,12 +12,21 @@ use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::resource_raw_policy::ResourceNumberContract;
 use crate::source_fields::FieldError;
 
+const CARGO_SLOT_NAMESPACE: &str = "dataforgeCargoSlot";
+
+#[derive(Clone, Copy)]
+enum BodyCoordinate {
+    Record,
+    CargoSlot { ordinal: u64 },
+}
+
 /// Binds Catalog fields to the one physical DataForge payload and Record position.
 #[derive(Clone, Copy)]
 pub(crate) struct CatalogRecordContext<'a> {
     sources: &'a SourceUses,
     dataforge: &'a SourceScope,
     record_index: u32,
+    body_coordinate: BodyCoordinate,
     numbers: Option<&'a NumberCapture>,
     cancel: Option<&'a CancelToken>,
 }
@@ -32,8 +41,17 @@ impl<'a> CatalogRecordContext<'a> {
             sources,
             dataforge,
             record_index,
+            body_coordinate: BodyCoordinate::Record,
             numbers: None,
             cancel: None,
+        }
+    }
+
+    /// Selects one original field ordinal in this Record's defaultCargoContainers structure.
+    pub(crate) const fn cargo_slot(&self, ordinal: u64) -> Self {
+        Self {
+            body_coordinate: BodyCoordinate::CargoSlot { ordinal },
+            ..*self
         }
     }
 
@@ -63,6 +81,7 @@ impl<'a> CatalogRecordContext<'a> {
     pub(crate) const fn at_record(&self, record_index: u32) -> Self {
         Self {
             record_index,
+            body_coordinate: BodyCoordinate::Record,
             numbers: None,
             ..*self
         }
@@ -197,9 +216,16 @@ impl<'a> CatalogRecordContext<'a> {
     }
 
     fn location(&self, path: &str) -> SourceLocation {
-        SourceLocation::DataForge {
-            record_index: self.record_index,
-            field: path.to_owned(),
+        match self.body_coordinate {
+            BodyCoordinate::Record => SourceLocation::DataForge {
+                record_index: self.record_index,
+                field: path.to_owned(),
+            },
+            BodyCoordinate::CargoSlot { ordinal } => SourceLocation::Subresource {
+                namespace: CARGO_SLOT_NAMESPACE.to_owned(),
+                indices: vec![u64::from(self.record_index), ordinal],
+                field: path.to_owned(),
+            },
         }
     }
 

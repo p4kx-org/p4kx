@@ -146,18 +146,29 @@ impl<'catalog> Walker<'_, 'catalog> {
         carrier: &'catalog Value,
         depth: usize,
     ) -> Result<()> {
+        self.bound_at(raw, path, carrier, depth, None)
+    }
+
+    fn bound_at(
+        &mut self,
+        raw: Option<&Raw<'_>>,
+        path: &str,
+        carrier: &'catalog Value,
+        depth: usize,
+        slot: Option<u64>,
+    ) -> Result<()> {
         if depth > MAX_RAW_DEPTH || self.coverage.checked_values >= MAX_RAW_VALUES {
             return Err(Failure::check("raw-source-walk-budget"));
         }
         self.coverage.checked_values += 1;
-        self.carriers.require(carrier, path)?;
+        self.require_origin(carrier, path, slot)?;
         match raw {
             None => Self::require_state(carrier, "absent"),
             Some(Raw::Null) => Self::require_state(carrier, "null"),
             Some(Raw::Struct(source)) => self.structure(source, path, carrier, depth),
             Some(Raw::Array(values)) => self.array(values, path, carrier, depth),
             Some(raw) if compare::is_reference(raw) => {
-                self.reference(raw, path, carrier)?;
+                self.reference(raw, path, carrier, slot)?;
                 self.checked_quality(path);
                 Ok(())
             }
@@ -256,15 +267,16 @@ impl<'catalog> Walker<'_, 'catalog> {
         depth: usize,
     ) -> Result<()> {
         let output = array_value(carrier, source.fields().len(), "cargo-slot-cardinality")?;
-        for (field, emitted) in source.fields().iter().zip(output) {
+        for ((field, emitted), ordinal) in source.fields().iter().zip(output).zip(0_u64..) {
             let item = format!("{path}.{}", field.name());
-            self.carriers.require(emitted, &item)?;
+            self.carriers.require_cargo_slot(emitted, ordinal, &item)?;
             let slot =
                 compare::present(emitted).ok_or_else(|| Failure::check("cargo-slot-state"))?;
             let name = slot
                 .get("slot")
                 .ok_or_else(|| Failure::check("cargo-slot-name"))?;
-            self.carriers.require(name, &format!("{item}.$fieldName"))?;
+            self.carriers
+                .require_cargo_slot(name, ordinal, &format!("{item}.$fieldName"))?;
             if compare::present(name).and_then(Value::as_str) != Some(field.name()) {
                 return Err(Failure::check("cargo-slot-name-order-origin"));
             }
@@ -275,19 +287,32 @@ impl<'catalog> Walker<'_, 'catalog> {
                 .insert((source.type_name().to_owned(), field.name().to_owned()));
             self.coverage.packaging_slots += 1;
             self.box_status(field.value());
-            self.bound(Some(field.value()), &item, entity, depth + 1)?;
+            self.bound_at(Some(field.value()), &item, entity, depth + 1, Some(ordinal))?;
         }
         Ok(())
     }
 
-    fn reference(&self, raw: &Raw<'_>, path: &str, carrier: &Value) -> Result<()> {
+    fn require_origin(&self, carrier: &Value, path: &str, slot: Option<u64>) -> Result<()> {
+        slot.map_or_else(
+            || self.carriers.require(carrier, path),
+            |ordinal| self.carriers.require_cargo_slot(carrier, ordinal, path),
+        )
+    }
+
+    fn reference(
+        &self,
+        raw: &Raw<'_>,
+        path: &str,
+        carrier: &Value,
+        slot: Option<u64>,
+    ) -> Result<()> {
         let value = compare::present(carrier)
             .filter(|value| compare::reference(raw, value))
             .ok_or_else(|| Failure::check("raw-reference-mismatch"))?;
         let guid = value
             .get("guid")
             .ok_or_else(|| Failure::check("reference-guid-origin"))?;
-        self.carriers.require(guid, path)?;
+        self.require_origin(guid, path, slot)?;
         if let Raw::Reference(target) = raw {
             for (name, field) in [
                 ("targetRecordIndex", "recordIndex"),
@@ -305,7 +330,7 @@ impl<'catalog> Walker<'_, 'catalog> {
                 let header = value
                     .get(name)
                     .ok_or_else(|| Failure::check("reference-header-origin"))?;
-                self.carriers.require(header, path)?;
+                self.require_origin(header, path, slot)?;
             }
         }
         Ok(())

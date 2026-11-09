@@ -67,9 +67,21 @@ Volatility retains `volatility` and `healthDecayPerSecond` without clamping or s
 CraftingData retains independent `qualityDistribution`, `qualityLocationOverride` and
 `qualityQuantization` source values.
 
-The exact cargo slot names are `one_eighthSCU`, `one_quarterSCU`, `one_halfSCU`, `oneSCU`, `twoSCU`,
-`fourSCU`, `eightSCU`, `sixteenSCU`, `twentyFourSCU` and `thirtyTwoSCU`. A slot label does not assert
-measured capacity or derive it from mesh/component data.
+Known cargo slot names include `one_eighthSCU`, `one_quarterSCU`, `one_halfSCU`, `oneSCU`, `twoSCU`,
+`fourSCU`, `eightSCU`, `sixteenSCU`, `twentyFourSCU` and `thirtyTwoSCU`. Every authored name is
+retained, including empty and repeated names. A slot label does not assert measured capacity or
+derive it from mesh/component data.
+
+Every declared slot keeps its own current reference value and original order, including repeated
+slot names. Slot wrappers, names and reference/GUID body facts use the `dataforgeCargoSlot`
+subresource namespace. Its two decimal-string indices are the physical ResourceType Record index
+and the original local field ordinal within that Record's selected `defaultCargoContainers`
+structure. The field label remains the full logical path, for example
+`defaultCargoContainers.oneSCU`; the authored name selector adds `.$fieldName`. This local tuple
+is not a raw byte offset, global field position or full ancestry vector. Resolved target-header
+facts retain the separate `dataforgeRecordHeader` namespace and the target's physical Record index.
+An empty authored name has field label `defaultCargoContainers.` and name selector
+`defaultCargoContainers..$fieldName`; its local ordinal still distinguishes it from other slots.
 
 Density payload tags are `density`, `molarMass` and `emptyBase`. A density's `densityUnit` retains
 its sourced concrete type and a payload tagged `gramsPerCubicCentimeter`, `kilogramsPerCubicMeter`
