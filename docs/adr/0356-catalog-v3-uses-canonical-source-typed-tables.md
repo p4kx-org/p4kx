@@ -66,6 +66,23 @@ wire mirror, global node identity, transformation execution or equality deduplic
 is introduced. This preserves the existing legal source depth through ordinary JSON
 parsers. Schema, local link validation and independent original-source ownership proof
 have separate responsibilities; a valid local index cannot certify a foreign source.
+
+Sequence.transformations requires the original field's declared StrongPointer array storage.
+A readable Class array is a projection error even when its materialized values look identical;
+diagnostic publication retains those original values and occurrences. Declaration checking uses
+the same original Field as the value read, without guessing storage from Value or type-name text.
+
+The u32 nodeIndex convention is sufficient for this accepted graph: the global StrongPointer pool
+has a u32 entry count N, each additional owned child consumes a distinct original pool slot, and
+the root adds one node. Reusing a pointer target produces an original OwnedTwice error instead of
+another owned node. Thus the largest node index is at most N. This bound depends on the checked
+StrongPointer-array declaration; it is not a general bound on arbitrary materialized Class arrays
+or open source-value arenas. The existing canonical tree resource policy remains separate.
+
+This check establishes data type and array storage, not declared target inheritance. The canonical
+reader follows the stored strong-pointer target independently of the declaration target word;
+that existing decode behavior is unchanged. No type name is inferred from the raw u16 target.
+
 ## Texts, identity and migration
 
 Use separate texts.publicNames and texts.gameTexts domains, with distinct typed references.

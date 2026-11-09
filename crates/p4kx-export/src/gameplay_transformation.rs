@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{SourcedValue, StructValue};
+use p4kx_extraction::{DataType, SourcedValue, StructValue};
 
 use crate::catalog_read::{CatalogFields, CatalogRecordContext};
 use crate::resource_value_read;
@@ -97,6 +97,7 @@ impl<'source> Arena<'_, 'source> {
         &mut self,
         fields: &CatalogFields<'_, 'source, '_>,
     ) -> Result<SourcedValue<Vec<SourcedValue<DisplayTransformationNodeRef>>>, CatalogError> {
+        self.check_sequence_storage(fields);
         let path = fields.location("transformations");
         fields
             .array("transformations", self.notes)?
@@ -117,6 +118,26 @@ impl<'source> Arena<'_, 'source> {
                     })
                     .collect()
             })
+    }
+
+    fn check_sequence_storage(&mut self, fields: &CatalogFields<'_, 'source, '_>) {
+        let Some(field) = fields
+            .source()
+            .fields()
+            .iter()
+            .find(|field| field.name() == "transformations")
+        else {
+            return;
+        };
+        let storage = field.storage();
+        if storage.is_array() && storage.data_type() == DataType::StrongPointer {
+            return;
+        }
+        self.notes.push(FieldError::Malformed {
+            source_type: fields.source().type_name().to_owned(),
+            field: fields.location("transformations"),
+            expected: "an array declared as StrongPointer",
+        });
     }
 }
 
