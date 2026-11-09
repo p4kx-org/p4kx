@@ -99,6 +99,7 @@ pub(super) enum AccountingFault {
     UnobservedFailure,
     MissingFieldInspection,
     ConflictingFieldInspection,
+    ConflictingTagTrace,
     FieldPath,
     ConflictingDisposition,
     Unreconciled,

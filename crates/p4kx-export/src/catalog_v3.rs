@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "catalog_declarations.rs"]
+pub(crate) mod catalog_declarations;
+#[path = "tag_catalog.rs"]
+pub(crate) mod tag_catalog;
+
 #[path = "catalog_definitions.rs"]
 pub(crate) mod catalog_definitions;
 #[path = "catalog_origins.rs"]
@@ -9,6 +14,8 @@ pub(crate) mod catalog_origins;
 pub(crate) mod catalog_projection;
 #[path = "catalog_read.rs"]
 pub(crate) mod catalog_read;
+#[path = "catalog_record_reference.rs"]
+pub(crate) mod catalog_record_reference;
 #[path = "catalog_text_contract.rs"]
 pub(crate) mod catalog_text_contract;
 #[path = "resource_density_read.rs"]
@@ -43,8 +50,6 @@ pub(crate) mod resource_quantization_read;
 pub(crate) mod resource_raw_policy;
 #[path = "resource_read.rs"]
 pub(crate) mod resource_read;
-#[path = "resource_reference.rs"]
-pub(crate) mod resource_reference;
 #[path = "resource_type_contract.rs"]
 pub(crate) mod resource_type_contract;
 #[path = "resource_value_read.rs"]

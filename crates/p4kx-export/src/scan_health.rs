@@ -11,12 +11,14 @@ use crate::selection::Kind;
 /// Source observations and rows produced by one Record check.
 pub(crate) struct RecordScan<'f> {
     pub(crate) picked: Option<Picked<'f>>,
+    pub(crate) entity_tags: Option<crate::catalog_v3::tag_catalog::EntityTags<'f>>,
     pub(crate) ledger: ExportLedger,
 }
 
 /// Rows and production accounting of the generic catalog scan.
 pub(crate) struct ScanRead<'f> {
     pub(crate) picked: Vec<Picked<'f>>,
+    pub(crate) entity_tags: Vec<crate::catalog_v3::tag_catalog::EntityTags<'f>>,
     pub(crate) ledger: ExportLedger,
 }
 
@@ -55,7 +57,11 @@ pub(crate) fn finish<'f>(
     };
     Ok(
         (picked.is_some() || !ledger.sources.is_empty() || !ledger.field_inspections.is_empty())
-            .then_some(RecordScan { picked, ledger }),
+            .then_some(RecordScan {
+                picked,
+                entity_tags: None,
+                ledger,
+            }),
     )
 }
 

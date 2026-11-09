@@ -7,7 +7,9 @@ use crate::{DataForge, Guid, TagResolver};
 #[path = "tag_events.rs"]
 mod events;
 
-pub use events::{TagBuildEvent, TagProjectionFailure, TagRelationIssue};
+pub use events::{
+    TagBuildEvent, TagPathEdgeKind, TagPathIncoming, TagProjectionFailure, TagRelationIssue,
+};
 
 /// The struct of the Record that lists the root tags.
 pub const TAG_DATABASE_TYPE: &str = "TagDatabase";

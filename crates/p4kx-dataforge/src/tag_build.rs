@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 
 use crate::DataForge;
-use crate::tags::{Node, TagBuildEvent, TagRelationIssue, TagTreeIssues};
+use crate::tags::{Node, TagBuildEvent, TagTreeIssues};
 
 use read::ReadTags;
 use walk::Walk;
@@ -54,22 +54,7 @@ pub(crate) fn layout_observed<'f, E>(
         issues,
         ticker,
     };
-    for root in roots {
-        if walk.ticker.stopped() {
-            break;
-        }
-        if let Some(&position) = positions.get(&root.target) {
-            walk.root(position, true, Some(&root.record), observe)?;
-        } else {
-            walk.issues.dangling += 1;
-            observe(TagBuildEvent::RelationSkipped {
-                record: &root.record,
-                field: "tags",
-                target: Some(root.target),
-                reason: TagRelationIssue::Dangling,
-            })?;
-        }
-    }
+    walk.listed_roots(roots, observe)?;
     walk.unlisted(observe)?;
     if walk.ticker.stopped() {
         observe(TagBuildEvent::Cancelled)?;

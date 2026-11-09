@@ -24,7 +24,7 @@ pub(crate) struct GameTextRef(pub(crate) String);
 /// One canonical text key and its actually available language projections.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
+#[schemars(rename = "CanonicalTextOf{R}", transform = every_field_required)]
 pub(crate) struct CanonicalText<'source, R> {
     pub(crate) id: SourcedValue<R>,
     pub(crate) key: SourcedValue<&'source str>,
@@ -40,3 +40,7 @@ pub(crate) struct CatalogTexts<'source> {
     #[schemars(extend("x-gameText" = true))]
     pub(crate) game_texts: Vec<CanonicalText<'source, GameTextRef>>,
 }
+
+#[cfg(test)]
+#[path = "catalog_text_schema_tests.rs"]
+mod tests;

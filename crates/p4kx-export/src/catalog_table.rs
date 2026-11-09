@@ -20,7 +20,7 @@ pub(crate) enum DatasetAvailability {
 /// One named typed dataset with its measured source-family availability.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
+#[schemars(rename = "CatalogTableOf{T}", transform = every_field_required)]
 #[must_use]
 pub(crate) struct CatalogTable<T> {
     pub(crate) availability: DatasetAvailability,
@@ -48,3 +48,7 @@ impl<T> CatalogTable<T> {
         Self { availability, rows }
     }
 }
+
+#[cfg(test)]
+#[path = "catalog_table_tests.rs"]
+mod tests;

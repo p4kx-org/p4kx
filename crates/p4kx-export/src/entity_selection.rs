@@ -15,9 +15,8 @@ pub(crate) enum Selected {
     Leftover(Kind),
 }
 
-/// Returns what the kind of `record` makes of it: the kinds that
-/// [`read_crafting`](crate::read_crafting) fills do not select, and a Record is selected when its
-/// struct is the type of its kind and, with a `filter`, its record path matches.
+/// Selects generic catalog Records by their declared type and filtered owning path.
+/// Dedicated readers select their own source scopes.
 pub(crate) fn select(
     record: &Record<'_>,
     filter: Option<&Filter>,
@@ -37,7 +36,7 @@ pub(crate) fn select(
 }
 
 const fn owns(kind: Kind) -> bool {
-    !kind.is_crafting()
+    !kind.has_dedicated_reader()
         && !matches!(
             kind,
             Kind::Contracts

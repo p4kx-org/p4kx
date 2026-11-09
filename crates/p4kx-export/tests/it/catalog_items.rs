@@ -311,6 +311,7 @@ fn every_kind_states_its_completeness() -> TestResult {
             "blueprints": {"status": "complete"},
             "resourceGroups": {"status": "complete"},
             "resourceTypes": {"status": "complete"},
+            "tags": {"status": "complete"},
             "blueprintCategories": {"status": "complete"},
             "gameplayProperties": {"status": "complete"},
             "qualityDistributions": {"status": "complete"},
@@ -369,9 +370,18 @@ fn every_kind_states_its_completeness() -> TestResult {
     );
     assert_eq!(class_names(&catalog, "items"), Vec::<&str>::new(), "none");
     assert_eq!(class_names(&catalog, "ships"), ["ACAS_Ship"], "the ship");
+    assert_eq!(
+        catalog["completeness"]["tags"],
+        json!({"status": "complete"}),
+        "the global Tag taxonomy retains its full selection scope"
+    );
     assert!(
-        built.summary().kinds().iter().all(|kind| !kind.complete),
-        "every kind partial"
+        built
+            .summary()
+            .kinds()
+            .iter()
+            .all(|entry| entry.complete == (entry.kind == Kind::Tags)),
+        "every scoped kind is partial; only the global Tag taxonomy stays complete"
     );
     Ok(())
 }

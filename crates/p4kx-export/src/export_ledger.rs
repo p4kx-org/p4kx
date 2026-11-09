@@ -294,6 +294,9 @@ pub enum ExportAccountingError {
         /// The affected kind.
         kind: Kind,
     },
+    /// Tag projection trace positions do not identify their original selected parent.
+    #[error("inconsistent original tag-path trace")]
+    ConflictingTagTrace,
     /// Counter arithmetic exceeded the supported range.
     #[error("export health counter exceeds its supported range")]
     CounterOverflow,

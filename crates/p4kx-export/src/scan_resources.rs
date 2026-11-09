@@ -54,6 +54,7 @@ impl<'f> Scan<'_, '_, 'f> {
         let mut trees = TreeBuilder::new();
         let mut read = ScanRead {
             picked: Vec::new(),
+            entity_tags: Vec::new(),
             ledger: ExportLedger::default(),
         };
         for index in physical {
@@ -69,6 +70,7 @@ impl<'f> Scan<'_, '_, 'f> {
             let result = self.resource(&mut trees, &record, &mut trace, &mut ledger, &context);
             if let Some(found) = crate::scan_health::finish(&record, &trace, result, ledger)? {
                 read.picked.extend(found.picked);
+                read.entity_tags.extend(found.entity_tags);
                 read.ledger.merge(found.ledger);
             }
         }

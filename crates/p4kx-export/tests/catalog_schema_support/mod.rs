@@ -25,6 +25,7 @@ mod resources;
 mod slugs;
 mod source_values;
 mod spawns;
+mod tags;
 
 use recovery::item_recovery;
 
@@ -43,6 +44,7 @@ pub(crate) fn minimal_catalog() -> Value {
         },
         "completeness": {
             "manufacturers": {"status": "complete"},
+            "tags": {"status": "complete"},
             "items": {"status": "complete"},
             "ships": {"status": "partial", "filter": "*/spaceships/*"},
             "commodities": {"status": "complete"},
@@ -177,9 +179,11 @@ pub(crate) fn minimal_catalog() -> Value {
             }
         }],
         "definitions": {"resourceTypes": resources::table(),
-            "commodities": commodities::definitions(), "manufacturers": manufacturer()},
+            "commodities": commodities::definitions(), "manufacturers": manufacturer(),
+            "tags": tags::definitions()},
+        "declarations": {"tagRoots": tags::roots(), "entityTags": tags::entities()},
         "texts": {"publicNames": public_names(), "gameTexts": []},
-        "projections": {"commodityPresentation": commodities::presentation()},
+        "projections": {"commodityPresentation": commodities::presentation(), "tagPaths": tags::paths()},
         "provenance": {"sources": [], "uses": []},
         "resourceGroups": [{
             "guid": "b1000000-0000-4000-8000-000000000001",

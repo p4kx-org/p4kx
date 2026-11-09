@@ -5,12 +5,12 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::catalog_record_reference::CatalogRecordReference;
 use crate::resource_float::ResourceFloat32;
 use crate::resource_quality_source::{
     ResourceQualityCurve, ResourceQualityOverrides, ResourceQualityQuantization,
     ResourceQualitySource,
 };
-use crate::resource_reference::ResourceReference;
 use crate::schema_fields;
 
 /// One named authored cargo slot without a derived capacity.
@@ -19,7 +19,7 @@ use crate::schema_fields;
 #[schemars(transform = schema_fields::every_field_required)]
 pub(crate) struct ResourceCargoSlot<'source> {
     pub(crate) slot: SourcedValue<&'source str>,
-    pub(crate) entity_class: SourcedValue<ResourceReference>,
+    pub(crate) entity_class: SourcedValue<CatalogRecordReference>,
 }
 
 /// One authored resource property and its exact concrete source type.

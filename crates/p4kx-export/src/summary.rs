@@ -67,7 +67,7 @@ pub struct KindSummary {
     pub count: usize,
     /// The selected Records left out as development leftovers.
     pub skipped: usize,
-    /// Whether the kind is a complete snapshot, i.e. no Filter was used.
+    /// Whether the kind has its full selection scope; global tags ignore the Entity Filter.
     pub complete: bool,
 }
 

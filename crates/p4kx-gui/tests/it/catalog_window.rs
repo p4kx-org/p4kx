@@ -127,6 +127,7 @@ fn the_summary_shows_the_kinds_the_texts_the_size_and_the_file() -> TestResult {
         .get_by_label("Export health: all selected sources were read and projected successfully.");
     harness.get_by_label("Manufacturers: 2 written, 1 skipped, complete");
     harness.get_by_label("Resource types: 0 written, 0 skipped, complete");
+    harness.get_by_label("Global tags: 0 written, 0 skipped, complete");
     harness.get_by_label("Mission property sets: 0 written, 0 skipped, complete");
     harness.get_by_label("Records skipped as development leftovers: 1");
     harness.get_by_label("Playability");
@@ -203,6 +204,7 @@ fn a_compressed_catalog_shows_both_sizes_in_german() -> TestResult {
 
     wait_for_the_end(&mut harness)?;
 
+    harness.get_by_label("Globale Tags: 0 geschrieben, 0 übersprungen, vollständig");
     harness.get_by_label_contains(" komprimiert (vom Upload-Limit 64 MB), ");
     harness.get_by_label_contains(" unkomprimiert");
     Ok(())

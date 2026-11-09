@@ -416,9 +416,12 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   blueprints, loadouts, paints, shops, the starmap, contracts (with their ship, NPC and entity
   spawns, location queries, hauling orders and canonical mission-property sets), contract templates, mission broker entries and
   cargo manifests, factions and reputation, mining,
-  refining and loot, each ordered by GUID, with test, template, dummy,
+  refining and loot, plus the full global Tag taxonomy, original root/child edges and selected
+  Entity GUID tags ([Tag contract](catalog-tags.md)). Definition kinds are ordered by GUID, with test, template, dummy,
   debug, deprecated and dev Records left out and counted as skipped, and names and descriptions
-  resolved in English and German. `--filter` marks the selection scope partial independently of
+  resolved in English and German. Global Tag definitions retain all source Records, including
+  development-like names; their convenience paths retain tree order. `--filter` leaves that
+  taxonomy complete and marks the owning Entity selection scope partial independently of
   read/projection health. It prints the counts per
   kind, the item classes read and the unresolved texts per language and warns when the catalog
   nears or exceeds the 64 MB upload limit. An `--out` name ending in `.zst` writes the catalog as

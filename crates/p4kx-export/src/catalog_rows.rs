@@ -18,6 +18,15 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
             .iter()
             .map(|row| (row.guid.0, row.record_path)),
     );
+    append(
+        &mut emitted,
+        Kind::Tags,
+        collected
+            .tags
+            .definitions
+            .iter()
+            .map(|row| (row.source.physical.guid, row.source.physical.record_path)),
+    );
     append_resources(&mut emitted, collected);
     append(
         &mut emitted,

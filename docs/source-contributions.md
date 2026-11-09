@@ -89,6 +89,17 @@ DataForge positions remain physical Record indices rather than nominal GUID alia
 Subresource ordinals serialize as canonical decimal strings through `DecimalU64`,
 preserving their full range independently of a JSON consumer's numeric precision.
 
+Pure classification helpers reconcile descriptive facts without creating an input binding.
+`SourceDeclarationKind::interpret` applies the original field-shape and raw-word rules;
+`SourceEncryptionState::from_declarations` combines all declaration occurrences with the
+record format and ZIP flags through the owning Archive classifier. The corresponding
+Archive helpers are `DeclaredEncryption::interpret`, `DeclaredEncryption::reconcile`
+and `SourceEncryption::from_declarations`. Declaration consensus requires matching states
+from every occurrence: contradictory declarations remain unknown. This differs from a field's
+contributing-source union, where a known encrypted contributor dominates unknown or plain
+contributors. These helpers do not read payloads, restore original handles or establish
+that serialized facts describe an authentic Archive.
+
 ## Field-addressed descriptions
 
 `FieldPath` is an exact escaped JSON Pointer into the complete output record. Object
@@ -110,6 +121,14 @@ are distinct nonempty strings. False requires a complete set; a complete empty s
 requires false, and an incomplete empty set requires null. True always needs an
 actual contributing reference. A nonempty set can remain unknown even when complete.
 Unknown additive metadata remains allowed, independently of those control rules.
+
+Generic schema definitions include their payload schema name, for example
+`SourcedValueOfuint32`. Catalog dataset and canonical-text definitions likewise include
+the row or reference domain. Adding an unrelated family therefore preserves existing
+reference names when payload names differ. Types that deliberately share a schema name
+retain their separate schema IDs and may still need the generator's disambiguation.
+This naming does not change exported JSON values, source-state correlations or origin
+rules; consumers resolve references through their owning schema.
 
 ## Explicit reader policy
 

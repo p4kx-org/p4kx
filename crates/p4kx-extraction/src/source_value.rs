@@ -48,7 +48,7 @@ pub enum SourceValueState {
 /// A typed data value with its immediate, materialized source origin.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = source_value_schema::correlate)]
+#[schemars(rename = "SourcedValueOf{T}", transform = source_value_schema::correlate)]
 pub struct SourcedValue<T> {
     state: SourceValueState,
     #[schemars(with = "T")]

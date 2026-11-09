@@ -5,12 +5,12 @@ use p4kx_extraction::{SourceValue, SourcedValue, Value, ValueError};
 
 use crate::CatalogError;
 use crate::catalog_read::CatalogFields;
+use crate::catalog_record_reference::CatalogRecordReference;
 use crate::definition_reference::DefinitionStatus;
 use crate::guid_text::CatalogGuid;
 use crate::resource_float::ResourceFloat32;
 use crate::resource_number::ResourceNumber;
 use crate::resource_raw_policy::{self, ResourceNumberContract};
-use crate::resource_reference::ResourceReference;
 use crate::source_fields::FieldError;
 
 /// Reads a source Single under its declared raw-number contract.
@@ -49,11 +49,11 @@ pub(crate) fn reference(
     fields: &CatalogFields<'_, '_, '_>,
     name: &str,
     notes: &mut Vec<FieldError>,
-) -> Result<SourcedValue<ResourceReference>, CatalogError> {
+) -> Result<SourcedValue<CatalogRecordReference>, CatalogError> {
     let path = fields.location(name);
     let value = match fields.source().field(name) {
         Some(Value::Reference(target)) if target.location().is_none() => {
-            Some(ResourceReference::resolved(
+            Some(CatalogRecordReference::resolved(
                 fields.context(),
                 &path,
                 target.record_index(),
@@ -63,7 +63,7 @@ pub(crate) fn reference(
             )?)
         }
         Some(Value::Error(ValueError::DanglingReference { guid })) => {
-            Some(ResourceReference::unresolved(
+            Some(CatalogRecordReference::unresolved(
                 fields.context(),
                 &path,
                 CatalogGuid(*guid),
@@ -71,7 +71,7 @@ pub(crate) fn reference(
             )?)
         }
         Some(Value::Error(ValueError::UnexpectedReferenceType { guid, .. })) => {
-            Some(ResourceReference::unresolved(
+            Some(CatalogRecordReference::unresolved(
                 fields.context(),
                 &path,
                 CatalogGuid(*guid),

@@ -120,6 +120,7 @@ const fn accounting_failure(error: &ExportAccountingError) -> AccountingFault {
         }
         ExportAccountingError::Unreconciled { .. } => AccountingFault::Unreconciled,
         ExportAccountingError::CounterOverflow => AccountingFault::CounterOverflow,
+        ExportAccountingError::ConflictingTagTrace => AccountingFault::ConflictingTagTrace,
     }
 }
 

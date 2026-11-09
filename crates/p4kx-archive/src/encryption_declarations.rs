@@ -18,6 +18,45 @@ pub enum DeclaredEncryption {
     Unknown,
 }
 
+impl DeclaredEncryption {
+    /// Interprets descriptive stored fields without an original input binding.
+    #[must_use]
+    pub const fn interpret(
+        source: EncryptionDeclarationSource,
+        declared_block_len: Option<u16>,
+        raw_word: Option<u16>,
+    ) -> Self {
+        let valid_shape = match source {
+            EncryptionDeclarationSource::CigExtraBlock => {
+                matches!(declared_block_len, Some(ENCRYPTION_BLOCK_LEN))
+            }
+            EncryptionDeclarationSource::P4kV2Field => declared_block_len.is_none(),
+        };
+        if !valid_shape {
+            return Self::Unknown;
+        }
+        match raw_word {
+            Some(0) => Self::Unencrypted,
+            Some(1) => Self::Encrypted,
+            _ => Self::Unknown,
+        }
+    }
+
+    /// Reconciles all declaration occurrences without giving a contradictory field precedence.
+    #[must_use]
+    pub fn reconcile(states: impl IntoIterator<Item = Self>) -> Self {
+        let mut states = states.into_iter();
+        let Some(first) = states.next() else {
+            return Self::Unknown;
+        };
+        if states.all(|state| state == first) {
+            first
+        } else {
+            Self::Unknown
+        }
+    }
+}
+
 /// The physical field supplying an encryption declaration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -109,20 +148,7 @@ impl StoredEncryptionDeclaration {
     /// Interprets this CIG/v2 field without interpreting ZIP flags or payload bytes.
     #[must_use]
     pub const fn state(&self) -> DeclaredEncryption {
-        let valid_shape = match self.source {
-            EncryptionDeclarationSource::CigExtraBlock => {
-                matches!(self.declared_block_len, Some(ENCRYPTION_BLOCK_LEN))
-            }
-            EncryptionDeclarationSource::P4kV2Field => self.declared_block_len.is_none(),
-        };
-        if !valid_shape {
-            return DeclaredEncryption::Unknown;
-        }
-        match self.raw_value() {
-            Some(0) => DeclaredEncryption::Unencrypted,
-            Some(1) => DeclaredEncryption::Encrypted,
-            _ => DeclaredEncryption::Unknown,
-        }
+        DeclaredEncryption::interpret(self.source, self.declared_block_len, self.raw_value())
     }
 }
 
@@ -163,16 +189,7 @@ impl EncryptionDeclarations {
     /// A known state requires every present field to be valid and equal; absence stays unknown.
     #[must_use]
     pub fn state(&self) -> DeclaredEncryption {
-        let mut declarations = self.iter();
-        let Some(first) = declarations.next() else {
-            return DeclaredEncryption::Unknown;
-        };
-        let state = first.state();
-        if declarations.any(|declaration| declaration.state() != state) {
-            DeclaredEncryption::Unknown
-        } else {
-            state
-        }
+        DeclaredEncryption::reconcile(self.iter().map(StoredEncryptionDeclaration::state))
     }
 
     pub(crate) const fn raw_v2_word(&self) -> Option<u16> {

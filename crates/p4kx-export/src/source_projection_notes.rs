@@ -11,7 +11,7 @@ use crate::export_ledger::ExportLedger;
 use crate::selection::Kind;
 use crate::source_fields::FieldError;
 
-/// Retains exact source identities for unsupported or malformed projected resource fields.
+/// Retains exact source identities for unsupported or malformed projected source fields.
 pub(crate) fn record(
     kind: Kind,
     role: ExportSourceRole,

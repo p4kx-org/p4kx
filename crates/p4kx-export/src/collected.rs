@@ -19,7 +19,7 @@ use crate::contract_template::ContractTemplate;
 use crate::crafting_warning::CraftingWarning;
 use crate::entity_spawn_model::EntitySpawnPool;
 use crate::export_ledger::ExportLedger;
-use crate::guid_text::{CatalogGuid, sort_by_guid};
+use crate::guid_text::CatalogGuid;
 use crate::location_template::{LocationTemplates, MissionLocationTemplate};
 use crate::loot_kinds::LootKinds;
 use crate::manufacturer::Manufacturer;
@@ -36,9 +36,13 @@ use crate::template_issues::Unknowns;
 use crate::texts::Texts;
 use crate::{CatalogFailure, ItemClassSummary, Kind, KindSummary, QuantizationSummary};
 
+#[path = "collected_order.rs"]
+mod order;
+
 /// The entities of every kind, ordered by GUID, with the counts of the summary.
 pub(crate) struct Collected<'f> {
     pub(crate) ledger: ExportLedger,
+    pub(crate) tags: crate::catalog_v3::tag_catalog::TagRows<'f>,
     pub(crate) manufacturers: Vec<Manufacturer<'f>>,
     pub(crate) items: Vec<Item<'f>>,
     pub(crate) ships: Vec<Ship<'f>>,
@@ -95,6 +99,7 @@ impl<'f> Collected<'f> {
         let skipped = Self::crafting_skipped(&crafting);
         let mut collected = Self {
             ledger: crafting.ledger,
+            tags: crate::catalog_v3::tag_catalog::TagRows::default(),
             manufacturers: Vec::new(),
             items: Vec::new(),
             ships: Vec::new(),
@@ -305,31 +310,6 @@ impl<'f> Collected<'f> {
             .dedup_by(|later, earlier| later.guid == earlier.guid);
     }
 
-    /// Orders the failures and the picked kinds by the text of the GUID.
-    fn order(&mut self) {
-        self.order_failures();
-        sort_by_guid(&mut self.manufacturers, |entity| entity.guid);
-        sort_by_guid(&mut self.items, |entity| entity.guid);
-        sort_by_guid(&mut self.ships, |entity| entity.guid);
-        sort_by_guid(&mut self.commodities, |entity| entity.guid);
-        sort_by_guid(&mut self.resource_groups, |entity| entity.guid);
-        sort_by_guid(&mut self.resource_types, |entity| entity.guid);
-        sort_by_guid(&mut self.blueprint_categories, |entity| entity.guid);
-        sort_by_guid(&mut self.starmap_objects, |entity| entity.guid);
-        sort_by_guid(&mut self.mineable_elements, |entity| entity.guid);
-        sort_by_guid(&mut self.refining_processes, |entity| entity.guid);
-        sort_by_guid(&mut self.mineable_compositions, |entity| entity.guid);
-        sort_by_guid(&mut self.mining_global_params, |entity| entity.guid);
-        sort_by_guid(&mut self.mineable_entities, |entity| entity.guid);
-        sort_by_guid(&mut self.crafters, |entity| entity.guid);
-        sort_by_guid(&mut self.harvestable_provider_presets, |entity| entity.guid);
-        sort_by_guid(&mut self.sub_harvestable_multi_configs, |entity| {
-            entity.guid
-        });
-        self.mission_kinds.order();
-        self.loot_kinds.order();
-    }
-
     /// Returns the counts of every kind, in the order of [`Kind::ALL`].
     pub(crate) fn summary(&self, complete: bool) -> Vec<KindSummary> {
         Kind::ALL
@@ -337,6 +317,7 @@ impl<'f> Collected<'f> {
             .map(|kind| KindSummary {
                 kind,
                 count: match kind {
+                    Kind::Tags => self.tags.count(),
                     Kind::Manufacturers => self.manufacturers.len(),
                     Kind::Items => self.items.len(),
                     Kind::Ships => self.ships.len(),
@@ -388,7 +369,7 @@ impl<'f> Collected<'f> {
                     | Kind::LegacyLootArchetypes => self.loot_kinds.count(kind),
                 },
                 skipped: self.skipped.get(kind.index()).copied().unwrap_or_default(),
-                complete,
+                complete: complete || kind == Kind::Tags,
             })
             .collect()
     }

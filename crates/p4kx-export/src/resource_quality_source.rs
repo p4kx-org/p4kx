@@ -5,8 +5,8 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::catalog_record_reference::CatalogRecordReference;
 use crate::resource_number::ResourceNumber;
-use crate::resource_reference::ResourceReference;
 use crate::schema_fields;
 
 /// An authored quality source retaining its inline or Reference form.
@@ -40,7 +40,7 @@ pub(crate) struct InlineQuality<T> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
 pub(crate) struct QualityRecordReference {
-    pub(crate) reference: SourcedValue<ResourceReference>,
+    pub(crate) reference: SourcedValue<CatalogRecordReference>,
 }
 
 /// Exact source bounds and numeric representations of one inline distribution.
@@ -86,7 +86,7 @@ pub(crate) enum ResourceQualityOverridePayload<'source> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
 pub(crate) struct ResourceQualityOverrideFields<'source> {
-    pub(crate) location: SourcedValue<ResourceReference>,
+    pub(crate) location: SourcedValue<CatalogRecordReference>,
     pub(crate) quality_distribution:
         SourcedValue<ResourceQualitySource<'source, ResourceQualityCurve<'source>>>,
 }

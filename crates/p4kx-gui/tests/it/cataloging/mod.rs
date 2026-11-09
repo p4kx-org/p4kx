@@ -5,8 +5,10 @@
 //! texts, opened headless.
 
 mod resource_fixture;
+mod tag_fixture;
 
 pub(crate) use resource_fixture::resources;
+pub(crate) use tag_fixture::tag_taxonomy;
 
 use crate::waiting::wait_polling;
 use std::error::Error;

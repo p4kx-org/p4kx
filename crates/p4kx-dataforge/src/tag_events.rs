@@ -3,6 +3,11 @@
 
 use crate::{DataForgeError, Guid, Record, RecordTree};
 
+#[path = "tag_path_source.rs"]
+mod tag_path_source;
+
+pub use tag_path_source::{TagPathEdgeKind, TagPathIncoming};
+
 /// A limit that prevents a canonically read tag from entering the tag tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TagProjectionFailure {
@@ -57,6 +62,23 @@ pub enum TagBuildEvent<'r, 'f> {
     Projected {
         /// The physical projected Record.
         record: &'r Record<'f>,
+    },
+    /// One actual first-selected tag path with its original incoming occurrence.
+    PathChosen {
+        /// The physical Tag Record whose name contributes to this path.
+        record: &'r Record<'f>,
+        /// Position of the selected node in the tree's pre-order.
+        position: u32,
+        /// Position of its selected parent, null for a root.
+        parent_position: Option<u32>,
+        /// The actual selected source edge, absent for an unlisted root.
+        incoming: Option<TagPathIncoming<'r, 'f>>,
+        /// The joined path actually materialized by the tree.
+        path: &'r str,
+        /// The actual selected tree depth.
+        depth: u16,
+        /// Whether this path descends from a declared database root.
+        listed: bool,
     },
     /// A canonical Tag was discarded by a projection limit.
     ProjectionFailed {

@@ -27,8 +27,17 @@ fn the_v3_and_the_older_loot_structs_of_one_folder_are_different_kinds() {
 }
 
 #[test]
-fn a_wrong_struct_under_a_prefix_or_a_path_outside_every_prefix_is_no_kind() {
-    assert_eq!(Kind::by_record(LOOT_TABLES, "Tag"), None);
+fn source_type_selects_the_global_taxonomy_independently_of_record_path() {
+    assert_eq!(Kind::by_record(LOOT_TABLES, "Tag"), Some(Kind::Tags));
+    assert_eq!(
+        Kind::by_record("synthetic/dev/tags.xml", "Tag"),
+        Some(Kind::Tags)
+    );
+    assert!(!is_kind_leftover(
+        Kind::Tags,
+        "synthetic/dev/tags.xml",
+        "Tag.Test"
+    ));
     assert_eq!(
         Kind::by_record("libs/foundry/records/other/x", "LootTable"),
         None

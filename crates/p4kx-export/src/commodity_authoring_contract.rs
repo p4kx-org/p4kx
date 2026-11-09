@@ -5,8 +5,8 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
-use crate::resource_reference::ResourceReference;
 use crate::schema_fields::every_field_required;
 
 /// Ordered commodity-owned bindings without presentation fallback.
@@ -59,5 +59,5 @@ pub(crate) struct CommodityContainer<'source> {
 #[schemars(transform = every_field_required)]
 pub(crate) struct CommodityComposition<'source> {
     pub(crate) source_type: SourcedValue<&'source str>,
-    pub(crate) entry: SourcedValue<ResourceReference>,
+    pub(crate) entry: SourcedValue<CatalogRecordReference>,
 }

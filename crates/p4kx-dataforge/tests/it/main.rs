@@ -55,6 +55,7 @@ mod sniff;
 mod survey;
 mod tag_limits;
 mod tag_lookup;
+mod tag_path_source;
 mod tag_tree;
 mod tree_builder;
 mod unsupported_version;

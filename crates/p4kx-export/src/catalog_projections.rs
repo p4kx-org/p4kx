@@ -13,5 +13,6 @@ use crate::schema_fields::every_field_required;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogProjections {
+    pub(crate) tag_paths: CatalogTable<super::tag_catalog::TagPath>,
     pub(crate) commodity_presentation: CatalogTable<CommodityPresentation>,
 }

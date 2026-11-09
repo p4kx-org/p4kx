@@ -9,6 +9,8 @@ use serde_json::{Value, json};
 
 use super::TestResult;
 
+#[path = "definition_names.rs"]
+mod definition_names;
 #[path = "origin_contract.rs"]
 mod origin_contract;
 

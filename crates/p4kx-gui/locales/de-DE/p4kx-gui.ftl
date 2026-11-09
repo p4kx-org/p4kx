@@ -495,6 +495,7 @@ catalog-writing = Schreibe { $path } …
 catalog-summary-title = Basetool-Katalog erstellt
 catalog-kinds-heading = Arten (Auswahlumfang)
 catalog-summary-kind = { $kind ->
+    [tags] Globale Tags
     [manufacturers] Hersteller
     [items] Items
     [ships] Schiffe

@@ -108,7 +108,8 @@ impl<'f> Picked<'f> {
             | Kind::LegacyLootArchetypes => {
                 return LootPick::entity(kind, tree).map(Self::Loot);
             }
-            Kind::Manufacturers
+            Kind::Tags
+            | Kind::Manufacturers
             | Kind::Ships
             | Kind::Commodities
             | Kind::ResourceGroups

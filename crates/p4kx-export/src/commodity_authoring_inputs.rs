@@ -4,8 +4,8 @@
 use p4kx_extraction::{SourceUseRole, SourceValue, SourceValueState, SourcedValue};
 
 use crate::CatalogError;
+use crate::catalog_record_reference::CatalogRecordReference;
 use crate::commodity_inputs::CommodityInputs;
-use crate::resource_reference::ResourceReference;
 
 /// Captures the exact observed field contribution without reconstructing origin references.
 pub(crate) fn field<T>(
@@ -31,7 +31,7 @@ pub(crate) fn reference(
     inputs: &mut CommodityInputs<'_>,
     record_index: u32,
     path: &str,
-    reference: &SourcedValue<ResourceReference>,
+    reference: &SourcedValue<CatalogRecordReference>,
 ) -> Result<(), CatalogError> {
     field(inputs, record_index, path, reference)?;
     let Some(reference) = reference.value() else {

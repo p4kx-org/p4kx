@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::{DeclaredEncryption, EntryMetadata, EntryRecordFormat};
+use crate::{DeclaredEncryption, EntryMetadata, EntryRecordFormat, ZipHeaderMetadata};
 
 const ZIP_ENCRYPTED_FLAG: u16 = 1;
 const ZIP_STRONG_ENCRYPTION_FLAG: u16 = 1 << 6;
@@ -20,23 +20,36 @@ pub enum SourceEncryption {
 
 impl SourceEncryption {
     pub(crate) fn of(metadata: &EntryMetadata) -> Self {
-        match metadata.encryption_declarations().state() {
+        Self::from_declarations(
+            metadata.encryption_declarations().state(),
+            Some(metadata.record_format()),
+            metadata
+                .zip_header()
+                .map(ZipHeaderMetadata::general_purpose_flags),
+        )
+    }
+
+    /// Reconciles descriptive declarations, directory format and ZIP flags without input authority.
+    #[must_use]
+    pub const fn from_declarations(
+        declared: DeclaredEncryption,
+        record_format: Option<EntryRecordFormat>,
+        zip_flags: Option<u16>,
+    ) -> Self {
+        match declared {
             DeclaredEncryption::Encrypted => Self::Encrypted,
             DeclaredEncryption::Unknown => Self::Unknown,
-            DeclaredEncryption::Unencrypted => match metadata.record_format() {
-                EntryRecordFormat::P4kV2 => Self::Unencrypted,
-                EntryRecordFormat::ZipCentralDirectory => {
-                    let clear = metadata.zip_header().is_some_and(|header| {
-                        header.general_purpose_flags()
-                            & (ZIP_ENCRYPTED_FLAG | ZIP_STRONG_ENCRYPTION_FLAG)
-                            == 0
-                    });
-                    if clear {
+            DeclaredEncryption::Unencrypted => match record_format {
+                Some(EntryRecordFormat::P4kV2) => Self::Unencrypted,
+                Some(EntryRecordFormat::ZipCentralDirectory) => match zip_flags {
+                    Some(flags)
+                        if flags & (ZIP_ENCRYPTED_FLAG | ZIP_STRONG_ENCRYPTION_FLAG) == 0 =>
+                    {
                         Self::Unencrypted
-                    } else {
-                        Self::Unknown
                     }
-                }
+                    _ => Self::Unknown,
+                },
+                None => Self::Unknown,
             },
         }
     }

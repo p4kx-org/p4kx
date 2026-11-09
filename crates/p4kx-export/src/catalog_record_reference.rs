@@ -15,7 +15,7 @@ use crate::schema_fields;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceReference {
+pub(crate) struct CatalogRecordReference {
     pub(crate) target_record_index: SourcedValue<u32>,
     pub(crate) guid: SourcedValue<CatalogGuid>,
     pub(crate) record_path: SourcedValue<String>,
@@ -23,7 +23,7 @@ pub(crate) struct ResourceReference {
     pub(crate) status: DefinitionStatus,
 }
 
-impl ResourceReference {
+impl CatalogRecordReference {
     pub(crate) fn resolved(
         context: &CatalogRecordContext<'_>,
         path: &str,

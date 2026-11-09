@@ -6,12 +6,12 @@ use std::fmt;
 use crate::selection::{Kind, KindRule};
 
 impl Kind {
-    /// Returns whether the kind is read by [`read_crafting`](crate::read_crafting) or by the
-    /// contract reader rather than by the generic selection of the catalog build.
-    pub(crate) const fn is_crafting(self) -> bool {
+    /// Returns whether a dedicated reader owns this kind instead of the generic Record scan.
+    pub(crate) const fn has_dedicated_reader(self) -> bool {
         matches!(
             self,
-            Self::Blueprints
+            Self::Tags
+                | Self::Blueprints
                 | Self::GameplayProperties
                 | Self::QualityDistributions
                 | Self::QualityQuantizations

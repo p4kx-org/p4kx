@@ -49,6 +49,7 @@ mod record_export_nested;
 mod run_control;
 mod sound;
 mod sound_conversion;
+mod source_encryption_controls;
 mod source_minimal_context;
 mod source_minimal_prefix;
 mod source_minimal_proof;

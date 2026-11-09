@@ -69,6 +69,7 @@ pub(super) fn projections<'a>(
                         p4kx_export::Kind::Manufacturers
                             | p4kx_export::Kind::Commodities
                             | p4kx_export::Kind::ResourceTypes
+                            | p4kx_export::Kind::Tags
                     ) {
                         &["guid", "value"]
                     } else {

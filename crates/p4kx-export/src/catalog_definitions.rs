@@ -15,6 +15,7 @@ use crate::schema_fields::every_field_required;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogDefinitions<'source> {
+    pub(crate) tags: CatalogTable<super::tag_catalog::TagDefinition<'source>>,
     pub(crate) resource_types: CatalogTable<ResourceType<'source>>,
     pub(crate) commodities: CatalogTable<CommodityDefinition<'source>>,
     pub(crate) manufacturers: CatalogTable<ManufacturerDefinition<'source>>,

@@ -31,7 +31,7 @@ not copied onto each item or folded into ship topology. Retain every #1059 field
 shipPassDestroyedPartDamageToComponent, shipPassDestroyedPartDamageToChild,
 shipDestructionBufferMultiplier and shipDestructionHealthThreshold.
 
-The complete family routing is in [the data-family map](../catalog-v3-data-map.md). Its 49 current Kind
+The complete family routing is in [the data-family map](../catalog-v3-data-map.md). Its current Kind
 names and all 51 catalog tickets are an inventory, not proof of implemented fields. The map
 includes the separate #1059 global configuration. Preserve Buff references without inventing
 a separate definition provider before a real owning type/identity/source scope is established.

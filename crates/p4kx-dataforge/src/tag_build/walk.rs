@@ -3,14 +3,15 @@
 
 use std::collections::HashMap;
 
+use crate::Guid;
 use crate::tags::{
     MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES, MAX_TAG_TEXT_BYTES, Node,
-    TAG_PATH_SEPARATOR, TagBuildEvent, TagProjectionFailure, TagRelationIssue, TagTreeIssues,
+    TAG_PATH_SEPARATOR, TagBuildEvent, TagPathEdgeKind, TagPathIncoming, TagProjectionFailure,
+    TagRelationIssue, TagTreeIssues,
 };
-use crate::{Guid, Record};
 
 use super::Ticker;
-use super::read::Raw;
+use super::read::{Raw, Root};
 
 pub(super) struct Walk<'a, 'f> {
     pub(super) raws: &'a [Raw<'f>],
@@ -30,16 +31,50 @@ struct Frame {
 }
 
 impl<'f> Walk<'_, 'f> {
+    pub(super) fn listed_roots<E>(
+        &mut self,
+        roots: Vec<Root<'f>>,
+        observe: &mut impl for<'r> FnMut(TagBuildEvent<'r, 'f>) -> Result<(), E>,
+    ) -> Result<(), E> {
+        for root in roots {
+            if self.ticker.stopped() {
+                break;
+            }
+            if let Some(&position) = self.positions.get(&root.target) {
+                self.root(
+                    position,
+                    true,
+                    Some(TagPathIncoming::new(
+                        &root.record,
+                        TagPathEdgeKind::Root,
+                        root.ordinal,
+                    )),
+                    observe,
+                )?;
+            } else {
+                self.issues.dangling += 1;
+                observe(TagBuildEvent::RelationSkipped {
+                    record: &root.record,
+                    field: "tags",
+                    target: Some(root.target),
+                    reason: TagRelationIssue::Dangling,
+                })?;
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn root<E>(
         &mut self,
         position: usize,
         listed: bool,
-        owner: Option<&Record<'f>>,
+        incoming: Option<TagPathIncoming<'_, 'f>>,
         observe: &mut impl for<'r> FnMut(TagBuildEvent<'r, 'f>) -> Result<(), E>,
     ) -> Result<(), E> {
         if self.visited.get(position).copied().unwrap_or(true) {
             self.issues.repeated += 1;
-            if let (Some(record), Some(raw)) = (owner, self.raws.get(position)) {
+            if let (Some(edge), Some(raw)) = (incoming, self.raws.get(position)) {
+                let record = edge.record();
                 observe(TagBuildEvent::RelationSkipped {
                     record,
                     field: "tags",
@@ -49,15 +84,28 @@ impl<'f> Walk<'_, 'f> {
             }
             return Ok(());
         }
-        let Some(node) = self.enter(position, None, listed, observe)? else {
+        let Some(node) = self.enter(position, None, listed, incoming, observe)? else {
             return Ok(());
         };
         self.roots.push(node);
-        let mut stack = vec![Frame {
-            node,
-            raw: position,
-            next: 0,
-        }];
+        self.descend(
+            Frame {
+                node,
+                raw: position,
+                next: 0,
+            },
+            listed,
+            observe,
+        )
+    }
+
+    fn descend<E>(
+        &mut self,
+        root: Frame,
+        listed: bool,
+        observe: &mut impl for<'r> FnMut(TagBuildEvent<'r, 'f>) -> Result<(), E>,
+    ) -> Result<(), E> {
+        let mut stack = vec![root];
         while let Some(frame) = stack.last_mut() {
             if self.ticker.stopped() {
                 return Ok(());
@@ -74,7 +122,7 @@ impl<'f> Walk<'_, 'f> {
             frame.next += 1;
             let parent = frame.node;
             let source = frame.raw;
-            let Some(position) = self.child(source, child, observe)? else {
+            let Some(position) = self.child(source, child.target, observe)? else {
                 continue;
             };
             if stack.len() >= MAX_TAG_DEPTH {
@@ -82,7 +130,11 @@ impl<'f> Walk<'_, 'f> {
                 self.leave_out(position, TagProjectionFailure::Depth, observe)?;
                 continue;
             }
-            if let Some(entered) = self.enter(position, Some(parent), listed, observe)?
+            let raws = self.raws;
+            let incoming = raws.get(source).map(|raw| {
+                TagPathIncoming::new(&raw.record, TagPathEdgeKind::Child, child.ordinal)
+            });
+            if let Some(entered) = self.enter(position, Some(parent), listed, incoming, observe)?
                 && let Some(parent) = self.nodes.get_mut(parent as usize)
             {
                 parent.children.push(entered);
@@ -139,11 +191,31 @@ impl<'f> Walk<'_, 'f> {
         }
     }
 
+    const fn projection_limit(
+        &self,
+        name_len: usize,
+        path_len: usize,
+        index: Option<u32>,
+    ) -> Option<TagProjectionFailure> {
+        if name_len > MAX_TAG_NAME_BYTES {
+            Some(TagProjectionFailure::NameBytes)
+        } else if path_len > MAX_TAG_PATH_BYTES {
+            Some(TagProjectionFailure::PathBytes)
+        } else if self.text_bytes.saturating_add(path_len) > MAX_TAG_TEXT_BYTES {
+            Some(TagProjectionFailure::TextBytes)
+        } else if index.is_none() {
+            Some(TagProjectionFailure::NodeCount)
+        } else {
+            None
+        }
+    }
+
     fn enter<E>(
         &mut self,
         position: usize,
         parent: Option<u32>,
         listed: bool,
+        incoming: Option<TagPathIncoming<'_, 'f>>,
         observe: &mut impl for<'r> FnMut(TagBuildEvent<'r, 'f>) -> Result<(), E>,
     ) -> Result<Option<u32>, E> {
         let Some(raw) = self.raws.get(position) else {
@@ -155,18 +227,7 @@ impl<'f> Walk<'_, 'f> {
         });
         let path_len = prefix + raw.name.len();
         let index = u32::try_from(self.nodes.len()).ok();
-        let failure = if raw.name.len() > MAX_TAG_NAME_BYTES {
-            Some(TagProjectionFailure::NameBytes)
-        } else if path_len > MAX_TAG_PATH_BYTES {
-            Some(TagProjectionFailure::PathBytes)
-        } else if self.text_bytes.saturating_add(path_len) > MAX_TAG_TEXT_BYTES {
-            Some(TagProjectionFailure::TextBytes)
-        } else if index.is_none() {
-            Some(TagProjectionFailure::NodeCount)
-        } else {
-            None
-        };
-        if let Some(reason) = failure {
+        if let Some(reason) = self.projection_limit(raw.name.len(), path_len, index) {
             self.issues.too_long += 1;
             self.leave_out(position, reason, observe)?;
             return Ok(None);
@@ -197,6 +258,17 @@ impl<'f> Walk<'_, 'f> {
         observe(TagBuildEvent::Projected {
             record: &raw.record,
         })?;
+        if let Some(node) = self.nodes.last() {
+            observe(TagBuildEvent::PathChosen {
+                record: &raw.record,
+                position: index,
+                parent_position: parent,
+                incoming,
+                path: &node.path,
+                depth,
+                listed,
+            })?;
+        }
         Ok(Some(index))
     }
 
@@ -225,7 +297,7 @@ impl<'f> Walk<'_, 'f> {
             stack.extend(
                 raw.children
                     .iter()
-                    .filter_map(|child| self.positions.get(child).copied())
+                    .filter_map(|child| self.positions.get(&child.target).copied())
                     .map(|position| (position, TagProjectionFailure::AncestorDiscarded)),
             );
         }
@@ -239,7 +311,7 @@ impl<'f> Walk<'_, 'f> {
         let mut has_parent = vec![false; self.raws.len()];
         for raw in self.raws {
             for child in &raw.children {
-                if let Some(&position) = self.positions.get(child)
+                if let Some(&position) = self.positions.get(&child.target)
                     && let Some(flag) = has_parent.get_mut(position)
                 {
                     *flag = true;
@@ -261,3 +333,7 @@ impl<'f> Walk<'_, 'f> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "walk_tests.rs"]
+mod tests;

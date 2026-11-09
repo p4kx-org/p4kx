@@ -134,13 +134,16 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         crafting: &CraftingKinds<'f>,
     ) -> Result<ScanRead<'f>, CatalogError> {
         let mut picked = Vec::new();
+        let mut entity_tags = Vec::new();
         for checked in checked {
             picked.extend(checked.picked);
+            entity_tags.extend(checked.entity_tags);
             ledger.merge(checked.ledger);
         }
         picked.extend(failures.into_iter().map(Picked::Failed));
         let resources = self.resource_commodities(&picked, crafting, &ledger)?;
         picked.extend(resources.picked);
+        entity_tags.extend(resources.entity_tags);
         ledger.merge(resources.ledger);
         picked.extend(self.links.warning().map(Picked::Warned));
         let has_signatures = picked.iter().any(
@@ -151,11 +154,15 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         }
         let inventories = Kind::ALL
             .into_iter()
-            .filter(|kind| !kind.is_crafting() && !kind.is_derived());
+            .filter(|kind| !kind.has_dedicated_reader() && !kind.is_derived());
         for kind in inventories {
             ledger.inventory(kind);
         }
-        Ok(ScanRead { picked, ledger })
+        Ok(ScanRead {
+            picked,
+            entity_tags,
+            ledger,
+        })
     }
 
     fn check(
@@ -174,10 +181,22 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             self.options.cancel,
         ));
         trees.set_read_observer(Some(capture.clone()));
-        let result = self.select(trees, record, &mut trace, &mut ledger, &capture);
+        let mut entity_tags = None;
+        let result = self.select(
+            trees,
+            record,
+            &mut trace,
+            &mut ledger,
+            &capture,
+            &mut entity_tags,
+        );
         trees.set_read_observer(None);
         ledger.merge(capture.finish()?);
-        crate::scan_health::finish(record, &trace, result, ledger)
+        let mut checked = crate::scan_health::finish(record, &trace, result, ledger)?;
+        if let Some(checked) = &mut checked {
+            checked.entity_tags = entity_tags;
+        }
+        Ok(checked)
     }
 
     /// Returns what a development leftover of kind counts as: a skipped Record, a skipped paint
@@ -234,6 +253,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         trace: &mut SourceTrace,
         ledger: &mut ExportLedger,
         capture: &crate::export_builder_capture::BuilderCapture,
+        entity_tags: &mut Option<crate::catalog_v3::tag_catalog::EntityTags<'f>>,
     ) -> Result<Option<Picked<'f>>, ScanError> {
         let kind = match select(record, self.options.filter)? {
             None => return Ok(None),
@@ -268,11 +288,26 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             ExportSourceRole::Selected,
             self.options.cancel,
         )?);
+        if tree.type_name() == "EntityClassDefinition" {
+            let (tags, notes) = crate::catalog_v3::tag_catalog::entity(
+                &tree,
+                self.projection.origins(),
+                self.options.cancel,
+            )?;
+            crate::source_projection_notes::record(
+                kind,
+                ExportSourceRole::Selected,
+                &tree,
+                notes,
+                ledger,
+            );
+            *entity_tags = Some(tags);
+        }
         self.project(kind, trees, record, &tree, ledger)
     }
 
     /// Returns whether the Components of `record` hold a crafter component, read without building
-    /// the Record tree; alse without any such component in the DataForge.
+    /// the Record tree; `false` without any such component in the DataForge.
     fn holds_crafter(
         &self,
         trees: &mut TreeBuilder<'f>,

@@ -81,6 +81,8 @@ pub(crate) struct Catalog<'a> {
     pub(crate) resource_groups: Vec<ResourceGroup<'a>>,
     /// Canonical resource definition rows, independently of commodity packaging.
     pub(crate) definitions: CatalogDefinitions<'a>,
+    /// Ordered authored tag uses and root listings.
+    pub(crate) declarations: crate::catalog_v3::catalog_declarations::CatalogDeclarations<'a>,
     /// Explicit derived choices using the canonical definitions' source facts.
     pub(crate) projections: CatalogProjections,
     /// Physical source observations and actual contribution uses.

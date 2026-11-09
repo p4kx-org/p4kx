@@ -93,6 +93,7 @@ impl Capture {
                 target,
                 reason,
             } => relation(&mut self.ledger, self.kind, record, field, *target, *reason),
+            TagBuildEvent::PathChosen { .. } => {}
             TagBuildEvent::Cancelled => return Err(CatalogError::Cancelled),
         }
         Ok(())

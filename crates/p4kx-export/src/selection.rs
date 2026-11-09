@@ -158,11 +158,13 @@ pub enum Kind {
     MissionPropertySets,
     /// Resource definitions: `ResourceType` Records under `resourcetypedatabase`.
     ResourceTypes,
+    /// Global Tag definitions, with `TagDatabase` roots as source dependencies.
+    Tags,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 49] = [
+    pub const ALL: [Self; 50] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -212,9 +214,10 @@ impl Kind {
         Self::ContractEntitySpawns,
         Self::MissionPropertySets,
         Self::ResourceTypes,
+        Self::Tags,
     ];
 
-    /// Returns the name of the kind's array in the catalog, e.g. `manufacturers`.
+    /// Returns the stable kind identifier, independently of its canonical dataset path.
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
@@ -267,6 +270,7 @@ impl Kind {
             Self::ContractEntitySpawns => "contractEntitySpawns",
             Self::MissionPropertySets => "missionPropertySets",
             Self::ResourceTypes => "resourceTypes",
+            Self::Tags => "tags",
         }
     }
 }
@@ -320,10 +324,13 @@ pub(crate) fn is_leftover(record_path: &str, name: &str) -> bool {
 }
 
 /// Returns whether a source Record is excluded by the kind's development-leftover policy.
+///
 /// Contract templates permit `template`; ships also exclude [`SHIP_EXCLUDED_TOKENS`].
+/// The global Tag taxonomy retains every source Record.
 #[must_use]
 pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
     match kind {
+        Kind::Tags => false,
         Kind::ContractTemplates => has_word(record_path, name, &CONTRACT_TEMPLATE_EXCLUDED_TOKENS),
         Kind::Ships => {
             is_leftover(record_path, name) || has_word(record_path, name, &SHIP_EXCLUDED_TOKENS)

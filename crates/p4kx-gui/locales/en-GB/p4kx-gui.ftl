@@ -495,6 +495,7 @@ catalog-writing = Writing { $path }…
 catalog-summary-title = Basetool catalog created
 catalog-kinds-heading = Kinds (selection scope)
 catalog-summary-kind = { $kind ->
+    [tags] Global tags
     [manufacturers] Manufacturers
     [items] Items
     [ships] Ships

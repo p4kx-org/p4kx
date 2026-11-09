@@ -3,11 +3,9 @@
 
 use std::io::{self, Write};
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
-use p4kx_channels::{PublicPatches, channel_name};
-use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry, utc_rfc3339};
+use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry};
 
 use crate::archive_key_use::ArchiveKeyUse;
 use crate::build_derived::{add_contracts, add_loadouts, add_paints};
@@ -22,9 +20,7 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
 use crate::collected::Collected;
-use crate::contract::{
-    BuildSource, Catalog, Completeness, KindCompleteness, SCHEMA_VERSION, Source,
-};
+use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
 use crate::mission_data::link_scenario_factions;
 use crate::recovery::{Recovery, read_recovery};
@@ -38,6 +34,10 @@ use crate::{BuiltCatalog, CatalogError, CatalogOptions, CatalogSummary};
 #[path = "build_parts.rs"]
 mod parts;
 use parts::Parts;
+
+#[path = "build_source.rs"]
+mod metadata;
+pub(crate) use metadata::source;
 
 /// Builds a deterministic Basetool catalog from the DataForge and available localization inputs.
 ///
@@ -166,6 +166,11 @@ fn assemble<R>(
         &projection,
         crafting,
     )?;
+    let mut tags = crate::catalog_v3::tag_catalog::read(&forge, &origins, options.cancel)?;
+    tags.rows.entity_tags = std::mem::take(&mut collected.tags.entity_tags);
+    collected.tags = tags.rows;
+    collected.ledger.merge(tags.ledger);
+    collected.add_failures(tags.failures);
     collected.ledger.archive_inventory_problem = crate::export_archive_health::inventory(archive);
     let paint_summary = add_paints(&forge, &mut collected, options.cancel)?;
     let loadout_summary = add_loadouts(archive, &entities, &mut collected, options.cancel)?;
@@ -243,12 +248,22 @@ fn assemble<R>(
         ships: collected.ships,
         blueprints: collected.blueprints,
         resource_groups: collected.resource_groups,
+        declarations: crate::catalog_v3::catalog_declarations::CatalogDeclarations {
+            tag_roots: CatalogTable::new(&forge, &["TagDatabase"], collected.tags.roots),
+            entity_tags: CatalogTable::new(
+                &forge,
+                &["EntityClassDefinition"],
+                collected.tags.entity_tags,
+            ),
+        },
         definitions: CatalogDefinitions {
+            tags: CatalogTable::new(&forge, &["Tag"], collected.tags.definitions),
             resource_types: CatalogTable::new(&forge, &["ResourceType"], collected.resource_types),
             commodities,
             manufacturers: crate::manufacturer::table(&forge, collected.manufacturers),
         },
         projections: CatalogProjections {
+            tag_paths: CatalogTable::new(&forge, &["Tag"], collected.tags.paths),
             commodity_presentation,
         },
         texts: projection.finish()?,
@@ -363,6 +378,8 @@ fn scan<'f>(
         return Err(CatalogError::Cancelled);
     }
     let mut collected = Collected::new(scanned.picked, crafting);
+    collected.tags.entity_tags = scanned.entity_tags;
+    collected.tags.order_entities();
     collected.ledger.merge(scanned.ledger);
     collected.ledger.merge(placements.ledger.clone());
     Ok((collected, placements))
@@ -374,28 +391,4 @@ fn completeness_of<'o>(options: &'o CatalogOptions<'_>) -> KindCompleteness<'o> 
             filter: filter.as_str(),
         }
     })
-}
-
-pub(crate) fn source<'a>(
-    archive: &'a Archive,
-    exported_at: SystemTime,
-    patches: Option<&'a PublicPatches>,
-    key_use: ArchiveKeyUse,
-) -> Source<'a> {
-    Source {
-        channel: channel_name(archive.path()),
-        build: archive.build().map(|build| BuildSource {
-            branch: build.branch(),
-            version: build.version(),
-            change_number: build.change_number(),
-            build_id: build.build_id(),
-            public_patch: patches.and_then(|patches| patches.of(build)),
-        }),
-        archive_size: archive.file_len(),
-        archive_modified: archive.file_modified().map(utc_rfc3339),
-        archive_key: key_use.state(),
-        encrypted_entries_unread: key_use.entries_unread(),
-        tool_version: env!("CARGO_PKG_VERSION"),
-        exported_at: utc_rfc3339(exported_at),
-    }
 }

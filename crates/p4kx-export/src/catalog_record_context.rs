@@ -105,7 +105,7 @@ impl<'a> CatalogRecordContext<'a> {
         )
     }
 
-    pub(super) fn read<'s, 'f, T>(
+    pub(crate) fn read<'s, 'f, T>(
         &self,
         value: Option<&'s Value<'f>>,
         owner: &str,

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_archive::SourceEncryption;
+use p4kx_archive::{
+    DeclaredEncryption, EncryptionDeclarationSource, EntryRecordFormat, SourceEncryption,
+};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::Serialize;
 
@@ -40,6 +42,41 @@ pub enum SourceEncryptionState {
 }
 
 impl SourceEncryptionState {
+    /// Reconciles descriptive declaration states with directory format and ZIP-flag facts.
+    #[must_use]
+    pub fn from_declarations(
+        record_format: SourceRecordFormat,
+        zip_flags: Option<u16>,
+        declarations: impl IntoIterator<Item = Self>,
+    ) -> Self {
+        let format = match record_format {
+            SourceRecordFormat::ZipCentralDirectory => Some(EntryRecordFormat::ZipCentralDirectory),
+            SourceRecordFormat::P4kV2 => Some(EntryRecordFormat::P4kV2),
+            SourceRecordFormat::Unknown => None,
+        };
+        let declared =
+            DeclaredEncryption::reconcile(declarations.into_iter().map(Self::as_declared));
+        Self::of(SourceEncryption::from_declarations(
+            declared, format, zip_flags,
+        ))
+    }
+
+    const fn as_declared(self) -> DeclaredEncryption {
+        match self {
+            Self::Encrypted => DeclaredEncryption::Encrypted,
+            Self::Unencrypted => DeclaredEncryption::Unencrypted,
+            Self::Unknown => DeclaredEncryption::Unknown,
+        }
+    }
+
+    const fn of_declared(value: DeclaredEncryption) -> Self {
+        match value {
+            DeclaredEncryption::Encrypted => Self::Encrypted,
+            DeclaredEncryption::Unencrypted => Self::Unencrypted,
+            _ => Self::Unknown,
+        }
+    }
+
     pub(crate) const fn of(value: SourceEncryption) -> Self {
         match value {
             SourceEncryption::Encrypted => Self::Encrypted,
@@ -83,6 +120,27 @@ pub enum SourceDeclarationKind {
     P4kV2Field,
     /// A future uninterpreted declaration kind.
     Unknown,
+}
+
+impl SourceDeclarationKind {
+    /// Interprets descriptive raw field facts without establishing an original source binding.
+    #[must_use]
+    pub const fn interpret(
+        self,
+        declared_block_length: Option<u16>,
+        raw_word: Option<u16>,
+    ) -> SourceEncryptionState {
+        let source = match self {
+            Self::CigExtraBlock => EncryptionDeclarationSource::CigExtraBlock,
+            Self::P4kV2Field => EncryptionDeclarationSource::P4kV2Field,
+            Self::Unknown => return SourceEncryptionState::Unknown,
+        };
+        SourceEncryptionState::of_declared(DeclaredEncryption::interpret(
+            source,
+            declared_block_length,
+            raw_word,
+        ))
+    }
 }
 
 /// An observed encryption declaration whose values originate in directory metadata.

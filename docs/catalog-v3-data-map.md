@@ -8,7 +8,7 @@ health. Seed field lists never exclude further useful declared source facts foun
 [ADR-0357](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md) requires the origin
 marker directly on every source-backed data value, including nested values and language variants.
 
-The inventory contains all 49 existing Kinds and all 51 catalog-lane tickets at the decision baseline,
+The inventory contains all 50 existing Kinds and all 51 catalog-lane tickets at the decision baseline,
 including the completed #816/#846/#1011. Independent media, package and platform tasks keep their
 own formats and acceptance gates. Declined #269/#284 stay closed and do not create output dialects.
 ## Every open catalog issue
@@ -40,7 +40,7 @@ own formats and acceptance gates. Declined #269/#284 stay closed and do not crea
 | #1062 | C.vehicleArmor | all damage/signature/penetration/deflection + curve links; suit Armor and clothing separate; Health/resource readers reused |
 | #1063 | C.facilities; P.facilityInstances | seat/eject/bed/med/rack/storage definition facts and per-ship context placement; reuse #1057 inventory; count repeated definitions separately, no inferred minimum crew |
 | #1064 | A.resourceNetworkLinks; P.resourceNetworkNodes; A.roomAssociations | all declared InternalHardpointLinks including repeats/cycles/non-relay links; exact context endpoints, ambiguity; isRelay evidence, declared fuse restrictions, room/bone associations; no name heuristics |
-| #1065 | D.tags; A.tagEdges, A.entityTags | original root/child edges/multiparents/repeats/unlisted/legacy IDs; Entity GUID tags distinct from AttachDef words/Record tags; complete taxonomy scope |
+| #1065 | D.tags with authored child arrays; A.tagRoots, A.entityTags; V.tagPaths | original root/child edges/multiparents/repeats/unlisted/legacy IDs; physical duplicate GUIDs; actual selected-occurrence path provenance; Entity GUID tags distinct from AttachDef words/Record tags; complete taxonomy scope ([contract](catalog-tags.md)) |
 | #1066 | D.factions | actual behavior/reaction/legal/arrest flags and direct description; links to reputation; never merges FactionIdentity/Reputation |
 | #1067 | D.starmapObjects, D.starmapTypes, D.starmapPresets, D.starmapAmenities | all visibility/travel/loading/scanning/body-recovery/type/nav/radar/asset facts; jurisdiction/Faction/amenity links; full preset owned blocks, existing placement separate |
 | #1068 | C.jumpPointConfigurations; P.jumpEndpoints; A.jumpConnections | every stored operating/global/override parameter, placed endpoint identity, declared partner link/evidence/direction; unpaired/ambiguous explicit, no name-based pairing |

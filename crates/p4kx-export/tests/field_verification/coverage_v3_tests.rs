@@ -17,6 +17,7 @@ fn catalog() -> super::Result<Value> {
     let database = DataForgeBuilder::new()
         .version(8)
         .structure(TestStruct::new("ResourceType").field("displayName", TestType::Locale))
+        .structure(TestStruct::new("Tag").field("tagName", TestType::String))
         .structure(TestStruct::new("FixtureComponent"))
         .structure(TestStruct::new("EntityClassDefinition").array(
             "Components",
@@ -37,6 +38,10 @@ fn catalog() -> super::Result<Value> {
             "EntityClassDefinition.AuditCommodity",
             "libs/foundry/records/entities/commodities/audit.xml",
         ));
+    let database = database.record(
+        TestRecord::new(3, "Tag", "Tag.Audit", "synthetic/dev/tags.xml")
+            .value("tagName", TestValue::text("Audit")),
+    );
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("Data.p4k");
     ArchiveBuilder::new()
@@ -55,6 +60,7 @@ fn inventory() -> Inventory {
     let fields = [
         ("resourceTypes", "ResourceType", "displayName"),
         ("commodities", "EntityClassDefinition", "Components"),
+        ("tags", "Tag", "tagName"),
     ]
     .into_iter()
     .map(|(group, owner, field)| Mapping {
@@ -72,6 +78,7 @@ fn inventory() -> Inventory {
         roots: vec![
             "ResourceType".to_owned(),
             "EntityClassDefinition".to_owned(),
+            "Tag".to_owned(),
         ],
         fields,
     }
@@ -91,7 +98,7 @@ fn actual_dynamic_audit_joins_the_original_canonical_definition_ids() -> super::
     let inventory = inventory();
     inventory.reviewed()?;
     let projections = super::coverage::projections(&catalog, &inventory, &|| false)?;
-    for group in ["resourceTypes", "commodities"] {
+    for group in ["resourceTypes", "commodities", "tags"] {
         assert_eq!(
             projections.get(group).ok_or("actual mapped group")?.len(),
             1,
@@ -105,7 +112,7 @@ fn actual_dynamic_audit_joins_the_original_canonical_definition_ids() -> super::
 fn missing_canonical_groups_and_nonpresent_identity_states_fail_the_actual_audit_router()
 -> super::Result<()> {
     let catalog = catalog()?;
-    for group in ["resourceTypes", "commodities"] {
+    for group in ["resourceTypes", "commodities", "tags"] {
         let mut missing = catalog.clone();
         missing
             .get_mut("definitions")

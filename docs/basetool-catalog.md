@@ -18,7 +18,8 @@ carriers is part of the breaking v3 migration, not an additive change to the rel
 
 Every catalog kind and the shared CLI/GUI JSON and compressed catalog writers use version 3.
 The implemented canonical-table/per-value-origin step covers ResourceTypes, Commodities,
-Manufacturers and their documented nested values, presentation and text rows. Other catalog
+Manufacturers, global Tag definitions/root declarations, owning Entity GUID-tag declarations,
+and their documented nested values, convenience paths, presentation and text rows. Other catalog
 families retain their current shapes; migration of all families and tool-output carriers remains
 in progress. The complete target is
 [ADR-0356](adr/0356-catalog-v3-uses-canonical-source-typed-tables.md); it is not a claim of complete
@@ -75,8 +76,8 @@ The rule is ADR-0054 (amending ADR-0002):
   (#898, ADR-0263), the kind `cargoManifests` with the contract field `haulingOrders` (#814,
   ADR-0265), and the kinds `missionLocationTemplates`, `contractShipSpawns` and
   `contractLocationQueries` with the contract fields `shipSpawns`, `locationQueries` and
-  `locationPrerequisites` (#902, ADR-0266). Later additions keep version 2 as long as they are
-  additive. The contract field `fixedRewards` (#888, ADR-0268) is one, and so is `cooldownLayers`
+  `locationPrerequisites` (#902, ADR-0266). The following fields also belong to the historical version-2 contract.
+  The contract field `fixedRewards` (#888, ADR-0268) is one, and so is `cooldownLayers`
   (#909, ADR-0271), and the contract fields `offeredAt`, `giverFaction` and `blueprintRewards`
   (#915, ADR-0273), and so are the kind `contractTemplates` (#812, ADR-0313) and the kind
   `missionBrokerEntries` with the contract field `brokerEntryGuid` (#813, ADR-0320), and the kinds
@@ -183,8 +184,9 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `source.encryptedEntriesUnread` | How many distinct encrypted Entries the export asked for and could not read because the key was missing or wrong; `0` when none was needed ([ADR-0353](adr/0353-exports-state-whether-the-archive-key-was-there.md)) |
 | `source.toolVersion` | The version of P4KX that wrote the catalog |
 | `source.exportedAt` | When the catalog was written, UTC in RFC 3339 form |
-| `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "…"}` when a Filter selected the Records |
+| `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "…"}` when a Filter selected the Records; global `tags` remains complete independently of that Filter |
 | `exportHealth` | Measured source-read and projection health, exact affected identities, separate Record/Archive Entry counters and bounded diagnostics; independent of Filter completeness ([contract](catalog-export-health.md)) |
+| `definitions.tags`, `declarations.tagRoots`, `declarations.entityTags`, `projections.tagPaths` | Global physical Tag definitions, original root/child/Entity GUID arrays, and separately named first-selected tree paths with exact per-value origin; the taxonomy stays complete under an Entity Filter ([contract](catalog-tags.md)) |
 | `definitions.manufacturers` | Source-family availability and directly sourced Manufacturer rows in GUID order, including typed Localization and canonical text references ([contract](catalog-manufacturer-types.md)) |
 | `items` | The items, ordered by GUID |
 | `ships` | The ships and ground vehicles, ordered by GUID |

@@ -29,6 +29,11 @@ The initial [inventory](../crates/p4kx-export/tests/field_verification/baseline.
 shield and quantum-drive projections. New fields found in these owners and their relevant targets
 require review. Initial published mappings cover an owning shield field and tagged rapid-fire rate.
 This is a baseline contribution, not a claim of exhaustive gameplay coverage.
+The canonical routing checks also cover the global `tags` kind and sourced Tag GUID joins;
+[Tag contract tests](catalog-tags.md#verification-scope) exercise the actual source fields,
+raw-array multiplicity, physical duplicates, source states, global Filter scope and strict new-field
+diagnostics. The ignored Tag oracle compares raw physical definitions and owning Entity arrays
+without treating convenience paths as source identity.
 
 Schema collection includes parents, owned targets and relevant polymorphic descendants. A changed
 declared base target with supported concrete instances is a schema-contract change, not observed

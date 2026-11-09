@@ -11,6 +11,8 @@ use crate::contract::every_field_required;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct Completeness<'a> {
+    /// The global taxonomy selection, independent of the Entity Filter.
+    pub(crate) tags: KindCompleteness<'a>,
     /// The completeness of `manufacturers`.
     pub(crate) manufacturers: KindCompleteness<'a>,
     /// The completeness of `items`.
@@ -117,6 +119,7 @@ impl<'a> Completeness<'a> {
     /// Returns the completeness that states `completeness` for every kind.
     pub(crate) const fn of_every_kind(completeness: KindCompleteness<'a>) -> Self {
         Self {
+            tags: KindCompleteness::Complete,
             manufacturers: completeness,
             items: completeness,
             ships: completeness,

@@ -5,7 +5,7 @@ use p4kx_extraction::{Guid, Reference};
 
 use crate::selection::Kind;
 
-/// A resolved source Reference whose target is a resource-related catalog definition.
+/// A resolved source Reference whose target is a canonical catalog definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CatalogReference {
     pub(crate) field: String,
@@ -57,6 +57,7 @@ pub(crate) fn target_kind(
 /// Returns the known catalog target family of a concrete source Record type.
 pub(crate) fn actual_kind(type_name: &str) -> Option<Kind> {
     match type_name {
+        "Tag" => Some(Kind::Tags),
         "SCItemManufacturer" => Some(Kind::Manufacturers),
         "ResourceType" => Some(Kind::ResourceTypes),
         "ResourceTypeGroup" => Some(Kind::ResourceGroups),

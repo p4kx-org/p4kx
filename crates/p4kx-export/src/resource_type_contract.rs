@@ -5,11 +5,11 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::guid_text::CatalogGuid;
 use crate::resource_density_source::ResourceDensitySource;
 use crate::resource_property_contract::{ResourceCargoSlot, ResourceProperty};
-use crate::resource_reference::ResourceReference;
 use crate::schema_fields::every_field_required;
 
 /// A selected resource definition with independent internal selection identity.
@@ -35,12 +35,12 @@ pub(crate) struct ResourceDefinition<'source> {
     #[schemars(extend("x-gameText" = true))]
     pub(crate) description: SourcedValue<GameTextRef>,
     pub(crate) group_guids: SourcedValue<Vec<SourcedValue<CatalogGuid>>>,
-    pub(crate) refined_version: SourcedValue<ResourceReference>,
+    pub(crate) refined_version: SourcedValue<CatalogRecordReference>,
     pub(crate) density: SourcedValue<ResourceDensitySource<'source>>,
     pub(crate) default_thumbnail_path: SourcedValue<&'source str>,
     #[serde(rename = "defaultThumbnailPathSVG")]
     pub(crate) default_thumbnail_path_svg: SourcedValue<&'source str>,
-    pub(crate) rtt_thumbnail_entity_class: SourcedValue<ResourceReference>,
+    pub(crate) rtt_thumbnail_entity_class: SourcedValue<CatalogRecordReference>,
     pub(crate) validate_default_cargo_box: SourcedValue<bool>,
     pub(crate) default_cargo_containers:
         SourcedValue<Vec<SourcedValue<ResourceCargoSlot<'source>>>>,

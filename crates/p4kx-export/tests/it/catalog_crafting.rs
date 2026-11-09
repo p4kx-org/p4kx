@@ -315,9 +315,18 @@ fn a_filter_marks_both_kinds_partial_and_selects_by_record_path() -> TestResult 
             "{kind} is partial"
         );
     }
+    assert_eq!(
+        catalog["completeness"]["tags"],
+        json!({"status": "complete"}),
+        "the global Tag taxonomy retains its full selection scope"
+    );
     assert!(
-        built.summary().kinds().iter().all(|kind| !kind.complete),
-        "the summary agrees"
+        built
+            .summary()
+            .kinds()
+            .iter()
+            .all(|entry| entry.complete == (entry.kind == Kind::Tags)),
+        "every scoped kind is partial; only the global Tag taxonomy stays complete"
     );
     Ok(())
 }

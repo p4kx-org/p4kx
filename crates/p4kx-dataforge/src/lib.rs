@@ -88,8 +88,8 @@ pub use schema::{Enum, Property, Struct};
 pub use survey::{FormatSurvey, PointerSurvey, TrailingSurvey};
 pub use tags::{
     MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES, MAX_TAG_TEXT_BYTES, TAG_DATABASE_TYPE,
-    TAG_PATH_SEPARATOR, Tag, TagBuildEvent, TagProjectionFailure, TagRelationIssue, TagTree,
-    TagTreeIssues,
+    TAG_PATH_SEPARATOR, Tag, TagBuildEvent, TagPathEdgeKind, TagPathIncoming, TagProjectionFailure,
+    TagRelationIssue, TagTree, TagTreeIssues,
 };
 pub use texts::{Resolution, TextResolver};
 pub use tree::RecordTree;

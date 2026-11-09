@@ -14,12 +14,19 @@ pub(super) struct Raw<'f> {
     pub(super) guid: Guid,
     pub(super) name: &'f str,
     pub(super) legacy_id: Option<u32>,
-    pub(super) children: Vec<Guid>,
+    pub(super) children: Vec<Child>,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct Child {
+    pub(super) target: Guid,
+    pub(super) ordinal: usize,
 }
 
 pub(super) struct Root<'f> {
     pub(super) record: Record<'f>,
     pub(super) target: Guid,
+    pub(super) ordinal: usize,
 }
 
 pub(super) struct ReadTags<'f> {
@@ -54,7 +61,11 @@ pub(super) fn read<'f, E>(
                 issues,
                 observe,
             )?;
-            roots.extend(listed.into_iter().map(|target| Root { record, target }));
+            roots.extend(listed.into_iter().map(|child| Root {
+                record,
+                target: child.target,
+                ordinal: child.ordinal,
+            }));
             observe(TagBuildEvent::Projected { record: &record })?;
         } else if let Some(tag) = tag(&record, &tree, &mut seen, issues, observe)? {
             raws.push(tag);
@@ -137,7 +148,7 @@ fn references<'f, E>(
     value: Option<&Value<'_>>,
     record: &Record<'f>,
     field: &'static str,
-    out: &mut Vec<Guid>,
+    out: &mut Vec<Child>,
     issues: &mut TagTreeIssues,
     observe: &mut impl for<'r> FnMut(TagBuildEvent<'r, 'f>) -> Result<(), E>,
 ) -> Result<(), E> {
@@ -145,10 +156,13 @@ fn references<'f, E>(
         return Ok(());
     };
     out.reserve(items.len());
-    for item in items {
+    for (ordinal, item) in items.iter().enumerate() {
         let (target, reason) = match item {
             Value::Reference(reference) => {
-                out.push(reference.guid());
+                out.push(Child {
+                    target: reference.guid(),
+                    ordinal,
+                });
                 continue;
             }
             Value::Null => continue,

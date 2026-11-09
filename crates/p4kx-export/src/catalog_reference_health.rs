@@ -93,10 +93,11 @@ fn status(
     {
         return Some(ExportReferenceStatus::OutsideCatalogSelection);
     }
-    if rows
-        .filter
-        .as_ref()
-        .is_some_and(|filter| !filter.matches(&reference.target_record_path))
+    if reference.target_kind != crate::Kind::Tags
+        && rows
+            .filter
+            .as_ref()
+            .is_some_and(|filter| !filter.matches(&reference.target_record_path))
     {
         return Some(ExportReferenceStatus::ExcludedByFilter);
     }

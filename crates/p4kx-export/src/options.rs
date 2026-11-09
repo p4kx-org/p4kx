@@ -34,7 +34,7 @@ pub struct CatalogProgress {
 pub struct CatalogOptions<'a> {
     /// Requires complete reads by default; diagnostic partial publication must be explicit.
     pub publication_mode: crate::CatalogPublicationMode,
-    /// Selects only the Records whose record path matches; every kind is then partial.
+    /// Selects owning catalog Records by path; the global tag taxonomy remains complete.
     pub filter: Option<&'a Filter>,
     /// The export time the catalog states.
     pub exported_at: SystemTime,

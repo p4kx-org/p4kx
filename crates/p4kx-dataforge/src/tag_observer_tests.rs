@@ -44,6 +44,7 @@ fn capture(seen: &mut Vec<Seen>, event: &TagBuildEvent<'_, '_>) {
             target: *target,
             reason: *reason,
         },
+        TagBuildEvent::PathChosen { .. } => return,
         TagBuildEvent::Cancelled => Seen::Cancelled,
     });
 }

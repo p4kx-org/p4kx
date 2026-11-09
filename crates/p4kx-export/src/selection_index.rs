@@ -56,6 +56,7 @@ impl Kind {
             Self::ContractEntitySpawns => 46,
             Self::MissionPropertySets => 47,
             Self::ResourceTypes => 48,
+            Self::Tags => 49,
         }
     }
 }
