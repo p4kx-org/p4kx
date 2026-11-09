@@ -3,7 +3,10 @@
 
 use std::collections::HashMap;
 
-use p4kx_extraction::Guid;
+use crate::CatalogError;
+use crate::catalog_origins::CatalogOrigins;
+use crate::quality_catalog::{Assembly, QualityRows};
+use p4kx_extraction::{CancelToken, Guid};
 
 use crate::crafting::Crafting;
 use crate::export_ledger::ExportLedger;
@@ -62,12 +65,18 @@ fn quantizations(data: &mut Crafting<'_>, mut links: HashMap<Guid, Vec<Guid>>) {
         .sum();
 }
 
-pub(super) fn assemble(tracked: Vec<Tracked<'_>>) -> ReadCrafting<'_> {
+pub(super) fn assemble<'f>(
+    tracked: Vec<Tracked<'f>>,
+    origins: Option<&CatalogOrigins>,
+    cancel: Option<&CancelToken>,
+) -> Result<ReadCrafting<'f>, CatalogError> {
     let mut data = Crafting::default();
     let mut ledger = ExportLedger::default();
     let mut links = HashMap::new();
+    let mut quality = Assembly::default();
     for tracked in tracked {
         ledger.merge(tracked.ledger);
+        quality.add(tracked.quality);
         if let Some(piece) = tracked.piece {
             insert(&mut data, &mut links, piece);
         }
@@ -79,5 +88,13 @@ pub(super) fn assemble(tracked: Vec<Tracked<'_>>) -> ReadCrafting<'_> {
     data.dismantle.sort_by_key(|item| item.guid);
     data.pools.sort_by_key(|item| item.guid);
     quantizations(&mut data, links);
-    ReadCrafting { data, ledger }
+    let quality = match origins {
+        Some(origins) => quality.finish(origins, cancel)?,
+        None => QualityRows::default(),
+    };
+    Ok(ReadCrafting {
+        data,
+        ledger,
+        quality,
+    })
 }

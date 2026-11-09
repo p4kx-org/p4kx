@@ -11,9 +11,8 @@ use crate::contract::{
     Blueprint, BlueprintCategory, BlueprintPool, BrokerEntry, Commodity, ContractEntry, Crafter,
     CraftingGlobal, DismantleProcess, GameplayProperty, HarvestableLocation,
     HarvestableProviderPreset, Item, Loadout, LootContainer, MineableComposition, MineableElement,
-    MineableEntity, MiningGlobalParams, Paint, QualityDistribution, QualityQuantization,
-    RefiningProcess, ResourceGroup, ResourceType, Ship, Shop, StarmapObject,
-    SubHarvestableMultiConfig,
+    MineableEntity, MiningGlobalParams, Paint, RefiningProcess, ResourceGroup, ResourceType, Ship,
+    Shop, StarmapObject, SubHarvestableMultiConfig,
 };
 use crate::contract_template::ContractTemplate;
 use crate::crafting_warning::CraftingWarning;
@@ -29,12 +28,13 @@ use crate::npc_spawn_model::NpcSpawnPool;
 use crate::paint_port::VehicleFacts;
 use crate::picked::Picked;
 use crate::playability::PlayabilitySummary;
+use crate::quality_catalog::QualityRows;
 use crate::record_read::KindRead;
 use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 use crate::spawn_pools::SpawnPools;
 use crate::template_issues::Unknowns;
 use crate::texts::Texts;
-use crate::{CatalogFailure, ItemClassSummary, Kind, KindSummary, QuantizationSummary};
+use crate::{CatalogFailure, ItemClassSummary, Kind, KindSummary};
 
 #[path = "collected_order.rs"]
 mod order;
@@ -54,9 +54,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) resource_types: Vec<ResourceType<'f>>,
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayProperty<'f>>,
-    pub(crate) quality_distributions: Vec<QualityDistribution<'f>>,
-    pub(crate) quality_quantizations: Vec<QualityQuantization<'f>>,
-    pub(crate) quantization_summary: QuantizationSummary,
+    pub(crate) quality: QualityRows<'f>,
     pub(crate) blueprint_pools: Vec<BlueprintPool<'f>>,
     pub(crate) dismantle_processes: Vec<DismantleProcess<'f>>,
     pub(crate) crafting_global: CraftingGlobal,
@@ -123,9 +121,7 @@ impl<'f> Collected<'f> {
             resource_types: Vec::new(),
             blueprint_categories: Vec::new(),
             gameplay_properties: crafting.properties,
-            quality_distributions: crafting.distributions,
-            quality_quantizations: crafting.quantizations,
-            quantization_summary: crafting.quantization_summary,
+            quality: crafting.quality,
             blueprint_pools: crafting.pools,
             dismantle_processes: crafting.dismantle,
             crafting_global: crafting.global,
@@ -333,8 +329,8 @@ impl<'f> Collected<'f> {
                     Kind::ResourceTypes => self.resource_types.len(),
                     Kind::BlueprintCategories => self.blueprint_categories.len(),
                     Kind::GameplayProperties => self.gameplay_properties.len(),
-                    Kind::QualityDistributions => self.quality_distributions.len(),
-                    Kind::QualityQuantizations => self.quality_quantizations.len(),
+                    Kind::QualityDistributions => self.quality.distributions.len(),
+                    Kind::QualityQuantizations => self.quality.quantizations.len(),
                     Kind::BlueprintPools => self.blueprint_pools.len(),
                     Kind::DismantleProcesses => self.dismantle_processes.len(),
                     Kind::Paints => self.paints.len(),

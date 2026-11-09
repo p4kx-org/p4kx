@@ -5,7 +5,8 @@ use p4kx_extraction::{SourceValue, StructValue, Value};
 
 use crate::CatalogError;
 use crate::catalog_read::{CatalogFields, CatalogRecordContext};
-use crate::resource_quality_source::{ResourceQualityQuantization, ResourceQuantizationBand};
+use crate::quality_source::{QualityBandSource, QualityQuantizationSource};
+use crate::resource_value_read::{self, NumericPresence};
 use crate::source_fields::FieldError;
 
 /// Reads every band in its authored position, including null or unsupported members.
@@ -14,7 +15,7 @@ pub(crate) fn read<'f>(
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
-) -> Result<ResourceQualityQuantization<'f>, CatalogError> {
+) -> Result<QualityQuantizationSource<'f>, CatalogError> {
     let fields = CatalogFields::new(source, path, context);
     fields.check(&["bands"], notes);
     let bands = fields.array("bands", notes)?.try_map(|values| {
@@ -36,7 +37,7 @@ pub(crate) fn read<'f>(
             })
             .collect::<Result<_, CatalogError>>()
     })?;
-    Ok(ResourceQualityQuantization { bands })
+    Ok(QualityQuantizationSource { bands })
 }
 
 fn band<'f>(
@@ -44,11 +45,11 @@ fn band<'f>(
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
-) -> Result<ResourceQuantizationBand<'f>, CatalogError> {
+) -> Result<QualityBandSource<'f>, CatalogError> {
     let fields = CatalogFields::new(source, path, context);
     if source.type_name() != "CraftingQualityQuantizationBand" {
         notes.push(crate::source_fields::Fields::new(source, path).unsupported(""));
-        return Ok(ResourceQuantizationBand {
+        return Ok(QualityBandSource {
             source_type: fields.source_type()?,
             start: context.selector(&format!("{path}.start"), SourceValue::Unsupported)?,
             end: context.selector(&format!("{path}.end"), SourceValue::Unsupported)?,
@@ -57,10 +58,30 @@ fn band<'f>(
         });
     }
     fields.check(&["start", "end", "mappedValue"], notes);
-    Ok(ResourceQuantizationBand {
+    if let (Some(Value::Int32(start)), Some(Value::Int32(end))) =
+        (source.field("start"), source.field("end"))
+        && end < start
+    {
+        notes.push(FieldError::Malformed {
+            source_type: source.type_name().to_owned(),
+            field: format!("{path}.end"),
+            expected: "an inclusive band end at least its start",
+        });
+    }
+    Ok(QualityBandSource {
         source_type: fields.source_type()?,
-        start: fields.required_int32("start", notes)?,
-        end: fields.required_int32("end", notes)?,
-        mapped_value: fields.required_int32("mappedValue", notes)?,
+        start: resource_value_read::int32_number(
+            &fields,
+            "start",
+            NumericPresence::Required,
+            notes,
+        )?,
+        end: resource_value_read::int32_number(&fields, "end", NumericPresence::Required, notes)?,
+        mapped_value: resource_value_read::int32_number(
+            &fields,
+            "mappedValue",
+            NumericPresence::Required,
+            notes,
+        )?,
     })
 }

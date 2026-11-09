@@ -17,7 +17,10 @@ pub(crate) enum ResourceNumber {
     #[serde(rename = "int16")]
     Int16 { value: i16 },
     #[serde(rename = "int32")]
-    Int32 { value: i32 },
+    Int32 {
+        #[schemars(range(min = i32::MIN, max = i32::MAX))]
+        value: i32,
+    },
     #[serde(rename = "int64")]
     Int64 { value: ResourceInt64 },
     #[serde(rename = "uint8")]
@@ -25,7 +28,10 @@ pub(crate) enum ResourceNumber {
     #[serde(rename = "uint16")]
     UInt16 { value: u16 },
     #[serde(rename = "uint32")]
-    UInt32 { value: u32 },
+    UInt32 {
+        #[schemars(range(min = u32::MIN, max = u32::MAX))]
+        value: u32,
+    },
     #[serde(rename = "uint64")]
     UInt64 { value: DecimalU64 },
     #[serde(rename = "f32")]

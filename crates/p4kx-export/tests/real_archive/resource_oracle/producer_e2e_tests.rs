@@ -168,13 +168,13 @@ fn expected_quality(alpha: &Value, property: &Value, carriers: &Carriers<'_>) ->
     );
     assert_eq!(
         quality.pointer("/payload/value/value/value/min/value"),
-        Some(&json!(16_777_217)),
-        "the exact authored lower bound survives"
+        Some(&json!({"type":"int32", "value":16_777_217})),
+        "the exact authored lower bound and original Int32 width survive"
     );
     assert_eq!(
         quality.pointer("/payload/value/value/value/max/value"),
-        Some(&json!(i32::MAX)),
-        "the exact authored upper bound survives"
+        Some(&json!({"type":"int32", "value":i32::MAX})),
+        "the exact authored upper bound and original Int32 width survive"
     );
     let mean = alpha
         .pointer(MEAN)
@@ -289,6 +289,7 @@ fn actual_producer_mutations_fail_without_replacement_carriers() -> Result<()> {
         let written = Written::new(target)?;
         expected_wire(&written)?;
         written.verify(&written.catalog)?;
+        reject_bound_mutations(&written)?;
         let mut changed = written.catalog.clone();
         let root = changed
             .pointer_mut(ALPHA)
@@ -316,6 +317,28 @@ fn actual_producer_mutations_fail_without_replacement_carriers() -> Result<()> {
         assert!(
             written.verify(&changed).is_err(),
             "the real nested immediate origin is checked"
+        );
+    }
+    Ok(())
+}
+
+fn reject_bound_mutations(written: &Written) -> Result<()> {
+    let path = concat!(
+        "/definitions/resourceTypes/rows/0/properties/value/1/value/payload/value/",
+        "qualityDistribution/value/payload/value/value/value/min/value"
+    );
+    for value in [
+        json!(16_777_217),
+        json!({"type":"int16", "value":16_777_217}),
+        json!({"type":"int32", "value":16_777_218}),
+    ] {
+        let mut changed = written.catalog.clone();
+        *changed
+            .pointer_mut(path)
+            .ok_or_else(|| Failure::check("synthetic-raw-bound"))? = value;
+        assert!(
+            written.verify(&changed).is_err(),
+            "the actual original Int32 bound rejects a flattened payload, changed width or changed exact value"
         );
     }
     Ok(())

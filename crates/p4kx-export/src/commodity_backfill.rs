@@ -45,7 +45,7 @@ pub(crate) fn for_resource<'context>(
             eligibility = true;
             observe(input, &mut inputs)?;
             if let Some(quantization) = input.quantization {
-                quantization_selectors(quantization, crafting, &mut inputs)?;
+                quantization_selectors(input.resource, quantization, crafting, &mut inputs);
             }
         }
     }
@@ -105,7 +105,7 @@ fn used_target(
             })
         },
         |guid| {
-            crafting.quantizations.iter().any(|row| {
+            crafting.quality.uses.iter().any(|row| {
                 row.guid.0 == guid
                     && row
                         .resource_type_guids
@@ -142,35 +142,31 @@ fn observe(
 }
 
 fn quantization_selectors(
+    resource: Guid,
     guid: Guid,
     crafting: &CraftingKinds<'_>,
     inputs: &mut CommodityInputs<'_>,
-) -> Result<(), CatalogError> {
+) {
     let mut observed = false;
-    for source in &crafting.ledger.sources {
-        if source.kind != Some(Kind::QualityQuantizations)
-            || source.guid != guid
-            || source.disposition != SourceDisposition::Projected
-        {
+    for choice in crafting.quality.uses.iter().filter(|row| {
+        row.guid.0 == guid
+            && row
+                .resource_type_guids
+                .iter()
+                .any(|member| member.0 == resource)
+    }) {
+        let Some(projection) = crafting
+            .quality
+            .inverse
+            .iter()
+            .find(|row| row.physical_index == choice.record_index)
+        else {
             continue;
-        }
-        if !crafting.quantizations.iter().any(|row| {
-            row.guid.0 == source.guid && source.record_path.as_deref() == Some(row.record_path)
-        }) {
-            continue;
-        }
-        for field in [
-            RecordHeaderInput::Field(RecordHeaderField::Guid),
-            RecordHeaderInput::Field(RecordHeaderField::SourceType),
-            RecordHeaderInput::NormalizedPath,
-            RecordHeaderInput::Field(RecordHeaderField::RecordName),
-        ] {
-            inputs.header_input(source.record_index, field, SourceUseRole::Selector)?;
-        }
+        };
+        inputs.extend(projection.inputs.iter().cloned(), projection.complete);
         observed = true;
     }
     inputs.require_complete(observed);
-    Ok(())
 }
 
 fn limit_applies(
@@ -186,7 +182,7 @@ fn limit_applies(
         source.record_index == limit.record_index
             && ((blueprint_source(source, crafting) && blueprint_uses(source, resource, crafting))
                 || (source.guid == resource
-                    && crafting.quantizations.iter().any(|row| {
+                    && crafting.quality.uses.iter().any(|row| {
                         row.resource_type_guids
                             .iter()
                             .any(|guid| guid.0 == resource)

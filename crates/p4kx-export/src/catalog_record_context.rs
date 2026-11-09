@@ -2,12 +2,14 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
-    StructValue, Value,
+    CancelToken, SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses, SourceValue,
+    SourcedValue, StructValue, Value,
 };
 
 use crate::CatalogError;
+use crate::catalog_number_capture::NumberCapture;
 use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
+use crate::resource_raw_policy::ResourceNumberContract;
 use crate::source_fields::FieldError;
 
 /// Binds Catalog fields to the one physical DataForge payload and Record position.
@@ -16,6 +18,8 @@ pub(crate) struct CatalogRecordContext<'a> {
     sources: &'a SourceUses,
     dataforge: &'a SourceScope,
     record_index: u32,
+    numbers: Option<&'a NumberCapture>,
+    cancel: Option<&'a CancelToken>,
 }
 
 impl<'a> CatalogRecordContext<'a> {
@@ -28,12 +32,38 @@ impl<'a> CatalogRecordContext<'a> {
             sources,
             dataforge,
             record_index,
+            numbers: None,
+            cancel: None,
+        }
+    }
+
+    /// Binds a local numeric receipt to this original Record context.
+    pub(crate) const fn with_numbers(mut self, numbers: &'a NumberCapture) -> Self {
+        self.numbers = Some(numbers);
+        self
+    }
+
+    pub(crate) const fn with_cancel(mut self, cancel: Option<&'a CancelToken>) -> Self {
+        self.cancel = cancel;
+        self
+    }
+
+    pub(crate) fn retain_number(
+        &self,
+        field: impl FnOnce() -> String,
+        source_type: &str,
+        contract: ResourceNumberContract,
+        value: &Value<'_>,
+    ) {
+        if let Some(numbers) = self.numbers {
+            numbers.retain(self.record_index, field, source_type, contract, value);
         }
     }
 
     pub(crate) const fn at_record(&self, record_index: u32) -> Self {
         Self {
             record_index,
+            numbers: None,
             ..*self
         }
     }
@@ -159,6 +189,9 @@ impl<'a> CatalogRecordContext<'a> {
         role: SourceUseRole,
         complete: bool,
     ) -> Result<SourcedValue<T>, CatalogError> {
+        if self.cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
+        }
         let source = self.dataforge.at(location, role)?;
         Ok(self.sources.value(value, &[source], complete))
     }

@@ -4,7 +4,7 @@
 use p4kx_extraction::{CancelToken, DataForge, Filter};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
-use crate::crafting::ledger::{read, read_catalog};
+use crate::crafting::ledger::{ReadMode, read, read_catalog};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::SourceDisposition;
 use crate::{CatalogError, Kind};
@@ -34,7 +34,7 @@ fn the_library_keeps_unfiltered_link_reads_while_the_catalog_requires_actual_tar
     let forge = DataForge::open(&bytes)?;
     let filter = Filter::new("included");
     let library = read(&forge, Some(&filter), None, None)?;
-    let catalog = read_catalog(&forge, Some(&filter), None, None)?;
+    let catalog = read_catalog(&forge, Some(&filter), None, None, ReadMode::Interpreted)?;
     assert_eq!(library.ledger.sources.len(), 1);
     assert_eq!(catalog.ledger.sources, []);
     assert_eq!(catalog.ledger.field_inspections, []);
@@ -77,7 +77,7 @@ fn a_selected_resource_dangling_link_keeps_its_actual_read_and_the_existing_coun
     let forge = DataForge::open(&bytes)?;
     let filter = Filter::new("included");
     let library = read(&forge, Some(&filter), None, None)?;
-    let catalog = read_catalog(&forge, Some(&filter), None, None)?;
+    let catalog = read_catalog(&forge, Some(&filter), None, None, ReadMode::Interpreted)?;
     assert_eq!(
         catalog.data.unresolved_quantization_links,
         library.data.unresolved_quantization_links
@@ -153,7 +153,7 @@ fn a_selected_quantization_keeps_failed_resource_dependencies_outside_the_filter
     .build();
     let forge = DataForge::open(&bytes)?;
     let filter = Filter::new("included");
-    let catalog = read_catalog(&forge, Some(&filter), None, None)?;
+    let catalog = read_catalog(&forge, Some(&filter), None, None, ReadMode::Interpreted)?;
     assert_eq!(catalog.data.quality_quantizations.len(), 1);
     assert!(
         catalog
@@ -175,7 +175,7 @@ fn the_target_metadata_inventory_is_cancellable_before_link_selection() -> TestR
     let cancel = CancelToken::new();
     cancel.cancel();
     assert!(matches!(
-        read_catalog(&forge, None, Some(&cancel), None),
+        read_catalog(&forge, None, Some(&cancel), None, ReadMode::Interpreted),
         Err(CatalogError::Cancelled)
     ));
     Ok(())

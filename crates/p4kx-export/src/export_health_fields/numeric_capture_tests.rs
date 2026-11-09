@@ -162,7 +162,7 @@ fn repeated_resource_inspections_are_identical_across_projection_contexts() -> T
         "canonical evidence does not depend on the requesting projection"
     );
     assert_eq!(
-        selected.resource_number_diagnostics.len(),
+        selected.number_requirements.len(),
         1,
         "the raw number still has conditional failure evidence"
     );
@@ -319,7 +319,7 @@ fn unsupported_numeric_storage_keeps_the_finite_projection_failure() -> TestResu
             .pop()
             .ok_or("field proof missing")?;
         assert!(
-            proof.resource_number_diagnostics.is_empty(),
+            proof.number_requirements.is_empty(),
             "unsupported numeric shape {index} is never a candidate"
         );
         assert!(

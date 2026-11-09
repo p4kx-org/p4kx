@@ -9,6 +9,7 @@ use p4kx_export::{CatalogError, Filter};
 use serde_json::{Value, json};
 
 use crate::catalog_crafting_support;
+use crate::quality_v3_support as source;
 use crate::resource_reference_fixture::{self as fixture, TargetShape};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -24,7 +25,7 @@ fn references(catalog: &Value) -> Result<&Vec<Value>, Box<dyn Error>> {
 fn a_policy_excluded_quality_target_is_retained_without_claiming_a_row() -> TestResult {
     let (_, catalog) =
         catalog_crafting_support::build_from(&fixture::target(TargetShape::Leftover), None)?;
-    assert_eq!(catalog["qualityDistributions"], json!([]));
+    assert_eq!(source::rows(&catalog, source::DISTRIBUTIONS)?.len(), 0);
     let source = &catalog["resourceTypes"][0]["properties"][0]["payload"]["qualityDistribution"];
     assert_eq!(source["payload"]["reference"]["status"], "present");
     assert_eq!(source["payload"]["reference"]["targetRecordIndex"], 1);
@@ -43,7 +44,7 @@ fn a_filtered_quality_target_is_distinct_from_a_missing_source() -> TestResult {
     let filter = Filter::new("included");
     let (_, catalog) =
         catalog_crafting_support::build_from(&fixture::target(TargetShape::Kept), Some(&filter))?;
-    assert_eq!(catalog["qualityDistributions"], json!([]));
+    assert_eq!(source::rows(&catalog, source::DISTRIBUTIONS)?.len(), 0);
     assert!(
         references(&catalog)?
             .iter()
@@ -55,18 +56,30 @@ fn a_filtered_quality_target_is_distinct_from_a_missing_source() -> TestResult {
 }
 
 #[test]
-fn a_failed_quality_projection_retains_the_resource_link_and_failure_category() -> TestResult {
+fn a_retained_quality_field_violation_does_not_become_an_omitted_reference_target() -> TestResult {
     let (_, catalog) = catalog_crafting_support::diagnostic_from(
         &fixture::target(TargetShape::InexactBounds),
         None,
     )?;
-    assert_eq!(catalog["qualityDistributions"], json!([]));
+    let quality = source::row(&catalog, source::DISTRIBUTIONS, 1)?;
+    assert_eq!(
+        source::at(
+            quality,
+            "/qualityDistribution/value/payload/value/value/value/min/value/type"
+        )?,
+        &json!("f32")
+    );
+    source::assert_field_error(
+        &catalog,
+        "qualityDistribution.min",
+        "CraftingQualityDistributionNormal",
+    )?;
     assert_eq!(catalog["resourceTypes"].as_array().map(Vec::len), Some(1));
     assert!(
-        references(&catalog)?
+        !references(&catalog)?
             .iter()
-            .any(|reference| reference["status"] == "targetProjectionFailed"
-                && reference["targetRecordIndex"] == 1)
+            .any(|reference| reference["targetRecordIndex"] == 1),
+        "the readable canonical raw target is materialized despite its separate field violation"
     );
     assert_eq!(catalog["exportHealth"]["status"], "incomplete");
     Ok(())

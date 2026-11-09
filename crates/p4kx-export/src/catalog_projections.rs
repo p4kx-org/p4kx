@@ -6,6 +6,7 @@ use serde::Serialize;
 
 use crate::catalog_table::CatalogTable;
 use crate::commodity_contract::CommodityPresentation;
+use crate::quality_catalog::contract::QualityQuantizationResources;
 use crate::schema_fields::every_field_required;
 
 /// Explicit choices and derived values, separate from authored definitions.
@@ -13,6 +14,7 @@ use crate::schema_fields::every_field_required;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogProjections {
+    pub(crate) quality_quantization_resources: CatalogTable<QualityQuantizationResources>,
     pub(crate) tag_paths: CatalogTable<super::tag_catalog::TagPath>,
     pub(crate) commodity_presentation: CatalogTable<CommodityPresentation>,
     pub(crate) resource_group_parents:

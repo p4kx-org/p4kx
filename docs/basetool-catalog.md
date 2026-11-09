@@ -203,8 +203,8 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.resourceGroups`, `declarations.resourceGroupMembers`, `projections.resourceGroupParents` | Physical group definitions, every ordered authored membership and the first-selected parent with direct per-value origins ([contract](catalog-resource-groups.md)) |
 | `blueprintCategories` | The blueprint categories, the targets of `categoryGuid`, ordered by GUID |
 | `gameplayProperties` | The gameplay properties the quality modifiers refer to, ordered by GUID |
-| `qualityDistributions` | The quality distributions and their location overrides, ordered by GUID |
-| `qualityQuantizations` | The quantised quality steps per `ResourceType`, each linked to its `ResourceType`s by GUID, ordered by GUID |
+| `definitions.qualityDistributions` | Physical distribution and location-override source declarations with exact numbers and immediate per-field origins ([contract](catalog-quality.md)) |
+| `definitions.qualityQuantizations`, `projections.qualityQuantizationResources` | Ordered raw bands, explicit eligibility and the genuine first-eligible nominal-GUID resource inverse ([contract](catalog-quality.md)) |
 | `blueprintPools` | The blueprint pools with the places that reward them, ordered by GUID |
 | `dismantleProcesses` | The dismantle processes, ordered by GUID |
 | `paints` | The paints, each the `itemGuid` of an entry of `items` with the ships it fits, ordered by `itemGuid` |
@@ -896,15 +896,15 @@ multipliers and modifiers.
 
 ### Quality, pools and dismantle
 
-Five kinds hold what a blueprint or a resource refers to; each entry has `guid`, `className` and
-`recordPath`, and the ordering, completeness and leftover rules of every other kind apply (a `--filter` matches
-the record path and marks the kind partial).
+Five kinds hold what a blueprint or resource refers to. Canonical quality definitions use the
+shared sourced Record header; the other lists keep their own identity fields. A `--filter`
+matches the record path and marks selected-kind scope partial independently of source health.
 
 | Kind | Fields |
 |------|--------|
 | `gameplayProperties` | `name`: the localisation key `propertyName` and its texts; a placeholder key stays as `key` and leaves `en` and `de` `null`, as for `items` and `blueprints`. The target of a modifier's `propertyGuid` |
-| `qualityDistributions` | `distribution`: shared QualityCurve with `kind`, exact nullable Int32 `min`/`max` and nullable finite f32 `mean`/`stddev`; `null` for an override Record. `overrides`: per-location `locationGuid` and its distribution, empty for a default Record. Both Record types of `crafting/qualitydistribution` are listed |
-| `qualityQuantizations` | `bands` and `resourceTypeGuids`, described under "Quality quantizations" below |
+| `definitions.qualityDistributions` | Shared sourced header, independent `qualityDistribution`/`locationOverride` declarations and ordered nullable override positions; exact numeric storage and inline/recordRef/emptyBase forms |
+| `definitions.qualityQuantizations`, `projections.qualityQuantizationResources` | Complete raw band definitions and a separate genuine inverse, described below |
 | `blueprintPools` | `entries`: per entry `blueprintGuid` and `weight`; `totalWeight`, the sum of the positive weights; `rewardSources`: every struct of any Record with a Reference to the pool (on LIVE the `BlueprintRewards` result of a contract) with `recordGuid`, `recordPath`, `contractId`, `contractName` (both from the nearest enclosing struct that has an `id`) and `chance`, ordered by `recordGuid` and then in stored order. A `blueprintGuid` may point at a blueprint that is left out of `blueprints` as a failure |
 | `dismantleProcesses` | `efficiency` (0.5 on LIVE) and `timeSeconds` (15 on LIVE) of the `GenericCraftingProcess_Dismantle` |
 
@@ -914,36 +914,26 @@ weight of zero or less give none. The quality distributions carry no link to a b
 the Records do not hold one, so the catalog lists them as they are. Resource-owned inline and
 linked forms preserve their source ownership in
 [`definitions.resourceTypes.rows[].properties`](catalog-resource-types.md#quality-source-wrappers-and-exact-curves).
-Their inline ResourceQualityCurve uses sourced exact-width numeric payloads. The top-level
-`qualityDistributions` and public Rust QualityCurve still use the existing finite-f32 contract:
-wrong numeric source types, nonfinite parameters and values outside finite f32 representation
-produce explicit projection failures. Known fieldless curve bases retain `kind` and null numbers;
-exact `Option<i32>` bounds remain shared through both existing public reexport paths.
+Standalone quality definitions and resource-owned declarations use the same typed exact-width
+numeric readers. The catalog preserves f32/f64 bits, wide integer widths, signed zero and
+nonfinite raw tokens. Separate declared Int32 and configured-range violations remain blocking
+field diagnoses without dropping a readable raw owner. The public Rust QualityCurve and
+read_crafting interfaces retain their independent finite f32 interpretation contract.
 
 #### Quality quantizations
 
-`qualityQuantizations` lists the `CraftingQualityQuantizationRecord` Records under
-`crafting/qualityquantization` (63 on LIVE, 62 after the `Quantization_TEMPLATE` leftover): the
-quantised quality steps of a resource (ADR-0177). Each entry has `guid`, `className`, `recordPath`
-and
+`definitions.qualityQuantizations` holds every selected readable physical quantization, including
+complete empty bands and field-invalid raw data. `projections.qualityQuantizationResources`
+contains only minimal original owner identity, explicit sourced eligibility and sorted unique
+inverse resource GUIDs. It preserves the first eligible nominal-GUID policy independently of a
+raw reference's physical target. Required resource dependencies remain outside the output Filter;
+optional bounded provenance capture never truncates the actual inverse calculation.
 
-| Field | Meaning |
-|-------|---------|
-| `bands` | `qualityQuantization.bands` in stored order: per band `start`, `end` (inclusive) and `mappedValue`, whole numbers. Every quality from `start` to `end` counts as `mappedValue`. LIVE has 8 bands per Record with the same ranges (0-399, 400-599, 600-699, 700-799, 800-899, 900-949, 950-998, 999-1000) that together cover the qualities 0 to 1000; only the `mappedValue`s differ per resource |
-| `resourceTypeGuids` | The GUIDs of the `ResourceType` Records whose crafting data link to the Record, without repeats and ordered by GUID. The link goes from the `ResourceType` (`properties[].qualityQuantization.qualityQuantizationRecord`); the quantization Record holds none. On LIVE 43 links reach 42 Records (`Carinite` and `CarinitePure` share one); every linked `ResourceType` is the `subtypeGuid` of a commodity of the catalog, because a `ResourceType` a kept quantization links to is backfilled as a commodity (ADR-0184); with a `--filter`, only those whose record path matches |
-
-When a catalog has a selected non-leftover quantization target, or its target metadata is
-uncertain, its reverse links are read from every non-leftover ResourceType, including sources
-outside the Filter. Without such a target, only selected ResourceType inputs contribute link
-evidence and the existing catalog counter. The public `read_crafting` API retains its unfiltered
-ResourceType-link contract. A development-leftover ResourceType neither links nor counts. A Record no `ResourceType`
-uses is ordinary game data and stays in the kind with an empty `resourceTypeGuids` (20 on LIVE);
-`CatalogSummary::quantizations().unused` and `quantizations.unused` of `p4kx catalog --json` count
-them, with no effect on the exit code. The same summary counts `unresolved_links`, the links to a
-Record that is no readable quantization of the catalog (another type, a failed Record or a
-leftover; a Reference to a GUID no Record has reads as null); it is 0 on LIVE. A Record without bands, or with a band that lacks a whole
-`start`, `end` or `mappedValue` or ends before it starts, cannot be read: it is left out and
-listed in the failures. No description, text or media is exported.
+`CatalogSummary::quantizations().unused` and the CLI summary count eligible unassigned results;
+`unresolved_links` retains its eligible-target/dedup/leftover scope. D row counts instead count
+all retained source definitions. No second flat quality list or reduced payload mirror is
+written. The [quality contract](catalog-quality.md) specifies source states, exact per-field
+capture proof, reference health, inverse contributors and publication behavior.
 
 #### Dismantle returns
 

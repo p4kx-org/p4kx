@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashSet;
+
 use p4kx_extraction::{SourceValue, SourcedValue, StructValue, Value};
 
 use super::CatalogRecordContext;
@@ -29,6 +31,16 @@ impl<'s, 'f, 'c> CatalogFields<'s, 'f, 'c> {
 
     pub(crate) fn check(&self, known: &[&str], notes: &mut Vec<FieldError>) {
         Fields::new(self.source, self.path).check(known, notes);
+        let mut seen = HashSet::new();
+        for field in self.source.fields() {
+            if !seen.insert(field.name()) {
+                notes.push(FieldError::Malformed {
+                    source_type: self.source.type_name().to_owned(),
+                    field: self.location(field.name()),
+                    expected: "a unique declared name in the named canonical DTO",
+                });
+            }
+        }
     }
 
     pub(crate) fn source_type(&self) -> Result<SourcedValue<&'f str>, CatalogError> {
@@ -77,33 +89,6 @@ impl<'s, 'f, 'c> CatalogFields<'s, 'f, 'c> {
             Value::Bool(value) => Some(*value),
             _ => None,
         })
-    }
-
-    pub(crate) fn int32(
-        &self,
-        name: &str,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<SourcedValue<i32>, CatalogError> {
-        self.read(name, "a nullable Int32", notes, |value| match value {
-            Value::Int32(value) => Some(*value),
-            _ => None,
-        })
-    }
-
-    pub(crate) fn required_int32(
-        &self,
-        name: &str,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<SourcedValue<i32>, CatalogError> {
-        let value = self.int32(name, notes)?;
-        if matches!(self.source.field(name), None | Some(Value::Null)) {
-            notes.push(FieldError::Malformed {
-                source_type: self.source.type_name().to_owned(),
-                field: self.location(name),
-                expected: "a non-null Int32",
-            });
-        }
-        Ok(value)
     }
 
     pub(crate) fn structure(

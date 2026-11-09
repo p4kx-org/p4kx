@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Exact quality bounds and explicit floating-point projection failures.
+//! Raw catalog numbers and the independent finite interpreted crafting contract.
 
 use std::error::Error;
 
@@ -11,6 +11,7 @@ use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestT
 use serde_json::Value;
 
 use crate::catalog_crafting_support;
+use crate::quality_v3_support as source;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -98,8 +99,11 @@ fn the_shared_public_curve_preserves_all_int32_bounds_and_finite_float_parameter
     assert_eq!((curve.mean, curve.stddev), (Some(7.5), Some(1.25)));
     let (_, catalog) = catalog_crafting_support::build_from(&database(Numbers::Exact), None)?;
     assert_eq!(
-        catalog["qualityDistributions"][0]["distribution"]["max"],
-        i32::MAX
+        source::at(
+            &catalog,
+            "/definitions/qualityDistributions/rows/0/qualityDistribution/value/payload/value/value/value/max/value/value"
+        )?,
+        &serde_json::json!(i32::MAX)
     );
     Ok(())
 }
@@ -118,11 +122,17 @@ fn assert_projection_failure(numbers: Numbers, field: &str) -> TestResult {
     );
     let (_, catalog) = catalog_crafting_support::diagnostic_from(&database, None)?;
     assert_eq!(
-        catalog
-            .get("qualityDistributions")
-            .ok_or("the distribution rows")?,
-        &serde_json::json!([]),
-        "no partial numeric row is emitted"
+        source::rows(&catalog, source::DISTRIBUTIONS)?.len(),
+        1,
+        "the raw owner remains present with its field-level contract error"
+    );
+    assert_eq!(
+        source::at(
+            source::row(&catalog, source::DISTRIBUTIONS, 0)?,
+            "/qualityDistribution/value/payload/value/value/value/min/value/type"
+        )?,
+        &serde_json::json!("f32"),
+        "wrong-width numeric storage remains an exact raw token"
     );
     let diagnostics = catalog
         .pointer("/exportHealth/diagnostics")
@@ -157,8 +167,8 @@ fn assert_quality_failure_health(catalog: &Value) -> TestResult {
         quality
             .pointer("/sourceRecords/omittedAfterProjectionFailure")
             .ok_or("the projection-failure count")?,
-        &serde_json::json!(1),
-        "the failed projection is counted once"
+        &serde_json::json!(0),
+        "a field contract failure does not omit the retained raw definition"
     );
     assert_eq!(
         quality
@@ -187,11 +197,56 @@ fn a_float_minimum_is_never_coerced_even_when_it_is_a_whole_number() -> TestResu
 }
 
 #[test]
-fn a_finite_double_beyond_the_f32_range_is_an_explicit_projection_failure() -> TestResult {
-    assert_projection_failure(Numbers::Overflow, "qualityDistribution.stddev")
+fn a_finite_double_beyond_f32_stays_exact_in_the_catalog_and_fails_the_interpreted_api()
+-> TestResult {
+    assert_interpreted_failure(Numbers::Overflow)?;
+    let (_, catalog) = catalog_crafting_support::build_from(&database(Numbers::Overflow), None)?;
+    let row = source::row(&catalog, source::DISTRIBUTIONS, 0)?;
+    assert_eq!(
+        source::at(
+            row,
+            "/qualityDistribution/value/payload/value/value/value/stddev/value"
+        )?,
+        &serde_json::json!({"type":"f64", "rawBits":"7e37e43c8800759c", "finite":1.0e300})
+    );
+    assert_eq!(
+        source::at(&catalog, "/exportHealth/status")?,
+        &serde_json::json!("complete")
+    );
+    Ok(())
 }
 
 #[test]
-fn a_nonfinite_parameter_cannot_become_an_undocumented_null() -> TestResult {
-    assert_projection_failure(Numbers::NonFinite, "qualityDistribution.mean")
+fn a_nonfinite_parameter_has_explicit_raw_bits_instead_of_an_undocumented_null() -> TestResult {
+    assert_interpreted_failure(Numbers::NonFinite)?;
+    let (_, catalog) = catalog_crafting_support::build_from(&database(Numbers::NonFinite), None)?;
+    let row = source::row(&catalog, source::DISTRIBUTIONS, 0)?;
+    assert_eq!(
+        source::at(
+            row,
+            "/qualityDistribution/value/payload/value/value/value/mean/value"
+        )?,
+        &serde_json::json!({"type":"f32", "rawBits":format!("{:08x}", f32::NAN.to_bits()), "finite":null})
+    );
+    assert_eq!(
+        source::at(&catalog, "/exportHealth/status")?,
+        &serde_json::json!("complete")
+    );
+    Ok(())
+}
+
+fn assert_interpreted_failure(numbers: Numbers) -> TestResult {
+    let bytes = database(numbers).build();
+    let forge = DataForge::open(&bytes)?;
+    let crafting = p4kx_export::read_crafting(&forge, None, None)?;
+    assert!(
+        crafting.quality_distributions.is_empty(),
+        "the current interpreted API keeps its finite f32 contract"
+    );
+    assert_eq!(
+        crafting.failures.len(),
+        1,
+        "the original interpreted field failure remains visible"
+    );
+    Ok(())
 }

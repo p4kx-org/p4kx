@@ -11,21 +11,39 @@ use crate::resource_number::ResourceNumber;
 use crate::resource_raw_policy::{self, ResourceNumberContract};
 use crate::source_fields::FieldError;
 
+/// Required presence of a numeric source field independently of its retained storage width.
+#[derive(Clone, Copy)]
+pub(crate) enum NumericPresence {
+    Optional,
+    Required,
+}
+
 /// Reads a source Single under its declared raw-number contract.
 pub(crate) fn single(
     fields: &CatalogFields<'_, '_, '_>,
     name: &str,
     notes: &mut Vec<FieldError>,
 ) -> Result<SourcedValue<ResourceFloat32>, CatalogError> {
-    fields.read(name, "a nullable Single", notes, |value| match value {
-        Value::Single(value)
-            if resource_raw_policy::field_contract(fields.source().type_name(), name)
-                == Some(ResourceNumberContract::Single) =>
-        {
-            Some(ResourceFloat32::new(*value))
-        }
-        _ => None,
-    })
+    fields.read(
+        name,
+        "a nullable Single",
+        notes,
+        |original| match original {
+            Value::Single(value)
+                if resource_raw_policy::field_contract(fields.source().type_name(), name)
+                    == Some(ResourceNumberContract::Single) =>
+            {
+                fields.context().retain_number(
+                    || fields.location(name),
+                    fields.source().type_name(),
+                    ResourceNumberContract::Single,
+                    original,
+                );
+                Some(ResourceFloat32::new(*value))
+            }
+            _ => None,
+        },
+    )
 }
 
 /// Reads a source number under its declared width contract.
@@ -35,11 +53,43 @@ pub(crate) fn number(
     notes: &mut Vec<FieldError>,
 ) -> Result<SourcedValue<ResourceNumber>, CatalogError> {
     fields.read(name, "a nullable number", notes, |value| {
-        (resource_raw_policy::field_contract(fields.source().type_name(), name)
-            == Some(ResourceNumberContract::Number))
-        .then(|| ResourceNumber::read(value))
-        .flatten()
+        let contract = resource_raw_policy::field_contract(fields.source().type_name(), name);
+        let Some(contract @ (ResourceNumberContract::Number | ResourceNumberContract::Int32)) =
+            contract
+        else {
+            return None;
+        };
+        let number = ResourceNumber::read(value)?;
+        fields.context().retain_number(
+            || fields.location(name),
+            fields.source().type_name(),
+            contract,
+            value,
+        );
+        Some(number)
     })
+}
+
+/// Retains numeric storage while enforcing its independent Int32 field contract.
+pub(crate) fn int32_number(
+    fields: &CatalogFields<'_, '_, '_>,
+    name: &str,
+    presence: NumericPresence,
+    notes: &mut Vec<FieldError>,
+) -> Result<SourcedValue<ResourceNumber>, CatalogError> {
+    let value = number(fields, name, notes)?;
+    let original = fields.source().field(name);
+    let valid = matches!(original, Some(Value::Int32(_)))
+        || (matches!(presence, NumericPresence::Optional)
+            && matches!(original, None | Some(Value::Null)));
+    if !valid && !matches!(original, Some(Value::Error(_))) {
+        notes.push(FieldError::Malformed {
+            source_type: fields.source().type_name().to_owned(),
+            field: fields.location(name),
+            expected: "an Int32 under the declared numeric field contract",
+        });
+    }
+    Ok(value)
 }
 
 /// Reads a Record Reference with independent target-header evidence.

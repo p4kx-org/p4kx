@@ -10,7 +10,8 @@ use crate::catalog_schema_support;
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const CONTRACT_PROPERTY: &str = "/contractTemplates/0/contractProperties/0";
-const QUALITY_DISTRIBUTION: &str = "/qualityDistributions/0/distribution";
+const QUALITY_DISTRIBUTION: &str =
+    "/definitions/qualityDistributions/rows/0/qualityDistribution/value/payload/value/value/value";
 
 fn with_value(value: &Value) -> TestResult<Value> {
     let mut catalog = catalog_schema_support::minimal_catalog();
@@ -176,35 +177,38 @@ fn raw_option_text_ids_preserve_empty_placeholder_and_null_tokens() -> TestResul
 }
 
 #[test]
-fn shared_quality_bounds_require_the_same_exact_i32_range() -> TestResult {
+fn raw_quality_bounds_validate_the_exact_declared_number_tag_and_storage() -> TestResult {
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     let mut catalog = catalog_schema_support::minimal_catalog();
-    *catalog
-        .pointer_mut(QUALITY_DISTRIBUTION)
-        .ok_or("quality distribution fixture absent")? = json!({
-        "kind": "CraftingQualityDistribution_BellCurve", "min": i32::MIN, "max": i32::MAX,
-        "mean": 0.125, "stddev": 0.25
-    });
+    for (field, value) in [("min", i32::MIN), ("max", i32::MAX)] {
+        *catalog
+            .pointer_mut(&format!("{QUALITY_DISTRIBUTION}/{field}/value"))
+            .ok_or("quality numeric token")? = json!({"type":"int32", "value":value});
+    }
     assert!(
         validator.is_valid(&catalog),
-        "complete signed source range with fractional parameters validates"
+        "the complete signed Int32 payload range remains exact"
     );
     for invalid in invalid_integers() {
         for field in ["min", "max"] {
             let mut changed = catalog.clone();
-            replace(
-                changed
-                    .pointer_mut(QUALITY_DISTRIBUTION)
-                    .ok_or("quality fixture absent")?,
-                field,
-                invalid.clone(),
-            )?;
+            *changed
+                .pointer_mut(&format!("{QUALITY_DISTRIBUTION}/{field}/value/value"))
+                .ok_or("quality Int32 payload")? = invalid.clone();
             assert!(
                 !validator.is_valid(&changed),
-                "quality bounds cannot become fractional or overflow"
+                "an Int32-tagged raw payload cannot be fractional or overflow"
             );
         }
     }
+    *catalog
+        .pointer_mut(&format!("{QUALITY_DISTRIBUTION}/min/value"))
+        .ok_or("quality numeric token")? =
+        json!({"type":"f64", "rawBits":"3ff4000000000000", "finite":1.25});
+    assert!(
+        validator.is_valid(&catalog),
+        "a wrong-contract numeric token can still be represented losslessly; export health diagnoses its declared Int32 contract"
+    );
     Ok(())
 }
 

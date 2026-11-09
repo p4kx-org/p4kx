@@ -26,6 +26,7 @@ const CONTROL_TYPES: &[&str] = &[
     "InputScope",
     "OwnedReferenceStatus",
     "PropertyReferenceStatus",
+    "QuantizationIneligibility",
     "SourceCoordinateOmission",
     "SourceDeclarationKind",
     "SourceDetails",

@@ -5,6 +5,9 @@
 //! catalog, built from a synthetic Archive with multi-tier blueprints (no blueprint of the
 //! real Archive has more than one tier).
 
+#[path = "catalog_crafting_quality.rs"]
+mod quality;
+
 use crate::catalog_crafting_support;
 use crate::crafting_detail_fixture;
 
@@ -153,29 +156,7 @@ fn quality_modifiers_name_their_property_and_keep_their_ranges() -> TestResult {
 #[test]
 fn quality_distributions_keep_their_location_overrides() -> TestResult {
     let (_, catalog) = build()?;
-    let list = catalog["qualityDistributions"].as_array().ok_or("list")?;
-    assert_eq!(list.len(), 2);
-    assert_eq!(list[0]["guid"], text(fixture::DEFAULT_CURVE).as_str());
-    assert_eq!(
-        list[0]["distribution"],
-        json!({"kind": "CraftingQualityDistributionNormal",
-               "min": 1, "max": 1000, "mean": 269.0, "stddev": 254.0})
-    );
-    assert_eq!(list[0]["overrides"], json!([]));
-    assert_eq!(list[1]["distribution"], Value::Null);
-    assert_eq!(
-        list[1]["overrides"][0]["locationGuid"],
-        text(fixture::PYRO).as_str()
-    );
-    assert_eq!(
-        list[1]["overrides"][0]["distribution"]["mean"], 295.0,
-        "the override curve"
-    );
-    assert_eq!(
-        list[1]["overrides"][0]["distribution"]["stddev"], 1.0,
-        "the finite override standard deviation"
-    );
-    Ok(())
+    quality::assert_location_overrides(&catalog)
 }
 
 #[test]

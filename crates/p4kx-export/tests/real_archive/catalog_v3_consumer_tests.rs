@@ -235,3 +235,82 @@ fn repeated_resource_fallback_row_is_rejected_within_its_family() -> TestResult 
     );
     Ok(())
 }
+
+#[test]
+fn quality_definitions_require_the_canonical_table_and_source_identity() -> TestResult {
+    let (_, mut catalog) = fixture::build(&fixture::database())?;
+    let rows = reader::rows(&catalog, Kind::QualityQuantizations)?;
+    assert!(
+        !rows.is_empty(),
+        "the actual producer retains selected quantization definitions"
+    );
+    for row in rows {
+        assert!(
+            !reader::identity(row, Kind::QualityQuantizations)?.is_empty(),
+            "canonical sourced GUID identity"
+        );
+        assert!(
+            reader::field(row, Kind::QualityQuantizations, "recordIndex")?.is_number(),
+            "canonical physical position"
+        );
+    }
+    catalog.as_object_mut().ok_or("catalog")?.insert(
+        "qualityQuantizations".to_owned(),
+        json!([{"guid":"distraction"}]),
+    );
+    catalog
+        .get_mut("definitions")
+        .and_then(Value::as_object_mut)
+        .ok_or("definitions")?
+        .remove("qualityQuantizations")
+        .ok_or("canonical quality table")?;
+    assert!(
+        reader::rows(&catalog, Kind::QualityQuantizations).is_err(),
+        "a flat distraction cannot replace a required canonical table"
+    );
+    Ok(())
+}
+
+#[test]
+fn quality_identity_allows_physical_alternatives_but_rejects_repeated_positions_and_wrong_families()
+-> TestResult {
+    let (_, catalog) = fixture::build(&fixture::database())?;
+    let original = reader::rows(&catalog, Kind::QualityQuantizations)?
+        .first()
+        .ok_or("quality definition")?;
+    let mut alias = original.clone();
+    *alias
+        .pointer_mut("/recordIndex/value")
+        .ok_or("physical position")? = json!(10_000);
+    let mut valid = catalog.clone();
+    valid
+        .pointer_mut("/definitions/qualityQuantizations/rows")
+        .and_then(Value::as_array_mut)
+        .ok_or("quality rows")?
+        .push(alias.clone());
+    crate::real_archive_verification::check_unique_guids(&valid)?;
+    let mut repeated = catalog.clone();
+    repeated
+        .pointer_mut("/definitions/qualityQuantizations/rows")
+        .and_then(Value::as_array_mut)
+        .ok_or("quality rows")?
+        .push(original.clone());
+    assert!(
+        crate::real_archive_verification::check_unique_guids(&repeated).is_err(),
+        "physical alternatives do not excuse repeated original positions"
+    );
+    *alias
+        .pointer_mut("/sourceType/value")
+        .ok_or("source family")? = json!("ResourceType");
+    let mut wrong = catalog;
+    wrong
+        .pointer_mut("/definitions/qualityQuantizations/rows")
+        .and_then(Value::as_array_mut)
+        .ok_or("quality rows")?
+        .push(alias);
+    assert!(
+        crate::real_archive_verification::check_unique_guids(&wrong).is_err(),
+        "a different source family cannot use the physical-alternative rule"
+    );
+    Ok(())
+}

@@ -8,6 +8,9 @@
 //! that case is covered by the synthetic `catalog_crafting_tiers` test; here a blueprint with
 //! more than one tier would only have to stay consistent with the first-tier fields.
 
+#[path = "real_archive_crafting_quality.rs"]
+mod quality;
+
 use std::collections::HashSet;
 use std::error::Error;
 use std::path::Path;
@@ -25,8 +28,6 @@ type TestResult = Result<(), Box<dyn Error>>;
 const LMG_MAGAZINE: &str = "BP_CRAFT_behr_lmg_ballistic_01_mag";
 const MULTIPLIER_BLUEPRINT: &str = "BP_CRAFT_slaver_armor_medium_arms_01_01_01";
 const EXPECTED_MULTIPLIER: f64 = 1.15;
-const CREATURE_DEFAULT: &str = "1dcde125-1275-474f-b0d7-d6682e9e521f";
-const PYRO: &str = "286cb603-b4ae-4279-80a1-d4505fee1916";
 const COVALEX_POOL: &str = "907989eb-9ee8-46a8-b794-032da6bd8a5d";
 const COVALEX_BLUEPRINT: &str = "33be7f1a-3f75-4627-bb8b-88e6d6b42f4e";
 const KINDS: [&str; 13] = [
@@ -237,39 +238,7 @@ fn check_quality(catalog: &Value) -> TestResult {
         kinds.contains("multiplier") && kinds.contains("additive"),
         "both range kinds occur: {kinds:?}"
     );
-    let distributions = list(catalog, "qualityDistributions")?;
-    let default = distributions
-        .iter()
-        .find(|item| item["guid"] == CREATURE_DEFAULT)
-        .ok_or("the default creature distribution")?;
-    assert_eq!(
-        at(default, "/distribution/kind"),
-        "CraftingQualityDistributionNormal",
-        "kind"
-    );
-    assert_eq!(
-        (
-            at(default, "/distribution/min"),
-            at(default, "/distribution/max"),
-            at(default, "/distribution/mean"),
-            at(default, "/distribution/stddev")
-        ),
-        (
-            &Value::from(1.0),
-            &Value::from(1000.0),
-            &Value::from(269.0),
-            &Value::from(254.0)
-        ),
-        "the curve"
-    );
-    assert!(
-        distributions
-            .iter()
-            .flat_map(|item| item["overrides"].as_array().into_iter().flatten())
-            .any(|over| over["locationGuid"] == PYRO && over["distribution"].is_object()),
-        "an override for Pyro"
-    );
-    Ok(())
+    quality::check_sources(catalog)
 }
 
 fn check_pools(catalog: &Value) -> TestResult {

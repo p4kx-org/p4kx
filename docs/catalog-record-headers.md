@@ -2,7 +2,8 @@
 
 Schema 3 uses one shared header for definitions.tags, declarations.tagRoots,
 declarations.entityTags, definitions.manufacturers, definitions.resourceGroups,
-definitions.commodities and definitions.resourceTypes. Its eight fields are flattened into each
+definitions.commodities, definitions.resourceTypes, definitions.qualityDistributions and
+definitions.qualityQuantizations. Its eight fields are flattened into each
 owning row, with the ordinary required state/value/containsEncryptedSource/sourceUsesRefs/
 sourceSetComplete carrier on each field. This shared contract adds no second flat view or v2
 writer. Minimal membership, parent and convenience-path owner references retain their own scope.
@@ -41,8 +42,8 @@ comes from that target's fileName conversion. Missing target headers remain abse
 original owning slot. A derived chosen-parent reference uses its actually selected physical
 parent's header GUID; it is not presented as an authored reference slot.
 
-Catalog and Entity identity inputs, selection, duplicate handling, order, counts and convenience
-values remain unchanged. Correcting colliding Header/Body coordinates changes document-local
+Header reads preserve the owning family's Catalog and Entity identity inputs, selection,
+duplicate handling, order, counts and convenience-value meanings. Correcting colliding Header/Body coordinates changes document-local
 SourceUse IDs in unreleased v3; consumers resolve the accompanying inventory rather than keeping
 old use IDs across documents. The SourceLocation union and origin protocol version remain
 unchanged. metadataTag neither expands Entity Filter scope nor chooses public/Member access;

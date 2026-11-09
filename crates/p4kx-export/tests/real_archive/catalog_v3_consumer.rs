@@ -10,7 +10,7 @@ use serde_json::Value;
 
 type TestResult<T> = Result<T, Box<dyn Error>>;
 
-/// Reads the one actual dataset for a Kind, with no legacy fallback.
+/// Reads the one actual dataset for a Kind.
 pub(crate) fn rows(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
     named_rows(catalog, kind.name())
 }
@@ -26,6 +26,12 @@ pub(crate) fn named_rows<'catalog>(
         .ok_or("unknown catalog Kind")?;
     match kind {
         Kind::Manufacturers => checked_table(catalog, kind, "/definitions/manufacturers"),
+        Kind::QualityDistributions => {
+            checked_table(catalog, kind, "/definitions/qualityDistributions")
+        }
+        Kind::QualityQuantizations => {
+            checked_table(catalog, kind, "/definitions/qualityQuantizations")
+        }
         Kind::Tags => checked_table(catalog, kind, "/definitions/tags"),
         Kind::ResourceTypes => checked_table(catalog, kind, "/definitions/resourceTypes"),
         Kind::ResourceGroups => checked_table(catalog, kind, "/definitions/resourceGroups"),
@@ -133,6 +139,8 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::ResourceTypes
             | Kind::ResourceGroups
             | Kind::Tags
+            | Kind::QualityDistributions
+            | Kind::QualityQuantizations
     ) {
         present(value)
     } else {

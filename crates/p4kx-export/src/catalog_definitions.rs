@@ -7,6 +7,9 @@ use serde::Serialize;
 use crate::catalog_table::CatalogTable;
 use crate::commodity_contract::CommodityDefinition;
 use crate::manufacturer::ManufacturerDefinition;
+use crate::quality_catalog::contract::{
+    QualityDistributionDefinition, QualityQuantizationDefinition,
+};
 use crate::resource_type_contract::ResourceType;
 use crate::schema_fields::every_field_required;
 
@@ -15,6 +18,8 @@ use crate::schema_fields::every_field_required;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogDefinitions<'source> {
+    pub(crate) quality_distributions: CatalogTable<QualityDistributionDefinition<'source>>,
+    pub(crate) quality_quantizations: CatalogTable<QualityQuantizationDefinition<'source>>,
     pub(crate) tags: CatalogTable<super::tag_catalog::TagDefinition<'source>>,
     pub(crate) resource_groups:
         CatalogTable<super::resource_group_catalog::ResourceGroupDefinition<'source>>,

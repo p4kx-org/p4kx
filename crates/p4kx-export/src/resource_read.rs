@@ -5,6 +5,7 @@ use p4kx_extraction::{RecordTree, SourceValue, SourcedValue, StructValue};
 
 use crate::CatalogError;
 use crate::canonical_record_header::CanonicalRecordHeader;
+use crate::catalog_number_capture::NumberCapture;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::{CatalogFields, CatalogRecordContext};
 use crate::guid_text::CatalogGuid;
@@ -42,12 +43,14 @@ pub(crate) fn read<'source>(
     memberships: ResourceMemberships,
 ) -> Result<ResourceRead<'source>, CatalogError> {
     let mut notes = Vec::new();
-    let data = definition(tree, projection, memberships, &mut notes)?;
+    let numbers = NumberCapture::default();
+    let data = definition(tree, projection, memberships, &numbers, &mut notes)?;
     Ok(ResourceRead {
         value: ResourceType {
             guid: CatalogGuid(tree.guid()),
             record_path: tree.record_path(),
             data,
+            numbers: numbers.finish(),
         },
         notes,
     })
@@ -57,10 +60,11 @@ fn definition<'source>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
     memberships: ResourceMemberships,
+    numbers: &NumberCapture,
     notes: &mut Vec<FieldError>,
 ) -> Result<ResourceDefinition<'source>, CatalogError> {
     let origins = projection.origins();
-    let context = origins.record(tree.record_index());
+    let context = origins.record(tree.record_index()).with_numbers(numbers);
     let fields = CatalogFields::new(tree.root(), "", &context);
     fields.check(RESOURCE_FIELDS, notes);
     let density = fields

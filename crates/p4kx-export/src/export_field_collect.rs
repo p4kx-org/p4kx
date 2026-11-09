@@ -5,6 +5,8 @@ use std::collections::BTreeMap;
 
 use p4kx_extraction::{Guid, RecordTree};
 
+use crate::catalog_number_capture::FloatToken;
+use crate::catalog_number_health::NumberRequirement;
 use crate::catalog_reference::{self, CatalogReference};
 use crate::export_diagnostic::{
     EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT, ExportDiagnostic, ExportDiagnosticCode,
@@ -15,24 +17,17 @@ use crate::export_field_inspection::FieldInspection;
 use crate::export_reference_issue::{
     ExportReferenceStatus, ExportSourcePointer, ExportUnresolvedReference,
 };
+use crate::resource_raw_policy::ResourceNumberContract;
 use crate::selection::Kind;
 
 const MAX_CATALOG_REFERENCES: usize = 4096;
 const MAX_CATALOG_REFERENCE_METADATA_BYTES: usize = 1024 * 1024;
-
-/// The payload contract that can retain a nonfinite source number.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum NonFiniteEncoding {
-    FiniteOnly,
-    ResourceBits,
-}
 
 type DiagnosticKey = (
     ExportDiagnosticStage,
     ExportDiagnosticCode,
     ExportDiagnosticSeverity,
     ExportDiagnosticUnit,
-    NonFiniteEncoding,
 );
 
 #[derive(Clone, Copy)]
@@ -55,6 +50,7 @@ pub(crate) struct FieldCollector<'t, 'f> {
     catalog_references: Vec<CatalogReference>,
     catalog_reference_bytes: usize,
     complete: bool,
+    numbers: Vec<NumberRequirement>,
 }
 
 impl<'t, 'f> FieldCollector<'t, 'f> {
@@ -74,6 +70,7 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
             catalog_references: Vec::new(),
             catalog_reference_bytes: 0,
             complete: true,
+            numbers: Vec::new(),
         }
     }
 
@@ -102,9 +99,20 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
         &mut self,
         field: &str,
         source_type: &str,
-        encoding: NonFiniteEncoding,
+        contract: Option<ResourceNumberContract>,
+        token: FloatToken,
     ) {
-        self.at_stage_encoded(
+        if let Some(contract) = contract {
+            self.numbers.push(NumberRequirement {
+                record_index: self.record_index,
+                field: field.to_owned(),
+                source_type: source_type.to_owned(),
+                contract,
+                token,
+            });
+            return;
+        }
+        self.at_stage(
             field,
             source_type,
             Note {
@@ -114,7 +122,6 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
                 unit: ExportDiagnosticUnit::Values,
                 target: None,
             },
-            encoding,
         );
     }
 
@@ -180,16 +187,6 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
     }
 
     fn at_stage(&mut self, field: &str, source_type: &str, note: Note) {
-        self.at_stage_encoded(field, source_type, note, NonFiniteEncoding::FiniteOnly);
-    }
-
-    fn at_stage_encoded(
-        &mut self,
-        field: &str,
-        source_type: &str,
-        note: Note,
-        encoding: NonFiniteEncoding,
-    ) {
         let Note {
             stage,
             code,
@@ -199,7 +196,7 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
         } = note;
         let diagnostic = self
             .diagnostics
-            .entry((stage, code, severity, unit, encoding))
+            .entry((stage, code, severity, unit))
             .or_insert_with(|| ExportDiagnostic {
                 kind: self.kind,
                 stage,
@@ -293,14 +290,8 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
     }
 
     pub(crate) fn finish(self) -> FieldInspection {
-        let mut diagnostics = Vec::new();
-        let mut resource_number_diagnostics = Vec::new();
-        for ((_, _, _, _, encoding), diagnostic) in self.diagnostics {
-            match encoding {
-                NonFiniteEncoding::FiniteOnly => diagnostics.push(diagnostic),
-                NonFiniteEncoding::ResourceBits => resource_number_diagnostics.push(diagnostic),
-            }
-        }
+        let diagnostics = self.diagnostics.into_values().collect();
+        let number_requirements = self.numbers;
         FieldInspection {
             record_index: self.record_index,
             kind: self.kind,
@@ -309,7 +300,7 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
             role: self.role,
             complete: self.complete,
             diagnostics,
-            resource_number_diagnostics,
+            number_requirements,
             unresolved_references: self.unresolved,
             catalog_references: self.catalog_references,
         }

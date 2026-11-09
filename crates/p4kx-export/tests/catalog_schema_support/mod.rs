@@ -19,6 +19,7 @@ mod loot;
 mod mission_sets;
 mod npc_spawns;
 mod objective_properties;
+mod quality;
 mod recovery;
 mod reputation;
 mod resource_groups;
@@ -179,12 +180,12 @@ pub(crate) fn minimal_catalog() -> Value {
                 "tierIndex": 0
             }
         }],
-        "definitions": {"resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
+        "definitions": {"qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
             "tags": tags::definitions()},
         "declarations": {"tagRoots": tags::roots(), "entityTags": tags::entities(), "resourceGroupMembers": resource_groups::members()},
         "texts": {"publicNames": public_names(), "gameTexts": []},
-        "projections": {"commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents()},
+        "projections": {"qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents()},
         "provenance": {"sources": [], "uses": []},
         "blueprintCategories": [{
             "guid": "d1000000-0000-4000-8000-000000000001",
@@ -197,29 +198,6 @@ pub(crate) fn minimal_catalog() -> Value {
             "className": "GPP_Armor",
             "recordPath": "libs/foundry/records/crafting/craftedproperties/gpp_armor",
             "name": {"key": "@StatName_GPP_Armor", "en": "Armour", "de": null}
-        }],
-        "qualityDistributions": [{
-            "guid": "e2000000-0000-4000-8000-000000000001",
-            "className": "Creature_Pyro",
-            "recordPath": "libs/foundry/records/crafting/qualitydistribution/creature_pyro",
-            "distribution": null,
-            "overrides": [{
-                "locationGuid": "e3000000-0000-4000-8000-000000000001",
-                "distribution": {
-                    "kind": "CraftingQualityDistributionNormal",
-                    "min": 1, "max": 1000, "mean": 269.0, "stddev": null
-                }
-            }]
-        }],
-        "qualityQuantizations": [{
-            "guid": "e4000000-0000-4000-8000-000000000001",
-            "className": "quantization_gold",
-            "recordPath": "libs/foundry/records/crafting/qualityquantization/quantization_gold",
-            "bands": [
-                {"start": 0, "end": 399, "mappedValue": 264},
-                {"start": 400, "end": 1000, "mappedValue": 553}
-            ],
-            "resourceTypeGuids": ["b1000000-0000-4000-8000-000000000001"]
         }],
         "blueprintPools": blueprints::pools(),
         "dismantleProcesses": [{

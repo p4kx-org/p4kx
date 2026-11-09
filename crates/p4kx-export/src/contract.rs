@@ -30,13 +30,12 @@ pub(crate) use crate::contract_mining::{
 pub(crate) use crate::contract_mining_params::MiningGlobalParams;
 pub(crate) use crate::contract_mission_data::{ContractScenario, MissionLocality, MissionType};
 pub(crate) use crate::contract_missions::ContractEntry;
-pub(crate) use crate::contract_quantization::QualityQuantization;
 pub(crate) use crate::contract_recovery::ItemRecovery;
 pub(crate) use crate::contract_reputation::{
     FactionReputation, ReputationContext, ReputationScope, ReputationStanding,
 };
 pub(crate) use crate::contract_rewards::{
-    BlueprintPool, CraftingGlobal, DismantleProcess, GameplayProperty, QualityDistribution,
+    BlueprintPool, CraftingGlobal, DismantleProcess, GameplayProperty,
 };
 pub(crate) use crate::contract_shops::Shop;
 pub(crate) use crate::contract_source::{BuildSource, Source};
@@ -90,10 +89,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'a>>,
     /// The gameplay property definitions the quality modifiers refer to, ordered by GUID.
     pub(crate) gameplay_properties: Vec<GameplayProperty<'a>>,
-    /// The quality distributions and their location overrides, ordered by GUID.
-    pub(crate) quality_distributions: Vec<QualityDistribution<'a>>,
-    /// The quality quantizations, the quantised quality steps per `ResourceType`, ordered by GUID.
-    pub(crate) quality_quantizations: Vec<QualityQuantization<'a>>,
     /// The blueprint pools with the places that reward them, ordered by GUID.
     pub(crate) blueprint_pools: Vec<BlueprintPool<'a>>,
     /// The dismantle processes, ordered by GUID.

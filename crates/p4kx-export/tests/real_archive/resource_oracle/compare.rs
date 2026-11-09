@@ -32,9 +32,9 @@ pub(super) fn scalar(raw: &Raw<'_>, value: &Value, path: &str) -> Result<bool> {
 
 fn number(raw: &Raw<'_>, value: &Value, path: &str) -> Result<bool> {
     let equal = match raw {
-        Raw::Int8(expected) => signed(value, "int8", i64::from(*expected), false),
-        Raw::Int16(expected) => signed(value, "int16", i64::from(*expected), false),
-        Raw::Int32(expected) => signed(value, "int32", i64::from(*expected), plain_int32(path)),
+        Raw::Int8(expected) => signed(value, "int8", i64::from(*expected)),
+        Raw::Int16(expected) => signed(value, "int16", i64::from(*expected)),
+        Raw::Int32(expected) => signed(value, "int32", i64::from(*expected)),
         Raw::Int64(expected) => {
             value["type"] == "int64"
                 && value["value"].as_str() == Some(expected.to_string().as_str())
@@ -69,16 +69,7 @@ fn number(raw: &Raw<'_>, value: &Value, path: &str) -> Result<bool> {
     Ok(equal)
 }
 
-fn plain_int32(path: &str) -> bool {
-    matches!(
-        path.rsplit('.').next(),
-        Some("min" | "max" | "start" | "end" | "mappedValue")
-    )
-}
-fn signed(value: &Value, kind: &str, expected: i64, plain: bool) -> bool {
-    if plain {
-        return value.as_i64() == Some(expected);
-    }
+fn signed(value: &Value, kind: &str, expected: i64) -> bool {
     value["type"] == kind && value["value"].as_i64() == Some(expected)
 }
 
@@ -97,7 +88,10 @@ fn float<T: Serialize>(
         serde_json::to_vec(&source).map_err(|error| Failure::source("raw-float-json", error))?;
     let expected: Value = serde_json::from_slice(&bytes)
         .map_err(|error| Failure::source("raw-float-number", error))?;
-    let tagged = matches!(path.rsplit('.').next(), Some("mean" | "stddev"));
+    let tagged = matches!(
+        path.rsplit('.').next(),
+        Some("min" | "max" | "start" | "end" | "mappedValue" | "mean" | "stddev")
+    );
     let width = if tagged {
         value["type"] == kind
     } else {
@@ -148,6 +142,10 @@ pub(super) const fn is_reference(raw: &Raw<'_>) -> bool {
             )
     )
 }
+
+#[cfg(test)]
+#[path = "compare_numeric_tests.rs"]
+mod numeric_tests;
 
 #[cfg(test)]
 mod tests {
@@ -265,7 +263,11 @@ mod tests {
             "false is not numeric zero"
         );
         assert!(
-            scalar(&Raw::Int32(0), &json!(0), "quality.min")?,
+            scalar(
+                &Raw::Int32(0),
+                &json!({"type":"int32", "value":0}),
+                "quality.min"
+            )?,
             "zero is an authored bound"
         );
         assert!(

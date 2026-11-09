@@ -205,6 +205,14 @@ fn quality_sources_reuse_exact_curves_and_preserve_nested_record_links() -> Test
     let alpha =
         &row(&catalog, "resourceTypes", fixture::RESOURCE_ALPHA)?["properties"][1]["payload"];
     let curve = &alpha["qualityDistribution"]["payload"]["value"];
+    assert_eq!(
+        alpha["qualityDistribution"]["sourceType"],
+        "CraftingQualityDistributionNormal"
+    );
+    assert!(
+        curve.get("kind").is_none(),
+        "canonical inline data does not copy the owning sourceType"
+    );
     assert_eq!(curve["min"], 16_777_217);
     assert_eq!(curve["max"], i32::MAX);
     assert_eq!(curve["mean"], 9.5);
@@ -232,8 +240,15 @@ fn quality_sources_reuse_exact_curves_and_preserve_nested_record_links() -> Test
         catalog_crafting_support::text(fixture::QUANTIZATION)
     );
     assert_eq!(
-        row(&catalog, "qualityDistributions", fixture::DISTRIBUTION)?["distribution"]["min"],
-        i32::MIN
+        crate::quality_v3_support::at(
+            crate::quality_v3_support::rows(&catalog, crate::quality_v3_support::DISTRIBUTIONS)?
+                .iter()
+                .find(|row| row.pointer("/guid/value").and_then(Value::as_str)
+                    == Some(catalog_crafting_support::text(fixture::DISTRIBUTION).as_str()))
+                .ok_or("quality distribution")?,
+            "/qualityDistribution/value/payload/value/value/value/min/value/value"
+        )?,
+        &json!(i32::MIN)
     );
     Ok(())
 }

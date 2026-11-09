@@ -1809,6 +1809,12 @@
         "manufacturers": {
           "$ref": "#/$defs/CatalogTableOfManufacturerDefinition"
         },
+        "qualityDistributions": {
+          "$ref": "#/$defs/CatalogTableOfQualityDistributionDefinition"
+        },
+        "qualityQuantizations": {
+          "$ref": "#/$defs/CatalogTableOfQualityQuantizationDefinition"
+        },
         "resourceGroups": {
           "$ref": "#/$defs/CatalogTableOfResourceGroupDefinition"
         },
@@ -1822,6 +1828,8 @@
       "required": [
         "commodities",
         "manufacturers",
+        "qualityDistributions",
+        "qualityQuantizations",
         "resourceGroups",
         "resourceTypes",
         "tags"
@@ -1834,6 +1842,9 @@
         "commodityPresentation": {
           "$ref": "#/$defs/CatalogTableOfCommodityPresentation"
         },
+        "qualityQuantizationResources": {
+          "$ref": "#/$defs/CatalogTableOfQualityQuantizationResources"
+        },
         "resourceGroupParents": {
           "$ref": "#/$defs/CatalogTableOfResourceGroupParent"
         },
@@ -1843,6 +1854,7 @@
       },
       "required": [
         "commodityPresentation",
+        "qualityQuantizationResources",
         "resourceGroupParents",
         "tagPaths"
       ],
@@ -1958,6 +1970,63 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ManufacturerDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfQualityDistributionDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/QualityDistributionDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfQualityQuantizationDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/QualityQuantizationDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfQualityQuantizationResources": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/QualityQuantizationResources"
           },
           "type": "array"
         }
@@ -7761,7 +7830,7 @@
       "description": "An inline payload from the same original Record owner.",
       "properties": {
         "value": {
-          "$ref": "#/$defs/SourcedValueOfResourceQualityCurve"
+          "$ref": "#/$defs/SourcedValueOfQualityCurveSource"
         }
       },
       "required": [
@@ -7773,7 +7842,7 @@
       "description": "An inline payload from the same original Record owner.",
       "properties": {
         "value": {
-          "$ref": "#/$defs/SourcedValueOfResourceQualityOverrides"
+          "$ref": "#/$defs/SourcedValueOfQualityOverridesSource"
         }
       },
       "required": [
@@ -7785,7 +7854,7 @@
       "description": "An inline payload from the same original Record owner.",
       "properties": {
         "value": {
-          "$ref": "#/$defs/SourcedValueOfResourceQualityQuantization"
+          "$ref": "#/$defs/SourcedValueOfQualityQuantizationSource"
         }
       },
       "required": [
@@ -10048,38 +10117,6 @@
       "required": [
         "displayName",
         "tag"
-      ],
-      "type": "object"
-    },
-    "LocationOverride": {
-      "description": "A distribution that replaces the default one at a location.",
-      "properties": {
-        "distribution": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/QualityCurve"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The distribution at the location, `null` when the Record holds none."
-        },
-        "locationGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the location Record, `null` for a null Reference."
-        }
-      },
-      "required": [
-        "distribution",
-        "locationGuid"
       ],
       "type": "object"
     },
@@ -13842,52 +13879,47 @@
       "description": "A reference into the public short-name domain.",
       "type": "string"
     },
-    "QualityCurve": {
-      "description": "A quality distribution with exact source integer bounds and floating-point parameters.",
+    "QualityBandSource": {
+      "description": "Exact numeric storage of one source quantization band.",
       "properties": {
-        "kind": {
-          "description": "The concrete source distribution struct.",
-          "type": "string"
+        "end": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "max": {
-          "description": "The exact source maximum quality, absent only for a missing or null field.",
-          "format": "int32",
-          "maximum": 2147483647,
-          "minimum": -2147483648,
-          "type": [
-            "integer",
-            "null"
-          ]
+        "mappedValue": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "mean": {
-          "description": "The finite source mean, represented as a 32-bit float.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "min": {
-          "description": "The exact source minimum quality, absent only for a missing or null field.",
-          "format": "int32",
-          "maximum": 2147483647,
-          "minimum": -2147483648,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "stddev": {
-          "description": "The finite source standard deviation, represented as a 32-bit float.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "start": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         }
       },
       "required": [
-        "kind",
+        "end",
+        "mappedValue",
+        "sourceType",
+        "start"
+      ],
+      "type": "object"
+    },
+    "QualityCurveSource": {
+      "description": "Exact source bounds and numeric representations of one inline distribution.",
+      "properties": {
+        "max": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "mean": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "min": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "stddev": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
         "max",
         "mean",
         "min",
@@ -13895,85 +13927,334 @@
       ],
       "type": "object"
     },
-    "QualityDistribution": {
-      "description": "A quality distribution Record under `crafting/qualitydistribution`: the default distribution\nof a source or the list of its location overrides.",
+    "QualityDistributionDefinition": {
+      "description": "Authored distribution and location-override declarations of one physical Record.",
       "properties": {
         "className": {
-          "description": "The Record name without its type.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "distribution": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/QualityCurve"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The distribution of a `CraftingQualityDistributionRecord`, `null` for an override Record."
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
         },
-        "overrides": {
-          "description": "The overrides of a `CraftingQualityLocationOverrideRecord`, empty for a default Record.",
-          "items": {
-            "$ref": "#/$defs/LocationOverride"
-          },
-          "type": "array"
+        "locationOverride": {
+          "$ref": "#/$defs/SourcedValueOfQualitySource2"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "qualityDistribution": {
+          "$ref": "#/$defs/SourcedValueOfQualitySource"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
         "className",
-        "distribution",
+        "fileName",
         "guid",
-        "overrides",
-        "recordPath"
+        "locationOverride",
+        "metadataTag",
+        "qualityDistribution",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
       ],
       "type": "object"
     },
-    "QualityQuantization": {
-      "description": "A quality quantization: a `CraftingQualityQuantizationRecord` under\n`crafting/qualityquantization`, the quantised quality steps of the `ResourceType`s that link to\nit. The Record itself holds no link to a `ResourceType`; the link goes the other way, so\n`resourceTypeGuids` is derived from the `ResourceType` Records.",
+    "QualityOverrideFields": {
+      "description": "Authored location and distribution fields of an override entry.",
       "properties": {
-        "bands": {
-          "description": "The bands in stored order, 8 on LIVE and the same ranges for every Record.",
-          "items": {
-            "$ref": "#/$defs/QuantizationBand"
-          },
-          "type": "array"
+        "location": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
         },
-        "className": {
-          "description": "The Record name without its type, e.g. `Quantization_Gold`.",
-          "type": "string"
-        },
-        "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
-        },
-        "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
-        },
-        "resourceTypeGuids": {
-          "description": "The GUIDs of the `ResourceType` Records whose crafting data link to the Record, ordered by\nGUID. It equals a commodity's `subtypeGuid` only when the catalog has that commodity.\nEmpty for a Record no `ResourceType` uses.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
+        "qualityDistribution": {
+          "$ref": "#/$defs/SourcedValueOfQualitySource"
         }
       },
       "required": [
-        "bands",
+        "location",
+        "qualityDistribution"
+      ],
+      "type": "object"
+    },
+    "QualityOverridePayload": {
+      "description": "The closed override-entry shapes accepted from the source.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/QualityOverrideFields",
+          "properties": {
+            "type": {
+              "const": "entry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "emptyBase",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "QualityOverrideSource": {
+      "description": "A concrete location-override entry with its actual source type.",
+      "properties": {
+        "payload": {
+          "$ref": "#/$defs/SourcedValueOfQualityOverridePayload"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "payload",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "QualityOverridesSource": {
+      "description": "An ordered nullable list of source location overrides.",
+      "properties": {
+        "locationOverrideList": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfQualityOverrideSource"
+        }
+      },
+      "required": [
+        "locationOverrideList"
+      ],
+      "type": "object"
+    },
+    "QualityPayload": {
+      "description": "Closed ownership forms of quality payload declarations.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/InlineQuality",
+          "properties": {
+            "type": {
+              "const": "inline",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/QualityRecordReference",
+          "properties": {
+            "type": {
+              "const": "recordRef",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "emptyBase",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "QualityPayload2": {
+      "description": "Closed ownership forms of quality payload declarations.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/InlineQuality2",
+          "properties": {
+            "type": {
+              "const": "inline",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/QualityRecordReference",
+          "properties": {
+            "type": {
+              "const": "recordRef",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "emptyBase",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "QualityPayload3": {
+      "description": "Closed ownership forms of quality payload declarations.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/InlineQuality3",
+          "properties": {
+            "type": {
+              "const": "inline",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/QualityRecordReference",
+          "properties": {
+            "type": {
+              "const": "recordRef",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "emptyBase",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "QualityQuantizationDefinition": {
+      "description": "Authored quantization declarations, independent of inverse eligibility.",
+      "properties": {
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "qualityQuantization": {
+          "$ref": "#/$defs/SourcedValueOfQualitySource3"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
         "className",
+        "fileName",
         "guid",
+        "metadataTag",
+        "qualityQuantization",
+        "recordIndex",
+        "recordName",
         "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "QualityQuantizationResources": {
+      "description": "A first-eligible nominal-GUID inverse without a second authored quality payload.",
+      "properties": {
+        "eligibility": {
+          "$ref": "#/$defs/SourcedValueOfQuantizationEligibility"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "resourceTypeGuids": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGuid"
+        }
+      },
+      "required": [
+        "eligibility",
+        "guid",
+        "recordIndex",
         "resourceTypeGuids"
+      ],
+      "type": "object"
+    },
+    "QualityQuantizationSource": {
+      "description": "Ordered source quantization bands, retaining every nullable position.",
+      "properties": {
+        "bands": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfQualityBandSource"
+        }
+      },
+      "required": [
+        "bands"
       ],
       "type": "object"
     },
@@ -13986,6 +14267,54 @@
       },
       "required": [
         "reference"
+      ],
+      "type": "object"
+    },
+    "QualitySource": {
+      "description": "An authored quality source retaining its inline or Reference form.",
+      "properties": {
+        "payload": {
+          "$ref": "#/$defs/SourcedValueOfQualityPayload"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "payload",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "QualitySource2": {
+      "description": "An authored quality source retaining its inline or Reference form.",
+      "properties": {
+        "payload": {
+          "$ref": "#/$defs/SourcedValueOfQualityPayload2"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "payload",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "QualitySource3": {
+      "description": "An authored quality source retaining its inline or Reference form.",
+      "properties": {
+        "payload": {
+          "$ref": "#/$defs/SourcedValueOfQualityPayload3"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "payload",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -14015,31 +14344,49 @@
       ],
       "type": "object"
     },
-    "QuantizationBand": {
-      "description": "One band of a quality quantization: every quality from `start` to `end` counts as\n`mappedValue`.",
-      "properties": {
-        "end": {
-          "description": "The highest quality of the band, inclusive, 399 to 1000 on LIVE.",
-          "format": "int64",
-          "type": "integer"
+    "QuantizationEligibility": {
+      "description": "The narrow eligibility result used by the nominal-GUID inverse relation.",
+      "oneOf": [
+        {
+          "properties": {
+            "status": {
+              "const": "eligible",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
         },
-        "mappedValue": {
-          "description": "The quality the game uses for every quality in the band, 0 to 1000 on LIVE.",
-          "format": "int64",
-          "type": "integer"
-        },
-        "start": {
-          "description": "The lowest quality of the band, 0 to 999 on LIVE.",
-          "format": "int64",
-          "type": "integer"
+        {
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/QuantizationIneligibility"
+            },
+            "status": {
+              "const": "notEligible",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
         }
-      },
-      "required": [
-        "end",
-        "mappedValue",
-        "start"
+      ]
+    },
+    "QuantizationIneligibility": {
+      "description": "Original source decisions that exclude a complete raw definition from inverse lookup.",
+      "enum": [
+        "noInlineBands",
+        "emptyBands",
+        "invalidBands",
+        "unavailable"
       ],
-      "type": "object"
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "QuantumDriveStats": {
       "description": "A quantum drive.",
@@ -14861,13 +15208,13 @@
       "description": "Independently authored quality configuration sources.",
       "properties": {
         "qualityDistribution": {
-          "$ref": "#/$defs/SourcedValueOfResourceQualitySource"
+          "$ref": "#/$defs/SourcedValueOfQualitySource"
         },
         "qualityLocationOverride": {
-          "$ref": "#/$defs/SourcedValueOfResourceQualitySource2"
+          "$ref": "#/$defs/SourcedValueOfQualitySource2"
         },
         "qualityQuantization": {
-          "$ref": "#/$defs/SourcedValueOfResourceQualitySource3"
+          "$ref": "#/$defs/SourcedValueOfQualitySource3"
         }
       },
       "required": [
@@ -15279,6 +15626,8 @@
             },
             "value": {
               "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -15350,6 +15699,7 @@
             },
             "value": {
               "format": "uint32",
+              "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             }
@@ -15466,321 +15816,6 @@
           "type": "object"
         }
       ]
-    },
-    "ResourceQualityCurve": {
-      "description": "Exact source bounds and numeric representations of one inline distribution.",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/SourcedValueOfstring"
-        },
-        "max": {
-          "$ref": "#/$defs/SourcedValueOfint32"
-        },
-        "mean": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
-        },
-        "min": {
-          "$ref": "#/$defs/SourcedValueOfint32"
-        },
-        "stddev": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
-        }
-      },
-      "required": [
-        "kind",
-        "max",
-        "mean",
-        "min",
-        "stddev"
-      ],
-      "type": "object"
-    },
-    "ResourceQualityOverride": {
-      "description": "A concrete location-override entry with its actual source type.",
-      "properties": {
-        "payload": {
-          "$ref": "#/$defs/SourcedValueOfResourceQualityOverridePayload"
-        },
-        "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
-        }
-      },
-      "required": [
-        "payload",
-        "sourceType"
-      ],
-      "type": "object"
-    },
-    "ResourceQualityOverrideFields": {
-      "description": "Authored location and distribution fields of an override entry.",
-      "properties": {
-        "location": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
-        },
-        "qualityDistribution": {
-          "$ref": "#/$defs/SourcedValueOfResourceQualitySource"
-        }
-      },
-      "required": [
-        "location",
-        "qualityDistribution"
-      ],
-      "type": "object"
-    },
-    "ResourceQualityOverridePayload": {
-      "description": "The closed override-entry shapes accepted from the source.",
-      "oneOf": [
-        {
-          "$ref": "#/$defs/ResourceQualityOverrideFields",
-          "properties": {
-            "type": {
-              "const": "entry",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "emptyBase",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "ResourceQualityOverrides": {
-      "description": "An ordered nullable list of source location overrides.",
-      "properties": {
-        "locationOverrideList": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceQualityOverride"
-        }
-      },
-      "required": [
-        "locationOverrideList"
-      ],
-      "type": "object"
-    },
-    "ResourceQualityPayload": {
-      "description": "Closed ownership forms of quality payload declarations.",
-      "oneOf": [
-        {
-          "$ref": "#/$defs/InlineQuality",
-          "properties": {
-            "type": {
-              "const": "inline",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        },
-        {
-          "$ref": "#/$defs/QualityRecordReference",
-          "properties": {
-            "type": {
-              "const": "recordRef",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "emptyBase",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "ResourceQualityPayload2": {
-      "description": "Closed ownership forms of quality payload declarations.",
-      "oneOf": [
-        {
-          "$ref": "#/$defs/InlineQuality2",
-          "properties": {
-            "type": {
-              "const": "inline",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        },
-        {
-          "$ref": "#/$defs/QualityRecordReference",
-          "properties": {
-            "type": {
-              "const": "recordRef",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "emptyBase",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "ResourceQualityPayload3": {
-      "description": "Closed ownership forms of quality payload declarations.",
-      "oneOf": [
-        {
-          "$ref": "#/$defs/InlineQuality3",
-          "properties": {
-            "type": {
-              "const": "inline",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        },
-        {
-          "$ref": "#/$defs/QualityRecordReference",
-          "properties": {
-            "type": {
-              "const": "recordRef",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "emptyBase",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "ResourceQualityQuantization": {
-      "description": "Ordered source quantization bands, retaining every nullable position.",
-      "properties": {
-        "bands": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceQuantizationBand"
-        }
-      },
-      "required": [
-        "bands"
-      ],
-      "type": "object"
-    },
-    "ResourceQualitySource": {
-      "description": "An authored quality source retaining its inline or Reference form.",
-      "properties": {
-        "payload": {
-          "$ref": "#/$defs/SourcedValueOfResourceQualityPayload"
-        },
-        "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
-        }
-      },
-      "required": [
-        "payload",
-        "sourceType"
-      ],
-      "type": "object"
-    },
-    "ResourceQualitySource2": {
-      "description": "An authored quality source retaining its inline or Reference form.",
-      "properties": {
-        "payload": {
-          "$ref": "#/$defs/SourcedValueOfResourceQualityPayload2"
-        },
-        "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
-        }
-      },
-      "required": [
-        "payload",
-        "sourceType"
-      ],
-      "type": "object"
-    },
-    "ResourceQualitySource3": {
-      "description": "An authored quality source retaining its inline or Reference form.",
-      "properties": {
-        "payload": {
-          "$ref": "#/$defs/SourcedValueOfResourceQualityPayload3"
-        },
-        "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
-        }
-      },
-      "required": [
-        "payload",
-        "sourceType"
-      ],
-      "type": "object"
-    },
-    "ResourceQuantizationBand": {
-      "description": "Exact Int32 fields of one source quantization band.",
-      "properties": {
-        "end": {
-          "$ref": "#/$defs/SourcedValueOfint32"
-        },
-        "mappedValue": {
-          "$ref": "#/$defs/SourcedValueOfint32"
-        },
-        "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
-        },
-        "start": {
-          "$ref": "#/$defs/SourcedValueOfint32"
-        }
-      },
-      "required": [
-        "end",
-        "mappedValue",
-        "sourceType",
-        "start"
-      ],
-      "type": "object"
     },
     "ResourceState": {
       "description": "One state of the resource component: its signatures and the resources it generates and uses.",
@@ -18374,6 +18409,272 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfQualityBandSource": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfQualityBandSource"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfQualityOverrideSource": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfQualityOverrideSource"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfResourceCargoSlot": {
       "allOf": [
         {
@@ -18602,272 +18903,6 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfResourceProperty"
-                },
-                "type": "array"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfArray_of_SourcedValueOfResourceQualityOverride": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "items": {
-                  "$ref": "#/$defs/SourcedValueOfResourceQualityOverride"
-                },
-                "type": "array"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfArray_of_SourcedValueOfResourceQuantizationBand": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "items": {
-                  "$ref": "#/$defs/SourcedValueOfResourceQuantizationBand"
                 },
                 "type": "array"
               }
@@ -21550,6 +21585,1696 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfQualityBandSource": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualityBandSource"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQualityCurveSource": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualityCurveSource"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQualityOverridePayload": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualityOverridePayload"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQualityOverrideSource": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualityOverrideSource"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQualityOverridesSource": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualityOverridesSource"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQualityPayload": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualityPayload"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQualityPayload2": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualityPayload2"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQualityPayload3": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualityPayload3"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQualityQuantizationSource": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualityQuantizationSource"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQualitySource": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualitySource"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQualitySource2": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualitySource2"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQualitySource3": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QualitySource3"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQuantizationEligibility": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QuantizationEligibility"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfResourceCargoSlot": {
       "allOf": [
         {
@@ -22720,1566 +24445,6 @@
       ],
       "type": "object"
     },
-    "SourcedValueOfResourceQualityCurve": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQualityCurve"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfResourceQualityOverride": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQualityOverride"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfResourceQualityOverridePayload": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQualityOverridePayload"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfResourceQualityOverrides": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQualityOverrides"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfResourceQualityPayload": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQualityPayload"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfResourceQualityPayload2": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQualityPayload2"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfResourceQualityPayload3": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQualityPayload3"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfResourceQualityQuantization": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQualityQuantization"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfResourceQualitySource": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQualitySource"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfResourceQualitySource2": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQualitySource2"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfResourceQualitySource3": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQualitySource3"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfResourceQuantizationBand": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/ResourceQuantizationBand"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
     "SourcedValueOfSourceEncryptionDeclaration": {
       "allOf": [
         {
@@ -24634,137 +24799,6 @@
             "properties": {
               "value": {
                 "type": "boolean"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfint32": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "format": "int32",
-                "type": "integer"
               }
             }
           }
@@ -27533,20 +27567,6 @@
       "$ref": "#/$defs/SourceInventory",
       "description": "Physical source observations and actual contribution uses."
     },
-    "qualityDistributions": {
-      "description": "The quality distributions and their location overrides, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/QualityDistribution"
-      },
-      "type": "array"
-    },
-    "qualityQuantizations": {
-      "description": "The quality quantizations, the quantised quality steps per `ResourceType`, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/QualityQuantization"
-      },
-      "type": "array"
-    },
     "refiningProcesses": {
       "description": "The refining processes, ordered by GUID.",
       "items": {
@@ -27670,8 +27690,6 @@
     "paints",
     "projections",
     "provenance",
-    "qualityDistributions",
-    "qualityQuantizations",
     "refiningProcesses",
     "reputationContexts",
     "reputationScopes",

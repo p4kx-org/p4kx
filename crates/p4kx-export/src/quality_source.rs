@@ -13,15 +13,15 @@ use crate::schema_fields;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceQualitySource<'source, T> {
+pub(crate) struct QualitySource<'source, T> {
     pub(crate) source_type: SourcedValue<&'source str>,
-    pub(crate) payload: SourcedValue<ResourceQualityPayload<T>>,
+    pub(crate) payload: SourcedValue<QualityPayload<T>>,
 }
 
 /// Closed ownership forms of quality payload declarations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub(crate) enum ResourceQualityPayload<T> {
+pub(crate) enum QualityPayload<T> {
     Inline(InlineQuality<T>),
     RecordRef(QualityRecordReference),
     EmptyBase,
@@ -47,10 +47,9 @@ pub(crate) struct QualityRecordReference {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceQualityCurve<'source> {
-    pub(crate) kind: SourcedValue<&'source str>,
-    pub(crate) min: SourcedValue<i32>,
-    pub(crate) max: SourcedValue<i32>,
+pub(crate) struct QualityCurveSource {
+    pub(crate) min: SourcedValue<ResourceNumber>,
+    pub(crate) max: SourcedValue<ResourceNumber>,
     pub(crate) mean: SourcedValue<ResourceNumber>,
     pub(crate) stddev: SourcedValue<ResourceNumber>,
 }
@@ -59,25 +58,25 @@ pub(crate) struct ResourceQualityCurve<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceQualityOverrides<'source> {
+pub(crate) struct QualityOverridesSource<'source> {
     pub(crate) location_override_list:
-        SourcedValue<Vec<SourcedValue<ResourceQualityOverride<'source>>>>,
+        SourcedValue<Vec<SourcedValue<QualityOverrideSource<'source>>>>,
 }
 
 /// A concrete location-override entry with its actual source type.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceQualityOverride<'source> {
+pub(crate) struct QualityOverrideSource<'source> {
     pub(crate) source_type: SourcedValue<&'source str>,
-    pub(crate) payload: SourcedValue<ResourceQualityOverridePayload<'source>>,
+    pub(crate) payload: SourcedValue<QualityOverridePayload<'source>>,
 }
 
 /// The closed override-entry shapes accepted from the source.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub(crate) enum ResourceQualityOverridePayload<'source> {
-    Entry(Box<ResourceQualityOverrideFields<'source>>),
+pub(crate) enum QualityOverridePayload<'source> {
+    Entry(Box<QualityOverrideFields<'source>>),
     EmptyBase,
 }
 
@@ -85,27 +84,26 @@ pub(crate) enum ResourceQualityOverridePayload<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceQualityOverrideFields<'source> {
+pub(crate) struct QualityOverrideFields<'source> {
     pub(crate) location: SourcedValue<CatalogRecordReference>,
-    pub(crate) quality_distribution:
-        SourcedValue<ResourceQualitySource<'source, ResourceQualityCurve<'source>>>,
+    pub(crate) quality_distribution: SourcedValue<QualitySource<'source, QualityCurveSource>>,
 }
 
 /// Ordered source quantization bands, retaining every nullable position.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceQualityQuantization<'source> {
-    pub(crate) bands: SourcedValue<Vec<SourcedValue<ResourceQuantizationBand<'source>>>>,
+pub(crate) struct QualityQuantizationSource<'source> {
+    pub(crate) bands: SourcedValue<Vec<SourcedValue<QualityBandSource<'source>>>>,
 }
 
-/// Exact Int32 fields of one source quantization band.
+/// Exact numeric storage of one source quantization band.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceQuantizationBand<'source> {
+pub(crate) struct QualityBandSource<'source> {
     pub(crate) source_type: SourcedValue<&'source str>,
-    pub(crate) start: SourcedValue<i32>,
-    pub(crate) end: SourcedValue<i32>,
-    pub(crate) mapped_value: SourcedValue<i32>,
+    pub(crate) start: SourcedValue<ResourceNumber>,
+    pub(crate) end: SourcedValue<ResourceNumber>,
+    pub(crate) mapped_value: SourcedValue<ResourceNumber>,
 }

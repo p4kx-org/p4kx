@@ -152,7 +152,13 @@ fn assemble<R>(
     let origins = CatalogOrigins::new(archive, entry, &sources)?;
     let projection = CatalogProjection::new(&texts, &origins);
     let crafting = kinds(
-        read_with_progress(&forge, options.filter, options.cancel, options.progress)?,
+        read_with_progress(
+            &forge,
+            options.filter,
+            options.cancel,
+            options.progress,
+            &origins,
+        )?,
         &texts,
         options.filter,
     );
@@ -263,6 +269,19 @@ fn assemble<R>(
             ),
         },
         definitions: CatalogDefinitions {
+            quality_distributions: CatalogTable::new(
+                &forge,
+                &[
+                    "CraftingQualityDistributionRecord",
+                    "CraftingQualityLocationOverrideRecord",
+                ],
+                collected.quality.distributions,
+            ),
+            quality_quantizations: CatalogTable::new(
+                &forge,
+                &["CraftingQualityQuantizationRecord"],
+                collected.quality.quantizations,
+            ),
             resource_groups: group_tables.definitions,
             tags: CatalogTable::new(&forge, &["Tag"], collected.tags.definitions),
             resource_types: CatalogTable::new(&forge, &["ResourceType"], collected.resource_types),
@@ -270,6 +289,11 @@ fn assemble<R>(
             manufacturers: crate::manufacturer::table(&forge, collected.manufacturers),
         },
         projections: CatalogProjections {
+            quality_quantization_resources: CatalogTable::new(
+                &forge,
+                &["CraftingQualityQuantizationRecord"],
+                collected.quality.inverse,
+            ),
             resource_group_parents: group_tables.parents,
             tag_paths: CatalogTable::new(&forge, &["Tag"], collected.tags.paths),
             commodity_presentation,
@@ -278,8 +302,6 @@ fn assemble<R>(
         provenance: origins.uses.freeze()?,
         blueprint_categories: collected.blueprint_categories,
         gameplay_properties: collected.gameplay_properties,
-        quality_distributions: collected.quality_distributions,
-        quality_quantizations: collected.quality_quantizations,
         blueprint_pools: collected.blueprint_pools,
         dismantle_processes: collected.dismantle_processes,
         crafting_global: collected.crafting_global,
@@ -338,7 +360,7 @@ fn assemble<R>(
             store_slugs: Box::new(resolved.summary),
             playability: collected.playability,
             variants,
-            quantizations: collected.quantization_summary,
+            quantizations: collected.quality.summary,
             failures: collected.failures,
             warnings: collected.warnings,
             archive_key: key_use,

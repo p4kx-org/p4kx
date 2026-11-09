@@ -6,11 +6,10 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::catalog_record_reference::CatalogRecordReference;
-use crate::resource_float::ResourceFloat32;
-use crate::resource_quality_source::{
-    ResourceQualityCurve, ResourceQualityOverrides, ResourceQualityQuantization,
-    ResourceQualitySource,
+use crate::quality_source::{
+    QualityCurveSource, QualityOverridesSource, QualityQuantizationSource, QualitySource,
 };
+use crate::resource_float::ResourceFloat32;
 use crate::schema_fields;
 
 /// One named authored cargo slot without a derived capacity.
@@ -56,12 +55,11 @@ pub(crate) struct ResourceVolatility {
 #[schemars(transform = schema_fields::every_field_required)]
 pub(crate) struct ResourceCraftingData<'source> {
     #[serde(rename = "qualityDistribution")]
-    pub(crate) distribution:
-        SourcedValue<ResourceQualitySource<'source, ResourceQualityCurve<'source>>>,
+    pub(crate) distribution: SourcedValue<QualitySource<'source, QualityCurveSource>>,
     #[serde(rename = "qualityLocationOverride")]
     pub(crate) location_override:
-        SourcedValue<ResourceQualitySource<'source, ResourceQualityOverrides<'source>>>,
+        SourcedValue<QualitySource<'source, QualityOverridesSource<'source>>>,
     #[serde(rename = "qualityQuantization")]
     pub(crate) quantization:
-        SourcedValue<ResourceQualitySource<'source, ResourceQualityQuantization<'source>>>,
+        SourcedValue<QualitySource<'source, QualityQuantizationSource<'source>>>,
 }

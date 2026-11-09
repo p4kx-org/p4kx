@@ -32,4 +32,5 @@ pub(crate) struct ExcludedCatalogRow {
 pub(crate) struct CatalogRows {
     pub(crate) emitted: Vec<CatalogRow>,
     pub(crate) filter: Option<Filter>,
+    pub(crate) numbers: Vec<crate::catalog_number_health::EmittedNumber>,
 }

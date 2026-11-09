@@ -5,17 +5,17 @@ use p4kx_extraction::StructValue;
 
 use crate::CatalogError;
 use crate::catalog_read::{CatalogFields, CatalogRecordContext};
-use crate::resource_quality_source::ResourceQualityCurve;
-use crate::resource_value_read;
+use crate::quality_source::QualityCurveSource;
+use crate::resource_value_read::{self, NumericPresence};
 use crate::source_fields::FieldError;
 
-/// Reads the resource-owned distribution without changing numeric representation.
-pub(crate) fn read<'f>(
-    source: &StructValue<'f>,
+/// Reads an inline distribution without changing numeric representation.
+pub(crate) fn read(
+    source: &StructValue<'_>,
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
-) -> Result<ResourceQualityCurve<'f>, CatalogError> {
+) -> Result<QualityCurveSource, CatalogError> {
     let fields = CatalogFields::new(source, path, context);
     if source.type_name() == "CraftingQualityDistributionNormal" {
         fields.check(&["min", "max", "mean", "stddev"], notes);
@@ -24,10 +24,9 @@ pub(crate) fn read<'f>(
     }
     let mean = resource_value_read::number(&fields, "mean", notes)?;
     let stddev = resource_value_read::number(&fields, "stddev", notes)?;
-    Ok(ResourceQualityCurve {
-        kind: fields.source_type()?,
-        min: fields.int32("min", notes)?,
-        max: fields.int32("max", notes)?,
+    Ok(QualityCurveSource {
+        min: resource_value_read::int32_number(&fields, "min", NumericPresence::Optional, notes)?,
+        max: resource_value_read::int32_number(&fields, "max", NumericPresence::Optional, notes)?,
         mean,
         stddev,
     })

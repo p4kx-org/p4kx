@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, Kind, build_catalog};
 use p4kx_extraction::{Archive, DataForgeEntry, Guid};
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
@@ -71,31 +71,69 @@ fn the_quality_quantizations_of_a_real_archive_link_to_resource_types() -> TestR
     let mut linked: HashSet<String> = HashSet::new();
     let (mut links, mut exported) = (0_usize, 0_usize);
     for quantization in entries {
-        let name = quantization["className"].as_str().ok_or("a className")?;
-        let bands = quantization["bands"].as_array().ok_or("bands")?;
+        let name =
+            catalog_v3_consumer::field(quantization, Kind::QualityQuantizations, "className")?
+                .as_str()
+                .ok_or("a className")?;
+        let original = quantization
+            .pointer("/recordIndex/value")
+            .and_then(Value::as_u64)
+            .ok_or("physical quality owner")?;
+        let inverse = catalog
+            .pointer("/projections/qualityQuantizationResources/rows")
+            .and_then(Value::as_array)
+            .ok_or("canonical inverse table")?
+            .iter()
+            .find(|row| row.pointer("/recordIndex/value").and_then(Value::as_u64) == Some(original))
+            .ok_or("same physical inverse owner")?;
+        if !eligible(inverse)? {
+            assert_eq!(
+                inverse
+                    .pointer("/resourceTypeGuids/value")
+                    .and_then(Value::as_array)
+                    .map(Vec::len),
+                Some(0),
+                "ineligible sources assign no inverse resources"
+            );
+            continue;
+        }
+        let bands = quantization
+            .pointer("/qualityQuantization/value/payload/value/value/value/bands/value")
+            .and_then(Value::as_array)
+            .ok_or("raw source bands")?;
         assert!(!bands.is_empty(), "{name} has bands");
         let mut next = 0_i64;
         for band in bands {
             let (start, end) = (
-                band["start"].as_i64().ok_or("start")?,
-                band["end"].as_i64().ok_or("end")?,
+                band.pointer("/value/start/value/value")
+                    .and_then(Value::as_i64)
+                    .ok_or("start")?,
+                band.pointer("/value/end/value/value")
+                    .and_then(Value::as_i64)
+                    .ok_or("end")?,
             );
             assert_eq!(start, next, "{name}: the bands follow each other");
             assert!(start <= end, "{name}: a band ends after it starts");
             assert!(
-                band["mappedValue"].as_i64().is_some(),
+                band.pointer("/value/mappedValue/value/value")
+                    .and_then(Value::as_i64)
+                    .is_some(),
                 "{name}: mappedValue"
             );
             next = end + 1;
         }
         assert_eq!(next, 1001, "{name}: the bands cover 0 to 1000");
-        let types = quantization["resourceTypeGuids"]
-            .as_array()
+        let types = inverse
+            .pointer("/resourceTypeGuids/value")
+            .and_then(Value::as_array)
             .ok_or("resourceTypeGuids")?;
         if types.is_empty() {
             unlinked.push(name);
         }
-        for text in types.iter().filter_map(Value::as_str) {
+        for member in types {
+            let text = catalog_v3_consumer::present(member)?
+                .as_str()
+                .ok_or("sourced resource GUID")?;
             let record = text
                 .parse::<Guid>()
                 .ok()
@@ -129,4 +167,24 @@ fn the_quality_quantizations_of_a_real_archive_link_to_resource_types() -> TestR
         "every link of a ResourceType reaches a quantization of the catalog"
     );
     Ok(())
+}
+
+fn eligible(inverse: &Value) -> Result<bool, Box<dyn Error>> {
+    let result = catalog_v3_consumer::present(
+        inverse
+            .get("eligibility")
+            .ok_or("required eligibility carrier")?,
+    )?;
+    match result.get("status").and_then(Value::as_str) {
+        Some("eligible") => Ok(true),
+        Some("notEligible")
+            if matches!(
+                result.get("reason").and_then(Value::as_str),
+                Some("noInlineBands" | "emptyBands" | "invalidBands" | "unavailable")
+            ) =>
+        {
+            Ok(false)
+        }
+        _ => Err("unknown or absent quantization eligibility control".into()),
+    }
 }

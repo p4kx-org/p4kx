@@ -171,10 +171,21 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
             .map(|entry| catalog_v3_consumer::identity(entry, kind))
             .collect::<Result<_, _>>()?;
         assert_eq!(guids.len(), entities.len(), "{kind} all have a {own}");
-        assert!(
-            guids.is_sorted_by(|a, b| a < b),
-            "{kind} strictly ordered by {own}, none twice"
-        );
+        if matches!(
+            kind,
+            Kind::QualityDistributions | Kind::QualityQuantizations
+        ) {
+            assert!(
+                guids.is_sorted(),
+                "{kind} orders nominal GUIDs while retaining physical alternatives"
+            );
+            check_quality_identity(&catalog, kind)?;
+        } else {
+            assert!(
+                guids.is_sorted_by(|a, b| a < b),
+                "{kind} strictly ordered by {own}, none twice"
+            );
+        }
     }
     check_unique_guids(&catalog)?;
     assert_eq!(
@@ -221,6 +232,13 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
         .into_iter()
         .filter(|kind| !kind.is_derived() && !matches!(kind, Kind::Contracts | Kind::Crafters));
     for kind in kinds {
+        if matches!(
+            kind,
+            Kind::QualityDistributions | Kind::QualityQuantizations
+        ) {
+            check_quality_identity(catalog, kind)?;
+            continue;
+        }
         let mut family = HashSet::new();
         for entity in list(catalog, kind)? {
             let guid = catalog_v3_consumer::identity(entity, kind)?;
@@ -283,7 +301,11 @@ fn check_leftovers(catalog: &Value) -> TestResult {
             for field in ["recordPath", "className"] {
                 let text = if matches!(
                     kind,
-                    Kind::Manufacturers | Kind::Commodities | Kind::ResourceTypes
+                    Kind::Manufacturers
+                        | Kind::Commodities
+                        | Kind::ResourceTypes
+                        | Kind::QualityDistributions
+                        | Kind::QualityQuantizations
                 ) {
                     catalog_v3_consumer::field(entity, kind, field)?
                         .as_str()
@@ -343,4 +365,36 @@ fn the_catalog_of_a_second_real_archive_is_complete_plausible_and_within_the_lim
         return Ok(());
     };
     real_archive_catalog_links::check(&verify_catalog(&path, false)?)
+}
+
+fn check_quality_identity(catalog: &Value, kind: Kind) -> TestResult {
+    let mut physical = HashSet::new();
+    let mut order = Vec::new();
+    for row in list(catalog, kind)? {
+        let index = catalog_v3_consumer::field(row, kind, "recordIndex")?
+            .as_u64()
+            .ok_or("original physical Record index")?;
+        if !physical.insert(index) {
+            return Err("one physical quality definition cannot occur twice".into());
+        }
+        let source_type = catalog_v3_consumer::field(row, kind, "sourceType")?
+            .as_str()
+            .ok_or("quality source type")?;
+        let matching = match kind {
+            Kind::QualityDistributions => matches!(
+                source_type,
+                "CraftingQualityDistributionRecord" | "CraftingQualityLocationOverrideRecord"
+            ),
+            Kind::QualityQuantizations => source_type == "CraftingQualityQuantizationRecord",
+            _ => false,
+        };
+        if !matching {
+            return Err("a physical quality row belongs to its declared source family".into());
+        }
+        order.push((catalog_v3_consumer::identity(row, kind)?, index));
+    }
+    if !order.is_sorted() {
+        return Err("equal nominal GUIDs keep increasing original physical positions".into());
+    }
+    Ok(())
 }

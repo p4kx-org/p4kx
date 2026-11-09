@@ -11,6 +11,7 @@ use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestT
 use serde_json::{Value, json};
 
 use crate::catalog_crafting_support;
+use crate::quality_v3_support as source;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -110,10 +111,22 @@ fn catalog_preserves_fieldless_top_level_and_resource_source_forms() -> TestResu
     let (_, catalog) = catalog_crafting_support::build_from(&database(BaseShape::Empty), None)?;
     for (index, name) in [BASE, NON_REF].into_iter().enumerate() {
         assert_eq!(
-            catalog["qualityDistributions"][index]["distribution"],
-            json!({
-                "kind": name, "min": null, "max": null, "mean": null, "stddev": null,
-            })
+            source::at(
+                source::rows(&catalog, source::DISTRIBUTIONS)?
+                    .get(index)
+                    .ok_or("quality row")?,
+                "/qualityDistribution/value/sourceType/value"
+            )?,
+            &json!(name)
+        );
+        assert_eq!(
+            source::at(
+                source::rows(&catalog, source::DISTRIBUTIONS)?
+                    .get(index)
+                    .ok_or("quality row")?,
+                "/qualityDistribution/value/payload/value/type"
+            )?,
+            &json!("emptyBase")
         );
         assert_eq!(
             catalog["resourceTypes"][index]["properties"][0]["payload"]["qualityDistribution"],
@@ -139,7 +152,7 @@ fn an_additional_declared_base_field_requires_diagnostic_publication() -> TestRe
     ));
     let (_, catalog) = catalog_crafting_support::diagnostic_from(&database, None)?;
     assert_eq!(
-        catalog["qualityDistributions"].as_array().map(Vec::len),
+        Some(source::rows(&catalog, source::DISTRIBUTIONS)?.len()),
         Some(2)
     );
     assert_eq!(catalog["resourceTypes"].as_array().map(Vec::len), Some(2));

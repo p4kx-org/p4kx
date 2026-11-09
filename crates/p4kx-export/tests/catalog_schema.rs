@@ -12,6 +12,8 @@ mod catalog_schema_support;
 mod health;
 #[path = "catalog_schema/mission_values.rs"]
 mod mission_values;
+#[path = "catalog_schema/quality_contract.rs"]
+mod quality_contract;
 #[path = "catalog_schema/resource_groups.rs"]
 mod resource_groups;
 #[path = "catalog_schema/revision.rs"]
@@ -153,8 +155,6 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         "blueprints",
         "blueprintCategories",
         "gameplayProperties",
-        "qualityDistributions",
-        "qualityQuantizations",
         "blueprintPools",
         "dismantleProcesses",
         "paints",
@@ -166,6 +166,7 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         assert!(validator.is_valid(&unknown), "unknown fields in {kind}");
     }
 
+    quality_contract::assert_unknown_quality_fields(&validator, &catalog)?;
     let mut unknown_manufacturer = catalog.clone();
     unknown_manufacturer["definitions"]["manufacturers"]["rows"][0]["extra"] = json!(true);
     assert!(

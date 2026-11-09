@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "catalog_input_limits.rs"]
+pub(crate) mod catalog_input_limits;
+#[path = "catalog_number_capture.rs"]
+pub(crate) mod catalog_number_capture;
+#[path = "catalog_number_diagnostics.rs"]
+pub(crate) mod catalog_number_diagnostics;
+#[path = "catalog_number_health.rs"]
+pub(crate) mod catalog_number_health;
+#[path = "number_position.rs"]
+pub(crate) mod number_position;
+
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
 #[path = "tag_catalog.rs"]
@@ -18,6 +29,14 @@ pub(crate) mod catalog_read;
 pub(crate) mod catalog_record_reference;
 #[path = "catalog_text_contract.rs"]
 pub(crate) mod catalog_text_contract;
+#[path = "quality_bands_read.rs"]
+pub(crate) mod quality_bands_read;
+#[path = "quality_curve_source_read.rs"]
+pub(crate) mod quality_curve_source_read;
+#[path = "quality_source.rs"]
+pub(crate) mod quality_source;
+#[path = "quality_source_read.rs"]
+pub(crate) mod quality_source_read;
 #[path = "resource_density_read.rs"]
 pub(crate) mod resource_density_read;
 #[path = "resource_density_source.rs"]
@@ -40,14 +59,6 @@ pub(crate) mod resource_number;
 pub(crate) mod resource_property_contract;
 #[path = "resource_property_read.rs"]
 pub(crate) mod resource_property_read;
-#[path = "resource_quality_curve.rs"]
-pub(crate) mod resource_quality_curve;
-#[path = "resource_quality_read.rs"]
-pub(crate) mod resource_quality_read;
-#[path = "resource_quality_source.rs"]
-pub(crate) mod resource_quality_source;
-#[path = "resource_quantization_read.rs"]
-pub(crate) mod resource_quantization_read;
 #[path = "resource_raw_policy.rs"]
 pub(crate) mod resource_raw_policy;
 #[path = "resource_read.rs"]

@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::canonical_record_header::CanonicalRecordHeader;
+use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::guid_text::CatalogGuid;
@@ -20,6 +21,8 @@ pub(crate) struct ResourceType<'source> {
     pub(crate) guid: CatalogGuid,
     #[serde(skip)]
     pub(crate) record_path: &'source str,
+    #[serde(skip)]
+    pub(crate) numbers: Vec<CapturedNumber>,
     #[serde(flatten)]
     pub(crate) data: ResourceDefinition<'source>,
 }

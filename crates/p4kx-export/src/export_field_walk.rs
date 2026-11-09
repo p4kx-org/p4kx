@@ -7,9 +7,12 @@ use p4kx_extraction::{
 };
 
 use crate::CatalogError;
+use crate::catalog_number_capture::FloatToken;
 use crate::export_diagnostic::{ExportDiagnosticCode, ExportDiagnosticSeverity, ExportSourceRole};
-use crate::export_field_collect::{FieldCollector, NonFiniteEncoding};
+use crate::export_field_collect::FieldCollector;
 use crate::export_ledger::{ExportAccountingError, ExportLedger};
+use crate::number_position::NumberPosition;
+use crate::resource_raw_policy::ResourceNumberContract;
 use crate::selection::Kind;
 
 /// Inspects only materialized owned values, retaining field failures independently of row mapping.
@@ -29,10 +32,15 @@ pub(crate) fn inspect(
     let mut walker = Walker {
         collector: FieldCollector::new(tree, record.index(), kind, role),
         visited: 0,
-        resource_raw_values: tree.type_name() == "ResourceType",
         cancel,
     };
-    walker.structure(tree.root(), &mut String::new(), 0, None)?;
+    walker.structure(
+        tree.root(),
+        &mut String::new(),
+        0,
+        None,
+        NumberPosition::Root,
+    )?;
     let mut ledger = ExportLedger::default();
     ledger.field_inspections.push(walker.collector.finish());
     Ok(ledger)
@@ -41,7 +49,6 @@ pub(crate) fn inspect(
 struct Walker<'t, 'f, 'c> {
     collector: FieldCollector<'t, 'f>,
     visited: usize,
-    resource_raw_values: bool,
     cancel: Option<&'c CancelToken>,
 }
 
@@ -52,6 +59,7 @@ impl Walker<'_, '_, '_> {
         path: &mut String,
         depth: usize,
         parent_type: Option<&str>,
+        position: NumberPosition,
     ) -> Result<bool, CatalogError> {
         if depth > MAX_NESTING_DEPTH {
             self.collector.limited(path, structure.type_name());
@@ -63,16 +71,14 @@ impl Walker<'_, '_, '_> {
                 path.push('.');
             }
             path.push_str(field.name());
-            let raw_float = self.resource_raw_values
-                && crate::resource_raw_policy::field_contract(structure.type_name(), field.name())
-                    .is_some_and(|contract| contract.captures(field.value()));
+            let position = position.field(structure.type_name(), field.name());
             let complete = self.value(
                 field.value(),
                 path,
                 structure.type_name(),
                 depth,
                 parent_type,
-                raw_float,
+                position,
             )?;
             path.truncate(length);
             if !complete {
@@ -89,7 +95,7 @@ impl Walker<'_, '_, '_> {
         source_type: &str,
         depth: usize,
         parent_type: Option<&str>,
-        raw_float: bool,
+        position: NumberPosition,
     ) -> Result<bool, CatalogError> {
         if self.cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
@@ -101,11 +107,35 @@ impl Walker<'_, '_, '_> {
         self.visited += 1;
         match value {
             Value::Struct(structure) => {
-                return self.structure(structure, path, depth + 1, Some(source_type));
+                self.structure(structure, path, depth + 1, Some(source_type), position)
             }
             Value::Array(values) => {
-                return self.array(values, path, source_type, depth, parent_type);
+                self.array(values, path, source_type, depth, parent_type, position)
             }
+            _ => Ok(self.scalar(
+                value,
+                path,
+                source_type,
+                parent_type,
+                position.contract(value),
+            )),
+        }
+    }
+
+    fn scalar(
+        &mut self,
+        value: &Value<'_>,
+        path: &str,
+        source_type: &str,
+        parent_type: Option<&str>,
+        contract: Option<ResourceNumberContract>,
+    ) -> bool {
+        if let Some(token) = FloatToken::read(value) {
+            self.collector
+                .non_finite(path, source_type, contract, token);
+            return true;
+        }
+        match value {
             Value::Null => self.collector.note(
                 path,
                 source_type,
@@ -129,23 +159,15 @@ impl Walker<'_, '_, '_> {
                     None,
                 );
             }
-            Value::Single(value) if !value.is_finite() => {
-                self.collector
-                    .non_finite(path, source_type, encoding(raw_float));
-            }
-            Value::Double(value) if !value.is_finite() => {
-                self.collector
-                    .non_finite(path, source_type, encoding(raw_float));
-            }
             Value::Error(error) => {
                 crate::export_field_error::record(&mut self.collector, path, source_type, *error);
             }
             Value::Reference(reference) => {
-                return Ok(self.reference(reference, path, source_type, parent_type));
+                return self.reference(reference, path, source_type, parent_type);
             }
             _ => {}
         }
-        Ok(true)
+        true
     }
 
     fn reference(
@@ -180,6 +202,7 @@ impl Walker<'_, '_, '_> {
         source_type: &str,
         depth: usize,
         parent_type: Option<&str>,
+        position: NumberPosition,
     ) -> Result<bool, CatalogError> {
         use std::fmt::Write as _;
 
@@ -198,20 +221,19 @@ impl Walker<'_, '_, '_> {
             write!(path, "[{index}]").map_err(|error| {
                 CatalogError::Accounting(ExportAccountingError::FieldPath(error))
             })?;
-            let complete = self.value(value, path, source_type, depth, parent_type, false)?;
+            let complete = self.value(
+                value,
+                path,
+                source_type,
+                depth,
+                parent_type,
+                position.element(),
+            )?;
             path.truncate(length);
             if !complete {
                 return Ok(false);
             }
         }
         Ok(true)
-    }
-}
-
-const fn encoding(raw_float: bool) -> NonFiniteEncoding {
-    if raw_float {
-        NonFiniteEncoding::ResourceBits
-    } else {
-        NonFiniteEncoding::FiniteOnly
     }
 }

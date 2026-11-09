@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::fs;
 
 use p4kx_export::{
-    CatalogError, CatalogFile, Compression, build_catalog, build_catalog_from, write_catalog_file,
+    CatalogFile, Compression, build_catalog, build_catalog_from, write_catalog_file,
     write_catalog_file_from,
 };
 use p4kx_extraction::{DataForgeEntry, Language};
@@ -162,12 +162,29 @@ fn raw_ieee_values_are_present_and_zero_false_empty_null_absent_stay_distinct() 
 }
 
 #[test]
-fn the_unported_quality_distribution_keeps_its_finite_projection_guard() -> TestResult {
+fn the_quality_distribution_retains_its_nonfinite_token_and_direct_plain_origin() -> TestResult {
     let (_directory, archive) = fixture::open(fixture::unported().build(), false)?;
-    let result = build_catalog(&archive, &fixture::options());
-    assert!(
-        matches!(result, Err(CatalogError::IncompleteExport { .. })),
-        "a different kind cannot silently serialize a nonfinite parameter as null"
+    let built = build_catalog(&archive, &fixture::options())?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    let row = crate::quality_v3_support::rows(&catalog, crate::quality_v3_support::DISTRIBUTIONS)?
+        .first()
+        .ok_or("quality definition")?;
+    let mean = crate::quality_v3_support::at(
+        row,
+        "/qualityDistribution/value/payload/value/value/value/mean",
+    )?;
+    assert_eq!(
+        crate::quality_v3_support::at(mean, "/value")?,
+        &serde_json::json!({"type":"f32", "rawBits":format!("{:08x}", f32::NAN.to_bits()), "finite":null})
+    );
+    crate::quality_v3_support::marker(mean, Some(false))?;
+    assert_eq!(
+        crate::quality_v3_support::at(mean, "/sourceSetComplete")?,
+        &serde_json::json!(true)
+    );
+    assert_eq!(
+        crate::quality_v3_support::at(&catalog, "/exportHealth/status")?,
+        &serde_json::json!("complete")
     );
     Ok(())
 }

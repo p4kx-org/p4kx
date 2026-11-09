@@ -5,10 +5,10 @@ use p4kx_extraction::{SourceValue, StructValue};
 
 use crate::CatalogError;
 use crate::catalog_read::{CatalogFields, CatalogRecordContext};
+use crate::quality_source_read;
 use crate::resource_property_contract::{
     ResourceCraftingData, ResourceProperty, ResourcePropertyPayload, ResourceVolatility,
 };
-use crate::resource_quality_read;
 use crate::resource_value_read;
 use crate::source_fields::FieldError;
 
@@ -71,7 +71,7 @@ fn crafting<'f>(
     let distribution = fields
         .structure("qualityDistribution", notes)?
         .try_map(|value| {
-            resource_quality_read::distribution(
+            quality_source_read::distribution(
                 value,
                 &format!("{path}.qualityDistribution"),
                 context,
@@ -81,7 +81,7 @@ fn crafting<'f>(
     let location_override = fields
         .structure("qualityLocationOverride", notes)?
         .try_map(|value| {
-            resource_quality_read::overrides(
+            quality_source_read::overrides(
                 value,
                 &format!("{path}.qualityLocationOverride"),
                 context,
@@ -91,7 +91,7 @@ fn crafting<'f>(
     let quantization = fields
         .structure("qualityQuantization", notes)?
         .try_map(|value| {
-            resource_quality_read::quantization(
+            quality_source_read::quantization(
                 value,
                 &format!("{path}.qualityQuantization"),
                 context,

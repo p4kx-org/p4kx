@@ -86,8 +86,8 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | blueprints | D.blueprints; C.blueprintTiers | tiers, first-tier ingredients, costs/quality/outputs, research separate |
 | blueprintCategories | D.blueprintCategories | category rules and identity |
 | gameplayProperties | D.gameplayProperties | quality-property targets, no guessed stat link |
-| qualityDistributions | D.qualityDistributions | quality curves/location overrides, inline vs referenced wrappers |
-| qualityQuantizations | D.qualityQuantizations | ordered bands/steps and ResourceType references |
+| qualityDistributions | D.qualityDistributions | complete physical declarations, exact numeric tokens and ordered nullable overrides; shared eight-field header and inline/recordRef/emptyBase forms ([contract](catalog-quality.md)) |
+| qualityQuantizations | D.qualityQuantizations; V.qualityQuantizationResources | all ordered raw bands and physical alternatives; genuine first-eligible nominal-GUID inverse, explicit eligibility and independent per-value sources ([contract](catalog-quality.md)) |
 | blueprintPools | D.blueprintPools; A.blueprintRewardSources | reward definitions and actual targeted-source relations |
 | dismantleProcesses | D.dismantleProcesses | costs/results, original units/links |
 | craftingGlobal | C.craftingGlobal | true global parameters, explicit presence/owner |

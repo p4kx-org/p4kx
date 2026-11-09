@@ -5,8 +5,9 @@ use std::collections::BTreeSet;
 
 use p4kx_extraction::Guid;
 
-const MAX_INPUTS: usize = 4096;
-const MAX_INPUT_BYTES: usize = 1024 * 1024;
+use crate::catalog_input_limits::{
+    MAX_DECISION_INPUT_BYTES as MAX_INPUT_BYTES, MAX_DECISION_INPUTS as MAX_INPUTS,
+};
 
 /// The observed resource and optional quantization used by one eligibility input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

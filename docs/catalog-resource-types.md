@@ -129,17 +129,18 @@ No generic-number path narrows a Double to Single or a 64-bit integer to a JSON 
 Resource quality sources retain sourced `sourceType` and `payload`. Present ownership tags are
 `inline`, `recordRef` and `emptyBase`. Inline payloads carry a sourced `value`; a record reference
 retains sourced target-header facts without copying or reading its target payload. Unknown shapes
-are explicitly unsupported. Inline curves use sourced Int32 `min`/`max` and exact-width
-ResourceNumber `mean`/`stddev`. Location overrides retain ordered nullable entries, concrete source
-types, locations and nested distributions. Quantization bands preserve sourced Int32 `start`,
-`end` and `mappedValue`.
+are explicitly unsupported. Inline curves use sourced exact-width ResourceNumber payloads for `min`, `max`, `mean` and
+`stddev`, with the independent declared Int32 contract for the bounds. Location overrides retain ordered nullable entries, concrete source
+types, locations and nested distributions. Quantization bands preserve exact-width ResourceNumber `start`, `end` and `mappedValue`,
+with independent required Int32 and configured-range checks.
 
-The separate top-level `qualityDistributions` and public Rust QualityCurve API still use their
-existing finite f32 projection and exact `Option<i32>` bounds. They are not migrated by this
-ResourceType step. Their wrong numeric types and nonfinite values still fail projection. A
-ResourceType's captured nonfinite numbers avoid a projection-loss failure only when that exact
-physical source has a successfully emitted lossless ResourceType row; a filtered source or a
-same-GUID alias cannot satisfy that proof.
+The wrapper alone retains the concrete distribution type; its inline curve has no duplicate `kind`.
+The same raw readers and carriers serve the canonical standalone quality definitions and their
+genuine inverse relation ([contract](catalog-quality.md)). The separate public Rust QualityCurve
+interpretation retains finite f32 parameters and exact `Option<i32>` bounds. Numeric projection
+loss is excused only when the exact original physical field and f32/f64 token bits have a
+successfully emitted raw capture. A filtered source, same-GUID alias or uncaptured field cannot
+satisfy that proof.
 
 ## Canonical names and protected texts
 
@@ -223,21 +224,21 @@ ResourceGroup mappings use the canonical definition and membership tables descri
 
 | Declaring type.field | Stored type | LIVE target | PTU target | Owning paths | Export mapping |
 | --- | --- | --- | --- | --- | --- |
-| CraftingQualityDistributionNormal.min | Int32 |  |  | ResourceType.properties[].qualityDistribution.min OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.min | inline ResourceQualityCurve.min (SourcedValue<i32>) |
-| CraftingQualityDistributionNormal.max | Int32 |  |  | ResourceType.properties[].qualityDistribution.max OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.max | inline ResourceQualityCurve.max (SourcedValue<i32>) |
-| CraftingQualityDistributionNormal.mean | Single |  |  | ResourceType.properties[].qualityDistribution.mean OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.mean | inline ResourceQualityCurve.mean (SourcedValue<ResourceNumber>; exact source width) |
-| CraftingQualityDistributionNormal.stddev | Single |  |  | ResourceType.properties[].qualityDistribution.stddev OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.stddev | inline ResourceQualityCurve.stddev (SourcedValue<ResourceNumber>; exact source width) |
-| CraftingQualityDistributionUniform.min | Int32 |  |  | ResourceType.properties[].qualityDistribution.min OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.min | inline ResourceQualityCurve.min (SourcedValue<i32>) |
-| CraftingQualityDistributionUniform.max | Int32 |  |  | ResourceType.properties[].qualityDistribution.max OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.max | inline ResourceQualityCurve.max (SourcedValue<i32>) |
+| CraftingQualityDistributionNormal.min | Int32 |  |  | ResourceType.properties[].qualityDistribution.min OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.min | inline QualityCurveSource.min (SourcedValue<ResourceNumber>) |
+| CraftingQualityDistributionNormal.max | Int32 |  |  | ResourceType.properties[].qualityDistribution.max OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.max | inline QualityCurveSource.max (SourcedValue<ResourceNumber>) |
+| CraftingQualityDistributionNormal.mean | Single |  |  | ResourceType.properties[].qualityDistribution.mean OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.mean | inline QualityCurveSource.mean (SourcedValue<ResourceNumber>; exact source width) |
+| CraftingQualityDistributionNormal.stddev | Single |  |  | ResourceType.properties[].qualityDistribution.stddev OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.stddev | inline QualityCurveSource.stddev (SourcedValue<ResourceNumber>; exact source width) |
+| CraftingQualityDistributionUniform.min | Int32 |  |  | ResourceType.properties[].qualityDistribution.min OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.min | inline QualityCurveSource.min (SourcedValue<ResourceNumber>) |
+| CraftingQualityDistributionUniform.max | Int32 |  |  | ResourceType.properties[].qualityDistribution.max OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.max | inline QualityCurveSource.max (SourcedValue<ResourceNumber>) |
 | CraftingQualityDistribution_RecordRef.qualityDistributionRecord | Reference | CraftingQualityDistributionRecord | CraftingQualityDistributionRecord | ResourceType.properties[].qualityDistribution.qualityDistributionRecord OR ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution.qualityDistributionRecord | qualityDistribution.payload.reference (target qualityDistributions; retain GUID/status) |
 | CraftingQualityLocationOverride.locationOverrideList | StrongPointer[] | CraftingQualityLocationOverrideEntry | CraftingQualityLocationOverrideEntry_Base | ResourceType.properties[].qualityLocationOverride.locationOverrideList | qualityLocationOverride.payload.value.locationOverrideList (ordered nullable entry sources; LIVE/PTU base widening accepted) |
 | CraftingQualityLocationOverrideEntry.location | Reference | StarMapObject | StarMapObject | ResourceType.properties[].qualityLocationOverride.locationOverrideList[].location | qualityLocationOverride.payload.value.locationOverrideList[].payload.location (StarMapObject Reference) |
-| CraftingQualityLocationOverrideEntry.qualityDistribution | StrongPointer | CraftingQualityDistribution_Base | CraftingQualityDistribution_Base | ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution | qualityLocationOverride.payload.value.locationOverrideList[].payload.qualityDistribution (ResourceQualityCurve inline-or-RecordRef source wrapper) |
+| CraftingQualityLocationOverrideEntry.qualityDistribution | StrongPointer | CraftingQualityDistribution_Base | CraftingQualityDistribution_Base | ResourceType.properties[].qualityLocationOverride.locationOverrideList[].qualityDistribution | qualityLocationOverride.payload.value.locationOverrideList[].payload.qualityDistribution (QualityCurveSource inline-or-RecordRef source wrapper) |
 | CraftingQualityLocationOverride_RecordRef.locationOverrideRecord | Reference | CraftingQualityLocationOverrideRecord | CraftingQualityLocationOverrideRecord | ResourceType.properties[].qualityLocationOverride.locationOverrideRecord | qualityLocationOverride.payload.reference (target qualityDistributions override row) |
 | CraftingQualityQuantization.bands | Class[] | CraftingQualityQuantizationBand | CraftingQualityQuantizationBand | ResourceType.properties[].qualityQuantization.bands | qualityQuantization.payload.value.bands (ordered shared QuantizationBand payloads) |
-| CraftingQualityQuantizationBand.start | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].start | ResourceQuantizationBand.start (SourcedValue<i32>) |
-| CraftingQualityQuantizationBand.end | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].end | ResourceQuantizationBand.end (SourcedValue<i32>) |
-| CraftingQualityQuantizationBand.mappedValue | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].mappedValue | ResourceQuantizationBand.mappedValue (SourcedValue<i32>) |
+| CraftingQualityQuantizationBand.start | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].start | QualityBandSource.start (SourcedValue<ResourceNumber>) |
+| CraftingQualityQuantizationBand.end | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].end | QualityBandSource.end (SourcedValue<ResourceNumber>) |
+| CraftingQualityQuantizationBand.mappedValue | Int32 |  |  | ResourceType.properties[].qualityQuantization.bands[].mappedValue | QualityBandSource.mappedValue (SourcedValue<ResourceNumber>) |
 | CraftingQualityQuantization_RecordRef.qualityQuantizationRecord | Reference | CraftingQualityQuantizationRecord | CraftingQualityQuantizationRecord | ResourceType.properties[].qualityQuantization.qualityQuantizationRecord | qualityQuantization.payload.reference (target qualityQuantizations) |
 | GramsPerCubicCentimeter.gramsPerCubicCentimeter | Single |  |  | ResourceType.densityType.densityUnit.gramsPerCubicCentimeter | definitions.resourceTypes.rows[].density.payload.densityUnit.payload.value (raw g/cm3) |
 | KilogramsPerCubicMeter.kilogramsPerCubicMeter | Single |  |  | ResourceType.densityType.densityUnit.kilogramsPerCubicMeter | definitions.resourceTypes.rows[].density.payload.densityUnit.payload.value (raw kg/m3) |

@@ -3,6 +3,7 @@
 
 use p4kx_extraction::{Filter, Guid};
 
+use crate::catalog_number_health::EmittedNumber;
 use crate::catalog_row::{CatalogRow, CatalogRows};
 use crate::collected::Collected;
 use crate::selection::Kind;
@@ -39,6 +40,7 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
     CatalogRows {
         emitted,
         filter: filter.cloned(),
+        numbers: numbers(collected),
     }
 }
 
@@ -71,17 +73,19 @@ fn append_resources(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
         emitted,
         Kind::QualityDistributions,
         collected
-            .quality_distributions
+            .quality
+            .distributions
             .iter()
-            .map(|row| (row.guid.0, row.record_path)),
+            .map(|row| (row.owner.guid.0, row.owner.record_path)),
     );
     append(
         emitted,
         Kind::QualityQuantizations,
         collected
-            .quality_quantizations
+            .quality
+            .quantizations
             .iter()
-            .map(|row| (row.guid.0, row.record_path)),
+            .map(|row| (row.owner.guid.0, row.owner.record_path)),
     );
 }
 
@@ -95,4 +99,35 @@ fn append<'source>(
         guid,
         record_path: record_path.to_owned(),
     }));
+}
+
+fn numbers(collected: &Collected<'_>) -> Vec<EmittedNumber> {
+    let mut numbers = Vec::new();
+    for (kind, values) in collected
+        .resource_types
+        .iter()
+        .map(|row| (Kind::ResourceTypes, &row.numbers))
+        .chain(
+            collected
+                .quality
+                .distributions
+                .iter()
+                .map(|row| (Kind::QualityDistributions, &row.numbers)),
+        )
+        .chain(
+            collected
+                .quality
+                .quantizations
+                .iter()
+                .map(|row| (Kind::QualityQuantizations, &row.numbers)),
+        )
+    {
+        numbers.extend(
+            values
+                .iter()
+                .cloned()
+                .map(|value| EmittedNumber { kind, value }),
+        );
+    }
+    numbers
 }

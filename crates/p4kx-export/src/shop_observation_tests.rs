@@ -14,7 +14,7 @@ use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::shop_containers::Component;
 use crate::shop_registry::RegistryNeed;
 use crate::shops::{self, REGISTRY};
-use crate::{CatalogOptions, Kind, QuantizationSummary, ShopSummary};
+use crate::{CatalogOptions, Kind, ShopSummary};
 
 #[path = "shop_inventory_observation_tests.rs"]
 mod inventories;
@@ -60,9 +60,7 @@ fn empty_collected() -> Collected<'static> {
         CraftingKinds {
             blueprints: Vec::new(),
             properties: Vec::new(),
-            distributions: Vec::new(),
-            quantizations: Vec::new(),
-            quantization_summary: QuantizationSummary::default(),
+            quality: crate::quality_catalog::QualityRows::default(),
             pools: Vec::new(),
             dismantle: Vec::new(),
             skipped: Vec::new(),

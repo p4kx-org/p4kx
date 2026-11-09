@@ -46,7 +46,7 @@
 //! quality modifiers, the quality distributions with their location overrides, the quality
 //! quantizations with the `ResourceType`s that use them, the blueprint
 //! pools with the contracts that reward them, the dismantle processes and the global
-//! parameters. It is the library API the catalog's crafting fields are built on.
+//! parameters. The catalog keeps its quality declarations as canonical source data.
 //!
 //! [`read_action_maps`] reads the action maps of the default profile
 //! (`Data\Libs\Config\defaultProfile.xml`): every action with the localisation key of its label
@@ -112,7 +112,6 @@ mod contract_mining_params;
 mod contract_mission_data;
 mod contract_missions;
 mod contract_offer;
-mod contract_quantization;
 mod contract_recipe;
 mod contract_recovery;
 mod contract_reputation;
@@ -257,6 +256,7 @@ mod paint_port;
 mod picked;
 mod playability;
 mod playability_rules;
+mod quality_catalog;
 mod quality_curve;
 mod quality_curve_read;
 mod quantization_summary;
@@ -333,16 +333,17 @@ mod variant_groups;
 mod variants;
 
 pub(crate) use catalog_v3::{
-    canonical_record_header, catalog_definitions, catalog_origins, catalog_projection,
+    canonical_record_header, catalog_definitions, catalog_input_limits, catalog_number_capture,
+    catalog_number_diagnostics, catalog_number_health, catalog_origins, catalog_projection,
     catalog_projections, catalog_read, catalog_record_reference, catalog_table,
     catalog_text_contract, commodity, commodity_authoring_contract, commodity_authoring_inputs,
     commodity_authoring_read, commodity_backfill, commodity_backfill_input, commodity_binding_read,
     commodity_composition_read, commodity_contract, commodity_inputs, commodity_presentation,
     commodity_resource, commodity_resource_presentation, commodity_source, commodity_text_choice,
-    commodity_text_input, record_header_field, resource_density_read, resource_density_source,
-    resource_float, resource_group, resource_group_read, resource_integer, resource_memberships,
-    resource_number, resource_property_contract, resource_property_read, resource_quality_curve,
-    resource_quality_read, resource_quality_source, resource_quantization_read,
+    commodity_text_input, number_position, quality_bands_read, quality_curve_source_read,
+    quality_source, quality_source_read, record_header_field, resource_density_read,
+    resource_density_source, resource_float, resource_group, resource_group_read, resource_integer,
+    resource_memberships, resource_number, resource_property_contract, resource_property_read,
     resource_raw_policy, resource_read, resource_type_contract, resource_value_read, source_header,
 };
 

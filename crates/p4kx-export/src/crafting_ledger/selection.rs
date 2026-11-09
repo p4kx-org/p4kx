@@ -9,6 +9,7 @@ use crate::crafting_records::{
 };
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{SourceDisposition, SourceObservation};
+use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::selection::{self, BlueprintSelection, Kind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,14 +128,19 @@ pub(super) fn choose(
     record: &Record<'_>,
     filter: Option<&Filter>,
 ) -> Result<Option<Selection>, DataForgeError> {
-    let path = record.record_path()?;
+    choose_observed(record, filter, |_, _| {})
+}
+
+pub(super) fn choose_observed(
+    record: &Record<'_>,
+    filter: Option<&Filter>,
+    mut observed: impl FnMut(RecordHeaderInput, bool),
+) -> Result<Option<Selection>, DataForgeError> {
+    let path = record.record_path();
+    observed(RecordHeaderInput::NormalizedPath, path.is_ok());
+    let path = path?;
     if RESOURCE_TYPES.matches_path(path) {
-        if record.type_name()? != RESOURCE_TYPES.type_name
-            || selection::is_leftover(path, record.name()?)
-        {
-            return Ok(None);
-        }
-        return selected(Action::ResourceLinks, record, path, filter).map(Some);
+        return resource_selection(record, path, filter, observed);
     }
     if !crafting_records::is_crafting_path(path) {
         return Ok(None);
@@ -164,6 +170,31 @@ pub(super) fn choose(
         return Ok(None);
     }
     selected(action, record, path, filter).map(Some)
+}
+
+fn resource_selection(
+    record: &Record<'_>,
+    path: &str,
+    filter: Option<&Filter>,
+    mut observed: impl FnMut(RecordHeaderInput, bool),
+) -> Result<Option<Selection>, DataForgeError> {
+    let source_type = record.type_name();
+    observed(
+        RecordHeaderInput::Field(RecordHeaderField::SourceType),
+        source_type.is_ok(),
+    );
+    if source_type? != RESOURCE_TYPES.type_name {
+        return Ok(None);
+    }
+    let name = record.name();
+    observed(
+        RecordHeaderInput::Field(RecordHeaderField::RecordName),
+        name.is_ok(),
+    );
+    if selection::is_leftover(path, name?) {
+        return Ok(None);
+    }
+    selected(Action::ResourceLinks, record, path, filter).map(Some)
 }
 
 pub(super) fn candidate_kind(record: &Record<'_>) -> Option<Kind> {

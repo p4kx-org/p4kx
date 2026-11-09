@@ -3,12 +3,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::ExportSourceRole;
+use crate::catalog_number_health::NumberCaptures;
 use crate::catalog_target_index::TargetIndex;
 use crate::export_diagnostic::{ExportDiagnostic, ExportDiagnosticSeverity, FailedExportRecord};
 use crate::export_field_inspection::FieldInspection;
 use crate::export_ledger::{ExportAccountingError, SourceObservation};
 use crate::export_reference_issue::ExportUnresolvedReference;
-use crate::{ExportSourceRole, Kind};
 
 /// Source inspections resolved onto each actual successful production read.
 pub(crate) struct Fields {
@@ -29,6 +30,7 @@ pub(crate) fn resolve(
     let targets = rows
         .map(|rows| TargetIndex::new(&rows.emitted, excluded, sources, &canonical))
         .transpose()?;
+    let captured = NumberCaptures::new(rows, targets.as_ref());
     let mut fields = Fields {
         incomplete_kinds: BTreeSet::new(),
         failed: Vec::new(),
@@ -39,9 +41,8 @@ pub(crate) fn resolve(
         .iter()
         .filter(|source| source.disposition.read_succeeded())
     {
-        let mut inspection = canonical
+        let inspection = canonical
             .get(&source.record_index)
-            .cloned()
             .ok_or(ExportAccountingError::MissingFieldInspection)?;
         if inspection.guid != source.guid
             || source
@@ -51,26 +52,20 @@ pub(crate) fn resolve(
         {
             return Err(ExportAccountingError::ConflictingFieldInspection);
         }
-        let resource_captured = targets.as_ref().is_some_and(|targets| {
-            targets
-                .emitted
-                .contains(&(Kind::ResourceTypes, source.record_index))
-                && !targets
-                    .ambiguous
-                    .contains(&(Kind::ResourceTypes, source.guid))
-        });
-        if !resource_captured {
-            inspection
-                .diagnostics
-                .append(&mut inspection.resource_number_diagnostics);
+        if !inspection.number_requirements.is_empty() {
+            let mut coverage = captured.for_record(source.record_index);
+            if let Some(diagnostic) =
+                crate::catalog_number_diagnostics::uncovered(inspection, source, &mut coverage)
+            {
+                retain_diagnostic(diagnostic, inspection, source, &mut fields);
+            }
         }
-        inspection.contextualize(source.kind, source.role);
         if !inspection.complete
             && let Some(kind) = source.kind
         {
             fields.incomplete_kinds.insert(kind.index());
         }
-        retain(&inspection, &mut fields);
+        retain(inspection, source, &mut fields);
     }
     let reference_diagnostics = fields.diagnostics.len();
     crate::catalog_reference_health::resolve(
@@ -106,26 +101,41 @@ fn canonical_inspections(
     Ok(canonical)
 }
 
-fn retain(inspection: &FieldInspection, fields: &mut Fields) {
-    for diagnostic in &inspection.diagnostics {
-        if diagnostic.severity != ExportDiagnosticSeverity::Information {
-            fields.failed.push(FailedExportRecord {
-                kind: inspection.kind,
-                record_index: inspection.record_index,
-                guid: inspection.guid.to_string(),
-                record_path: Some(inspection.record_path.clone()),
-                role: inspection.role,
-                stage: diagnostic.stage,
-                code: diagnostic.code,
-            });
-        }
+fn retain(inspection: &FieldInspection, source: &SourceObservation, fields: &mut Fields) {
+    for original in &inspection.diagnostics {
+        let mut diagnostic = original.clone();
+        diagnostic.kind = source.kind;
+        diagnostic.source_role = Some(source.role);
+        retain_diagnostic(diagnostic, inspection, source, fields);
     }
     fields
-        .diagnostics
-        .extend(inspection.diagnostics.iter().cloned());
-    fields
         .references
-        .extend(inspection.unresolved_references.iter().cloned());
+        .extend(inspection.unresolved_references.iter().map(|original| {
+            let mut reference = original.clone();
+            reference.kind = source.kind;
+            reference.source_role = source.role;
+            reference
+        }));
+}
+
+fn retain_diagnostic(
+    diagnostic: ExportDiagnostic,
+    inspection: &FieldInspection,
+    source: &SourceObservation,
+    fields: &mut Fields,
+) {
+    if diagnostic.severity != ExportDiagnosticSeverity::Information {
+        fields.failed.push(FailedExportRecord {
+            kind: source.kind,
+            record_index: inspection.record_index,
+            guid: inspection.guid.to_string(),
+            record_path: Some(inspection.record_path.clone()),
+            role: source.role,
+            stage: diagnostic.stage,
+            code: diagnostic.code,
+        });
+    }
+    fields.diagnostics.push(diagnostic);
 }
 
 /// Retains every available blocking owner identity before aggregate example limits are applied.

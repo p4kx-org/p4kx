@@ -3,6 +3,7 @@
 
 mod assemble;
 mod fault;
+mod mode;
 mod projection;
 mod read;
 mod resource_scope;
@@ -12,12 +13,14 @@ use crate::export_ledger::ExportLedger;
 
 use super::Crafting;
 
+pub(crate) use mode::ReadMode;
 pub(crate) use read::{read, read_catalog};
 
 /// The public crafting result and actual production-source observations.
 pub(crate) struct ReadCrafting<'f> {
     pub(crate) data: Crafting<'f>,
     pub(crate) ledger: ExportLedger,
+    pub(crate) quality: crate::quality_catalog::QualityRows<'f>,
 }
 
 #[cfg(test)]

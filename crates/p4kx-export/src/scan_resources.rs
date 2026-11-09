@@ -8,11 +8,12 @@ use p4kx_extraction::{CancelToken, Guid, Record, TreeBuilder};
 use super::{RESOURCE_TYPE, Scan};
 use crate::catalog_crafting::CraftingKinds;
 use crate::commodity;
-use crate::contract::{Blueprint, QualityQuantization};
+use crate::contract::Blueprint;
 use crate::cost_resources;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::picked::Picked;
+use crate::quality_catalog::QuantizationUse;
 use crate::scan_health::{ScanError, ScanRead, SourceTrace};
 use crate::{CatalogError, Kind};
 
@@ -29,7 +30,7 @@ impl<'f> Scan<'_, '_, 'f> {
         crafting: &CraftingKinds<'f>,
         scanned: &ExportLedger,
     ) -> Result<ScanRead<'f>, CatalogError> {
-        let used = unrepresented_resources(picked, &crafting.blueprints, &crafting.quantizations);
+        let used = unrepresented_resources(picked, &crafting.blueprints, &crafting.quality.uses);
         let physical: BTreeSet<_> = scanned
             .sources
             .iter()
@@ -132,7 +133,7 @@ impl<'f> Scan<'_, '_, 'f> {
 fn unrepresented_resources(
     picked: &[Picked<'_>],
     blueprints: &[Blueprint<'_>],
-    quantizations: &[QualityQuantization<'_>],
+    quantizations: &[QuantizationUse],
 ) -> HashSet<Guid> {
     let mut carried = HashSet::new();
     for pick in picked {
