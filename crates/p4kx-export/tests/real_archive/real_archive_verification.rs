@@ -200,7 +200,8 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
     Ok(catalog)
 }
 
-/// Checks family identities and permits only the same physical ResourceType fallback across tables.
+/// Checks family identities and permits only the same physical `ResourceType` fallback
+/// across tables.
 pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
     let mut seen: HashMap<&str, (Kind, &Value)> = HashMap::new();
     let identities: Vec<(&str, &str)> = list(catalog, Kind::Contracts)?
