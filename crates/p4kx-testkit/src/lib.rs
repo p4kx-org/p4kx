@@ -102,6 +102,7 @@ pub mod offline_seam;
 mod opus;
 mod opus_encode;
 mod prefab;
+pub mod query_selection_sample;
 mod real_archive;
 mod reference_output;
 mod rig_logic;

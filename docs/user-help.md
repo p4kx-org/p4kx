@@ -341,6 +341,10 @@ case and lists by their first value and then their length; click again to revers
 cannot be read, nulls and missing values stay at the end either way. Large results are shown
 500 rows per page; the number of Records and the page buttons are below the table.
 
+A value that cannot be read to decide `where` fails the Query with its Record and reason.
+Missing or null values keep their normal unknown meaning and may yield a successful empty result.
+Cancellation drops the partial selection. A failed or cancelled selection cannot replace an export.
+
 **Export CSV…** and **Export JSON…** write the whole result in the order of `docs/query.md`,
 byte for byte as `p4kx dcb query --format csv|json --out <file>` writes it, whatever the table is
 sorted by. The file is written in the background and only replaces an existing file once

@@ -4,8 +4,7 @@
 use crate::ValueError;
 use crate::query::MAX_PATH_VALUES;
 
-/// What paths have used of their limits while they are read in one Record: one shared by every
-/// column of its row, and one for each comparison of its condition.
+/// The array budget and unresolved links shared by the columns of one Record row.
 #[derive(Debug)]
 pub(crate) struct WalkState {
     budget: usize,

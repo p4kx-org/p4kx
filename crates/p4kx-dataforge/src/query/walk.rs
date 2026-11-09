@@ -99,6 +99,9 @@ impl Walk {
         place: Place<'f>,
         sink: &mut S,
     ) -> Result<ControlFlow<()>, ValueError> {
+        if sink.proceed().is_break() {
+            return Ok(ControlFlow::Break(()));
+        }
         let step = match self.steps.get(index) {
             Some(step) if index < end => step,
             _ => return Ok(sink.reached(Reached::Place(place))),
@@ -140,6 +143,9 @@ impl Walk {
         };
         sink.charge(indices.len())?;
         for element in indices {
+            if sink.proceed().is_break() {
+                return Ok(ControlFlow::Break(()));
+            }
             let flow = match element_of(forge, elements, select, first.saturating_add(element)) {
                 Some(Reached::Place(target)) => self.step(forge, next, end, target, sink)?,
                 Some(Reached::Value(value)) => sink.reached(Reached::Value(value)),

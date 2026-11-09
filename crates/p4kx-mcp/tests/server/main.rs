@@ -29,6 +29,7 @@ mod model_animations;
 mod models;
 mod mtl_summary;
 mod query;
+mod query_selection;
 mod read;
 mod read_only;
 mod read_text;

@@ -24,33 +24,6 @@ pub struct QueryRun<'q, 'f> {
 }
 
 impl<'f> CompiledQuery<'f> {
-    /// Selects the Records by type and record path and keeps those that meet the condition, in
-    /// parallel over every Record.
-    ///
-    /// Records whose record path cannot be read are never selected. A Record whose values cannot
-    /// be read to decide the condition is kept, and its row reports why.
-    #[must_use]
-    pub fn run(&self) -> QueryRun<'_, 'f> {
-        self.resume(self.select(|| true))
-    }
-
-    /// Selects the Records as [`run`](Self::run) does, asking `proceed` before every Record;
-    /// returns `None` as soon as it has answered `false` and the selection is dropped.
-    #[must_use]
-    pub fn run_while(&self, proceed: impl Fn() -> bool + Sync) -> Option<QueryRun<'_, 'f>> {
-        let records = self.select(&proceed);
-        proceed().then(|| self.resume(records))
-    }
-
-    fn select(&self, proceed: impl Fn() -> bool + Sync) -> Vec<u32> {
-        self.forge
-            .path_order()
-            .par_iter()
-            .copied()
-            .filter(|&record| proceed() && self.selects(record))
-            .collect()
-    }
-
     /// Returns the run that selected `records`, the indexes [`QueryRun::indexes`] gave for this
     /// Query over the same DataForge; an index that is no Record gives no row.
     #[must_use]
@@ -61,35 +34,7 @@ impl<'f> CompiledQuery<'f> {
         }
     }
 
-    fn selects(&self, record: u32) -> bool {
-        self.plan_of(record).is_some()
-            && self
-                .referrers
-                .as_ref()
-                .is_none_or(|referrers| referrers.binary_search(&record).is_ok())
-            && self.pattern.as_ref().is_none_or(|pattern| {
-                self.forge
-                    .path_of(record)
-                    .is_some_and(|path| pattern.matches(path))
-            })
-            && self.meets_condition(record)
-    }
-
-    /// Returns whether the Record meets the condition or cannot be read to decide it.
-    fn meets_condition(&self, record: u32) -> bool {
-        let Some(predicate) = &self.predicate else {
-            return true;
-        };
-        match self.plan_of(record) {
-            Some(Plan::Read { tests, .. }) => self.instance_of(record).map_or(true, |place| {
-                predicate.eval(self.forge, tests, place) == Some(true)
-            }),
-            Some(Plan::Broken(_)) => true,
-            None => false,
-        }
-    }
-
-    fn plan_of(&self, record: u32) -> Option<&Plan> {
+    pub(super) fn plan_of(&self, record: u32) -> Option<&Plan> {
         let def = self.forge.record_def(record)?;
         self.plans
             .get(usize::try_from(def.struct_index).ok()?)?
@@ -270,7 +215,7 @@ impl<'f> CompiledQuery<'f> {
     }
 
     /// Returns the Record's instance, which the Record tree reads its values from.
-    fn instance_of(&self, index: u32) -> Result<Place<'f>, DataForgeError> {
+    pub(super) fn instance_of(&self, index: u32) -> Result<Place<'f>, DataForgeError> {
         let forge = self.forge;
         let def = forge
             .record_def(index)

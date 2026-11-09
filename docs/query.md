@@ -322,18 +322,16 @@ writes that same JSON array in its field. The table writes the values in their t
 separated by `, ` in brackets, e.g. `[250.5, 1200]` or `[]`, shortened after 8 values; the
 values are not quoted there, so a string holding `, ` or `]` reads ambiguously in the table only.
 
-Paths reach at most 4,096 array elements (`MAX_PATH_VALUES`). The `select` paths of one row share
-this budget, as their cells hold their values: it bounds the memory of a page to at most 4,096
-values per row. Each comparison of `where` has a budget of its own, as it holds none of the values
-it compares, so `tags[*] = -1 or tags[*] = 1` checks both comparisons in full. `[n]` counts one
-element, `[*]` and `[TypeName]` every element of their array, also those `[TypeName]` skips, and
-nested brackets count on every level: `Components[*].modes[*]` counts the components and then
-the modes of each.
+The `select` paths of one row share a budget of 4,096 array elements (`MAX_PATH_VALUES`), as
+cells retain their values. `[n]` counts one element, `[*]` and `[TypeName]` every element of their
+array, including those a type selector skips; nested brackets count at every level. A bracket
+that would exceed the remaining budget produces the error value `error: the paths of the Record
+reach more than 4096 array elements` in its cell. The cells after it can use the remaining budget.
 
-A bracket that would go beyond the budget of the row gives the error value `error: the paths of
-the Record reach more than 4096 array elements` in its cell, and the cells after it can still
-read what remains. A comparison that would go beyond its budget is unknown, unless a value it
-reached before already holds.
+Comparisons in `where` stream values without retaining a list or imposing an element-count cap.
+An existential comparison stops when a value proves it true. Cancellable selection checks its
+callback at Records, path steps and array elements, including elements skipped by `[TypeName]`.
+An observed stop is latched and drops the entire selection.
 
 ## Conditions
 
@@ -394,15 +392,31 @@ damage, ships without weapons included.
 
 A comparison is unknown when the Record has no value for its path: its type does not resolve the
 path (without `from`), the path ends at a type the value cannot be compared with, reaches `null`
-through a null pointer or an index out of range, or the value cannot be read. An unknown
+through a null pointer or an index out of range. An unknown
 comparison never matches, and the conditions combine as in SQL:
 `not` of unknown is unknown, `false and unknown` is false, `true or unknown` is true, and any
 other combination with unknown is unknown. A Record is kept only when the whole condition is
 true, so `x = 1` and `not x = 1` together never select a Record without a value for `x`.
 
-A Record whose layout or instance cannot be read is different: no value of it can be read, so
-the condition cannot be decided, and the Record is reported as failed rather than silently
-dropped, as for `select`.
+A demanded value that cannot be read is a selection failure, carrying the Record definition
+index, record path, comparison index and original value-reading error. It does not become unknown
+or a successful empty result. A true existential witness, `true or ...`, or `false and ...` proves
+the result without demanding irrelevant read failures, including failures reached before that
+proof. Without such a proof, a reached read failure is reported even alongside ordinary unknowns.
+A stop remains authoritative over a proof or read failure.
+
+`CompiledQuery::run` returns `Result<QueryRun, SelectionError>`; `run_while` returns
+`Result<Option<QueryRun>, SelectionError>`, with `Ok(None)` for a stop. Successful indexes alone
+may be cached or resumed. CLI query and field statistics return DataForge error status 5 on a
+selection failure before writing output; MCP returns a tool error and the GUI reports a failed
+Query. Existing atomic exports remain intact when selection fails or is stopped.
+
+A Record whose entire layout or instance cannot be read retains its visible failed row. This is
+separate from an unreadable value reached while deciding a condition. For candidates with readable
+whole-Record layouts and instances, successful selection completes demanded condition evaluation
+under SQL/Kleene semantics. Whole-Record failures remain explicit failed rows; successful selection
+does not certify global source completeness.
+The contract is recorded in [ADR-0358](adr/0358-query-selection-is-complete-or-explicitly-failed.md).
 
 ## Field statistics
 

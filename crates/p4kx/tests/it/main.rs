@@ -57,6 +57,7 @@ mod dcb_query_export;
 mod dcb_query_output;
 mod dcb_query_paths;
 mod dcb_query_references;
+mod dcb_query_selection;
 mod dcb_refs;
 mod dcb_tags;
 mod entity_audio;

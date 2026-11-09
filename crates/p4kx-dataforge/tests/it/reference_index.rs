@@ -329,9 +329,8 @@ fn a_limited_index_can_be_cancelled() -> TestResult {
 }
 
 fn selected(forge: &DataForge<'_>, text: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let query = Query::parse(text)?;
-    let compiled = query.compile(forge)?;
-    let run = compiled.run();
+    let compiled = Query::parse(text)?.compile(forge)?;
+    let run = compiled.run()?;
     Ok(run
         .indexes()
         .iter()

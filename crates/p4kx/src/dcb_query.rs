@@ -82,7 +82,7 @@ pub(crate) fn run(args: &DcbQueryArgs, as_json: bool) -> Result<ExitCode> {
     let compiled = query
         .compile(&forge)
         .map_err(|error| compile_error(&error, &args.query))?;
-    let run = compiled.run();
+    let run = compiled.run()?;
     let output = Output {
         compiled: &compiled,
         run: &run,

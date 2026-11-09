@@ -164,36 +164,4 @@ impl Reader {
         });
         reached.map_or_else(Value::Error, |()| Value::Array(values.into_boxed_slice()))
     }
-
-    /// Returns whether some value of the path holds `test`: `Some(true)` when one does, `None`
-    /// when none does but one is unknown, `Some(false)` otherwise, also when there is none.
-    pub(crate) fn any<'f>(
-        &self,
-        forge: &'f DataForge<'f>,
-        place: Place<'f>,
-        state: &mut WalkState,
-        test: impl Fn(&Value<'f>) -> Option<bool>,
-    ) -> Option<bool> {
-        let walk = match self {
-            Self::Column(column) => return test(&column.read(forge, place)),
-            Self::Walk(walk) => walk,
-        };
-        let mut result = Some(false);
-        let reached = walk.visit(forge, place, state, &mut |value| match test(&value) {
-            Some(true) => {
-                result = Some(true);
-                ControlFlow::Break(())
-            }
-            Some(false) => ControlFlow::Continue(()),
-            None => {
-                result = None;
-                ControlFlow::Continue(())
-            }
-        });
-        match (reached, result) {
-            (_, Some(true)) => Some(true),
-            (Err(_), _) => None,
-            (Ok(()), result) => result,
-        }
-    }
 }

@@ -31,6 +31,8 @@ mod query_path_syntax;
 mod query_paths;
 mod query_references;
 mod query_run;
+mod query_selection_errors;
+mod query_selection_regression;
 mod query_shared_prefixes;
 mod query_syntax;
 mod read_observer;

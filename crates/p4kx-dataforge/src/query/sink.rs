@@ -16,8 +16,23 @@ pub(crate) enum Reached<'f> {
     Value(Value<'f>),
 }
 
+impl<'f> Reached<'f> {
+    /// Reads the reached place or returns its terminal value.
+    pub(super) fn read(self, forge: &'f DataForge<'f>, leaf: &Column) -> Value<'f> {
+        match self {
+            Self::Place(place) => leaf.read(forge, place),
+            Self::Value(value) => value,
+        }
+    }
+}
+
 /// Where a walk sends what it charges, counts and reaches.
 pub(crate) trait Sink<'f> {
+    /// Returns whether the walk may continue at its next step or array element.
+    fn proceed(&mut self) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
     /// Counts `elements` more array elements.
     fn charge(&mut self, elements: usize) -> Result<(), ValueError>;
 
@@ -46,10 +61,7 @@ impl<'f> Sink<'f> for Live<'_, 'f> {
     }
 
     fn reached(&mut self, reached: Reached<'f>) -> ControlFlow<()> {
-        let value = match reached {
-            Reached::Place(place) => self.leaf.read(self.forge, place),
-            Reached::Value(value) => value,
-        };
+        let value = reached.read(self.forge, self.leaf);
         (self.emit)(value)
     }
 }

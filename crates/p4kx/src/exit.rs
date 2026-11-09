@@ -8,6 +8,7 @@ use p4kx_blender::PackageError;
 use p4kx_comparison::LineDiffError;
 use p4kx_export::{ActionMapError, CatalogError};
 use p4kx_extraction::cryxml::CryXmlError;
+use p4kx_extraction::query::SelectionError;
 use p4kx_extraction::{
     ArchiveError, DataForgeError, DataForgeLoadError, FieldStatisticsError, FilterError,
     FolderError, LocalizationLoadError, UnknownEntries,
@@ -68,7 +69,7 @@ pub(crate) const INVALID_INPUT: u8 = 2;
 pub(crate) const ARCHIVE_ERROR: u8 = 3;
 /// The Archive changed on disk after it was opened, so the Extraction stopped.
 pub(crate) const ARCHIVE_CHANGED: u8 = 4;
-/// The Archive holds no DataForge, or its DataForge has an unknown version or is corrupt.
+/// The Archive holds no DataForge, or its DataForge or a demanded Query value cannot be read.
 pub(crate) const DATAFORGE_ERROR: u8 = 5;
 /// A Comparison ran, but its report or its output cannot be written.
 pub(crate) const COMPARISON_FAILED: u8 = 6;
@@ -140,7 +141,8 @@ pub(crate) const EXIT_CODES_HELP: &str = "Exit codes:
      Extraction stopped, and Entries written before may be stale
   5  the DataForge cannot be read: the Archive holds none, its version is not supported or it
      is corrupt, or its Records have more field paths than dcb fields counts, or the Record of
-     the Entity whose Loadout or audio is shown cannot be read
+     the Entity whose Loadout or audio is shown cannot be read, or a demanded Query value
+     cannot be read to decide the selection
   6  compare: the report or the output cannot be written
   7  the Archive key is missing or wrong: an Entry is encrypted and no key was given with --key,
      P4KX_ARCHIVE_KEY or `p4kx key set`, or the key does not decrypt the Archive
@@ -207,6 +209,7 @@ fn code_for(error: &anyhow::Error) -> u8 {
         ARCHIVE_ERROR
     } else if dataforge.is_some()
         || error.downcast_ref::<DataForgeError>().is_some()
+        || error.downcast_ref::<SelectionError>().is_some()
         || error.downcast_ref::<FieldStatisticsError>().is_some()
         || is_loadout_or_screen_forge_error(error)
         || is_unreadable_change(error)

@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use p4kx_assembly::{ChangeError, EntityLookupError, LoadoutError};
 use p4kx_extraction::model::MaterialError;
+use p4kx_extraction::query::SelectionError;
 use p4kx_extraction::{ArchiveError, ConversionError, DataForgeError, EntryReadError, FilterError};
 use p4kx_settings::{KeyChoiceError, SettingsError};
 use thiserror::Error;
@@ -196,6 +197,9 @@ pub(crate) enum ToolError {
         "selecting the Records was stopped after at most {0} seconds or by the client; narrow the Query with `from`, `at` or `where`"
     )]
     QueryStopped(u64),
+    /// A demanded Query value cannot be read to decide the selection.
+    #[error("cannot select the Records of the Query")]
+    QuerySelection(#[from] SelectionError),
     /// No ATL definition has the audio trigger.
     #[error("no ATL definition has the audio trigger `{0}`; search_audio_triggers finds triggers")]
     UnknownTrigger(String),

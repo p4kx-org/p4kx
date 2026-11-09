@@ -126,6 +126,7 @@ mod query_completion_window;
 mod query_export_model;
 mod query_model;
 mod query_saved_window;
+mod query_selection_model;
 mod query_window;
 mod querying;
 mod read_only;

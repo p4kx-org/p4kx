@@ -63,7 +63,7 @@ fn page_size(size: usize) -> NonZeroUsize {
 /// Returns every row as its record path and cell texts.
 fn rows(forge: &DataForge<'_>, text: &str, size: usize) -> Result<Vec<String>, Box<dyn Error>> {
     let compiled = Query::parse(text)?.compile(forge)?;
-    let run = compiled.run();
+    let run = compiled.run()?;
     let mut rows = Vec::new();
     for page in run.pages(page_size(size)) {
         assert!(page.len() <= size, "a page holds at most {size} rows");
@@ -137,7 +137,7 @@ fn any_range_of_rows_is_built_on_its_own() -> TestResult {
     let bytes = database();
     let forge = DataForge::open(&bytes)?;
     let compiled = Query::parse("from Leaf select id")?.compile(&forge)?;
-    let run = compiled.run();
+    let run = compiled.run()?;
     let paths: Vec<&str> = run.record_paths().collect();
 
     let middle: Vec<&str> = run.rows(10..13).iter().map(Row::record_path).collect();
@@ -175,7 +175,7 @@ fn cells_hold_the_values_of_the_record_tree() -> TestResult {
     let bytes = database();
     let forge = DataForge::open(&bytes)?;
     let compiled = Query::parse("at \"*\" select weight, id")?.compile(&forge)?;
-    let run = compiled.run();
+    let run = compiled.run()?;
 
     for page in run.pages(page_size(50)) {
         for row in page {
@@ -267,7 +267,7 @@ fn random_queries_compile_or_fail_with_a_span_inside_the_query() -> TestResult {
         text += &paths.join(", ");
         match Query::parse(&text)?.compile(&forge) {
             Ok(compiled) => {
-                let run = compiled.run();
+                let run = compiled.run()?;
                 let count: usize = run.pages(page_size(16)).map(|page| page.len()).sum();
                 assert_eq!(count, run.len(), "{text}");
             }
@@ -286,9 +286,9 @@ fn a_run_that_is_stopped_gives_nothing() -> TestResult {
     let forge = DataForge::open(&bytes)?;
     let compiled = Query::parse("from Base select id")?.compile(&forge)?;
 
-    assert!(compiled.run_while(|| false).is_none(), "stopped at once");
+    assert!(compiled.run_while(|| false)?.is_none(), "stopped at once");
     assert_eq!(
-        compiled.run_while(|| true).map(|run| run.len()),
+        compiled.run_while(|| true)?.map(|run| run.len()),
         Some(225),
         "never stopped"
     );
@@ -300,7 +300,7 @@ fn a_selection_resumes_to_the_same_rows() -> TestResult {
     let bytes = database();
     let forge = DataForge::open(&bytes)?;
     let compiled = Query::parse("from Derived select weight")?.compile(&forge)?;
-    let run = compiled.run();
+    let run = compiled.run()?;
 
     let resumed = compiled.resume(run.indexes().to_vec());
 

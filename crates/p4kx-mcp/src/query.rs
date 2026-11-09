@@ -82,7 +82,7 @@ fn selection(
     }
     let deadline = Instant::now() + TIME_LIMIT;
     let run = compiled
-        .run_while(|| !cancel.is_cancelled() && Instant::now() < deadline)
+        .run_while(|| !cancel.is_cancelled() && Instant::now() < deadline)?
         .ok_or(ToolError::QueryStopped(TIME_LIMIT.as_secs()))?;
     let records: Arc<[u32]> = run.indexes().into();
     opened.keep_selection(canonical, Arc::clone(&records));
