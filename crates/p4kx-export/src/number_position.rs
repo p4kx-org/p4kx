@@ -21,6 +21,8 @@ pub(crate) enum NumberPosition {
     Quantization,
     Bands,
     Band,
+    Transformation,
+    TransformationChildren,
     Number(ResourceNumberContract),
 }
 
@@ -49,6 +51,13 @@ impl NumberPosition {
             Self::Quantization if owner == "CraftingQualityQuantization" && name == "bands" => {
                 Self::Bands
             }
+            Self::Transformation => match (owner, name) {
+                ("CraftingDisplayTransformation_Scale", "scale") => numeric(owner, name),
+                ("CraftingDisplayTransformation_Sequence", "transformations") => {
+                    Self::TransformationChildren
+                }
+                _ => Self::None,
+            },
             _ => Self::None,
         }
     }
@@ -58,6 +67,7 @@ impl NumberPosition {
             Self::Properties => Self::Property,
             Self::OverrideList => Self::OverrideEntry,
             Self::Bands => Self::Band,
+            Self::TransformationChildren => Self::Transformation,
             _ => Self::None,
         }
     }
@@ -81,6 +91,7 @@ fn root_field(owner: &str, name: &str) -> NumberPosition {
         ("CraftingQualityQuantizationRecord", "qualityQuantization") => {
             NumberPosition::Quantization
         }
+        ("CraftingGameplayPropertyDef", "displayTransformation") => NumberPosition::Transformation,
         _ => NumberPosition::None,
     }
 }

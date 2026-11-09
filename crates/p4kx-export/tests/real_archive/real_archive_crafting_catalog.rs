@@ -16,7 +16,7 @@ use std::error::Error;
 use std::path::Path;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, UPLOAD_LIMIT, build_catalog};
+use p4kx_export::{CatalogOptions, Kind, UPLOAD_LIMIT, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_b_path, real_archive_path};
 use serde_json::Value;
@@ -219,8 +219,8 @@ fn check_tiers(catalog: &Value) -> TestResult {
 fn check_quality(catalog: &Value) -> TestResult {
     let properties: HashSet<&str> = list(catalog, "gameplayProperties")?
         .iter()
-        .filter_map(|property| property["guid"].as_str())
-        .collect();
+        .map(|property| catalog_v3_consumer::identity(property, Kind::GameplayProperties))
+        .collect::<Result<_, _>>()?;
     let mut kinds = HashSet::new();
     for blueprint in list(catalog, "blueprints")? {
         for line in lines(blueprint) {

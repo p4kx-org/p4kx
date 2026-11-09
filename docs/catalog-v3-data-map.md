@@ -86,7 +86,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | blueprints | D.blueprints; C.blueprintTiers | tiers, first-tier ingredients, costs/quality/outputs, research separate |
 | blueprintCategories | D.blueprintCategories | implemented fieldless physical category definitions with the shared eight sourced header fields; no fabricated name, rule or hierarchy |
 | blueprintCategoryLists | A.blueprintCategoryLists | implemented type-wide physical category database declarations, independently filtered; shared eight-field header and ordered stateful references without a category catalog join ([contract](catalog-blueprint-category-lists.md)) |
-| gameplayProperties | D.gameplayProperties | quality-property targets, no guessed stat link |
+| gameplayProperties | D.gameplayProperties | all four authored fields, owner-local flat transformation occurrences, ordered overrides, exact numbers and public inert TextForms; no guessed stat link ([contract](catalog-gameplay-properties.md)) |
 | qualityDistributions | D.qualityDistributions | complete physical declarations, exact numeric tokens and ordered nullable overrides; shared eight-field header and inline/recordRef/emptyBase forms ([contract](catalog-quality.md)) |
 | qualityQuantizations | D.qualityQuantizations; V.qualityQuantizationResources | all ordered raw bands and physical alternatives; genuine first-eligible nominal-GUID inverse, explicit eligibility and independent per-value sources ([contract](catalog-quality.md)) |
 | blueprintPools | D.blueprintPools; A.blueprintRewardSources | reward definitions and actual targeted-source relations |

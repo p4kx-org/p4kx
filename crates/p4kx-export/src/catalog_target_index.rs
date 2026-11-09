@@ -134,6 +134,7 @@ fn origins<'source>(
         if !matches!(
             kind,
             Kind::Manufacturers
+                | Kind::GameplayProperties
                 | Kind::Tags
                 | Kind::Commodities
                 | Kind::ResourceTypes

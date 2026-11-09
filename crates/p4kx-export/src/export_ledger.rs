@@ -297,6 +297,9 @@ pub enum ExportAccountingError {
     /// Tag projection trace positions do not identify their original selected parent.
     #[error("inconsistent original tag-path trace")]
     ConflictingTagTrace,
+    /// A reserved transformation occurrence has no completed original-node projection.
+    #[error("an original transformation node was not completed")]
+    UnfilledTransformationNode,
     /// Counter arithmetic exceeded the supported range.
     #[error("export health counter exceeds its supported range")]
     CounterOverflow,

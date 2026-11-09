@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, DataForge, Filter, Record, TreeBuilder};
+use p4kx_extraction::{CancelToken, DataForge, Filter, Record, RecordTree, TreeBuilder};
 use rayon::prelude::*;
 
 use crate::crafting_scan;
@@ -15,12 +15,14 @@ use super::projection::{self, Piece};
 use super::resource_scope::ResourceLinkScope;
 use super::selection::{self, ReadPolicy, Selection};
 use super::{ReadCrafting, ReadMode};
+use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyInput;
 use crate::quality_catalog::Step;
 
 pub(super) struct Tracked<'f> {
     pub(super) piece: Option<Piece<'f>>,
     pub(super) ledger: ExportLedger,
     pub(super) quality: Step<'f>,
+    pub(super) gameplay: Option<GameplayPropertyInput<'f>>,
 }
 
 fn candidate<'f>(
@@ -52,6 +54,7 @@ fn candidate<'f>(
             .then(|| Piece::Failed(CatalogFailure::of(record, error))),
         ledger,
         quality: Step::default(),
+        gameplay: None,
     }
 }
 
@@ -82,6 +85,7 @@ fn failure<'f>(
             .then(|| Piece::Failed(CatalogFailure::of(record, fault.error()))),
         ledger,
         quality: Step::default(),
+        gameplay: None,
     }
 }
 
@@ -91,7 +95,7 @@ fn one<'f>(
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
     scope: ResourceLinkScope,
-    mode: ReadMode<'_>,
+    mode: ReadMode<'_, 'f>,
 ) -> Result<Option<Tracked<'f>>, CatalogError> {
     if !scope.includes(record, filter) {
         return Ok(None);
@@ -103,6 +107,7 @@ fn one<'f>(
             piece: None,
             ledger: ExportLedger::default(),
             quality: Step::default(),
+            gameplay: None,
         },
         Ok(None) => return Ok(None),
         Err(error) => {
@@ -120,7 +125,7 @@ fn selected_record<'f>(
     record: &Record<'f>,
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
-    mode: ReadMode<'_>,
+    mode: ReadMode<'_, 'f>,
     selected: Selection,
 ) -> Result<Tracked<'f>, CatalogError> {
     if selected.policy == ReadPolicy::SkipBefore {
@@ -130,6 +135,7 @@ fn selected_record<'f>(
             piece: Some(Piece::Skipped),
             ledger,
             quality: Step::default(),
+            gameplay: None,
         });
     }
     let tree = match trees.build(record) {
@@ -146,18 +152,30 @@ fn selected_record<'f>(
             return Ok(tracked);
         }
     };
+    project_tree(record, &tree, selected, mode, cancel, filter)
+}
+
+fn project_tree<'f>(
+    record: &Record<'f>,
+    tree: &RecordTree<'f>,
+    selected: Selection,
+    mode: ReadMode<'_, 'f>,
+    cancel: Option<&CancelToken>,
+    filter: Option<&Filter>,
+) -> Result<Tracked<'f>, CatalogError> {
     let mut ledger = crate::export_field_walk::inspect(
-        &tree,
+        tree,
         record,
         selected.action.kind(),
         selected.role,
         cancel,
     )?;
-    let input = mode.project(selected, &tree, &mut ledger, cancel)?;
-    let piece = if input.is_some() {
+    let input = mode.project(selected, tree, &mut ledger, cancel)?;
+    let gameplay = mode.property(selected, tree, &mut ledger, cancel)?;
+    let piece = if input.is_some() || gameplay.is_some() {
         None
     } else {
-        match projection::project(selected.action, &tree, selected.role, &mut ledger) {
+        match projection::project(selected.action, tree, selected.role, &mut ledger) {
             Ok(piece) => piece,
             Err(error) => {
                 return Ok(failure(
@@ -174,6 +192,7 @@ fn selected_record<'f>(
     Ok(Tracked {
         piece,
         ledger,
+        gameplay,
         quality: Step {
             input,
             ..Step::default()
@@ -216,7 +235,7 @@ pub(crate) fn read_catalog<'f>(
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
     progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
-    mode: ReadMode<'_>,
+    mode: ReadMode<'_, 'f>,
 ) -> Result<ReadCrafting<'f>, CatalogError> {
     let records: Vec<_> = forge.records().collect();
     let scope = ResourceLinkScope::catalog(&records, filter, cancel)?;
@@ -229,7 +248,7 @@ fn read_scoped<'f>(
     cancel: Option<&CancelToken>,
     progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
     scope: ResourceLinkScope,
-    mode: ReadMode<'_>,
+    mode: ReadMode<'_, 'f>,
 ) -> Result<ReadCrafting<'f>, CatalogError> {
     let tracked = records
         .par_iter()

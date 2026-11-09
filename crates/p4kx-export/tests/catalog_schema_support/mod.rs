@@ -14,6 +14,7 @@ mod commodities;
 mod contract_properties;
 mod contracts;
 mod crafters;
+mod gameplay_properties;
 mod harvest;
 mod health;
 mod loadouts;
@@ -183,7 +184,7 @@ pub(crate) fn minimal_catalog() -> Value {
                 "tierIndex": 0
             }
         }],
-        "definitions": {"blueprintCategories": blueprint_categories::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
+        "definitions": {"blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
             "tags": tags::definitions()},
         "declarations": {
@@ -196,12 +197,6 @@ pub(crate) fn minimal_catalog() -> Value {
         "projections": {"qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents()},
         "provenance": {"sources": [], "uses": []},
 
-        "gameplayProperties": [{
-            "guid": "e1000000-0000-4000-8000-000000000001",
-            "className": "GPP_Armor",
-            "recordPath": "libs/foundry/records/crafting/craftedproperties/gpp_armor",
-            "name": {"key": "@StatName_GPP_Armor", "en": "Armour", "de": null}
-        }],
         "blueprintPools": blueprints::pools(),
         "dismantleProcesses": [{
             "guid": "f1000000-0000-4000-8000-000000000001",
@@ -321,6 +316,7 @@ fn manufacturer() -> Value {
 
 fn public_names() -> Vec<Value> {
     let mut rows = commodities::public_names();
+    rows.extend(gameplay_properties::public_names());
     rows.push(json!({
         "id": source_values::present(json!("name:22:@manufacturer_NameACAS")),
         "key": source_values::present(json!("@manufacturer_NameACAS")),

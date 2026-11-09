@@ -5,6 +5,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use p4kx_extraction::{CancelToken, DataForge, Filter, Guid};
 
+use crate::catalog_projection::CatalogProjection;
 use crate::crafting_types::{
     BlueprintPool, BlueprintTiers, DismantleProcess, DismantleReturn, GameplayProperty,
     GlobalParams, QualityDistribution, QualityQuantization, RewardChance, RewardSource,
@@ -79,14 +80,14 @@ pub(crate) fn read_with_progress<'f>(
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
     progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
-    origins: &crate::catalog_origins::CatalogOrigins,
+    projection: &CatalogProjection<'_, 'f>,
 ) -> Result<ReadCrafting<'f>, CatalogError> {
     ledger::read_catalog(
         forge,
         filter,
         cancel,
         progress,
-        ledger::ReadMode::Catalog(origins),
+        ledger::ReadMode::Catalog(projection),
     )
 }
 

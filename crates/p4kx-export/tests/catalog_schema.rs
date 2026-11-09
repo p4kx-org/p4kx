@@ -8,6 +8,8 @@
 #![recursion_limit = "256"]
 
 mod catalog_schema_support;
+#[path = "catalog_schema/gameplay_properties.rs"]
+mod gameplay_properties;
 #[path = "catalog_schema/health.rs"]
 mod health;
 #[path = "catalog_schema/mission_values.rs"]
@@ -153,7 +155,6 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         "items",
         "ships",
         "blueprints",
-        "gameplayProperties",
         "blueprintPools",
         "dismantleProcesses",
         "paints",
@@ -377,6 +378,7 @@ fn the_crafting_fields_accept_additions_and_new_closed_values_but_stay_required(
 fn assert_unknown_canonical_fields(validator: &Validator, catalog: &Value) -> TestResult {
     for pointer in [
         "/definitions/blueprintCategories/rows/0",
+        "/definitions/gameplayProperties/rows/0",
         "/definitions/commodities/rows/0",
         "/projections/commodityPresentation/rows/0",
     ] {

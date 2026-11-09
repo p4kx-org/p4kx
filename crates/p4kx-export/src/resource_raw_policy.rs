@@ -15,9 +15,8 @@ pub(crate) fn field_contract(owner: &str, field: &str) -> Option<ResourceNumberC
         ("GramsPerCubicCentimeter", "gramsPerCubicCentimeter")
         | ("KilogramsPerCubicMeter", "kilogramsPerCubicMeter")
         | ("ResourceTypeMolarMass", "molarMass")
-        | ("ResourceTypeVolatility", "volatility" | "healthDecayPerSecond") => {
-            Some(ResourceNumberContract::Single)
-        }
+        | ("ResourceTypeVolatility", "volatility" | "healthDecayPerSecond")
+        | ("CraftingDisplayTransformation_Scale", "scale") => Some(ResourceNumberContract::Single),
         (
             "CraftingQualityDistributionNormal" | "CraftingQualityDistributionUniform",
             "mean" | "stddev",

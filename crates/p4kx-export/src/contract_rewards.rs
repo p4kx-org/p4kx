@@ -4,24 +4,8 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract::{LocalisedText, every_field_required};
+use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
-
-/// A gameplay property definition: a `CraftingGameplayPropertyDef` Record under
-/// `crafting/craftedproperties`, the target of the `propertyGuid` of a modifier.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct GameplayProperty<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The name of the property; a placeholder key leaves `en` and `de` `null`.
-    pub(crate) name: LocalisedText<'a>,
-}
 
 /// One entry of a blueprint pool.
 #[derive(Debug, Serialize, JsonSchema)]

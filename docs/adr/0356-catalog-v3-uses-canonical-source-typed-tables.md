@@ -57,6 +57,15 @@ strings with documented known values. Unknown controls are rejected; unknown lab
 to a successful state. Existing closed payload unions remain closed and emitted nullable keys remain
 required. Additive unknown object fields stay accepted.
 
+Gameplay-property transformations use one owner-local flat preorder arena. The original
+root/child slots and node facts retain source states and direct contributions; root,
+nodes and nodeIndex are only structural controls. Each independently owned original
+occurrence has a separate node, even when values are equal. Unknown classes keep their
+actual type and Unsupported payload with the original type selector. No recursive
+wire mirror, global node identity, transformation execution or equality deduplication
+is introduced. This preserves the existing legal source depth through ordinary JSON
+parsers. Schema, local link validation and independent original-source ownership proof
+have separate responsibilities; a valid local index cannot certify a foreign source.
 ## Texts, identity and migration
 
 Use separate texts.publicNames and texts.gameTexts domains, with distinct typed references.

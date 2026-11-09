@@ -53,6 +53,7 @@ fn kind_health(kind: Kind, catalog: &Value) -> KindExportHealth {
         source_entries: ExportEntryCounts::default(),
         written_rows: match kind {
             Kind::BlueprintCategories => catalog.pointer("/definitions/blueprintCategories/rows"),
+            Kind::GameplayProperties => catalog.pointer("/definitions/gameplayProperties/rows"),
             Kind::BlueprintCategoryLists => {
                 catalog.pointer("/declarations/blueprintCategoryLists/rows")
             }

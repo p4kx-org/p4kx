@@ -8,12 +8,13 @@ use p4kx_extraction::Guid;
 use crate::blueprint_category::{BlueprintCategory, unlink_categories};
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
+use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::contract::{
     Blueprint, BlueprintPool, BrokerEntry, Commodity, ContractEntry, Crafter, CraftingGlobal,
-    DismantleProcess, GameplayProperty, HarvestableLocation, HarvestableProviderPreset, Item,
-    Loadout, LootContainer, MineableComposition, MineableElement, MineableEntity,
-    MiningGlobalParams, Paint, RefiningProcess, ResourceGroup, ResourceType, Ship, Shop,
-    StarmapObject, SubHarvestableMultiConfig,
+    DismantleProcess, HarvestableLocation, HarvestableProviderPreset, Item, Loadout, LootContainer,
+    MineableComposition, MineableElement, MineableEntity, MiningGlobalParams, Paint,
+    RefiningProcess, ResourceGroup, ResourceType, Ship, Shop, StarmapObject,
+    SubHarvestableMultiConfig,
 };
 use crate::contract_template::ContractTemplate;
 use crate::crafting_warning::CraftingWarning;
@@ -58,7 +59,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) resource_types: Vec<ResourceType<'f>>,
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'f>>,
     pub(crate) blueprint_category_lists: Vec<PreparedBlueprintCategoryList<'f>>,
-    pub(crate) gameplay_properties: Vec<GameplayProperty<'f>>,
+    pub(crate) gameplay_properties: Vec<GameplayPropertyDefinition<'f>>,
     pub(crate) quality: QualityRows<'f>,
     pub(crate) blueprint_pools: Vec<BlueprintPool<'f>>,
     pub(crate) dismantle_processes: Vec<DismantleProcess<'f>>,

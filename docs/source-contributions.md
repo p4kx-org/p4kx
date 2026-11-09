@@ -5,6 +5,22 @@ field-addressed output companions. Runtime observations and serialized descripti
 have separate authority. This API does not itself migrate every tool output; the
 remaining carrier coverage belongs to #1125.
 
+## Gameplay-property occurrences
+
+Canonical gameplay definitions retain the original physical Record/body coordinates
+through a flat owner-local transformation arena. Each actual root, Sequence array and
+child slot keeps its sourced carrier. Node grouping, root links and nodeIndex are
+independent structural controls. They do not acquire a stored integer or Conversion
+source. Both sourceType and supported/Unsupported payload choice use the actual
+original path.$type Selector; the neighboring sourceType carrier does not substitute
+for the payload's own contribution set. Numeric and Enum fields retain their original
+Payloads, widths and full paths, without transformation or condition evaluation.
+
+Numeric coverage requires the actual Scale.scale Single receipt on an emitted physical
+definition. The owning traversal policy only stages possible coverage; equal bits,
+nominal GUID aliases, excluded rows and repeated captures cannot excuse another token.
+Public property names and UI templates use the shared TextForms lookup, with exact
+source text and separate display conversion. See the [gameplay-property contract](catalog-gameplay-properties.md).
 ## Runtime observations
 
 `SourceUses` owns one physical-source/use inventory. `observe` accepts an actual

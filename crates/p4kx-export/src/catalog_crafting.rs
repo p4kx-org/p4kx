@@ -6,9 +6,8 @@ use std::collections::{HashMap, HashSet};
 use p4kx_extraction::{Filter, Guid};
 
 use crate::blueprint::{Links, blueprint};
-use crate::contract::{
-    Blueprint, BlueprintPool, CraftingGlobal, DismantleProcess, GameplayProperty,
-};
+use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
+use crate::contract::{Blueprint, BlueprintPool, CraftingGlobal, DismantleProcess};
 use crate::contract_recipe::BlueprintDismantle;
 use crate::contract_rewards::{PoolEntry, RewardSource};
 use crate::crafting::{Crafting, ReadCrafting};
@@ -23,10 +22,10 @@ use crate::{CatalogFailure, Kind};
 #[path = "crafting_ledger/catalog_rows.rs"]
 mod rows;
 
-/// Selected crafting and canonical quality datasets in their documented GUID order.
+/// Selected crafting and canonical source datasets in their documented GUID order.
 pub(crate) struct CraftingKinds<'f> {
     pub(crate) blueprints: Vec<Blueprint<'f>>,
-    pub(crate) properties: Vec<GameplayProperty<'f>>,
+    pub(crate) properties: Vec<GameplayPropertyDefinition<'f>>,
     pub(crate) quality: QualityRows<'f>,
     pub(crate) pools: Vec<BlueprintPool<'f>>,
     pub(crate) dismantle: Vec<DismantleProcess<'f>>,
@@ -37,7 +36,7 @@ pub(crate) struct CraftingKinds<'f> {
     pub(crate) ledger: ExportLedger,
 }
 
-/// Combines selected canonical quality facts with interpreted crafting datasets.
+/// Combines canonical gameplay and quality facts with interpreted crafting datasets.
 /// Other crafting rows apply their own catalog Filter and development-leftover rules.
 pub(crate) fn kinds<'f>(
     read: ReadCrafting<'f>,
@@ -47,10 +46,12 @@ pub(crate) fn kinds<'f>(
     let ReadCrafting {
         data: crafting,
         mut ledger,
+        gameplay,
         quality,
     } = read;
     let mut selected = rows::Selection::new(filter, &mut ledger);
-    let (properties, properties_skipped) = properties(&crafting, texts, &mut selected);
+    let properties = gameplay.definitions;
+    let properties_skipped = gameplay.skipped;
     let distributions_skipped = quality.skipped_distributions;
     let quantizations_skipped = quality.skipped_quantizations;
     let sources = sources_by_pool(&crafting.reward_sources);
@@ -82,25 +83,6 @@ pub(crate) fn kinds<'f>(
         warnings: crafting.warnings,
         ledger,
     }
-}
-
-fn properties<'f>(
-    crafting: &Crafting<'f>,
-    texts: &Texts<'f>,
-    selected: &mut rows::Selection<'_>,
-) -> (Vec<GameplayProperty<'f>>, usize) {
-    selected.entities(
-        Kind::GameplayProperties,
-        &crafting.properties,
-        |item| (item.record_path, item.class_name, CatalogGuid(item.guid)),
-        |source| GameplayProperty {
-            guid: CatalogGuid(source.guid),
-            class_name: source.class_name,
-            record_path: source.record_path,
-            name: texts.localised(source.name_key),
-        },
-        |entity| entity.guid,
-    )
 }
 
 fn dismantle<'f>(

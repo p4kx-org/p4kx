@@ -126,7 +126,13 @@ fn a_cost_line_keeps_its_quantity_multiplier_and_leaves_the_quantity_alone() -> 
 
 #[test]
 fn quality_modifiers_name_their_property_and_keep_their_ranges() -> TestResult {
-    let (_, catalog) = build()?;
+    let database = fixture::database();
+    let property_source = crate::catalog_crafting_property::original(
+        &database,
+        fixture::PROPERTY,
+        "@StatName_GPP_Armor",
+    )?;
+    let (built, catalog) = build_from(&database, None)?;
     let line = &blueprint(&catalog, fixture::TWO_TIERS)?["tiers"][1]["mandatory"]["options"][0];
     assert_eq!(
         line["modifiers"],
@@ -140,16 +146,7 @@ fn quality_modifiers_name_their_property_and_keep_their_ranges() -> TestResult {
             ],
         }])
     );
-    assert_eq!(
-        catalog["gameplayProperties"],
-        json!([{
-            "guid": text(fixture::PROPERTY),
-            "className": "GPP_Armor_DamageMitigation",
-            "recordPath": "libs/foundry/records/crafting/craftedproperties/gpp_armor_damagemitigation",
-            "name": {"key": "@StatName_GPP_Armor", "en": "Armour", "de": null},
-        }]),
-        "the property the modifier points at"
-    );
+    crate::catalog_crafting_property::assert_armour(&built, &property_source)?;
     Ok(())
 }
 

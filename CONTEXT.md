@@ -733,6 +733,12 @@ definitions. Repeated references and null positions remain part of the list; it 
 category rules or hierarchy.
 _Avoid_: category definition, category rule
 
+**Display transformation**:
+An authored operation describing how a gameplay property's value is displayed. The
+catalog retains its concrete source form, parameters and ordered Sequence children
+without executing it; local node links organize original occurrences, not game identity.
+_Avoid_: evaluated stat, formatting result, shared operation identity
+
 **Export health**:
 Measured source-read and projection outcomes carried by the Basetool catalog, independently of
 Filter completeness. Physical source Records, required Archive Entry operations and emitted rows

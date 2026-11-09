@@ -31,6 +31,14 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
     append_resources(&mut emitted, collected);
     append(
         &mut emitted,
+        Kind::GameplayProperties,
+        collected
+            .gameplay_properties
+            .iter()
+            .map(|row| (row.physical_guid.0, row.physical_path)),
+    );
+    append(
+        &mut emitted,
         Kind::StarmapObjects,
         collected
             .starmap_objects
@@ -107,6 +115,12 @@ fn numbers(collected: &Collected<'_>) -> Vec<EmittedNumber> {
         .resource_types
         .iter()
         .map(|row| (Kind::ResourceTypes, &row.numbers))
+        .chain(
+            collected
+                .gameplay_properties
+                .iter()
+                .map(|row| (Kind::GameplayProperties, &row.numbers)),
+        )
         .chain(
             collected
                 .quality

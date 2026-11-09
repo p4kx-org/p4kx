@@ -9,6 +9,7 @@ mod read;
 mod resource_scope;
 mod selection;
 
+use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyRows;
 use crate::export_ledger::ExportLedger;
 
 use super::Crafting;
@@ -20,6 +21,7 @@ pub(crate) use read::{read, read_catalog};
 pub(crate) struct ReadCrafting<'f> {
     pub(crate) data: Crafting<'f>,
     pub(crate) ledger: ExportLedger,
+    pub(crate) gameplay: GameplayPropertyRows<'f>,
     pub(crate) quality: crate::quality_catalog::QualityRows<'f>,
 }
 

@@ -34,9 +34,7 @@ pub(crate) use crate::contract_recovery::ItemRecovery;
 pub(crate) use crate::contract_reputation::{
     FactionReputation, ReputationContext, ReputationScope, ReputationStanding,
 };
-pub(crate) use crate::contract_rewards::{
-    BlueprintPool, CraftingGlobal, DismantleProcess, GameplayProperty,
-};
+pub(crate) use crate::contract_rewards::{BlueprintPool, CraftingGlobal, DismantleProcess};
 pub(crate) use crate::contract_shops::Shop;
 pub(crate) use crate::contract_source::{BuildSource, Source};
 pub(crate) use crate::contract_starmap::StarmapObject;
@@ -85,8 +83,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) provenance: SourceInventory,
     /// Public short-name and protected game-text tables.
     pub(crate) texts: CatalogTexts<'a>,
-    /// The gameplay property definitions the quality modifiers refer to, ordered by GUID.
-    pub(crate) gameplay_properties: Vec<GameplayProperty<'a>>,
     /// The blueprint pools with the places that reward them, ordered by GUID.
     pub(crate) blueprint_pools: Vec<BlueprintPool<'a>>,
     /// The dismantle processes, ordered by GUID.

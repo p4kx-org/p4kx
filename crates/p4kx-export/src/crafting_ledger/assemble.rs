@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyRows;
 use crate::quality_catalog::{Assembly, QualityRows};
 use p4kx_extraction::{CancelToken, Guid};
 
@@ -74,9 +75,11 @@ pub(super) fn assemble<'f>(
     let mut ledger = ExportLedger::default();
     let mut links = HashMap::new();
     let mut quality = Assembly::default();
+    let mut gameplay = GameplayPropertyRows::default();
     for tracked in tracked {
         ledger.merge(tracked.ledger);
         quality.add(tracked.quality);
+        gameplay.add(tracked.gameplay);
         if let Some(piece) = tracked.piece {
             insert(&mut data, &mut links, piece);
         }
@@ -88,6 +91,7 @@ pub(super) fn assemble<'f>(
     data.dismantle.sort_by_key(|item| item.guid);
     data.pools.sort_by_key(|item| item.guid);
     quantizations(&mut data, links);
+    gameplay.order();
     let quality = match origins {
         Some(origins) => quality.finish(origins, cancel)?,
         None => QualityRows::default(),
@@ -95,6 +99,7 @@ pub(super) fn assemble<'f>(
     Ok(ReadCrafting {
         data,
         ledger,
+        gameplay,
         quality,
     })
 }

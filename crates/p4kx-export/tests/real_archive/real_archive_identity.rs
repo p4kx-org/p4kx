@@ -12,21 +12,10 @@ use crate::catalog_v3_consumer;
 
 /// Checks declared family identities and the physical `ResourceType` fallback.
 pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
-    check_list_aliases(catalog)?;
+    check_family_aliases(catalog, Kind::BlueprintCategoryLists)?;
+    check_family_aliases(catalog, Kind::GameplayProperties)?;
     let mut seen: HashMap<&str, (Kind, &Value)> = HashMap::new();
-    let identities: Vec<(&str, &str)> = list(catalog, Kind::Contracts)?
-        .iter()
-        .map(|entry| {
-            (
-                entry["guid"].as_str().unwrap_or_default(),
-                entry["subContractGuid"].as_str().unwrap_or_default(),
-            )
-        })
-        .collect();
-    assert!(
-        identities.is_sorted_by(|a, b| a < b),
-        "contracts strictly ordered by guid and subContractGuid, none twice"
-    );
+    check_contract_order(catalog)?;
     let kinds = Kind::ALL
         .into_iter()
         .filter(|kind| !kind.is_derived() && !matches!(kind, Kind::Contracts | Kind::Crafters));
@@ -36,7 +25,10 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
         }
         if matches!(
             kind,
-            Kind::BlueprintCategories | Kind::QualityDistributions | Kind::QualityQuantizations
+            Kind::BlueprintCategories
+                | Kind::GameplayProperties
+                | Kind::QualityDistributions
+                | Kind::QualityQuantizations
         ) {
             definition_identity::check(catalog, kind)?;
             continue;
@@ -57,6 +49,23 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
             }
         }
     }
+    Ok(())
+}
+
+fn check_contract_order(catalog: &Value) -> TestResult {
+    let identities: Vec<(&str, &str)> = list(catalog, Kind::Contracts)?
+        .iter()
+        .map(|entry| {
+            (
+                entry["guid"].as_str().unwrap_or_default(),
+                entry["subContractGuid"].as_str().unwrap_or_default(),
+            )
+        })
+        .collect();
+    assert!(
+        identities.is_sorted_by(|a, b| a < b),
+        "contracts strictly ordered by guid and subContractGuid, none twice"
+    );
     Ok(())
 }
 
@@ -98,24 +107,20 @@ fn same_resource_fallback(
             == catalog_v3_consumer::field(resource, Kind::ResourceTypes, "recordPath")?)
 }
 
-fn check_list_aliases(catalog: &Value) -> TestResult {
-    let lists: HashSet<_> = list(catalog, Kind::BlueprintCategoryLists)?
+fn check_family_aliases(catalog: &Value, owner: Kind) -> TestResult {
+    let family_guids: HashSet<_> = list(catalog, owner)?
         .iter()
-        .map(|row| catalog_v3_consumer::identity(row, Kind::BlueprintCategoryLists))
+        .map(|row| catalog_v3_consumer::identity(row, owner))
         .collect::<Result<_, _>>()?;
-    if lists.is_empty() {
+    if family_guids.is_empty() {
         return Ok(());
     }
     for kind in Kind::ALL.into_iter().filter(|kind| {
-        !kind.is_derived()
-            && !matches!(
-                kind,
-                Kind::Contracts | Kind::Crafters | Kind::BlueprintCategoryLists
-            )
+        !kind.is_derived() && !matches!(kind, Kind::Contracts | Kind::Crafters) && *kind != owner
     }) {
         for row in list(catalog, kind)? {
-            if lists.contains(catalog_v3_consumer::identity(row, kind)?) {
-                return Err(format!("a category-list GUID also occurs in {kind}").into());
+            if family_guids.contains(catalog_v3_consumer::identity(row, kind)?) {
+                return Err(format!("a {owner} GUID also occurs in {kind}").into());
             }
         }
     }

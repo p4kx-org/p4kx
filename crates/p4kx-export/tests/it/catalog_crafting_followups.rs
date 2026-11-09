@@ -200,19 +200,13 @@ fn a_placeholder_property_name_keeps_its_key_like_every_other_kind() -> TestResu
         )
         .value("propertyName", TestValue::text("@LOC_PLACEHOLDER")),
     );
-    let (_, catalog) = build_from(&forge, None)?;
-    let property = catalog["gameplayProperties"]
-        .as_array()
-        .and_then(|list| {
-            list.iter()
-                .find(|entry| entry["className"] == "GPP_Placeholder")
-        })
-        .ok_or("the placeholder property")?;
-    assert_eq!(
-        property["name"],
-        json!({"key": "@LOC_PLACEHOLDER", "en": null, "de": null})
-    );
-    Ok(())
+    let property_source = crate::catalog_crafting_property::original(
+        &forge,
+        PLACEHOLDER_PROPERTY,
+        "@LOC_PLACEHOLDER",
+    )?;
+    let (built, _) = build_from(&forge, None)?;
+    crate::catalog_crafting_property::assert_placeholder(&built, &property_source)
 }
 
 fn unreadable_property() -> DataForgeBuilder {

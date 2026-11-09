@@ -205,7 +205,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.resourceGroups`, `declarations.resourceGroupMembers`, `projections.resourceGroupParents` | Physical group definitions, every ordered authored membership and the first-selected parent with direct per-value origins ([contract](catalog-resource-groups.md)) |
 | `definitions.blueprintCategories` | Source-family availability and physical fieldless category rows with the shared eight sourced header fields in GUID order |
 | `declarations.blueprintCategoryLists` | Physical `BlueprintCategoryDatabaseRecord` owners selected at every path by the ordinary Filter, with eight sourced headers and ordered sourced category-reference slots ([contract](catalog-blueprint-category-lists.md)) |
-| `gameplayProperties` | The gameplay properties the quality modifiers refer to, ordered by GUID |
+| `definitions.gameplayProperties` | Physical gameplay-property definitions with shared eight-field headers, all four authored fields and local flat transformation trees ([contract](catalog-gameplay-properties.md)) |
 | `definitions.qualityDistributions` | Physical distribution and location-override source declarations with exact numbers and immediate per-field origins ([contract](catalog-quality.md)) |
 | `definitions.qualityQuantizations`, `projections.qualityQuantizationResources` | Ordered raw bands, explicit eligibility and the genuine first-eligible nominal-GUID resource inverse ([contract](catalog-quality.md)) |
 | `blueprintPools` | The blueprint pools with the places that reward them, ordered by GUID |
@@ -453,12 +453,13 @@ follow ADR-0072; the blocks `miningLaser` and `miningModifier` and the fire-mode
 ##### From a gameplay property to a stat field
 
 The Archive holds no link from a `CraftingGameplayPropertyDef` to the item field it changes: the
-Record has a name (`propertyName`), a unit format and a display transformation, nothing that names a
-field (ADR-0072). The catalog therefore states no link per entry of `gameplayProperties`; the
-consumer joins a modifier's `propertyGuid` to the `className` of that entry and takes the stat
-field from this table. The table covers the 29 properties of LIVE 4.10.2; `real_archive_gear_stats`
-checks that every `className` of `gameplayProperties` has a row. A multiplier-kind modifier scales
-the base value of the field, an additive one adds to it.
+Record has a name (`propertyName`), a unit format, a display transformation and ordered name
+overrides, none of which identifies an item stat field (ADR-0072). The catalog therefore states
+no stat link per entry of `definitions.gameplayProperties.rows`. Resolve a modifier's
+`propertyGuid` against those rows' sourced `guid.value`, then use that row's `className.value`
+as the key into the stat-field table below. The table covers the 29 properties of LIVE 4.10.2;
+`real_archive_gear_stats` checks that every catalogued `className.value` has a row. A multiplier-kind
+modifier scales the base value of the field; an additive one adds to it.
 
 | `className` | `stats` field the modifier changes | Items |
 |-------------|------------------------------------|-------|
@@ -905,7 +906,7 @@ flattens, so a selection stays a selection:
 | `minQuality` | `resource` and `item`: `minQuality` |
 | `quantityMultiplier` | The factor of `CraftingCostContext_QuantityMultiplier` (1.15 on 3 lines of LIVE), `null` without one. The quantities stay the stored ones; the consumer applies the factor |
 | `compositionInclusion` | The option of `CraftingCostContext_ResultCompositionInclusion`, e.g. `Include`; `null` without one |
-| `modifiers` | `CraftingCostContext_ResultGameplayPropertyModifiers`: per modifier `propertyGuid` (a `gameplayProperties` entry) and `ranges`, each with `kind` (`multiplier` for factors, `additive` for summands; a closed set the game may extend), `startQuality`, `endQuality`, `atStart` and `atEnd`, linear in the quality between the two ends |
+| `modifiers` | `CraftingCostContext_ResultGameplayPropertyModifiers`: per modifier `propertyGuid` (a `definitions.gameplayProperties.rows` entry) and `ranges`, each with `kind` (`multiplier` for factors, `additive` for summands; a closed set the game may extend), `startQuality`, `endQuality`, `atStart` and `atEnd`, linear in the quality between the two ends |
 
 A selection carries the context of the selection itself in the same fields.
 
@@ -922,7 +923,7 @@ matches the record path and marks selected-kind scope partial independently of s
 
 | Kind | Fields |
 |------|--------|
-| `gameplayProperties` | `name`: the localisation key `propertyName` and its texts; a placeholder key stays as `key` and leaves `en` and `de` `null`, as for `items` and `blueprints`. The target of a modifier's `propertyGuid` |
+| `definitions.gameplayProperties` | `propertyName` and `unitFormat` are sourced public-name references with source/display TextForms; `displayTransformation` preserves original operation occurrences through local links, and `nameOverrides` retains every ordered name/condition declaration. Scale numbers retain exact original width/bits. These definitions remain the targets of modifiers' nominal `propertyGuid` values; no transformation or condition is evaluated ([contract](catalog-gameplay-properties.md)) |
 | `definitions.qualityDistributions` | Shared sourced header, independent `qualityDistribution`/`locationOverride` declarations and ordered nullable override positions; exact numeric storage and inline/recordRef/emptyBase forms |
 | `definitions.qualityQuantizations`, `projections.qualityQuantizationResources` | Complete raw band definitions and a separate genuine inverse, described below |
 | `blueprintPools` | `entries`: per entry `blueprintGuid` and `weight`; `totalWeight`, the sum of the positive weights; `rewardSources`: every struct of any Record with a Reference to the pool (on LIVE the `BlueprintRewards` result of a contract) with `recordGuid`, `recordPath`, `contractId`, `contractName` (both from the nearest enclosing struct that has an `id`) and `chance`, ordered by `recordGuid` and then in stored order. A `blueprintGuid` may point at a blueprint that is left out of `blueprints` as a failure |

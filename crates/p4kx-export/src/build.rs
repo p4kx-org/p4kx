@@ -157,7 +157,7 @@ fn assemble<R>(
             options.filter,
             options.cancel,
             options.progress,
-            &origins,
+            &projection,
         )?,
         &texts,
         options.filter,
@@ -273,6 +273,10 @@ fn assemble<R>(
             ),
         },
         definitions: CatalogDefinitions {
+            gameplay_properties: crate::catalog_v3::gameplay_property_catalog::table(
+                &forge,
+                collected.gameplay_properties,
+            ),
             blueprint_categories: crate::blueprint_category::table(
                 &forge,
                 collected.blueprint_categories,
@@ -308,7 +312,6 @@ fn assemble<R>(
         },
         texts: projection.finish()?,
         provenance: origins.uses.freeze()?,
-        gameplay_properties: collected.gameplay_properties,
         blueprint_pools: collected.blueprint_pools,
         dismantle_processes: collected.dismantle_processes,
         crafting_global: collected.crafting_global,

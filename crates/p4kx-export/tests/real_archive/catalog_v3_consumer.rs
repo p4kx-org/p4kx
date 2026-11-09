@@ -11,6 +11,9 @@ use serde_json::Value;
 #[path = "catalog_v3_category_lists.rs"]
 mod category_lists;
 
+#[path = "catalog_v3_gameplay_properties.rs"]
+pub(crate) mod gameplay_properties;
+
 type TestResult<T> = Result<T, Box<dyn Error>>;
 
 /// Reads the one actual dataset for a Kind.
@@ -28,6 +31,7 @@ pub(crate) fn named_rows<'catalog>(
         .find(|kind| kind.name() == name)
         .ok_or("unknown catalog Kind")?;
     match kind {
+        Kind::GameplayProperties => checked_table(catalog, kind, "/definitions/gameplayProperties"),
         Kind::BlueprintCategoryLists => {
             checked_table(catalog, kind, "/declarations/blueprintCategoryLists")
         }
@@ -65,12 +69,15 @@ fn checked_table<'catalog>(
         identity(row, kind)?;
         if matches!(
             kind,
-            Kind::BlueprintCategories | Kind::BlueprintCategoryLists
+            Kind::BlueprintCategories | Kind::BlueprintCategoryLists | Kind::GameplayProperties
         ) {
-            category_header(row)?;
+            record_header(row)?;
         }
         if kind == Kind::BlueprintCategoryLists {
             category_lists::check(row)?;
+        }
+        if kind == Kind::GameplayProperties {
+            gameplay_properties::check(row)?;
         }
     }
     Ok(rows)
@@ -154,6 +161,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
         kind,
         Kind::BlueprintCategories
             | Kind::BlueprintCategoryLists
+            | Kind::GameplayProperties
             | Kind::Manufacturers
             | Kind::Commodities
             | Kind::ResourceTypes
@@ -232,7 +240,7 @@ pub(crate) fn nullable_guid(carrier: &Value) -> TestResult<Option<&str>> {
     }
 }
 
-fn category_header(row: &Value) -> TestResult<()> {
+fn record_header(row: &Value) -> TestResult<()> {
     for name in [
         "guid",
         "recordName",
@@ -253,7 +261,7 @@ fn category_header(row: &Value) -> TestResult<()> {
                 value.is_string()
             };
             if !valid {
-                return Err("category header source payload type".into());
+                return Err("Record header source payload type".into());
             }
         }
     }

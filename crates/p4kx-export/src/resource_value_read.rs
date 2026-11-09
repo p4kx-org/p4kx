@@ -46,6 +46,40 @@ pub(crate) fn single(
     )
 }
 
+/// Retains numeric storage while enforcing its independent Single field contract.
+pub(crate) fn single_number(
+    fields: &CatalogFields<'_, '_, '_>,
+    name: &str,
+    notes: &mut Vec<FieldError>,
+) -> Result<SourcedValue<ResourceNumber>, CatalogError> {
+    let value = fields.read(name, "a nullable number", notes, |original| {
+        let number = ResourceNumber::read(original)?;
+        if matches!(original, Value::Single(_))
+            && resource_raw_policy::field_contract(fields.source().type_name(), name)
+                == Some(ResourceNumberContract::Single)
+        {
+            fields.context().retain_number(
+                || fields.location(name),
+                fields.source().type_name(),
+                ResourceNumberContract::Single,
+                original,
+            );
+        }
+        Some(number)
+    })?;
+    if let Some(original) = fields.source().field(name)
+        && value.value().is_some()
+        && !matches!(original, Value::Single(_))
+    {
+        notes.push(FieldError::Malformed {
+            source_type: fields.source().type_name().to_owned(),
+            field: fields.location(name),
+            expected: "a Single under the declared numeric field contract",
+        });
+    }
+    Ok(value)
+}
+
 /// Reads a source number under its declared width contract.
 pub(crate) fn number(
     fields: &CatalogFields<'_, '_, '_>,

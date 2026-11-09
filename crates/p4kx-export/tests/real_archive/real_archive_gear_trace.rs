@@ -8,10 +8,12 @@ use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
+
+use crate::catalog_v3_consumer;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -149,17 +151,14 @@ fn every_modified_property_is_filled_on_the_item_the_blueprint_produces() -> Tes
     let archive = Archive::open_with_key(real_archive_path()?, None)?;
     let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let classes: HashMap<&str, String> = catalog["gameplayProperties"]
-        .as_array()
-        .ok_or("the properties")?
-        .iter()
-        .filter_map(|property| {
-            Some((
-                property["guid"].as_str()?,
-                property["className"].as_str()?.to_ascii_lowercase(),
-            ))
-        })
-        .collect();
+    let mut classes = HashMap::new();
+    for property in catalog_v3_consumer::rows(&catalog, Kind::GameplayProperties)? {
+        let guid = catalog_v3_consumer::identity(property, Kind::GameplayProperties)?;
+        let class = catalog_v3_consumer::field(property, Kind::GameplayProperties, "className")?
+            .as_str()
+            .ok_or("a present property className")?;
+        classes.insert(guid, class.to_ascii_lowercase());
+    }
     let items: HashMap<&str, &Value> = catalog["items"]
         .as_array()
         .ok_or("the items")?

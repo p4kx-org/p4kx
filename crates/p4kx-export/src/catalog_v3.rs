@@ -36,6 +36,8 @@ pub(crate) mod catalog_record_reference;
 pub(crate) mod catalog_text_contract;
 #[path = "catalog_text_forms.rs"]
 pub(crate) mod catalog_text_forms;
+#[path = "gameplay_property_catalog.rs"]
+pub(crate) mod gameplay_property_catalog;
 #[path = "quality_bands_read.rs"]
 pub(crate) mod quality_bands_read;
 #[path = "quality_curve_source_read.rs"]
