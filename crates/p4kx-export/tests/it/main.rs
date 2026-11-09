@@ -117,6 +117,8 @@ mod crafting_depth;
 mod crafting_detail;
 mod crafting_detail_fixture;
 mod crafting_fixture;
+mod export_complete_pickup_places;
+mod export_complete_pickup_source;
 mod export_health;
 mod export_health_missions;
 mod export_health_paints;

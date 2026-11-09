@@ -70,7 +70,7 @@ pub(crate) struct ContractEntry<'a> {
     /// The `factionReputation` of the handler, as stored: the faction of a contract that has no
     /// reputation result, e.g. the collector's. `null` when the handler names none.
     pub(crate) faction: Option<ContractFaction<'a>>,
-    /// Where the contract is offered or picked up, at most five starmap objects: those of the
+    /// All resolved starmap objects where the contract is offered or picked up: those of the
     /// `MissionLocality` and location prerequisites of the sub contract (else of the contract and
     /// its handler), a star left out, the star system first, then planets and moons, then the
     /// rest, each group in stored order. When none of those is left (nothing named, or only stars
@@ -78,7 +78,7 @@ pub(crate) struct ContractEntry<'a> {
     /// `MissionBrokerEntry`. Empty when that names none either or the starmap objects are not part
     /// of the catalog build.
     pub(crate) pickup_places: Vec<PickupPlace<'a>>,
-    /// Every place the contract is offered at, without the cap of `pickupPlaces`: the localities
+    /// Every authored place the contract is offered at: the localities
     /// and location objects of the same prerequisites, as stated.
     pub(crate) offered_at: OfferedAt<'a>,
     /// The faction of the contract and where it was found: `faction` (source `handler`), else the

@@ -1207,7 +1207,7 @@ that the rule on equal `guid` and `subContractGuid` above drops.
 | `description` | The resolved description (game text; must not be passed on to third parties) |
 | `missionTypeGuid`, `missionType` | The `MissionType` Record and its localised name (game text) |
 | `contractor` | The `Contractor` string parameter (game text) |
-| `pickupPlaces` | Up to five starmap objects the contract is offered at, each `starmapObjectGuid`, `objectType`, `place` (game text) |
+| `pickupPlaces` | Every eligible resolved starmap object the contract is offered at, each `starmapObjectGuid`, `objectType`, `place` (game text) |
 | `offeredAt` | Every place the contract is offered at, uncapped (see "Offered at"): `localityGuids` (entries of `missionLocalities`) and `locations` (starmap objects, each `starmapObjectGuid`, `objectType`, `place`), and `brokerFallback` (`true` when `locations` is the broker entry's location because no place is stated) |
 | `faction` | The `factionReputation` of the handler as stored: `guid`, Record `name` and `displayName` (game text), `null` when the handler names none |
 | `giverFaction` | The faction of the contract and where it was found: `source` (`handler`, `reputationResult` or `reputationPrerequisite`) and `faction` (`guid`, `name`, `displayName`), `null` when none names one (see "Giver faction") |
@@ -1300,12 +1300,12 @@ faction reputation (game text).
 `ContractPrerequisite_Locality` (a `MissionLocality` Record) and the object of each
 `ContractPrerequisite_Location`, in stored order, none twice. A star (`type` `Star`) is left out and
 what is not in `starmapObjects` is skipped. The list is ordered by rank, stably: the star system
-(`SolarSystem`) first, then planets and moons (`Planet`, `Moon`), then every other type, and holds
-at most **5** places (`MAX_PICKUP_PLACES`). Each place has the `starmapObjectGuid`, its `objectType`
-and the `place` name (game text). The places come from the starmap objects of the same build: a
+(`SolarSystem`) first, then planets and moons (`Planet`, `Moon`), then every other type. Every
+eligible resolved place is retained. Each has the `starmapObjectGuid`, its `objectType` and the
+`place` name (game text). The places come from the starmap objects of the same build: a
 Filter that leaves them out leaves `pickupPlaces` empty.
 
-**Offered at (ADR-0273).** The same prerequisites as the pickup places, read without the cap and
+**Offered at (ADR-0273).** The same prerequisites as the pickup places, read as authored and
 without a filter on the object type. `localityGuids` lists the `MissionLocality` Record of each
 `ContractPrerequisite_Locality`, in stored order and none twice; a consumer reads its places in
 `missionLocalities[].starmapObjectGuids` and their names in `starmapObjects`. `locations` lists the

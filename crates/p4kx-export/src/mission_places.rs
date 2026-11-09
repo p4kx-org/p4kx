@@ -14,9 +14,6 @@ use crate::mission_index::MissionIndex;
 use crate::mission_layers::items;
 use crate::record_fields::linked;
 
-/// The most pickup places an entry lists.
-pub(crate) const MAX_PICKUP_PLACES: usize = 5;
-
 const LOCALITY: &str = "ContractPrerequisite_Locality";
 const LOCATION: &str = "ContractPrerequisite_Location";
 const SYSTEM: &str = "SolarSystem";
@@ -73,7 +70,7 @@ impl<'s, 'f> Places<'s, 'f> {
 
     /// Returns the pickup places of the levels `levels`, nearest first: the starmap objects of
     /// their localities and locations, a star left out, the system first, then planets and moons,
-    /// then the rest, each group in stored order, at most [`MAX_PICKUP_PLACES`], none twice.
+    /// then the rest, each group in stored order and none twice.
     pub(crate) fn pickup(
         &self,
         index: &MissionIndex<'f>,
@@ -109,7 +106,6 @@ impl<'s, 'f> Places<'s, 'f> {
         ranked.sort_by_key(|(rank, _, _)| *rank);
         ranked
             .into_iter()
-            .take(MAX_PICKUP_PLACES)
             .map(|(_, guid, object)| describe(guid, Some(object)))
             .collect()
     }

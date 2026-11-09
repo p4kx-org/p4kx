@@ -34,12 +34,12 @@ fn guids<'a>(value: &'a Value, field: &str) -> HashSet<&'a str> {
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn every_contract_links_all_its_places_and_none_is_lost_to_the_cap() -> TestResult {
+fn every_contract_links_its_places_and_reports_pickup_list_lengths() -> TestResult {
     let catalog = catalog()?;
     let localities = guids(&catalog, "missionLocalities");
     let objects = guids(&catalog, "starmapObjects");
     let contracts = catalog["contracts"].as_array().ok_or("contracts")?;
-    let (mut with_places, mut uncapped, mut unlinked) = (0_usize, 0_usize, 0_usize);
+    let (mut with_places, mut max_pickup, mut unlinked) = (0_usize, 0_usize, 0_usize);
     for entry in contracts {
         let offered = &entry["offeredAt"];
         let linked = offered["localityGuids"].as_array().ok_or("localityGuids")?;
@@ -68,12 +68,10 @@ fn every_contract_links_all_its_places_and_none_is_lost_to_the_cap() -> TestResu
                 "a contract with a pickup place states where it is offered"
             );
         }
-        if pickup == 5 {
-            uncapped += 1;
-        }
+        max_pickup = max_pickup.max(pickup);
     }
     print_line(&format!(
-        "{} entries, {with_places} state a place, {uncapped} reach the cap of five, {unlinked} links without an entry",
+        "{} entries, {with_places} state a place, largest pickup list {max_pickup}, {unlinked} links without an entry",
         contracts.len()
     ));
     let added: usize = contracts

@@ -226,7 +226,7 @@ fn places(entry: &Value) -> Vec<(&str, &str)> {
 }
 
 #[test]
-fn the_pickup_places_put_the_system_and_planets_first_skip_stars_and_stop_at_five() -> TestResult {
+fn the_pickup_places_put_the_system_and_planets_first_and_keep_every_non_star() -> TestResult {
     let (_, catalog) = build(None)?;
     assert_eq!(
         places(entry(&catalog, A, None)?),
@@ -247,7 +247,11 @@ fn the_pickup_places_put_the_system_and_planets_first_skip_stars_and_stop_at_fiv
         entry(&catalog, A, None)?["pickupPlaces"],
         "a sub contract without places takes the contract's"
     );
-    assert_eq!(places(entry(&catalog, B, None)?).len(), 5, "at most five");
+    assert_eq!(
+        places(entry(&catalog, B, None)?).len(),
+        7,
+        "every eligible original place"
+    );
     assert_eq!(places(entry(&catalog, C, None)?), [], "none named");
     Ok(())
 }
