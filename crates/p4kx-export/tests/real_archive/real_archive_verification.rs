@@ -9,7 +9,11 @@
 #[path = "real_archive_definition_identity.rs"]
 mod definition_identity;
 
-use std::collections::{HashMap, HashSet};
+#[path = "real_archive_identity.rs"]
+mod identity;
+pub(crate) use identity::check_unique_guids;
+
+use std::collections::HashSet;
 use std::error::Error;
 use std::io::Read;
 use std::path::Path;
@@ -19,7 +23,7 @@ use p4kx_export::{
     CatalogOptions, CatalogSummary, Compression, DECOMPRESSED_LIMIT, EXCLUDED_TOKENS, Kind,
     UPLOAD_LIMIT, catalog_schema, write_catalog,
 };
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::{real_archive_b_path, real_archive_path};
 use serde_json::Value;
 
@@ -176,7 +180,10 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
         assert_eq!(guids.len(), entities.len(), "{kind} all have a {own}");
         if matches!(
             kind,
-            Kind::BlueprintCategories | Kind::QualityDistributions | Kind::QualityQuantizations
+            Kind::BlueprintCategories
+                | Kind::BlueprintCategoryLists
+                | Kind::QualityDistributions
+                | Kind::QualityQuantizations
         ) {
             assert!(
                 guids.is_sorted(),
@@ -191,6 +198,11 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
         }
     }
     check_unique_guids(&catalog)?;
+    if !list(&catalog, Kind::BlueprintCategoryLists)?.is_empty() {
+        let entry = DataForgeEntry::read(&archive)?;
+        let forge = entry.open()?;
+        definition_identity::check_original_lists(&catalog, &forge)?;
+    }
     assert_eq!(
         summary.size_warning(),
         None,
@@ -214,95 +226,15 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
     Ok(catalog)
 }
 
-/// Checks family identities and permits only the same physical `ResourceType` fallback
-/// across tables.
-pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
-    let mut seen: HashMap<&str, (Kind, &Value)> = HashMap::new();
-    let identities: Vec<(&str, &str)> = list(catalog, Kind::Contracts)?
-        .iter()
-        .map(|entry| {
-            (
-                entry["guid"].as_str().unwrap_or_default(),
-                entry["subContractGuid"].as_str().unwrap_or_default(),
-            )
-        })
-        .collect();
-    assert!(
-        identities.is_sorted_by(|a, b| a < b),
-        "contracts strictly ordered by guid and subContractGuid, none twice"
-    );
-    let kinds = Kind::ALL
-        .into_iter()
-        .filter(|kind| !kind.is_derived() && !matches!(kind, Kind::Contracts | Kind::Crafters));
-    for kind in kinds {
-        if matches!(
-            kind,
-            Kind::BlueprintCategories | Kind::QualityDistributions | Kind::QualityQuantizations
-        ) {
-            definition_identity::check(catalog, kind)?;
-            continue;
-        }
-        let mut family = HashSet::new();
-        for entity in list(catalog, kind)? {
-            let guid = catalog_v3_consumer::identity(entity, kind)?;
-            if !family.insert(guid) {
-                return Err(format!("{guid} occurs twice inside {kind}").into());
-            }
-            if let Some((previous_kind, previous)) = seen.get(guid) {
-                if !same_resource_fallback(*previous_kind, previous, kind, entity)? {
-                    return Err(format!("{guid} occurs twice, also in {kind}").into());
-                }
-            } else {
-                seen.insert(guid, (kind, entity));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn same_resource_fallback(
-    left_kind: Kind,
-    left: &Value,
-    right_kind: Kind,
-    right: &Value,
-) -> Result<bool, Box<dyn Error>> {
-    let (commodity, resource) = match (left_kind, right_kind) {
-        (Kind::Commodities, Kind::ResourceTypes) => (left, right),
-        (Kind::ResourceTypes, Kind::Commodities) => (right, left),
-        _ => return Ok(false),
-    };
-    if catalog_v3_consumer::field(commodity, Kind::Commodities, "selection")?.as_str()
-        != Some("resourceFallback")
-        || catalog_v3_consumer::field(commodity, Kind::Commodities, "sourceType")?.as_str()
-            != Some("ResourceType")
-    {
-        return Ok(false);
-    }
-    let commodity_guid = commodity.get("guid").ok_or("Commodity GUID carrier")?;
-    let resource_guid = resource.get("guid").ok_or("ResourceType GUID carrier")?;
-    let references = commodity_guid
-        .get("sourceUsesRefs")
-        .and_then(Value::as_array)
-        .ok_or("original GUID uses")?;
-    Ok(!references.is_empty()
-        && commodity_guid.get("sourceUsesRefs") == resource_guid.get("sourceUsesRefs")
-        && commodity_guid
-            .get("sourceSetComplete")
-            .and_then(Value::as_bool)
-            == Some(true)
-        && resource_guid
-            .get("sourceSetComplete")
-            .and_then(Value::as_bool)
-            == Some(true)
-        && catalog_v3_consumer::field(commodity, Kind::Commodities, "recordPath")?
-            == catalog_v3_consumer::field(resource, Kind::ResourceTypes, "recordPath")?)
-}
-
 fn check_leftovers(catalog: &Value) -> TestResult {
     for kind in Kind::ALL {
         for entity in list(catalog, kind)? {
             for field in ["recordPath", "className"] {
-                if kind == Kind::BlueprintCategories && field == "className" {
+                if matches!(
+                    kind,
+                    Kind::BlueprintCategories | Kind::BlueprintCategoryLists
+                ) && field == "className"
+                {
                     let carrier = entity.get(field).ok_or("required category class carrier")?;
                     if matches!(
                         carrier.get("state").and_then(Value::as_str),
@@ -315,6 +247,7 @@ fn check_leftovers(catalog: &Value) -> TestResult {
                 let text = if matches!(
                     kind,
                     Kind::BlueprintCategories
+                        | Kind::BlueprintCategoryLists
                         | Kind::Manufacturers
                         | Kind::Commodities
                         | Kind::ResourceTypes

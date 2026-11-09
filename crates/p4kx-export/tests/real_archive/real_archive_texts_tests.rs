@@ -3,7 +3,9 @@
 
 use std::error::Error;
 
-use p4kx_export::Kind;
+use p4kx_export::{Kind, Language};
+use p4kx_extraction::{Archive, LocalizationEntry};
+use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 use serde_json::{Value, json};
 
 use super::{Coverage, Oracle, floor_verdict, keyed_texts, verdict};
@@ -108,12 +110,8 @@ fn a_per_kind_floor_survives_unlimited_source_gaps() {
 }
 
 fn canonical_catalog() -> Result<Value, Box<dyn Error>> {
-    use p4kx_export::{CatalogOptions, Language};
-    use p4kx_extraction::Archive;
-    use p4kx_testkit::{
-        ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestStruct,
-        TestType, TestValue,
-    };
+    use p4kx_export::CatalogOptions;
+    use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, TestStruct, TestType};
     use std::time::UNIX_EPOCH;
     let mut forge = DataForgeBuilder::new()
         .version(8)
@@ -128,23 +126,7 @@ fn canonical_catalog() -> Result<Value, Box<dyn Error>> {
                 .field("Localization", TestType::Class("SCItemLocalization".into())),
         );
     for guid in [1, 2] {
-        forge = forge.record(
-            TestRecord::new(
-                guid,
-                "SCItemManufacturer",
-                format!("SCItemManufacturer.M{guid}"),
-                format!("libs/foundry/records/scitemmanufacturer/m{guid}.xml"),
-            )
-            .value("Code", TestValue::text("M"))
-            .value(
-                "Localization",
-                TestValue::Struct(
-                    TestInstance::new("SCItemLocalization")
-                        .value("Name", TestValue::text("@name"))
-                        .value("Description", TestValue::text("@description")),
-                ),
-            ),
-        );
+        forge = forge.record(manufacturer(guid));
     }
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("Data.p4k");
@@ -160,12 +142,49 @@ fn canonical_catalog() -> Result<Value, Box<dyn Error>> {
         ))
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
+    assert_original_locales(&archive)?;
     let built = p4kx_export::build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
     assert!(
         built.summary().export_health().is_complete(),
         "the source fixture has complete production health"
     );
     Ok(serde_json::from_slice(built.json())?)
+}
+
+fn manufacturer(guid: u128) -> TestRecord {
+    TestRecord::new(
+        guid,
+        "SCItemManufacturer",
+        format!("SCItemManufacturer.M{guid}"),
+        format!("libs/foundry/records/scitemmanufacturer/m{guid}.xml"),
+    )
+    .value("Code", TestValue::text("M"))
+    .value(
+        "Localization",
+        TestValue::Struct(
+            TestInstance::new("SCItemLocalization")
+                .value("Name", TestValue::text("@name"))
+                .value("Description", TestValue::text("@description")),
+        ),
+    )
+}
+
+fn assert_original_locales(archive: &Archive) -> Result<(), Box<dyn Error>> {
+    for language in [Language::English, Language::German] {
+        let entry = LocalizationEntry::read(archive, language)?;
+        let original = entry.parse()?;
+        assert_eq!(
+            original.resolve("@name"),
+            Some("Correct"),
+            "the positive source control uses the actual winning original name"
+        );
+        assert_eq!(
+            original.resolve("@description"),
+            Some("  "),
+            "the original description is padded before display normalization"
+        );
+    }
+    Ok(())
 }
 
 fn canonical_coverage(catalog: &Value) -> Result<(Coverage, Coverage), Box<dyn Error>> {
@@ -187,6 +206,11 @@ fn canonical_text_coverage_counts_each_source_use_and_retains_empty_source_texts
         );
     }
     let oracle = Oracle::parse("blank=  \n");
+    assert_eq!(
+        oracle.source_text("@blank"),
+        Some("  "),
+        "the independent oracle retains the unnormalized winning RHS"
+    );
     assert_eq!(oracle.canonical_text("@blank"), Some(""));
     assert_eq!(oracle.text("@blank"), None);
     assert_eq!(oracle.canonical_text("@missing"), None);
@@ -259,11 +283,27 @@ fn wrong_translations_and_empty_text_without_a_source_key_are_contradictions()
 -> Result<(), Box<dyn Error>> {
     let catalog = canonical_catalog()?;
     let mut wrong = catalog.clone();
-    wrong["texts"]["publicNames"][0]["translations"]["value"]["en"]["value"] = json!("Wrong");
+    wrong["texts"]["publicNames"][0]["translations"]["value"]["en"]["displayText"]["value"] =
+        json!("Wrong");
     assert_eq!(canonical_coverage(&wrong)?.0.contradictions, 2);
+    let mut wrong_raw = catalog.clone();
+    wrong_raw["texts"]["publicNames"][0]["translations"]["value"]["en"]["sourceText"]["value"] =
+        json!("Wrong raw");
+    let coverage = canonical_coverage(&wrong_raw)?.0;
+    assert_eq!(
+        coverage.contradictions, 2,
+        "a raw-only mutation rejects both actual owner occurrences"
+    );
+    assert_eq!(
+        coverage.total(),
+        4,
+        "two forms never double the original occurrence count"
+    );
     let mut lost_empty = catalog.clone();
-    lost_empty["texts"]["gameTexts"][0]["translations"]["value"]["en"]["state"] = json!("absent");
-    lost_empty["texts"]["gameTexts"][0]["translations"]["value"]["en"]["value"] = Value::Null;
+    lost_empty["texts"]["gameTexts"][0]["translations"]["value"]["en"]["displayText"]["state"] =
+        json!("absent");
+    lost_empty["texts"]["gameTexts"][0]["translations"]["value"]["en"]["displayText"]["value"] =
+        Value::Null;
     assert_eq!(canonical_coverage(&lost_empty)?.0.contradictions, 2);
     let mut missing_source = catalog;
     missing_source["texts"]["gameTexts"][0]["key"]["value"] = json!("@missing");
@@ -305,3 +345,6 @@ fn canonical_raw_mission_tokens_are_compared_exactly() {
 
 #[path = "real_archive_texts_baseline_tests.rs"]
 mod baseline;
+
+#[path = "real_archive_text_oracle_lines_tests.rs"]
+mod oracle_lines;

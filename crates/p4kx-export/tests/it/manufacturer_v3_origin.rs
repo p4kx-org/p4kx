@@ -73,14 +73,9 @@ fn actual_payload_selector_and_conversion_uses_stay_at_their_physical_fields() -
 fn encrypted_localization_does_not_taint_headers_code_or_authored_text_refs() -> TestResult {
     let (_, catalog) = fixture::normal(&fixture::database())?;
     let name = fixture::text(&catalog, "publicNames", "name")?;
-    assert_eq!(
-        fixture::at(name, "/translations/value/en/containsEncryptedSource")?,
-        &json!(true)
-    );
-    assert_eq!(
-        fixture::at(name, "/translations/value/de/containsEncryptedSource")?,
-        &json!(false)
-    );
+    for (language, expected) in [("en", true), ("de", false)] {
+        assert_markers(name, language, &json!(expected))?;
+    }
     for path in [
         "/guid",
         "/code",
@@ -131,13 +126,11 @@ fn original_encrypted_and_unknown_dcb_origins_reach_every_direct_fact() -> TestR
                 &expected
             );
         }
-        assert_eq!(
-            fixture::at(
-                fixture::text(&catalog, "publicNames", "name")?,
-                "/translations/value/de/containsEncryptedSource"
-            )?,
-            &expected
-        );
+        assert_markers(
+            fixture::text(&catalog, "publicNames", "name")?,
+            "de",
+            &expected,
+        )?;
         commodity_v3_source_inventory::reference_closure(&catalog)?;
     }
     Ok(())
@@ -152,6 +145,16 @@ fn every_available_language_retains_its_own_winning_payload_and_crypto_index() -
     let built = build_catalog(&archive, &options)?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let name = fixture::text(&catalog, "publicNames", "name")?;
+    assert_winning_forms(name)?;
+    assert_eq!(
+        fixture::at(fixture::row(&catalog)?, "/code/containsEncryptedSource")?,
+        &json!(false)
+    );
+    commodity_v3_source_inventory::reference_closure(&catalog)?;
+    Ok(())
+}
+
+fn assert_winning_forms(name: &Value) -> TestResult {
     let translations = fixture::at(name, "/translations/value")?
         .as_object()
         .ok_or("language map")?;
@@ -164,24 +167,49 @@ fn every_available_language_retains_its_own_winning_payload_and_crypto_index() -
         let translation = translations
             .get(language.code())
             .ok_or("available language carrier")?;
-        assert_eq!(fixture::at(translation, "/state")?, &json!("present"));
+        for field in ["sourceText", "displayText"] {
+            let value = fixture::at(translation, &format!("/{field}"))?;
+            crate::text_forms_assertions::direct(value)?;
+            assert_eq!(
+                fixture::at(value, "/state")?,
+                &json!("present"),
+                "every available language retains both winning text forms"
+            );
+        }
     }
-    assert_eq!(
-        fixture::at(name, "/translations/value/en/value")?,
-        &json!("English winner")
-    );
-    assert_eq!(
-        fixture::at(name, "/translations/value/de/value")?,
-        &json!("Translated name")
-    );
-    assert_eq!(
-        fixture::at(name, "/translations/value/fr/containsEncryptedSource")?,
-        &Value::Null
-    );
-    assert_eq!(
-        fixture::at(fixture::row(&catalog)?, "/code/containsEncryptedSource")?,
-        &json!(false)
-    );
-    commodity_v3_source_inventory::reference_closure(&catalog)?;
+    for field in ["sourceText", "displayText"] {
+        assert_eq!(
+            fixture::at(name, &format!("/translations/value/en/{field}/value"))?,
+            &json!("English winner"),
+            "the original English winner is unchanged"
+        );
+        assert_eq!(
+            fixture::at(name, &format!("/translations/value/de/{field}/value"))?,
+            &json!("Translated name"),
+            "the actual German winner is retained"
+        );
+        assert_eq!(
+            fixture::at(
+                name,
+                &format!("/translations/value/fr/{field}/containsEncryptedSource")
+            )?,
+            &Value::Null,
+            "unknown encryption remains explicit per form"
+        );
+    }
+    Ok(())
+}
+
+fn assert_markers(name: &Value, language: &str, expected: &Value) -> TestResult {
+    let forms = crate::text_forms_assertions::forms(name, language)?;
+    for field in ["sourceText", "displayText"] {
+        let value = forms.get(field).ok_or("actual direct text form")?;
+        crate::text_forms_assertions::direct(value)?;
+        assert_eq!(
+            fixture::at(value, "/containsEncryptedSource")?,
+            expected,
+            "both direct forms retain the original language/key encryption inputs"
+        );
+    }
     Ok(())
 }

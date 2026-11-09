@@ -48,9 +48,14 @@ pub(super) fn text_row<'a>(catalog: &'a Value, domain: &str, key: &str) -> TestR
 }
 
 fn english<'a>(catalog: &'a Value, key: &str) -> TestResult<&'a Value> {
-    text_row(catalog, "publicNames", key)?
-        .pointer("/translations/value/en")
-        .ok_or_else(|| "English text state missing".into())
+    english_form(catalog, key, "displayText")
+}
+
+fn english_form<'a>(catalog: &'a Value, key: &str, field: &str) -> TestResult<&'a Value> {
+    let forms = crate::text_forms_assertions::forms(text_row(catalog, "publicNames", key)?, "en")?;
+    let value = forms.get(field).ok_or("English direct form")?;
+    crate::text_forms_assertions::direct(value)?;
+    Ok(value)
 }
 
 #[test]
@@ -62,14 +67,14 @@ fn placeholders_do_not_consume_an_available_encrypted_locale() -> TestResult {
     )?;
     for domain in ["publicNames", "gameTexts"] {
         let row = text_row(&catalog, domain, "@LOC_EMPTY")?;
-        let value = row
-            .pointer("/translations/value/en")
-            .ok_or("placeholder state")?;
-        assert_eq!(value["state"], "absent", "placeholder retains no text");
-        assert_eq!(
-            value["containsEncryptedSource"], false,
-            "only the plain DCB selector contributes"
-        );
+        let forms = crate::text_forms_assertions::forms(row, "en")?;
+        crate::text_forms_assertions::absent(forms)?;
+        for field in ["sourceText", "displayText"] {
+            assert_eq!(
+                forms[field]["containsEncryptedSource"], false,
+                "only the plain DCB selector contributes to either placeholder form"
+            );
+        }
         assert_eq!(
             row["translations"]["containsEncryptedSource"], false,
             "aggregate excludes unused locale"
@@ -90,10 +95,10 @@ fn placeholders_do_not_consume_an_available_encrypted_locale() -> TestResult {
 
 #[test]
 fn declared_empty_and_trimmed_empty_texts_are_present_and_missing_keys_are_absent() -> TestResult {
-    for (text, state, displayed) in [
-        ("fixture_name=", "present", Some("")),
-        ("fixture_name=  \\n  ", "present", Some("")),
-        ("other=unrelated", "absent", None),
+    for (text, state, raw, displayed) in [
+        ("fixture_name=", "present", Some(""), Some("")),
+        ("fixture_name=  \\n  ", "present", Some("  \\n  "), Some("")),
+        ("other=unrelated", "absent", None, None),
     ] {
         let catalog = catalog("@fixture_name", "@LOC_EMPTY", text)?;
         let value = english(&catalog, "@fixture_name")?;
@@ -114,22 +119,38 @@ fn declared_empty_and_trimmed_empty_texts_are_present_and_missing_keys_are_absen
             value["sourceSetComplete"], true,
             "the lookup source set is complete"
         );
+        let source = english_form(&catalog, "@fixture_name", "sourceText")?;
+        assert_eq!(
+            source["state"], state,
+            "raw presence retains the actual winner"
+        );
+        assert_eq!(
+            source["value"].as_str(),
+            raw,
+            "raw text retains the exact original RHS"
+        );
+        assert_eq!(
+            source["containsEncryptedSource"], true,
+            "the actual encrypted lookup contributes to raw text"
+        );
     }
     Ok(())
 }
 
 #[test]
 fn suffix_case_and_duplicate_winner_semantics_are_preserved() -> TestResult {
-    for (text, expected) in [
+    for (text, raw, expected) in [
         (
             "fixture_name=\nFIXTURE_NAME,P=Suffix winner",
+            "Suffix winner",
             "Suffix winner",
         ),
         (
             "fixture_name=discarded\nFIXTURE_NAME=Last winner\nfixture_name,P=Ignored suffix",
             "Last winner",
+            "Last winner",
         ),
-        ("fixture_name=   \nfixture_name,P=Ignored suffix", ""),
+        ("fixture_name=   \nfixture_name,P=Ignored suffix", "   ", ""),
     ] {
         let catalog = catalog("@FiXtUrE_NaMe", "@LOC_EMPTY", text)?;
         let value = english(&catalog, "@FiXtUrE_NaMe")?;
@@ -137,6 +158,11 @@ fn suffix_case_and_duplicate_winner_semantics_are_preserved() -> TestResult {
         assert_eq!(
             value["value"], expected,
             "the existing winner and trimming rules apply"
+        );
+        assert_eq!(
+            english_form(&catalog, "@FiXtUrE_NaMe", "sourceText")?["value"],
+            raw,
+            "the original winning declaration retains padding before display conversion"
         );
     }
     Ok(())
@@ -152,15 +178,17 @@ fn bare_keys_resolve_but_literal_looking_inputs_never_escape_into_global_source_
         "Bare key winner",
         "bare keys retain lookup behavior"
     );
+    assert_eq!(
+        english_form(&catalog, "fixture_name", "sourceText")?["value"],
+        "Bare key winner",
+        "the original bare-key winner is retained before display conversion"
+    );
     let private = text_row(&catalog, "gameTexts", sentinel)?;
     assert_eq!(
         private["key"]["value"], sentinel,
         "original Locale field stays in its protected domain"
     );
-    assert_eq!(
-        private["translations"]["value"]["en"]["state"], "absent",
-        "no literal fallback is invented"
-    );
+    crate::text_forms_assertions::absent(crate::text_forms_assertions::forms(private, "en")?)?;
     assert!(
         !serde_json::to_string(&catalog["provenance"])?.contains(sentinel),
         "global use IDs and source locations cannot expose the protected original string"

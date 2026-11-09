@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "real_archive_text_forms_mutations.rs"]
+mod forms_mutations;
+
 use std::collections::BTreeSet;
 use std::error::Error;
 
@@ -250,6 +253,7 @@ fn canonical_owner_requires_state_and_origin_metadata() -> TestResult {
             );
         }
     }
+    forms_mutations::require_metadata(&fixture)?;
     Ok(())
 }
 
@@ -279,31 +283,7 @@ fn missing_canonical_dataset_is_not_zero_key_coverage() -> TestResult {
 
 #[test]
 fn wrong_or_falsely_missing_canonical_translations_are_contradictions() -> TestResult {
-    let fixture = Fixture::new()?;
-    for kind in [Kind::ResourceTypes, Kind::Commodities] {
-        let id = reference(&fixture.catalog, kind)?;
-        let mut wrong = fixture.catalog.clone();
-        replace_value(
-            target(&mut wrong, id)?,
-            "/translations/value/en/value",
-            json!("Wrong source text"),
-        )?;
-        assert!(
-            fixture.coverage(&wrong, kind)?.0.contradictions > 0,
-            "wrong actual text is compared to independent source lines"
-        );
-        let mut missing = fixture.catalog.clone();
-        let language = target(&mut missing, id)?
-            .pointer_mut("/translations/value/en")
-            .ok_or("actual English carrier")?;
-        replace_value(language, "/state", json!("absent"))?;
-        replace_value(language, "/value", Value::Null)?;
-        assert!(
-            fixture.coverage(&missing, kind)?.0.contradictions > 0,
-            "a source-backed translation cannot silently become absent"
-        );
-    }
-    Ok(())
+    forms_mutations::wrong_or_missing()
 }
 
 fn omit_references(catalog: &mut Value, kind: Kind) -> TestResult<usize> {

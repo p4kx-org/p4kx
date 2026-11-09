@@ -126,9 +126,28 @@ fn translated<'row>(
     translations: &'row Map<String, Value>,
     language: &str,
 ) -> Result<Option<&'row str>, Box<dyn Error>> {
-    let Some(value) = translations.get(language) else {
+    let Some(forms) = translations.get(language) else {
         return Ok(None);
     };
+    let value = forms
+        .get("displayText")
+        .ok_or("required direct display form")?;
+    for field in ["sourceText", "displayText"] {
+        let carrier = forms.get(field).ok_or("required direct language form")?;
+        crate::text_forms_assertions::direct(carrier)?;
+    }
+    let source = forms
+        .get("sourceText")
+        .ok_or("required direct source form")?;
+    if !matches!(
+        (
+            source.get("state").and_then(Value::as_str),
+            source.get("value")
+        ),
+        (Some("present"), Some(Value::String(_))) | (Some("absent"), Some(Value::Null))
+    ) {
+        return Err("canonical raw text state is invalid".into());
+    }
     match value.get("state").and_then(Value::as_str) {
         Some("present") => value
             .get("value")

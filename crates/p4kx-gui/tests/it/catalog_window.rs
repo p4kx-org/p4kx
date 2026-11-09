@@ -4,6 +4,9 @@
 //! The Basetool catalog entry of the Export menu and its windows driven headless through
 //! `egui_kittest`.
 
+#[path = "catalog_category_lists_window.rs"]
+mod category_lists;
+
 use crate::cataloging;
 use crate::waiting::{RunQuiet, wait_for};
 
@@ -228,7 +231,7 @@ fn a_plain_catalog_shows_one_size() -> TestResult {
 
 #[test]
 fn a_catalog_near_the_upload_limit_shows_the_warning() -> TestResult {
-    let (_dir, mut model, out) = opened(&cataloging::wordy(30, 1_000_000))?;
+    let (_dir, mut model, out) = opened(&cataloging::near_upload_limit())?;
     model.start_catalog(out.join("catalog.json"), || {});
     let mut harness = harness(model);
 

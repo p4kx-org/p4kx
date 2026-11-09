@@ -75,10 +75,7 @@ fn an_authored_empty_locale_is_a_present_key_and_is_counted_per_lookup() -> Test
     assert_eq!(fixture::at(name, "/key/value")?, &json!(""));
     assert_eq!(fixture::at(name, "/id/value")?, &json!("name:0:"));
     for language in ["en", "de"] {
-        assert_eq!(
-            fixture::at(name, &format!("/translations/value/{language}/state"))?,
-            &json!("absent")
-        );
+        crate::text_forms_assertions::absent(crate::text_forms_assertions::forms(name, language)?)?;
         let summary = built
             .summary()
             .texts()

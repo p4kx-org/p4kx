@@ -28,7 +28,16 @@ pub(crate) struct GameTextRef(pub(crate) String);
 pub(crate) struct CanonicalText<'source, R> {
     pub(crate) id: SourcedValue<R>,
     pub(crate) key: SourcedValue<&'source str>,
-    pub(crate) translations: SourcedValue<BTreeMap<String, SourcedValue<Cow<'source, str>>>>,
+    pub(crate) translations: SourcedValue<BTreeMap<String, TextForms<'source>>>,
+}
+
+/// The exact decoded source text and its derived display form for one language.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub(crate) struct TextForms<'source> {
+    pub(crate) source_text: SourcedValue<Cow<'source, str>>,
+    pub(crate) display_text: SourcedValue<Cow<'source, str>>,
 }
 
 /// Separate public-name and protected game-text definition tables.

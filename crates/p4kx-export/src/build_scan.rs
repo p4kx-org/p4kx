@@ -50,6 +50,8 @@ pub(super) fn scan<'f>(
     if options.cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
+    let mut crafting = crafting;
+    crafting.ledger.merge(scanned.ledger);
     let mut collected = Collected::new(scanned.picked, crafting);
     collected.resource_group_members = scanned.resource_group_members;
     collected
@@ -57,7 +59,7 @@ pub(super) fn scan<'f>(
         .sort_by_cached_key(|row| (row.physical.guid.text(), row.physical.record_index));
     collected.tags.entity_tags = scanned.entity_tags;
     collected.tags.order_entities();
-    collected.ledger.merge(scanned.ledger);
+
     collected.ledger.merge(placements.ledger.clone());
     Ok((collected, placements))
 }

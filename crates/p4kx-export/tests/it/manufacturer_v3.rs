@@ -143,14 +143,15 @@ fn public_names_and_protected_descriptions_keep_separate_canonical_domains() -> 
         fixture::at(public, "/id/value")?,
         fixture::at(protected, "/id/value")?
     );
-    assert_eq!(
-        fixture::at(public, "/translations/value/en/value")?,
-        &json!("Shared text")
-    );
-    assert_eq!(
-        fixture::at(protected, "/translations/value/de/value")?,
-        &json!("Gemeinsamer Text")
-    );
+    for (row, language, expected) in [
+        (public, "en", "Shared text"),
+        (protected, "de", "Gemeinsamer Text"),
+    ] {
+        let forms = crate::text_forms_assertions::forms(row, language)?;
+        for field in ["sourceText", "displayText"] {
+            crate::text_forms_assertions::present(forms, field, expected)?;
+        }
+    }
     crate::commodity_v3_source_inventory::reference_closure(&catalog)?;
     Ok(())
 }

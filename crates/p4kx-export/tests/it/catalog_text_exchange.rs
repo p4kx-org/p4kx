@@ -77,15 +77,19 @@ fn generated_game_text_policy_removes_private_reference_closure_and_keeps_shared
     );
     let name = text(&member, "publicNames", &shared["name"]["value"])?;
     let description = text(&member, "gameTexts", &shared["description"]["value"])?;
-    assert_eq!(
-        name["translations"]["value"]["de"]["value"],
-        description["translations"]["value"]["de"]["value"],
-        "source bytes may be shared"
-    );
-    assert_eq!(
-        description["translations"]["value"]["de"]["containsEncryptedSource"], false,
-        "plain encryption origin is not public authorization"
-    );
+    for field in ["sourceText", "displayText"] {
+        assert_eq!(
+            name["translations"]["value"]["de"][field]["value"],
+            description["translations"]["value"]["de"][field]["value"],
+            "the actual source and display bytes may be shared across domains"
+        );
+        let carrier = &description["translations"]["value"]["de"][field];
+        crate::text_forms_assertions::direct(carrier)?;
+        assert_eq!(
+            carrier["containsEncryptedSource"], false,
+            "plain encryption origin is not public authorization for either form"
+        );
+    }
 
     let public = public_projection(&member, &schema)?;
     assert!(
@@ -143,18 +147,15 @@ fn successful_bare_keys_and_unresolved_literal_looking_fields_keep_existing_sema
         name["key"]["value"], "fixture_name",
         "bare source key is unchanged"
     );
-    assert_eq!(
-        name["translations"]["value"]["en"]["value"], "English winner",
-        "the existing INI winner resolves a bare key"
-    );
+    let forms = crate::text_forms_assertions::forms(name, "en")?;
+    for field in ["sourceText", "displayText"] {
+        crate::text_forms_assertions::present(forms, field, "English winner")?;
+    }
     let description = text(&member, "gameTexts", &bare["description"]["value"])?;
     assert_eq!(
         description["key"]["value"], PRIVATE_LITERAL,
         "original field remains protected"
     );
-    assert_eq!(
-        description["translations"]["value"]["en"]["state"], "absent",
-        "a missing bare key is not echoed as a literal translation"
-    );
+    crate::text_forms_assertions::absent(crate::text_forms_assertions::forms(description, "en")?)?;
     Ok(())
 }

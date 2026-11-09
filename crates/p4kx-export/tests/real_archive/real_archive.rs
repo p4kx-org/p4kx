@@ -132,12 +132,17 @@ fn check_texts(summary: &CatalogSummary, catalog: &Value, list: &[Value]) -> Tes
             "manufacturer {code} retains its authored key"
         );
         for language in ["en", "de"] {
-            assert!(
-                name.pointer(&format!("/translations/value/{language}/value"))
-                    .and_then(Value::as_str)
-                    .is_some_and(|text| !text.is_empty()),
-                "manufacturer {code} has a {language} name"
-            );
+            for field in ["sourceText", "displayText"] {
+                let carrier = name
+                    .pointer(&format!("/translations/value/{language}/{field}"))
+                    .ok_or("actual direct manufacturer text form")?;
+                assert!(
+                    crate::catalog_v3_consumer::present(carrier)?
+                        .as_str()
+                        .is_some_and(|text| !text.is_empty()),
+                    "manufacturer {code} has a validated {language} {field}"
+                );
+            }
         }
     }
     for language in [Language::English, Language::German] {

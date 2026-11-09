@@ -260,6 +260,10 @@ fn assemble<R>(
         ships: collected.ships,
         blueprints: collected.blueprints,
         declarations: crate::catalog_v3::catalog_declarations::CatalogDeclarations {
+            blueprint_category_lists: crate::catalog_v3::blueprint_category_list_read::table(
+                &forge,
+                collected.blueprint_category_lists,
+            ),
             resource_group_members: group_tables.members,
             tag_roots: CatalogTable::new(&forge, &["TagDatabase"], collected.tags.roots),
             entity_tags: CatalogTable::new(

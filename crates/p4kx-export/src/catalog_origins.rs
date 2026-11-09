@@ -4,8 +4,8 @@
 use std::collections::BTreeMap;
 
 use p4kx_extraction::{
-    Archive, DataForgeEntry, DataForgeOrigin, InputScope, Language, SourceInput, SourceScope,
-    SourceUses,
+    Archive, DataForgeEntry, DataForgeOrigin, IniEncoding, InputScope, Language, SourceInput,
+    SourceScope, SourceUses,
 };
 
 use crate::CatalogError;
@@ -16,7 +16,23 @@ use crate::texts::TextSources;
 pub(crate) struct CatalogOrigins {
     pub(crate) uses: SourceUses,
     pub(crate) dataforge: SourceScope,
-    locales: BTreeMap<Language, SourceScope>,
+    locales: BTreeMap<Language, CatalogLocaleInput>,
+}
+
+/// One original locale input and its recorded Entry-decoding contribution.
+pub(crate) struct CatalogLocaleInput {
+    scope: SourceScope,
+    decoded: bool,
+}
+
+impl CatalogLocaleInput {
+    pub(crate) const fn scope(&self) -> &SourceScope {
+        &self.scope
+    }
+
+    pub(crate) const fn decoded(&self) -> bool {
+        self.decoded
+    }
 }
 
 impl CatalogOrigins {
@@ -43,7 +59,19 @@ impl CatalogOrigins {
                 let input = entry
                     .origin()
                     .map_or(SourceInput::Unknown, SourceInput::Archive);
-                locales.insert(language, uses.observe(input, InputScope::Payload)?);
+                let text = entry.text();
+                let decoded = text.is_lossy()
+                    || matches!(
+                        text.encoding(),
+                        IniEncoding::Utf8Bom | IniEncoding::Utf16Le | IniEncoding::Utf16Be
+                    );
+                locales.insert(
+                    language,
+                    CatalogLocaleInput {
+                        scope: uses.observe(input, InputScope::Payload)?,
+                        decoded,
+                    },
+                );
             }
         }
         Ok(Self {
@@ -57,7 +85,7 @@ impl CatalogOrigins {
         CatalogRecordContext::new(&self.uses, &self.dataforge, record_index)
     }
 
-    pub(crate) fn locale(&self, language: Language) -> Option<&SourceScope> {
+    pub(crate) fn locale(&self, language: Language) -> Option<&CatalogLocaleInput> {
         self.locales.get(&language)
     }
 }

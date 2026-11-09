@@ -218,6 +218,14 @@ resolves to one text per language in that language's `global.ini` Entry
 spelling `Localization`.
 _Avoid_: loc string, text id
 
+**Source text**:
+The winning decoded value of a Localisation key before display escapes or surrounding whitespace
+are changed. A UI format template keeps this form as data and is not evaluated by the Export.
+
+**Display text**:
+The display form of a Source text, with stored line-break escapes decoded and surrounding
+whitespace removed. It remains separate from the unchanged Source text.
+
 **Tag**:
 A Record of the struct `Tag` that labels game content, e.g. `Ship.Series.Avenger`. Fields such as
 `Tags`, `RequiredTags` and `PortTags` refer to Tags by GUID (a Reference). Not the Record tag.
@@ -718,6 +726,12 @@ _Avoid_: p4k-catalog, basetool export
 One group of entities in the Basetool catalog, e.g. manufacturers or items, selected by record-path
 prefix and type and complete or partial on its own.
 _Avoid_: category, entity type
+
+**Blueprint category list**:
+An authored ordered collection of references to blueprint categories, separate from the category
+definitions. Repeated references and null positions remain part of the list; it declares no
+category rules or hierarchy.
+_Avoid_: category definition, category rule
 
 **Export health**:
 Measured source-read and projection outcomes carried by the Basetool catalog, independently of

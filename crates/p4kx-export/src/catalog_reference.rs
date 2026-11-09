@@ -36,7 +36,8 @@ pub(crate) fn target_kind(
     }
     match (source_type, name) {
         ("ResourceType", "rttThumbnailEntityClass")
-        | ("SResourceTypeDefaultCargoContainers", _) => return None,
+        | ("SResourceTypeDefaultCargoContainers", _)
+        | ("BlueprintCategoryDatabaseRecord", "categories") => return None,
         ("ResourceType", "refinedVersion") | ("ResourceTypeGroup", "resources") => {
             return Some(Kind::ResourceTypes);
         }

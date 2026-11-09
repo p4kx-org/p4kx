@@ -107,10 +107,12 @@ identifiers, short names or fact values. The catalog keeps the `description` fie
 Basetool's logged-in members; the Basetool keeps them, `displayType` and the contract texts away
 from third parties. Every such field carries
 `"x-gameText": true` in the JSON Schema, and no other field does; a test checks this.
-Every game text is trimmed of leading and trailing white space; see Texts. ResourceTypes use
+Display text is trimmed of leading and trailing white space; see Texts. Canonical text rows
+also retain their exact decoded source text. ResourceTypes, Commodities and Manufacturers use
 `texts.publicNames` and `texts.gameTexts` instead of inline `key`/`en`/`de` objects. Their description
-reference, GameTextRef type and complete gameTexts table carry the protection through the reference.
-A shared key used as both a name and a description has separate rows in the two domains.
+reference, GameTextRef type and complete gameTexts table protect both source and display forms
+through the reference. A shared key used as both a name and a description has separate rows in
+the two domains. Public short UI format templates use the existing public domain and stay inert.
 An unencrypted source marker does not remove `x-gameText` protection.
 
 An extensible source vocabulary derived from a Rust enum is a definition of `"type": "string"`
@@ -197,11 +199,12 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `ships` | The ships and ground vehicles, ordered by GUID |
 | `definitions.commodities`, `projections.commodityPresentation` | Commodity source identities/authored bindings and explicit derived choices, paired in existing GUID order; see [Commodity contract](catalog-commodity-types.md) |
 | `definitions.resourceTypes` | Closed source-family `availability` and canonical `rows`, independently selected and ordered by GUID; every source-backed field uses the typed value carrier ([contract](catalog-resource-types.md)) |
-| `texts.publicNames`, `texts.gameTexts` | Canonical sourced-definition short-name and protected-description rows, each with sourced `id`, `key` and per-language `translations` |
+| `texts.publicNames`, `texts.gameTexts` | Canonical sourced-definition short-name and protected-description rows, each with sourced `id`, `key` and per-language `translations` containing separate source and display forms |
 | `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the sourced definition carriers |
 | `blueprints` | The crafting blueprints with their ingredients, all tiers, default availability and dismantle link, ordered by GUID |
 | `definitions.resourceGroups`, `declarations.resourceGroupMembers`, `projections.resourceGroupParents` | Physical group definitions, every ordered authored membership and the first-selected parent with direct per-value origins ([contract](catalog-resource-groups.md)) |
 | `definitions.blueprintCategories` | Source-family availability and physical fieldless category rows with the shared eight sourced header fields in GUID order |
+| `declarations.blueprintCategoryLists` | Physical `BlueprintCategoryDatabaseRecord` owners selected at every path by the ordinary Filter, with eight sourced headers and ordered sourced category-reference slots ([contract](catalog-blueprint-category-lists.md)) |
 | `gameplayProperties` | The gameplay properties the quality modifiers refer to, ordered by GUID |
 | `definitions.qualityDistributions` | Physical distribution and location-override source declarations with exact numbers and immediate per-field origins ([contract](catalog-quality.md)) |
 | `definitions.qualityQuantizations`, `projections.qualityQuantizationResources` | Ordered raw bands, explicit eligibility and the genuine first-eligible nominal-GUID resource inverse ([contract](catalog-quality.md)) |
@@ -285,11 +288,14 @@ bounded canonical decimal strings. The exact payloads, states and reference cont
 [ResourceType contract](catalog-resource-types.md#immediate-value-and-origin-carrier).
 
 Name and description values reference separate canonical text tables. Their `translations.value`
-maps every actually available supported language to another five-key value. Existing empty or
-whitespace-only translations stay present empty strings after display normalization; absent keys
-remain absent. The game-text protection axis remains independent of source encryption, including
-through canonical references. Consumers cannot infer this per-value proof from the global
-`source.archiveKey` or unread-entry counts.
+maps each actually available supported language directly to `TextForms`: independently sourced
+`sourceText` and `displayText`, without a redundant language-group carrier. Source text preserves
+the exact winning decoded INI value; display text keeps the existing escape decoding and trimming.
+An empty winner stays present in both forms; padding remains in source text while display text is
+present and empty. Missing keys and placeholders have two absent forms. A missing language Entry
+creates no map key. The [TextForms contract](catalog-text-forms.md) defines exact inputs, summary
+accounting and consumer paths. Game-text protection remains independent of source encryption;
+consumers cannot infer per-value proof from the global `source.archiveKey` or unread-entry counts.
 
 This coverage is implemented for ResourceTypes, Commodities and Manufacturers, their canonical
 text rows and Commodity presentation. Other families and
@@ -852,8 +858,10 @@ produces no category row and remains a source-read failure.
 The old flat root list is absent. Its `guid`, `className` and `recordPath` values are now the
 corresponding sourced fields' `value` in `definitions.blueprintCategories.rows`. The additional
 raw name, exact filename, physical index, source type and metadata-tag state come from the actual
-header. `BlueprintCategoryDatabaseRecord.categories` is a separate ordered listing owner; it does
-not declare rules or a category hierarchy.
+header. `declarations.blueprintCategoryLists` independently retains each selected physical
+`BlueprintCategoryDatabaseRecord` and its ordered, sourced `categories` reference slots
+([contract](catalog-blueprint-category-lists.md)). These declarations do not change the category
+definitions' selection or GUID order and declare no category rules or hierarchy.
 
 Every `typeGuid` of a commodity and every `categoryGuid` of a blueprint resolves to a `guid.value`
 in `definitions.resourceGroups.rows` or `definitions.blueprintCategories.rows` (checked against
@@ -2518,14 +2526,17 @@ formula over the exported facts is documented as one (ADR-0218).
 
 The inline `key`/`en`/`de` rules below describe the existing non-migrated family shapes.
 Manufacturers, ResourceTypes and Commodity text fields use canonical `texts.publicNames`/`texts.gameTexts`
-rows and all supported languages
-whose Entries are available. Each row retains its authored key, even if empty. Its language values
-use the state/value/origin carrier: missing key means `absent`, while an existing empty or
-whitespace-only winner is `present` with an empty normalized string. Placeholders retain their
-key and have absent language values without locale contributions. Bare keys still use existing
-lookup rules; unmatched strings are not literal text fallbacks. Locale provenance references the
-DataForge selector and actual winning language Entry, without putting protected key text in global
-source-use IDs. This canonical path retains the display normalization and duplicate winner rules.
+rows and all supported languages whose Entries are available. Each row retains its authored key,
+even if empty. Each language has direct `sourceText` and `displayText` sourced values. The source
+form preserves the winning decoded RHS, including whitespace and literal backslash-n; the display
+form applies the existing line-break decoding and trimming. Both preserve present empty values.
+Placeholders retain their key and have two absent forms without locale contributions; missing keys
+retain their actual lookup selectors. Bare keys and plain/suffix winners keep the existing lookup
+rules. Provenance references the actual DataForge key selector and winning language Entry, without
+putting protected key text in global source-use IDs. See [TextForms](catalog-text-forms.md) for the
+direct origin rules and the unchanged display-based summary accounting.
+
+#### Inline family texts
 
 `key` is the localisation key as the Record holds it, e.g. `@manufacturer_NameACAS`; an empty key
 is `null`. `en` and `de` are its texts from the Archive's `global.ini` of that language:
@@ -2579,6 +2590,7 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `blueprints` | `libs/foundry/records/crafting/blueprints/crafting/` | `CraftingBlueprintRecord` |
 | `resourceGroups` | `libs/foundry/records/resourcetypedatabase/` | `ResourceTypeGroup` |
 | `blueprintCategories` | `libs/foundry/records/crafting/blueprintcategories/` | `BlueprintCategoryRecord` |
+| `blueprintCategoryLists` | Every original path, subject to the ordinary Filter | `BlueprintCategoryDatabaseRecord` |
 | `gameplayProperties` | `libs/foundry/records/crafting/craftedproperties/` | `CraftingGameplayPropertyDef` |
 | `qualityDistributions` | `libs/foundry/records/crafting/qualitydistribution/` | `CraftingQualityDistributionRecord` and `CraftingQualityLocationOverrideRecord` |
 | `qualityQuantizations` | `libs/foundry/records/crafting/qualityquantization/` | `CraftingQualityQuantizationRecord` |

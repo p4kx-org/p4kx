@@ -164,6 +164,13 @@ pub(crate) fn many(count: u32) -> ArchiveBuilder {
     archive(&forge, &texts, &texts)
 }
 
+/// A two-language catalog with both text forms close to the upload limit.
+pub(crate) fn near_upload_limit() -> ArchiveBuilder {
+    const MANUFACTURERS: u32 = 15;
+    const DESCRIPTION_CHARACTERS: usize = 1_000_000;
+    wordy(MANUFACTURERS, DESCRIPTION_CHARACTERS)
+}
+
 /// `count` manufacturers with distinct description keys and `length` characters per language.
 pub(crate) fn wordy(count: u32, length: usize) -> ArchiveBuilder {
     let mut forge = structures();

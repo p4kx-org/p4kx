@@ -151,6 +151,34 @@ null through its actual parse selector/conversion, without claiming a stored-nul
 payload. The [Media Build carrier](media-export.md#build-declaration-origins)
 defines both output placements and their exact projection hash domain.
 
+## Canonical catalog text forms
+
+Each available language in a canonical text row has `sourceText` and `displayText`, each with
+its own immediate source state, value, encryption marker and original-use references. One actual
+`TextSet::text` lookup supplies the winning decoded INI RHS; `display_text` derives the existing
+display value once. The existing `(Domain, key)` registry and IDs own both forms. There is no
+alternate raw-mode registration or third sourced wrapper around the grouping object.
+
+The original authored key is a Selector. An available-locale lookup adds the actual
+`LocalizationLookup` Selector, whose selector reference resolves to that original key use. A
+winner adds the actual locale Payload to both forms. The original `IniText` encoding/lossy
+receipt adds source-form Conversion for BOM removal, UTF16 transcoding or lossy decoding;
+plain valid UTF8 needs no such Conversion. This is an Entry-decoding contribution, not proof
+that the winning slice itself contained replacement characters. The display form additionally
+uses the actual display conversion at that same lookup. Equal actual Conversion handles may
+deduplicate because SourceUse identity describes an input/coordinate/role, not processing stages.
+
+Missing keys retain lookup Selector evidence without a winning Payload or text Conversion.
+Placeholders perform no locale lookup; a missing language Entry has no translation map member.
+The outer translations carrier unions the actual form contributions. Complete contributors may
+still have unknown encryption; publication domain and `x-gameText` are independent. The shared
+Forms schema is public-neutral, with protection applied by the existing protected domain/owner.
+
+Summary counts retain the existing display-based occurrence semantics once per original lookup,
+including unresolved empty displays and once-per-registration placeholders. Neither form nor
+canonical row deduplication doubles or suppresses those counters. The [TextForms contract](catalog-text-forms.md)
+documents exact consumer paths and source/display meanings.
+
 ## Field-addressed descriptions
 
 `FieldPath` is an exact escaped JSON Pointer into the complete output record. Object

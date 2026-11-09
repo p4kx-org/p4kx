@@ -119,16 +119,7 @@ fn group_text_domains_and_languages_keep_their_own_sources_and_protection() -> T
             &json!("@shared"),
             "the canonical ResourceGroup source contract is preserved"
         );
-        assert_eq!(
-            at(text, "/translations/value/en/containsEncryptedSource")?,
-            &json!(true),
-            "the canonical ResourceGroup source contract is preserved"
-        );
-        assert_eq!(
-            at(text, "/translations/value/de/containsEncryptedSource")?,
-            &json!(false),
-            "the canonical ResourceGroup source contract is preserved"
-        );
+        assert_text_form_markers(text)?;
     }
     assert_eq!(
         at(row, "/name/containsEncryptedSource")?,
@@ -140,6 +131,21 @@ fn group_text_domains_and_languages_keep_their_own_sources_and_protection() -> T
         &json!(false),
         "the canonical ResourceGroup source contract is preserved"
     );
+    Ok(())
+}
+
+fn assert_text_form_markers(text: &Value) -> TestResult {
+    for (language, expected) in [("en", true), ("de", false)] {
+        let forms = crate::text_forms_assertions::forms(text, language)?;
+        for field in ["sourceText", "displayText"] {
+            crate::text_forms_assertions::direct(&forms[field])?;
+            assert_eq!(
+                at(&forms[field], "/containsEncryptedSource")?,
+                &json!(expected),
+                "each group text form retains its actual language-input origin"
+            );
+        }
+    }
     Ok(())
 }
 

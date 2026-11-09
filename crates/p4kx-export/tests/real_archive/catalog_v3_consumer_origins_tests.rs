@@ -56,17 +56,19 @@ fn actual_encrypted_inputs_keep_direct_proof_through_acceptance_reads() -> TestR
     }
     let choice = fixture::presentation(&catalog, fixture::RESOURCE_FALLBACK)?;
     let target = fixture::text_row(&catalog, "publicNames", fixture::payload(choice, "name")?)?;
-    let language = fixture::at(target, "/translations/value/en")?;
-    assert_eq!(
-        reader::present(language)?,
-        &json!("Fallback resource"),
-        "the real English source target is reached without a copied legacy name"
-    );
-    assert_eq!(
-        language.get("containsEncryptedSource"),
-        Some(&json!(true)),
-        "the separately encrypted locale input keeps its own direct marker"
-    );
+    for field in ["sourceText", "displayText"] {
+        let language = fixture::at(target, &format!("/translations/value/en/{field}"))?;
+        assert_eq!(
+            reader::present(language)?,
+            &json!("Fallback resource"),
+            "both actual English forms are reached without a copied flat name"
+        );
+        assert_eq!(
+            language.get("containsEncryptedSource"),
+            Some(&json!(true)),
+            "the separately encrypted locale input keeps each form's direct marker"
+        );
+    }
     Ok(())
 }
 

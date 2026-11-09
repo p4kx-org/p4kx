@@ -10,13 +10,14 @@ use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
 use catalog_fixture::{Maker, english, write_archive, write_archive_with};
-use p4kx_export::{
-    BuiltCatalog, CatalogOptions, Filter, ItemClass, ItemClassSummary, Kind, build_catalog,
-};
+use p4kx_export::{BuiltCatalog, CatalogOptions, ItemClass, ItemClassSummary, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+#[path = "catalog_items_completeness.rs"]
+mod completeness;
 
 const EXPORTED_AT: Duration = Duration::from_secs(1_792_000_000);
 
@@ -294,94 +295,6 @@ fn a_ship_carries_names_role_career_crew_manufacturer_and_vehicle_definition() -
             "insurance": null,
         }),
         "the ship fields"
-    );
-    Ok(())
-}
-
-#[test]
-fn every_kind_states_its_completeness() -> TestResult {
-    let (_, catalog) = catalog_with(&options())?;
-    assert_eq!(
-        catalog["completeness"],
-        json!({
-            "manufacturers": {"status": "complete"},
-            "items": {"status": "complete"},
-            "ships": {"status": "complete"},
-            "commodities": {"status": "complete"},
-            "blueprints": {"status": "complete"},
-            "resourceGroups": {"status": "complete"},
-            "resourceTypes": {"status": "complete"},
-            "tags": {"status": "complete"},
-            "blueprintCategories": {"status": "complete"},
-            "gameplayProperties": {"status": "complete"},
-            "qualityDistributions": {"status": "complete"},
-            "qualityQuantizations": {"status": "complete"},
-            "blueprintPools": {"status": "complete"},
-            "dismantleProcesses": {"status": "complete"},
-            "paints": {"status": "complete"},
-            "loadouts": {"status": "complete"},
-            "starmapObjects": {"status": "complete"},
-            "contracts": {"status": "complete"},
-            "mineableElements": {"status": "complete"},
-            "refiningProcesses": {"status": "complete"},
-            "mineableCompositions": {"status": "complete"},
-            "miningGlobalParams": {"status": "complete"},
-            "harvestableProviderPresets": {"status": "complete"},
-            "subHarvestableMultiConfigs": {"status": "complete"},
-            "harvestableLocations": {"status": "complete"},
-            "shops": {"status": "complete"},
-            "factionReputations": {"status": "complete"},
-            "reputationScopes": {"status": "complete"},
-            "reputationStandings": {"status": "complete"},
-            "reputationContexts": {"status": "complete"},
-            "missionTypes": {"status": "complete"},
-            "missionLocalities": {"status": "complete"},
-            "contractScenarios": {"status": "complete"},
-            "cargoManifests": {"status": "complete"},
-            "missionLocationTemplates": {"status": "complete"},
-            "contractShipSpawns": {"status": "complete"},
-            "contractLocationQueries": {"status": "complete"},
-            "contractTemplates": {"status": "complete"},
-            "missionBrokerEntries": {"status": "complete"},
-            "contractNpcSpawns": {"status": "complete"},
-            "contractEntitySpawns": {"status": "complete"},
-            "missionPropertySets": {"status": "complete"},
-            "lootTables": {"status": "complete"},
-            "lootArchetypes": {"status": "complete"},
-            "lootPoolFilters": {"status": "complete"},
-            "legacyLootTables": {"status": "complete"},
-            "legacyLootArchetypes": {"status": "complete"},
-            "lootContainers": {"status": "complete"},
-            "mineableEntities": {"status": "complete"},
-            "crafters": {"status": "complete"},
-            "shipStoreSlugs": {"status": "complete"},
-        }),
-        "complete"
-    );
-    let filter = Filter::new("*/spaceships/*");
-    let (built, catalog) = catalog_with(&CatalogOptions {
-        filter: Some(&filter),
-        ..options()
-    })?;
-    assert_eq!(
-        catalog["completeness"]["items"],
-        json!({"status": "partial", "filter": "*/spaceships/*"}),
-        "partial"
-    );
-    assert_eq!(class_names(&catalog, "items"), Vec::<&str>::new(), "none");
-    assert_eq!(class_names(&catalog, "ships"), ["ACAS_Ship"], "the ship");
-    assert_eq!(
-        catalog["completeness"]["tags"],
-        json!({"status": "complete"}),
-        "the global Tag taxonomy retains its full selection scope"
-    );
-    assert!(
-        built
-            .summary()
-            .kinds()
-            .iter()
-            .all(|entry| entry.complete == (entry.kind == Kind::Tags)),
-        "every scoped kind is partial; only the global Tag taxonomy stays complete"
     );
     Ok(())
 }

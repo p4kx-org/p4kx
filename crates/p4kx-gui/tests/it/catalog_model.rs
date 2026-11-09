@@ -334,7 +334,7 @@ fn a_zst_file_name_writes_the_catalog_as_a_zstd_frame() -> TestResult {
 
 #[test]
 fn a_catalog_near_the_upload_limit_is_flagged() -> TestResult {
-    let (_dir, mut model, out) = opened(&cataloging::wordy(30, 1_000_000))?;
+    let (_dir, mut model, out) = opened(&cataloging::near_upload_limit())?;
 
     model.start_catalog(out.join("catalog.json"), || {});
     let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {

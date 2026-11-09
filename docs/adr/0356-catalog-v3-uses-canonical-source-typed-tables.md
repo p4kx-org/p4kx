@@ -60,12 +60,26 @@ required. Additive unknown object fields stay accepted.
 ## Texts, identity and migration
 
 Use separate texts.publicNames and texts.gameTexts domains, with distinct typed references.
-Public short-name use stays public even if the same key/bytes also occur as protected description
-or lore. Both protected text rows and protected owner references carry x-gameText; exchange tests
-must follow reference closure, not merely inspect field names. Keep all actually available supported
-language codes, exact keys, decoding/trimming rules and per-language source provenance. No guessed
-translation or fallback becomes stored text. Replace duplicated key/en/de wire fields with these
-canonical references and language maps; document their exact old-value reconstruction.
+Public short names and short UI format templates stay public even if the same key/bytes also occur
+as protected description or lore. Both protected text rows and protected owner references carry
+x-gameText; exchange tests follow reference closure through both text forms.
+
+Keep one canonical row/identifier per existing domain and exact authored key. Each actually
+available language has TextForms with independently sourced sourceText and displayText, inside the
+existing sourced translations map. sourceText is the exact winning decoded INI value; displayText
+preserves the existing escape-decoding/trimming result. Missing keys/placeholders keep both forms
+absent, an empty source or display string remains present, and a missing language file adds no
+language entry. No fallback or template evaluation becomes stored data. Names/descriptions consume
+displayText; UI format consumers use sourceText as inert data. The two values come from one
+original lookup and retain the existing once-per-occurrence display-based summary counts.
+
+Both forms carry direct actual origins: sourceText uses its authored key, winning language payload
+and justified original Entry-decoding contributions; displayText also uses the actual display
+Conversion. Whole-Entry decoding facts do not claim a particular winning value was altered.
+SourceUse handles describe input/coordinate/role, so actual Conversion handles may deduplicate
+without fictional stage locations. Preserve all existing identifier inputs, key/winner rules and
+normalization results. Replace inline key/en/de wire duplicates with the canonical references and
+language maps; the old normalized value is displayText, not a second legacy view.
 
 Freeze existing content-identity inputs independently of new wire serialization. MissionPropertySet
 keeps its current owner/location hash and stored-byte UUID mapping. Spawn/query content IDs use

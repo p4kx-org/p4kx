@@ -14,10 +14,9 @@ fn untranslated_own_names_win_before_lookup_and_unused_resource_inputs_do_not_le
     let chosen = fixture::text_row(&catalog, "publicNames", &row["name"]["value"])?;
     assert_eq!(chosen["key"]["value"], "@own_untranslated");
     for language in ["en", "de"] {
-        assert_eq!(
-            chosen["translations"]["value"][language]["state"], "absent",
-            "an available translated resource key is not a language fallback"
-        );
+        crate::text_forms_assertions::absent(crate::text_forms_assertions::forms(
+            chosen, language,
+        )?)?;
     }
     let expected = BTreeSet::from([
         (
@@ -75,18 +74,21 @@ fn placeholder_fallback_uses_the_actual_resource_owner_and_only_its_retained_key
     let row = fixture::presentation(&catalog, fixture::BETA)?;
     let chosen = fixture::text_row(&catalog, "publicNames", &row["name"]["value"])?;
     assert_eq!(chosen["key"]["value"], "@resource_name");
-    assert_eq!(
-        chosen["translations"]["value"]["en"]["value"],
-        "Resource English"
-    );
-    assert_eq!(
-        chosen["translations"]["value"]["en"]["containsEncryptedSource"],
-        true
-    );
-    assert_eq!(
-        chosen["translations"]["value"]["de"]["containsEncryptedSource"],
-        false
-    );
+    for field in ["sourceText", "displayText"] {
+        crate::text_forms_assertions::present(
+            crate::text_forms_assertions::forms(chosen, "en")?,
+            field,
+            "Resource English",
+        )?;
+        for (language, expected) in [("en", true), ("de", false)] {
+            let carrier = &chosen["translations"]["value"][language][field];
+            crate::text_forms_assertions::direct(carrier)?;
+            assert_eq!(
+                carrier["containsEncryptedSource"], expected,
+                "each form retains its actual language-input origin"
+            );
+        }
+    }
     let uses = commodity_v3_source::uses(&catalog, &row["name"])?;
     let actual: BTreeSet<_> = uses
         .iter()
@@ -134,11 +136,14 @@ fn placeholder_precedence_is_preserved_even_when_the_fallback_is_also_a_placehol
         "a nonempty resource key precedes the original own placeholder"
     );
     for language in ["en", "de"] {
-        assert_eq!(chosen["translations"]["value"][language]["state"], "absent");
-        assert_eq!(
-            chosen["translations"]["value"][language]["containsEncryptedSource"], false,
-            "an unused encrypted locale is not a contributor"
-        );
+        let forms = crate::text_forms_assertions::forms(chosen, language)?;
+        crate::text_forms_assertions::absent(forms)?;
+        for field in ["sourceText", "displayText"] {
+            assert_eq!(
+                forms[field]["containsEncryptedSource"], false,
+                "an unused encrypted locale contributes to neither form"
+            );
+        }
     }
     Ok(())
 }

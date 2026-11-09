@@ -70,7 +70,7 @@ fn localized(reference: Option<&Value>, texts: &Value, domain: &str) -> ViewResu
     let translated = |language| {
         let text = translations
             .get(language)
-            .map_or(Ok(Value::Null), |text| value(text, None))?;
+            .map_or(Ok(Value::Null), language_display)?;
         Ok::<_, &'static str>(if text.as_str().is_some_and(str::is_empty) {
             Value::Null
         } else {
@@ -82,6 +82,28 @@ fn localized(reference: Option<&Value>, texts: &Value, domain: &str) -> ViewResu
 
 fn empty_text() -> Value {
     json!({"key": null, "en": null, "de": null})
+}
+
+fn language_display(forms: &Value) -> ViewResult<Value> {
+    for field in ["sourceText", "displayText"] {
+        let carrier = forms.get(field).ok_or("required direct text form")?;
+        if !sourced(carrier) {
+            return Err("direct text form lacks its source carrier");
+        }
+        if !matches!(
+            (
+                carrier.get("state").and_then(Value::as_str),
+                carrier.get("value")
+            ),
+            (Some("present"), Some(Value::String(_))) | (Some("absent"), Some(Value::Null))
+        ) {
+            return Err("invalid direct text state or payload");
+        }
+    }
+    value(
+        forms.get("displayText").ok_or("display form is missing")?,
+        None,
+    )
 }
 
 fn value(input: &Value, field: Option<&str>) -> ViewResult<Value> {
@@ -244,7 +266,9 @@ mod tests {
             "definitions": {"resourceTypes": {"rows": [{"name": sourced(&json!("name-ref"))}]}},
             "texts": {"publicNames": [{
                 "id": sourced(&json!("name-ref")), "key": sourced(&json!("@empty")),
-                "translations": sourced(&json!({"en": sourced(&json!(""))}))
+                "translations": sourced(&json!({"en": {
+                    "sourceText": sourced(&json!("")), "displayText": sourced(&json!(""))
+                }}))
             }], "gameTexts": []}
         });
         let comparison = project(actual)?;
@@ -263,7 +287,9 @@ mod tests {
             "description": sourced(&json!("text:4:@key")), "groupGuids": sourced(&json!([]))});
         let text = |id, translation| {
             json!({"id": sourced(&json!(id)), "key": sourced(&json!("@key")),
-            "translations": sourced(&json!({"en": sourced(&json!(translation))}))})
+            "translations": sourced(&json!({"en": {
+                "sourceText": sourced(&json!(translation)), "displayText": sourced(&json!(translation))
+            }}))})
         };
         let actual = json!({"schemaVersion": 3,
             "definitions": {"resourceTypes": {"availability": "available", "rows": [row]},

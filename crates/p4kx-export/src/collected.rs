@@ -7,6 +7,7 @@ use p4kx_extraction::Guid;
 
 use crate::blueprint_category::{BlueprintCategory, unlink_categories};
 use crate::catalog_crafting::CraftingKinds;
+use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::contract::{
     Blueprint, BlueprintPool, BrokerEntry, Commodity, ContractEntry, Crafter, CraftingGlobal,
     DismantleProcess, GameplayProperty, HarvestableLocation, HarvestableProviderPreset, Item,
@@ -17,6 +18,7 @@ use crate::contract::{
 use crate::contract_template::ContractTemplate;
 use crate::crafting_warning::CraftingWarning;
 use crate::entity_spawn_model::EntitySpawnPool;
+use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::location_template::{LocationTemplates, MissionLocationTemplate};
@@ -36,6 +38,8 @@ use crate::template_issues::Unknowns;
 use crate::texts::Texts;
 use crate::{CatalogFailure, ItemClassSummary, Kind, KindSummary};
 
+#[path = "collected_counts.rs"]
+mod counts;
 #[path = "collected_order.rs"]
 mod order;
 
@@ -53,6 +57,7 @@ pub(crate) struct Collected<'f> {
         Vec<crate::catalog_v3::resource_group_catalog::ResourceGroupMembers>,
     pub(crate) resource_types: Vec<ResourceType<'f>>,
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'f>>,
+    pub(crate) blueprint_category_lists: Vec<PreparedBlueprintCategoryList<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayProperty<'f>>,
     pub(crate) quality: QualityRows<'f>,
     pub(crate) blueprint_pools: Vec<BlueprintPool<'f>>,
@@ -100,7 +105,21 @@ impl<'f> Collected<'f> {
         for pick in picked {
             collected.take(pick, &mut missing_categories);
         }
-        missing_categories.extend(collected.failures.iter().map(|failure| failure.guid));
+        missing_categories.extend(
+            collected
+                .ledger
+                .sources
+                .iter()
+                .filter(|source| {
+                    source.kind == Some(Kind::BlueprintCategories)
+                        && matches!(
+                            source.role,
+                            ExportSourceRole::Selected | ExportSourceRole::SelectionCandidate
+                        )
+                        && source.disposition.failed()
+                })
+                .map(|source| source.guid),
+        );
         unlink_categories(&mut collected.blueprints, &missing_categories);
         collected.order();
         collected
@@ -120,6 +139,7 @@ impl<'f> Collected<'f> {
             resource_group_members: Vec::new(),
             resource_types: Vec::new(),
             blueprint_categories: Vec::new(),
+            blueprint_category_lists: Vec::new(),
             gameplay_properties: crafting.properties,
             quality: crafting.quality,
             blueprint_pools: crafting.pools,
@@ -186,6 +206,7 @@ impl<'f> Collected<'f> {
             Picked::ResourceGroup(entity) => self.resource_groups.push(entity),
             Picked::ResourceType(entity) => self.resource_types.push(*entity),
             Picked::BlueprintCategory(entity) => self.blueprint_categories.push(entity),
+            Picked::BlueprintCategoryList(entity) => self.blueprint_category_lists.push(entity),
             Picked::Starmap(entity) => self.starmap_objects.push(entity),
             Picked::Mineable(entity) => self.mineable_elements.push(entity),
             Picked::Refining(entity) => self.refining_processes.push(entity),
@@ -318,58 +339,7 @@ impl<'f> Collected<'f> {
             .into_iter()
             .map(|kind| KindSummary {
                 kind,
-                count: match kind {
-                    Kind::Tags => self.tags.count(),
-                    Kind::Manufacturers => self.manufacturers.len(),
-                    Kind::Items => self.items.len(),
-                    Kind::Ships => self.ships.len(),
-                    Kind::Commodities => self.commodities.len(),
-                    Kind::Blueprints => self.blueprints.len(),
-                    Kind::ResourceGroups => self.resource_groups.len(),
-                    Kind::ResourceTypes => self.resource_types.len(),
-                    Kind::BlueprintCategories => self.blueprint_categories.len(),
-                    Kind::GameplayProperties => self.gameplay_properties.len(),
-                    Kind::QualityDistributions => self.quality.distributions.len(),
-                    Kind::QualityQuantizations => self.quality.quantizations.len(),
-                    Kind::BlueprintPools => self.blueprint_pools.len(),
-                    Kind::DismantleProcesses => self.dismantle_processes.len(),
-                    Kind::Paints => self.paints.len(),
-                    Kind::Loadouts => self.loadouts.len(),
-                    Kind::StarmapObjects => self.starmap_objects.len(),
-                    Kind::Contracts => self.contracts.len(),
-                    Kind::MissionLocationTemplates => self.mission_location_templates.len(),
-                    Kind::ContractShipSpawns => self.contract_ship_spawns.len(),
-                    Kind::ContractLocationQueries => self.contract_location_queries.len(),
-                    Kind::ContractTemplates => self.contract_templates.len(),
-                    Kind::MissionBrokerEntries => self.mission_broker_entries.len(),
-                    Kind::ContractNpcSpawns => self.contract_npc_spawns.len(),
-                    Kind::ContractEntitySpawns => self.contract_entity_spawns.len(),
-                    Kind::MissionPropertySets => self.mission_property_sets.len(),
-                    Kind::MineableElements => self.mineable_elements.len(),
-                    Kind::RefiningProcesses => self.refining_processes.len(),
-                    Kind::MineableCompositions => self.mineable_compositions.len(),
-                    Kind::MiningGlobalParams => self.mining_global_params.len(),
-                    Kind::MineableEntities => self.mineable_entities.len(),
-                    Kind::HarvestableProviderPresets => self.harvestable_provider_presets.len(),
-                    Kind::SubHarvestableMultiConfigs => self.sub_harvestable_multi_configs.len(),
-                    Kind::HarvestableLocations => self.harvestable_locations.len(),
-                    Kind::LootContainers => self.loot_containers.len(),
-                    Kind::Shops => self.shops.len(),
-                    Kind::Crafters => self.crafters.len(),
-                    Kind::FactionReputations
-                    | Kind::ReputationScopes
-                    | Kind::ReputationStandings
-                    | Kind::ReputationContexts
-                    | Kind::MissionTypes
-                    | Kind::MissionLocalities
-                    | Kind::ContractScenarios
-                    | Kind::CargoManifests => self.mission_kinds.count(kind),
-                    Kind::LootTables
-                    | Kind::LootArchetypes
-                    | Kind::LootPoolFilters
-                    | Kind::LegacyLootTables
-                    | Kind::LegacyLootArchetypes => self.loot_kinds.count(kind),
-                },
+                count: self.count(kind),
                 skipped: self.skipped.get(kind.index()).copied().unwrap_or_default(),
                 complete: complete || kind == Kind::Tags,
             })

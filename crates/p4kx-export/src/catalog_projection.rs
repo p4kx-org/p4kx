@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -10,10 +9,11 @@ use p4kx_extraction::{
     is_placeholder_key,
 };
 
+use super::catalog_text_forms;
 use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_text_contract::{CanonicalText, CatalogTexts, GameTextRef, PublicNameRef};
-use crate::texts::{CATALOG_LANGUAGES, Texts};
+use crate::texts::{CATALOG_LANGUAGES, TextProjection, Texts};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Domain {
@@ -25,7 +25,7 @@ struct Pending<'source> {
     key: &'source str,
     payloads: Vec<SourceUse>,
     selectors: Vec<SourceUse>,
-    translations: BTreeMap<Language, Option<Cow<'source, str>>>,
+    translations: BTreeMap<Language, Option<TextProjection<'source>>>,
     looked_up: bool,
 }
 
@@ -159,29 +159,19 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         let mut all_uses = row.selectors.clone();
         let mut translations = BTreeMap::new();
         for (language, text) in row.translations {
-            let Some(scope) = self.origins.locale(language) else {
+            let Some(input) = self.origins.locale(language) else {
                 continue;
             };
-            let mut uses = row.selectors.clone();
-            if row.looked_up {
-                for selector in &row.selectors {
-                    let location = SourceLocation::LocalizationLookup {
-                        language,
-                        selector: selector.reference().clone(),
-                    };
-                    uses.push(scope.at(location.clone(), SourceUseRole::Selector)?);
-                    if text.is_some() {
-                        uses.push(scope.at(location.clone(), SourceUseRole::Payload)?);
-                        uses.push(scope.at(location, SourceUseRole::Conversion)?);
-                    }
-                }
-            }
-            all_uses.extend(uses.iter().cloned());
-            let value = text.map_or(SourceValue::Absent, SourceValue::Present);
-            translations.insert(
-                language.code().to_owned(),
-                self.origins.uses.value(value, &uses, true),
-            );
+            let projection = catalog_text_forms::project(
+                &self.origins.uses,
+                input,
+                language,
+                &row.selectors,
+                text,
+                row.looked_up,
+            )?;
+            all_uses.extend(projection.uses);
+            translations.insert(language.code().to_owned(), projection.forms);
         }
         Ok(CanonicalText {
             id: self

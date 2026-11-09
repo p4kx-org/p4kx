@@ -6,8 +6,13 @@ use std::collections::HashMap;
 use p4kx_export::Language;
 use p4kx_extraction::LocalizationSet;
 
-/// Expected display texts parsed directly from decoded source lines.
-pub(crate) struct Oracle(HashMap<String, String>);
+/// Expected winning source and display texts parsed directly from decoded lines.
+pub(crate) struct Oracle(HashMap<String, ExpectedText>);
+
+struct ExpectedText {
+    source: String,
+    display: String,
+}
 
 #[derive(Default)]
 struct Lines<'a> {
@@ -25,7 +30,8 @@ impl Oracle {
 
     pub(crate) fn parse(source: &str) -> Self {
         let mut lines: HashMap<String, Lines<'_>> = HashMap::new();
-        for line in source.trim_start_matches('\u{feff}').lines() {
+        for line in source.trim_start_matches('\u{feff}').split('\n') {
+            let line = line.strip_suffix('\r').unwrap_or(line);
             let Some((key, text)) = line.split_once('=') else {
                 continue;
             };
@@ -53,7 +59,13 @@ impl Oracle {
                         .or(lines.suffixed)
                         .or(lines.plain)?;
                     let shown = text.replace("\\n", "\n").trim().to_owned();
-                    Some((key, shown))
+                    Some((
+                        key,
+                        ExpectedText {
+                            source: text.to_owned(),
+                            display: shown,
+                        },
+                    ))
                 })
                 .collect(),
         )
@@ -63,11 +75,16 @@ impl Oracle {
         let key = key.strip_prefix('@').unwrap_or(key).to_ascii_lowercase();
         self.0
             .get(&key)
-            .map(String::as_str)
+            .map(|text| text.display.as_str())
             .filter(|text| !text.is_empty())
     }
     pub(crate) fn canonical_text(&self, key: &str) -> Option<&str> {
         let key = key.strip_prefix('@').unwrap_or(key).to_ascii_lowercase();
-        self.0.get(&key).map(String::as_str)
+        self.0.get(&key).map(|text| text.display.as_str())
+    }
+
+    pub(crate) fn source_text(&self, key: &str) -> Option<&str> {
+        let key = key.strip_prefix('@').unwrap_or(key).to_ascii_lowercase();
+        self.0.get(&key).map(|text| text.source.as_str())
     }
 }

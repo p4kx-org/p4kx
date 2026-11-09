@@ -344,6 +344,15 @@ fn a_filter_marks_the_crafting_kinds_partial_and_selects_by_record_path() -> Tes
 
 #[test]
 fn the_summary_counts_the_crafting_kinds_and_the_skipped_blueprints() -> TestResult {
+    let bytes = fixture::database().build();
+    let forge = DataForge::open(&bytes)?;
+    for record in forge.records() {
+        assert_ne!(
+            record.type_name()?,
+            "BlueprintCategoryDatabaseRecord",
+            "this original detailed fixture has no category-list source"
+        );
+    }
     let (built, _) = build()?;
     let counts: Vec<(Kind, usize, usize)> = built
         .summary()
@@ -362,7 +371,9 @@ fn the_summary_counts_the_crafting_kinds_and_the_skipped_blueprints() -> TestRes
             (Kind::QualityQuantizations, 0, 0),
             (Kind::BlueprintPools, 3, 1),
             (Kind::DismantleProcesses, 1, 0),
-        ]
+            (Kind::BlueprintCategoryLists, 0, 0),
+        ],
+        "all original crafting counts and the appended source-empty listing kind"
     );
     assert!(built.summary().is_complete(), "no failure, no warning");
     Ok(())

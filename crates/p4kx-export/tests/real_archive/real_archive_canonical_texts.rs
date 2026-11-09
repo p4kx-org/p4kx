@@ -53,10 +53,19 @@ impl<'catalog> TextTarget<'catalog> {
 
     /// Borrows one required validated language payload, including an explicit source gap.
     pub(crate) fn shown(&self, language: &str) -> TestResult<&'catalog Value> {
-        self.translations
+        self.form(language, "displayText")
+    }
+
+    fn raw(&self, language: &str) -> TestResult<&'catalog Value> {
+        self.form(language, "sourceText")
+    }
+
+    fn form(&self, language: &str, field: &str) -> TestResult<&'catalog Value> {
+        let forms = self
+            .translations
             .get(language)
-            .and_then(|carrier| carrier.get("value"))
-            .ok_or_else(|| format!("required canonical language {language}").into())
+            .ok_or_else(|| format!("required canonical language {language}"))?;
+        language_payload(forms.get(field).ok_or("required direct text form")?)
     }
 }
 
@@ -146,8 +155,8 @@ fn table<'catalog>(
         )?
         .as_object()
         .ok_or("canonical language map")?;
-        for carrier in translations.values() {
-            language_payload(carrier)?;
+        for forms in translations.values() {
+            validate_forms(forms, key)?;
         }
         let target = TextTarget {
             source: row,
@@ -159,6 +168,16 @@ fn table<'catalog>(
         }
     }
     Ok(index)
+}
+
+fn validate_forms(forms: &Value, key: &str) -> TestResult<()> {
+    for field in ["sourceText", "displayText"] {
+        let value = language_payload(forms.get(field).ok_or("required direct text form")?)?;
+        if p4kx_extraction::is_placeholder_key(key) && !value.is_null() {
+            return Err("placeholder cannot retain a winning source or display text".into());
+        }
+    }
+    Ok(())
 }
 
 fn language_payload(carrier: &Value) -> TestResult<&Value> {
@@ -207,10 +226,18 @@ impl<'oracle> CoverageCounters<'oracle> {
         if p4kx_extraction::is_placeholder_key(target.key) {
             return Ok(());
         }
-        self.english
-            .count_canonical(self.english_oracle, target.key, target.shown("en")?);
-        self.german
-            .count_canonical(self.german_oracle, target.key, target.shown("de")?);
+        self.english.count_forms(
+            self.english_oracle,
+            target.key,
+            target.raw("en")?,
+            target.shown("en")?,
+        );
+        self.german.count_forms(
+            self.german_oracle,
+            target.key,
+            target.raw("de")?,
+            target.shown("de")?,
+        );
         Ok(())
     }
 

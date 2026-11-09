@@ -12,7 +12,8 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
-use catalog_support::{EXPORTED_AT, english, write_archive, write_archive_with};
+use catalog_support::{EXPORTED_AT, english, origins, write_archive, write_archive_with};
+use p4kx_extraction::Language;
 use p4kx_testkit::TestEntry;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -290,16 +291,32 @@ fn catalog_without_a_german_global_ini_leaves_german_null_and_counts_it() -> Tes
     let dir = tempfile::tempdir()?;
     let archive = write_archive_with(dir.path(), &[english()])?;
     let out = dir.path().join("english-only.json");
+    origins::assert_input_encryption(&archive, Language::English)?;
 
     let summary = catalog(&archive, &out, &[])?;
 
     let catalog: serde_json::Value = serde_json::from_str(&fs::read_to_string(&out)?)?;
     let name = manufacturer_name(&catalog, 1)?;
     assert_eq!(name["key"]["value"], "@manufacturer_NameACAS");
-    assert_eq!(
-        name["translations"]["value"]["en"]["value"],
-        "Ace Astrogation"
-    );
+    for field in ["sourceText", "displayText"] {
+        let form = &name["translations"]["value"]["en"][field];
+        assert_eq!(
+            form["value"], "Ace Astrogation",
+            "both forms retain the original unpadded English fixture text"
+        );
+        assert_eq!(
+            form["state"], "present",
+            "the original English winner remains present"
+        );
+        assert_eq!(
+            form["sourceSetComplete"], true,
+            "each form retains its complete original input set"
+        );
+        assert_eq!(
+            form["containsEncryptedSource"], true,
+            "the original localization key is selected from the encrypted DataForge Entry"
+        );
+    }
     assert!(
         name["translations"]["value"].get("de").is_none(),
         "no German input"
@@ -317,6 +334,7 @@ fn catalog_reads_a_german_global_ini_with_invalid_bytes_lossily() -> TestResult 
     );
     let archive = write_archive_with(dir.path(), &[english(), damaged])?;
     let out = dir.path().join("damaged.json");
+    origins::assert_input_encryption(&archive, Language::German)?;
     let output = p4kx(&["catalog"])?
         .arg(&archive)
         .arg("--out")
@@ -335,10 +353,25 @@ fn catalog_reads_a_german_global_ini_with_invalid_bytes_lossily() -> TestResult 
         "the clean Entry is not named: {stderr}"
     );
     let catalog: serde_json::Value = serde_json::from_str(&fs::read_to_string(out)?)?;
-    assert_eq!(
-        manufacturer_name(&catalog, 1)?["translations"]["value"]["de"]["value"],
-        "Ace\u{fffd}",
-        "the bad byte is replaced, the text kept"
-    );
+    let name = manufacturer_name(&catalog, 1)?;
+    for field in ["sourceText", "displayText"] {
+        let form = &name["translations"]["value"]["de"][field];
+        assert_eq!(
+            form["value"], "Ace\u{fffd}",
+            "the actual invalid source byte is decoded in both forms"
+        );
+        assert_eq!(
+            form["state"], "present",
+            "lossy decoding retains the winning value"
+        );
+        assert_eq!(
+            form["sourceSetComplete"], true,
+            "known contributors remain complete despite lossy decoding"
+        );
+        assert_eq!(
+            form["containsEncryptedSource"], true,
+            "the original encrypted key contributes independently of lossy decoding"
+        );
+    }
     Ok(())
 }

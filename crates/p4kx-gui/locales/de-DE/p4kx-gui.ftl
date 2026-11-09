@@ -505,6 +505,7 @@ catalog-summary-kind = { $kind ->
     [resourceTypes] Ressourcentypen
     [missionPropertySets] Eigenschaftssätze für Missionen
     [blueprintCategories] Blaupausenkategorien
+    [blueprintCategoryLists] Blaupausenkategorielisten
     [paints] Lackierungen
     [loadouts] Loadouts
    *[other] { $kind }

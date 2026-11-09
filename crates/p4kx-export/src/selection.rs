@@ -160,11 +160,13 @@ pub enum Kind {
     ResourceTypes,
     /// Global Tag definitions, with `TagDatabase` roots as source dependencies.
     Tags,
+    /// Authored lists: every `BlueprintCategoryDatabaseRecord` under the ordinary Filter.
+    BlueprintCategoryLists,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 50] = [
+    pub const ALL: [Self; 51] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -215,6 +217,7 @@ impl Kind {
         Self::MissionPropertySets,
         Self::ResourceTypes,
         Self::Tags,
+        Self::BlueprintCategoryLists,
     ];
 
     /// Returns the stable kind identifier, independently of its canonical dataset path.
@@ -271,6 +274,7 @@ impl Kind {
             Self::MissionPropertySets => "missionPropertySets",
             Self::ResourceTypes => "resourceTypes",
             Self::Tags => "tags",
+            Self::BlueprintCategoryLists => "blueprintCategoryLists",
         }
     }
 }

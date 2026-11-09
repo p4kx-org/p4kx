@@ -3,6 +3,9 @@
 
 //! Direct product-wire and Basetool consumer checks for the complete resource family.
 
+#[path = "catalog_resource_language_origin.rs"]
+mod language_origin;
+
 use std::collections::BTreeSet;
 use std::fs;
 
@@ -11,31 +14,10 @@ use p4kx_export::{
     write_catalog_file_from,
 };
 use p4kx_extraction::{DataForgeEntry, Language};
-use serde::Deserialize;
 use serde_json::Value;
 
 use crate::resource_origin_fixture::{self as fixture, TestResult};
 use crate::resource_quality_schema_fixture::OverrideEntryTarget;
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ImportedValue<T> {
-    state: String,
-    value: Option<T>,
-    contains_encrypted_source: Option<bool>,
-    source_uses_refs: Vec<String>,
-    source_set_complete: bool,
-}
-
-impl<T> ImportedValue<T> {
-    fn public_value(&self) -> Option<&T> {
-        (self.state == "present"
-            && self.source_set_complete
-            && self.contains_encrypted_source == Some(false))
-        .then_some(self.value.as_ref())
-        .flatten()
-    }
-}
 
 fn row(catalog: &Value) -> TestResult<&Value> {
     catalog
@@ -68,40 +50,7 @@ fn basetool_classifies_each_value_without_reconstructing_provenance() -> TestRes
         catalog["definitions"]["resourceTypes"]["availability"],
         "available"
     );
-    let resource = row(&catalog)?;
-    let guid: ImportedValue<String> = serde_json::from_value(resource["guid"].clone())?;
-    assert!(
-        guid.public_value().is_some(),
-        "the DCB payload is unencrypted"
-    );
-    assert!(
-        !guid.source_uses_refs.is_empty(),
-        "immediate origin refers to actual uses"
-    );
-    let names = text_row(&catalog, "publicNames", "@fixture_name")?;
-    let translations = &names["translations"]["value"];
-    let english: ImportedValue<String> = serde_json::from_value(translations["en"].clone())?;
-    let german: ImportedValue<String> = serde_json::from_value(translations["de"].clone())?;
-    let french: ImportedValue<String> = serde_json::from_value(translations["fr"].clone())?;
-    assert_eq!(english.value.as_deref(), Some("English winner"));
-    assert_eq!(english.contains_encrypted_source, Some(true));
-    assert!(
-        english.public_value().is_none(),
-        "encrypted language contribution is not public"
-    );
-    assert!(
-        german.public_value().is_some(),
-        "this language uses only known unencrypted input"
-    );
-    assert_eq!(french.contains_encrypted_source, None);
-    assert!(
-        french.public_value().is_none(),
-        "unknown origin cannot be promoted by read success"
-    );
-    assert!(
-        !english.source_uses_refs.is_empty() && !german.source_uses_refs.is_empty(),
-        "each localized value carries its own uses"
-    );
+    language_origin::assert_classification(&catalog)?;
     Ok(())
 }
 
@@ -204,6 +153,10 @@ fn every_available_supported_language_uses_its_actual_winning_entry() -> TestRes
             languages.contains_key(language.code()),
             "available language is retained"
         );
+        let forms = crate::text_forms_assertions::forms(text, language.code())?;
+        for field in ["sourceText", "displayText"] {
+            crate::text_forms_assertions::direct(&forms[field])?;
+        }
     }
     let sources = catalog["provenance"]["sources"]
         .as_array()
@@ -262,12 +215,17 @@ fn standalone_dcb_origin_is_not_inferred_from_the_localization_archive() -> Test
         row(&catalog)?["guid"]["containsEncryptedSource"].is_null(),
         "file P4K lineage is unknown"
     );
-    let german =
-        &text_row(&catalog, "publicNames", "@fixture_name")?["translations"]["value"]["de"];
-    assert!(
-        german["containsEncryptedSource"].is_null(),
-        "the actual unknown DCB key selector contributes"
-    );
+    let forms = crate::text_forms_assertions::forms(
+        text_row(&catalog, "publicNames", "@fixture_name")?,
+        "de",
+    )?;
+    for field in ["sourceText", "displayText"] {
+        crate::text_forms_assertions::direct(&forms[field])?;
+        assert!(
+            forms[field]["containsEncryptedSource"].is_null(),
+            "the actual unknown DCB key selector contributes to both forms"
+        );
+    }
     Ok(())
 }
 

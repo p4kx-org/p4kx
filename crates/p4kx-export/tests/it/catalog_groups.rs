@@ -261,6 +261,7 @@ fn the_kinds_follow_the_existing_ones_in_the_catalog_order() {
             "missionPropertySets",
             "resourceTypes",
             "tags",
+            "blueprintCategoryLists",
         ],
         "order of the catalog"
     );

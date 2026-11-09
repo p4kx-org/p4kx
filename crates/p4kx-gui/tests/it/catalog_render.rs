@@ -236,7 +236,7 @@ fn normal_incomplete_publication_is_drawn_as_a_refusal_in_both_languages() -> Te
 #[test]
 fn the_warning_alert_of_a_catalog_near_the_limit_is_drawn_at_both_sizes() -> TestResult {
     for size in SIZES {
-        let (_dir, mut model, out) = opened(&cataloging::wordy(30, 1_000_000))?;
+        let (_dir, mut model, out) = opened(&cataloging::near_upload_limit())?;
         model.start_catalog(out.join("basetool-catalog.json"), || {});
         let Some(mut harness) = window(model, size) else {
             return Ok(());

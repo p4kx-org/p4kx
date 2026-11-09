@@ -43,6 +43,12 @@ pub(crate) struct Texts<'e> {
     placeholders: AtomicUsize,
 }
 
+/// One winning decoded text and its display form from the same lookup.
+pub(crate) struct TextProjection<'source> {
+    pub(crate) source: &'source str,
+    pub(crate) display: Cow<'source, str>,
+}
+
 struct LanguageCount {
     language: Language,
     resolved: AtomicUsize,
@@ -124,8 +130,8 @@ impl<'e> Texts<'e> {
             .collect()
     }
 
-    /// Projects an existing winning text, retaining an explicitly empty display value.
-    pub(crate) fn project(&self, language: Language, key: &str) -> Option<Cow<'e, str>> {
+    /// Projects both forms of one winning text and counts its display result once.
+    pub(crate) fn project(&self, language: Language, key: &str) -> Option<TextProjection<'e>> {
         let count = self
             .languages
             .iter()
@@ -133,9 +139,12 @@ impl<'e> Texts<'e> {
         let text = if is_placeholder_key(key) {
             None
         } else {
-            self.set.text(key, language).map(display_text)
+            self.set.text(key, language).map(|source| TextProjection {
+                source,
+                display: display_text(source),
+            })
         };
-        if text.as_ref().is_some_and(|text| !text.is_empty()) {
+        if text.as_ref().is_some_and(|text| !text.display.is_empty()) {
             count.resolved.fetch_add(1, Ordering::Relaxed);
         } else {
             count.unresolved.fetch_add(1, Ordering::Relaxed);
@@ -148,6 +157,8 @@ impl<'e> Texts<'e> {
     }
 
     fn resolve(&self, language: Language, key: &str) -> Option<Cow<'e, str>> {
-        self.project(language, key).filter(|text| !text.is_empty())
+        self.project(language, key)
+            .map(|text| text.display)
+            .filter(|text| !text.is_empty())
     }
 }

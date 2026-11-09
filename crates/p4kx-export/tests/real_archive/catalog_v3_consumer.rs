@@ -8,6 +8,9 @@ use p4kx_export::Kind;
 use p4kx_extraction::Guid;
 use serde_json::Value;
 
+#[path = "catalog_v3_category_lists.rs"]
+mod category_lists;
+
 type TestResult<T> = Result<T, Box<dyn Error>>;
 
 /// Reads the one actual dataset for a Kind.
@@ -25,6 +28,9 @@ pub(crate) fn named_rows<'catalog>(
         .find(|kind| kind.name() == name)
         .ok_or("unknown catalog Kind")?;
     match kind {
+        Kind::BlueprintCategoryLists => {
+            checked_table(catalog, kind, "/declarations/blueprintCategoryLists")
+        }
         Kind::BlueprintCategories => {
             checked_table(catalog, kind, "/definitions/blueprintCategories")
         }
@@ -57,8 +63,14 @@ fn checked_table<'catalog>(
     let rows = table(catalog, path)?;
     for row in rows {
         identity(row, kind)?;
-        if kind == Kind::BlueprintCategories {
+        if matches!(
+            kind,
+            Kind::BlueprintCategories | Kind::BlueprintCategoryLists
+        ) {
             category_header(row)?;
+        }
+        if kind == Kind::BlueprintCategoryLists {
+            category_lists::check(row)?;
         }
     }
     Ok(rows)
@@ -141,6 +153,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
     if matches!(
         kind,
         Kind::BlueprintCategories
+            | Kind::BlueprintCategoryLists
             | Kind::Manufacturers
             | Kind::Commodities
             | Kind::ResourceTypes

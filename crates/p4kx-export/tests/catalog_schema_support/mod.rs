@@ -7,6 +7,7 @@ use p4kx_extraction::SourceValue;
 use serde_json::{Value, json};
 
 mod blueprint_categories;
+mod blueprint_category_lists;
 mod blueprints;
 mod brokers;
 mod commodities;
@@ -55,6 +56,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "resourceGroups": {"status": "complete"},
             "resourceTypes": {"status": "complete"},
             "blueprintCategories": {"status": "partial", "filter": "*/blueprintcategories/*"},
+            "blueprintCategoryLists": {"status": "complete"},
             "gameplayProperties": {"status": "complete"},
             "qualityDistributions": {"status": "complete"},
             "qualityQuantizations": {"status": "complete"},
@@ -184,7 +186,12 @@ pub(crate) fn minimal_catalog() -> Value {
         "definitions": {"blueprintCategories": blueprint_categories::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
             "tags": tags::definitions()},
-        "declarations": {"tagRoots": tags::roots(), "entityTags": tags::entities(), "resourceGroupMembers": resource_groups::members()},
+        "declarations": {
+            "blueprintCategoryLists": blueprint_category_lists::declarations(),
+            "tagRoots": tags::roots(),
+            "entityTags": tags::entities(),
+            "resourceGroupMembers": resource_groups::members()
+        },
         "texts": {"publicNames": public_names(), "gameTexts": []},
         "projections": {"qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents()},
         "provenance": {"sources": [], "uses": []},
@@ -318,7 +325,10 @@ fn public_names() -> Vec<Value> {
         "id": source_values::present(json!("name:22:@manufacturer_NameACAS")),
         "key": source_values::present(json!("@manufacturer_NameACAS")),
         "translations": source_values::present(json!({
-            "en": source_values::present(json!("Ace Astrogation"))
+            "en": {
+                "sourceText": source_values::present(json!("Ace Astrogation")),
+                "displayText": source_values::present(json!("Ace Astrogation"))
+            }
         }))
     }));
     rows

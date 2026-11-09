@@ -4,6 +4,7 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::blueprint_category_list::BlueprintCategoryList;
 use super::catalog_table::CatalogTable;
 use super::tag_catalog::{EntityTags, TagRoots};
 use crate::schema_fields::every_field_required;
@@ -13,6 +14,7 @@ use crate::schema_fields::every_field_required;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogDeclarations<'source> {
+    pub(crate) blueprint_category_lists: CatalogTable<BlueprintCategoryList<'source>>,
     pub(crate) tag_roots: CatalogTable<TagRoots<'source>>,
     pub(crate) entity_tags: CatalogTable<EntityTags<'source>>,
     pub(crate) resource_group_members:

@@ -12,6 +12,11 @@ pub(crate) mod catalog_number_health;
 #[path = "number_position.rs"]
 pub(crate) mod number_position;
 
+#[path = "blueprint_category_list.rs"]
+pub(crate) mod blueprint_category_list;
+#[path = "blueprint_category_list_read.rs"]
+pub(crate) mod blueprint_category_list_read;
+
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
 #[path = "tag_catalog.rs"]
@@ -29,6 +34,8 @@ pub(crate) mod catalog_read;
 pub(crate) mod catalog_record_reference;
 #[path = "catalog_text_contract.rs"]
 pub(crate) mod catalog_text_contract;
+#[path = "catalog_text_forms.rs"]
+pub(crate) mod catalog_text_forms;
 #[path = "quality_bands_read.rs"]
 pub(crate) mod quality_bands_read;
 #[path = "quality_curve_source_read.rs"]

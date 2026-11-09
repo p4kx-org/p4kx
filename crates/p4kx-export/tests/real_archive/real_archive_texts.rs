@@ -138,6 +138,31 @@ impl Coverage {
         }
     }
 
+    pub(crate) fn count_forms(
+        &mut self,
+        oracle: &Oracle,
+        key: &str,
+        source: &Value,
+        shown: &Value,
+    ) {
+        let expected = oracle.source_text(key);
+        let matches = match (expected, source) {
+            (Some(expected), Value::String(actual)) => actual == expected,
+            (None, Value::Null) => true,
+            _ => false,
+        };
+        if matches {
+            self.count_canonical(oracle, key, shown);
+        } else {
+            self.contradictions += 1;
+            if self.contradicted.len() < SAMPLE {
+                self.contradicted.push(format!(
+                    "{key}: source file {expected:?}, catalog {source:?}"
+                ));
+            }
+        }
+    }
+
     const fn total(&self) -> usize {
         self.resolved + self.fallback + self.contradictions
     }

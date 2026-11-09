@@ -4,6 +4,7 @@
 use p4kx_extraction::{Guid, RecordTree};
 
 use crate::blueprint_category::BlueprintCategory;
+use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::contract::{
     Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
     MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup, ResourceType, Ship,
@@ -42,6 +43,8 @@ pub(crate) enum Picked<'f> {
     ResourceType(Box<ResourceType<'f>>),
     /// A blueprint category.
     BlueprintCategory(BlueprintCategory<'f>),
+    /// One original category database list.
+    BlueprintCategoryList(PreparedBlueprintCategoryList<'f>),
     /// A starmap object.
     Starmap(StarmapObject<'f>),
     /// A mineable element.
@@ -115,6 +118,7 @@ impl<'f> Picked<'f> {
             | Kind::ResourceTypes
             | Kind::Blueprints
             | Kind::BlueprintCategories
+            | Kind::BlueprintCategoryLists
             | Kind::GameplayProperties
             | Kind::QualityDistributions
             | Kind::QualityQuantizations

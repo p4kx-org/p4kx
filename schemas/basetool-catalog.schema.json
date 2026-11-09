@@ -895,6 +895,50 @@
       ],
       "type": "object"
     },
+    "BlueprintCategoryList": {
+      "description": "One physical category database with its ordered authored reference slots.",
+      "properties": {
+        "categories": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "categories",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "BlueprintDismantle": {
       "description": "What dismantling the item of a blueprint returns: a link to the process and the tier.\n\nThe item returns the share `efficiency` of the process of the costs of the tier `tierIndex`,\nexcept the resources in `craftingGlobal.dismantleExcludedResourceGuids`. A `select` is not\nresolved and the quantity multiplier is not applied; these are assumptions, not verified\nagainst the game.",
       "properties": {
@@ -1540,7 +1584,7 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "translations": {
-          "$ref": "#/$defs/SourcedValueOfMap_of_SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfMap_of_TextForms"
         }
       },
       "required": [
@@ -1560,7 +1604,7 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "translations": {
-          "$ref": "#/$defs/SourcedValueOfMap_of_SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfMap_of_TextForms"
         }
       },
       "required": [
@@ -1795,6 +1839,9 @@
     "CatalogDeclarations": {
       "description": "Original ordered uses, independently of reusable definitions and derived paths.",
       "properties": {
+        "blueprintCategoryLists": {
+          "$ref": "#/$defs/CatalogTableOfBlueprintCategoryList"
+        },
         "entityTags": {
           "$ref": "#/$defs/CatalogTableOfEntityTags"
         },
@@ -1806,6 +1853,7 @@
         }
       },
       "required": [
+        "blueprintCategoryLists",
         "entityTags",
         "resourceGroupMembers",
         "tagRoots"
@@ -1929,6 +1977,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/BlueprintCategoryDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfBlueprintCategoryList": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/BlueprintCategoryList"
           },
           "type": "array"
         }
@@ -2832,6 +2899,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `blueprintCategories`."
         },
+        "blueprintCategoryLists": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The ordinary filtered selection of authored category databases."
+        },
         "blueprintPools": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `blueprintPools`."
@@ -3035,6 +3106,7 @@
       },
       "required": [
         "blueprintCategories",
+        "blueprintCategoryLists",
         "blueprintPools",
         "blueprints",
         "cargoManifests",
@@ -9187,6 +9259,10 @@
         {
           "description": "Global Tag definitions, with `TagDatabase` roots as source dependencies.",
           "value": "tags"
+        },
+        {
+          "description": "Authored lists: every `BlueprintCategoryDatabaseRecord` under the ordinary Filter.",
+          "value": "blueprintCategoryLists"
         }
       ]
     },
@@ -20675,7 +20751,7 @@
       ],
       "type": "object"
     },
-    "SourcedValueOfMap_of_SourcedValueOfstring": {
+    "SourcedValueOfMap_of_TextForms": {
       "allOf": [
         {
           "allOf": [
@@ -20769,7 +20845,7 @@
             "properties": {
               "value": {
                 "additionalProperties": {
-                  "$ref": "#/$defs/SourcedValueOfstring"
+                  "$ref": "#/$defs/TextForms"
                 },
                 "type": "object"
               }
@@ -27061,6 +27137,22 @@
         "value",
         "valueType",
         "variable"
+      ],
+      "type": "object"
+    },
+    "TextForms": {
+      "description": "The exact decoded source text and its derived display form for one language.",
+      "properties": {
+        "displayText": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceText": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "displayText",
+        "sourceText"
       ],
       "type": "object"
     },

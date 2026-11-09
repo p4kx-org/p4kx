@@ -4,6 +4,8 @@
 //! A synthetic Archive for the `p4kx catalog` tests: manufacturers, an item, a ship, a commodity
 //! and a blueprint with English and German `global.ini` files.
 
+pub(crate) mod origins;
+
 use std::error::Error;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
