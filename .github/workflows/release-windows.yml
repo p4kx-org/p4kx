@@ -179,6 +179,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Exact historical AMD64 MSI download failed.' }
       - name: Pure exact-PATH validator and run-all mocks
         run: |
+          .github/scripts/test-msi-feedback-workflow.ps1
+          .github/scripts/test-msi-feedback-budget.ps1
+          .github/scripts/test-msi-phase-journal-encoding.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-phase-journal-encoding')
+          .github/scripts/test-msi-feedback-parent.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-feedback-parent')
           .github/scripts/test-msi-diagnostics.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-diagnostics')
           .github/scripts/test-msi-diagnostic-failures.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-diagnostic-failures')
           .github/scripts/test-msi-raw-fixture.ps1
@@ -191,8 +195,15 @@ jobs:
             cargo build --release --locked --target $env:P4KX_TARGET -p p4kx-msi-path --example p4kx-msi-registry-fixture --features native-fixtures
             if ($LASTEXITCODE -ne 0) { throw 'Opt-in Registry fixture compilation failed.' }
           } finally { $env:P4KX_FIXTURE_SOURCE_REVISION = $original }
+      - name: Prepare the independent installer step allowance
+        id: msi-budget
+        timeout-minutes: 1
+        run: .github/scripts/prepare-msi-feedback.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/feedback')
       - name: Installer metadata, upgrade, downgrade, rollback, CPU replacement and preservation
+        timeout-minutes: ${{ fromJSON(steps.msi-budget.outputs.minutes) }}
         run: |
+          . .github/scripts/msi-diagnostic-budget.ps1
+          Assert-P4kxMsiStepAdmission $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC $env:P4KX_MSI_STEP_MINUTES $env:P4KX_MSI_STEP_COMPUTED_AT_UTC
           . .github/scripts/platform-contract.ps1
           $row = Get-P4kxPlatform -Target $env:P4KX_TARGET
           $other = @((Get-P4kxPlatformContract).targets | Where-Object { $_.os -eq 'windows' -and $_.arch -ne $row.arch })[0]
@@ -215,6 +226,7 @@ jobs:
           Copy-Item "$base/validation/package-tools.json" "$base/package/P4KX-$env:VERSION-$env:P4KX_TARGET-package-tools.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
+        timeout-minutes: 5
         with:
           name: windows-package-logs-${{ matrix.target }}
           path: |

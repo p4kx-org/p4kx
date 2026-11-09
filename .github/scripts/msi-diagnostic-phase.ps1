@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'msi-diagnostic-utf8.ps1')
 
 function New-P4kxMsiPhaseContext {
     param([string]$Directory, [string]$Target)
@@ -85,8 +86,7 @@ function Assert-P4kxMsiPhaseEvent {
 function Read-P4kxMsiPhaseJournal {
     param([string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) { return @{present=$false; complete=$false; events=0; active=@(); terminal=$null} }
-    if ((Get-Item -LiteralPath $Path).Length -gt 1MB) { throw 'MSI phase journal exceeds its byte bound.' }
-    $text = [IO.File]::ReadAllText($Path, [Text.UTF8Encoding]::new($false,$true))
+    $text = Read-P4kxMsiDiagnosticUtf8 $Path 1MB 'MSI phase journal exceeds its byte bound.'
     $lines = $text.Split([char]10)
     $complete = $text.EndsWith([string][char]10, [StringComparison]::Ordinal)
     $count = 0; $active = @{}; $terminal = $null

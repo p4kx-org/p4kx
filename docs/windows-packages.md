@@ -177,6 +177,14 @@ direct-process watchdog and five-second termination wait; process startup, synch
 or file IO and callbacks are not a hard elapsed-time guarantee. Existing inner installer and
 fixture limits, source/CPU guards and uncertainty fences remain required.
 
+An independent runner limit also surrounds the installer step. Its allowance is the smaller of
+12 minutes and the remaining whole minutes of the original deadline. Preparation and admission
+reject expired, inflated or stale allowances before platform or installer work. The original
+worker deadline remains in effect. `installer-check/feedback/step-feedback.json` records the
+prepared allowance and source/run/CPU binding separately from the worker's diagnostic directory.
+The cancellation-aware diagnostic upload has its own five-minute step limit. Runner or service
+failure can still prevent delivery; retained partial evidence leaves native completion unproven.
+
 `installer-check/diagnostics` retains source/input identities, bounded UTC-millisecond phase
 rows in `phase-journal.jsonl`, captured worker output and `diagnostic-result.json`. Phase rows
 identify actual preamble, lifecycle, runtime, restore and cleanup boundaries. A completed
@@ -188,3 +196,14 @@ restore Registry values, kill a process tree or infer that the Windows Installer
 finished. Diagnostics cannot replace the source-bound native runtime and exact-PATH release
 proofs. The infrastructure tests execute synthetic PowerShell children and mocked native
 adapters; they are not a reproduction of an installer timeout.
+
+The diagnostic-only `MSI feedback runner-fuse probe` workflow runs native AMD64 and ARM64
+complete/timeout controls through the same phase writer. Its separate verifier downloads the
+actual artifacts and checks the service's failed-step and timeout annotations, source revision,
+run/attempt, CPU, original source hashes and phase closure. Only the expected timeout probe may
+tolerate failure; the verifier and real installer jobs retain strict failure gating. Successful
+probe evidence establishes feedback transport. Installer correctness remains owned by the real
+MSI lifecycle. Both capture readers use one bounded byte reader and strict UTF-8 decoding; only
+a UTF-8 byte order mark is accepted. The journal keeps its 1-MiB bound and diagnostic JSON its
+64-KiB bound. Their contract tests preserve exact-limit inputs, incomplete journal rows and
+original writer output while rejecting invalid UTF-8 and UTF-16 byte order marks.

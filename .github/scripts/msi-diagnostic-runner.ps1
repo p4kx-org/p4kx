@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'portal-process.ps1')
 . (Join-Path $PSScriptRoot 'msi-diagnostic-phase.ps1')
+. (Join-Path $PSScriptRoot 'msi-diagnostic-budget.ps1')
 
 function Get-P4kxMsiWorkerArguments {
     param([string]$Script, [System.Collections.IDictionary]$Parameters, [string]$Location, [string]$NativeDirectory)
@@ -11,15 +12,6 @@ function Get-P4kxMsiWorkerArguments {
     }
     foreach ($value in @('-LifecycleWorker','-WorkerLocation',$Location,'-WorkerProcessDirectory',$NativeDirectory)) { $arguments.Add($value) }
     return ,$arguments.ToArray()
-}
-
-function Get-P4kxMsiWorkerBudget {
-    param([string]$Deadline)
-    $timestamp = [DateTimeOffset]::MinValue
-    if (-not [DateTimeOffset]::TryParseExact($Deadline, 'o', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$timestamp)) { throw 'Missing or invalid native MSI diagnostic deadline.' }
-    $remaining = [Math]::Floor(($timestamp-[DateTimeOffset]::UtcNow).TotalMilliseconds)
-    if ($remaining -le 0 -or $remaining -gt 35*60*1000) { throw 'Native MSI diagnostic deadline expired or exceeds its job budget.' }
-    return [int][Math]::Min(600000,$remaining)
 }
 
 function Write-P4kxMsiDiagnosticInputs {
@@ -39,7 +31,7 @@ function Write-P4kxMsiDiagnosticInputs {
 function Write-P4kxMsiDiagnosticSources {
     param([System.Collections.IDictionary]$Parameters, [string]$ScriptDirectory, [string]$Directory)
     $sources = @()
-    foreach ($name in @('check-msi.ps1','msi-diagnostic-runner.ps1','msi-diagnostic-phase.ps1','portal-process.ps1','package-process.ps1','msi-path-verification.ps1','msi-raw-fixture.ps1','msi-installation.ps1','msi-invocation.ps1','msi-database.ps1','msi-embedded-helper.ps1','check-package-runtime.ps1')) {
+    foreach ($name in @('check-msi.ps1','msi-diagnostic-runner.ps1','msi-diagnostic-budget.ps1','msi-diagnostic-phase.ps1','msi-diagnostic-utf8.ps1','portal-process.ps1','package-process.ps1','msi-path-verification.ps1','msi-raw-fixture.ps1','msi-installation.ps1','msi-invocation.ps1','msi-database.ps1','msi-embedded-helper.ps1','check-package-runtime.ps1')) {
         $sources += @{name=$name; sha256=(Get-FileHash -LiteralPath (Join-Path $ScriptDirectory $name) -Algorithm SHA256).Hash.ToLowerInvariant()}
     }
     @{schema=1; role='native-msi-diagnostic-sources'; revision=$env:GITHUB_SHA; run=$env:GITHUB_RUN_ID; attempt=$env:GITHUB_RUN_ATTEMPT; target=$Parameters['Target']; process_arch=[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString(); sources=$sources} |
