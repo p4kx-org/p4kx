@@ -90,7 +90,7 @@ pub struct Subresource {
 }
 
 /// Root file provenance and the public Build declaration.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[non_exhaustive]
 pub struct RootSource {
     /// Root file display path, using lossy Unicode conversion when needed.
@@ -101,6 +101,12 @@ pub struct RootSource {
     pub size: u64,
     /// Build fields as declared by the adjacent launcher manifest.
     pub build: Option<BuildProvenance>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) build_origin: Option<crate::origin_build::RootBuildOrigin>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) build_present: bool,
     /// Public source installation flags, absent when the layout provides none.
     pub installation_flags: Option<u8>,
     /// Total directory issues observed by the reader, including beyond its sample limit.
@@ -114,7 +120,7 @@ pub struct RootSource {
 }
 
 /// Public launcher Build fields without inferred values.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[non_exhaustive]
 pub struct BuildProvenance {
     /// Branch declaration.
@@ -127,6 +133,9 @@ pub struct BuildProvenance {
     pub build_id: String,
     /// Optional public patch supplied by the caller.
     pub public_patch: Option<String>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) canonical_shape: bool,
 }
 
 /// One retained source available to a provider during its callback.
@@ -191,12 +200,15 @@ pub(crate) fn root(archive: &Archive, digest: Digest, size: u64) -> RootSource {
         change_number: build.change_number().into(),
         build_id: build.build_id().into(),
         public_patch: build.public_patch().map(str::to_owned),
+        canonical_shape: true,
     });
     RootSource {
         path: archive.path().to_string_lossy().into_owned(),
         digest,
         size,
         build,
+        build_origin: None,
+        build_present: true,
         installation_flags: archive.installation_status().raw_flags(),
         directory_issue_count: archive.issue_count(),
         directory_issues: archive

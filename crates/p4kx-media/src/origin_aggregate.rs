@@ -147,7 +147,10 @@ const fn known_members(profile: OriginProfile) -> &'static [&'static str] {
             &["/data/payload/reason"]
         }
         OriginProfile::MaterialConfigurationFailure => &["/data/record_type"],
-        OriginProfile::ArchiveLayout | OriginProfile::Unmigrated => &[],
+        OriginProfile::ArchiveLayout
+        | OriginProfile::Unmigrated
+        | OriginProfile::ArchiveBuild
+        | OriginProfile::IndexBuild => &[],
     }
 }
 

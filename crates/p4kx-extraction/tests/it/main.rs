@@ -6,6 +6,7 @@
 mod animation_bounds;
 mod animation_listing;
 mod archive_change;
+mod build_manifest_origin;
 mod conflict_policy;
 mod conversion;
 mod coverage;

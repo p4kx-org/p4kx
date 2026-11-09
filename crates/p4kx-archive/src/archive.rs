@@ -10,6 +10,7 @@ use std::time::SystemTime;
 use p4kx_foundation::ArchiveKey;
 
 use crate::archive_metadata::ArchiveMetadata;
+use crate::build::{self, ObservedBuild};
 use crate::container::{self, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN};
 use crate::entry_identity::ContainerChain;
 use crate::format_error::FormatError;
@@ -18,8 +19,8 @@ use crate::key_slot::KeySlot;
 use crate::origin_ancestor::OriginAncestor;
 use crate::source::Source;
 use crate::{
-    ArchiveError, ArchiveInputOrigin, Build, Entry, EntryIssue, EntryReader, InstallationStatus,
-    OpenOptions, entry_reader, layout,
+    ArchiveError, ArchiveInputOrigin, Build, BuildManifestObservation, Entry, EntryIssue,
+    EntryReader, InstallationStatus, OpenOptions, entry_reader, layout,
 };
 
 mod key;
@@ -47,6 +48,7 @@ pub struct Archive {
     installation_flags: Option<u8>,
     metadata: ArchiveMetadata,
     build: Option<Build>,
+    build_manifest_observation: BuildManifestObservation,
     key: KeySlot,
 }
 
@@ -99,9 +101,9 @@ impl Archive {
             installation_flags,
             metadata,
         } = directory.map_err(|error| error.at(path))?;
-        let build = path
+        let observed = path
             .parent()
-            .and_then(|folder| Build::read_from(folder).ok().flatten());
+            .map_or_else(ObservedBuild::missing, build::read_observed);
         Ok(Self {
             path: path.to_path_buf(),
             location: path.to_path_buf(),
@@ -117,7 +119,8 @@ impl Archive {
             log,
             installation_flags,
             metadata,
-            build,
+            build: observed.build,
+            build_manifest_observation: observed.observation,
             key: KeySlot::with(options.key),
         })
     }
@@ -169,6 +172,7 @@ impl Archive {
                 installation_flags,
                 metadata,
                 build: self.build.clone(),
+                build_manifest_observation: self.build_manifest_observation.clone(),
                 key: self.key.clone(),
             }),
             Err(error) => Err(ArchiveError::Container {
@@ -264,6 +268,12 @@ impl Archive {
     #[must_use]
     pub const fn build(&self) -> Option<&Build> {
         self.build.as_ref()
+    }
+
+    /// Returns the eager original manifest-read observation shared by this Archive's containers.
+    #[must_use]
+    pub const fn build_manifest_observation(&self) -> &BuildManifestObservation {
+        &self.build_manifest_observation
     }
 
     /// Opens the decrypted and decompressed data of `entry`, which must be one of this Archive's

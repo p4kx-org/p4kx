@@ -6,6 +6,12 @@
 mod archive;
 mod archive_layout;
 mod budgets;
+mod build_origin_fixture;
+mod build_origin_index;
+mod build_origin_public;
+mod build_origin_record;
+mod build_origin_support;
+mod build_origin_tamper;
 mod capabilities;
 mod converted_artifact_failures;
 mod converted_artifact_support;

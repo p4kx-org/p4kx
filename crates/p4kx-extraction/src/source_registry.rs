@@ -6,10 +6,10 @@ use std::sync::Arc;
 
 use p4kx_archive::{ArchiveInputOrigin, ObservedEntryBinding};
 
-use crate::DataForgeFileOrigin;
 use crate::field_origin::FieldOrigin;
 use crate::source_archive_binding::ArchiveSourceBinding;
 use crate::source_details::SourceDetails;
+use crate::source_file_input::{FileInput, FileInputRef};
 use crate::source_inventory::{
     PhysicalSource, PhysicalSourceKind, PhysicalSourceRef, SourceEncryptionState,
 };
@@ -32,7 +32,7 @@ pub(crate) enum InputIdentity {
         source_refs: HashMap<ObservedEntryBinding, PhysicalSourceRef>,
     },
     ArchiveView(ArchiveSourceBinding),
-    File(DataForgeFileOrigin),
+    File(FileInput),
 }
 
 pub(crate) struct SourceRegistry {
@@ -74,19 +74,8 @@ impl SourceRegistry {
                 }
             }
 
-            SourceInput::File(origin) => {
-                let index = self.file_input(origin);
-                let id = PhysicalSourceRef(format!("f{index}"));
-                if !self.sources.contains_key(&id) {
-                    let source = source_registration::file(self, id.clone(), origin);
-                    self.sources.insert(id.clone(), source);
-                }
-                RegisteredSource {
-                    id,
-                    payload: SourceEncryptionState::Unknown,
-                    metadata: SourceEncryptionState::Unknown,
-                }
-            }
+            SourceInput::File(origin) => self.file(FileInputRef::DataForge(origin)),
+            SourceInput::BuildManifest(origin) => self.file(FileInputRef::BuildManifest(origin)),
             SourceInput::Unknown => {
                 let id = PhysicalSourceRef(format!("u{}", self.sources.len()));
                 self.unknown(id.clone(), Vec::new());
@@ -113,14 +102,28 @@ impl SourceRegistry {
         index
     }
 
-    fn file_input(&mut self, origin: &DataForgeFileOrigin) -> usize {
+    fn file(&mut self, origin: FileInputRef<'_>) -> RegisteredSource {
+        let index = self.file_input(origin);
+        let id = PhysicalSourceRef(format!("f{index}"));
+        if !self.sources.contains_key(&id) {
+            let source = source_registration::file(self, id.clone(), origin);
+            self.sources.insert(id.clone(), source);
+        }
+        RegisteredSource {
+            id,
+            payload: SourceEncryptionState::Unknown,
+            metadata: SourceEncryptionState::Unknown,
+        }
+    }
+
+    fn file_input(&mut self, origin: FileInputRef<'_>) -> usize {
         if let Some(index) = self.inputs.iter().position(
-            |known| matches!(known, InputIdentity::File(value) if value.is_same_input(origin)),
+            |known| matches!(known, InputIdentity::File(value) if origin.is_same_input(value)),
         ) {
             return index;
         }
         let index = self.inputs.len();
-        self.inputs.push(InputIdentity::File(origin.clone()));
+        self.inputs.push(InputIdentity::File(origin.into_owned()));
         index
     }
 

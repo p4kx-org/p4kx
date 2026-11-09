@@ -129,6 +129,7 @@ mod source_archive_binding;
 mod source_details;
 mod source_encryption_evidence;
 mod source_evidence_error;
+mod source_file_input;
 mod source_inventory;
 mod source_protection;
 mod source_provenance;
@@ -258,12 +259,13 @@ pub use output_file::{
 };
 pub use owned_output_failure::owned_output_failure;
 pub use p4kx_archive::{
-    Archive, ArchiveError, ArchiveInputOrigin, Build, BuildError, Checksum, Compression,
-    DemandScope, DosCalendar, DosTimestamp, EffectiveEncoding, Entry, EntryIssue, EntryMetadata,
-    EntryOrigin, EntryOriginStep, EntryReader, EntryRecordFormat, InstallationStatus, KeyCheck,
-    KeyDemand, KeyDemandSnapshot, MAX_COMPRESSION_RATIO, MAX_CONTAINER_DEPTH,
-    MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN, MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN,
-    OpenOptions, SourceEncryption, UnreadEntries, ZipHeaderMetadata,
+    Archive, ArchiveError, ArchiveInputOrigin, Build, BuildError, BuildManifestObservation,
+    BuildManifestOrigin, BuildManifestOutcome, Checksum, Compression, DemandScope, DosCalendar,
+    DosTimestamp, EffectiveEncoding, Entry, EntryIssue, EntryMetadata, EntryOrigin,
+    EntryOriginStep, EntryReader, EntryRecordFormat, InstallationStatus, KeyCheck, KeyDemand,
+    KeyDemandSnapshot, MAX_COMPRESSION_RATIO, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES,
+    MAX_CONTAINER_LEN, MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN, OpenOptions, SourceEncryption,
+    UnreadEntries, ZipHeaderMetadata,
 };
 pub use p4kx_archive::{
     ArchiveLayoutKind, ArchiveMetadata, ArchiveMetadataStatus, AvailableMetadataSpan,

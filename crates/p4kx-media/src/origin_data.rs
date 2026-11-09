@@ -37,7 +37,9 @@ pub(crate) fn scope(profile: OriginProfile, pointer: &str) -> ScopeMapping {
         | OriginProfile::MaterialConfigurationFailure => {
             crate::origin_material_profile::scope(profile, data)
         }
-        OriginProfile::Unmigrated => ScopeMapping::Unmapped,
+        OriginProfile::Unmigrated | OriginProfile::ArchiveBuild | OriginProfile::IndexBuild => {
+            ScopeMapping::Unmapped
+        }
     }
 }
 
@@ -115,7 +117,10 @@ pub(crate) fn independent(profile: OriginProfile, pointer: &str) -> bool {
         | OriginProfile::MaterialConfigurationFailure => {
             crate::origin_material_profile::independent(profile, pointer)
         }
-        OriginProfile::ArchiveEntry | OriginProfile::Unmigrated => false,
+        OriginProfile::ArchiveEntry
+        | OriginProfile::Unmigrated
+        | OriginProfile::ArchiveBuild
+        | OriginProfile::IndexBuild => false,
     }
 }
 

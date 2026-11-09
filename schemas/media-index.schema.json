@@ -597,6 +597,19 @@
             "type"
           ],
           "type": "object"
+        },
+        {
+          "description": "Canonical nullable Index.source.build projection, separately from the Index file.",
+          "properties": {
+            "type": {
+              "const": "indexBuild",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
         }
       ]
     },

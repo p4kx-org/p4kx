@@ -4,7 +4,7 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use p4kx_archive::{ArchiveInputOrigin, EntryOrigin, ObservedEntry};
+use p4kx_archive::{ArchiveInputOrigin, BuildManifestOrigin, EntryOrigin, ObservedEntry};
 
 use crate::DataForgeFileOrigin;
 use crate::source_details::SourceCoordinateOmission;
@@ -30,6 +30,8 @@ pub enum SourceInput<'a> {
     },
     /// An observed standalone file with unknown original P4K lineage.
     File(&'a DataForgeFileOrigin),
+    /// One completed original build-manifest read with unknown P4K lineage.
+    BuildManifest(&'a BuildManifestOrigin),
     /// An input without trusted physical binding.
     Unknown,
 }

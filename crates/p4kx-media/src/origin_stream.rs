@@ -41,6 +41,7 @@ impl<'a> OriginTransport<'a> {
             .collect();
         summaries.push(summary(OriginStream::Sources));
         summaries.push(summary(OriginStream::Artifacts));
+        summaries.push(summary(OriginStream::IndexBuild));
         Ok(Self {
             fields: Stream::create(root, "field-origins.jsonl".into(), &checkpoint)?,
             summaries,
@@ -82,6 +83,8 @@ impl<'a> OriginTransport<'a> {
             payload_depth(stream, self.max_depth),
             &mut |field| {
                 self.checkpoint.check()?;
+                let address = address(stream, field);
+                let field = address.as_ref();
                 let contribution = resolver.resolve(field, prepared)?;
                 let origin = contribution.field_origin();
                 observe(&mut coverage, &origin)?;
@@ -214,6 +217,16 @@ fn increment(value: DecimalU64, extra: u64) -> Result<DecimalU64, MediaError> {
 pub(crate) const fn payload_depth(stream: OriginStream, configured: u32) -> u32 {
     match stream {
         OriginStream::Records { .. } => configured,
-        OriginStream::Sources | OriginStream::Artifacts => crate::limits::MAX_VALUE_DEPTH,
+        OriginStream::Sources | OriginStream::Artifacts | OriginStream::IndexBuild => {
+            crate::limits::MAX_VALUE_DEPTH
+        }
+    }
+}
+
+pub(crate) fn address(stream: OriginStream, path: &str) -> std::borrow::Cow<'_, str> {
+    if stream == OriginStream::IndexBuild {
+        std::borrow::Cow::Owned(format!("/source/build{path}"))
+    } else {
+        std::borrow::Cow::Borrowed(path)
     }
 }

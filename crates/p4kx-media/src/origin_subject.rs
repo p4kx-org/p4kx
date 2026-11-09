@@ -9,13 +9,14 @@ pub(crate) enum OriginSubject<'a> {
     Record(&'a Source),
     Source(&'a Source),
     Artifact,
+    IndexBuild,
 }
 
 impl<'a> OriginSubject<'a> {
     pub(crate) const fn source_data(self) -> Option<&'a Source> {
         match self {
             Self::Record(source) | Self::Source(source) => Some(source),
-            Self::Artifact => None,
+            Self::Artifact | Self::IndexBuild => None,
         }
     }
 }

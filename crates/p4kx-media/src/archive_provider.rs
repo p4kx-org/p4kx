@@ -46,7 +46,7 @@ impl Provider for ArchiveProvider {
                 detail: issue.detail.clone(),
             })
             .collect();
-        writer.record(
+        writer.archive_root_record(
             &Subresource::new("archive-root", Vec::new()),
             if root.enumeration_complete {
                 Status::Complete

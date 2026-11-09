@@ -9,7 +9,8 @@ remaining carrier coverage belongs to #1125.
 
 `SourceUses` owns one physical-source/use inventory. `observe` accepts an actual
 Archive Entry origin, an observed standalone DataForge file, a completed whole-Archive
-file observation, or explicitly unknown input. Paths, equal decoded bytes, digest
+file observation, an original completed build-manifest read, or explicitly unknown
+input. Paths, equal decoded bytes, digest
 strings and serialized references do not establish that binding.
 
 `SourceScope::at` records an actual payload, selector or conversion contribution.
@@ -70,9 +71,10 @@ impose no global metadata, writer or schema quota.
 | Archive Entry | Actual indexed Entry, original containing Entries and stored declarations. |
 | Whole Archive file | Same opaque Archive input owner, distinct file identity and actual completed byte length; stored encryption is unknown without an honest declaration. |
 | Standalone DataForge file | Observed file identity and metadata; original P4K lineage is unknown. |
+| Build manifest | Same completed manifest read, basename and byte length; external File lineage is unknown, including malformed content. |
 | Unknown input | No trusted physical binding is claimed. |
 
-The whole-file observation belongs immediately after the existing completed hash/read
+The whole-Archive-file observation belongs immediately after the existing completed hash/read
 and source checkpoint. The producer checks the measured length against the owning
 Archive; it must not hash again, substitute an active Entry or reconstruct proof from
 the exported root digest. The root-file row is not an invented ancestor of every Entry.
@@ -117,6 +119,37 @@ optional full detail independently of these explicit fact states.
 `SourceEncryptionState::is_possible_from_evidence` checks the stored state through Archive's
 `SourceEncryption::possible_from_evidence`. Known unsupported format differs from unavailable
 format detail. These pure descriptions create no original runtime proof.
+
+## Build-manifest observations
+
+`Archive::build_manifest_observation` returns the cached observation from the eager
+manifest read performed when the root Archive opens. `BuildManifestOutcome`
+distinguishes `Missing`, `Unreadable`, `Parsed` and `Malformed`. Only the two
+completed-read outcomes provide a `BuildManifestOrigin`, including an empty or
+invalid-UTF-8 manifest that could not be parsed. Its `name` and `byte_length`
+getters retain the basename and the original completed byte count.
+
+`BuildManifestOrigin::is_same_input` compares original read ownership. Clones and
+containers share that owner; independent reads remain distinct even at the same
+path with identical bytes or equal Build values. Later manifest changes do not
+replace the cached observation. `Build` equality, public `Build::read_from`
+values/errors and its optional public-patch enrichment retain their own contracts.
+
+`SourceInput::BuildManifest` registers this original handle through the existing
+standalone `file` source kind and shared inventory. Payload and file-metadata
+encryption remain unknown because the external manifest proves no original P4K
+lineage. A standalone DataForge read of those same bytes has its own read identity.
+Paths, serialized Build fields, digests and source-use identifiers cannot recreate
+a completed-read handle.
+
+The Media producer binds that observation before provider callbacks. Its private
+inventory/root binding and bounded projection token check coherence of an
+already-bound Build; the token supplies no authority on its own. Deserialization
+restores no runtime binding. Missing/I/O observations are separate `Attempted`
+uses on unknown input. A malformed completed read can contribute to a generated
+null through its actual parse selector/conversion, without claiming a stored-null
+payload. The [Media Build carrier](media-export.md#build-declaration-origins)
+defines both output placements and their exact projection hash domain.
 
 ## Field-addressed descriptions
 

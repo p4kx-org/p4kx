@@ -39,6 +39,15 @@ impl OriginResolver<'_> {
         pointer: &str,
         prepared: Option<&PreparedRecordOrigins>,
     ) -> Result<OriginContributions, MediaError> {
+        if let Some(prepared) = prepared
+            && matches!(
+                prepared.profile(),
+                OriginProfile::ArchiveBuild | OriginProfile::IndexBuild
+            )
+            && let Some(actual) = prepared.visit(pointer)
+        {
+            return Ok(actual.clone());
+        }
         if let Some(aggregate) = origin_aggregate::resolve(self, pointer, prepared)? {
             if let Some(prepared) = prepared {
                 let _actual = prepared.visit(pointer);

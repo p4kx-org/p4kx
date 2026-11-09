@@ -22,6 +22,8 @@ mod archive_tables_read;
 mod artifact;
 mod artifact_extension;
 mod artifact_placement;
+mod build_projection;
+mod build_value_read;
 mod checkpoint;
 mod chunk;
 mod chunk_copy;
@@ -85,6 +87,8 @@ mod origin_aggregate_support;
 mod origin_archive;
 #[cfg(test)]
 mod origin_atomic_tests;
+mod origin_build;
+mod origin_build_map;
 mod origin_capture;
 #[cfg(test)]
 mod origin_capture_tests;
@@ -100,6 +104,11 @@ mod origin_depth_tests;
 mod origin_error;
 mod origin_fact_read;
 mod origin_index;
+mod origin_index_build_read;
+#[cfg(test)]
+mod origin_index_build_tests;
+#[cfg(test)]
+mod origin_index_test_support;
 mod origin_input;
 mod origin_inventory_read;
 #[cfg(test)]
@@ -162,6 +171,7 @@ mod required_input_fault_support;
 mod required_reader;
 mod retained_payload;
 mod retained_source;
+mod root_source_read;
 mod schema;
 mod schema_merge;
 #[cfg(test)]
@@ -194,6 +204,7 @@ mod traversal_projection;
 mod traversal_visit;
 #[cfg(test)]
 mod write_context_tests;
+mod writer_build_origins;
 mod writer_manifest;
 mod writer_origins;
 mod writer_record;

@@ -17,8 +17,7 @@ use crate::{Algorithm, ByteScope, Index, Limits, MediaError};
 
 use super::{Budget, Buffer, Counter, Encoding};
 
-#[path = "origin_index_test_support.rs"]
-mod support;
+use crate::origin_index_test_support as support;
 
 use support::TestResult;
 

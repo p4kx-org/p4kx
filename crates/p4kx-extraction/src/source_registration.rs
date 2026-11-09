@@ -5,6 +5,7 @@ use p4kx_archive::{
     EncryptionDeclarationSource, EntryOriginStep, EntryRecordFormat, StoredEncryptionDeclaration,
 };
 
+use crate::source_file_input::FileInputRef;
 use crate::source_inventory::{
     ArchiveEntrySource, ArchiveFileSource, FileSource, PhysicalSource, PhysicalSourceKind,
     PhysicalSourceRef, SourceDeclarationKind, SourceEncryptionDeclaration, SourceEncryptionState,
@@ -12,7 +13,7 @@ use crate::source_inventory::{
 };
 use crate::source_registry::SourceRegistry;
 use crate::source_value::{SourceValue, SourcedValue};
-use crate::{ArchiveByteRange, DataForgeFileOrigin, DecimalU64};
+use crate::{ArchiveByteRange, DecimalU64};
 
 pub(crate) fn archive(
     registry: &mut SourceRegistry,
@@ -116,19 +117,13 @@ fn declaration(
 pub(crate) fn file(
     registry: &mut SourceRegistry,
     id: PhysicalSourceRef,
-    origin: &DataForgeFileOrigin,
+    origin: FileInputRef<'_>,
 ) -> PhysicalSource {
-    let name = origin
-        .path()
-        .file_name()
-        .map_or(SourceValue::Absent, |name| {
-            SourceValue::Present(name.to_string_lossy().into_owned())
-        });
-    let name = registry.file_metadata_value(&id, "name".to_owned(), name);
+    let name = registry.file_metadata_value(&id, "name".to_owned(), origin.name());
     let byte_length = registry.file_metadata_value(
         &id,
         "byteLength".to_owned(),
-        SourceValue::Present(DecimalU64::new(origin.stamp().size())),
+        SourceValue::Present(DecimalU64::new(origin.byte_length())),
     );
     PhysicalSource {
         id,

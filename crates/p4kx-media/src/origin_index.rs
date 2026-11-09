@@ -294,7 +294,11 @@ fn streams() -> impl Iterator<Item = OriginStream> {
     ]
     .into_iter()
     .map(|kind| OriginStream::Records { kind })
-    .chain([OriginStream::Sources, OriginStream::Artifacts])
+    .chain([
+        OriginStream::Sources,
+        OriginStream::Artifacts,
+        OriginStream::IndexBuild,
+    ])
 }
 
 fn maximum_receipts() -> OriginReceipts {

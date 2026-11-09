@@ -94,6 +94,45 @@ remain binding: additive metadata with old-document defaults-to-unknown is not a
 Blender's own minor-version rule still applies. Keys/settings/discovery/static schemas are not game
 payload and receive no fabricated Entry flag.
 
+### Media Build carrier
+
+The original adjacent manifest is an external File with unknown P4K lineage.
+Archive caches its eager read outcome separately from Build value equality and
+public read errors. Only completed Parsed/Malformed reads create an opaque
+original-read owner with the observed basename and byte count; containers share
+that owner. Missing/Unreadable reads retain Attempted observations without a
+completed payload contributor. Equal paths, bytes, values or serialized metadata
+cannot create that runtime owner.
+
+Media binds the original observation before callbacks. A private inventory/root
+binding and bounded projection token check coherence of the already-bound value;
+the token cannot restore authority. Parsed members retain their own logical
+manifest Payload/Conversion plus the successful parse-shape Selector. Generated
+malformed null retains its actual parse Selector/Conversion without a fabricated
+stored-null Payload. Other RootSource metadata remains explicitly unmigrated.
+
+The Archive-root placement addresses `/data/build` under profile `archiveBuild`.
+Every fresh generation also emits stream/profile `indexBuild`, independently of
+Archive kind selection, at ordinal decimal string `"0"`. The latter addresses
+`/source/build` and hashes only the compact nullable typed Build value without a
+newline. An object has six nodes (root plus its five members); null has one.
+Both placements reuse original logical source uses. This projection digest is
+separate from whole-Index generation integrity.
+
+Declared indexBuild receipts require canonical actual object/null shape and exact
+hash, paths, node coverage, single occurrence, completion and EOF. Missing Build
+keys, missing nullable patch keys, unknown members and sequence-shaped objects
+cannot be normalized into certified current coverage. Historical absence of this
+scope stays unknown and can be reused as such or regenerated; it grants no missing
+proof. The existing Index base bound already includes the Build projection, so
+there is no new manifest input cap or payload-output budget.
+
+This extends the unreleased `p4kx.field-origins/1` capability while Media stays
+`1.0`. The 0.5.0 catalog writer emits schema `3` only. These three version
+contracts are independent. [Media export](../media-export.md#build-declaration-origins)
+and [shared observations](../source-contributions.md#build-manifest-observations)
+define the concrete carrier and runtime API.
+
 ## Proof required
 
 A synthetic Basetool consumer, another structured tool output and a field-addressed companion each prove immediate plain/encrypted/unknown fields in one row without global/row/provenanceRef recomputation. Synthetic cases cover v1/v2 recognized/missing/short/invalid-length/unknown/conflicting declarations,

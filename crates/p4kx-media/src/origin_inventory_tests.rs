@@ -53,10 +53,18 @@ fn attempted_and_reference_uses_cannot_supply_field_origins() -> TestResult {
         let fixture = Fixture::new()?;
         let mut index = fixture.index.clone();
         let mut rows = rows(&fixture, true)?;
-        rows.first_mut()
+        let reference = field_reference(&fixture)?;
+        let target = rows
+            .iter_mut()
+            .find(|row| row.get("id").and_then(Value::as_str) == Some(reference.as_str()))
             .and_then(Value::as_object_mut)
-            .ok_or("original shared use")?
-            .insert("role".into(), Value::String(role.into()));
+            .ok_or("actual contributing field use")?;
+        assert_ne!(
+            target.get("role").and_then(Value::as_str),
+            Some(role),
+            "the mutation changes an actual contributing field use"
+        );
+        target.insert("role".into(), Value::String(role.into()));
         rewrite(&fixture, &mut index, true, &rows)?;
         assert!(
             fixture.verify(&index).is_err(),
@@ -96,6 +104,21 @@ fn original_ancestor_and_use_source_references_are_closed() -> TestResult {
     Ok(())
 }
 
+fn field_reference(fixture: &Fixture) -> Result<String, Box<dyn std::error::Error>> {
+    let text = fs::read_to_string(fixture.root.join(&fixture.receipts().fields.path))?;
+    for line in text.lines() {
+        let row: Value = serde_json::from_str(line)?;
+        if let Some(reference) = row
+            .get("sourceUsesRefs")
+            .and_then(Value::as_array)
+            .and_then(|references| references.first())
+            .and_then(Value::as_str)
+        {
+            return Ok(reference.to_owned());
+        }
+    }
+    Err("the actual fixture has a contributing field use".into())
+}
 fn rows(fixture: &Fixture, uses: bool) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
     let artifact = if uses {
         &fixture.receipts().uses

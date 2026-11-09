@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::origin_contract::OriginProfile;
 use crate::origin_resolver::BuiltinOrigins;
 
 use p4kx_extraction::{FieldPath, SourceUses};
@@ -17,6 +18,7 @@ pub(crate) struct PreparedRecordOrigins {
     owner: SourceUses,
     addresses: OriginAddresses,
     builtin: Option<BuiltinOrigins>,
+    profile: Option<OriginProfile>,
 }
 
 impl PreparedRecordOrigins {
@@ -25,6 +27,7 @@ impl PreparedRecordOrigins {
             owner: owner.clone(),
             addresses: OriginAddresses::default(),
             builtin: None,
+            profile: None,
         }
     }
 
@@ -73,6 +76,20 @@ impl PreparedRecordOrigins {
             return Err(origin_error::foreign());
         }
         self.addresses.insert_subtree(path, contributions)
+    }
+
+    pub(crate) const fn set_profile(&mut self, profile: OriginProfile) {
+        self.profile = Some(profile);
+    }
+
+    pub(crate) const fn profile(&self) -> OriginProfile {
+        match &self.builtin {
+            Some(builtin) => builtin.profile,
+            None => match self.profile {
+                Some(profile) => profile,
+                None => OriginProfile::Unmigrated,
+            },
+        }
     }
 
     pub(crate) fn set_builtin(&mut self, builtin: BuiltinOrigins) -> Result<(), MediaError> {

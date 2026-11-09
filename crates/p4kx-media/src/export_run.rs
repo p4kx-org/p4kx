@@ -29,7 +29,7 @@ pub(crate) fn build(
         &checkpoint,
     )?;
     checkpoint.finish()?;
-    let root = source::root(archive, digest, size);
+    let mut root = source::root(archive, digest, size);
     let capabilities = providers
         .iter()
         .map(|provider| provider.capability())
@@ -42,8 +42,11 @@ pub(crate) fn build(
         options.diagnostic,
     )?;
     writer.origins.observe_root(archive, size)?;
+    writer.bind_build(archive, &mut root)?;
     root_callbacks(&root, providers, &mut writer)?;
     let entries = collect(archive, options, &root, providers, &mut writer)?;
+    writer.index_build(&root)?;
+    root.build_origin = None;
     let finished = writer.finish()?;
     let complete = root.enumeration_complete
         && finished

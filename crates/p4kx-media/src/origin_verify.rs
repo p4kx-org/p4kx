@@ -34,7 +34,7 @@ pub(crate) fn generation(
     };
     origin_index::validate_receipts(receipts)?;
     let inventory = ReadInventory::open(root, receipts, checkpoint, policy)?;
-    let mut payloads = PayloadStreams::open(root, index)?;
+    let mut payloads = PayloadStreams::open(root, index, checkpoint)?;
     let mut lines = OriginLines::open(root, &receipts.fields, checkpoint, policy.line_bytes)?;
     loop {
         match lines.next(RowSeed(policy.fields))? {
@@ -95,7 +95,15 @@ fn occurrence(
         fields = fields
             .checked_add(1)
             .ok_or_else(|| invalid("origin field count overflow"))?;
-        field(scope, path, inventory, lines, policy, &mut coverage)
+        let address = origin_stream::address(scope.stream, path);
+        field(
+            scope,
+            address.as_ref(),
+            inventory,
+            lines,
+            policy,
+            &mut coverage,
+        )
     })?;
     match lines.next(RowSeed(policy.fields))? {
         Some(ReadRow::End {
@@ -138,7 +146,10 @@ fn field(
 fn verify_profile(stream: OriginStream, profile: OriginProfile) -> Result<(), MediaError> {
     let valid = matches!(
         (stream, profile),
-        (_, OriginProfile::Unmigrated)
+        (
+            OriginStream::Records { .. } | OriginStream::Sources | OriginStream::Artifacts,
+            OriginProfile::Unmigrated
+        ) | (OriginStream::IndexBuild, OriginProfile::IndexBuild)
             | (
                 OriginStream::Records {
                     kind: MediaKind::Material
@@ -152,7 +163,9 @@ fn verify_profile(stream: OriginStream, profile: OriginProfile) -> Result<(), Me
                 OriginStream::Records {
                     kind: MediaKind::Archive
                 },
-                OriginProfile::ArchiveEntry | OriginProfile::ArchiveLayout,
+                OriginProfile::ArchiveEntry
+                    | OriginProfile::ArchiveLayout
+                    | OriginProfile::ArchiveBuild,
             )
             | (
                 OriginStream::Records {

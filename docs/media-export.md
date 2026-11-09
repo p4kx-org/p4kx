@@ -276,8 +276,10 @@ The first two files use the original shared PhysicalSource and SourceUseDescript
 they supplement the existing Media `sources.jsonl` and `artifacts.jsonl`.
 
 The field stream addresses every actual JSON node in each emitted record, source row and artifact
-row. An occurrence header supplies its closed stream kind, contiguous decimal-string ordinal,
-producer profile and SHA-256 of the original payload line including its newline. Field rows carry
+row, plus the nullable Build projection in the Index. Record/source/artifact occurrence headers
+supply their closed stream kind, contiguous decimal-string ordinal, producer profile and SHA-256
+of the original payload line including its newline. The Index Build projection has the separate
+hash domain defined below. Field rows carry
 absolute escaped RFC 6901 pointers and the immediate shared FieldOrigin:
 `containsEncryptedSource`, `sourceUsesRefs` and `sourceSetComplete`. Explicit end coverage
 counts and the terminal EOF preserve row and field multiplicities. Repeated equal artifacts may
@@ -304,7 +306,7 @@ independent of content, while filenames retain metadata origins. Actual parsed d
 syntax failures keep their consumed payload contributions. Literal configuration bounds and null
 counts do not acquire contributions from unused retained bytes.
 
-Root Build fields, general index fields, compiled shader-cache semantics and other provider
+Other RootSource and general Index fields, compiled shader-cache semantics and other provider
 carriers retain explicitly incomplete or unknown coverage in this slice. A profile name and
 per-occurrence coverage are separate from existing payload health and record status.
 The field writer walks the already-admitted original JSON line without constructing a JSON value
@@ -322,3 +324,55 @@ Reuse checks the receipts, payload-line hashes, exact addresses and ordinals, so
 coverage totals and EOF. Historical index files without this capability have unknown provenance;
 they cannot be reported as a freshly migrated current skip. The consumer's finite metadata
 policy is separate from producer admission and never changes the original payload bytes.
+
+### Build declaration origins
+
+A fresh generation emits an `indexBuild` occurrence even when the Archive provider
+is unselected. With the Archive provider selected, its root record also addresses
+the Build under `/data/build`; the Index carrier uses `/source/build`. Each has its
+own immediate field origins. Corresponding fields reuse the same original logical
+source-use references.
+
+The closed producer profiles are `archiveBuild` for the Archive-root record and
+`indexBuild` for the Index projection. The latter stream has exactly one
+occurrence with ordinal `"0"`. Its SHA-256 domain is the compact serialization of
+the nullable typed `Index.source.build` value, without a trailing newline.
+It does not certify the whole Index or its other metadata. Existing generation
+integrity separately binds the committed Index and companion receipts.
+
+| Actual Build value | Addressed nodes |
+| --- | --- |
+| Object | Six: `/source/build` and its `branch`, `version`, `change_number`, `build_id`, `public_patch` children. |
+| Explicit null | One: `/source/build`, without invented children. |
+
+The Archive-root placement uses the same child names below `/data/build`.
+The original adjacent manifest supplies `Data.Branch`, `Data.Version`,
+`Data.RequestedP4ChangeNum` and `Data.BuildId` in the `build-manifest` logical
+namespace. Each value retains its own Payload and JSON interpretation Conversion,
+plus the successful `required-shape` Selector. These coordinates name logical
+parser facts, not raw byte offsets. The Archive reader defaults `public_patch` to null as an independent
+tool value; a supplied value without its own binding remains unknown.
+
+The shared [Build-manifest observation](source-contributions.md#build-manifest-observations)
+retains the original completed read and byte count. Its wire source kind is
+`file`, with unknown original P4K lineage. Equal bytes, a matching path or a
+serialized Build cannot establish that original handle. A private coherence token
+only checks an already-bound value. Missing or unreadable manifests retain
+Attempted observations without contributing a completed File. Malformed completed
+reads retain their parse-outcome Selector and Conversion for the generated null,
+without inventing a stored-null Payload. Other RootSource fields remain unmigrated.
+
+The reader verifies this projection's hash, ordinal, full field paths, node count,
+single occurrence, completion and EOF against the committed receipts. A declared
+`indexBuild` scope requires the actual canonical object/null: missing `build` or
+`public_patch`, unknown Build members and a sequence-shaped Build are refused.
+Historical receipts without this particular scope retain unknown Build coverage;
+a verified historical skip preserves that absence, while regeneration emits the
+current carrier. Missing the entire origin capability still follows the existing
+historical-generation upgrade rule.
+
+This extends the unreleased `p4kx.field-origins/1` contract. Media stays at
+`p4kx-media` `1.0`; the catalog writer for 0.5.0 emits only schema `3`.
+The projection uses the existing Index/record bound: its compact nullable Build
+bytes are part of the Index base payload. It introduces no additional manifest
+input limit or payload-output allowance.

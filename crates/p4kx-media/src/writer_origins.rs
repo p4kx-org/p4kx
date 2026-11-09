@@ -97,7 +97,9 @@ impl MediaWriter<'_> {
             | OriginProfile::MaterialLibrary
             | OriginProfile::MaterialFailure
             | OriginProfile::MaterialSourceLimit
-            | OriginProfile::MaterialConfigurationFailure => {
+            | OriginProfile::MaterialConfigurationFailure
+            | OriginProfile::ArchiveBuild
+            | OriginProfile::IndexBuild => {
                 return Err(MediaError::Contract(
                     "shader producer used a foreign origin profile".into(),
                 ));
@@ -140,7 +142,10 @@ impl MediaWriter<'_> {
         };
         self.origin_transport.emit(
             OriginStream::Records { kind },
-            builtin.map_or(OriginProfile::Unmigrated, |builtin| builtin.profile),
+            prepared.map_or_else(
+                || builtin.map_or(OriginProfile::Unmigrated, |builtin| builtin.profile),
+                PreparedRecordOrigins::profile,
+            ),
             payload,
             &resolver,
             prepared,

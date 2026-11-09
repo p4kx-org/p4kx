@@ -32,6 +32,8 @@ pub(super) fn index() -> Index {
             },
             size: 0,
             build: None,
+            build_origin: None,
+            build_present: true,
             installation_flags: None,
             directory_issue_count: 0,
             directory_issues: Vec::new(),

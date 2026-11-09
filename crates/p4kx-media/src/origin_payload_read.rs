@@ -9,6 +9,7 @@ use sha2::{Digest as _, Sha256};
 
 use crate::checkpoint::Checkpoint;
 use crate::origin_contract::{OriginScope, OriginStream, OriginStreamSummary};
+use crate::origin_index_build_read::IndexBuildPayload;
 use crate::{Artifact, Index, MediaError, error, hashing};
 
 struct PayloadStream {
@@ -23,10 +24,15 @@ struct PayloadStream {
 pub(crate) struct PayloadStreams {
     streams: Vec<PayloadStream>,
     record_bytes: u64,
+    index_build: Option<IndexBuildPayload>,
 }
 
 impl PayloadStreams {
-    pub(crate) fn open(root: &Path, index: &Index) -> Result<Self, MediaError> {
+    pub(crate) fn open(
+        root: &Path,
+        index: &Index,
+        checkpoint: Checkpoint<'_>,
+    ) -> Result<Self, MediaError> {
         let mut streams = Vec::new();
         for kind in &index.kinds {
             let stream = OriginStream::Records {
@@ -60,6 +66,7 @@ impl PayloadStreams {
         Ok(Self {
             streams,
             record_bytes: index.limits.record_bytes,
+            index_build: IndexBuildPayload::open(index, checkpoint)?,
         })
     }
 
@@ -70,6 +77,13 @@ impl PayloadStreams {
         checkpoint: Checkpoint<'_>,
     ) -> Result<Vec<u8>, MediaError> {
         checkpoint.check()?;
+        if scope.stream == OriginStream::IndexBuild {
+            return self
+                .index_build
+                .as_mut()
+                .ok_or_else(|| invalid("Index Build scope is not declared"))?
+                .occurrence(scope, expected_hash);
+        }
         let record_bytes = self.record_bytes;
         let stream = self.find(scope.stream)?;
         if scope.ordinal.get() != stream.occurrences {
@@ -85,10 +99,7 @@ impl PayloadStreams {
         if bytes.is_empty() || bytes.last() != Some(&b'\n') || bytes.len() as u64 > record_bytes {
             return Err(invalid("origin occurrence has no admitted payload row"));
         }
-        if expected_hash.len() != 64 || hashing::hex(Sha256::digest(&bytes).into()) != expected_hash
-        {
-            return Err(invalid("origin occurrence payload hash mismatch"));
-        }
+        verify_hash(&bytes, expected_hash)?;
         stream.occurrences = stream
             .occurrences
             .checked_add(1)
@@ -98,6 +109,13 @@ impl PayloadStreams {
     }
 
     pub(crate) fn fields(&mut self, stream: OriginStream, count: u64) -> Result<(), MediaError> {
+        if stream == OriginStream::IndexBuild {
+            return self
+                .index_build
+                .as_mut()
+                .ok_or_else(|| invalid("Index Build scope is not declared"))?
+                .fields(count);
+        }
         let stream = self.find(stream)?;
         stream.fields = stream
             .fields
@@ -111,7 +129,7 @@ impl PayloadStreams {
         summaries: &[OriginStreamSummary],
         checkpoint: Checkpoint<'_>,
     ) -> Result<(), MediaError> {
-        if summaries.len() != self.streams.len() {
+        if summaries.len() != self.streams.len() + usize::from(self.index_build.is_some()) {
             return Err(invalid(
                 "origin summary does not cover every payload stream",
             ));
@@ -144,6 +162,9 @@ impl PayloadStreams {
                 ));
             }
         }
+        if let Some(index_build) = &self.index_build {
+            index_build.finish(summaries)?;
+        }
         Ok(())
     }
 
@@ -174,4 +195,11 @@ fn open_stream(
 
 fn invalid(message: &str) -> MediaError {
     MediaError::Destination(message.to_owned())
+}
+
+pub(crate) fn verify_hash(bytes: &[u8], expected_hash: &str) -> Result<(), MediaError> {
+    if expected_hash.len() != 64 || hashing::hex(Sha256::digest(bytes).into()) != expected_hash {
+        return Err(invalid("origin occurrence payload hash mismatch"));
+    }
+    Ok(())
 }

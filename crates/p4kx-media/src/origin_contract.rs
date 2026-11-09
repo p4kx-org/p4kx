@@ -30,6 +30,8 @@ pub enum OriginStream {
     Sources,
     /// Actual artifact-manifest row occurrences.
     Artifacts,
+    /// Canonical nullable Index.source.build projection, separately from the Index file.
+    IndexBuild,
 }
 
 /// The exact stream-local position of an emitted payload row.
@@ -74,6 +76,10 @@ pub enum OriginProfile {
     MaterialSourceLimit,
     /// Invalid material reader configuration without a content contribution.
     MaterialConfigurationFailure,
+    /// Original manifest-backed Build members within the Archive-root record.
+    ArchiveBuild,
+    /// Original manifest-backed nullable Build projection in the Index.
+    IndexBuild,
 }
 
 /// Exact occurrence and field counts for one payload stream.
