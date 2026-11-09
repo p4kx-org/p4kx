@@ -1,10 +1,11 @@
+#requires -Version 7.5
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'msi-diagnostic-phase.ps1')
 . (Join-Path $PSScriptRoot 'msi-diagnostic-utf8.ps1')
 
 function Read-P4kxMsiProbeJson([string]$Path) {
     $text=Read-P4kxMsiDiagnosticUtf8 $Path 65536 'Probe JSON exceeds its fixed diagnostic bound.'
-    return $text | ConvertFrom-Json -AsHashtable -Depth 8
+    return $text | ConvertFrom-Json -AsHashtable -Depth 8 -DateKind String
 }
 function Assert-P4kxMsiProbeBinding {
     param([hashtable]$Value,[string]$Target,[string]$Mode,[string]$Revision,[string]$Head,[string]$Run,[string]$Attempt)

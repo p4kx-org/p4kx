@@ -205,8 +205,12 @@ tolerate failure; the verifier and real installer jobs retain strict failure gat
 probe evidence establishes feedback transport. Installer correctness remains owned by the real
 MSI lifecycle. Both capture readers use one bounded byte reader and strict UTF-8 decoding; only
 a UTF-8 byte order mark is accepted. The journal keeps its 1-MiB bound and diagnostic JSON its
-64-KiB bound. Their contract tests preserve exact-limit inputs, incomplete journal rows and
-original writer output while rejecting invalid UTF-8 and UTF-16 byte order marks.
+64-KiB bound. The diagnostic JSON reader requires PowerShell 7.5 or newer and preserves timestamp
+strings with `ConvertFrom-Json -DateKind String`; original precision and offsets reach the strict
+budget parser unchanged under every culture. This requirement belongs to the CI diagnostic
+scripts; the released Rust applications do not require PowerShell. Their contract tests preserve
+exact-limit inputs, incomplete journal rows and original writer output while rejecting invalid
+UTF-8 and UTF-16 byte order marks.
 
 
 ### Dynamic parent-chain feedback experiment
