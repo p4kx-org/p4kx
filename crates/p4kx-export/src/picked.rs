@@ -3,11 +3,11 @@
 
 use p4kx_extraction::{Guid, RecordTree};
 
-use crate::blueprint_category::blueprint_category;
+use crate::blueprint_category::BlueprintCategory;
 use crate::contract::{
-    BlueprintCategory, Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition,
-    MineableElement, MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup,
-    ResourceType, Ship, StarmapObject, SubHarvestableMultiConfig,
+    Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
+    MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup, ResourceType, Ship,
+    StarmapObject, SubHarvestableMultiConfig,
 };
 use crate::crafter::crafter;
 use crate::crafting_warning::CraftingWarning;
@@ -86,7 +86,6 @@ impl<'f> Picked<'f> {
                 Self::Item(item, line, carries_ports(tree))
             }
             Kind::Crafters => return crafter(tree).map(Self::Crafter),
-            Kind::BlueprintCategories => Self::BlueprintCategory(blueprint_category(tree, texts)),
             Kind::MineableElements => Self::Mineable(mineable_element(tree)),
             Kind::RefiningProcesses => Self::Refining(refining_process(tree, texts)),
             Kind::MineableCompositions => Self::Composition(mineable_composition(tree, texts)),
@@ -115,6 +114,7 @@ impl<'f> Picked<'f> {
             | Kind::ResourceGroups
             | Kind::ResourceTypes
             | Kind::Blueprints
+            | Kind::BlueprintCategories
             | Kind::GameplayProperties
             | Kind::QualityDistributions
             | Kind::QualityQuantizations

@@ -17,7 +17,7 @@ pub(crate) use crate::commodity_contract::Commodity;
 pub(crate) use crate::contract_cargo::CargoManifest;
 pub(crate) use crate::contract_completeness::{Completeness, KindCompleteness};
 pub(crate) use crate::contract_crafter::Crafter;
-pub(crate) use crate::contract_crafting::{Blueprint, BlueprintCategory, Ingredient};
+pub(crate) use crate::contract_crafting::{Blueprint, Ingredient};
 pub(crate) use crate::contract_entities::{Item, Paint, Ship};
 pub(crate) use crate::contract_harvest::{HarvestableLocation, HarvestableProviderPreset};
 pub(crate) use crate::contract_harvest_config::SubHarvestableMultiConfig;
@@ -85,8 +85,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) provenance: SourceInventory,
     /// Public short-name and protected game-text tables.
     pub(crate) texts: CatalogTexts<'a>,
-    /// The blueprint categories, ordered by GUID.
-    pub(crate) blueprint_categories: Vec<BlueprintCategory<'a>>,
     /// The gameplay property definitions the quality modifiers refer to, ordered by GUID.
     pub(crate) gameplay_properties: Vec<GameplayProperty<'a>>,
     /// The blueprint pools with the places that reward them, ordered by GUID.

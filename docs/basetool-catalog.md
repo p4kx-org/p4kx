@@ -18,7 +18,7 @@ carriers is part of the breaking v3 migration, not an additive change to the rel
 
 Every catalog kind and the shared CLI/GUI JSON and compressed catalog writers use version 3.
 The implemented canonical-table/per-value-origin step covers ResourceTypes, ResourceGroups, Commodities,
-Manufacturers, global Tag definitions/root declarations, owning Entity GUID-tag declarations,
+Manufacturers, BlueprintCategories, global Tag definitions/root declarations, owning Entity GUID-tag declarations,
 and their documented nested values, convenience paths, presentation and text rows. Other catalog
 families retain their current shapes; migration of all families and tool-output carriers remains
 in progress. The complete target is
@@ -201,7 +201,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the sourced definition carriers |
 | `blueprints` | The crafting blueprints with their ingredients, all tiers, default availability and dismantle link, ordered by GUID |
 | `definitions.resourceGroups`, `declarations.resourceGroupMembers`, `projections.resourceGroupParents` | Physical group definitions, every ordered authored membership and the first-selected parent with direct per-value origins ([contract](catalog-resource-groups.md)) |
-| `blueprintCategories` | The blueprint categories, the targets of `categoryGuid`, ordered by GUID |
+| `definitions.blueprintCategories` | Source-family availability and physical fieldless category rows with the shared eight sourced header fields in GUID order |
 | `gameplayProperties` | The gameplay properties the quality modifiers refer to, ordered by GUID |
 | `definitions.qualityDistributions` | Physical distribution and location-override source declarations with exact numbers and immediate per-field origins ([contract](catalog-quality.md)) |
 | `definitions.qualityQuantizations`, `projections.qualityQuantizationResources` | Ordered raw bands, explicit eligibility and the genuine first-eligible nominal-GUID resource inverse ([contract](catalog-quality.md)) |
@@ -784,7 +784,7 @@ A blueprint (`CraftingBlueprintRecord`) takes its fields from `blueprint`:
 |-------|--------|
 | `className`, `key` | The Record name without its type, e.g. `BP_CRAFT_behr_lmg_ballistic_01_mag`; both hold it |
 | `name` | `blueprintName` |
-| `categoryGuid` | The GUID `category` links to, the `guid` of a `blueprintCategories` entry; `null` without a category or when that Record is a left-out development leftover or unreadable |
+| `categoryGuid` | The GUID `category` links to, the `guid.value` of a `definitions.blueprintCategories.rows` entry; `null` without a category or when that Record is a left-out development leftover or unreadable |
 | `producedItemGuid` | The GUID `processSpecificData.entityClass` links to; `null` for a Reference to a Record the DataForge lacks |
 | `craftTimeSeconds` | `costs.craftTime` of the first tier (`days`, `hours`, `minutes`, `seconds`) in whole seconds, rounded |
 | `ingredients` | The costs of the first tier, see below |
@@ -835,17 +835,29 @@ all distinct selected direct memberships sorted by GUID. Thumbnail paths remain 
 cataloging does not extract the media. No parallel root resourceGroups array is emitted. See the
 [ResourceGroup contract](catalog-resource-groups.md) for identity, provenance and health details.
 
-A blueprint category (`BlueprintCategoryRecord`, 21 on LIVE) is the target of the `categoryGuid` of
-a blueprint. The Record holds no field at all, so the category has `guid`, `className` (e.g.
-`FPSArmours`, `VehicleComponentS2`), `recordPath` and a `name` without a key, which stays `null`
-until the game adds one; the game localises no category. Categories do not nest: the Record has no
-parent, and the `BlueprintCategoryDatabaseRecord` beside them only lists them. Some categories
-carry no blueprint on LIVE (`FuseBattery`, `Medical`, `Utility`, and the examples `Example1`,
-`Example2`, `DismantleExample1` and `RefiningExample1`); they stay, as the kind is complete by
-Record.
+`definitions.blueprintCategories` holds the selected readable physical `BlueprintCategoryRecord`
+definitions as an `availability`/`rows` table. A declared family with no selected rows is
+`available` with an empty list; a missing family is `absent`. Unavailable family metadata remains
+`unavailable`, independently of source-read failures reported in `exportHealth`. Categories use
+the existing path/type, Filter and development-leftover selection. Rows remain in GUID order;
+equal GUIDs retain their original physical order and distinct `recordIndex` values.
 
-Every `typeGuid` of a commodity and every `categoryGuid` of a blueprint resolves to a `guid` of
-`definitions.resourceGroups` or `blueprintCategories` (checked against LIVE; a commodity without a
+The Record declares no body fields. Each row therefore contains only the
+[shared eight-field Record header](catalog-record-headers.md), with the immediate per-datum
+origin marker on every field. There is no fabricated `name` or text-table row, parent or category
+rule. A readable unexpected body field is diagnosed and blocks normal publication; diagnostic
+publication retains the header row and the exact field diagnosis. A failed strict tree read
+produces no category row and remains a source-read failure.
+
+The old flat root list is absent. Its `guid`, `className` and `recordPath` values are now the
+corresponding sourced fields' `value` in `definitions.blueprintCategories.rows`. The additional
+raw name, exact filename, physical index, source type and metadata-tag state come from the actual
+header. `BlueprintCategoryDatabaseRecord.categories` is a separate ordered listing owner; it does
+not declare rules or a category hierarchy.
+
+Every `typeGuid` of a commodity and every `categoryGuid` of a blueprint resolves to a `guid.value`
+in `definitions.resourceGroups.rows` or `definitions.blueprintCategories.rows` (checked against
+LIVE; a commodity without a
 `ResourceType` or group, 1 on LIVE, and a blueprint without a category or whose category is a
 left-out leftover or unreadable have `null`; a commodity whose `ResourceType` only a leftover or
 unreadable group lists has a `null` `typeGuid`). Only selected groups affect group and commodity
@@ -2185,8 +2197,8 @@ it accepts:
 
 A rule (`blueprintCategoryAvailability` of a queue and `condition` of a modifier) has `kind`, the
 name of the struct as `structName` (`null` for `none`) and `blueprintCategoryGuids`, the `guid`s of
-the Records the struct's `categories` link to, in stored order; these are `blueprintCategories`
-entries, unless a Filter left the entry out of that kind. A rule that is `none` or `unknown` has
+the Records the struct's `categories` link to, in stored order; these are
+`definitions.blueprintCategories.rows` entries, unless a Filter left the entry out of that kind. A rule that is `none` or `unknown` has
 no GUIDs.
 
 #### Modifiers
@@ -2743,7 +2755,7 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   `resourceGuid` and `itemGuid` resolves to a catalog entry; no GUID occurs twice.
 - Every commodity `typeGuid` resolves to a `definitions.resourceGroups` entry, every chosen group
   parent in `projections.resourceGroupParents` to another one, and every blueprint `categoryGuid`
-  to a `blueprintCategories` entry. On LIVE the
+  to a `definitions.blueprintCategories.rows` entry. On LIVE the
   catalog holds 19 groups (8 of them nested) and 21 categories, 14 of which carry blueprints.
 - Texts that carry a key (placeholder keys excluded), checked per kind against the Archive's own
   `global.ini` files (ADR-0270): a key a file holds resolves in the catalog, a key it lacks is

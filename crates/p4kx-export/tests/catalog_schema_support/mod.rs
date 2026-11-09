@@ -6,6 +6,7 @@
 use p4kx_extraction::SourceValue;
 use serde_json::{Value, json};
 
+mod blueprint_categories;
 mod blueprints;
 mod brokers;
 mod commodities;
@@ -180,19 +181,14 @@ pub(crate) fn minimal_catalog() -> Value {
                 "tierIndex": 0
             }
         }],
-        "definitions": {"qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
+        "definitions": {"blueprintCategories": blueprint_categories::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
             "tags": tags::definitions()},
         "declarations": {"tagRoots": tags::roots(), "entityTags": tags::entities(), "resourceGroupMembers": resource_groups::members()},
         "texts": {"publicNames": public_names(), "gameTexts": []},
         "projections": {"qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents()},
         "provenance": {"sources": [], "uses": []},
-        "blueprintCategories": [{
-            "guid": "d1000000-0000-4000-8000-000000000001",
-            "className": "Ammo",
-            "recordPath": "libs/foundry/records/crafting/blueprintcategories/blueprintcategorydatabase",
-            "name": {"key": null, "en": null, "de": null}
-        }],
+
         "gameplayProperties": [{
             "guid": "e1000000-0000-4000-8000-000000000001",
             "className": "GPP_Armor",

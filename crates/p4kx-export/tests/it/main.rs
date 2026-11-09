@@ -5,6 +5,12 @@
 
 #![recursion_limit = "256"]
 
+mod blueprint_category_v3_contract;
+mod blueprint_category_v3_failures;
+mod blueprint_category_v3_fixture;
+mod blueprint_category_v3_origins;
+mod blueprint_category_v3_parity;
+mod blueprint_category_v3_selection;
 mod canonical_header;
 mod canonical_header_fixture;
 mod canonical_header_origin;

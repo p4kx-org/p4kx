@@ -3,7 +3,7 @@
 
 //! The crafting stations in the Basetool catalog, through the public API.
 
-use crate::catalog_crafting_support::commodity;
+use crate::catalog_crafting_support::{blueprint_categories, commodity};
 use crate::crafters_fixture::{
     BENCH, BROKEN, CATEGORY_A, CATEGORY_B, FABRICATOR, HOST_SHIP, MODIFIED, MOUNTED, ODD,
     SELF_SHIP, write_archive,
@@ -250,7 +250,7 @@ fn a_time_modifier_with_a_category_condition_and_the_queue_rules_are_exported_as
         json!([true, false, true])
     );
     assert_eq!(entry["issues"], json!([]));
-    let categories = class_names(&catalog, "blueprintCategories");
+    let categories = blueprint_categories::class_names(&catalog)?;
     assert_eq!(
         categories,
         ["category_a", "category_b"],

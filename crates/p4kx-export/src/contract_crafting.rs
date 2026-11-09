@@ -23,7 +23,7 @@ pub(crate) struct Blueprint<'a> {
     pub(crate) key: &'a str,
     /// The name, from `CraftingBlueprint.blueprintName`.
     pub(crate) name: LocalisedText<'a>,
-    /// The GUID of the category Record, the `guid` of a `blueprintCategories` entry; `null`
+    /// The category Record GUID in `definitions.blueprintCategories`; `null`
     /// without a category or when its Record is a left-out leftover or unreadable.
     pub(crate) category_guid: Option<CatalogGuid>,
     /// The GUID of the entity the blueprint produces, `null` without one or for a Reference to
@@ -65,20 +65,4 @@ pub(crate) struct Ingredient<'a> {
     pub(crate) slot: Option<&'a str>,
     /// The localisation key of the slot name, `null` without one or for a placeholder.
     pub(crate) slot_key: Option<&'a str>,
-}
-
-/// A blueprint category: a `BlueprintCategoryRecord` Record under `crafting/blueprintcategories`,
-/// the target of the `categoryGuid` of a blueprint.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct BlueprintCategory<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `FPSArmours`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The name; the Record holds no field for one, so the key is `null`.
-    pub(crate) name: LocalisedText<'a>,
 }

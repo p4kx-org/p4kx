@@ -269,6 +269,10 @@ fn assemble<R>(
             ),
         },
         definitions: CatalogDefinitions {
+            blueprint_categories: crate::blueprint_category::table(
+                &forge,
+                collected.blueprint_categories,
+            ),
             quality_distributions: CatalogTable::new(
                 &forge,
                 &[
@@ -300,7 +304,6 @@ fn assemble<R>(
         },
         texts: projection.finish()?,
         provenance: origins.uses.freeze()?,
-        blueprint_categories: collected.blueprint_categories,
         gameplay_properties: collected.gameplay_properties,
         blueprint_pools: collected.blueprint_pools,
         dismantle_processes: collected.dismantle_processes,

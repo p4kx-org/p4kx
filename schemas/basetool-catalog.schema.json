@@ -768,7 +768,7 @@
               "type": "null"
             }
           ],
-          "description": "The GUID of the category Record, the `guid` of a `blueprintCategories` entry; `null`\nwithout a category or when its Record is a left-out leftover or unreadable."
+          "description": "The category Record GUID in `definitions.blueprintCategories`; `null`\nwithout a category or when its Record is a left-out leftover or unreadable."
         },
         "className": {
           "description": "The Record name without its type, e.g. `BP_CRAFT_behr_lmg_ballistic_01_mag`.",
@@ -855,31 +855,43 @@
       ],
       "type": "object"
     },
-    "BlueprintCategory": {
-      "description": "A blueprint category: a `BlueprintCategoryRecord` Record under `crafting/blueprintcategories`,\nthe target of the `categoryGuid` of a blueprint.",
+    "BlueprintCategoryDefinition": {
+      "description": "One physical fieldless `BlueprintCategoryRecord` definition with directly sourced metadata.",
       "properties": {
         "className": {
-          "description": "The Record name without its type, e.g. `FPSArmours`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
         },
-        "name": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The name; the Record holds no field for one, so the key is `null`."
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
         "className",
+        "fileName",
         "guid",
-        "name",
-        "recordPath"
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -1803,6 +1815,9 @@
     "CatalogDefinitions": {
       "description": "Canonical typed definitions with distinct physical identities and source scopes.",
       "properties": {
+        "blueprintCategories": {
+          "$ref": "#/$defs/CatalogTableOfBlueprintCategoryDefinition"
+        },
         "commodities": {
           "$ref": "#/$defs/CatalogTableOfCommodityDefinition"
         },
@@ -1826,6 +1841,7 @@
         }
       },
       "required": [
+        "blueprintCategories",
         "commodities",
         "manufacturers",
         "qualityDistributions",
@@ -1901,6 +1917,25 @@
         "status",
         "targetRecordIndex",
         "targetType"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfBlueprintCategoryDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/BlueprintCategoryDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
       ],
       "type": "object"
     },
@@ -2197,7 +2232,7 @@
       "description": "A polymorphic struct that names blueprint categories: the condition of a modifier or the\navailability of a queue.",
       "properties": {
         "blueprintCategoryGuids": {
-          "description": "The `guid`s of the `blueprintCategories` entries `categories` links to, in stored order;\n`[]` for `none` and `unknown`.",
+          "description": "Category Record GUIDs in `definitions.blueprintCategories.rows`, in stored order;\n`[]` for `none` and `unknown`.",
           "items": {
             "$ref": "#/$defs/Guid"
           },
@@ -27283,13 +27318,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "The Basetool catalog: the game data the basetool's P4K import reads.",
   "properties": {
-    "blueprintCategories": {
-      "description": "The blueprint categories, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/BlueprintCategory"
-      },
-      "type": "array"
-    },
     "blueprintPools": {
       "description": "The blueprint pools with the places that reward them, ordered by GUID.",
       "items": {
@@ -27647,7 +27675,6 @@
     }
   },
   "required": [
-    "blueprintCategories",
     "blueprintPools",
     "blueprints",
     "cargoManifests",

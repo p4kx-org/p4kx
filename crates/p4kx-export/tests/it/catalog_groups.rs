@@ -4,11 +4,10 @@
 //! Resource groups and blueprint categories of the Basetool catalog, through the public API.
 
 use crate::catalog_crafting_support::commodity::{self, TextDomain};
-use crate::catalog_crafting_support::groups;
+use crate::catalog_crafting_support::{blueprint_categories, groups};
 use crate::commodity_v3_fixture::at;
 use crate::crafting_fixture;
 
-use std::collections::HashSet;
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -34,27 +33,17 @@ fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error
 }
 
 fn class_names<'a>(catalog: &'a Value, kind: &str) -> Result<Vec<&'a str>, Box<dyn Error>> {
-    let entries = if kind == "resourceGroups" {
-        groups::definitions(catalog)?
-    } else {
-        catalog
-            .get(kind)
-            .and_then(Value::as_array)
-            .map(Vec::as_slice)
-            .ok_or("required fixture kind")?
-    };
-    let path = if kind == "resourceGroups" {
-        "/className/value"
-    } else {
-        "/className"
+    let entries = match kind {
+        "resourceGroups" => groups::definitions(catalog)?,
+        "blueprintCategories" => blueprint_categories::rows(catalog)?,
+        _ => return Err("unknown group/category fixture family".into()),
     };
     entries
         .iter()
         .map(|entry| {
-            entry
-                .pointer(path)
-                .and_then(Value::as_str)
-                .ok_or_else(|| "required fixture class name".into())
+            crate::commodity_v3_fixture::payload(entry, "className")?
+                .as_str()
+                .ok_or_else(|| "required canonical class name".into())
         })
         .collect()
 }
@@ -145,32 +134,24 @@ fn blueprint_categories_are_the_category_records_without_leftovers() -> TestResu
         Some((2, 1, true)),
         "counts"
     );
-    assert_eq!(
-        catalog["blueprintCategories"][0],
-        json!({
-            "guid": "d1000000-0000-4000-8000-000000000001",
-            "className": "Ammo",
-            "recordPath": "libs/foundry/records/crafting/blueprintcategories/blueprintcategorydatabase",
-            "name": {"key": null, "en": null, "de": null},
-        }),
-        "the Record holds no name"
-    );
+    let row = blueprint_categories::rows(&catalog)?
+        .first()
+        .ok_or("the Ammo category")?;
+    blueprint_categories::assert_header(
+        row,
+        &crafting_fixture::database(),
+        "d1000000-0000-4000-8000-000000000001",
+        "Ammo",
+        "libs/foundry/records/crafting/blueprintcategories/blueprintcategorydatabase",
+    )?;
     Ok(())
 }
 
 #[test]
 fn every_type_guid_and_category_guid_resolves_to_an_entry() -> TestResult {
     let (_, catalog) = build(None)?;
-    let guids = |kind: &str| -> HashSet<&str> {
-        catalog[kind]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|entry| entry["guid"].as_str())
-            .collect()
-    };
     let groups = groups::guids(&catalog)?;
-    let categories = guids("blueprintCategories");
+    let categories = blueprint_categories::guids(&catalog)?;
     let types: Vec<&str> = catalog["projections"]["commodityPresentation"]["rows"]
         .as_array()
         .into_iter()

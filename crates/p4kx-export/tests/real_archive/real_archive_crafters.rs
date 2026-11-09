@@ -17,6 +17,8 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::{Value, json};
 
+use crate::catalog_v3_consumer;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const FABRICATOR_PATH: &str = "libs/foundry/records/entities/basebuilding/interactables/\
@@ -60,12 +62,10 @@ fn the_crafters_of_a_real_archive_resolve_their_categories_and_report_nothing_un
     let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
     let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let categories: HashSet<&str> = catalog["blueprintCategories"]
-        .as_array()
-        .ok_or("the blueprint categories")?
+    let categories = catalog_v3_consumer::rows(&catalog, Kind::BlueprintCategories)?
         .iter()
-        .filter_map(|category| category["guid"].as_str())
-        .collect();
+        .map(|category| catalog_v3_consumer::identity(category, Kind::BlueprintCategories))
+        .collect::<Result<HashSet<_>, _>>()?;
     let guids_resolve = |rule: &Value| {
         !matches!(
             rule["kind"].as_str(),

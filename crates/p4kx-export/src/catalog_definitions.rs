@@ -4,6 +4,7 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::blueprint_category::BlueprintCategoryDefinition;
 use crate::catalog_table::CatalogTable;
 use crate::commodity_contract::CommodityDefinition;
 use crate::manufacturer::ManufacturerDefinition;
@@ -18,6 +19,7 @@ use crate::schema_fields::every_field_required;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogDefinitions<'source> {
+    pub(crate) blueprint_categories: CatalogTable<BlueprintCategoryDefinition<'source>>,
     pub(crate) quality_distributions: CatalogTable<QualityDistributionDefinition<'source>>,
     pub(crate) quality_quantizations: CatalogTable<QualityQuantizationDefinition<'source>>,
     pub(crate) tags: CatalogTable<super::tag_catalog::TagDefinition<'source>>,

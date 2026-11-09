@@ -66,6 +66,10 @@ impl<'f> Scan<'_, '_, 'f> {
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
         let (picked, notes) = match kind {
+            Kind::BlueprintCategories => {
+                let read = crate::blueprint_category::read(tree, self.projection)?;
+                (Picked::BlueprintCategory(read.value), read.notes)
+            }
             Kind::Manufacturers => {
                 let read = crate::manufacturer::read(tree, self.projection)?;
                 (Picked::Manufacturer(Box::new(read.value)), read.notes)

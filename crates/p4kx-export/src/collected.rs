@@ -5,14 +5,14 @@ use std::collections::HashSet;
 
 use p4kx_extraction::Guid;
 
-use crate::blueprint_category::unlink_categories;
+use crate::blueprint_category::{BlueprintCategory, unlink_categories};
 use crate::catalog_crafting::CraftingKinds;
 use crate::contract::{
-    Blueprint, BlueprintCategory, BlueprintPool, BrokerEntry, Commodity, ContractEntry, Crafter,
-    CraftingGlobal, DismantleProcess, GameplayProperty, HarvestableLocation,
-    HarvestableProviderPreset, Item, Loadout, LootContainer, MineableComposition, MineableElement,
-    MineableEntity, MiningGlobalParams, Paint, RefiningProcess, ResourceGroup, ResourceType, Ship,
-    Shop, StarmapObject, SubHarvestableMultiConfig,
+    Blueprint, BlueprintPool, BrokerEntry, Commodity, ContractEntry, Crafter, CraftingGlobal,
+    DismantleProcess, GameplayProperty, HarvestableLocation, HarvestableProviderPreset, Item,
+    Loadout, LootContainer, MineableComposition, MineableElement, MineableEntity,
+    MiningGlobalParams, Paint, RefiningProcess, ResourceGroup, ResourceType, Ship, Shop,
+    StarmapObject, SubHarvestableMultiConfig,
 };
 use crate::contract_template::ContractTemplate;
 use crate::crafting_warning::CraftingWarning;

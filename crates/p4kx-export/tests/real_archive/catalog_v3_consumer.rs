@@ -25,6 +25,9 @@ pub(crate) fn named_rows<'catalog>(
         .find(|kind| kind.name() == name)
         .ok_or("unknown catalog Kind")?;
     match kind {
+        Kind::BlueprintCategories => {
+            checked_table(catalog, kind, "/definitions/blueprintCategories")
+        }
         Kind::Manufacturers => checked_table(catalog, kind, "/definitions/manufacturers"),
         Kind::QualityDistributions => {
             checked_table(catalog, kind, "/definitions/qualityDistributions")
@@ -54,6 +57,9 @@ fn checked_table<'catalog>(
     let rows = table(catalog, path)?;
     for row in rows {
         identity(row, kind)?;
+        if kind == Kind::BlueprintCategories {
+            category_header(row)?;
+        }
     }
     Ok(rows)
 }
@@ -134,7 +140,8 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
         .ok_or_else(|| format!("required {kind} field {name}"))?;
     if matches!(
         kind,
-        Kind::Manufacturers
+        Kind::BlueprintCategories
+            | Kind::Manufacturers
             | Kind::Commodities
             | Kind::ResourceTypes
             | Kind::ResourceGroups
@@ -210,4 +217,32 @@ pub(crate) fn nullable_guid(carrier: &Value) -> TestResult<Option<&str>> {
         }
         _ => Err("nullable GUID choice must be a string or null".into()),
     }
+}
+
+fn category_header(row: &Value) -> TestResult<()> {
+    for name in [
+        "guid",
+        "recordName",
+        "className",
+        "recordPath",
+        "recordIndex",
+        "sourceType",
+        "fileName",
+        "metadataTag",
+    ] {
+        let value = source_value(row.get(name).ok_or("required category header carrier")?)?;
+        if let Some(value) = value {
+            let valid = if name == "recordIndex" {
+                value
+                    .as_u64()
+                    .is_some_and(|index| u32::try_from(index).is_ok())
+            } else {
+                value.is_string()
+            };
+            if !valid {
+                return Err("category header source payload type".into());
+            }
+        }
+    }
+    Ok(())
 }

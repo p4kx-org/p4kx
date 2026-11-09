@@ -153,7 +153,6 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         "items",
         "ships",
         "blueprints",
-        "blueprintCategories",
         "gameplayProperties",
         "blueprintPools",
         "dismantleProcesses",
@@ -173,7 +172,7 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         validator.is_valid(&unknown_manufacturer),
         "unknown manufacturer fields"
     );
-    assert_unknown_commodity_fields(&validator, &catalog)?;
+    assert_unknown_canonical_fields(&validator, &catalog)?;
 
     let mut unknown_kind = catalog.clone();
     unknown_kind["starmap"] = json!([{"guid": "x"}]);
@@ -375,8 +374,9 @@ fn the_crafting_fields_accept_additions_and_new_closed_values_but_stay_required(
     Ok(())
 }
 
-fn assert_unknown_commodity_fields(validator: &Validator, catalog: &Value) -> TestResult {
+fn assert_unknown_canonical_fields(validator: &Validator, catalog: &Value) -> TestResult {
     for pointer in [
+        "/definitions/blueprintCategories/rows/0",
         "/definitions/commodities/rows/0",
         "/projections/commodityPresentation/rows/0",
     ] {
@@ -384,7 +384,7 @@ fn assert_unknown_commodity_fields(validator: &Validator, catalog: &Value) -> Te
         unknown
             .pointer_mut(pointer)
             .and_then(Value::as_object_mut)
-            .ok_or("the canonical Commodity row")?
+            .ok_or("the canonical row")?
             .insert("extra".to_owned(), json!(true));
         assert!(validator.is_valid(&unknown), "unknown fields in {pointer}");
     }

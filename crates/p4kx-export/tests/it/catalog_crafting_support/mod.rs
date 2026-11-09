@@ -3,6 +3,7 @@
 
 //! Building and reading the catalog of a synthetic Archive for the crafting catalog tests.
 
+pub(crate) mod blueprint_categories;
 pub(crate) mod commodity;
 pub(crate) mod groups;
 mod resource_v3_view;

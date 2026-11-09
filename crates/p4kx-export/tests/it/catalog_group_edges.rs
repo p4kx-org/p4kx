@@ -3,10 +3,9 @@
 
 //! Edge cases of resource groups and blueprint categories: leftovers, unreadable groups, cycles.
 
-use crate::catalog_crafting_support::{commodity, groups};
+use crate::catalog_crafting_support::{blueprint_categories, commodity, groups};
 use crate::crafting_fixture;
 
-use std::collections::HashSet;
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -344,12 +343,7 @@ fn a_blueprint_whose_category_is_a_leftover_has_no_category_guid() -> TestResult
         ),
     );
     let (_, catalog) = build_from(&crafting_fixture::database().record(orphan), None)?;
-    let categories: HashSet<&str> = catalog["blueprintCategories"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|category| category["guid"].as_str())
-        .collect();
+    let categories = blueprint_categories::guids(&catalog)?;
     let blueprints = catalog["blueprints"].as_array().ok_or("blueprints")?;
     let orphan = blueprints
         .iter()

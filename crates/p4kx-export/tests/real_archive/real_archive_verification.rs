@@ -6,6 +6,9 @@
 //! `--ignored` when `P4KX_DATA_P4K` names one; the test of the second Channel returns early
 //! while `P4KX_DATA_P4K_B` is unset.
 
+#[path = "real_archive_definition_identity.rs"]
+mod definition_identity;
+
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io::Read;
@@ -173,13 +176,13 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
         assert_eq!(guids.len(), entities.len(), "{kind} all have a {own}");
         if matches!(
             kind,
-            Kind::QualityDistributions | Kind::QualityQuantizations
+            Kind::BlueprintCategories | Kind::QualityDistributions | Kind::QualityQuantizations
         ) {
             assert!(
                 guids.is_sorted(),
                 "{kind} orders nominal GUIDs while retaining physical alternatives"
             );
-            check_quality_identity(&catalog, kind)?;
+            definition_identity::check(&catalog, kind)?;
         } else {
             assert!(
                 guids.is_sorted_by(|a, b| a < b),
@@ -234,9 +237,9 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
     for kind in kinds {
         if matches!(
             kind,
-            Kind::QualityDistributions | Kind::QualityQuantizations
+            Kind::BlueprintCategories | Kind::QualityDistributions | Kind::QualityQuantizations
         ) {
-            check_quality_identity(catalog, kind)?;
+            definition_identity::check(catalog, kind)?;
             continue;
         }
         let mut family = HashSet::new();
@@ -299,9 +302,20 @@ fn check_leftovers(catalog: &Value) -> TestResult {
     for kind in Kind::ALL {
         for entity in list(catalog, kind)? {
             for field in ["recordPath", "className"] {
+                if kind == Kind::BlueprintCategories && field == "className" {
+                    let carrier = entity.get(field).ok_or("required category class carrier")?;
+                    if matches!(
+                        carrier.get("state").and_then(Value::as_str),
+                        Some("absent" | "null")
+                    ) {
+                        catalog_v3_consumer::source_value(carrier)?;
+                        continue;
+                    }
+                }
                 let text = if matches!(
                     kind,
-                    Kind::Manufacturers
+                    Kind::BlueprintCategories
+                        | Kind::Manufacturers
                         | Kind::Commodities
                         | Kind::ResourceTypes
                         | Kind::QualityDistributions
@@ -365,36 +379,4 @@ fn the_catalog_of_a_second_real_archive_is_complete_plausible_and_within_the_lim
         return Ok(());
     };
     real_archive_catalog_links::check(&verify_catalog(&path, false)?)
-}
-
-fn check_quality_identity(catalog: &Value, kind: Kind) -> TestResult {
-    let mut physical = HashSet::new();
-    let mut order = Vec::new();
-    for row in list(catalog, kind)? {
-        let index = catalog_v3_consumer::field(row, kind, "recordIndex")?
-            .as_u64()
-            .ok_or("original physical Record index")?;
-        if !physical.insert(index) {
-            return Err("one physical quality definition cannot occur twice".into());
-        }
-        let source_type = catalog_v3_consumer::field(row, kind, "sourceType")?
-            .as_str()
-            .ok_or("quality source type")?;
-        let matching = match kind {
-            Kind::QualityDistributions => matches!(
-                source_type,
-                "CraftingQualityDistributionRecord" | "CraftingQualityLocationOverrideRecord"
-            ),
-            Kind::QualityQuantizations => source_type == "CraftingQualityQuantizationRecord",
-            _ => false,
-        };
-        if !matching {
-            return Err("a physical quality row belongs to its declared source family".into());
-        }
-        order.push((catalog_v3_consumer::identity(row, kind)?, index));
-    }
-    if !order.is_sorted() {
-        return Err("equal nominal GUIDs keep increasing original physical positions".into());
-    }
-    Ok(())
 }
