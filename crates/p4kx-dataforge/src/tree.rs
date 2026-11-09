@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::{Field, Guid, Location, Step, StructValue, Value, ValueError};
+use crate::{Field, Guid, Location, RecordMetadata, Step, StructValue, Value, ValueError};
 
 /// The canonical tree of one Record: its GUID, record path, name and root struct with the fields.
 ///
@@ -9,6 +9,7 @@ use crate::{Field, Guid, Location, Step, StructValue, Value, ValueError};
 #[derive(Debug, Clone, PartialEq)]
 pub struct RecordTree<'f> {
     pub(crate) record_index: u32,
+    pub(crate) metadata: RecordMetadata<'f>,
     pub(crate) guid: Guid,
     pub(crate) record_path: &'f str,
     pub(crate) name: &'f str,
@@ -17,6 +18,12 @@ pub struct RecordTree<'f> {
 }
 
 impl<'f> RecordTree<'f> {
+    /// Returns original borrowed metadata independently of normalized legacy header getters.
+    #[must_use]
+    pub const fn metadata(&self) -> RecordMetadata<'f> {
+        self.metadata
+    }
+
     /// Returns the owning Record position in source definition order.
     #[must_use]
     pub const fn record_index(&self) -> u32 {

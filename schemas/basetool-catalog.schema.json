@@ -2520,11 +2520,20 @@
         "entity": {
           "$ref": "#/$defs/SourcedValueOfCommodityAuthoring"
         },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "recordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -2545,8 +2554,11 @@
       "required": [
         "className",
         "entity",
+        "fileName",
         "guid",
+        "metadataTag",
         "recordIndex",
+        "recordName",
         "recordPath",
         "selection",
         "selectionDiagnostics",
@@ -4763,8 +4775,14 @@
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -4784,7 +4802,9 @@
       },
       "required": [
         "className",
+        "fileName",
         "guid",
+        "metadataTag",
         "recordIndex",
         "recordName",
         "recordPath",
@@ -10612,11 +10632,17 @@
         "code": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
         "localization": {
           "$ref": "#/$defs/SourcedValueOfManufacturerLocalization"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -10634,8 +10660,10 @@
       "required": [
         "className",
         "code",
+        "fileName",
         "guid",
         "localization",
+        "metadataTag",
         "recordIndex",
         "recordName",
         "recordPath",
@@ -15096,8 +15124,14 @@
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "x-gameText": true
         },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "name": {
           "$ref": "#/$defs/SourcedValueOfPublicNameRef"
@@ -15120,7 +15154,9 @@
         "defaultThumbnailPath",
         "defaultThumbnailPathSVG",
         "description",
+        "fileName",
         "guid",
+        "metadataTag",
         "name",
         "recordIndex",
         "recordName",
@@ -15816,17 +15852,29 @@
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "x-gameText": true
         },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "groupGuids": {
           "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGuid"
         },
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "name": {
           "$ref": "#/$defs/SourcedValueOfPublicNameRef"
         },
         "properties": {
           "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceProperty"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -15836,6 +15884,9 @@
         },
         "rttThumbnailEntityClass": {
           "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "validateDefaultCargoBox": {
           "$ref": "#/$defs/SourcedValueOfboolean"
@@ -15848,13 +15899,18 @@
         "defaultThumbnailPathSVG",
         "density",
         "description",
+        "fileName",
         "groupGuids",
         "guid",
+        "metadataTag",
         "name",
         "properties",
+        "recordIndex",
+        "recordName",
         "recordPath",
         "refinedVersion",
         "rttThumbnailEntityClass",
+        "sourceType",
         "validateDefaultCargoBox"
       ],
       "type": "object"
@@ -26017,11 +26073,17 @@
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
         "legacyGuid": {
           "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -26042,8 +26104,10 @@
       "required": [
         "children",
         "className",
+        "fileName",
         "guid",
         "legacyGuid",
+        "metadataTag",
         "recordIndex",
         "recordName",
         "recordPath",
@@ -26225,8 +26289,14 @@
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -26246,7 +26316,9 @@
       },
       "required": [
         "className",
+        "fileName",
         "guid",
+        "metadataTag",
         "recordIndex",
         "recordName",
         "recordPath",

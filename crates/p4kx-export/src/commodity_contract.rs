@@ -5,6 +5,7 @@ use p4kx_extraction::{SourceUse, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::commodity_authoring_contract::CommodityAuthoring;
 use crate::guid_text::CatalogGuid;
@@ -15,11 +16,8 @@ use crate::schema_fields::every_field_required;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CommodityDefinition<'source> {
-    pub(crate) guid: SourcedValue<CatalogGuid>,
-    pub(crate) class_name: SourcedValue<&'source str>,
-    pub(crate) record_path: SourcedValue<&'source str>,
-    pub(crate) record_index: SourcedValue<u32>,
-    pub(crate) source_type: SourcedValue<&'source str>,
+    #[serde(flatten)]
+    pub(crate) source: CanonicalRecordHeader<'source>,
     pub(crate) selection: SourcedValue<CommoditySelection>,
     pub(crate) selection_diagnostics: Vec<CommoditySelectionDiagnostic>,
     pub(crate) entity: SourcedValue<CommodityAuthoring<'source>>,

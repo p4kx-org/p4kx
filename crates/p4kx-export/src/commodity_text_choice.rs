@@ -7,7 +7,7 @@ use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::commodity_inputs::CommodityInputs;
-use crate::commodity_text_input::CommodityTextInput;
+use crate::commodity_text_input::{CommodityTextInput, CommodityTextSelector};
 
 /// Returns whether the original own key permits consulting the resource fallback.
 #[must_use]
@@ -94,7 +94,14 @@ fn decision(
     input: &CommodityTextInput<'_>,
 ) -> Result<(), CatalogError> {
     for selector in &input.selectors {
-        inputs.at(input.record_index, selector, SourceUseRole::Selector)?;
+        match selector {
+            CommodityTextSelector::Body(path) => {
+                inputs.at(input.record_index, path, SourceUseRole::Selector)?;
+            }
+            CommodityTextSelector::Header(field) => {
+                inputs.header(input.record_index, *field, SourceUseRole::Selector)?;
+            }
+        }
     }
     inputs.field(
         input.record_index,

@@ -9,6 +9,7 @@ use crate::CatalogError;
 use crate::catalog_read::CatalogRecordContext;
 use crate::definition_reference::DefinitionStatus;
 use crate::guid_text::CatalogGuid;
+use crate::record_header_field::RecordHeaderField;
 use crate::schema_fields;
 
 /// A Record link with independently sourced target-header fields.
@@ -35,11 +36,17 @@ impl CatalogRecordReference {
         let target = context.at_record(index);
         context.reference_observation(path)?;
         Ok(Self {
-            target_record_index: target.selector("$recordIndex", SourceValue::Present(index))?,
+            target_record_index: target
+                .header_selector(RecordHeaderField::RecordIndex, SourceValue::Present(index))?,
             guid: context.value(path, SourceValue::Present(guid))?,
-            record_path: target
-                .selector("$recordPath", SourceValue::Present(record_path.to_owned()))?,
-            target_type: target.selector("$type", SourceValue::Present(target_type.to_owned()))?,
+            record_path: target.header_conversion(
+                RecordHeaderField::FileName,
+                SourceValue::Present(record_path.to_owned()),
+            )?,
+            target_type: target.header_selector(
+                RecordHeaderField::SourceType,
+                SourceValue::Present(target_type.to_owned()),
+            )?,
             status: DefinitionStatus::Present,
         })
     }

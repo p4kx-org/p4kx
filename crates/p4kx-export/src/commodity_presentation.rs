@@ -12,6 +12,7 @@ use crate::commodity_source;
 use crate::commodity_text_choice;
 use crate::commodity_text_input::CommodityTextInput;
 use crate::guid_text::CatalogGuid;
+use crate::record_header_field::RecordHeaderField;
 use crate::resource_group::Groups;
 use crate::source_fields::FieldError;
 
@@ -105,9 +106,10 @@ impl<'read, 'context, 'source> CommodityPresentationContext<'read, 'context, 'so
         let origins = self.projection.origins();
         let subtype = subtype_guid.value().copied().flatten();
         Ok(CommodityPresentation {
-            commodity_guid: origins
-                .record(tree.record_index())
-                .value("$guid", SourceValue::Present(CatalogGuid(tree.guid())))?,
+            commodity_guid: origins.record(tree.record_index()).header_value(
+                RecordHeaderField::Guid,
+                SourceValue::Present(CatalogGuid(tree.guid())),
+            )?,
             name: texts.name,
             description: texts.description,
             display_type: texts.display_type,

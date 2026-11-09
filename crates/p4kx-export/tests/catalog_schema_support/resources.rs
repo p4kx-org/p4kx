@@ -11,6 +11,11 @@ pub(super) fn table() -> Value {
             "availability": "available",
             "rows": [{
                 "guid": present(json!("00000000-0000-0000-0000-000000007001")),
+                "recordName": present(json!("ResourceType.FixtureResource")),
+                "recordIndex": present(json!(4)),
+                "sourceType": present(json!("ResourceType")),
+                "fileName": present(json!("libs/foundry/records/resourcetypedatabase/fixture_resource.xml")),
+                "metadataTag": source(SourceValue::Absent),
                 "className": present(json!("FixtureResource")),
                 "recordPath": present(json!("libs/foundry/records/resourcetypedatabase/fixture_resource")),
                 "name": source(SourceValue::Absent),

@@ -6,6 +6,7 @@ use p4kx_extraction::{SourceLocation, SourceUseRole, SourceValue, SourcedValue};
 use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
 use crate::guid_text::CatalogGuid;
+use crate::record_header_field::RecordHeaderField;
 use crate::resource_group::ResourceMemberships;
 
 /// Binds every selected membership to its actual group GUID and authored list position.
@@ -15,10 +16,7 @@ pub(crate) fn values(
     resource_index: u32,
 ) -> Result<SourcedValue<Vec<SourcedValue<CatalogGuid>>>, CatalogError> {
     let selector = origins.dataforge.at(
-        SourceLocation::DataForge {
-            record_index: resource_index,
-            field: "$guid".to_owned(),
-        },
+        RecordHeaderField::Guid.location(resource_index),
         SourceUseRole::Selector,
     )?;
     let mut all_uses = vec![selector.clone()];
@@ -27,10 +25,7 @@ pub(crate) fn values(
         let mut uses = vec![selector.clone()];
         for source in member.sources {
             uses.push(origins.dataforge.at(
-                SourceLocation::DataForge {
-                    record_index: source.record_index,
-                    field: "$guid".to_owned(),
-                },
+                RecordHeaderField::Guid.location(source.record_index),
                 SourceUseRole::Payload,
             )?);
             uses.push(origins.dataforge.at(

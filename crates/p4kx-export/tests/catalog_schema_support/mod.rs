@@ -323,6 +323,8 @@ fn manufacturer() -> Value {
     json!({"availability": "available", "rows": [{
         "guid": source_values::present(json!("cfc0122d-5275-415a-a656-3dcb3346feb5")),
         "recordName": source_values::present(json!("SCItemManufacturer.ACAS")),
+        "fileName": source_values::present(json!("libs/foundry/records/scitemmanufacturer/acas.xml")),
+        "metadataTag": source_values::source(SourceValue::Absent),
         "className": source_values::present(json!("ACAS")),
         "recordPath": source_values::present(json!("libs/foundry/records/scitemmanufacturer/acas")),
         "recordIndex": source_values::present(json!(0)),

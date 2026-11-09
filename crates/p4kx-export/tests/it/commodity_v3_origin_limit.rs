@@ -8,6 +8,7 @@ use crate::commodity_v3_fixture::{self as fixture, DcbOrigin, TestResult};
 use crate::commodity_v3_origin_limit_fixture::{self as limit_fixture, COST_COUNT};
 use crate::commodity_v3_origin_payload as payload;
 use crate::commodity_v3_source;
+use crate::commodity_v3_source_inventory::SourceField;
 
 #[test]
 fn capture_limit_keeps_payload_and_publication_complete() -> TestResult {
@@ -132,8 +133,7 @@ fn assert_retained_inputs(catalog: &Value, row: &Value) -> TestResult {
         .iter()
         .filter(|(index, path, role)| {
             *index == limit_fixture::BLUEPRINT_INDEX
-                && path.starts_with("blueprint.tiers[0].recipe.costs.optionalCosts[")
-                && path.ends_with(".resource")
+                && matches!(path, SourceField::Body(path) if path.starts_with("blueprint.tiers[0].recipe.costs.optionalCosts[") && path.ends_with(".resource"))
                 && role == "selector"
         })
         .count();

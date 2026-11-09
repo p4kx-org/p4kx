@@ -7,8 +7,22 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as fixture, TestResult};
 
-/// One physical DataForge use addressed by Record index, field and role.
-pub(crate) type Use = (u64, String, String);
+/// An original body site or a separately addressed Record-header field.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum SourceField {
+    Body(String),
+    Header(String),
+}
+
+pub(crate) fn body(path: &str) -> SourceField {
+    SourceField::Body(path.to_owned())
+}
+pub(crate) fn header(field: &str) -> SourceField {
+    SourceField::Header(field.to_owned())
+}
+
+/// One original source use with explicit body/header distinction and role.
+pub(crate) type Use = (u64, SourceField, String);
 
 /// Resolves each immediate use through the actual product inventory.
 pub(crate) fn uses(catalog: &Value, carrier: &Value) -> TestResult<BTreeSet<Use>> {
@@ -56,11 +70,6 @@ fn physical_use(used: &Value, source: &Value) -> TestResult<Use> {
         "no locale or host path is promoted to a DCB fact"
     );
     assert_eq!(
-        fixture::at(used, "/location/type")?,
-        &json!("dataForge"),
-        "physical facts retain their DataForge location kind"
-    );
-    assert_eq!(
         fixture::at(used, "/scope")?,
         &json!("payload"),
         "the DCB byte domain is explicit"
@@ -70,17 +79,57 @@ fn physical_use(used: &Value, source: &Value) -> TestResult<Use> {
         matches!(role, "payload" | "selector" | "conversion"),
         "attempted and untouched references are not actual contributors"
     );
-    Ok((
-        fixture::at(used, "/location/recordIndex")?
-            .as_u64()
-            .ok_or("physical Record index")?,
-        fixture::at(used, "/location/field")?
-            .as_str()
-            .ok_or("field path")?
-            .to_owned(),
-        role.to_owned(),
-    ))
+    let (record_index, field) = physical_field(used)?;
+    Ok((record_index, field, role.to_owned()))
 }
+fn physical_field(used: &Value) -> TestResult<(u64, SourceField)> {
+    let field = fixture::at(used, "/location/field")?
+        .as_str()
+        .ok_or("original field")?;
+    match fixture::at(used, "/location/type")?.as_str() {
+        Some("dataForge") => Ok((
+            fixture::at(used, "/location/recordIndex")?
+                .as_u64()
+                .ok_or("body Record index")?,
+            body(field),
+        )),
+        Some("subresource") => {
+            assert_eq!(
+                fixture::at(used, "/location/namespace")?,
+                &json!("dataforgeRecordHeader"),
+                "the only admitted subresource is the original Record-header namespace"
+            );
+            let indices = fixture::at(used, "/location/indices")?
+                .as_array()
+                .ok_or("header position")?;
+            assert_eq!(
+                indices.len(),
+                1,
+                "one original physical Record index owns the header"
+            );
+            let index = indices
+                .first()
+                .and_then(Value::as_str)
+                .ok_or("decimal header index")?
+                .parse::<u32>()?;
+            assert!(
+                matches!(
+                    field,
+                    "guid"
+                        | "recordName"
+                        | "recordIndex"
+                        | "sourceType"
+                        | "fileName"
+                        | "metadataTag"
+                ),
+                "a derived name/path is never invented as a stored header field"
+            );
+            Ok((u64::from(index), header(field)))
+        }
+        _ => Err("unexpected physical source coordinate".into()),
+    }
+}
+
 /// Checks that every source-use reference closes in the catalog inventory.
 pub(crate) fn reference_closure(catalog: &Value) -> TestResult {
     let ids: BTreeSet<_> = fixture::at(catalog, "/provenance/uses")?

@@ -5,9 +5,11 @@ use std::collections::HashMap;
 use std::ptr;
 use std::sync::Arc;
 
+use crate::RecordMetadata;
 use crate::dataforge::out_of_range;
 use crate::layout::{FieldSlot, Layout, Layouts};
 use crate::scalar::{first_bytes, read_scalar};
+use crate::strings;
 use crate::{
     DataForge, DataForgeError, DataType, Field, Guid, Location, Record, RecordTree, Step,
     StructValue, Value, ValueError, ValueKind,
@@ -94,9 +96,13 @@ impl<'f> TreeBuilder<'f> {
         let def = record.def;
         let instance = u32::from(def.instance_index);
         let layout = self.layouts.get(forge, def.struct_index)?;
-        let record_path = record.record_path()?;
-        let name = record.name()?;
-        let tag = record.tag()?.filter(|tag| !tag.is_empty());
+        let file_name = record.stored_file_name()?;
+        let name = record.stored_name()?;
+        let tag = record.stored_tag()?;
+        let metadata = RecordMetadata::new(file_name, name, tag);
+        let record_path = strings::strip_xml(file_name);
+        let name = metadata.legacy_name();
+        let tag = metadata.legacy_tag();
         let bytes = forge.instance(def.struct_index, instance).ok_or_else(|| {
             out_of_range("Record", record.index as usize, "instance", instance.into())
         })?;
@@ -104,6 +110,7 @@ impl<'f> TreeBuilder<'f> {
         let fields = self.fields(forge, &layout, bytes, 0)?;
         let mut tree = RecordTree {
             record_index: record.index(),
+            metadata,
             guid: Guid::from_stored(def.guid),
             record_path,
             name,

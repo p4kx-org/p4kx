@@ -4,6 +4,7 @@
 use p4kx_extraction::{RecordTree, SourceValue, SourcedValue, StructValue};
 
 use crate::CatalogError;
+use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::{CatalogFields, CatalogRecordContext};
 use crate::guid_text::CatalogGuid;
@@ -70,9 +71,7 @@ fn definition<'source>(
         .try_map(|value| cargo_slots(value, &context, notes))?;
     let properties = properties(tree, &fields, &context, notes)?;
     Ok(ResourceDefinition {
-        guid: context.value("$guid", SourceValue::Present(CatalogGuid(tree.guid())))?,
-        class_name: crate::source_header::class_name(tree, origins)?,
-        record_path: context.value("$recordPath", SourceValue::Present(tree.record_path()))?,
+        source: CanonicalRecordHeader::read(tree, origins)?,
         name: projection.name(
             fields.locale("displayName", notes)?,
             tree.record_index(),

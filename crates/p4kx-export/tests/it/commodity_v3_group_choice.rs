@@ -6,6 +6,7 @@ use serde_json::{Value, json};
 use crate::commodity_v3_fixture::{self as fixture, TestResult};
 use crate::commodity_v3_group_choice_fixture::{self as group_fixture, FaultPosition};
 use crate::commodity_v3_source;
+use crate::commodity_v3_source_inventory::{body, header};
 
 #[test]
 fn later_unreadable_membership_cannot_taint_an_existing_first_group() -> TestResult {
@@ -30,7 +31,7 @@ fn later_unreadable_membership_cannot_taint_an_existing_first_group() -> TestRes
         baseline_uses, later_uses,
         "the winner's actual decision prefix is independent of later group inputs"
     );
-    assert!(later_uses.contains(&(2, "$guid".to_owned(), "payload".to_owned())));
+    assert!(later_uses.contains(&(2, header("guid"), "payload".to_owned())));
     assert!(
         later_uses.iter().all(|(index, _, _)| *index != 3),
         "the later unreadable membership supplies no contributor to this choice"
@@ -60,11 +61,11 @@ fn earlier_unreadable_membership_keeps_the_first_group_choice_incomplete() -> Te
     );
     let used = commodity_v3_source::uses(&catalog, carrier)?;
     assert!(
-        used.contains(&(2, "resources".to_owned(), "selector".to_owned())),
+        used.contains(&(2, body("resources"), "selector".to_owned())),
         "the incomplete prefix keeps its actual earlier array selector"
     );
     assert!(
-        used.contains(&(3, "$guid".to_owned(), "payload".to_owned())),
+        used.contains(&(3, header("guid"), "payload".to_owned())),
         "the chosen GUID retains its actual physical owner"
     );
     Ok(())

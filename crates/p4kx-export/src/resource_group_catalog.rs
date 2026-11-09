@@ -9,8 +9,7 @@ mod members;
 mod parent;
 
 pub(crate) use contract::{
-    ResourceGroup, ResourceGroupDefinition, ResourceGroupHeader, ResourceGroupMembers,
-    ResourceGroupParent,
+    ResourceGroup, ResourceGroupDefinition, ResourceGroupMembers, ResourceGroupParent,
 };
 pub(crate) use members::read as members;
 pub(crate) use parent::read as parent;

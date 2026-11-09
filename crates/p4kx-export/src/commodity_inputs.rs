@@ -7,6 +7,7 @@ use p4kx_extraction::{
 
 use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
+use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 
 /// Actual inputs used by one Commodity choice or conversion.
 #[must_use]
@@ -39,6 +40,31 @@ impl<'context> CommodityInputs<'context> {
             role,
         )?);
         Ok(())
+    }
+
+    pub(crate) fn header(
+        &mut self,
+        record_index: u32,
+        field: RecordHeaderField,
+        role: SourceUseRole,
+    ) -> Result<(), CatalogError> {
+        self.uses.push(
+            self.origins
+                .record(record_index)
+                .observe_header(field, role)?,
+        );
+        Ok(())
+    }
+
+    pub(crate) fn header_input(
+        &mut self,
+        record_index: u32,
+        input: RecordHeaderInput,
+        role: SourceUseRole,
+    ) -> Result<(), CatalogError> {
+        self.origins
+            .record(record_index)
+            .append_header_input(input, role, &mut self.uses)
     }
 
     pub(crate) fn field<T>(

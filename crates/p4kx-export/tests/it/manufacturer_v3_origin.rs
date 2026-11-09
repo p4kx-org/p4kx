@@ -8,39 +8,49 @@ use p4kx_extraction::Language;
 use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::DcbOrigin;
-use crate::commodity_v3_source_inventory;
+use crate::commodity_v3_source_inventory::{self, SourceField, body, header};
 use crate::manufacturer_v3_fixture::{self as fixture, TestResult};
 
-const DIRECT_FIELDS: [(&str, &str, &str); 10] = [
-    ("/guid", "$guid", "payload"),
-    ("/recordName", "$name", "payload"),
-    ("/recordPath", "$recordPath", "payload"),
-    ("/recordIndex", "$recordIndex", "selector"),
-    ("/sourceType", "$type", "selector"),
-    ("/code", "Code", "payload"),
-    ("/localization", "Localization", "payload"),
-    (
-        "/localization/value/sourceType",
-        "Localization.$type",
-        "selector",
-    ),
-    ("/localization/value/name", "Localization.Name", "payload"),
-    (
-        "/localization/value/description",
-        "Localization.Description",
-        "payload",
-    ),
-];
+type DirectField = (&'static str, SourceField, &'static str);
+
+fn direct_fields() -> [DirectField; 12] {
+    [
+        ("/guid", header("guid"), "payload"),
+        ("/recordName", header("recordName"), "payload"),
+        ("/recordPath", header("fileName"), "conversion"),
+        ("/recordIndex", header("recordIndex"), "selector"),
+        ("/sourceType", header("sourceType"), "selector"),
+        ("/fileName", header("fileName"), "payload"),
+        ("/metadataTag", header("metadataTag"), "payload"),
+        ("/code", body("Code"), "payload"),
+        ("/localization", body("Localization"), "payload"),
+        (
+            "/localization/value/sourceType",
+            body("Localization.$type"),
+            "selector",
+        ),
+        (
+            "/localization/value/name",
+            body("Localization.Name"),
+            "payload",
+        ),
+        (
+            "/localization/value/description",
+            body("Localization.Description"),
+            "payload",
+        ),
+    ]
+}
 
 #[test]
 fn actual_payload_selector_and_conversion_uses_stay_at_their_physical_fields() -> TestResult {
     let (_, catalog) = fixture::normal(&fixture::database())?;
     let row = fixture::row(&catalog)?;
-    for (carrier, field, role) in DIRECT_FIELDS {
+    for (carrier, field, role) in direct_fields() {
         let value = fixture::at(row, carrier)?;
         assert_eq!(
             commodity_v3_source_inventory::uses(&catalog, value)?,
-            BTreeSet::from([(0, field.to_owned(), role.to_owned())]),
+            BTreeSet::from([(0, field, role.to_owned())]),
             "only the actual field contributes to {carrier}"
         );
         assert_eq!(
@@ -51,8 +61,8 @@ fn actual_payload_selector_and_conversion_uses_stay_at_their_physical_fields() -
     assert_eq!(
         commodity_v3_source_inventory::uses(&catalog, fixture::at(row, "/className")?)?,
         BTreeSet::from([
-            (0, "$name".to_owned(), "conversion".to_owned()),
-            (0, "$type".to_owned(), "selector".to_owned())
+            (0, header("recordName"), "conversion".to_owned()),
+            (0, header("sourceType"), "selector".to_owned())
         ])
     );
     commodity_v3_source_inventory::reference_closure(&catalog)?;

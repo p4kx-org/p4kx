@@ -26,6 +26,11 @@ in progress. The complete target is
 implementation. Other exported formats retain their independently documented versions.
 
 
+The implemented canonical families use the [shared eight-field Record header](catalog-record-headers.md),
+including exact fileName and separately stateful metadataTag. Header provenance uses the explicit
+dataforgeRecordHeader namespace; body paths keep their original DataForge coordinate. Consumers
+must resolve document-local SourceUse IDs in the accompanying inventory.
+
 The rule is ADR-0054 (amending ADR-0002):
 
 - **Additive changes keep `schemaVersion`:** a new kind, a new field on an entity, on `source` or

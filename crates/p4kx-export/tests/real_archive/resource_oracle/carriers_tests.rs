@@ -32,7 +32,10 @@ fn carrier(state: &str, value: &Value, references: &[&str]) -> Value {
 
 #[test]
 fn nominal_aliases_do_not_replace_exact_physical_record_ownership() -> Result<()> {
-    let rows = [use_row("first", "$guid", 3), use_row("second", "$guid", 7)];
+    let rows = [
+        header_use("first", "guid", 3),
+        header_use("second", "guid", 7),
+    ];
     let inventory = uses(&rows);
     assert_eq!(
         inventory.record_index(&json!({"guid":
@@ -88,6 +91,56 @@ fn array_positions_retain_their_exact_field_origins() -> Result<()> {
     assert!(
         carriers.array("properties", 1).is_none(),
         "array length is exact"
+    );
+    Ok(())
+}
+
+fn header_use(id: &str, field: &str, owner: u32) -> Value {
+    json!({"id": id, "source": "synthetic-dcb", "scope": "payload", "role": "payload",
+        "location": {"type": "subresource", "namespace": "dataforgeRecordHeader", "indices": [owner.to_string()], "field": field}})
+}
+
+#[test]
+fn body_header_equal_labels_cannot_replace_each_others_original_coordinates() -> Result<()> {
+    let rows = [
+        use_row("body", "guid", 3),
+        header_use("header", "guid", 3),
+        use_row("dollar", "$guid", 3),
+    ];
+    let inventory = uses(&rows);
+    for reference in ["body", "dollar"] {
+        assert!(
+            inventory
+                .record_index(
+                    &json!({"guid":carrier("present", &json!("same-nominal-guid"), &[reference])})
+                )
+                .is_err(),
+            "a body label cannot become a physical header owner"
+        );
+    }
+    let output = json!({"body": carrier("present", &json!("body-value"), &["body"]), "header": carrier("present", &json!("header-value"), &["header"])});
+    let fields = Carriers::new(&output, &inventory, 3)?;
+    let body = output
+        .get("body")
+        .ok_or_else(|| super::super::Failure::check("synthetic-body"))?;
+    let header = output
+        .get("header")
+        .ok_or_else(|| super::super::Failure::check("synthetic-header"))?;
+    assert!(
+        fields.require_at(body, 3, "guid").is_ok(),
+        "the body is bound to its own original site"
+    );
+    assert!(
+        fields.require_header_at(header, 3, "guid").is_ok(),
+        "the header is bound to its separate original site"
+    );
+    assert!(
+        fields.require_at(header, 3, "guid").is_err(),
+        "equal labels never merge header into body"
+    );
+    assert!(
+        fields.require_header_at(body, 3, "guid").is_err(),
+        "equal labels never merge body into header"
     );
     Ok(())
 }

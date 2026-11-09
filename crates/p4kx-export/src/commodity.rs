@@ -17,6 +17,7 @@ use crate::commodity_presentation::CommodityPresentationContext;
 use crate::commodity_resource::CommodityResourceSelection;
 use crate::commodity_source;
 use crate::guid_text::CatalogGuid;
+use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::resource_group::Groups;
 use crate::source_fields::FieldError;
 
@@ -154,8 +155,12 @@ fn entity_selection(
     origins: &CatalogOrigins,
 ) -> Result<SourcedValue<CommoditySelection>, CatalogError> {
     let mut inputs = CommodityInputs::new(origins);
-    for field in ["$type", "$recordPath", "$name"] {
-        inputs.at(tree.record_index(), field, SourceUseRole::Selector)?;
+    for field in [
+        RecordHeaderInput::Field(RecordHeaderField::SourceType),
+        RecordHeaderInput::NormalizedPath,
+        RecordHeaderInput::Field(RecordHeaderField::RecordName),
+    ] {
+        inputs.header_input(tree.record_index(), field, SourceUseRole::Selector)?;
     }
     Ok(inputs.value(CommoditySelection::Entity))
 }
@@ -167,8 +172,12 @@ fn representation_headers(
     origins: &CatalogOrigins,
 ) -> Result<(Vec<SourceUse>, bool), CatalogError> {
     let mut inputs = CommodityInputs::new(origins);
-    for field in ["$type", "$recordPath", "$name"] {
-        inputs.at(tree.record_index(), field, SourceUseRole::Selector)?;
+    for field in [
+        RecordHeaderInput::Field(RecordHeaderField::SourceType),
+        RecordHeaderInput::NormalizedPath,
+        RecordHeaderInput::Field(RecordHeaderField::RecordName),
+    ] {
+        inputs.header_input(tree.record_index(), field, SourceUseRole::Selector)?;
     }
     inputs.extend(sources, complete);
     Ok(inputs.into_evidence())
@@ -184,19 +193,23 @@ pub(crate) fn resource_commodity<'source>(
     let origins = projection.origins();
     let context = origins.record(tree.record_index());
     let mut links = CommodityInputs::new(origins);
-    links.at(tree.record_index(), "$guid", SourceUseRole::Selector)?;
+    links.header(
+        tree.record_index(),
+        RecordHeaderField::Guid,
+        SourceUseRole::Selector,
+    )?;
     let (links, _) = links.into_evidence();
     let presentation_context =
         CommodityPresentationContext::new(projection, Some(tree), &links, &links, true);
     let mut resource_notes = Vec::new();
     let texts = presentation_context.texts(None, None, None, &mut resource_notes)?;
-    let subtype = context.value(
-        "$guid",
+    let subtype = context.header_value(
+        RecordHeaderField::Guid,
         SourceValue::Present(Some(CatalogGuid(tree.guid()))),
     )?;
     let presentation = presentation_context.finish(tree, texts, subtype, groups)?;
     let selection = crate::commodity_backfill::selection(&evidence);
-    let entity = context.selector("$type", SourceValue::Absent)?;
+    let entity = context.header_selector(RecordHeaderField::SourceType, SourceValue::Absent)?;
     let definition =
         commodity_source::definition(tree, entity, selection, evidence.diagnostics, origins)?;
     Ok(CommodityRead {

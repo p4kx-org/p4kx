@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{RecordTree, SourceUse, SourceUseRole, SourceValue, SourcedValue};
+use p4kx_extraction::{RecordTree, SourceUse, SourceUseRole, SourcedValue};
 
 use crate::CatalogError;
+use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::CatalogFields;
@@ -13,8 +14,9 @@ use crate::commodity_contract::{
 };
 use crate::commodity_inputs::CommodityInputs;
 use crate::commodity_resource::CommodityResourceSelection;
-use crate::commodity_text_input::CommodityTextInput;
+use crate::commodity_text_input::{CommodityTextInput, CommodityTextSelector};
 use crate::guid_text::CatalogGuid;
+use crate::record_header_field::RecordHeaderField;
 use crate::source_fields::FieldError;
 
 /// Captures only the original first-resource selectors for one Commodity choice.
@@ -43,7 +45,11 @@ pub(crate) fn resource_inputs(
         .as_ref()
         .and_then(|link| link.reference.target_record_index)
     {
-        inputs.at(index, "$type", SourceUseRole::Selector)?;
+        inputs.header(
+            index,
+            RecordHeaderField::SourceType,
+            SourceUseRole::Selector,
+        )?;
     }
     Ok(inputs.into_evidence().0)
 }
@@ -57,7 +63,9 @@ pub(crate) fn resource_text<'source>(
     let context = projection.origins().record(tree.record_index());
     let key = CatalogFields::new(tree.root(), "", &context).locale(field, notes)?;
     let mut input = CommodityTextInput::new(key, tree.record_index(), field.to_owned());
-    input.selectors.push("$type".to_owned());
+    input
+        .selectors
+        .push(CommodityTextSelector::Header(RecordHeaderField::SourceType));
     Ok(input)
 }
 
@@ -69,14 +77,8 @@ pub(crate) fn definition<'source>(
     selection_diagnostics: Vec<CommoditySelectionDiagnostic>,
     origins: &CatalogOrigins,
 ) -> Result<CommodityDefinition<'source>, CatalogError> {
-    let context = origins.record(tree.record_index());
     Ok(CommodityDefinition {
-        guid: context.value("$guid", SourceValue::Present(CatalogGuid(tree.guid())))?,
-        class_name: crate::source_header::class_name(tree, origins)?,
-        record_path: context.value("$recordPath", SourceValue::Present(tree.record_path()))?,
-        record_index: context
-            .selector("$recordIndex", SourceValue::Present(tree.record_index()))?,
-        source_type: context.selector("$type", SourceValue::Present(tree.type_name()))?,
+        source: CanonicalRecordHeader::read(tree, origins)?,
         selection,
         selection_diagnostics,
         entity,

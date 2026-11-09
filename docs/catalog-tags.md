@@ -1,5 +1,8 @@
 # Catalog Tag taxonomy and Entity GUID tags
 
+The [shared Record-header contract](catalog-record-headers.md) defines the eight sourced header
+fields, exact original filename/metadata-tag states and separate Header/Body provenance coordinates.
+
 Catalog 0.5.0 writes these datasets only in schema version 3. The released v2 fixtures remain
 historical contract tests; there is no v2 writer, compatibility alias or parallel flat tag view.
 
@@ -21,7 +24,7 @@ from read/projection health: `completeness.tags` is `complete` even when source 
 ## Direct source fields
 
 Definition and declaration headers retain `guid`, `recordName`, `className`, `recordPath`,
-`recordIndex` and `sourceType` as separate sourced values. `recordName` preserves the declared
+`recordIndex`, `sourceType`, `fileName` and `metadataTag` as separate sourced values. `recordName` preserves the declared
 namespace; `className` uses the existing class-name conversion. No name or path becomes identity.
 
 A Tag additionally stores:

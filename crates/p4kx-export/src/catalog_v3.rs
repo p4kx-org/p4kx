@@ -111,5 +111,9 @@ pub(crate) mod commodity_text_choice;
 #[path = "commodity_text_input.rs"]
 pub(crate) mod commodity_text_input;
 
+#[path = "canonical_record_header.rs"]
+pub(crate) mod canonical_record_header;
+#[path = "record_header_field.rs"]
+pub(crate) mod record_header_field;
 #[path = "source_header.rs"]
 pub(crate) mod source_header;

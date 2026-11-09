@@ -6,6 +6,7 @@ use p4kx_extraction::{SourceUseRole, SourceValue, SourceValueState, SourcedValue
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::commodity_inputs::CommodityInputs;
+use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 
 /// Captures the exact observed field contribution without reconstructing origin references.
 pub(crate) fn field<T>(
@@ -41,23 +42,23 @@ pub(crate) fn reference(
     let target = reference.target_record_index.value().copied();
     for (header, complete) in [
         (
-            "$recordIndex",
+            RecordHeaderInput::Field(RecordHeaderField::RecordIndex),
             reference.target_record_index.origin().source_set_complete(),
         ),
         (
-            "$recordPath",
+            RecordHeaderInput::NormalizedPath,
             reference.record_path.origin().source_set_complete(),
         ),
         (
-            "$type",
+            RecordHeaderInput::Field(RecordHeaderField::SourceType),
             reference.target_type.origin().source_set_complete(),
         ),
     ] {
-        inputs.at(
-            target.unwrap_or(record_index),
-            target.map_or(path, |_| header),
-            SourceUseRole::Selector,
-        )?;
+        if let Some(target) = target {
+            inputs.header_input(target, header, SourceUseRole::Selector)?;
+        } else {
+            inputs.at(record_index, path, SourceUseRole::Selector)?;
+        }
         inputs.require_complete(complete);
     }
     Ok(())

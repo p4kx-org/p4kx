@@ -11,6 +11,11 @@ marker directly on every source-backed data value, including nested values and l
 The inventory contains all 50 existing Kinds and all 51 catalog-lane tickets at the decision baseline,
 including the completed #816/#846/#1011. Independent media, package and platform tasks keep their
 own formats and acceptance gates. Declined #269/#284 stay closed and do not create output dialects.
+The implemented canonical Record families share the [eight-field source header](catalog-record-headers.md):
+raw name, exact filename and layout-aware metadataTag remain distinct from convenience className/
+recordPath and Tag taxonomy fields. Header coordinates use the original DCB physical index in
+dataforgeRecordHeader; genuine body paths, identity, selection and counts retain their meaning.
+
 ## Every open catalog issue
 
 | Issue | Owning contract location | Facts/cardinality/scope kept |

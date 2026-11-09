@@ -119,33 +119,12 @@ pub(super) fn members<'catalog>(
     Ok(())
 }
 
-fn header(tree: &RecordTree<'_>, row: &Value, uses: &Uses<'_>) -> Result<()> {
-    require(
-        uses.record_index(row)? == tree.record_index(),
-        "group-guid-source-owner",
-    )?;
-    let class_name = tree
-        .name()
-        .strip_prefix(tree.type_name())
-        .and_then(|name| name.strip_prefix('.'))
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| tree.name());
-    for (field, expected) in [
-        ("guid", tree.guid().to_string()),
-        ("recordName", tree.name().to_owned()),
-        ("className", class_name.to_owned()),
-        ("recordPath", tree.record_path().to_owned()),
-        ("sourceType", tree.type_name().to_owned()),
-    ] {
-        require(
-            row.get(field)
-                .and_then(compare::present)
-                .and_then(Value::as_str)
-                == Some(expected.as_str()),
-            "group-original-header",
-        )?;
-    }
-    Ok(())
+fn header<'catalog>(
+    tree: &RecordTree<'_>,
+    row: &'catalog Value,
+    uses: &Uses<'catalog>,
+) -> Result<()> {
+    super::super::record_header::check(tree, row, uses)
 }
 
 fn member(raw: &Raw<'_>, value: &Value) -> Result<()> {

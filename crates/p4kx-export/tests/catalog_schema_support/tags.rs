@@ -3,7 +3,8 @@
 
 use serde_json::{Map, Value, json};
 
-use super::source_values::present;
+use super::source_values::{present, source};
+use p4kx_extraction::SourceValue;
 
 fn header(index: u32, kind: &str) -> Map<String, Value> {
     Map::from_iter([
@@ -22,6 +23,8 @@ fn header(index: u32, kind: &str) -> Map<String, Value> {
         ),
         ("recordIndex".to_owned(), present(json!(index))),
         ("sourceType".to_owned(), present(json!(kind))),
+        ("fileName".to_owned(), present(json!("synthetic/tags.xml"))),
+        ("metadataTag".to_owned(), source(SourceValue::Absent)),
     ])
 }
 

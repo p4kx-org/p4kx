@@ -8,6 +8,7 @@ use p4kx_extraction::{
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::CatalogRecordContext;
 use crate::guid_text::CatalogGuid;
+use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::{CatalogError, Kind};
 
 /// Original target metadata retained at the selected group's canonical read.
@@ -121,20 +122,28 @@ impl ParentSource {
             return Ok(None);
         }
         let context = origins.record(record.index());
-        let mut inputs = vec![context.observe("$recordIndex", SourceUseRole::Selector)?];
+        let mut inputs =
+            vec![context.observe_header(RecordHeaderField::RecordIndex, SourceUseRole::Selector)?];
         for (field, readable) in [
-            ("$recordPath", path.is_ok()),
-            ("$type", kind.is_ok()),
-            ("$name", record.name().is_ok()),
+            (RecordHeaderInput::NormalizedPath, path.is_ok()),
+            (
+                RecordHeaderInput::Field(RecordHeaderField::SourceType),
+                kind.is_ok(),
+            ),
+            (
+                RecordHeaderInput::Field(RecordHeaderField::RecordName),
+                record.name().is_ok(),
+            ),
         ] {
-            inputs.push(context.observe(
+            context.append_header_input(
                 field,
                 if readable {
                     SourceUseRole::Selector
                 } else {
                     SourceUseRole::Attempted
                 },
-            )?);
+                &mut inputs,
+            )?;
             if !readable {
                 break;
             }
@@ -172,10 +181,16 @@ impl ParentSource {
 }
 
 fn headers(context: &CatalogRecordContext<'_>) -> Result<Vec<SourceUse>, CatalogError> {
-    ["$recordPath", "$type", "$name", "$recordIndex"]
-        .into_iter()
-        .map(|field| context.observe(field, SourceUseRole::Selector))
-        .collect()
+    let mut uses = Vec::new();
+    for field in [
+        RecordHeaderInput::NormalizedPath,
+        RecordHeaderInput::Field(RecordHeaderField::SourceType),
+        RecordHeaderInput::Field(RecordHeaderField::RecordName),
+        RecordHeaderInput::Field(RecordHeaderField::RecordIndex),
+    ] {
+        context.append_header_input(field, SourceUseRole::Selector, &mut uses)?;
+    }
+    Ok(uses)
 }
 
 const fn observation(value: Option<&Value<'_>>) -> (SourceUseRole, bool) {
@@ -199,7 +214,7 @@ fn slot(
     {
         (
             Some(target.guid()),
-            Some(context.observe("$guid", SourceUseRole::Selector)?),
+            Some(context.observe_header(RecordHeaderField::Guid, SourceUseRole::Selector)?),
         )
     } else {
         (None, None)

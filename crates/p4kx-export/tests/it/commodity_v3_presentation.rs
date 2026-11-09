@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 
 use crate::commodity_v3_fixture::{self as fixture, TestResult};
 use crate::commodity_v3_source;
+use crate::commodity_v3_source_inventory::{body, header};
 
 #[test]
 fn untranslated_own_names_win_before_lookup_and_unused_resource_inputs_do_not_leak() -> TestResult {
@@ -21,37 +22,37 @@ fn untranslated_own_names_win_before_lookup_and_unused_resource_inputs_do_not_le
     let expected = BTreeSet::from([
         (
             fixture::ALPHA_INDEX,
-            "Components".to_owned(),
+            body("Components"),
             "selector".to_owned(),
         ),
         (
             fixture::ALPHA_INDEX,
-            "Components[0]".to_owned(),
+            body("Components[0]"),
             "selector".to_owned(),
         ),
         (
             fixture::ALPHA_INDEX,
-            "Components[1].$type".to_owned(),
+            body("Components[1].$type"),
             "selector".to_owned(),
         ),
         (
             fixture::ALPHA_INDEX,
-            "Components[2].$type".to_owned(),
+            body("Components[2].$type"),
             "selector".to_owned(),
         ),
         (
             fixture::ALPHA_INDEX,
-            "Components[2].displayName".to_owned(),
+            body("Components[2].displayName"),
             "selector".to_owned(),
         ),
         (
             fixture::ALPHA_INDEX,
-            "Components[2].displayName".to_owned(),
+            body("Components[2].displayName"),
             "payload".to_owned(),
         ),
         (
             fixture::ALPHA_INDEX,
-            "Components[2].displayName".to_owned(),
+            body("Components[2].displayName"),
             "conversion".to_owned(),
         ),
     ]);
@@ -95,19 +96,19 @@ fn placeholder_fallback_uses_the_actual_resource_owner_and_only_its_retained_key
     assert_eq!(
         actual,
         BTreeSet::from([
-            (0, "displayName".to_owned(), "payload".to_owned()),
-            (0, "displayName".to_owned(), "conversion".to_owned()),
+            (0, body("displayName"), "payload".to_owned()),
+            (0, body("displayName"), "conversion".to_owned()),
         ]),
         "the resource key is not misattributed to the Entity or its placeholder"
     );
     assert!(uses.contains(&(
         fixture::BETA_INDEX,
-        "Components[0].displayName".to_owned(),
+        body("Components[0].displayName"),
         "selector".to_owned()
     )));
     assert!(uses.contains(&(
         fixture::BETA_INDEX,
-        "Components[1].defaultComposition[0].entry".to_owned(),
+        body("Components[1].defaultComposition[0].entry"),
         "selector".to_owned()
     )));
     assert!(
@@ -164,11 +165,11 @@ fn first_group_choice_uses_source_record_order_while_density_and_refining_remain
     );
     let uses = commodity_v3_source::uses(&catalog, &row["typeGuid"])?;
     assert!(
-        uses.contains(&(3, "$guid".to_owned(), "payload".to_owned())),
+        uses.contains(&(3, header("guid"), "payload".to_owned())),
         "the selected group owns the value"
     );
     assert!(
-        !uses.contains(&(4, "$guid".to_owned(), "payload".to_owned())),
+        !uses.contains(&(4, header("guid"), "payload".to_owned())),
         "a later lower GUID is not selected"
     );
     let fallback = fixture::presentation(&catalog, fixture::RESOURCE_FALLBACK)?;

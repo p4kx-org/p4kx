@@ -10,6 +10,8 @@ pub(super) fn definitions() -> Value {
     json!({"availability":"available", "rows":[{
         "guid": present(json!("00000000-0000-0000-0000-000000007002")),
         "recordName": present(json!("ResourceTypeGroup.Metal")),
+        "fileName": present(json!("synthetic/resource_group.xml")),
+        "metadataTag": source(SourceValue::Absent),
         "className": present(json!("Metal")),
         "recordPath": present(json!("synthetic/resource_group")),
         "recordIndex": present(json!(7)),

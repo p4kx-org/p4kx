@@ -5,6 +5,7 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::guid_text::CatalogGuid;
@@ -28,9 +29,8 @@ pub(crate) struct ResourceType<'source> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct ResourceDefinition<'source> {
-    pub(crate) guid: SourcedValue<CatalogGuid>,
-    pub(crate) class_name: SourcedValue<&'source str>,
-    pub(crate) record_path: SourcedValue<&'source str>,
+    #[serde(flatten)]
+    pub(crate) source: CanonicalRecordHeader<'source>,
     pub(crate) name: SourcedValue<PublicNameRef>,
     #[schemars(extend("x-gameText" = true))]
     pub(crate) description: SourcedValue<GameTextRef>,

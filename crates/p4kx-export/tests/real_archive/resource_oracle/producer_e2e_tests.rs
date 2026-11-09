@@ -320,3 +320,28 @@ fn actual_producer_mutations_fail_without_replacement_carriers() -> Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn original_filename_and_metadata_tag_states_are_checked_independently_of_normalized_paths()
+-> Result<()> {
+    let written = Written::new(OverrideEntryTarget::Concrete)?;
+    written.verify(&written.catalog)?;
+    for (field, state, value) in [
+        ("fileName", "present", json!("changed-original-suffix.XML")),
+        ("metadataTag", "null", Value::Null),
+        ("recordName", "null", Value::Null),
+    ] {
+        let mut changed = written.catalog.clone();
+        let carrier = changed
+            .pointer_mut(&format!("{ALPHA}/{field}"))
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| Failure::check("synthetic-original-header"))?;
+        carrier.insert("state".to_owned(), json!(state));
+        carrier.insert("value".to_owned(), value);
+        assert!(
+            written.verify(&changed).is_err(),
+            "each exact raw header fact is checked against the original read even when normalized recordPath and GUID remain unchanged"
+        );
+    }
+    Ok(())
+}

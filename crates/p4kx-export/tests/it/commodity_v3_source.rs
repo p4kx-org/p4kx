@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use serde_json::Value;
 
 use crate::commodity_v3_fixture::{self as fixture, TestResult};
+use crate::commodity_v3_source_inventory::{body, header};
 
 use crate::commodity_v3_source_inventory as inventory;
 pub(crate) use crate::commodity_v3_source_inventory::uses;
@@ -23,36 +24,32 @@ fn definition_headers_keep_the_actual_physical_source_owner() -> TestResult {
     );
     assert_eq!(
         uses(&catalog, &row["guid"])?,
-        BTreeSet::from([(
-            fixture::ALPHA_INDEX,
-            "$guid".to_owned(),
-            "payload".to_owned()
-        )])
+        BTreeSet::from([(fixture::ALPHA_INDEX, header("guid"), "payload".to_owned())])
     );
     assert_eq!(
         uses(&catalog, &row["className"])?,
         BTreeSet::from([
             (
                 fixture::ALPHA_INDEX,
-                "$name".to_owned(),
+                header("recordName"),
                 "conversion".to_owned()
             ),
             (
                 fixture::ALPHA_INDEX,
-                "$type".to_owned(),
+                header("sourceType"),
                 "selector".to_owned()
             ),
         ]),
         "class-name normalization retains its actual header inputs"
     );
     for (field, path, role) in [
-        ("recordPath", "$recordPath", "payload"),
-        ("recordIndex", "$recordIndex", "selector"),
-        ("sourceType", "$type", "selector"),
+        ("recordPath", "fileName", "conversion"),
+        ("recordIndex", "recordIndex", "selector"),
+        ("sourceType", "sourceType", "selector"),
     ] {
         assert_eq!(
             uses(&catalog, &row[field])?,
-            BTreeSet::from([(fixture::ALPHA_INDEX, path.to_owned(), role.to_owned())])
+            BTreeSet::from([(fixture::ALPHA_INDEX, header(path), role.to_owned())])
         );
     }
     Ok(())
@@ -102,11 +99,11 @@ fn aggregate_child_inputs_and_each_nested_carrier_have_complete_reference_closur
     let aggregate = uses(&catalog, &row["entity"])?;
     assert!(aggregate.contains(&(
         fixture::ALPHA_INDEX,
-        "Components[2].displayName".to_owned(),
+        body("Components[2].displayName"),
         "payload".to_owned()
     )));
     assert!(
-        aggregate.contains(&(1, "$recordIndex".to_owned(), "selector".to_owned())),
+        aggregate.contains(&(1, header("recordIndex"), "selector".to_owned())),
         "retained reference target headers contribute to the aggregate independently"
     );
     for definition in catalog["definitions"]["commodities"]["rows"]

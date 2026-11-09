@@ -139,7 +139,7 @@ fn parent_choices<'catalog>(
         let parent =
             compare::present(carrier).ok_or_else(|| Failure::check("group-parent-value"))?;
         let carriers = Carriers::new(row, uses, selected.index)?;
-        carriers.require_at(carrier, selected.index, "$guid")?;
+        carriers.require_header_at(carrier, selected.index, "guid")?;
         match expected.parents.get(&selected.guid) {
             None => require(parent.is_null(), "group-parent-none")?,
             Some(chosen) => {

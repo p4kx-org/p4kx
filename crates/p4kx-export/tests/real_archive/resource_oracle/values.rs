@@ -86,6 +86,7 @@ pub(super) fn check(
             .build(&record)
             .map_err(|error| Failure::source("raw-resource-tree", error))?;
         identity(&tree, row)?;
+        super::record_header::check(&tree, row, &uses)?;
         sample(&tree, row, &uses, &mut coverage, &mut fields)?;
         coverage.sampled_rows += 1;
     }
@@ -289,15 +290,15 @@ impl<'catalog> Walker<'_, 'catalog> {
         self.carriers.require(guid, path)?;
         if let Raw::Reference(target) = raw {
             for (name, field) in [
-                ("targetRecordIndex", "$recordIndex"),
-                ("recordPath", "$recordPath"),
-                ("targetType", "$type"),
+                ("targetRecordIndex", "recordIndex"),
+                ("recordPath", "fileName"),
+                ("targetType", "sourceType"),
             ] {
                 let header = value
                     .get(name)
                     .ok_or_else(|| Failure::check("reference-header-origin"))?;
                 self.carriers
-                    .require_at(header, target.record_index(), field)?;
+                    .require_header_at(header, target.record_index(), field)?;
             }
         } else {
             for name in ["targetRecordIndex", "recordPath", "targetType"] {

@@ -7,6 +7,7 @@ use p4kx_extraction::{
 };
 
 use crate::CatalogError;
+use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::source_fields::FieldError;
 
 /// Binds Catalog fields to the one physical DataForge payload and Record position.
@@ -42,13 +43,7 @@ impl<'a> CatalogRecordContext<'a> {
         path: &str,
         value: SourceValue<T>,
     ) -> Result<SourcedValue<T>, CatalogError> {
-        let (role, complete) = match &value {
-            SourceValue::Present(_) | SourceValue::Null | SourceValue::Invalid => {
-                (SourceUseRole::Payload, true)
-            }
-            SourceValue::Absent | SourceValue::Unsupported => (SourceUseRole::Selector, true),
-            _ => (SourceUseRole::Attempted, false),
-        };
+        let (role, complete) = value_policy(&value);
         self.bind(path, value, role, complete)
     }
 
@@ -69,6 +64,77 @@ impl<'a> CatalogRecordContext<'a> {
         Ok(self.dataforge.at(self.location(path), role)?)
     }
 
+    /// Binds a known original header fact without routing an arbitrary body path.
+    pub(crate) fn header_value<T>(
+        &self,
+        field: RecordHeaderField,
+        value: SourceValue<T>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let (role, complete) = value_policy(&value);
+        self.bind_at(field.location(self.record_index), value, role, complete)
+    }
+
+    pub(crate) fn header_selector<T>(
+        &self,
+        field: RecordHeaderField,
+        value: SourceValue<T>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        self.bind_at(
+            field.location(self.record_index),
+            value,
+            SourceUseRole::Selector,
+            true,
+        )
+    }
+
+    pub(crate) fn header_conversion<T>(
+        &self,
+        field: RecordHeaderField,
+        value: SourceValue<T>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let (_, complete) = value_policy(&value);
+        let role = if complete {
+            SourceUseRole::Conversion
+        } else {
+            SourceUseRole::Attempted
+        };
+        self.bind_at(field.location(self.record_index), value, role, complete)
+    }
+
+    pub(crate) fn observe_header(
+        &self,
+        field: RecordHeaderField,
+        role: SourceUseRole,
+    ) -> Result<SourceUse, CatalogError> {
+        Ok(self.dataforge.at(field.location(self.record_index), role)?)
+    }
+
+    /// Retains the actual original filename conversion when a normalized path is consulted.
+    pub(crate) fn append_header_input(
+        &self,
+        input: RecordHeaderInput,
+        role: SourceUseRole,
+        uses: &mut Vec<SourceUse>,
+    ) -> Result<(), CatalogError> {
+        match input {
+            RecordHeaderInput::Field(field) => uses.push(self.observe_header(field, role)?),
+            RecordHeaderInput::NormalizedPath => {
+                if role != SourceUseRole::Attempted {
+                    uses.push(
+                        self.observe_header(
+                            RecordHeaderField::FileName,
+                            SourceUseRole::Conversion,
+                        )?,
+                    );
+                }
+                if role != SourceUseRole::Conversion {
+                    uses.push(self.observe_header(RecordHeaderField::FileName, role)?);
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn reference_observation(&self, path: &str) -> Result<(), CatalogError> {
         let _observation = self
             .dataforge
@@ -83,7 +149,17 @@ impl<'a> CatalogRecordContext<'a> {
         role: SourceUseRole,
         complete: bool,
     ) -> Result<SourcedValue<T>, CatalogError> {
-        let source = self.dataforge.at(self.location(path), role)?;
+        self.bind_at(self.location(path), value, role, complete)
+    }
+
+    fn bind_at<T>(
+        &self,
+        location: SourceLocation,
+        value: SourceValue<T>,
+        role: SourceUseRole,
+        complete: bool,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let source = self.dataforge.at(location, role)?;
         Ok(self.sources.value(value, &[source], complete))
     }
 
@@ -149,3 +225,17 @@ impl<'a> CatalogRecordContext<'a> {
         self.value(path, state)
     }
 }
+
+const fn value_policy<T>(value: &SourceValue<T>) -> (SourceUseRole, bool) {
+    match value {
+        SourceValue::Present(_) | SourceValue::Null | SourceValue::Invalid => {
+            (SourceUseRole::Payload, true)
+        }
+        SourceValue::Absent | SourceValue::Unsupported => (SourceUseRole::Selector, true),
+        _ => (SourceUseRole::Attempted, false),
+    }
+}
+
+#[cfg(test)]
+#[path = "catalog_record_context_tests.rs"]
+mod tests;

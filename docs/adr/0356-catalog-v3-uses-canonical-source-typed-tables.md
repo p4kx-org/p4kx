@@ -111,3 +111,16 @@ projection, strict controls, source resolution versus selection, complete refere
 physical sources, conflict/invalid identity and cancel/write preservation. Native Windows/Linux on
 AMD64/ARM64 remain mandatory. The user-deferred installed-Archive acceptance remains deferred;
 synthetic model checks are not substitutes for that evidence.
+
+
+## Original Record metadata and header coordinates
+
+Canonical Record families reuse the [shared eight-field header](../catalog-record-headers.md),
+including exact stored fileName and separate layout-aware metadataTag. Successful format reads
+retain one borrowed original metadata snapshot; no successful row is invented for a strict
+metadata admission failure. The existing SourceLocation subresource namespace
+dataforgeRecordHeader explicitly separates all original header facts from body paths. Derived
+className/recordPath retain their actual name/type/filename contributors and branch roles;
+authored Reference GUIDs remain at their original body slots. Correcting colliding coordinates
+may change SourceUse IDs within unreleased v3, while catalog identities, values, selection,
+order, counts, the origin protocol union and standalone Record serialization stay unchanged.

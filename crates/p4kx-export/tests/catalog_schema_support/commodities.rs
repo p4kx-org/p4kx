@@ -12,6 +12,9 @@ const NAME_ID: &str = "name:23:@items_commodities_gold";
 pub(super) fn definitions() -> Value {
     json!({"availability": "available", "rows": [{
         "guid": present(json!(GUID)),
+        "recordName": present(json!("EntityClassDefinition.gold")),
+        "fileName": present(json!("libs/foundry/records/entities/commodities/metals/gold.xml")),
+        "metadataTag": source(SourceValue::Absent),
         "className": present(json!("gold")),
         "recordPath": present(json!("libs/foundry/records/entities/commodities/metals/gold")),
         "recordIndex": present(json!(0)),

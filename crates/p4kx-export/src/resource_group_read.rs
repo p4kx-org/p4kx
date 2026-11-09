@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Guid, RecordTree, SourceValue};
+use p4kx_extraction::{Guid, RecordTree};
 
 use crate::CatalogError;
-use crate::catalog_origins::CatalogOrigins;
+use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::CatalogFields;
-use crate::catalog_v3::resource_group_catalog::{
-    ResourceGroup, ResourceGroupDefinition, ResourceGroupHeader,
-};
+use crate::catalog_v3::resource_group_catalog::{ResourceGroup, ResourceGroupDefinition};
 use crate::guid_text::CatalogGuid;
 use crate::resource_group::ParentChoice;
 use crate::source_fields::FieldError;
@@ -73,7 +71,7 @@ fn definition<'source>(
         notes,
     );
     Ok(ResourceGroupDefinition {
-        source: header(tree, projection.origins())?,
+        source: CanonicalRecordHeader::read(tree, projection.origins())?,
         name: projection.name(
             fields.locale("displayName", notes)?,
             tree.record_index(),
@@ -86,21 +84,5 @@ fn definition<'source>(
         )?,
         default_thumbnail_path: fields.text("defaultThumbnailPath", notes)?,
         default_thumbnail_path_svg: fields.text("defaultThumbnailPathSVG", notes)?,
-    })
-}
-
-fn header<'source>(
-    tree: &RecordTree<'source>,
-    origins: &CatalogOrigins,
-) -> Result<ResourceGroupHeader<'source>, CatalogError> {
-    let context = origins.record(tree.record_index());
-    Ok(ResourceGroupHeader {
-        guid: context.value("$guid", SourceValue::Present(CatalogGuid(tree.guid())))?,
-        record_name: context.value("$name", SourceValue::Present(tree.name()))?,
-        class_name: crate::source_header::class_name(tree, origins)?,
-        record_path: context.value("$recordPath", SourceValue::Present(tree.record_path()))?,
-        record_index: context
-            .selector("$recordIndex", SourceValue::Present(tree.record_index()))?,
-        source_type: context.selector("$type", SourceValue::Present(tree.type_name()))?,
     })
 }

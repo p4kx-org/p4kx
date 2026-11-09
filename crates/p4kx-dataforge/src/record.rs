@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::dataforge::out_of_range;
-use crate::rows::{NO_STRING, RecordDef};
+use crate::rows::RecordDef;
 use crate::strings::{compare_ignoring_case, compare_paths, strip_xml};
 use crate::{
     DataForge, DataForgeError, Guid, RecordTree, Reference, Struct, TreeBuilder, Value, ValueError,
@@ -36,10 +36,7 @@ impl<'f> Record<'f> {
     ///
     /// Returns [`DataForgeError::InvalidString`] when the name offset is not a valid string.
     pub fn name(&self) -> Result<&'f str, DataForgeError> {
-        if self.def.name == NO_STRING {
-            return Ok("");
-        }
-        self.forge.blob.get(self.def.name)
+        Ok(self.stored_name()?.fold(|| "", || "", |name| name))
     }
 
     /// Returns the record path: the file the Record is defined in, without its `.xml` extension,
@@ -49,7 +46,7 @@ impl<'f> Record<'f> {
     ///
     /// Returns [`DataForgeError::InvalidString`] when the file name offset is not a valid string.
     pub fn record_path(&self) -> Result<&'f str, DataForgeError> {
-        self.forge.text.get(self.def.file_name).map(strip_xml)
+        self.stored_file_name().map(strip_xml)
     }
 
     /// Returns the Record tag version 8 stores with every Record, e.g. `SystemsDesign`, or `None` for
@@ -60,11 +57,7 @@ impl<'f> Record<'f> {
     ///
     /// Returns [`DataForgeError::InvalidString`] when the tag offset is not a valid string.
     pub fn tag(&self) -> Result<Option<&'f str>, DataForgeError> {
-        self.def
-            .tag
-            .filter(|tag| *tag != NO_STRING)
-            .map(|tag| self.forge.blob.get(tag))
-            .transpose()
+        Ok(self.stored_tag()?.fold(|| None, || None, Some))
     }
 
     /// Returns the struct the Record is an instance of.

@@ -10,6 +10,7 @@ use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
 use crate::export_ledger::ExportAccountingError;
 use crate::guid_text::CatalogGuid;
+use crate::record_header_field::RecordHeaderField;
 
 struct NodeInputs {
     record_index: u32,
@@ -120,26 +121,34 @@ fn row(
         Some(parent) => {
             let parent_context = origins.record(parent.record_index);
             TagPathParent::Tag {
-                guid: parent_context
-                    .value("$guid", SourceValue::Present(CatalogGuid(parent.guid)))?,
-                record_index: parent_context
-                    .selector("$recordIndex", SourceValue::Present(parent.record_index))?,
+                guid: parent_context.header_value(
+                    RecordHeaderField::Guid,
+                    SourceValue::Present(CatalogGuid(parent.guid)),
+                )?,
+                record_index: parent_context.header_selector(
+                    RecordHeaderField::RecordIndex,
+                    SourceValue::Present(parent.record_index),
+                )?,
             }
         }
     };
     let mut parent_inputs = inputs.selection.clone();
     if let Some(parent) = parent {
-        parent_inputs.push(observe(
-            origins,
-            parent.record_index,
-            "$guid",
-            SourceUseRole::Payload,
-        )?);
+        parent_inputs.push(
+            origins
+                .record(parent.record_index)
+                .observe_header(RecordHeaderField::Guid, SourceUseRole::Payload)?,
+        );
     }
     Ok(TagPath {
-        guid: context.value("$guid", SourceValue::Present(CatalogGuid(chosen.guid)))?,
-        record_index: context
-            .selector("$recordIndex", SourceValue::Present(chosen.record_index))?,
+        guid: context.header_value(
+            RecordHeaderField::Guid,
+            SourceValue::Present(CatalogGuid(chosen.guid)),
+        )?,
+        record_index: context.header_selector(
+            RecordHeaderField::RecordIndex,
+            SourceValue::Present(chosen.record_index),
+        )?,
         path: origins.uses.value(
             SourceValue::Present(chosen.path.to_owned()),
             &inputs.construction,
@@ -167,10 +176,15 @@ fn header_inputs(
     origins: &CatalogOrigins,
     record_index: u32,
 ) -> Result<Vec<SourceUse>, CatalogError> {
-    ["$guid", "$type", "$recordIndex"]
-        .into_iter()
-        .map(|field| observe(origins, record_index, field, SourceUseRole::Selector))
-        .collect()
+    let context = origins.record(record_index);
+    [
+        RecordHeaderField::Guid,
+        RecordHeaderField::SourceType,
+        RecordHeaderField::RecordIndex,
+    ]
+    .into_iter()
+    .map(|field| context.observe_header(field, SourceUseRole::Selector))
+    .collect()
 }
 
 fn observe(

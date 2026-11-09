@@ -18,6 +18,8 @@ mod compare;
 mod fixture;
 #[path = "resource_oracle/groups.rs"]
 mod groups;
+#[path = "resource_oracle/record_header.rs"]
+mod record_header;
 #[path = "resource_oracle/values.rs"]
 mod values;
 

@@ -9,6 +9,7 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::{self, CatalogFields};
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::guid_text::CatalogGuid;
+use crate::record_header_field::RecordHeaderField;
 use crate::source_fields::FieldError;
 
 /// Freezes both original membership arrays before the selected group map is constructed.
@@ -28,9 +29,14 @@ pub(crate) fn read(
                 guid: CatalogGuid(tree.guid()),
                 record_index: tree.record_index(),
             },
-            guid: context.value("$guid", SourceValue::Present(CatalogGuid(tree.guid())))?,
-            record_index: context
-                .selector("$recordIndex", SourceValue::Present(tree.record_index()))?,
+            guid: context.header_value(
+                RecordHeaderField::Guid,
+                SourceValue::Present(CatalogGuid(tree.guid())),
+            )?,
+            record_index: context.header_selector(
+                RecordHeaderField::RecordIndex,
+                SourceValue::Present(tree.record_index()),
+            )?,
             groups,
             resources,
         },

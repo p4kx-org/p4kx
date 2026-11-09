@@ -7,6 +7,7 @@ use p4kx_export::CatalogPublicationMode;
 use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult, at};
+use crate::commodity_v3_source_inventory::{body, header};
 use crate::commodity_v3_source_inventory::{reference_closure, uses};
 use crate::resource_group_v3_fixture as fixture;
 
@@ -16,16 +17,20 @@ fn group_headers_arrays_and_reference_headers_retain_exact_independent_source_ce
     let (_, catalog) = fixture::diagnostic(&fixture::graph())?;
     let group = fixture::row(&catalog, "definitions/resourceGroups", 0)?;
     for (field, input, role) in [
-        ("guid", "$guid", "payload"),
-        ("recordName", "$name", "payload"),
-        ("recordIndex", "$recordIndex", "selector"),
-        ("sourceType", "$type", "selector"),
-        ("recordPath", "$recordPath", "payload"),
-        ("defaultThumbnailPath", "defaultThumbnailPath", "payload"),
+        ("guid", header("guid"), "payload"),
+        ("recordName", header("recordName"), "payload"),
+        ("recordIndex", header("recordIndex"), "selector"),
+        ("sourceType", header("sourceType"), "selector"),
+        ("recordPath", header("fileName"), "conversion"),
+        (
+            "defaultThumbnailPath",
+            body("defaultThumbnailPath"),
+            "payload",
+        ),
     ] {
         assert_eq!(
             uses(&catalog, at(group, &format!("/{field}"))?)?,
-            BTreeSet::from([(0, input.to_owned(), role.to_owned())]),
+            BTreeSet::from([(0, input, role.to_owned())]),
             "the canonical ResourceGroup source contract is preserved"
         );
     }
@@ -142,13 +147,13 @@ fn assert_member_origins(catalog: &Value) -> TestResult {
     let members = fixture::row(catalog, "declarations/resourceGroupMembers", 0)?;
     assert_eq!(
         uses(catalog, at(members, "/groups")?)?,
-        BTreeSet::from([(0, "groups".to_owned(), "payload".to_owned())]),
+        BTreeSet::from([(0, body("groups"), "payload".to_owned())]),
         "the canonical ResourceGroup source contract is preserved"
     );
     let edge = at(members, "/groups/value/3")?;
     assert_eq!(
         uses(catalog, edge)?,
-        BTreeSet::from([(0, "groups[3]".to_owned(), "payload".to_owned())]),
+        BTreeSet::from([(0, body("groups[3]"), "payload".to_owned())]),
         "the canonical ResourceGroup source contract is preserved"
     );
     assert_eq!(
@@ -159,14 +164,14 @@ fn assert_member_origins(catalog: &Value) -> TestResult {
     let target = at(edge, "/value/targetRecordIndex/value")?
         .as_u64()
         .ok_or("physical target")?;
-    for (field, source) in [
-        ("targetRecordIndex", "$recordIndex"),
-        ("targetType", "$type"),
-        ("recordPath", "$recordPath"),
+    for (field, source, role) in [
+        ("targetRecordIndex", "recordIndex", "selector"),
+        ("targetType", "sourceType", "selector"),
+        ("recordPath", "fileName", "conversion"),
     ] {
         assert_eq!(
             uses(catalog, at(edge, &format!("/value/{field}"))?)?,
-            BTreeSet::from([(target, source.to_owned(), "selector".to_owned())]),
+            BTreeSet::from([(target, header(source), role.to_owned())]),
             "the canonical ResourceGroup source contract is preserved"
         );
     }
@@ -200,20 +205,20 @@ fn assert_parent_prefix(
 ) -> TestResult {
     let actual = uses(catalog, decision)?;
     assert!(
-        actual.contains(&(winner, "groups[0]".to_owned(), "selector".to_owned())),
+        actual.contains(&(winner, body("groups[0]"), "selector".to_owned())),
         "the original chosen edge contributes"
     );
     assert!(
-        actual.contains(&(winner, "$guid".to_owned(), "payload".to_owned())),
+        actual.contains(&(winner, header("guid"), "payload".to_owned())),
         "the chosen parent identity contributes"
     );
     assert!(
-        actual.contains(&(2, "$guid".to_owned(), "selector".to_owned())),
+        actual.contains(&(2, header("guid"), "selector".to_owned())),
         "the child identity selects its parent"
     );
     if before {
         assert!(
-            !actual.contains(&(0, "groups".to_owned(), "attempted".to_owned())),
+            !actual.contains(&(0, body("groups"), "attempted".to_owned())),
             "attempts are observations rather than retained contributors"
         );
         let inventory = at(catalog, "/provenance/uses")?
@@ -273,13 +278,13 @@ fn an_unreadable_first_header_retains_the_known_physical_order_selector() -> Tes
     );
     let used = uses(&catalog, choice)?;
     assert!(
-        used.contains(&(0, "$recordIndex".to_owned(), "selector".to_owned())),
+        used.contains(&(0, header("recordIndex"), "selector".to_owned())),
         "the known original occurrence remains an actual order selector"
     );
     assert!(
         !used
             .iter()
-            .any(|(index, field, _)| *index == 0 && field == "$recordPath"),
+            .any(|(index, field, _)| *index == 0 && field == &header("fileName")),
         "failed metadata is not a retained contribution"
     );
     let inventory = at(&catalog, "/provenance/uses")?
@@ -288,11 +293,11 @@ fn an_unreadable_first_header_retains_the_known_physical_order_selector() -> Tes
     assert!(
         inventory.iter().any(
             |used| used.get("role").and_then(Value::as_str) == Some("attempted")
-                && used
-                    .pointer("/location/recordIndex")
-                    .and_then(Value::as_u64)
-                    == Some(0)
-                && used.pointer("/location/field").and_then(Value::as_str) == Some("$recordPath")
+                && used.pointer("/location/type").and_then(Value::as_str) == Some("subresource")
+                && used.pointer("/location/namespace").and_then(Value::as_str)
+                    == Some("dataforgeRecordHeader")
+                && used.pointer("/location/indices") == Some(&json!(["0"]))
+                && used.pointer("/location/field").and_then(Value::as_str) == Some("fileName")
         ),
         "the actual failed header read remains observable separately"
     );
@@ -310,14 +315,14 @@ fn a_no_parent_result_excludes_identity_inputs_used_only_for_other_children() ->
     );
     let actual = uses(&catalog, parent)?;
     assert!(
-        actual.contains(&(4, "$guid".to_owned(), "selector".to_owned())),
+        actual.contains(&(4, header("guid"), "selector".to_owned())),
         "the queried child GUID contributes to its own lookup"
     );
     for candidate in [0, 1, 5, 6] {
         assert!(
             !actual
                 .iter()
-                .any(|(index, field, _)| *index == candidate && field == "$guid"),
+                .any(|(index, field, _)| *index == candidate && field == &header("guid")),
             "a different child's self-check does not contribute to this no-parent result"
         );
     }

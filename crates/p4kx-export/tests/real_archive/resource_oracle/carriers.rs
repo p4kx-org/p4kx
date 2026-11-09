@@ -3,6 +3,8 @@
 
 #[path = "dcb_binding.rs"]
 mod dcb_binding;
+#[path = "source_coordinate.rs"]
+mod source_coordinate;
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -10,6 +12,7 @@ use p4kx_extraction::{DataForgeOrigin, SourceEncryption, SourceUseRole};
 use serde_json::Value;
 
 use self::dcb_binding::dcb_source;
+use self::source_coordinate::Coordinate;
 use super::{Failure, Result};
 
 const MAX_USES: usize = 262_144;
@@ -69,21 +72,11 @@ impl<'catalog> Uses<'catalog> {
             if observation["source"] == self.dcb
                 && observation["role"] == "payload"
                 && observation["scope"] == "payload"
-                && observation
-                    .pointer("/location/type")
-                    .and_then(Value::as_str)
-                    == Some("dataForge")
-                && observation
-                    .pointer("/location/field")
-                    .and_then(Value::as_str)
-                    == Some("$guid")
             {
-                let index = observation
-                    .pointer("/location/recordIndex")
-                    .and_then(Value::as_u64)
-                    .and_then(|index| u32::try_from(index).ok())
-                    .ok_or_else(|| Failure::check("physical-record-index"))?;
-                indices.insert(index);
+                let (index, coordinate) = source_coordinate::read(observation)?;
+                if coordinate == Coordinate::Header("guid") {
+                    indices.insert(index);
+                }
             }
         }
         let mut indices = indices.into_iter();
@@ -122,13 +115,10 @@ impl<'catalog> Uses<'catalog> {
                 || observation["source"] != self.dcb
                 || observation["scope"] != "payload"
                 || !self.roles.contains(&observation["role"])
-                || observation
-                    .pointer("/location/type")
-                    .and_then(Value::as_str)
-                    != Some("dataForge")
             {
                 return Ok(false);
             }
+            let _coordinate = source_coordinate::read(observation)?;
         }
         Ok(true)
     }
@@ -148,7 +138,7 @@ fn contributing_roles() -> Result<[Value; 3]> {
 pub(super) struct Carriers<'catalog> {
     row: &'catalog Value,
     owner: u32,
-    fields: HashMap<(u32, &'catalog str), Vec<&'catalog Value>>,
+    fields: HashMap<(u32, Coordinate<'catalog>), Vec<&'catalog Value>>,
 }
 
 impl<'catalog> Carriers<'catalog> {
@@ -199,15 +189,7 @@ impl<'catalog> Carriers<'catalog> {
             .ok_or_else(|| Failure::check("field-source-uses"))?;
         for reference in references {
             let observation = uses.get(reference)?;
-            let owner = observation
-                .pointer("/location/recordIndex")
-                .and_then(Value::as_u64)
-                .and_then(|index| u32::try_from(index).ok())
-                .ok_or_else(|| Failure::check("dataforge-use-record"))?;
-            let field = observation
-                .pointer("/location/field")
-                .and_then(Value::as_str)
-                .ok_or_else(|| Failure::check("dataforge-use-field"))?;
+            let (owner, field) = source_coordinate::read(observation)?;
             self.fields.entry((owner, field)).or_default().push(value);
         }
         Ok(())
@@ -227,14 +209,33 @@ impl<'catalog> Carriers<'catalog> {
     }
 
     pub(super) fn require_at(&self, carrier: &Value, owner: u32, path: &str) -> Result<()> {
-        if self.fields.get(&(owner, path)).is_some_and(|values| {
-            values
-                .iter()
-                .any(|candidate| std::ptr::eq(*candidate, carrier))
-        }) {
+        if self
+            .fields
+            .get(&(owner, Coordinate::Body(path)))
+            .is_some_and(|values| {
+                values
+                    .iter()
+                    .any(|candidate| std::ptr::eq(*candidate, carrier))
+            })
+        {
             return Ok(());
         }
         Err(Failure::check("bound-field-origin"))
+    }
+
+    pub(super) fn require_header_at(&self, carrier: &Value, owner: u32, field: &str) -> Result<()> {
+        if self
+            .fields
+            .get(&(owner, Coordinate::Header(field)))
+            .is_some_and(|values| {
+                values
+                    .iter()
+                    .any(|candidate| std::ptr::eq(*candidate, carrier))
+            })
+        {
+            return Ok(());
+        }
+        Err(Failure::check("bound-header-origin"))
     }
 
     pub(super) fn child(

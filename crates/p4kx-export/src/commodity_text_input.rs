@@ -6,6 +6,14 @@ use p4kx_extraction::{SourceValue, SourceValueState, SourcedValue};
 use crate::CatalogError;
 use crate::catalog_read::CatalogRecordContext;
 use crate::commodity_authoring_inputs;
+use crate::record_header_field::RecordHeaderField;
+
+/// An explicitly typed original selector used to find a text candidate.
+#[derive(Debug, Clone)]
+pub(crate) enum CommodityTextSelector {
+    Body(String),
+    Header(RecordHeaderField),
+}
 
 /// A raw text key and the original selectors used to find its component.
 #[derive(Debug, Clone)]
@@ -13,7 +21,7 @@ pub(crate) struct CommodityTextInput<'source> {
     pub(crate) key: SourcedValue<&'source str>,
     pub(crate) record_index: u32,
     pub(crate) field: String,
-    pub(crate) selectors: Vec<String>,
+    pub(crate) selectors: Vec<CommodityTextSelector>,
     pub(crate) selectors_complete: bool,
 }
 
@@ -32,7 +40,11 @@ impl<'source> CommodityTextInput<'source> {
         }
     }
 
-    pub(crate) fn with_selectors(mut self, selectors: &[String], complete: bool) -> Self {
+    pub(crate) fn with_selectors(
+        mut self,
+        selectors: &[CommodityTextSelector],
+        complete: bool,
+    ) -> Self {
         self.selectors = selectors.to_vec();
         self.selectors_complete = complete;
         self
@@ -52,7 +64,10 @@ impl<'source> CommodityTextInput<'source> {
             key: context.value(field, value)?,
             record_index,
             field: field.to_owned(),
-            selectors,
+            selectors: selectors
+                .into_iter()
+                .map(CommodityTextSelector::Body)
+                .collect(),
             selectors_complete: complete,
         })
     }

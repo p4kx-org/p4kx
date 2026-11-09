@@ -1,5 +1,8 @@
 # Canonical ResourceGroup source tables
 
+The [shared Record-header contract](catalog-record-headers.md) defines the eight sourced header
+fields, exact original filename/metadata-tag states and separate Header/Body provenance coordinates.
+
 P4KX 0.5.0 emits only catalog schema v3. `definitions.resourceGroups` owns every selected physical
 ResourceTypeGroup's original header, `name` from displayName, protected `description` and original
 thumbnail paths. Selection remains the existing resourcetypedatabase path/type rule, Entity Filter

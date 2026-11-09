@@ -8,6 +8,7 @@ use serde_json::{Value, json};
 
 use crate::catalog_tags_fixture::{self as fixture, TestResult, at};
 use crate::commodity_v3_fixture::DcbOrigin;
+use crate::commodity_v3_source_inventory::{body, header};
 use crate::commodity_v3_source_inventory::{reference_closure, uses};
 
 #[test]
@@ -15,40 +16,40 @@ fn direct_headers_names_arrays_and_reference_fields_retain_separate_physical_use
     let (_, catalog) = fixture::diagnostic(&fixture::graph())?;
     let row = fixture::row(&catalog, "definitions/tags", 0)?;
     for (field, source, role) in [
-        ("guid", "$guid", "payload"),
-        ("recordName", "$name", "payload"),
-        ("recordPath", "$recordPath", "payload"),
-        ("recordIndex", "$recordIndex", "selector"),
-        ("sourceType", "$type", "selector"),
-        ("tagName", "tagName", "payload"),
-        ("legacyGuid", "legacyGUID", "payload"),
-        ("children", "children", "payload"),
+        ("guid", header("guid"), "payload"),
+        ("recordName", header("recordName"), "payload"),
+        ("recordPath", header("fileName"), "conversion"),
+        ("recordIndex", header("recordIndex"), "selector"),
+        ("sourceType", header("sourceType"), "selector"),
+        ("tagName", body("tagName"), "payload"),
+        ("legacyGuid", body("legacyGUID"), "payload"),
+        ("children", body("children"), "payload"),
     ] {
         assert_eq!(
             uses(&catalog, at(row, &format!("/{field}"))?)?,
-            BTreeSet::from([(0, source.to_owned(), role.to_owned())])
+            BTreeSet::from([(0, source, role.to_owned())])
         );
     }
     let child = at(row, "/children/value/3")?;
     assert_eq!(
         uses(&catalog, child)?,
-        BTreeSet::from([(0, "children[3]".to_owned(), "payload".to_owned())])
+        BTreeSet::from([(0, body("children[3]"), "payload".to_owned())])
     );
     assert_eq!(
         uses(&catalog, at(child, "/value/guid")?)?,
-        BTreeSet::from([(0, "children[3]".to_owned(), "payload".to_owned())])
+        BTreeSet::from([(0, body("children[3]"), "payload".to_owned())])
     );
     let target_index = at(child, "/value/targetRecordIndex/value")?
         .as_u64()
         .ok_or("target index")?;
-    for (field, source) in [
-        ("targetRecordIndex", "$recordIndex"),
-        ("targetType", "$type"),
-        ("recordPath", "$recordPath"),
+    for (field, source, role) in [
+        ("targetRecordIndex", "recordIndex", "selector"),
+        ("targetType", "sourceType", "selector"),
+        ("recordPath", "fileName", "conversion"),
     ] {
         assert_eq!(
             uses(&catalog, at(child, &format!("/value/{field}"))?)?,
-            BTreeSet::from([(target_index, source.to_owned(), "selector".to_owned())])
+            BTreeSet::from([(target_index, header(source), role.to_owned())])
         );
     }
     assert_eq!(
@@ -66,14 +67,14 @@ fn convenience_path_uses_only_the_actual_chosen_occurrences_and_ancestor_names()
     let row = fixture::row(&catalog, "projections/tagPaths", 1)?;
     let actual = uses(&catalog, at(row, "/path")?)?;
     let mut expected = BTreeSet::from([
-        (0, "tagName".to_owned(), "conversion".to_owned()),
-        (1, "tagName".to_owned(), "conversion".to_owned()),
-        (4, "tags[2]".to_owned(), "selector".to_owned()),
-        (0, "children[3]".to_owned(), "selector".to_owned()),
+        (0, body("tagName"), "conversion".to_owned()),
+        (1, body("tagName"), "conversion".to_owned()),
+        (4, body("tags[2]"), "selector".to_owned()),
+        (0, body("children[3]"), "selector".to_owned()),
     ]);
     for record in [0, 1, 4] {
-        for field in ["$guid", "$type", "$recordIndex"] {
-            expected.insert((record, field.to_owned(), "selector".to_owned()));
+        for field in ["guid", "sourceType", "recordIndex"] {
+            expected.insert((record, header(field), "selector".to_owned()));
         }
     }
     assert_eq!(
@@ -89,11 +90,11 @@ fn convenience_path_uses_only_the_actual_chosen_occurrences_and_ancestor_names()
     );
     let depth = uses(&catalog, at(row, "/depth")?)?;
     assert!(
-        depth.contains(&(0, "tagName".to_owned(), "selector".to_owned())),
+        depth.contains(&(0, body("tagName"), "selector".to_owned())),
         "ancestor name participates in the path-budget selection"
     );
     assert!(
-        depth.contains(&(1, "tagName".to_owned(), "selector".to_owned())),
+        depth.contains(&(1, body("tagName"), "selector".to_owned())),
         "selected child name participates in its path-budget selection"
     );
     let unlisted = uses(
@@ -119,13 +120,17 @@ fn entity_root_array_and_repeated_elements_use_their_actual_owning_record() -> T
         .ok_or("owner index")?;
     assert_eq!(
         uses(&catalog, at(row, "/tags")?)?,
-        BTreeSet::from([(index, "tags".to_owned(), "payload".to_owned())])
+        BTreeSet::from([(index, body("tags"), "payload".to_owned())])
     );
     for ordinal in 0..3 {
         let element = at(row, &format!("/tags/value/{ordinal}"))?;
         assert_eq!(
             uses(&catalog, element)?,
-            BTreeSet::from([(index, format!("tags[{ordinal}]"), "payload".to_owned())])
+            BTreeSet::from([(
+                index,
+                body(&format!("tags[{ordinal}]")),
+                "payload".to_owned()
+            )])
         );
     }
     reference_closure(&catalog)?;
@@ -212,7 +217,7 @@ fn equal_database_guids_keep_both_physical_root_declarations_and_the_selected_ow
     );
     let inputs = uses(&catalog, at(path, "/path")?)?;
     assert!(
-        inputs.contains(&(7, "tags[0]".to_owned(), "selector".to_owned())),
+        inputs.contains(&(7, body("tags[0]"), "selector".to_owned())),
         "original physical database owns the selected incoming slot"
     );
     assert!(

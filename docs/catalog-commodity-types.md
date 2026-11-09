@@ -1,5 +1,8 @@
 # Canonical Commodity definitions and presentation
 
+The [shared Record-header contract](catalog-record-headers.md) defines the eight sourced header
+fields, exact original filename/metadata-tag states and separate Header/Body provenance coordinates.
+
 Catalog schema 3 publishes `definitions.commodities` and
 `projections.commodityPresentation`. Each is a typed dataset with `availability` and `rows`.
 The root `commodities` array is removed. Both tables use the existing Commodity selection and
@@ -22,7 +25,8 @@ is independent of game-text protection, selection completeness and publication h
 | Definition field | Actual source and scope |
 | --- | --- |
 | `guid` | The actual Entity Record GUID, or the actual ResourceType GUID for resource fallback. |
-| `className` | The existing type-prefix removal from the original Record name; `$name` conversion and `$type` selector inputs are retained. |
+| `className` | The existing type-prefix removal from the original Record name; original header recordName conversion and sourceType selector inputs are retained; a no-string name keeps only its actual default selector. |
+| `recordName`, `fileName`, `metadataTag` | Exact stored name, filename and separate Record-table metadata tag, with the shared sentinel/layout states. |
 | `recordPath`, `recordIndex`, `sourceType` | The original normalized Record path, physical DataForge Record position and concrete source struct name. Physical position and nominal GUID remain different identities. |
 | `selection` | Closed `entity` or `resourceFallback` choice, with the actual selection inputs. Resource fallback retains its eligibility and representation-check inputs here. |
 | `selectionDiagnostics` | Separate origin-capture bookkeeping. `originMetadataLimit` names a bounded field/selector-metadata capture limit; `originTargetInventoryLimit` names the separate bounded affected-target inventory. Each carries its actual source Record index and applies only to the affected resource/kept-quantization decision. It does not claim a payload read failure. |

@@ -14,6 +14,7 @@ use crate::commodity_inputs::CommodityInputs;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
 use crate::picked::Picked;
+use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::selection::Kind;
 
 pub(crate) struct BackfillEvidence<'context> {
@@ -30,8 +31,13 @@ pub(crate) fn for_resource<'context>(
     origins: &'context CatalogOrigins,
 ) -> Result<BackfillEvidence<'context>, CatalogError> {
     let mut inputs = CommodityInputs::new(origins);
-    for field in ["$guid", "$type", "$recordPath", "$name"] {
-        inputs.at(tree.record_index(), field, SourceUseRole::Selector)?;
+    for field in [
+        RecordHeaderInput::Field(RecordHeaderField::Guid),
+        RecordHeaderInput::Field(RecordHeaderField::SourceType),
+        RecordHeaderInput::NormalizedPath,
+        RecordHeaderInput::Field(RecordHeaderField::RecordName),
+    ] {
+        inputs.header_input(tree.record_index(), field, SourceUseRole::Selector)?;
     }
     let mut eligibility = false;
     for input in &crafting.ledger.commodity_backfill_inputs {
@@ -122,8 +128,12 @@ fn observe(
     input: &CommodityBackfillInput,
     inputs: &mut CommodityInputs<'_>,
 ) -> Result<(), CatalogError> {
-    for field in ["$type", "$recordPath", "$name"] {
-        inputs.at(input.record_index, field, SourceUseRole::Selector)?;
+    for field in [
+        RecordHeaderInput::Field(RecordHeaderField::SourceType),
+        RecordHeaderInput::NormalizedPath,
+        RecordHeaderInput::Field(RecordHeaderField::RecordName),
+    ] {
+        inputs.header_input(input.record_index, field, SourceUseRole::Selector)?;
     }
     for field in &input.selectors {
         inputs.at(input.record_index, field, SourceUseRole::Selector)?;
@@ -149,8 +159,13 @@ fn quantization_selectors(
         }) {
             continue;
         }
-        for field in ["$guid", "$type", "$recordPath", "$name"] {
-            inputs.at(source.record_index, field, SourceUseRole::Selector)?;
+        for field in [
+            RecordHeaderInput::Field(RecordHeaderField::Guid),
+            RecordHeaderInput::Field(RecordHeaderField::SourceType),
+            RecordHeaderInput::NormalizedPath,
+            RecordHeaderInput::Field(RecordHeaderField::RecordName),
+        ] {
+            inputs.header_input(source.record_index, field, SourceUseRole::Selector)?;
         }
         observed = true;
     }
@@ -215,9 +230,10 @@ fn limits(
         if !reported.insert((limit.record_index, limit.target.is_some())) {
             continue;
         }
-        let record_index = origins
-            .record(limit.record_index)
-            .selector("$recordIndex", SourceValue::Present(limit.record_index))?;
+        let record_index = origins.record(limit.record_index).header_selector(
+            RecordHeaderField::RecordIndex,
+            SourceValue::Present(limit.record_index),
+        )?;
         diagnostics.push(CommoditySelectionDiagnostic {
             code: if limit.target.is_some() {
                 "originMetadataLimit"

@@ -9,6 +9,7 @@ use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
 use crate::commodity_inputs::CommodityInputs;
 use crate::guid_text::CatalogGuid;
+use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::resource_group::Groups;
 
 /// Reproduces the first selected group without replacing original scan order by GUID order.
@@ -25,13 +26,21 @@ pub(crate) fn first_group(
     };
     let choice = groups.first_of_resource(&subtype.0);
     for source in choice.selectors() {
-        for field in ["$recordPath", "$type", "$name"] {
-            inputs.at(source.record_index, field, SourceUseRole::Selector)?;
+        for field in [
+            RecordHeaderInput::NormalizedPath,
+            RecordHeaderInput::Field(RecordHeaderField::SourceType),
+            RecordHeaderInput::Field(RecordHeaderField::RecordName),
+        ] {
+            inputs.header_input(source.record_index, field, SourceUseRole::Selector)?;
         }
         inputs.at(source.record_index, "resources", source.resources_role)?;
     }
     if let Some(source) = choice.selected {
-        inputs.at(source.record_index, "$guid", SourceUseRole::Payload)?;
+        inputs.header(
+            source.record_index,
+            RecordHeaderField::Guid,
+            SourceUseRole::Payload,
+        )?;
         inputs.at(
             source.record_index,
             &format!("resources[{}]", source.position),
@@ -159,7 +168,11 @@ pub(crate) fn refined(
                 "refinedVersion",
                 SourceUseRole::Payload,
             )?;
-            inputs.at(target.record_index(), "$guid", SourceUseRole::Selector)?;
+            inputs.header(
+                target.record_index(),
+                RecordHeaderField::Guid,
+                SourceUseRole::Selector,
+            )?;
             Some(CatalogGuid(target.guid()))
         }
         _ => None,

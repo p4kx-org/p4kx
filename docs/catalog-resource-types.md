@@ -1,5 +1,8 @@
 # Resource catalog contract
 
+The [shared Record-header contract](catalog-record-headers.md) defines the eight sourced header
+fields, exact original filename/metadata-tag states and separate Header/Body provenance coordinates.
+
 The catalog uses schema version 3. The ResourceType family is published at
 `definitions.resourceTypes.rows`, with immediate source origin on every source-backed field and
 nested list element. Its localized names and descriptions use canonical text tables. Commodities
@@ -28,7 +31,7 @@ directly lists that resource; it is not the list of all group memberships.
 The existing ResourceType-backed commodity fallback remains limited to otherwise unrepresented
 resources used by blueprint costs or kept quality quantizations. It uses the resource GUID for
 both `guid` and `subtypeGuid`. This does not limit independent ResourceType selection.
-`densityGramsPerCubicCentimetre` retains its existing finite g/cmÃ‚Â³ meaning; other units are not
+`densityGramsPerCubicCentimetre` retains its existing finite g/cm^3 meaning; other units are not
 converted into it. The derived nullable value now uses its own direct field carrier in `projections.commodityPresentation`.
 The [Commodity contract](catalog-commodity-types.md) documents the separate authored definitions, exact old-value reconstruction and precise selection origins.
 
@@ -46,7 +49,7 @@ reference `status` and table availability remain typed control metadata.
 
 | Field | Source and value contract |
 | --- | --- |
-| `guid`, `className`, `recordPath` | Persistent GUID, unprefixed Record name and normalized Record path. These are sourced data too. |
+| `guid`, `recordName`, `className`, `recordPath`, `recordIndex`, `sourceType`, `fileName`, `metadataTag` | The shared eight-field original Record header, including exact filename and metadata declaration state. Every field has its own immediate origin. |
 | `name`, `description` | Authored `displayName`/`description` keys projected to a `PublicNameRef`/`GameTextRef`; description carries `x-gameText`. |
 | `groupGuids` | All distinct selected groups directly listing the resource, sorted by GUID; no inferred transitive membership. Each GUID has its own carrier. |
 | `refinedVersion` | Authored ResourceType reference with sourced GUID, physical target index, path and type, plus source-resolution status. |

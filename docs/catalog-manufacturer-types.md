@@ -1,5 +1,8 @@
 # Canonical Manufacturer definitions
 
+The [shared Record-header contract](catalog-record-headers.md) defines the eight sourced header
+fields, exact original filename/metadata-tag states and separate Header/Body provenance coordinates.
+
 Catalog schema 3 emits only `definitions.manufacturers`, with `availability` and `rows`.
 There is no root `manufacturers` array or compatibility view. Kind `manufacturers`, logical row
 counts, Filter completeness and publication health retain their meanings. The source family is
@@ -26,11 +29,13 @@ is a direct conservative filter index over actual used inputs, independently of 
 | Row field | Meaning/source |
 | --- | --- |
 | `guid` | Original Record GUID, canonical lower-case UUID text |
-| `recordName` | Exact unstripped Record name |
+| `recordName` | Exact unstripped Record name; no-string sentinel is null, stored empty text is present |
 | `className` | Existing type-prefix removal; original name retained when removal does not apply |
 | `recordPath` | Original Record path without `.xml` |
 | `recordIndex` | Original physical DataForge Record index, independent of output sorting |
 | `sourceType` | Actual selected Record type |
+| `fileName` | Exact stored filename, including original suffix, case and separators |
+| `metadataTag` | Raw Record-table tag: v6 absent, v8 sentinel null, actual empty text present |
 | `code` | Raw `Code` String, including an authored empty string; no enum/code/name fallback |
 | `localization` | Actual owned `Localization` state, including absent/null/unreadable/invalid |
 
@@ -60,7 +65,8 @@ Text summaries count actual authored lookup occurrences, not unique canonical ro
 retained empty key therefore adds unresolved occurrences. Deduplication can reduce bytes while
 retaining those counts. The existing text identifier algorithm is unchanged.
 
-A raw header, Code or authored text reference uses its own actual DataForge fields. The className
+A raw header uses its own original dataforgeRecordHeader coordinate; Code and authored text
+references retain their actual DataForge body paths. The className
 derivation uses the actual name and type inputs. A localized translation also uses its own winning
 language payload/selector/conversion evidence. Merely loaded encrypted locales and untouched
 reference targets do not taint unrelated Manufacturer facts. Unknown input evidence remains
