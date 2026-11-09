@@ -27,7 +27,7 @@ pub(crate) fn write(
             "The owning source has malformed or unavailable global layout declarations; lazy row checks remain independent.",
         )]
     };
-    writer.record(
+    writer.archive_layout_record(
         &Subresource::new(LAYOUT_NAMESPACE, Vec::new()),
         if issues.is_empty() {
             Status::Complete

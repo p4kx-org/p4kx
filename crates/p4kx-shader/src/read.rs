@@ -7,8 +7,6 @@ use std::str;
 use crate::{Budget, Definition, Encoding, Limits, ReadError, Span, SyntaxError, SyntaxErrorKind};
 use crate::{lexer, parser};
 
-const MAX_DEPTH: usize = 128;
-
 /// Reads ordered declarations while borrowing the exact original source.
 ///
 /// # Errors
@@ -39,9 +37,7 @@ pub fn read_with<E>(
         )
         .into());
     }
-    if limits.depth > MAX_DEPTH {
-        return Err(SyntaxError::limit(Budget::Depth, MAX_DEPTH, Span::new(0, 0)).into());
-    }
+    limits.validate_configuration()?;
     let text = str::from_utf8(source).map_err(|error| {
         let start = error.valid_up_to();
         let end = error.error_len().map_or(source.len(), |size| start + size);

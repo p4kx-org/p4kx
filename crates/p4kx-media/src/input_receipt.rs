@@ -4,6 +4,7 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::origin_input::MediaOriginInput;
 use crate::{Digest, Source, Subresource};
 
 /// Why required input bytes have no published raw reference.
@@ -30,4 +31,7 @@ pub struct InputReceipt {
     pub omission: Option<InputOmission>,
     /// Source-local declaration that actually requires this input.
     pub use_at: Subresource,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) origin: Option<MediaOriginInput>,
 }

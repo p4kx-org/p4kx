@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::origin_input::MediaOriginInput;
+use p4kx_extraction::InputScope;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -16,6 +19,7 @@ pub(crate) fn place(
     source_namespace: &OwnedDirectoryPermit,
     digest: Digest,
     size: u64,
+    origin: &MediaOriginInput,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(RawReference, PathBuf), MediaError> {
     if !output_path::file(payload)? {
@@ -51,11 +55,15 @@ pub(crate) fn place(
                 cause: Box::new(cause.into()),
             })?;
     }
-    writer.artifact(&Artifact {
-        path: relative.clone(),
-        size,
-        digest: digest.clone(),
-    })?;
+    writer.artifact_with_input(
+        &Artifact {
+            path: relative.clone(),
+            size,
+            digest: digest.clone(),
+        },
+        origin,
+        InputScope::Payload,
+    )?;
     Ok((
         RawReference {
             path: relative,

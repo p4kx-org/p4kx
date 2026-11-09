@@ -57,7 +57,7 @@ pub(crate) fn write(
         } else {
             Vec::new()
         };
-        writer.record(
+        writer.archive_layout_record(
             &Subresource::new(RECORD_NAMESPACE, vec![position]),
             if issues.is_empty() {
                 Status::Complete

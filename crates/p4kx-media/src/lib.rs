@@ -71,6 +71,67 @@ mod metadata_input;
 mod metadata_input_tests;
 mod numeric;
 mod observed_write;
+mod origin_addresses;
+mod origin_aggregate;
+#[cfg(test)]
+mod origin_aggregate_support;
+mod origin_archive;
+#[cfg(test)]
+mod origin_atomic_tests;
+mod origin_capture;
+#[cfg(test)]
+mod origin_capture_tests;
+mod origin_contract;
+mod origin_contributions;
+mod origin_coverage_read;
+mod origin_data;
+mod origin_decimal;
+#[cfg(test)]
+mod origin_deep_tests;
+#[cfg(test)]
+mod origin_depth_tests;
+mod origin_error;
+mod origin_fact_read;
+mod origin_index;
+mod origin_input;
+mod origin_inventory_read;
+#[cfg(test)]
+mod origin_inventory_tests;
+mod origin_inventory_wire;
+mod origin_json;
+mod origin_line_reader;
+mod origin_payload_read;
+#[cfg(test)]
+mod origin_pipeline_tests;
+mod origin_prepared;
+#[cfg(test)]
+mod origin_profile_tests;
+mod origin_read_policy;
+#[cfg(test)]
+mod origin_read_support;
+#[cfg(test)]
+mod origin_record_aggregate_tests;
+#[cfg(test)]
+mod origin_record_budget_tests;
+mod origin_resolver;
+mod origin_rows_read;
+#[cfg(test)]
+mod origin_shader_failure_tests;
+mod origin_source;
+#[cfg(test)]
+mod origin_source_aggregate_tests;
+mod origin_source_facts;
+mod origin_source_identity;
+mod origin_source_shape;
+mod origin_state;
+mod origin_stream;
+mod origin_subject;
+#[cfg(test)]
+mod origin_tamper_tests;
+#[cfg(test)]
+mod origin_test_support;
+mod origin_value_read;
+mod origin_verify;
 mod output_operation;
 mod output_path;
 #[cfg(test)]
@@ -115,6 +176,9 @@ mod traversal_projection;
 mod traversal_visit;
 #[cfg(test)]
 mod write_context_tests;
+mod writer_manifest;
+mod writer_origins;
+mod writer_record;
 
 pub use archive_metadata_diagnostic::{ArchiveMetadataDiagnostic, ArchiveMetadataFailure};
 pub use archive_provider::ArchiveProvider;
@@ -154,6 +218,10 @@ pub use material_shader_reference::{MaterialShaderReference, MaterialShaderRole}
 pub use material_surface::{MaterialPalette, MaterialSurface, MaterialSurfaceBasis};
 pub use media_writer::MediaWriter;
 pub use numeric::{Float32, Float64, ValueOrigin};
+pub use origin_contract::{
+    OriginCoverage, OriginProfile, OriginProtocol, OriginReceipts, OriginScope, OriginStream,
+    OriginStreamSummary,
+};
 pub use p4kx_extraction::{
     ArchiveByteRange, ArchiveCigInstallation, ArchiveDeclarationState, ArchiveLayout,
     ArchiveLayoutInfo as ArchiveLayoutData, ArchiveMetadataVersion, ArchiveRegion,

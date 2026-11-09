@@ -3,7 +3,7 @@
 
 use crate::{DeclaredEncryption, EntryMetadata, EntryRecordFormat, ZipHeaderMetadata};
 
-const ZIP_ENCRYPTED_FLAG: u16 = 1;
+pub(crate) const ZIP_ENCRYPTED_FLAG: u16 = 1;
 const ZIP_STRONG_ENCRYPTION_FLAG: u16 = 1 << 6;
 
 /// Encryption evidence from supported source declarations, independently of payload reads.

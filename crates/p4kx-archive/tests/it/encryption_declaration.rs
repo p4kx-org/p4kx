@@ -7,3 +7,5 @@ mod context;
 mod fixture;
 mod malformed;
 mod valid;
+
+mod partial;

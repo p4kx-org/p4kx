@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::MediaError;
 
+pub(crate) const MAX_VALUE_DEPTH: u32 = 512;
+
 /// Bounds applied before reading or writing the next unit of work.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
@@ -31,11 +33,11 @@ pub struct Limits {
     pub record_bytes: u64,
     /// Bytes in one typed binary chunk.
     pub chunk_bytes: u64,
-    /// Bytes written to generation artifacts, excluding the separately bounded index.
+    /// Bytes written to payload artifacts, excluding the index and field-origin companion streams.
     pub output_bytes: u64,
     /// Ordered container chain length.
     pub depth: u32,
-    /// Maximum JSON value nesting, including the record envelope.
+    /// Maximum record JSON nesting, including its envelope.
     pub value_depth: u32,
     /// Reference queries across the generation.
     pub references: u64,
@@ -83,7 +85,7 @@ impl Limits {
                 "container depth exceeds reader capacity".into(),
             ));
         }
-        if self.value_depth == 0 || self.value_depth > 512 {
+        if self.value_depth == 0 || self.value_depth > MAX_VALUE_DEPTH {
             return Err(MediaError::Contract(
                 "value depth must be between one and 512".into(),
             ));

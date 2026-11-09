@@ -85,7 +85,9 @@ fn header(
         span: ShaderSpan::new(0, definition.source().len())?,
         counts,
     });
-    writer.record(
+    writer.shader_record(
+        context,
+        crate::origin_contract::OriginProfile::ShaderDefinition,
         &Subresource::new(DEFINITION_NAMESPACE, Vec::new()),
         Status::Complete,
         &data,
@@ -126,7 +128,9 @@ impl Emitter<'_, '_, '_, '_, '_> {
             declaration,
         });
         let path = self.copy_path()?;
-        self.writer.record(
+        self.writer.shader_record(
+            self.context,
+            crate::origin_contract::OriginProfile::ShaderProperty,
             &Subresource::new(PROPERTY_NAMESPACE, path),
             Status::Complete,
             &data,
@@ -157,7 +161,9 @@ impl Emitter<'_, '_, '_, '_, '_> {
             self.text, node, meaning, parent,
         )?);
         let path = self.copy_path()?;
-        self.writer.record(
+        self.writer.shader_record(
+            self.context,
+            crate::origin_contract::OriginProfile::ShaderDeclaration,
             &Subresource::new(DECLARATION_NAMESPACE, path),
             status,
             &data,

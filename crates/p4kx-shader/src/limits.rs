@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::{Budget, Span, SyntaxError};
+
+const MAX_DEPTH: usize = 128;
+
 /// Per-source limits applied before token or declaration storage grows.
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
@@ -30,6 +34,24 @@ impl Default for Limits {
             declarations: 16_384,
             properties: 4_096,
             depth: 64,
+        }
+    }
+}
+
+impl Limits {
+    /// Checks supported reader configuration without inspecting a source.
+    ///
+    /// # Errors
+    /// Returns a depth-limit diagnostic when nesting configuration exceeds the supported maximum.
+    pub const fn validate_configuration(&self) -> Result<(), SyntaxError> {
+        if self.depth > MAX_DEPTH {
+            Err(SyntaxError::limit(
+                Budget::Depth,
+                MAX_DEPTH,
+                Span::new(0, 0),
+            ))
+        } else {
+            Ok(())
         }
     }
 }

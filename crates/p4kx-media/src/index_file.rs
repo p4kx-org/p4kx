@@ -4,12 +4,12 @@
 use std::io::Write;
 use std::path::Path;
 
-use crate::artifact::BoundedLine;
 use crate::checkpoint::Checkpoint;
 use crate::error;
 use crate::generation::Boundary;
 use crate::json_output;
 use crate::observed_write::ObservedWrite;
+use crate::origin_index::{Budget, Buffer, Encoding};
 use crate::output_path;
 use crate::publication::Publication;
 use crate::temporary_file::TemporaryFile;
@@ -28,13 +28,12 @@ pub(crate) fn write(
     publication.check(path, checkpoint)?;
     output_path::ensure_directory(parent, checkpoint)?;
     output_path::file(path)?;
-    let mut line = BoundedLine::new(index.limits.record_bytes);
+    let mut line = Buffer::new(Budget::for_index(index, Encoding::Pretty)?);
     let serialised = serde_json::to_writer_pretty(ObservedWrite::new(&mut line, checkpoint), index);
     json_output::finish(serialised, *checkpoint)?;
-    line.write_all(b"\n").map_err(|_| MediaError::Limit {
-        budget: "index_bytes",
-        limit: index.limits.record_bytes,
-    })?;
+    line.write_all(b"\n")
+        .map_err(|source| error::input(error::io(path, source)))?;
+    line.finish()?;
     checkpoint.finish()?;
     let mut temporary = TemporaryFile::create(parent, *checkpoint)?;
     let result = (|| {

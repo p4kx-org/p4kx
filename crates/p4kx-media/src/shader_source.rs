@@ -3,6 +3,10 @@
 
 use std::io;
 
+use p4kx_shader::{Limits as ShaderLimits, SyntaxError};
+
+use crate::origin_contract::OriginProfile;
+
 use crate::shader_payload::{
     ShaderBudget, ShaderDefinitionFailure, ShaderFailureReason, ShaderPayload,
 };
@@ -14,7 +18,7 @@ use crate::{shader_diagnostic, shader_projection, shader_values};
 
 pub(crate) fn project(
     context: &SourceContext<'_>,
-    limits: p4kx_shader::Limits,
+    limits: ShaderLimits,
     writer: &mut MediaWriter<'_>,
 ) -> Result<Projection, MediaError> {
     let bound = shader_values::count(limits.source_bytes)?;
@@ -28,13 +32,20 @@ pub(crate) fn project(
             start: 0,
             end_exclusive: context.source.size,
         };
-        return failed(context, failure, span, writer);
+        return failed(
+            context,
+            OriginProfile::ShaderSourceLimit,
+            failure,
+            span,
+            writer,
+        );
     }
     let bytes = crate::retained_payload::read(context, writer)?;
     match p4kx_shader::read_with(&bytes, limits, || writer.checkpoint()) {
         Ok(definition) => shader_projection::project(context, &definition, writer),
         Err(p4kx_shader::ReadError::Syntax(error)) => failed(
             context,
+            failure_profile(&limits, error),
             shader_diagnostic::failure(error)?,
             ShaderSpan::from_reader(error.span)?,
             writer,
@@ -57,6 +68,7 @@ pub(crate) fn file_name(path: &str) -> &str {
 
 fn failed(
     context: &SourceContext<'_>,
+    profile: OriginProfile,
     failure: ShaderFailureReason,
     span: ShaderSpan,
     writer: &mut MediaWriter<'_>,
@@ -72,7 +84,9 @@ fn failed(
         span,
         counts: (),
     });
-    writer.record(
+    writer.shader_record(
+        context,
+        profile,
         &Subresource::new(shader_projection::FAILURE_NAMESPACE, Vec::new()),
         Status::Failed,
         &data,
@@ -84,4 +98,12 @@ fn failed(
         )],
     )?;
     Ok(Projection::Written)
+}
+
+fn failure_profile(limits: &ShaderLimits, error: SyntaxError) -> OriginProfile {
+    if limits.validate_configuration().err() == Some(error) {
+        OriginProfile::ShaderConfigurationFailure
+    } else {
+        OriginProfile::ShaderFailure
+    }
 }

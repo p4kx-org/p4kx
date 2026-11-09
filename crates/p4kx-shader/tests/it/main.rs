@@ -3,6 +3,7 @@
 
 //! Synthetic source, structure, numeric and resource-bound reader verification.
 
+mod configuration;
 mod grammar;
 mod limits;
 mod malformed;

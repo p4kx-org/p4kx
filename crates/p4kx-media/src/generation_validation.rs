@@ -8,6 +8,9 @@ use std::path::{Component, Path};
 use crate::checkpoint::Checkpoint;
 use crate::error;
 use crate::hashing;
+use crate::origin_index;
+use crate::origin_read_policy::OriginReadPolicy;
+use crate::origin_verify::{self, OriginAvailability};
 use crate::output_path;
 use crate::{Algorithm, Artifact, Index, Limits, MediaError};
 
@@ -20,19 +23,7 @@ pub(crate) fn existing(
     if !output_path::file(&path)? {
         return Ok(None);
     }
-    let input = File::open(&path).map_err(|source| error::io(&path, source))?;
-    let mut bytes = Vec::new();
-    input
-        .take(limits.record_bytes.saturating_add(1))
-        .read_to_end(&mut bytes)
-        .map_err(|source| error::io(&path, source))?;
-    if bytes.len() as u64 > limits.record_bytes {
-        return Err(MediaError::Limit {
-            budget: "index_bytes",
-            limit: limits.record_bytes,
-        });
-    }
-    let mut index: Index = serde_json::from_slice(&bytes)?;
+    let mut index = origin_index::read(&path, limits.record_bytes, checkpoint)?;
     let fingerprint = hashing::generation(&mut index, checkpoint)?;
     if index.format != crate::MediaFormat::P4kxMedia
         || index.format_version != crate::MediaVersion::V1
@@ -56,6 +47,9 @@ pub(crate) fn existing(
         limits,
         checkpoint,
     )?;
+    if index.field_origins.is_none() {
+        return Ok(None);
+    }
     Ok(Some(index))
 }
 
@@ -98,6 +92,19 @@ pub(crate) fn artifacts(
         }
         let artifact: Artifact = serde_json::from_slice(&line)?;
         verify(root, &artifact, &mut remaining, checkpoint)?;
+    }
+    origins(root, index, checkpoint)
+}
+
+fn origins(root: &Path, index: &Index, checkpoint: &Checkpoint<'_>) -> Result<(), MediaError> {
+    let Some(receipts) = &index.field_origins else {
+        return Ok(());
+    };
+    let policy = OriginReadPolicy::from_receipts(receipts);
+    if origin_verify::generation(root, index, *checkpoint, policy)? != OriginAvailability::Current {
+        return Err(MediaError::Destination(
+            "origin mapping is not a verified current generation".into(),
+        ));
     }
     Ok(())
 }

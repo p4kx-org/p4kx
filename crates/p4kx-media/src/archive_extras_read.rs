@@ -48,7 +48,7 @@ pub(crate) fn write<'source>(
                 "The original extra field is malformed; all available field or tail bytes are retained.",
             )]
         };
-        writer.record(
+        writer.archive_layout_record(
             &Subresource::new(EXTRA_NAMESPACE, vec![position, extra.ordinal()]),
             if complete {
                 Status::Complete

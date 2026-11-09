@@ -41,10 +41,8 @@ pub(crate) fn build(
         checkpoint,
         options.diagnostic,
     )?;
-    for (index, provider) in providers.iter().enumerate() {
-        writer.begin(index, archive_provider::root_source(&root))?;
-        provider.root(&root, &mut writer)?;
-    }
+    writer.origins.observe_root(archive, size)?;
+    root_callbacks(&root, providers, &mut writer)?;
     let entries = collect(archive, options, &root, providers, &mut writer)?;
     let finished = writer.finish()?;
     let complete = root.enumeration_complete
@@ -65,9 +63,25 @@ pub(crate) fn build(
         kinds: finished.kinds,
         source_manifest: finished.sources,
         artifact_manifest: finished.artifacts,
+        field_origins: Some(finished.origins),
     };
     index.generation = hashing::generation(&mut index, &checkpoint)?;
     Ok(index)
+}
+
+fn root_callbacks(
+    root: &RootSource,
+    providers: &[&dyn Provider],
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    for (index, provider) in providers.iter().enumerate() {
+        let input = writer.origins.root.clone().ok_or_else(|| {
+            MediaError::Contract("completed root read lost its original evidence".into())
+        })?;
+        writer.begin_with_input(index, archive_provider::root_source(root), input)?;
+        provider.root(root, writer)?;
+    }
+    Ok(())
 }
 
 fn collect(

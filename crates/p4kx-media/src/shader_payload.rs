@@ -128,7 +128,7 @@ pub enum ShaderFailureReason {
     Limit {
         /// Precise exhausted domain budget.
         budget: ShaderBudget,
-        /// Actual configured bound.
+        /// Configured or supported bound reported by the reader.
         limit: u64,
     },
     /// The bounded reader could not allocate its next storage unit.

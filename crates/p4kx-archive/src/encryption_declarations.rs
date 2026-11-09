@@ -5,6 +5,8 @@ use std::slice;
 
 pub(crate) const ENCRYPTION_BLOCK_LEN: u16 = 6;
 const WORD_LEN: u8 = 2;
+pub(crate) const UNENCRYPTED_WORD: u16 = 0;
+pub(crate) const ENCRYPTED_WORD: u16 = 1;
 
 /// Stored CIG/v2 declaration state, without reconciling ZIP encryption flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,8 +38,8 @@ impl DeclaredEncryption {
             return Self::Unknown;
         }
         match raw_word {
-            Some(0) => Self::Unencrypted,
-            Some(1) => Self::Encrypted,
+            Some(UNENCRYPTED_WORD) => Self::Unencrypted,
+            Some(ENCRYPTED_WORD) => Self::Encrypted,
             _ => Self::Unknown,
         }
     }

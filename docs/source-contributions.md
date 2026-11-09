@@ -100,6 +100,24 @@ contributing-source union, where a known encrypted contributor dominates unknown
 contributors. These helpers do not read payloads, restore original handles or establish
 that serialized facts describe an authentic Archive.
 
+Partial descriptive facts use the same owning classifier without erasing retained evidence.
+`Fact` readers preserve all six existing `SourceValue` states. The neutral
+`EncryptionFieldEvidence<T>` distinguishes present, absent, known malformed and unavailable
+facts: only unreadable or omitted capture is unavailable; null, invalid and unsupported
+source facts are known malformed. An absent CIG length is malformed, while an absent v2
+length is its defined shape. Absent ZIP flags use the canonical absent-header rule;
+unreadable flags preserve possible alternatives. Known missing/invalid words and available
+short bytes cannot become arbitrary encrypted/plain values when another fact is unreadable.
+
+`SourceDeclarationEvidence` distinguishes unavailable occurrences from known malformed or
+unsupported occurrences. A known absent occurrence contributes nothing; a known empty or
+absent whole list has unknown consensus. A malformed whole list/occurrence retains unknown
+evidence; an unreadable list/occurrence preserves alternatives. Capture-limited proof omits
+optional full detail independently of these explicit fact states.
+`SourceEncryptionState::is_possible_from_evidence` checks the stored state through Archive's
+`SourceEncryption::possible_from_evidence`. Known unsupported format differs from unavailable
+format detail. These pure descriptions create no original runtime proof.
+
 ## Field-addressed descriptions
 
 `FieldPath` is an exact escaped JSON Pointer into the complete output record. Object

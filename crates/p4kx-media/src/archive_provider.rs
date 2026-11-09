@@ -87,11 +87,10 @@ impl Provider for ArchiveProvider {
                 .map(|digest| p4kx_extraction::Checksum::Sha256(digest).hex()),
             stored_sha256_checked_by_reader: entry.is_sha256_verified(),
         };
-        writer.record(
+        writer.archive_entry_record(
+            context,
             &Subresource::new(ENTRY_NAMESPACE, Vec::new()),
-            Status::Complete,
             &data,
-            &[],
         )?;
         Ok(Projection::Written)
     }

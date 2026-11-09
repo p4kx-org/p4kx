@@ -164,4 +164,7 @@ pub struct Index {
     pub source_manifest: Artifact,
     /// Streaming manifest of raw and converted artifact hashes.
     pub artifact_manifest: Artifact,
+    /// Hashed field origins; missing historical metadata has unknown coverage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field_origins: Option<crate::origin_contract::OriginReceipts>,
 }

@@ -222,7 +222,13 @@ impl MediaWriter<'_> {
                 &mut temporary,
                 "typed chunk content-address collision",
             )?;
-            self.artifact(&artifact)?;
+            if matches!(accounting, ChunkAccounting::RetainedMetadata)
+                && let Some(input) = self.origins.directory().cloned()
+            {
+                self.artifact_with_input(&artifact, &input, p4kx_extraction::InputScope::Payload)?;
+            } else {
+                self.artifact(&artifact)?;
+            }
             if matches!(accounting, ChunkAccounting::Converted) {
                 self.converted_output(created)?;
             }

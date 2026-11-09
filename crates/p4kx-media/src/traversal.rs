@@ -84,10 +84,13 @@ impl Traversal<'_> {
                     self.budget,
                     writer,
                 )?;
+                let original = writer.origins.input(archive, entry)?;
+                writer.origins.push_directory(original)?;
                 chain.push(source::identity(archive, entry));
                 let result = self.visit(&container, chain, writer, visit);
                 let _parent = chain.pop();
-                result?;
+                let restored = writer.origins.pop_directory();
+                crate::error::finish(result, restored)?;
             }
         }
         Ok(())

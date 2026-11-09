@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::origin_input::MediaOriginInput;
+
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::Entry;
+use crate::origin_capture::OriginSite;
+use p4kx_extraction::{Entry, InputScope, SourceUseRole};
 
 use crate::directory_lookup::DirectoryLookup;
 use crate::error;
@@ -31,6 +34,32 @@ impl RequiredInput<'_> {
     }
 }
 
+impl RequiredInput<'_> {
+    fn observe_digest_origin(&self, writer: &MediaWriter<'_>) -> Result<(), MediaError> {
+        let input = self.origin_input(writer)?;
+        let mut observation = writer.capture_origins();
+        observation.add(
+            &input,
+            InputScope::Payload,
+            OriginSite::new("media-physical-input", &[], "complete-payload"),
+            SourceUseRole::Conversion,
+            writer,
+        )
+    }
+    pub(crate) fn origin_input(
+        &self,
+        writer: &MediaWriter<'_>,
+    ) -> Result<MediaOriginInput, MediaError> {
+        writer.checkpoint()?;
+        let origin = self.receipt.origin.as_ref().ok_or_else(|| {
+            MediaError::Contract("required input lost its original evidence".into())
+        })?;
+        if !origin.owner.is_same_inventory(&writer.origins.owner) {
+            return Err(crate::origin_error::foreign());
+        }
+        Ok(origin.clone())
+    }
+}
 impl Read for RequiredInput<'_> {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
         self.reader.read(output)
@@ -74,6 +103,7 @@ impl SourceContext<'_> {
                     digest,
                     omission: None,
                     use_at: use_at.clone(),
+                    origin: None,
                 },
                 writer,
                 consume,
@@ -136,6 +166,7 @@ pub(crate) fn with_reference_input<T>(
                         digest,
                         omission: Some(InputOmission::ReferenceLookup),
                         use_at: use_at.clone(),
+                        origin: None,
                     },
                     writer,
                     consume,
@@ -176,6 +207,7 @@ fn with_private_input<T>(
                         digest,
                         omission: Some(InputOmission::ExplicitExclusion),
                         use_at: use_at.clone(),
+                        origin: None,
                     },
                     writer,
                     consume,
@@ -212,7 +244,8 @@ pub(crate) fn retain(
             let mut source = declared;
             source::retained(&mut source, entry, raw);
             let publication = if first {
-                writer.retained(&source)
+                let origin = writer.origins.input(lookup.index.archive, entry)?;
+                writer.retained_with_input(&source, &origin)
             } else {
                 Ok(())
             };
@@ -237,7 +270,7 @@ fn use_payload<T>(
     lookup: &DirectoryLookup<'_>,
     entry: &Entry,
     payload: &Path,
-    receipt: InputReceipt,
+    mut receipt: InputReceipt,
     writer: &mut MediaWriter<'_>,
     consume: impl FnOnce(&mut RequiredInput<'_>, &mut MediaWriter<'_>) -> Result<T, MediaError>,
 ) -> Result<T, MediaError> {
@@ -250,7 +283,10 @@ fn use_payload<T>(
         writer.limits(),
     )
     .map_err(|cause| error::at(&receipt.source, cause))?;
+    let origin = writer.origins.input(lookup.index.archive, entry)?;
+    receipt.origin = Some(origin);
     let mut input = RequiredInput { receipt, reader };
+    input.observe_digest_origin(writer)?;
     let result = consume(&mut input, writer)
         .map_err(|cause| error::at(&input.receipt.source, error::input(cause)));
     drop(input);

@@ -12,6 +12,7 @@ use crate::checkpoint::{Checkpoint, IO_BLOCK_BYTES};
 use crate::error;
 use crate::json_output;
 use crate::observed_write::ObservedWrite;
+use crate::origin_index::{Budget, Encoding};
 use crate::{Algorithm, ByteScope, Digest, MediaError};
 
 pub(crate) fn file(
@@ -72,36 +73,37 @@ pub(crate) fn generation(
     index: &mut crate::Index,
     checkpoint: &Checkpoint<'_>,
 ) -> Result<String, MediaError> {
+    checkpoint.check()?;
+    let budget = Budget::for_index(index, Encoding::Compact)?;
     let generation = std::mem::take(&mut index.generation);
     let base = std::mem::take(&mut index.artifact_base);
     let mut writer = HashWriter {
         hash: Sha256::new(),
-        remaining: index.limits.record_bytes,
-        limit: index.limits.record_bytes,
+        budget,
+        written: 0,
     };
     let serialised = serde_json::to_writer(ObservedWrite::new(&mut writer, checkpoint), &*index);
     index.generation = generation;
     index.artifact_base = base;
     json_output::finish(serialised, *checkpoint)?;
+    budget.finish(writer.written)?;
     Ok(hex(writer.hash.finalize().into()))
 }
 
 struct HashWriter {
     hash: Sha256,
-    remaining: u64,
-    limit: u64,
+    budget: Budget,
+    written: u64,
 }
 
 impl Write for HashWriter {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if bytes.len() as u64 > self.remaining {
-            return Err(io::Error::other(MediaError::Limit {
-                budget: "index_bytes",
-                limit: self.limit,
-            }));
-        }
-        self.remaining -= bytes.len() as u64;
+        let next = self
+            .budget
+            .admit(self.written, bytes.len())
+            .map_err(io::Error::other)?;
         self.hash.update(bytes);
+        self.written = next;
         Ok(bytes.len())
     }
 

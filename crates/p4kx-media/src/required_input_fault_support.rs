@@ -49,13 +49,7 @@ pub(crate) fn with_fixture(
     let stage = StagedDirectory::create(folder.path(), ".fault-stage-", checkpoint)?;
     fs::create_dir(stage.path().join("raw"))?;
     fs::create_dir(stage.path().join("chunks"))?;
-    let mut writer = MediaWriter::new(
-        stage.permit(),
-        vec![input_capability()],
-        crate::Limits::default(),
-        checkpoint,
-        true,
-    )?;
+    let mut writer = fixture_writer(stage.permit(), checkpoint)?;
     let budget = InputBudget::default();
     let keys = Cell::new(0);
     let index = DirectoryIndex::new(&archive, &keys);
@@ -79,23 +73,39 @@ pub(crate) fn with_fixture(
     );
     let entry = archive.entries().first().ok_or("owner")?;
     let (source, payload) = super::required_input::retain(&lookup, entry, &mut writer)?;
-    writer.begin(0, source.clone())?;
+    let original = writer.origins.input(&archive, entry)?;
+    writer.begin_with_input(0, source.clone(), original)?;
     let context = SourceContext {
         source: &source,
         entry,
         payload: &payload,
         directory: &lookup,
     };
-    let result =
-        run(&context, &mut writer, checkpoint, folder.path()).map_err(|cause| MediaError::Io {
-            path: "synthetic-fault-fixture".into(),
-            source: io::Error::other(cause),
-        });
+    let result = run(&context, &mut writer, checkpoint, folder.path()).map_err(fixture_error);
     drop(writer);
     stage.finish(result)?;
     Ok(())
 }
 
+fn fixture_writer<'a>(
+    namespace: &'a p4kx_extraction::OwnedDirectoryPermit,
+    checkpoint: Checkpoint<'a>,
+) -> Result<MediaWriter<'a>, MediaError> {
+    MediaWriter::new(
+        namespace,
+        vec![input_capability()],
+        crate::Limits::default(),
+        checkpoint,
+        true,
+    )
+}
+
+fn fixture_error(cause: Box<dyn std::error::Error + Send + Sync>) -> MediaError {
+    MediaError::Io {
+        path: "synthetic-fault-fixture".into(),
+        source: io::Error::other(cause),
+    }
+}
 fn input_capability() -> Capability {
     Capability::new(
         MediaKind::Texture,

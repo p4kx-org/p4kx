@@ -25,7 +25,15 @@ pub(crate) fn retain(
     writer: &mut MediaWriter<'_>,
 ) -> Result<(RawReference, PathBuf), MediaError> {
     materialize(archive, entry, writer, |payload, permit, digest, writer| {
-        raw_output::place(payload, permit, digest, entry.uncompressed_size(), writer)
+        let origin = writer.origins.input(archive, entry)?;
+        raw_output::place(
+            payload,
+            permit,
+            digest,
+            entry.uncompressed_size(),
+            &origin,
+            writer,
+        )
     })
 }
 

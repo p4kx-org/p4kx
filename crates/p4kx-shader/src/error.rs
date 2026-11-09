@@ -57,7 +57,7 @@ pub enum SyntaxErrorKind {
     Limit {
         /// Resource being bounded.
         budget: Budget,
-        /// Actual configured bound.
+        /// Configured or supported bound reported by the reader.
         limit: usize,
     },
     /// A collection could not reserve the next bounded element.

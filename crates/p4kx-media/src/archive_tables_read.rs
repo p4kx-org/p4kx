@@ -180,7 +180,7 @@ fn emit<T: serde::Serialize>(
             "The original table row contains an invalid progress, reserved-word or free-range declaration; its raw bytes are retained.",
         )]
     };
-    writer.record(
+    writer.archive_layout_record(
         &Subresource::new(namespace, vec![ordinal]),
         if valid {
             Status::Complete

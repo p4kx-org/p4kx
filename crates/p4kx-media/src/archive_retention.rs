@@ -149,7 +149,7 @@ fn stream<'source>(
             range: ArchiveByteRange::of(part.range()),
             chunk,
         };
-        writer.record(
+        writer.archive_layout_record(
             &Subresource::new(RAW_NAMESPACE, indices(series, ordinal)?),
             Status::Complete,
             &data,

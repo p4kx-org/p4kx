@@ -205,6 +205,15 @@
       ],
       "type": "object"
     },
+    "DecimalU64": {
+      "description": "Canonical unsigned 64-bit decimal text, from 0 through 18446744073709551615.",
+      "maxLength": 20,
+      "not": {
+        "pattern": "[^0-9]"
+      },
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|1844674407370955[0-0][0-9]{3}|18446744073709551[0-5][0-9]{2}|184467440737095516[0-0][0-9]{1}|1844674407370955161[0-4][0-9]{0}|18446744073709551615)$",
+      "type": "string"
+    },
     "Digest": {
       "description": "An explicitly scoped integrity value.",
       "properties": {
@@ -356,7 +365,7 @@
           "type": "integer"
         },
         "output_bytes": {
-          "description": "Bytes written to generation artifacts, excluding the separately bounded index.",
+          "description": "Bytes written to payload artifacts, excluding the index and field-origin companion streams.",
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
@@ -404,7 +413,7 @@
           "type": "integer"
         },
         "value_depth": {
-          "description": "Maximum JSON value nesting, including the record envelope.",
+          "description": "Maximum record JSON nesting, including its envelope.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
@@ -495,6 +504,124 @@
           "type": "string"
         }
       ]
+    },
+    "OriginProtocol": {
+      "description": "The closed field-origin transport contract.",
+      "oneOf": [
+        {
+          "const": "p4kx.field-origins/1",
+          "description": "Shared original inventories and occurrence-scoped immediate origins.",
+          "type": "string"
+        }
+      ]
+    },
+    "OriginReceipts": {
+      "description": "Hashed shared inventories and field origins bound into the generation identity.",
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/Artifact",
+          "description": "Occurrence, field, completion and EOF rows."
+        },
+        "protocol": {
+          "$ref": "#/$defs/OriginProtocol",
+          "description": "Closed transport capability."
+        },
+        "sources": {
+          "$ref": "#/$defs/Artifact",
+          "description": "Original shared `PhysicalSource` rows."
+        },
+        "streams": {
+          "description": "Complete multiplicities for every payload stream.",
+          "items": {
+            "$ref": "#/$defs/OriginStreamSummary"
+          },
+          "type": "array"
+        },
+        "uses": {
+          "$ref": "#/$defs/Artifact",
+          "description": "Original shared `SourceUseDescription` rows."
+        }
+      },
+      "required": [
+        "protocol",
+        "sources",
+        "uses",
+        "fields",
+        "streams"
+      ],
+      "type": "object"
+    },
+    "OriginStream": {
+      "description": "One payload stream whose individual occurrences have separate origins.",
+      "oneOf": [
+        {
+          "description": "One provider-kind JSONL stream.",
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/MediaKind",
+              "description": "Provider output kind."
+            },
+            "type": {
+              "const": "records",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Retained physical source rows.",
+          "properties": {
+            "type": {
+              "const": "sources",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Actual artifact-manifest row occurrences.",
+          "properties": {
+            "type": {
+              "const": "artifacts",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OriginStreamSummary": {
+      "description": "Exact occurrence and field counts for one payload stream.",
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Actual addressed JSON nodes."
+        },
+        "occurrences": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Actual emitted rows, including repeated equal artifacts."
+        },
+        "stream": {
+          "$ref": "#/$defs/OriginStream",
+          "description": "Payload stream being counted."
+        }
+      },
+      "required": [
+        "stream",
+        "occurrences",
+        "fields"
+      ],
+      "type": "object"
     },
     "RootSource": {
       "description": "Root file provenance and the public Build declaration.",
@@ -629,6 +756,17 @@
     "enumeration_complete": {
       "description": "Whether traversal discovered every selected source in its configured scope.",
       "type": "boolean"
+    },
+    "field_origins": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OriginReceipts"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Hashed field origins; missing historical metadata has unknown coverage."
     },
     "format": {
       "$ref": "#/$defs/MediaFormat",

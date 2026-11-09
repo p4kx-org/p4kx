@@ -28,6 +28,7 @@ mod dos_calendar;
 mod dos_timestamp;
 mod effective_encoding;
 mod encryption_declarations;
+mod encryption_evidence;
 mod end_records;
 mod entry;
 mod entry_decoder;
@@ -99,6 +100,9 @@ pub use effective_encoding::EffectiveEncoding;
 pub use encryption_declarations::{
     DeclaredEncryption, EncryptionDeclarationSource, EncryptionDeclarations,
     StoredEncryptionDeclaration,
+};
+pub use encryption_evidence::{
+    EncryptionDeclarationEvidence, EncryptionFieldEvidence, EncryptionFormatEvidence,
 };
 pub use entry::Entry;
 pub use entry_metadata::EntryMetadata;

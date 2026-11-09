@@ -41,7 +41,8 @@ impl TraversalVisit for ProjectionVisit<'_> {
         }
         let (source, payload) = required_input::retain(lookup, entry, writer)?;
         for (index, provider) in self.providers.iter().enumerate() {
-            writer.begin(index, source.clone())?;
+            let input = writer.origins.input(lookup.index.archive, entry)?;
+            writer.begin_with_input(index, source.clone(), input)?;
             let result = provider
                 .source(
                     &SourceContext {

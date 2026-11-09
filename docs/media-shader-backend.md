@@ -48,6 +48,15 @@ never acquires decoded definition or Property counts. Failed structured sources 
 not a healthy zero inventory. The existing normal-refusal and explicit diagnostic-generation
 policy applies; failure never replaces a prior complete media index.
 
+`p4kx_shader::Limits::validate_configuration` checks supported configuration without inspecting
+source content. `read_with` checks its original checkpoint and source-byte admission first.
+A failure's `limit` is the reported reader bound; an unsupported nesting configuration reports
+the supported maximum. Source-size refusal, configuration-only refusal and actual parser failure
+have distinct field-origin profiles. Filename and directory-size values retain their metadata
+origins; parser-derived diagnostics and byte ranges retain consumed payload contributions.
+Configured bounds, literal controls and unavailable counts have complete empty contributor sets.
+Retained raw Source and Record origins independently preserve their actual encrypted witnesses.
+
 ## Schema and integration scope
 
 `shader_payload_schema()` validates the precise tagged payload union. `shader_record_schema()`

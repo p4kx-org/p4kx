@@ -266,3 +266,59 @@ The permanent Archive provider's default-registry CLI and full-directory metadat
 separate synthetic/native checks; this focused probe does not exercise them. Domain providers,
 encrypted payloads, nested real containers and full-Archive semantic coverage require their own checks.
 No game files or keys are fixtures; source assets and generated real-Archive output must stay private.
+
+## Field origins
+
+Each current generation additionally commits `origin-sources.jsonl`, `origin-uses.jsonl` and
+`field-origins.jsonl`. The optional index group `field_origins` identifies their hashes and
+the independent capability `p4kx.field-origins/1`. Catalog schema versions do not apply.
+The first two files use the original shared PhysicalSource and SourceUseDescription serializers;
+they supplement the existing Media `sources.jsonl` and `artifacts.jsonl`.
+
+The field stream addresses every actual JSON node in each emitted record, source row and artifact
+row. An occurrence header supplies its closed stream kind, contiguous decimal-string ordinal,
+producer profile and SHA-256 of the original payload line including its newline. Field rows carry
+absolute escaped RFC 6901 pointers and the immediate shared FieldOrigin:
+`containsEncryptedSource`, `sourceUsesRefs` and `sourceSetComplete`. Explicit end coverage
+counts and the terminal EOF preserve row and field multiplicities. Repeated equal artifacts may
+share their bytes while retaining different origins for each actual manifest occurrence.
+
+Original observed Entry ownership and encryption proof are retained before optional paths,
+declaration details or logical coordinates are copied. Local capture cuts are listed on the
+affected field. An opaque use retains its actual source owner, domain, role and known encrypted
+witness. A cut cannot turn a known encrypted contributor into an unknown or plain marker or
+consume later independent fields' optional-capture allowance. Attempts and untouched reference
+targets remain inventory observations and do not taint the contributing field set.
+
+The built-in Archive Entry/layout and decoded Shader profiles map their own data domains.
+A shader filename comes from directory metadata; its parsed content comes from the payload.
+Containing encrypted Entries influence both domains, while a leaf's own encryption does not
+change its directory metadata. Computed intrinsic artifact digests use their actual bytes,
+independently of relationship selectors. Public custom-provider records remain explicitly
+`unmigrated`, even if they reuse a built-in kind, capability spelling or namespace.
+
+Shader failure origins distinguish the early directory-size check from a diagnostic formed after
+content inspection. The format owner's canonical configuration check also identifies unsupported
+reader configuration before UTF-8 or lexical inspection. Its failure and zero-range controls are
+independent of content, while filenames retain metadata origins. Actual parsed depth, token and
+syntax failures keep their consumed payload contributions. Literal configuration bounds and null
+counts do not acquire contributions from unused retained bytes.
+
+Root Build fields, general index fields, compiled shader-cache semantics and other provider
+carriers retain explicitly incomplete or unknown coverage in this slice. A profile name and
+per-occurrence coverage are separate from existing payload health and record status.
+The field writer walks the already-admitted original JSON line without constructing a JSON value
+tree, retains shared address prefixes and immutable contribution sets, and writes one field at a
+time. Provenance bytes do not spend or enlarge the original record/source/artifact payload budgets.
+
+Descriptive validation checks each captured use against its physical kind and byte domain,
+retained raw declaration words/bytes and ZIP facts where available, and the complete transitive
+ancestor state. Known encrypted or unknown outer witnesses cannot disappear through a shortened
+leaf ancestor list. Missing optional details retain existing minimal proof; legacy alias text is
+not treated as a new physical identity rule. Validation does not restore original input handles.
+
+The existing staged generation and index replacement commit all three receipts atomically.
+Reuse checks the receipts, payload-line hashes, exact addresses and ordinals, source/use closure,
+coverage totals and EOF. Historical index files without this capability have unknown provenance;
+they cannot be reported as a freshly migrated current skip. The consumer's finite metadata
+policy is separate from producer admission and never changes the original payload bytes.

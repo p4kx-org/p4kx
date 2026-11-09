@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+pub use crate::field_origin::FieldOrigin;
+pub use crate::field_origin_seed::FieldOriginSeed;
+pub use crate::field_origins::{FieldOrigins, FieldOriginsError};
+pub use crate::field_origins_seed::FieldOriginsSeed;
+pub use crate::field_path::{FieldPath, FieldPathError};
+pub use crate::field_path_seed::FieldPathSeed;
+pub use crate::origin_reader_limits::OriginReaderLimits;
+pub use crate::source_details::{SourceCoordinateOmission, SourceDetails};
+pub use crate::source_encryption_evidence::SourceDeclarationEvidence;
+pub use crate::source_evidence_error::SourceEvidenceError;
+pub use crate::source_inventory::{
+    ArchiveEntryProof, ArchiveEntrySource, ArchiveFileSource, FileSource, PhysicalSource,
+    PhysicalSourceKind, PhysicalSourceRef, SourceDeclarationKind, SourceEncryptionDeclaration,
+    SourceEncryptionState, SourceInventory, SourceRecordFormat,
+};
+pub use crate::source_scope::{SourceInput, SourceScope};
+pub use crate::source_use::{
+    InputScope, SourceLocation, SourceUse, SourceUseDescription, SourceUseRef, SourceUseRole,
+};
+pub use crate::source_uses::SourceUses;
+pub use crate::source_value::{SourceValue, SourceValueState, SourcedValue};
+pub use p4kx_archive::EncryptionFieldEvidence;

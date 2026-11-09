@@ -28,7 +28,10 @@ pub(crate) fn run(
     };
     let mut access = view.access(&mut charge, checkpoint.cancel.flag());
     for (index, provider) in providers.iter().enumerate() {
-        writer.begin(index, source.clone())?;
+        let input = writer.origins.directory().cloned().ok_or_else(|| {
+            MediaError::Contract("directory callback has no original input".into())
+        })?;
+        writer.begin_with_input(index, source.clone(), input)?;
         provider
             .directory(
                 &mut DirectoryContext {

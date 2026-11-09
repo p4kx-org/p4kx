@@ -29,7 +29,7 @@ pub(crate) fn write(
         let index = u64::try_from(index)
             .map_err(|_| MediaError::Contract("section index exceeds source width".into()))?;
         let projection = read(context, section, reader_section, &mut retained, writer)?;
-        writer.record(
+        writer.archive_layout_record(
             &Subresource::new(SECTION_NAMESPACE, vec![index]),
             if projection.issues.is_empty() {
                 Status::Complete

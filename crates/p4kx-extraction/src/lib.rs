@@ -127,9 +127,11 @@ mod source_ancestor_tests;
 mod source_archive;
 mod source_archive_binding;
 mod source_details;
+mod source_encryption_evidence;
 mod source_evidence_error;
 mod source_inventory;
 mod source_protection;
+mod source_provenance;
 mod source_registration;
 mod source_registry;
 mod source_scope;
@@ -221,12 +223,6 @@ pub use entry_record_format_info::EntryRecordFormatInfo;
 pub use entry_tree::{EntryTree, Folder, FolderId};
 pub use exclusion::{Exclusion, LeftOut, MAX_EXCLUSIONS};
 pub use extract::extract;
-pub use field_origin::FieldOrigin;
-pub use field_origin_seed::FieldOriginSeed;
-pub use field_origins::{FieldOrigins, FieldOriginsError};
-pub use field_origins_seed::FieldOriginsSeed;
-pub use field_path::{FieldPath, FieldPathError};
-pub use field_path_seed::FieldPathSeed;
 pub use filter::{Filter, FilterError, MAX_FILTER_LEN, MAX_FILTER_WILDCARDS};
 pub use folder_convert::convert_folder;
 pub use folder_source::{
@@ -256,7 +252,6 @@ pub use model_textures::{ArchiveTextures, MAX_MODEL_TEXTURE_PIXELS};
 pub use options::{
     AudioConversion, CancelToken, ConflictPolicy, ExtractOptions, Progress, TextureConversion,
 };
-pub use origin_reader_limits::OriginReaderLimits;
 pub use output_file::{
     Replaced, check_protected_output, write_bytes_replacing, write_replacing,
     write_replacing_counted, write_replacing_counted_protected, write_replacing_protected,
@@ -357,19 +352,16 @@ pub use report::{EntryFailure, ExtractionError, ExtractionReport};
 pub use resolved_texts::LanguageTexts;
 pub use selection::{UnknownEntries, select_entries};
 pub use sound::{MAX_SOUND_LEN, Sound};
-pub use source_details::{SourceCoordinateOmission, SourceDetails};
-pub use source_evidence_error::SourceEvidenceError;
-pub use source_inventory::{
-    ArchiveEntryProof, ArchiveEntrySource, ArchiveFileSource, FileSource, PhysicalSource,
-    PhysicalSourceKind, PhysicalSourceRef, SourceDeclarationKind, SourceEncryptionDeclaration,
-    SourceEncryptionState, SourceInventory, SourceRecordFormat,
+pub use source_provenance::{
+    ArchiveEntryProof, ArchiveEntrySource, ArchiveFileSource, EncryptionFieldEvidence, FieldOrigin,
+    FieldOriginSeed, FieldOrigins, FieldOriginsError, FieldOriginsSeed, FieldPath, FieldPathError,
+    FieldPathSeed, FileSource, InputScope, OriginReaderLimits, PhysicalSource, PhysicalSourceKind,
+    PhysicalSourceRef, SourceCoordinateOmission, SourceDeclarationEvidence, SourceDeclarationKind,
+    SourceDetails, SourceEncryptionDeclaration, SourceEncryptionState, SourceEvidenceError,
+    SourceInput, SourceInventory, SourceLocation, SourceRecordFormat, SourceScope, SourceUse,
+    SourceUseDescription, SourceUseRef, SourceUseRole, SourceUses, SourceValue, SourceValueState,
+    SourcedValue,
 };
-pub use source_scope::{SourceInput, SourceScope};
-pub use source_use::{
-    InputScope, SourceLocation, SourceUse, SourceUseDescription, SourceUseRef, SourceUseRole,
-};
-pub use source_uses::SourceUses;
-pub use source_value::{SourceValue, SourceValueState, SourcedValue};
 pub use target::{
     create_default_target, create_default_target_protected, default_target_name, utc_rfc3339,
 };

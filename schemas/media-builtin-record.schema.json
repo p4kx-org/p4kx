@@ -4409,7 +4409,7 @@
               "description": "Precise exhausted domain budget."
             },
             "limit": {
-              "description": "Actual configured bound.",
+              "description": "Configured or supported bound reported by the reader.",
               "format": "uint64",
               "minimum": 0,
               "type": "integer"

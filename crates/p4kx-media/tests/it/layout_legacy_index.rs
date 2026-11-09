@@ -42,7 +42,7 @@ fn independently_authored_legacy_index_keeps_its_known_generation_hash() -> Test
 }
 
 #[test]
-fn existing_index_validator_accepts_legacy_generation_for_skip_and_overwrite() -> TestResult {
+fn a_legacy_generation_is_validated_then_rebuilt_with_current_field_origins() -> TestResult {
     let folder = tempfile::tempdir()?;
     let archive = support::archive(folder.path())?;
     let output = folder.path().join("media");
@@ -51,16 +51,24 @@ fn existing_index_validator_accepts_legacy_generation_for_skip_and_overwrite() -
     fs::write(generation.join("sources.jsonl"), b"")?;
     fs::write(generation.join("artifacts.jsonl"), b"")?;
     fs::write(output.join("media-index.json"), LEGACY_JSON)?;
+    let current = support::published(p4kx_media::export(
+        &archive,
+        &output,
+        &ExportOptions::default(),
+    )?)?;
+    assert_ne!(current.generation, LEGACY_GENERATION);
+    assert!(
+        current.field_origins.is_some(),
+        "current provenance is regenerated before reuse"
+    );
+    let committed = fs::read(output.join("media-index.json"))?;
     let ExportOutcome::Skipped { index } =
         p4kx_media::export(&archive, &output, &ExportOptions::default())?
     else {
-        return Err("existing validated legacy index was not kept".into());
+        return Err("the current validated generation was not reused".into());
     };
-    assert_eq!(index.generation, LEGACY_GENERATION);
-    assert_eq!(
-        fs::read_to_string(output.join("media-index.json"))?,
-        LEGACY_JSON
-    );
+    assert_eq!(index.generation, current.generation);
+    assert_eq!(fs::read(output.join("media-index.json"))?, committed);
     let options = ExportOptions {
         conflict: ConflictPolicy::Overwrite,
         ..ExportOptions::default()

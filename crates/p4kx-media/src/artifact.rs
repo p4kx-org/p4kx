@@ -50,6 +50,9 @@ impl<'a> Stream<'a> {
         })
     }
 
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
     pub(crate) fn finish(mut self) -> Result<Artifact, MediaError> {
         self.checkpoint.check()?;
         self.token
@@ -81,7 +84,10 @@ impl Write for Stream<'_> {
                 io::Error::other("artifact writer reported an invalid byte count")
             })?,
         );
-        self.size += written as u64;
+        self.size = self
+            .size
+            .checked_add(written as u64)
+            .ok_or_else(|| io::Error::other("actual artifact size exceeds its wire width"))?;
         Ok(written)
     }
 
