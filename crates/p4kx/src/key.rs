@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Context, Result};
-use p4kx_channels::{SearchPaths, detect};
+use p4kx_channels::SearchRecipe;
 use p4kx_comparison::LineDiffError;
 use p4kx_extraction::{
     Archive, ArchiveError, ArchiveKey, ArchiveKeyError, Entry, KeyCheck, OpenOptions,
@@ -233,7 +233,7 @@ fn check_against(key: &ArchiveKey, archive: Option<&Path>) -> Result<Option<Path
         let checked = open_unkeyed(path)?.verify_key(key)?;
         return Ok((checked == KeyCheck::Verified).then(|| path.to_path_buf()));
     }
-    for path in installed_archives() {
+    for path in installed_archives()? {
         let Ok(archive) = open_unkeyed(&path) else {
             continue;
         };
@@ -248,22 +248,18 @@ fn open_unkeyed(path: &Path) -> Result<Archive, ArchiveError> {
     Archive::open(path)
 }
 
-fn installed_archives() -> Vec<PathBuf> {
+fn installed_archives() -> Result<Vec<PathBuf>> {
     let settings = default_settings_file()
         .and_then(|file| Settings::load(&file).ok())
         .unwrap_or_default();
-    let standard = SearchPaths::standard();
-    let paths = SearchPaths {
-        default_library: standard.default_library,
-        launcher: standard.launcher,
-        wine_prefixes: standard.wine_prefixes,
-        manual_folders: settings.channels.folders,
-        manual_archives: settings.channels.archives,
-    };
-    detect(&paths)
+    let recipe =
+        SearchRecipe::standard().with_manual(settings.channels.folders, settings.channels.archives);
+    let (channels, _patches) =
+        crate::launcher_discovery::reported(recipe.snapshot().detect())?.into_parts();
+    Ok(channels
         .iter()
         .map(|channel| channel.archive().to_path_buf())
-        .collect()
+        .collect())
 }
 
 fn show(store: &KeyStore, flag: Option<&str>, as_json: bool) -> Result<()> {

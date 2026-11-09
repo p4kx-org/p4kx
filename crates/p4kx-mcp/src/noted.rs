@@ -9,16 +9,18 @@ use rmcp::handler::server::tool::IntoCallToolResult;
 use rmcp::model::{CallToolResponse, CallToolResult, ContentBlock};
 use serde::Serialize;
 
-use crate::key_report;
+use crate::error::ToolError;
+use crate::{discovery_notes, key_report};
 
 thread_local! {
     static PENDING: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
-/// Forgets the notice and the Archives of an earlier call on this thread.
+/// Clears the call's Archive, key and discovery notices on this thread.
 pub(crate) fn clear() {
     PENDING.with_borrow_mut(Option::take);
     key_report::clear();
+    discovery_notes::clear();
 }
 
 /// Remembers `notice` for the result of the call running on this thread.
@@ -33,23 +35,35 @@ pub(crate) fn take() -> Notes {
     Notes {
         archive: PENDING.with_borrow_mut(Option::take),
         key: key_report::take(),
+        discovery: discovery_notes::take(),
     }
 }
 
-/// What a result carries besides its value: the notice of the Archive it was read from, if the
-/// Archive has one, and how the Archive key served the call, if encrypted Entries stayed unread or
-/// a key was used.
+/// The call's Archive, key-use and incomplete-discovery notices.
 #[derive(Debug, Default)]
 pub(crate) struct Notes {
     pub(crate) archive: Option<String>,
     pub(crate) key: Option<ArchiveKeyUse>,
+    pub(crate) discovery: Vec<String>,
 }
 
 impl Notes {
-    /// Adds the notes to `result`: the Archive notice and the key note as text content blocks, the
-    /// key use as `_meta`.
+    /// Preserves discovery diagnostics when a tool returns an error instead of a value.
+    pub(crate) fn error_message(self, error: &ToolError) -> String {
+        let mut message = error.message();
+        for note in self.discovery {
+            message.push('\n');
+            message.push_str(&note);
+        }
+        message
+    }
+
+    /// Adds Archive and discovery text notices, with key-use text and metadata when applicable.
     pub(crate) fn apply(self, result: &mut CallToolResult) {
         result.content.extend(self.archive.map(ContentBlock::text));
+        result
+            .content
+            .extend(self.discovery.into_iter().map(ContentBlock::text));
         if let Some(key) = self.key {
             result
                 .content

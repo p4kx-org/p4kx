@@ -19,6 +19,7 @@ mod container;
 mod content;
 mod content_tools;
 mod definitions;
+mod discovery_notes;
 mod entries;
 mod error;
 mod forge_file;
@@ -56,6 +57,7 @@ mod records;
 mod server;
 mod shapes;
 
+use std::io::{self, Write};
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -123,7 +125,10 @@ fn main() -> Result<()> {
         .as_deref()
         .map(|archive| locations.resolve(archive, locate::Accepts::Archive))
         .transpose()
-        .map_err(|error| anyhow::anyhow!(error.message()))?;
+        .map_err(|error| anyhow::anyhow!(noted::take().error_message(&error)))?;
+    for note in noted::take().discovery {
+        writeln!(io::stderr().lock(), "{note}")?;
+    }
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

@@ -3621,6 +3621,7 @@ dependencies = [
  "p4kx-archive",
  "p4kx-settings",
  "p4kx-testkit",
+ "same-file",
  "serde_json",
  "tempfile",
 ]

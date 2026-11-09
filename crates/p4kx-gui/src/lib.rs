@@ -13,12 +13,15 @@ mod backends;
 mod browser;
 mod catalog_export;
 mod channel_list;
+mod channel_refresh;
 mod characters;
 mod checks;
 mod comparison;
 mod containers;
 mod content_search;
 mod dialog;
+#[cfg(test)]
+mod discovery_test_support;
 #[cfg(windows)]
 pub mod dwm;
 mod entities;
@@ -41,6 +44,7 @@ mod model_info;
 mod output_target;
 mod prerequisite_notice;
 mod preview;
+mod protected_open;
 mod public_patches;
 mod query;
 mod read_gate;

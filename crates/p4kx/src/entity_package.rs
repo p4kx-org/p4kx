@@ -12,7 +12,7 @@ use p4kx_blender::{
     BuildInfo, Issue, PackageInfo, PackageSummary, PackageWriteContext, Replacement,
     check_output_with_context, write_package_with_context,
 };
-use p4kx_channels::{PublicPatches, channel_name};
+use p4kx_channels::channel_name;
 use p4kx_extraction::{Archive, DataForgeEntry, GlbOptions, is_same_file};
 use serde::Serialize;
 
@@ -107,7 +107,7 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
     if args.no_vertex_colours {
         glb = glb.without_vertex_colours();
     }
-    let info = info_of(&archive, &changes);
+    let info = info_of(&archive, &changes)?;
     let loader = models.textures();
     let summary = write_package_with_context(
         &assembly, &models, &loader, &glb, &info, &args.out, &context,
@@ -180,20 +180,22 @@ impl<'a> PackageJson<'a> {
 }
 
 /// Returns the Build of `archive` as a package records it.
-pub(crate) fn build_info(archive: &Archive) -> Option<BuildInfo> {
-    let build = archive.build()?;
-    let patches = PublicPatches::standard();
-    Some(BuildInfo {
+pub(crate) fn build_info(archive: &Archive) -> io::Result<Option<BuildInfo>> {
+    let Some(build) = archive.build() else {
+        return Ok(None);
+    };
+    let patches = crate::launcher_discovery::patches()?;
+    Ok(Some(BuildInfo {
         branch: build.branch().to_owned(),
         version: build.version().to_owned(),
         public_patch: patches.of(build).map(str::to_owned),
         change_number: build.change_number().to_owned(),
         build_id: build.build_id().to_owned(),
-    })
+    }))
 }
 
-fn info_of(archive: &Archive, changes: &LoadoutChanges) -> PackageInfo {
-    let build = build_info(archive);
+fn info_of(archive: &Archive, changes: &LoadoutChanges) -> io::Result<PackageInfo> {
+    let build = build_info(archive)?;
     let replace = changes
         .replacements()
         .iter()
@@ -202,8 +204,8 @@ fn info_of(archive: &Archive, changes: &LoadoutChanges) -> PackageInfo {
             entity: entity.clone(),
         })
         .collect();
-    PackageInfo::new(channel_name(archive.path()), build)
-        .with_changes(changes.exclusions().to_vec(), replace)
+    Ok(PackageInfo::new(channel_name(archive.path()), build)
+        .with_changes(changes.exclusions().to_vec(), replace))
 }
 
 fn print_changes(out: &mut impl Write, info: &PackageInfo) -> io::Result<()> {

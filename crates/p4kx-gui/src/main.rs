@@ -8,7 +8,6 @@
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
-use p4kx_channels::SearchPaths;
 use p4kx_gui::smoke::Frames;
 use p4kx_gui::{
     App, ChannelList, Language, Model, PrerequisiteNotice, ProtectionText, RecordTextChoice, Text,
@@ -45,13 +44,13 @@ fn main() -> Result<()> {
         return Ok(());
     }
     let runtime = check_runtime()?;
-    p4kx_extraction::protect_libraries();
+    let protection_issues = p4kx_extraction::protect_libraries_report();
     let settings_file = default_settings_file();
     let settings = settings_file
         .as_deref()
         .and_then(|file| Settings::load(file).ok())
         .unwrap_or_default();
-    let mut model = configured_model(&settings);
+    let mut model = configured_model(&settings, protection_issues);
     set_up_key(&mut model);
     let title = model.texts().get(Text::AppTitle);
     let options = window::native_options(window::viewport(settings.window, &title));
@@ -83,12 +82,14 @@ fn main() -> Result<()> {
     .map_err(|error| anyhow!("cannot show the window: {error}"))
 }
 
-fn configured_model(settings: &Settings) -> Model {
+fn configured_model(
+    settings: &Settings,
+    protection_issues: Vec<p4kx_channels::DiscoveryIssue>,
+) -> Model {
     let mut model = Model::new(Language::resolve(settings.language.as_deref()));
-    model.set_channels(ChannelList::new(
-        SearchPaths::standard(),
-        settings.channels.clone(),
-    ));
+    model.set_channels(
+        ChannelList::standard(settings.channels.clone()).with_startup_issues(protection_issues),
+    );
     model.set_recent(settings.recent.clone());
     model.set_extraction_folder(settings.extraction_folder.clone());
     model.set_extraction_conversion(settings.extraction_conversion);

@@ -4,7 +4,7 @@
 use std::io::{self, Write};
 
 use anyhow::Result;
-use p4kx_channels::{PublicPatches, channel_name};
+use p4kx_channels::channel_name;
 use p4kx_extraction::{Archive, ArchiveLayoutInfo, Build, Entry};
 use serde::Serialize;
 
@@ -33,7 +33,7 @@ pub(crate) fn run(args: &InfoArgs, as_json: bool) -> Result<()> {
         warn_about_manifest(&archive)?;
     }
     crate::issues::warn(&archive)?;
-    let patches = PublicPatches::standard();
+    let patches = crate::launcher_discovery::patches()?;
     let build = archive.build().map(|build| patches.attach(build));
     let entries = archive.entries();
     let info = Summary {

@@ -8,7 +8,7 @@ use std::thread::{self, JoinHandle};
 
 use p4kx_extraction::{
     ConversionError, ExtractionError, QueryExportError, WriteProtectionError, WriteRefused,
-    game_is_running, protect_archive_folder, protect_libraries, protect_manual,
+    game_is_running, protect_archive_folder_report, protect_libraries_report, protect_manual,
 };
 use p4kx_settings::{Settings, default_settings_file};
 
@@ -50,7 +50,8 @@ fn look_for_game() -> bool {
 /// Protects the Library folders and the folders and Archives added by hand to the settings, which
 /// `P4KX_CONFIG_DIR` can point to another folder.
 pub(crate) fn protect_installations() {
-    protect_libraries();
+    let issues = protect_libraries_report();
+    let _warning_delivery = crate::launcher_discovery::report(&issues);
     let file = std::env::var_os(CONFIG_DIR_VARIABLE)
         .map(|dir| PathBuf::from(dir).join("settings.toml"))
         .or_else(default_settings_file);
@@ -76,7 +77,8 @@ pub(crate) fn start_game_check() {
 /// Protects the installation around the Archive at `path` and warns once per run when the game is
 /// running.
 pub(crate) fn on_archive_open(path: &Path) {
-    protect_archive_folder(path);
+    let issues = protect_archive_folder_report(path);
+    let _warning_delivery = crate::launcher_discovery::report(&issues);
     if game_check() == GameCheck::Off {
         return;
     }

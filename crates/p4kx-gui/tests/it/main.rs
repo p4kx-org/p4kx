@@ -22,6 +22,7 @@ mod catalog_render;
 mod catalog_resource_wire;
 mod catalog_window;
 mod cataloging;
+mod channel_discovery;
 mod channel_picker;
 mod character_export_window;
 mod character_expression;

@@ -109,6 +109,7 @@ mod issues;
 mod json;
 mod key;
 mod key_note;
+mod launcher_discovery;
 mod layers_json;
 mod list;
 mod loc;

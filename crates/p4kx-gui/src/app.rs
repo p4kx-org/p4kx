@@ -112,7 +112,10 @@ impl App {
                 ui::open(ui, &mut self.model, path);
             }
             Some((Dialog::AddFolder | Dialog::AddArchive, path)) => {
-                settings_changed = self.model.add_manual(path);
+                let ctx = ui.ctx().clone();
+                settings_changed = self
+                    .model
+                    .add_manual_with_wake(path, move || ctx.request_repaint());
             }
             Some((Dialog::ExtractionFolder, path)) => {
                 if let Some(setup) = self.model.extraction_setup_mut() {

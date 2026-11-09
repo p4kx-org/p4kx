@@ -21,6 +21,7 @@ mod audio_preview;
 mod browse_panels;
 mod catalog_lines;
 mod catalog_outcome;
+mod channel_discovery;
 mod channels;
 mod character_choices;
 mod character_chooser;
@@ -135,6 +136,7 @@ mod ui_tab_preview;
 mod ui_tab_toolbar;
 mod ui_tab_variables;
 mod viewer_input;
+mod warning_notice;
 mod work_scroll;
 mod wrapped_actions;
 mod xml_preview;
@@ -189,7 +191,9 @@ pub(crate) fn show_with_output_target(
     poll_search(ui, model);
     if let Some(path) = dropped_file(ui) {
         if path.is_dir() {
-            requests.settings_changed |= model.add_manual(path);
+            let ctx = ui.ctx().clone();
+            requests.settings_changed |=
+                model.add_manual_with_wake(path, move || ctx.request_repaint());
         } else {
             open(ui, model, path);
         }
@@ -206,6 +210,7 @@ pub(crate) fn show_with_output_target(
         regions.header = Some(header.response.rect);
     });
     game_running::show(ui, model);
+    channel_discovery::show(ui, model);
     archive_change::show(ui, model);
     archive_issues::show(ui, model);
     archive_notice::show(ui, model);

@@ -2,17 +2,22 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use p4kx_channels::{Channel, SearchPaths, detect_with_patches};
+use p4kx_channels::{Channel, DiscoveryIssue, SearchPaths, SearchRecipe};
 use p4kx_settings::ManualChannels;
+
+use crate::channel_refresh::{ChannelSearch, Measurement};
 
 /// The Channels the picker offers: detected in the standard places and the manual entries.
 #[derive(Debug, Clone, Default)]
 pub struct ChannelList {
-    base: SearchPaths,
+    recipe: Arc<SearchRecipe>,
     manual: ManualChannels,
     added: ManualChannels,
     detected: Vec<Channel>,
+    discovery_issue_count: usize,
+    issues: Vec<DiscoveryIssue>,
 }
 
 impl ChannelList {
@@ -20,21 +25,49 @@ impl ChannelList {
     /// `base`.
     #[must_use]
     pub fn new(base: SearchPaths, manual: ManualChannels) -> Self {
+        Self::from_recipe(SearchRecipe::explicit(base), manual)
+    }
+
+    /// Captures platform inputs and reports incomplete automatic discovery in the picker.
+    #[must_use]
+    pub fn standard(manual: ManualChannels) -> Self {
+        Self::from_recipe(SearchRecipe::standard(), manual)
+    }
+
+    /// Detects Channels with an owned recipe and the supplied manual entries.
+    #[must_use]
+    pub fn from_recipe(recipe: SearchRecipe, manual: ManualChannels) -> Self {
         let mut list = Self {
-            base: SearchPaths {
-                manual_folders: Vec::new(),
-                manual_archives: Vec::new(),
-                ..base
-            },
+            recipe: Arc::new(recipe.with_manual(Vec::new(), Vec::new())),
             manual,
             added: ManualChannels::default(),
             detected: Vec::new(),
+            discovery_issue_count: 0,
+            issues: Vec::new(),
         };
         list.detect();
         list
     }
 
-    /// Returns the detected Channels in the order of [`detect`].
+    /// Retains installation-protection diagnostics from startup alongside current discovery.
+    #[must_use]
+    pub fn with_startup_issues(mut self, issues: Vec<DiscoveryIssue>) -> Self {
+        self.record_protection_issues(issues);
+        self
+    }
+
+    pub(crate) fn record_protection_issues(&mut self, issues: Vec<DiscoveryIssue>) {
+        self.issues.truncate(self.discovery_issue_count);
+        self.issues.extend(issues);
+    }
+
+    /// Returns current discovery failures and the latest installation-protection report.
+    #[must_use]
+    pub fn discovery_issues(&self) -> &[DiscoveryIssue] {
+        &self.issues
+    }
+
+    /// Returns the detected Channels in the order of [`p4kx_channels::detect`].
     #[must_use]
     pub fn detected(&self) -> &[Channel] {
         &self.detected
@@ -52,30 +85,38 @@ impl ChannelList {
         &self.added
     }
 
-    /// Adds `path` as a manual entry, an Archive when it is a file and a folder otherwise, and
-    /// detects again; returns whether it was not listed yet.
+    /// Registers `path` as a manual entry and returns whether it was not listed yet.
+    /// [`crate::Model`] refreshes automatic discovery off the UI thread.
     pub fn add(&mut self, path: PathBuf) -> bool {
         let path = std::path::absolute(&path).unwrap_or(path);
-        let added = if path.is_file() {
+        if path.is_file() {
             self.added.add_archive(path.clone());
             self.manual.add_archive(path)
         } else {
             self.added.add_folder(path.clone());
             self.manual.add_folder(path)
-        };
-        if added {
-            self.detect();
         }
-        added
+    }
+
+    pub(crate) fn search(&self) -> ChannelSearch {
+        ChannelSearch {
+            recipe: Arc::clone(&self.recipe),
+            manual: self.manual.clone(),
+        }
     }
 
     fn detect(&mut self) {
-        let (detected, patches) = detect_with_patches(&SearchPaths {
-            manual_folders: self.manual.folders.clone(),
-            manual_archives: self.manual.archives.clone(),
-            ..self.base.clone()
-        });
+        self.adopt(self.search().measure());
+    }
+
+    pub(crate) fn adopt(&mut self, measured: Measurement) {
+        let (found, issues) = measured.into_parts();
+        let (detected, patches) = found.into_parts();
         self.detected = detected;
+        let protection = self.issues.split_off(self.discovery_issue_count);
+        self.issues = issues;
+        self.discovery_issue_count = self.issues.len();
+        self.issues.extend(protection);
         crate::public_patches::publish(patches);
     }
 }

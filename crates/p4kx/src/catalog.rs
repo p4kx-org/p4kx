@@ -7,7 +7,6 @@ use std::process::ExitCode;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use p4kx_channels::PublicPatches;
 use p4kx_export::{
     CatalogError, CatalogFailure, CatalogFile, CatalogOptions, CatalogPublicationMode,
     CatalogSummary, Compression, CraftingWarning, Filter, catalog_schema, write_catalog_file,
@@ -46,7 +45,7 @@ pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
     let cancel = cancel_on_interrupt()?;
     let line = ProgressLine::new();
     let show = |progress| line.show_records(progress);
-    let patches = PublicPatches::standard();
+    let patches = crate::launcher_discovery::patches()?;
     let options = CatalogOptions {
         filter: filter.as_ref(),
         exported_at,

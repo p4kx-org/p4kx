@@ -320,8 +320,9 @@ pub use p4kx_guard::{
     OwnedOutputCleanupError, OwnedOutputError, RuntimeEnvironment, RuntimePrerequisiteError,
     WriteProtectionError, WriteRefused, check_runtime_environment, check_runtime_prerequisites,
     create_output_directory, create_output_file, ensure_writable, game_is_running, protect,
-    protect_archive_folder, protect_libraries, protect_manual, remove_owned_output,
-    remove_owned_output_target_only, validated_output_directory,
+    protect_archive_folder, protect_archive_folder_report, protect_libraries,
+    protect_libraries_report, protect_manual, remove_owned_output, remove_owned_output_target_only,
+    validated_output_directory,
 };
 pub use p4kx_localization::{
     GlobalIni, IniEncoding, IniText, Language, LocalizationError, Lookup, MAX_GLOBAL_INI_KEYS,

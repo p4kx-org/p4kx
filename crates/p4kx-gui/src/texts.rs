@@ -108,6 +108,10 @@ pub enum Text {
     ChannelsHeading,
     /// Shown in the Channel picker when no Channel was found.
     ChannelsNone,
+    /// Automatic discovery or installation protection did not complete.
+    ChannelsDiscoveryIncomplete,
+    /// A background Channel discovery worker ended without a result.
+    ChannelsDiscoveryStopped,
     /// The name of the button that shows the sidebar a narrow window hides.
     SidebarShow,
     /// The name of the button that hides the sidebar again.

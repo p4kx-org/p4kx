@@ -7,7 +7,6 @@ use std::process::ExitCode;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use p4kx_channels::PublicPatches;
 use p4kx_export::{
     ArchiveKeyState, BuiltShipBase, CatalogFailure, Filter, ShipBaseError, ShipBaseOptions,
     build_ship_base,
@@ -60,7 +59,7 @@ pub(crate) fn run(args: &ShipsArgs, as_json: bool) -> Result<ExitCode> {
     let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     let line = ProgressLine::new();
     let show = |progress| line.show_records(progress);
-    let patches = PublicPatches::standard();
+    let patches = crate::launcher_discovery::patches()?;
     let options = ShipBaseOptions {
         filter: filter.as_ref(),
         exported_at,

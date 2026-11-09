@@ -74,7 +74,7 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
     if args.no_vertex_colours {
         glb = glb.without_vertex_colours();
     }
-    let info = PackageInfo::new(channel_name(outer.path()), build_info(outer));
+    let info = PackageInfo::new(channel_name(outer.path()), build_info(outer)?);
     let name = name_of(entry);
     let scene = InteriorScene::new(&name, &interior);
     let loader = models.textures();

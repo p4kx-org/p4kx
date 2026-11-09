@@ -107,14 +107,17 @@ impl Server {
     pub(crate) async fn preload(&self, archive: Option<String>) -> Result<(), String> {
         let state = Arc::clone(&self.state);
         let outcome = tokio::task::spawn_blocking(move || {
-            let loaded = state.forge(archive.as_deref())?.load_dataforge();
             noted::clear();
-            loaded
+            let loaded = state
+                .forge(archive.as_deref())
+                .and_then(|forge| forge.load_dataforge());
+            let notes = noted::take();
+            loaded.map_err(|error| notes.error_message(&error))
         })
         .await;
         match outcome {
             Ok(Ok(())) => Ok(()),
-            Ok(Err(error)) => Err(error.message()),
+            Ok(Err(error)) => Err(error),
             Err(_) => Err(ToolError::Stopped.message()),
         }
     }
@@ -154,12 +157,15 @@ impl Server {
             let result = work(&state);
             let notes = noted::take();
             drop(permit);
-            result.map(|value| (value, notes))
+            match result {
+                Ok(value) => Ok((value, notes)),
+                Err(error) => Err(notes.error_message(&error)),
+            }
         })
         .await;
         match outcome {
             Ok(Ok(done)) => Ok(done),
-            Ok(Err(error)) => Err(error.message()),
+            Ok(Err(error)) => Err(error),
             Err(_) => Err(ToolError::Stopped.message()),
         }
     }
@@ -343,3 +349,7 @@ impl ServerHandler for Server {
             .with_instructions(INSTRUCTIONS)
     }
 }
+
+#[cfg(test)]
+#[path = "server_prefix_tests.rs"]
+mod prefix_tests;

@@ -453,7 +453,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   manual entries in `settings.toml` in `%APPDATA%\P4KX` (the platform config directory
   elsewhere). `--config-dir`, `--launcher-dir` and `--default-library` (or `P4KX_CONFIG_DIR`,
   `P4KX_LAUNCHER_DIR`, `P4KX_DEFAULT_LIBRARY`) override these locations. Launcher credential
-  files and the launcher's settings store are never opened.
+  files and the launcher's settings store are never opened. On Linux, Proton/Steam external
+  libraries, Bottles and immediate `~/Games/*` prefixes are searched with bounded exact/unique-case
+  resolution. Incomplete automatic discovery is reported on stderr; manual entries remain usable.
+  See [Channel discovery](channel-discovery.md) for roots, priority, limits and cache behavior.
 - `p4kx cryxml <file> [--out <file>]` converts a CryXml file on disk, e.g. an Entry extracted
   earlier, to UTF-8 XML on stdout or in `--out`. All three signatures (`CryXmlB`, `CryXml`,
   `CRY3SDK`) and both byte orders are read; the XML is indented by two spaces with LF line

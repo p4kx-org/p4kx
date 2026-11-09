@@ -25,6 +25,17 @@ whose identity cannot be verified. A file chooser grant can hide the Archive's h
 write grant does not establish that writing there is safe. Choose a source and destination with
 the required visibility. Cleanup or restoration failures remain visible even after cancellation.
 
+## Channel discovery
+
+The Channel picker searches native launcher logs and, on Linux, bounded Proton, Steam, Bottles
+and immediate `~/Games/*` prefixes. If automatic discovery or startup installation protection
+is incomplete, a warning names the manual fallback; its tooltip gives the first technical reason.
+Use **Add folder.** or **Add Archive.** for a missing installation. Existing manual entries remain
+listed. Adding a new entry stores and protects it immediately, then refreshes the automatic list
+in the background. The list updates when the current search completes; earlier results cannot
+replace a newer selection. A search failure appears in the existing warning notice. See [Channel discovery](channel-discovery.md)
+for source priority, supported roots, limits and cache behavior.
+
 ## Preview
 
 Click an Entry's name in the table to preview it below the table. The Entry is read straight

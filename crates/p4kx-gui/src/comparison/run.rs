@@ -18,6 +18,7 @@ use super::record_list::RecordChangeList;
 use super::schema_view::SchemaView;
 use super::{ComparisonStage, ComparisonView};
 use crate::model::describe;
+use crate::protected_open::ProtectedResult;
 
 /// How a Comparison ended.
 #[derive(Debug)]
@@ -27,6 +28,12 @@ pub(crate) enum Outcome {
     Cancelled,
 }
 
+#[derive(Debug)]
+pub(crate) struct Completion {
+    pub(crate) outcome: Outcome,
+    pub(crate) issues: Vec<p4kx_channels::DiscoveryIssue>,
+}
+
 /// A Comparison running on a background thread.
 #[derive(Debug)]
 pub(crate) struct Run {
@@ -34,7 +41,7 @@ pub(crate) struct Run {
     alive: Weak<()>,
     stage: Arc<Mutex<ComparisonStage>>,
     key_asked: Arc<AtomicBool>,
-    result: Receiver<Outcome>,
+    result: Receiver<Completion>,
 }
 
 impl Run {
@@ -56,11 +63,14 @@ impl Run {
     }
 
     /// Takes the outcome once the thread ended.
-    pub(crate) fn poll(&self) -> Option<Outcome> {
+    pub(crate) fn poll(&self) -> Option<Completion> {
         match self.result.try_recv() {
             Ok(outcome) => Some(outcome),
             Err(TryRecvError::Empty) => None,
-            Err(TryRecvError::Disconnected) => Some(Outcome::Failed(None)),
+            Err(TryRecvError::Disconnected) => Some(Completion {
+                outcome: Outcome::Failed(None),
+                issues: Vec::new(),
+            }),
         }
     }
 }
@@ -87,7 +97,7 @@ pub(crate) fn start(
         .spawn(move || {
             let outcome = run(
                 (&old, &new),
-                (levels, key),
+                (levels, key.as_ref()),
                 (&thread_cancel, &thread_stage, &thread_asked),
                 &wake,
             );
@@ -106,20 +116,21 @@ pub(crate) fn start(
     })
 }
 
-fn open(path: &Path, key: Option<ArchiveKey>) -> Result<Arc<Archive>, String> {
-    p4kx_extraction::protect_archive_folder(path);
-    Archive::open_with_key(path, key)
-        .map(Arc::new)
-        .map_err(|error| format!("{}: {}", path.display(), describe(&error)))
+fn open(path: &Path, key: Option<ArchiveKey>) -> ProtectedResult<Arc<Archive>, String> {
+    ProtectedResult::read(path, || {
+        Archive::open_with_key(path, key)
+            .map(Arc::new)
+            .map_err(|error| format!("{}: {}", path.display(), describe(&error)))
+    })
 }
 
 fn open_both(
     old: &Path,
     new: &Path,
     key: Option<&ArchiveKey>,
-) -> Result<(Arc<Archive>, Arc<Archive>), String> {
+) -> ProtectedResult<(Arc<Archive>, Arc<Archive>), String> {
     let (old, new) = rayon::join(|| open(old, key.cloned()), || open(new, key.cloned()));
-    Ok((old?, new?))
+    old.zip(new)
 }
 
 /// Reads the DataForge Entry of `archive` and checks that it opens.
@@ -139,8 +150,22 @@ fn read_forges(old: &Archive, new: &Archive) -> Result<OwnedDataForges, String> 
 }
 
 fn run(
-    (old, new): (&Path, &Path),
-    (levels, key): (Levels, Option<ArchiveKey>),
+    paths: (&Path, &Path),
+    options: (Levels, Option<&ArchiveKey>),
+    progress: (&CancelToken, &Mutex<ComparisonStage>, &AtomicBool),
+    wake: &(impl Fn() + Sync),
+) -> Completion {
+    let opened = open_both(paths.0, paths.1, options.1);
+    let outcome = compare(opened.result, options.0, progress, wake);
+    Completion {
+        outcome,
+        issues: opened.issues,
+    }
+}
+
+fn compare(
+    archives: Result<(Arc<Archive>, Arc<Archive>), String>,
+    levels: Levels,
     (cancel, stage, key_asked): (&CancelToken, &Mutex<ComparisonStage>, &AtomicBool),
     wake: &(impl Fn() + Sync),
 ) -> Outcome {
@@ -148,7 +173,7 @@ fn run(
         *stage.lock().unwrap_or_else(PoisonError::into_inner) = now;
         wake();
     };
-    let (old, new) = match open_both(old, new, key.as_ref()) {
+    let (old, new) = match archives {
         Ok(both) => both,
         Err(reason) => return Outcome::Failed(Some(reason)),
     };
@@ -184,7 +209,16 @@ fn run(
         Err(ComparisonError::Cancelled) => return Outcome::Cancelled,
         Err(error) => return Outcome::Failed(Some(describe(&error))),
     };
-    let records = match levels.records.then(|| records(&comparison, cancel, &set)) {
+    prepare_view(comparison, levels.records, cancel, &set)
+}
+
+fn prepare_view(
+    comparison: OwnedComparison,
+    records_enabled: bool,
+    cancel: &CancelToken,
+    set: &(impl Fn(ComparisonStage) + Sync),
+) -> Outcome {
+    let records = match records_enabled.then(|| records(&comparison, cancel, set)) {
         None => None,
         Some(Ok(list)) => Some(list),
         Some(Err(outcome)) => return outcome,
@@ -226,3 +260,7 @@ fn records(
         Err(error) => Err(Outcome::Failed(Some(describe(&error)))),
     }
 }
+
+#[cfg(test)]
+#[path = "run_tests.rs"]
+mod tests;

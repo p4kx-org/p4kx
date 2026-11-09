@@ -170,7 +170,7 @@ fn store(
     scene: &CharacterScene<'_>,
     context: &PackageWriteContext<'_>,
 ) -> Result<PackageSummary> {
-    let info = PackageInfo::new(channel_name(archive.path()), build_info(archive));
+    let info = PackageInfo::new(channel_name(archive.path()), build_info(archive)?);
     Ok(write_character_package_with_context(
         scene,
         &models.textures(),
