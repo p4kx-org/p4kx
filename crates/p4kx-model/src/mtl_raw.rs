@@ -168,14 +168,6 @@ pub(crate) fn layers<'a>(element: impl XmlElement<'a>, budget: &mut Budget) -> V
     layers
 }
 
-pub(crate) fn public_params<'a>(element: impl XmlElement<'a>) -> Attributes {
-    element
-        .children()
-        .filter(|child| child.name().eq_ignore_ascii_case("PublicParams"))
-        .flat_map(|params| attributes(params))
-        .collect()
-}
-
 pub(crate) fn other_elements<'a>(
     element: impl XmlElement<'a>,
     budget: &mut Budget,

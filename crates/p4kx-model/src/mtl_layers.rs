@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 
 use crate::mtl_layer_cache::MAX_LAYER_FILES;
-use crate::mtl_parse::{scalar, vector};
+use crate::mtl_number;
 use crate::{CompanionResolver, LayerCache, Material, MaterialLayer, MaterialLibrary, TextureSlot};
 
 const WHITE: [f32; 3] = [1.0; 3];
@@ -27,14 +27,16 @@ impl MaterialLayer {
     #[must_use]
     pub fn tint(&self) -> [f32; 3] {
         self.attribute("TintColor")
-            .and_then(vector)
+            .and_then(mtl_number::vector)
             .unwrap_or(WHITE)
     }
 
     /// Returns the layer's `GlossMult`, 1 when it is missing or malformed.
     #[must_use]
     pub fn gloss_mult(&self) -> f32 {
-        self.attribute("GlossMult").and_then(scalar).unwrap_or(1.0)
+        self.attribute("GlossMult")
+            .and_then(mtl_number::scalar)
+            .unwrap_or(1.0)
     }
 }
 
@@ -46,7 +48,7 @@ impl Material {
         self.public_params
             .iter()
             .find(|(name, _)| name.eq_ignore_ascii_case("WearBlendBase"))
-            .and_then(|(_, value)| scalar(value))
+            .and_then(|(_, value)| mtl_number::scalar(value))
             .unwrap_or(0.0)
     }
 }

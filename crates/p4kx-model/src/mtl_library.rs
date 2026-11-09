@@ -3,7 +3,7 @@
 
 use crate::mtl_source::MaterialSourceLimits;
 use crate::mtl_source_error::MaterialReadError;
-use crate::{Material, MaterialError, MaterialLibrary, mtl_source_read};
+use crate::{Material, MaterialError, MaterialLibrary, MaterialReadObservation, mtl_source_read};
 impl MaterialLibrary {
     /// Reads the `.mtl` file `bytes`, text XML or `CryXml`, of the library `path`.
     ///
@@ -34,7 +34,24 @@ impl MaterialLibrary {
         limits: MaterialSourceLimits,
         checkpoint: impl FnMut() -> Result<(), Interrupted>,
     ) -> Result<Self, MaterialReadError<Interrupted>> {
-        mtl_source_read::read(path, bytes, limits, checkpoint)
+        Self::parse_with_observer(path, bytes, limits, checkpoint, |_| Ok(()))
+    }
+
+    /// Reads bounded material syntax and reports original sites used by interpreted fields.
+    ///
+    /// Observations borrow only during the callback. Callers retain contributions only after a
+    /// successful parse; observer errors use the same interruption path as the checkpoint.
+    ///
+    /// # Errors
+    /// Returns the original material/input-limit error or caller interruption.
+    pub fn parse_with_observer<Interrupted>(
+        path: &str,
+        bytes: &[u8],
+        limits: MaterialSourceLimits,
+        checkpoint: impl FnMut() -> Result<(), Interrupted>,
+        observer: impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
+    ) -> Result<Self, MaterialReadError<Interrupted>> {
+        mtl_source_read::read_observed(path, bytes, limits, checkpoint, observer)
     }
 
     /// Returns the material of `id`, or `None` when the library has no sub-material at that
