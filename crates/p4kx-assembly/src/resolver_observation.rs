@@ -8,8 +8,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use p4kx_dataforge::{DataForgeError, Guid, Record, RecordTree, TreeBuilder};
 
 use crate::{
-    Entities, LoadoutDocumentKind, LoadoutError, LoadoutFileError, LoadoutFileIdentity,
-    LoadoutResolver,
+    Entities, LoadoutDocumentKind, LoadoutError, LoadoutFileError, LoadoutFileObservation,
+    LoadoutFileSource, LoadoutResolver,
 };
 
 /// An actual source operation performed by a loadout resolver.
@@ -20,7 +20,7 @@ pub enum LoadoutReadEvent<'r, 'f> {
     /// An actual required XML file read completed.
     FileRead {
         /// The actual Entry identity or configured missing target.
-        source: LoadoutFileIdentity<'r>,
+        source: &'r LoadoutFileSource,
         /// The intrinsic document projection requested by the reader.
         kind: LoadoutDocumentKind,
         /// The actual byte-read outcome.
@@ -29,11 +29,16 @@ pub enum LoadoutReadEvent<'r, 'f> {
     /// The actual intrinsic source document projection completed.
     FileProjection {
         /// The same source identity as the preceding successful file read.
-        source: LoadoutFileIdentity<'r>,
+        source: &'r LoadoutFileSource,
         /// The intrinsic document projection performed.
         kind: LoadoutDocumentKind,
         /// The actual parse or document-shape outcome.
         outcome: Result<(), &'r str>,
+    },
+    /// Original file and projection outcomes supplied a cached document result.
+    FileReused {
+        /// Immutable first-population evidence, without another source operation.
+        observation: &'r LoadoutFileObservation,
     },
     /// A canonical dependency read completed before optional projection helpers run.
     CanonicalRead {
@@ -86,9 +91,16 @@ impl Observation {
         self.stopped.load(Ordering::Acquire)
     }
 
+    pub(crate) fn stop(&self) {
+        self.stopped.store(true, Ordering::Release);
+    }
+
     fn notify(&self, event: LoadoutReadEvent<'_, '_>) -> Result<(), LoadoutError> {
+        if self.stopped() {
+            return Err(LoadoutError::ObservationStopped);
+        }
         if self.observer.observe(event).is_break() {
-            self.stopped.store(true, Ordering::Release);
+            self.stop();
         }
         if self.stopped() {
             Err(LoadoutError::ObservationStopped)
@@ -173,6 +185,9 @@ pub(crate) fn read_spec<'f>(
     record: &Record<'f>,
     observation: Option<&Observation>,
 ) -> Result<crate::spec::EntitySpec, LoadoutError> {
+    if observation.is_some_and(Observation::stopped) {
+        return Err(LoadoutError::ObservationStopped);
+    }
     if !crate::entities::is_entity(record) {
         let error = LoadoutError::NotAnEntity {
             guid: record.guid(),

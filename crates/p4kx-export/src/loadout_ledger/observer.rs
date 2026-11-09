@@ -127,6 +127,7 @@ impl LoadoutReadObserver for Capture {
                 kind,
                 outcome,
             } => self.file_projection(source, kind, outcome),
+            LoadoutReadEvent::FileReused { observation } => self.file_reused(observation),
             LoadoutReadEvent::InventoryIncomplete => self.incomplete_files(),
             LoadoutReadEvent::CanonicalRead { record, outcome } => self.canonical(record, outcome),
             LoadoutReadEvent::ProvidedTree { record, .. } => self.reuse(record, true),

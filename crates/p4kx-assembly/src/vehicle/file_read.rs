@@ -3,17 +3,18 @@
 
 use super::locate;
 use super::patch::{self, ModificationReport};
+use crate::loadout_file_events::Document;
+use crate::loadout_file_trace::FileTrace;
 use crate::markup::{self, Budget, Element, MAX_ELEMENT_DEPTH};
 use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
 use crate::{LoadoutDocumentKind, LoadoutError, LoadoutFileError, LoadoutFiles};
 pub(super) fn base(
-    files: &dyn LoadoutFiles,
     path: &str,
-    bytes: &[u8],
+    document: Document,
     budget: &mut Budget,
     observation: Option<&Observation>,
 ) -> Result<Element, LoadoutError> {
-    let result = markup::parse(bytes, budget).and_then(|root| {
+    let result = markup::parse(&document, budget).and_then(|root| {
         if root.name.eq_ignore_ascii_case("Vehicle") {
             Ok(root)
         } else {
@@ -21,25 +22,21 @@ pub(super) fn base(
         }
     });
     crate::loadout_file_events::parsed(
-        files,
-        path,
-        LoadoutDocumentKind::VehicleImplementation,
+        document,
         result.as_ref().map(|_| ()).map_err(String::as_str),
         observation,
     )?;
     result.map_err(|reason| locate::issue(path, reason))
 }
 
-/// Parses the patch `bytes` and applies it to `root`, within `budget`.
+/// Parses the source document and applies its patch to `root`, within `budget`.
 pub(super) fn patch(
     root: &mut Element,
-    bytes: &[u8],
+    source: Document,
     budget: &mut Budget,
-    files: &dyn LoadoutFiles,
-    path: &str,
     observation: Option<&Observation>,
 ) -> Result<ModificationReport, String> {
-    let document = match markup::parse(bytes, budget) {
+    let document = match markup::parse(&source, budget) {
         Err(error) if budget.exhausted() => {
             resolver_observation::notify(observation, LoadoutReadEvent::InventoryIncomplete)
                 .map_err(|error| error.to_string())?;
@@ -48,9 +45,7 @@ pub(super) fn patch(
         result => result,
     };
     crate::loadout_file_events::parsed(
-        files,
-        path,
-        LoadoutDocumentKind::VehiclePatch,
+        source,
         document.as_ref().map(|_| ()).map_err(String::as_str),
         observation,
     )
@@ -70,11 +65,15 @@ pub(super) fn first(
     candidates: &[String],
     kind: LoadoutDocumentKind,
     observation: Option<&Observation>,
-) -> Result<Option<(String, Vec<u8>)>, LoadoutError> {
+    trace: &mut FileTrace,
+) -> Result<Option<(String, Document)>, LoadoutError> {
     for path in candidates {
-        match crate::loadout_file_events::read(files, path, kind, observation) {
+        match crate::loadout_file_events::read(files, path, kind, observation, trace) {
             Ok(bytes) => return Ok(Some((path.clone(), bytes))),
             Err(LoadoutFileError::NotFound) => {}
+            Err(_) if observation.is_some_and(Observation::stopped) => {
+                return Err(LoadoutError::ObservationStopped);
+            }
             Err(LoadoutFileError::ObservationStopped) => {
                 return Err(LoadoutError::ObservationStopped);
             }

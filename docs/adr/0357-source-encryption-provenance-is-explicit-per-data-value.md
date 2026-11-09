@@ -24,6 +24,14 @@ observations; they do not taint the emitted data's origin. A retained/used prefi
 Subject origins in Entry listings/failures remain visible independently of payload contributions.
 Equal decoded bytes or equal artifact digests never merge distinct encrypted/plain source uses.
 
+Intrinsic copied Record-header facts retain their own original header contribution.
+Resolved target metadata also retains the actual caller-field Selector that chose that
+target, alongside the authentic target-header fact. A stored Reference GUID remains its
+own body Payload; a pointer-derived GUID retains the selected header and actual pointer
+selection/conversion. Matching descriptors or a later target lookup cannot supply these
+contributions. The original target admission and field declaration must be retained at
+the actual read; source value equality does not establish that authority.
+
 ## Filter index
 
 For a precisely named data/result scope, containsEncryptedSource is:

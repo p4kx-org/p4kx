@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::{Field, Guid, Location, RecordMetadata, Step, StructValue, Value, ValueError};
+use crate::tree_owner::TreeOwner;
+use crate::{Field, Guid, Location, Record, RecordMetadata, Step, StructValue, Value, ValueError};
 
 /// The canonical tree of one Record: its GUID, record path, name and root struct with the fields.
 ///
 /// It is the single model every output is made from; text is borrowed from the DataForge.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct RecordTree<'f> {
     pub(crate) record_index: u32,
     pub(crate) metadata: RecordMetadata<'f>,
@@ -15,9 +16,18 @@ pub struct RecordTree<'f> {
     pub(crate) name: &'f str,
     pub(crate) tag: Option<&'f str>,
     pub(crate) root: StructValue<'f>,
+    pub(crate) owner: TreeOwner<'f>,
 }
 
 impl<'f> RecordTree<'f> {
+    /// Returns whether this tree was built from this exact original Record owner and position.
+    ///
+    /// Equal values, GUIDs or indices do not establish original ownership.
+    #[must_use]
+    pub fn is_from(&self, record: &Record<'_>) -> bool {
+        self.record_index == record.index() && self.owner.is_from(record)
+    }
+
     /// Returns original borrowed metadata independently of normalized legacy header getters.
     #[must_use]
     pub const fn metadata(&self) -> RecordMetadata<'f> {
@@ -105,6 +115,18 @@ impl<'f> RecordTree<'f> {
     #[must_use]
     pub fn error_count(&self) -> usize {
         count_field_errors(&self.root.fields)
+    }
+}
+
+impl PartialEq for RecordTree<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_index == other.record_index
+            && self.metadata == other.metadata
+            && self.guid == other.guid
+            && self.record_path == other.record_path
+            && self.name == other.name
+            && self.tag == other.tag
+            && self.root == other.root
     }
 }
 

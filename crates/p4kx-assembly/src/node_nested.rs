@@ -47,6 +47,9 @@ impl LoadoutResolver<'_> {
         walk: &mut Walk,
         issues: &mut Vec<LoadoutError>,
     ) -> Vec<PortNode> {
+        if self.observation_stopped() {
+            return Vec::new();
+        }
         let Some(loadout) = loadout else {
             return Vec::new();
         };
@@ -65,6 +68,9 @@ impl LoadoutResolver<'_> {
         let mut ports = Vec::new();
         walk.nesting = walk.nesting.saturating_add(1);
         for entry in entries.list.iter() {
+            if self.observation_stopped() {
+                break;
+            }
             if !walk.reserve() {
                 issues.push(LoadoutError::TooManyPorts);
                 break;

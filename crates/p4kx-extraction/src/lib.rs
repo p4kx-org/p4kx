@@ -294,16 +294,16 @@ pub use p4kx_dataforge::query;
 pub use p4kx_dataforge::{
     Annotations, CSV_BYTE_ORDER_MARK, CanonicalReadObserver, DataForge, DataForgeError,
     DataForgeIssue, DataType, Enum, FLAT_COLUMNS, FLAT_TAG_COLUMN, FLAT_TEXT_COLUMN, Field,
-    FieldKind, FieldStat, FieldStatistics, FieldStatisticsError, FileGraph, FlatFormat, FlatValues,
-    FormatSurvey, Guid, IndexedReference, InvalidGuid, JsonLayout, MAX_DATAFORGE_ISSUES,
-    MAX_DISTINCT_VALUES, MAX_FIELD_PATHS, MAX_INDEXED_REFERENCES, MAX_NESTING_DEPTH,
-    MAX_RECORD_VALUES, MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES, MAX_TAG_TEXT_BYTES,
-    Number, PointerProbe, PointerSurvey, Property, RECORD_XML_NAMESPACE, Record, RecordJson,
-    RecordMetadata, RecordText, RecordTree, RecordXml, Reference, ReferenceIndex, Resolution,
-    Struct, StructValue, TAG_DATABASE_TYPE, TAG_PATH_SEPARATOR, TAG_TYPE, Tag, TagBuildEvent,
-    TagPathEdgeKind, TagPathIncoming, TagProjectionFailure, TagRelationIssue, TagResolver, TagTree,
-    TagTreeIssues, TextResolver, TrailingSurvey, TreeBuilder, Value, ValueError, ValueKind,
-    write_csv_cell,
+    FieldKind, FieldStat, FieldStatistics, FieldStatisticsError, FieldStorage, FileGraph,
+    FlatFormat, FlatValues, FormatSurvey, Guid, IndexedReference, InvalidGuid, JsonLayout,
+    MAX_DATAFORGE_ISSUES, MAX_DISTINCT_VALUES, MAX_FIELD_PATHS, MAX_INDEXED_REFERENCES,
+    MAX_NESTING_DEPTH, MAX_RECORD_VALUES, MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES,
+    MAX_TAG_TEXT_BYTES, Number, PointerProbe, PointerSurvey, Property, RECORD_XML_NAMESPACE,
+    Record, RecordJson, RecordMetadata, RecordText, RecordTree, RecordXml, Reference,
+    ReferenceIndex, ReferenceOrigin, Resolution, Struct, StructValue, TAG_DATABASE_TYPE,
+    TAG_PATH_SEPARATOR, TAG_TYPE, Tag, TagBuildEvent, TagPathEdgeKind, TagPathIncoming,
+    TagProjectionFailure, TagRelationIssue, TagResolver, TagTree, TagTreeIssues, TextResolver,
+    TrailingSurvey, TreeBuilder, Value, ValueError, ValueKind, write_csv_cell,
 };
 pub use p4kx_foundation::{ArchiveKey, ArchiveKeyError};
 pub use p4kx_gfx as gfx;

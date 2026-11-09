@@ -96,6 +96,38 @@ jobs:
       - name: Refuse a different source, target or tool archive before execution
         shell: pwsh
         run: .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -ArchivePath nextest-archive.tar.zst -MetadataPath nextest-archive.json -ValidateArchive
+      - name: Preserve actual native format layout evidence
+        id: format_layout
+        if: matrix.partition == 1
+        shell: pwsh
+        run: |
+          . .github/scripts/platform-contract.ps1
+          $platform = Get-P4kxPlatform -Target $env:P4KX_TARGET
+          $directory = Join-Path $env:RUNNER_TEMP 'native-format-layout'
+          New-Item -ItemType Directory -Path $directory -Force | Out-Null
+          Copy-Item -LiteralPath nextest-archive.json -Destination (Join-Path $directory 'nextest-archive.json')
+          $log = Join-Path $directory 'native-layout.log'
+          cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --no-capture --no-tests fail -E 'package(p4kx-dataforge) & (test(original_field_storage_distinguishes_reference_and_weak_scalar_and_array_decoding) | test(original_target_receipts_keep_actual_lookup_owners_for_scalar_and_array_links))' 2>&1 | Tee-Object -FilePath $log
+          $layoutExit = $LASTEXITCODE
+          if ($layoutExit -ne 0) { throw "Native format layout tests failed with exit $layoutExit." }
+          $arch = [regex]::Escape(($env:P4KX_TARGET -split '-')[0])
+          $os = [regex]::Escape($platform.os)
+          $field = "^FIELD_STORAGE_LAYOUT arch=$arch os=$os field=[0-9]+/[0-9]+ storage=[0-9]+/[0-9]+ value=[0-9]+/[0-9]+ datatype=[0-9]+/[0-9]+$"
+          $reference = "^REFERENCE_ORIGIN_LAYOUT arch=$arch os=$os reference=[0-9]+/[0-9]+ view=[0-9]+/[0-9]+ value=[0-9]+/[0-9]+$"
+          $lines = @(Get-Content -LiteralPath $log)
+          if (@($lines | Where-Object { $_ -cmatch $field }).Count -ne 1 -or @($lines | Where-Object { $_ -cmatch $reference }).Count -ne 1) {
+            throw 'Native format layout output is missing, duplicated or belongs to a different CPU/OS.'
+          }
+      - name: Upload native format layout evidence
+        if: always() && matrix.partition == 1 && steps.format_layout.outcome != 'skipped'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-format-layout-${{ inputs.target }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-format-layout/native-layout.log
+            ${{ runner.temp }}/native-format-layout/nextest-archive.json
+          retention-days: 14
+          if-no-files-found: error
       - name: Install the native software Vulkan driver
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1 libasound2t64 libx11-6 libxcursor1 libxi6 libxrandr2 libxkbcommon-x11-0 libegl1 xvfb

@@ -118,8 +118,8 @@ fn event_fault(event: &LoadoutReadEvent<'_, '_>) -> Option<Fault> {
             kind,
             outcome: Err(error),
         } if !matches!(error, LoadoutFileError::NotFound) => Some(Fault::FileRead {
-            entry_index: source.entry_index,
-            path: source.path.to_owned(),
+            entry_index: source.identity().entry_index,
+            path: source.identity().path.to_owned(),
             kind,
             source: error.clone(),
         }),
@@ -128,8 +128,8 @@ fn event_fault(event: &LoadoutReadEvent<'_, '_>) -> Option<Fault> {
             kind,
             outcome: Err(reason),
         } => Some(Fault::FileProjection {
-            entry_index: source.entry_index,
-            path: source.path.to_owned(),
+            entry_index: source.identity().entry_index,
+            path: source.identity().path.to_owned(),
             kind,
             reason: reason.to_owned(),
         }),
@@ -137,7 +137,8 @@ fn event_fault(event: &LoadoutReadEvent<'_, '_>) -> Option<Fault> {
         LoadoutReadEvent::ProvidedTree { .. }
         | LoadoutReadEvent::Reused { .. }
         | LoadoutReadEvent::FileRead { .. }
-        | LoadoutReadEvent::FileProjection { .. } => None,
+        | LoadoutReadEvent::FileProjection { .. }
+        | LoadoutReadEvent::FileReused { .. } => None,
     }
 }
 

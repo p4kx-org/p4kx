@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::hash_map::Entry;
 use std::sync::Arc;
+
+use crate::loadout_file_cache::CachedDocument;
 
 use crate::resolver::VehicleResult;
 use crate::spec::EntitySpec;
@@ -25,17 +28,24 @@ impl LoadoutResolver<'_> {
             vehicle_spec.modification.to_ascii_lowercase(),
             class_name.to_ascii_lowercase()
         );
-        let loaded = self.vehicles.entry(key).or_insert_with(|| {
-            vehicle::load_observed(
-                files,
-                class_name,
-                &vehicle_spec.definition,
-                &vehicle_spec.modification,
-                self.observation.as_deref(),
-            )
-            .map(Arc::new)
-        });
-        Some(loaded.clone())
+        let observation = self.observation.as_deref();
+        let loaded = match self.vehicles.entry(key) {
+            Entry::Occupied(entry) => entry.into_mut().reused(observation),
+            Entry::Vacant(entry) => Ok(entry
+                .insert(CachedDocument::read(|trace| {
+                    vehicle::load_observed(
+                        files,
+                        class_name,
+                        &vehicle_spec.definition,
+                        &vehicle_spec.modification,
+                        observation,
+                        trace,
+                    )
+                    .map(Arc::new)
+                }))
+                .value()),
+        };
+        Some(loaded.map_or_else(Err, Clone::clone))
     }
 
     /// Returns the gears of the landing gear Record the vehicle component of `spec` names, read

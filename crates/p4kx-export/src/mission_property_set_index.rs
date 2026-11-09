@@ -3,25 +3,26 @@
 
 use std::collections::HashMap;
 use std::fmt::{self, Write};
-use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
+use std::ptr;
 
 use p4kx_extraction::{StructValue, Value};
 
-struct SourceNode<'t, 'f>(&'t StructValue<'f>);
-
-impl Hash for SourceNode<'_, '_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::ptr::hash(self.0, state);
-    }
+/// A borrowed node's immutable allocation identity, never a serialized source receipt.
+#[derive(PartialEq, Eq, Hash)]
+struct SourceNode<'tree, 'source> {
+    address: usize,
+    borrowed: PhantomData<(&'tree (), &'source ())>,
 }
 
-impl PartialEq for SourceNode<'_, '_> {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.0, other.0)
+impl<'tree, 'source> SourceNode<'tree, 'source> {
+    fn new(source: &'tree StructValue<'source>) -> Self {
+        Self {
+            address: ptr::from_ref(source).addr(),
+            borrowed: PhantomData,
+        }
     }
 }
-
-impl Eq for SourceNode<'_, '_> {}
 
 /// Canonical authored locations of borrowed source nodes that own property overrides.
 pub(crate) struct MissionPropertySetIndex<'t, 'f> {
@@ -38,7 +39,9 @@ impl<'t, 'f> MissionPropertySetIndex<'t, 'f> {
 
     /// Returns the node's authored location without resolving names or equivalent content.
     pub(crate) fn location(&self, node: &'t StructValue<'f>) -> Option<&str> {
-        self.locations.get(&SourceNode(node)).map(String::as_str)
+        self.locations
+            .get(&SourceNode::new(node))
+            .map(String::as_str)
     }
 }
 
@@ -48,7 +51,7 @@ fn visit<'t, 'f>(
     locations: &mut HashMap<SourceNode<'t, 'f>, String>,
 ) -> fmt::Result {
     if value.field("propertyOverrides").is_some() {
-        locations.insert(SourceNode(value), path.clone());
+        locations.insert(SourceNode::new(value), path.clone());
     }
     for field in value.fields() {
         let length = path.len();

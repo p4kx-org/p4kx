@@ -8,6 +8,7 @@ use p4kx_dataforge::{DataForge, Guid, Record, RecordTree, TagTree, TreeBuilder};
 
 use crate::assortment::Assorted;
 use crate::entities::is_entity;
+use crate::loadout_file_cache::CachedDocument;
 use crate::pick::LoadoutPicks;
 use crate::plan::Plan;
 use crate::resolver_observation::{self, Cache, LoadoutReadEvent, Observation};
@@ -15,7 +16,7 @@ use crate::spec::{EntitySpec, EntrySpec, LoadoutSpec, TargetSpec};
 use crate::walk::Walk;
 use crate::{
     ChangeError, ChangedLoadout, Entities, EntityNode, ItemFacts, LandingGear, LoadoutChanges,
-    LoadoutError, LoadoutFiles, VehicleImplementation, Wearable, xml,
+    LoadoutError, LoadoutFiles, VehicleImplementation, Wearable,
 };
 
 #[path = "resolver_specs.rs"]
@@ -52,8 +53,8 @@ pub struct LoadoutResolver<'f> {
     pub(crate) entities: Arc<Entities<'f>>,
     pub(crate) files: Option<&'f dyn LoadoutFiles>,
     pub(crate) specs: HashMap<u32, SpecResult>,
-    xml: HashMap<String, EntriesResult>,
-    pub(crate) vehicles: HashMap<String, VehicleResult>,
+    pub(crate) xml: HashMap<String, CachedDocument<EntriesResult>>,
+    pub(crate) vehicles: HashMap<String, CachedDocument<VehicleResult>>,
     pub(crate) landing: HashMap<Guid, Result<Arc<[LandingGear]>, LoadoutError>>,
     pub(crate) builder: TreeBuilder<'f>,
     pub(crate) observation: Option<Arc<Observation>>,
@@ -169,6 +170,9 @@ impl<'f> LoadoutResolver<'f> {
         let spec = spec.as_ref().as_ref().map_err(Clone::clone)?;
         let mut walk = Walk::new(entity.guid(), None);
         let mut node = self.node(spec, None, &mut walk);
+        if self.observation_stopped() {
+            return Err(LoadoutError::ObservationStopped);
+        }
         self.dress_body(&mut node);
         if self.observation_stopped() {
             return Err(LoadoutError::ObservationStopped);
@@ -188,10 +192,7 @@ impl<'f> LoadoutResolver<'f> {
         entity: &Record<'f>,
         tree: &RecordTree<'f>,
     ) -> Result<EntityNode, LoadoutError> {
-        if (tree.guid(), tree.record_index()) == (entity.guid(), entity.index())
-            && !self.specs.contains_key(&entity.index())
-            && is_entity(entity)
-        {
+        if tree.is_from(entity) && !self.specs.contains_key(&entity.index()) && is_entity(entity) {
             resolver_observation::notify(
                 self.observation.as_deref(),
                 LoadoutReadEvent::ProvidedTree {
@@ -268,6 +269,9 @@ impl<'f> LoadoutResolver<'f> {
         let mut walk = Walk::new(entity.guid(), plan);
         walk.cancellable = true;
         let mut node = self.node(spec, None, &mut walk);
+        if self.observation_stopped() {
+            return Err(LoadoutError::ObservationStopped.into());
+        }
         self.dress_body(&mut node);
         node.issues.extend(self.unknown_picks());
         let (ignored, mismatches) = match walk.plan.take() {
@@ -336,24 +340,7 @@ impl<'f> LoadoutResolver<'f> {
             Some(LoadoutSpec::Manual(entries)) => Ok(Entries::complete(Arc::clone(entries))),
             Some(LoadoutSpec::Layered(layers)) => self.layered_entries(layers),
             Some(LoadoutSpec::Assortments(guids)) => Ok(self.assortment_entries(guids)),
-            Some(LoadoutSpec::Xml(path)) => {
-                let Some(files) = self.files else {
-                    return Err(LoadoutError::NoLoadoutFiles {
-                        path: path.to_string(),
-                    });
-                };
-                self.xml
-                    .entry(path.to_ascii_lowercase())
-                    .or_insert_with(|| {
-                        xml::load_observed(files, path, self.observation.as_deref()).map(|loaded| {
-                            Entries {
-                                list: Arc::from(loaded.entries),
-                                issues: Arc::from(loaded.issues),
-                            }
-                        })
-                    })
-                    .clone()
-            }
+            Some(LoadoutSpec::Xml(path)) => self.xml_entries(path),
         }
     }
 

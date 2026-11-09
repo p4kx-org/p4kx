@@ -5,10 +5,10 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::sync::OnceLock;
 
-use p4kx_archive::Archive;
+use p4kx_archive::{Archive, Entry};
 use thiserror::Error;
 
-use crate::LoadoutFileIdentity;
+use crate::{LoadoutFileIdentity, LoadoutFileRead, LoadoutFileSource};
 
 /// The largest XML Loadout file that is read, 16 MiB.
 pub const MAX_XML_LOADOUT_LEN: u64 = 16 << 20;
@@ -21,6 +21,11 @@ pub trait LoadoutFiles: Sync {
     ///
     /// Returns a typed error when the file is absent or cannot be read.
     fn read(&self, path: &str) -> Result<Vec<u8>, LoadoutFileError>;
+
+    /// Reads once with an unbound source unless this provider captures its original admission.
+    fn read_observed(&self, path: &str) -> LoadoutFileRead {
+        LoadoutFileRead::unbound(path, self.read(path))
+    }
 
     /// Returns the exact source identity selected by the same resolution as `read`.
     fn identity(&self, _path: &str) -> Option<LoadoutFileIdentity<'_>> {
@@ -35,6 +40,9 @@ pub enum LoadoutFileError {
     /// The optional observer stopped the operation.
     #[error("the loadout file observer stopped the operation")]
     ObservationStopped,
+    /// Original Entry membership could not be retained for an admitted source.
+    #[error("the original loadout file admission could not be retained")]
+    SourceEvidenceUnavailable,
     /// There is no such file.
     #[error("there is no such file")]
     NotFound,
@@ -100,6 +108,38 @@ impl LoadoutFiles for ArchiveFiles<'_> {
             .entry_index(path)
             .and_then(|index| self.archive.entries().get(index))
             .ok_or(LoadoutFileError::NotFound)?;
+        self.read_entry(entry)
+    }
+
+    fn read_observed(&self, path: &str) -> LoadoutFileRead {
+        let Some(entry) = self
+            .entry_index(path)
+            .and_then(|index| self.archive.entries().get(index))
+        else {
+            return LoadoutFileRead::unbound(path, Err(LoadoutFileError::NotFound));
+        };
+        let Some(original) = self.archive.entry_origin(entry) else {
+            return LoadoutFileRead::unbound(
+                path,
+                Err(LoadoutFileError::SourceEvidenceUnavailable),
+            );
+        };
+        let source = LoadoutFileSource::archive(original);
+        LoadoutFileRead::new(source, self.read_entry(entry))
+    }
+
+    fn identity(&self, path: &str) -> Option<LoadoutFileIdentity<'_>> {
+        let index = self.entry_index(path)?;
+        let entry = self.archive.entries().get(index)?;
+        Some(LoadoutFileIdentity {
+            entry_index: Some(index),
+            path: entry.path(),
+        })
+    }
+}
+
+impl ArchiveFiles<'_> {
+    fn read_entry(&self, entry: &Entry) -> Result<Vec<u8>, LoadoutFileError> {
         let size = entry.uncompressed_size();
         if size > MAX_XML_LOADOUT_LEN {
             return Err(LoadoutFileError::TooLarge { size });
@@ -115,15 +155,6 @@ impl LoadoutFiles for ArchiveFiles<'_> {
             .read_to_end(&mut bytes)
             .map_err(|error| unreadable(error.to_string()))?;
         Ok(bytes)
-    }
-
-    fn identity(&self, path: &str) -> Option<LoadoutFileIdentity<'_>> {
-        let index = self.entry_index(path)?;
-        let entry = self.archive.entries().get(index)?;
-        Some(LoadoutFileIdentity {
-            entry_index: Some(index),
-            path: entry.path(),
-        })
     }
 }
 

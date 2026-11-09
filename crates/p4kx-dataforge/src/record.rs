@@ -4,6 +4,7 @@
 use crate::dataforge::out_of_range;
 use crate::rows::RecordDef;
 use crate::strings::{compare_ignoring_case, compare_paths, strip_xml};
+use crate::tree_owner::TreeOwner;
 use crate::{
     DataForge, DataForgeError, Guid, RecordTree, Reference, Struct, TreeBuilder, Value, ValueError,
 };
@@ -130,6 +131,7 @@ impl<'f> Record<'f> {
         );
         let def = def.ok_or(ValueError::DanglingReference { guid })?;
         Ok(Reference {
+            owner: TreeOwner::new(forge),
             record_index: self.index(),
             guid,
             record_path: forge.text.value(self.def.file_name).map(strip_xml)?,

@@ -59,6 +59,55 @@ keeps its existing calling contract and uses the same dispatch as `with_origin`,
 both the database and its captured origin. Cached `Arc<LoadedDataForge>` handles preserve the same
 context. No separate worker or source lookup reconstructs it from the current Archive or key state.
 
+## Canonical read ownership
+
+`RecordTree::is_from(&Record)` checks the original borrowed DataForge owner and physical
+Record position retained by its actual TreeBuilder read. Equal GUIDs, indices, paths or
+values from another DataForge do not satisfy it. A genuine whole-tree clone keeps the
+binding. Tree value equality remains independent from that runtime authority.
+
+Each actual `Field` retains `FieldStorage`, available through `Field::storage()`. Its
+`data_type`, `is_array` and raw `target` word describe the declaration that decoded that
+same field. A WeakPointer can resolve to the same visible Reference value as a stored
+Reference GUID; this receipt preserves their original declaration difference. The target
+word is not a resolved target name. Copying this descriptive receipt cannot attach it to
+a different field or establish physical input authority.
+
+`Reference::original_target()` returns a borrowed `ReferenceOrigin` from the original
+Record or weak-pointer admission. `shares_source_with` checks its DataForge owner, not
+that the supplied Record is the target. The view exposes the actual target Record index,
+GUID and normalized path, plus the instance location when applicable. `record_type` is
+inapplicable for an owned-instance target; callers must not invent its owner Record type
+from the instance type or reconstruct a stored filename from the normalized path.
+Reference value equality, Debug and canonical JSON/XML keep their descriptive contract;
+none serializes or restores the private original owner.
+
+These types are reexported by `p4kx-extraction`. They add no second source lookup or
+Record decode, per-field allocation, Archive dependency in DataForge, or new data limit.
+Their Rust memory layout is target dependent. An output adapter must still pair the
+actual tree and owner, capture the same field's value and declaration, and register the
+actual payload/selector/conversion contributions before publishing an origin marker.
+
+## Observed loadout documents
+
+`LoadoutFiles::read_observed` returns one `LoadoutFileRead` pairing its actual bytes or
+failure with the original `LoadoutFileSource`. `ArchiveFiles` captures the actual admitted
+Entry before size/open/read failures. A generic provider remains unbound and is read once;
+its descriptive `identity` cannot bind arbitrary bytes to an Archive. Forwarding the
+whole genuine read preserves the original pair.
+
+`LoadoutFileObservation` retains that operation's exact read outcome and optional actual
+parse outcome. `LoadoutReadEvent::FileReused` borrows those original outcomes without a
+second read, parse or read/parse counter increment. A context budget refusal can leave
+the intrinsic parse outcome absent while reporting incomplete inventory. A cache event
+alone does not supply the current caller's authored selection contributions.
+
+Observer cancellation and unavailable original admission remain fatal across later reads,
+cache accesses and resolver roots. The Export adapter preserves the first cause;
+`CatalogError::LoadoutSourceEvidence` retains actual admission unavailability rather than
+turning it into an ordinary unreadable source row. Normal no-observer reads retain their
+existing route and do not create original-source observation storage.
+
 ## Export contract and verification
 
 The [shared source-contribution API](source-contributions.md) defines runtime inventory authority,

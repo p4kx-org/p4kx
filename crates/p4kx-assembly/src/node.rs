@@ -6,8 +6,9 @@ use std::sync::Arc;
 
 use crate::entities::describe;
 use crate::geometry_choice::GeometryChoice;
-use crate::merge::{merge_by_port, port_key};
+use crate::merge::port_key;
 use crate::node_body::is_head_type;
+use crate::node_inputs::NodeInputs;
 use crate::node_notes;
 use crate::port::PortDefinition;
 use crate::resolver::LoadoutResolver;
@@ -49,18 +50,26 @@ impl LoadoutResolver<'_> {
         walk: &mut Walk,
     ) -> EntityNode {
         let attached_vehicle = spec.docked_vehicle && !walk.is_root();
+        if self.observation_stopped() {
+            return shell(spec, attached_vehicle, false);
+        }
         if self.stop_at_docked && attached_vehicle {
             walk.stopped_here();
             return shell(spec, attached_vehicle, false);
         }
         let mut issues = Vec::new();
         let mut ports = Vec::new();
-        let vehicle = self.vehicle_with_issues(spec, &mut issues);
-        let landing_gear = self.landing_gear_of(spec, &mut issues);
-        let entries = self.merged_entries(spec, overrides, &mut issues);
+        let Some(inputs) = self.node_inputs(spec, overrides, &mut issues) else {
+            return shell(spec, attached_vehicle, false);
+        };
+        let NodeInputs {
+            vehicle,
+            landing_gear,
+            entries,
+        } = inputs;
         let shared = shared_port_flags(spec);
         for pending in pending_ports(spec, &entries, vehicle.as_deref()) {
-            if walk.cancellable && self.stopped() {
+            if self.observation_stopped() || (walk.cancellable && self.stopped()) {
                 break;
             }
             if !walk.reserve() {
@@ -90,25 +99,6 @@ impl LoadoutResolver<'_> {
             vehicle,
             landing_gear,
             ..shell(spec, attached_vehicle, true)
-        }
-    }
-
-    /// Returns the vehicle implementation of `spec`, pushing its issues to `issues`.
-    fn vehicle_with_issues(
-        &mut self,
-        spec: &EntitySpec,
-        issues: &mut Vec<LoadoutError>,
-    ) -> Option<Arc<VehicleImplementation>> {
-        match self.vehicle_of(spec) {
-            Some(Ok(vehicle)) => {
-                issues.extend(vehicle.issues.iter().cloned());
-                Some(vehicle)
-            }
-            Some(Err(error)) => {
-                issues.push(error);
-                None
-            }
-            None => None,
         }
     }
 
@@ -146,41 +136,10 @@ impl LoadoutResolver<'_> {
                 node.nested = self.nested_ports(pending.loadout, walk, issues);
             }
         }
-        self.choose_sub_geometry(&mut node, vehicle, shared);
+        if !self.observation_stopped() {
+            self.choose_sub_geometry(&mut node, vehicle, shared);
+        }
         node
-    }
-
-    /// Returns the entries of the Entity's own Loadout, each replaced in place by the entry of
-    /// the same port in `overrides`, with the other overriding entries appended.
-    fn merged_entries(
-        &mut self,
-        spec: &EntitySpec,
-        overrides: Option<&LoadoutSpec>,
-        issues: &mut Vec<LoadoutError>,
-    ) -> Vec<(EntrySpec, PortSource)> {
-        let mut entries = Vec::new();
-        match self.entries(spec.loadout.as_ref()) {
-            Ok(own) => {
-                issues.extend(own.issues.iter().cloned());
-                entries.extend(
-                    own.list
-                        .iter()
-                        .map(|entry| (entry.clone(), PortSource::Loadout)),
-                );
-            }
-            Err(error) => issues.push(error),
-        }
-        if overrides.is_some() {
-            match self.entries(overrides) {
-                Ok(given) => {
-                    issues.extend(given.issues.iter().cloned());
-                    let given = given.list.iter().map(|e| (e.clone(), PortSource::Override));
-                    merge_by_port(&mut entries, given, |(entry, _)| &entry.port);
-                }
-                Err(error) => issues.push(error),
-            }
-        }
-        entries
     }
 
     /// Resolves what one port holds.
@@ -190,6 +149,9 @@ impl LoadoutResolver<'_> {
         loadout: Option<&LoadoutSpec>,
         walk: &mut Walk,
     ) -> Attachment {
+        if self.observation_stopped() {
+            return unresolved(Target::Unreadable, LoadoutError::ObservationStopped);
+        }
         let named = match target {
             TargetSpec::None => return Attachment::Empty,
             TargetSpec::Invalid(reason) => {
@@ -231,7 +193,9 @@ impl LoadoutResolver<'_> {
         walk.ancestors.push(guid);
         let mut child = self.node(spec, loadout, walk);
         walk.ancestors.pop();
-        if let Some(ambiguity) = self.ambiguity(target) {
+        if !self.observation_stopped()
+            && let Some(ambiguity) = self.ambiguity(target)
+        {
             child.issues.insert(0, ambiguity);
         }
         Attachment::Entity(Box::new(child))

@@ -11,6 +11,7 @@ mod item_port;
 mod locate;
 mod origin;
 mod patch;
+mod paths;
 mod read;
 mod structure;
 mod totals;

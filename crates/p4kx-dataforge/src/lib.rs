@@ -23,6 +23,7 @@ mod annotations;
 mod build;
 mod dataforge;
 mod error;
+mod field_storage;
 mod fields;
 mod flat;
 mod flat_cells;
@@ -43,6 +44,7 @@ mod record;
 mod record_metadata;
 mod record_table;
 mod reference_index;
+mod reference_origin;
 mod rows;
 mod scalar;
 mod schema;
@@ -54,6 +56,7 @@ mod tag_build;
 mod tags;
 mod texts;
 mod tree;
+mod tree_owner;
 mod value;
 mod value_error;
 mod value_json;
@@ -67,6 +70,7 @@ pub use annotations::{Annotations, TAG_TYPE, TagResolver};
 pub use build::{MAX_NESTING_DEPTH, MAX_RECORD_VALUES, TreeBuilder};
 pub use dataforge::DataForge;
 pub use error::DataForgeError;
+pub use field_storage::FieldStorage;
 pub use fields::{
     FieldKind, FieldStat, FieldStatistics, FieldStatisticsError, MAX_DISTINCT_VALUES,
     MAX_FIELD_PATHS, Number,
@@ -86,6 +90,7 @@ pub use read_observer::CanonicalReadObserver;
 pub use record::Record;
 pub use record_metadata::{RecordMetadata, RecordText};
 pub use reference_index::{FileGraph, IndexedReference, MAX_INDEXED_REFERENCES, ReferenceIndex};
+pub use reference_origin::ReferenceOrigin;
 pub use schema::{Enum, Property, Struct};
 pub use survey::{FormatSurvey, PointerSurvey, TrailingSurvey};
 pub use tags::{

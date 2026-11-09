@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::fmt;
 use std::sync::Arc;
 
+use crate::reference_origin::ReferenceOrigin;
+use crate::tree_owner::TreeOwner;
 use crate::{Field, Guid, Location, Value};
 
 /// A struct inside a Record, or the Record's own fields: an inline class, the target of a strong
@@ -41,8 +44,9 @@ impl<'f> StructValue<'f> {
 ///
 /// A Reference field links to another Record. A weak pointer links into the Record that holds
 /// it: to the same GUID and record path, with the [`location`](Self::location) of the instance.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Reference<'f> {
+    pub(crate) owner: TreeOwner<'f>,
     pub(crate) record_index: u32,
     pub(crate) guid: Guid,
     pub(crate) record_path: &'f str,
@@ -50,7 +54,37 @@ pub struct Reference<'f> {
     pub(crate) location: Option<Arc<Location<'f>>>,
 }
 
+impl PartialEq for Reference<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_index == other.record_index
+            && self.guid == other.guid
+            && self.record_path == other.record_path
+            && self.type_name == other.type_name
+            && self.location == other.location
+    }
+}
+
+impl Eq for Reference<'_> {}
+
+impl fmt::Debug for Reference<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Reference")
+            .field("record_index", &self.record_index)
+            .field("guid", &self.guid)
+            .field("record_path", &self.record_path)
+            .field("type_name", &self.type_name)
+            .field("location", &self.location)
+            .finish()
+    }
+}
+
 impl<'f> Reference<'f> {
+    /// Borrows the original paired target admission without looking it up again.
+    #[must_use]
+    pub const fn original_target(&self) -> ReferenceOrigin<'_, 'f> {
+        ReferenceOrigin::new(self)
+    }
+
     /// Returns the actual target Record position in source definition order.
     #[must_use]
     pub const fn record_index(&self) -> u32 {

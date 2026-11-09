@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Deref;
+use std::sync::Arc;
+
+use crate::loadout_file_trace::FileTrace;
 use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
-use crate::{LoadoutError, LoadoutFileError, LoadoutFiles};
+use crate::{LoadoutError, LoadoutFileError, LoadoutFileObservation, LoadoutFiles};
 
 /// The intrinsic source document interpreted by a loadout reader.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -24,11 +28,17 @@ pub struct LoadoutFileIdentity<'a> {
     pub path: &'a str,
 }
 
-fn identity<'a>(files: &'a dyn LoadoutFiles, path: &'a str) -> LoadoutFileIdentity<'a> {
-    files.identity(path).unwrap_or(LoadoutFileIdentity {
-        entry_index: None,
-        path,
-    })
+pub(crate) struct Document {
+    bytes: Vec<u8>,
+    observation: Option<Arc<LoadoutFileObservation>>,
+}
+
+impl Deref for Document {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.bytes
+    }
 }
 
 pub(crate) fn read(
@@ -36,38 +46,57 @@ pub(crate) fn read(
     path: &str,
     kind: LoadoutDocumentKind,
     observation: Option<&Observation>,
-) -> Result<Vec<u8>, LoadoutFileError> {
+    trace: &mut FileTrace,
+) -> Result<Document, LoadoutFileError> {
     if observation.is_some_and(Observation::stopped) {
         return Err(LoadoutFileError::ObservationStopped);
     }
-    let result = files.read(path);
-    if observation.is_some() {
-        resolver_observation::notify(
-            observation,
-            LoadoutReadEvent::FileRead {
-                source: identity(files, path),
-                kind,
-                outcome: result.as_ref().map(|_| ()),
-            },
-        )
-        .map_err(|_| LoadoutFileError::ObservationStopped)?;
+    let Some(observer) = observation else {
+        return files.read(path).map(|bytes| Document {
+            bytes,
+            observation: None,
+        });
+    };
+    let (source, outcome) = files.read_observed(path).into_parts();
+    let document = trace.capture(source, kind, &outcome);
+    resolver_observation::notify(
+        observation,
+        LoadoutReadEvent::FileRead {
+            source: document.source(),
+            kind,
+            outcome: outcome.as_ref().map(|_| ()),
+        },
+    )
+    .map_err(|_| LoadoutFileError::ObservationStopped)?;
+    if matches!(&outcome, Err(LoadoutFileError::SourceEvidenceUnavailable)) {
+        observer.stop();
+        return Err(LoadoutFileError::SourceEvidenceUnavailable);
     }
-    result
+    outcome.map(|bytes| Document {
+        bytes,
+        observation: Some(document),
+    })
 }
 
 pub(crate) fn parsed(
-    files: &dyn LoadoutFiles,
-    path: &str,
-    kind: LoadoutDocumentKind,
+    document: Document,
     outcome: Result<(), &str>,
     observation: Option<&Observation>,
 ) -> Result<(), LoadoutError> {
-    if observation.is_some() {
+    if observation.is_some_and(Observation::stopped) {
+        return Err(LoadoutError::ObservationStopped);
+    }
+    if let Some(original) = document.observation {
+        let outcome = original
+            .projected(outcome)
+            .as_ref()
+            .copied()
+            .map_err(String::as_str);
         resolver_observation::notify(
             observation,
             LoadoutReadEvent::FileProjection {
-                source: identity(files, path),
-                kind,
+                source: original.source(),
+                kind: original.kind(),
                 outcome,
             },
         )?;

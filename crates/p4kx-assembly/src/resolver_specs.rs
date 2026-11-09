@@ -18,6 +18,9 @@ impl<'f> LoadoutResolver<'f> {
     }
 
     pub(crate) fn spec_record(&mut self, record: &Record<'f>) -> SpecResult {
+        if self.observation_stopped() {
+            return Arc::new(Err(LoadoutError::ObservationStopped));
+        }
         if let Some(spec) = self.specs.get(&record.index()) {
             if let Err(error) = resolver_observation::notify(
                 self.observation.as_deref(),

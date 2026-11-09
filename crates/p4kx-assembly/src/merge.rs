@@ -72,6 +72,9 @@ impl LoadoutResolver<'_> {
         let mut issues: Vec<LoadoutError> = Vec::new();
         let mut failure = None;
         for layer in layers {
+            if self.observation_stopped() {
+                return Err(LoadoutError::ObservationStopped);
+            }
             match self.entries(Some(layer)) {
                 Ok(entries) => {
                     issues.extend(entries.issues.iter().cloned());

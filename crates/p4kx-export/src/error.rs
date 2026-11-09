@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_assembly::LoadoutFileError;
 use p4kx_extraction::{
     DataForgeError, DataForgeLoadError, LocalizationError, LocalizationLoadError,
 };
@@ -13,6 +14,9 @@ pub enum CatalogError {
     /// Shared field-origin evidence was interrupted during mutation.
     #[error(transparent)]
     SourceEvidence(#[from] p4kx_extraction::SourceEvidenceError),
+    /// The original loadout file admission could not be retained.
+    #[error(transparent)]
+    LoadoutSourceEvidence(LoadoutFileError),
     /// An Archive-backed DataForge belongs to another observed input or container.
     #[error("the DataForge origin does not match the supplied Archive input")]
     SourceOriginMismatch,

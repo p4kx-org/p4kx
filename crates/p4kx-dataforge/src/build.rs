@@ -7,9 +7,11 @@ use std::sync::Arc;
 
 use crate::RecordMetadata;
 use crate::dataforge::out_of_range;
+use crate::field_storage::FieldStorage;
 use crate::layout::{FieldSlot, Layout, Layouts};
 use crate::scalar::{first_bytes, read_scalar};
 use crate::strings;
+use crate::tree_owner::TreeOwner;
 use crate::{
     DataForge, DataForgeError, DataType, Field, Guid, Location, Record, RecordTree, Step,
     StructValue, Value, ValueError, ValueKind,
@@ -119,6 +121,7 @@ impl<'f> TreeBuilder<'f> {
                 type_name: layout.type_name,
                 fields,
             },
+            owner: TreeOwner::new(forge),
         };
         self.resolve_weak(forge, &mut tree);
         Ok(tree)
@@ -184,6 +187,7 @@ impl<'f> TreeBuilder<'f> {
             let value = self.value(forge, slot, field, depth);
             self.stack.pop();
             fields.push(Field {
+                storage: FieldStorage::from_slot(slot),
                 name: slot.name,
                 value: value?,
             });

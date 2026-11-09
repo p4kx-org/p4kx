@@ -171,7 +171,11 @@ impl<'f> LoadoutResolver<'f> {
             animation_database: None,
         };
         let mut walk = Walk::new(spec.guid, None);
-        Ok(self.node(&spec, None, &mut walk))
+        let node = self.node(&spec, None, &mut walk);
+        if self.observation_stopped() {
+            return Err(LoadoutError::ObservationStopped);
+        }
+        Ok(node)
     }
 
     /// Returns the pieces of armour and clothing a Loadout tree holds, in tree order: every

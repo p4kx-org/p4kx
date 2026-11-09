@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use p4kx_cryxml::{Element, Xml};
 
+use crate::loadout_file_trace::FileTrace;
 use crate::merge::merge_by_port;
 use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
 use crate::spec::{EntrySpec, LoadoutOrigin, LoadoutSpec, TargetSpec};
@@ -74,10 +75,12 @@ pub(crate) fn load_observed(
     files: &dyn LoadoutFiles,
     path: &str,
     observation: Option<&Observation>,
+    trace: &mut FileTrace,
 ) -> Result<XmlEntries, LoadoutError> {
     let mut loader = Loader {
         observation,
         files,
+        trace,
         stack: Vec::new(),
         done: HashMap::new(),
         loads: 0,
@@ -94,6 +97,7 @@ pub(crate) fn load_observed(
 struct Loader<'l> {
     observation: Option<&'l Observation>,
     files: &'l dyn LoadoutFiles,
+    trace: &'l mut FileTrace,
     stack: Vec<String>,
     done: HashMap<String, Result<Vec<EntrySpec>, LoadoutError>>,
     loads: usize,
@@ -102,6 +106,9 @@ struct Loader<'l> {
 
 impl Loader<'_> {
     fn load(&mut self, path: &str) -> Result<Vec<EntrySpec>, LoadoutError> {
+        if self.observation.is_some_and(Observation::stopped) {
+            return Err(LoadoutError::ObservationStopped);
+        }
         if let Some(done) = self.done.get(&path.to_ascii_lowercase()) {
             return done.clone();
         }
@@ -123,7 +130,7 @@ impl Loader<'_> {
             )));
         }
         self.loads = self.loads.saturating_add(1);
-        let loadout = match load_file(self.files, path, self.observation) {
+        let loadout = match load_file(self.files, path, self.observation, self.trace) {
             Ok(loadout) => loadout,
             Err(error) => {
                 self.done
@@ -132,9 +139,21 @@ impl Loader<'_> {
             }
         };
         self.stack.push(path.to_owned());
+        let mut entries = self.load_includes(&loadout.includes)?;
+        self.stack.pop();
+        merge_into(&mut entries, loadout.entries);
+        self.done
+            .insert(path.to_ascii_lowercase(), Ok(entries.clone()));
+        Ok(entries)
+    }
+
+    fn load_includes(&mut self, paths: &[String]) -> Result<Vec<EntrySpec>, LoadoutError> {
         let mut entries = Vec::new();
         let mut named = HashSet::new();
-        for include in &loadout.includes {
+        for include in paths {
+            if self.observation.is_some_and(Observation::stopped) {
+                return Err(LoadoutError::ObservationStopped);
+            }
             let key = include.to_ascii_lowercase();
             if !named.insert(key.clone()) {
                 continue;
@@ -154,13 +173,12 @@ impl Loader<'_> {
             }
             match self.load(include) {
                 Ok(included) => merge_into(&mut entries, included),
+                Err(error) if self.observation.is_some_and(Observation::stopped) => {
+                    return Err(error);
+                }
                 Err(error) => self.issues.push(error),
             }
         }
-        self.stack.pop();
-        merge_into(&mut entries, loadout.entries);
-        self.done
-            .insert(path.to_ascii_lowercase(), Ok(entries.clone()));
         Ok(entries)
     }
 }
@@ -169,25 +187,30 @@ fn load_file(
     files: &dyn LoadoutFiles,
     path: &str,
     observation: Option<&Observation>,
+    trace: &mut FileTrace,
 ) -> Result<XmlLoadout, LoadoutError> {
     let failed = |reason| LoadoutError::XmlLoadout {
         path: path.to_owned(),
         reason,
     };
-    let bytes =
-        crate::loadout_file_events::read(files, path, LoadoutDocumentKind::XmlLoadout, observation)
-            .map_err(|error| match error {
-                crate::LoadoutFileError::ObservationStopped => LoadoutError::ObservationStopped,
-                crate::LoadoutFileError::NotFound => LoadoutError::MissingXmlLoadout {
-                    path: path.to_owned(),
-                },
-                error => failed(error.to_string()),
-            })?;
-    let result = parse(&bytes, &LoadoutOrigin::File(Arc::from(path)));
-    crate::loadout_file_events::parsed(
+    let bytes = crate::loadout_file_events::read(
         files,
         path,
         LoadoutDocumentKind::XmlLoadout,
+        observation,
+        trace,
+    )
+    .map_err(|error| match error {
+        crate::LoadoutFileError::ObservationStopped => LoadoutError::ObservationStopped,
+        _ if observation.is_some_and(Observation::stopped) => LoadoutError::ObservationStopped,
+        crate::LoadoutFileError::NotFound => LoadoutError::MissingXmlLoadout {
+            path: path.to_owned(),
+        },
+        error => failed(error.to_string()),
+    })?;
+    let result = parse(&bytes, &LoadoutOrigin::File(Arc::from(path)));
+    crate::loadout_file_events::parsed(
+        bytes,
         result.as_ref().map(|_| ()).map_err(String::as_str),
         observation,
     )?;

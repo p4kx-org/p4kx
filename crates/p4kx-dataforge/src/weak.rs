@@ -46,6 +46,7 @@ impl<'f> TreeBuilder<'f> {
         let at = span(positions, owned);
         if at.is_empty() {
             return Value::Reference(Box::new(Reference {
+                owner: tree.owner,
                 record_index: tree.record_index(),
                 guid: tree.guid,
                 record_path: tree.record_path,
@@ -64,6 +65,7 @@ impl<'f> TreeBuilder<'f> {
             .or_insert_with(|| Arc::new(Location::new(steps)))
             .clone();
         Value::Reference(Box::new(Reference {
+            owner: tree.owner,
             record_index: tree.record_index(),
             guid: tree.guid,
             record_path: tree.record_path,

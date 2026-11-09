@@ -8,6 +8,7 @@ use p4kx_dataforge::DataForge;
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry};
 
 use super::{Budget, Element, LoadoutDocumentKind};
+use crate::loadout_file_trace::FileTrace;
 use crate::{ArchiveFiles, Entities, LoadoutReadEvent, LoadoutReadObserver, LoadoutResolver};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,10 +26,10 @@ impl LoadoutReadObserver for Observer {
         let event = match event {
             LoadoutReadEvent::FileRead {
                 source, outcome, ..
-            } => Seen::Read(source.entry_index, outcome.is_ok()),
+            } => Seen::Read(source.identity().entry_index, outcome.is_ok()),
             LoadoutReadEvent::FileProjection {
                 source, outcome, ..
-            } => Seen::Parsed(source.entry_index, outcome.is_ok()),
+            } => Seen::Parsed(source.identity().entry_index, outcome.is_ok()),
             LoadoutReadEvent::InventoryIncomplete => Seen::Incomplete,
             _ => return ControlFlow::Continue(()),
         };
@@ -66,11 +67,13 @@ fn one_patch_under_two_context_budgets_does_not_claim_conflicting_intrinsic_resu
     let resolver =
         LoadoutResolver::with_observed_entities(Arc::new(Entities::new(&forge)), observer.clone());
     for constrained in [true, false] {
+        let mut trace = FileTrace::default();
         let bytes = crate::loadout_file_events::read(
             &files,
             CONFIGURED,
             LoadoutDocumentKind::VehiclePatch,
             resolver.observation.as_deref(),
+            &mut trace,
         )?;
         let mut root = Element::read("Vehicle".to_owned(), Vec::new(), Vec::new());
         let mut budget = if constrained {
@@ -80,10 +83,8 @@ fn one_patch_under_two_context_budgets_does_not_claim_conflicting_intrinsic_resu
         };
         let result = super::patch(
             &mut root,
-            &bytes,
+            bytes,
             &mut budget,
-            &files,
-            CONFIGURED,
             resolver.observation.as_deref(),
         );
         assert_eq!(
