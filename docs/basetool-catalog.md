@@ -266,6 +266,11 @@ reads and untouched reference targets do not. Sources keep distinct physical ide
 paths, GUIDs or decoded bytes are equal. Nested container ancestry affects the result. Directory
 metadata and Entry payload are separate scopes.
 
+Every `provenance.uses` row requires `effectiveEncryption`: `encrypted`, `unencrypted` or
+`unknown`, captured for that original use's byte domain. It includes the applicable containing
+Entries and can differ from the leaf's `storedEncryption`. Consumers can check a value's direct
+marker against these contributing-use facts; the inventory does not replace per-value markers.
+
 Fixed Single resource numbers retain `rawBits` (eight lowercase hexadecimal digits) plus nullable
 `finite`; Double payloads use sixteen digits. Infinity and NaN remain present, including their
 original bits. Generic numeric fields add the source-width `type` tag; Int64/UInt64 values use
@@ -279,7 +284,8 @@ remain absent. The game-text protection axis remains independent of source encry
 through canonical references. Consumers cannot infer this per-value proof from the global
 `source.archiveKey` or unread-entry counts.
 
-This coverage is implemented for ResourceTypes and their canonical text rows. Other families and
+This coverage is implemented for ResourceTypes, Commodities and Manufacturers, their canonical
+text rows and Commodity presentation. Other families and
 structured/raw tool outputs still require their own migration under
 [#1125](https://github.com/p4kx-org/p4kx/issues/1125); the presence of `provenance` is not proof that
 all current output fields have origin metadata.

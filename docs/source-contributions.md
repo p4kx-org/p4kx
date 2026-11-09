@@ -18,8 +18,18 @@ to another value. Foreign-inventory handles are excluded and make the contributi
 set incomplete. A `SourceUse` shares its original immutable registered description;
 cloning the handle does not copy its reference/location strings or create a registry.
 `reference`, `role` and `description` borrow those original facts; `encryption` returns
-the classification captured for that byte domain. `reference` and `role` are ordinary
-methods, so callers cannot use them in const evaluation.
+the classification captured for that byte domain. `reference`, `role` and `encryption`
+are ordinary methods, so callers cannot use them in const evaluation.
+
+Current use descriptions always serialize `effectiveEncryption` with the closed states
+`encrypted`, `unencrypted` and `unknown`. It is captured at original use registration
+and shared immutably by the handle and description; the description's
+`effective_encryption` getter returns that same fact. It includes exactly the observed
+byte domain and can differ from the leaf physical source's `storedEncryption`.
+Descriptive readers may use this evidence to validate an already direct field marker;
+it does not replace that marker or restore runtime authority. Absence means unknown
+only where the governing older output format permits omission; current descriptions
+require the field. Catalog v3 does not accept a missing current field as a legacy default.
 
 `SourceUses::freeze` preserves the original sorted wire descriptions. Runtime owner
 tokens and handles are not serialized or restored by a metadata reader.

@@ -157,11 +157,11 @@ impl SourceRegistry {
                 scope,
                 role,
                 location,
+                effective_encryption: encryption,
             })
         });
         SourceUse {
             description: Arc::clone(description),
-            encryption,
             identity: Arc::clone(&self.identity),
         }
     }

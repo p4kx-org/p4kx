@@ -17211,6 +17211,9 @@
     "SourceUseDescription": {
       "description": "One source-use inventory row, kept separately from the field's actual contribution set.",
       "properties": {
+        "effectiveEncryption": {
+          "$ref": "#/$defs/SourceEncryptionState"
+        },
         "id": {
           "$ref": "#/$defs/SourceUseRef"
         },
@@ -17228,6 +17231,7 @@
         }
       },
       "required": [
+        "effectiveEncryption",
         "id",
         "location",
         "role",

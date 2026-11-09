@@ -175,7 +175,6 @@ fn language_code<S: Serializer>(language: &Language, serializer: S) -> Result<S:
 #[derive(Debug, Clone)]
 pub struct SourceUse {
     pub(crate) description: Arc<SourceUseDescription>,
-    pub(crate) encryption: SourceEncryptionState,
     pub(crate) identity: Arc<()>,
 }
 
@@ -200,8 +199,8 @@ impl SourceUse {
 
     /// Returns the captured effective encryption in this original observation's byte domain.
     #[must_use]
-    pub const fn encryption(&self) -> SourceEncryptionState {
-        self.encryption
+    pub fn encryption(&self) -> SourceEncryptionState {
+        self.description.effective_encryption()
     }
 }
 
@@ -215,6 +214,7 @@ pub struct SourceUseDescription {
     pub(crate) scope: InputScope,
     pub(crate) role: SourceUseRole,
     pub(crate) location: SourceLocation,
+    pub(crate) effective_encryption: SourceEncryptionState,
 }
 
 impl SourceUseDescription {
@@ -246,6 +246,12 @@ impl SourceUseDescription {
     #[must_use]
     pub const fn location(&self) -> &SourceLocation {
         &self.location
+    }
+
+    /// Returns the effective encryption captured for this observation's original byte domain.
+    #[must_use]
+    pub const fn effective_encryption(&self) -> SourceEncryptionState {
+        self.effective_encryption
     }
 }
 
