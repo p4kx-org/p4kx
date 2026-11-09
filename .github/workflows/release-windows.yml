@@ -138,6 +138,8 @@ jobs:
       VERSION: ${{ inputs.version }}
       NEXT_MSI_VERSION: ${{ inputs.next-msi-version }}
     steps:
+      - name: Bound native installer diagnostics before the job deadline
+        run: '"P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC=$([DateTimeOffset]::UtcNow.AddMinutes(35).ToString(''o''))" >> $env:GITHUB_ENV'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -177,6 +179,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Exact historical AMD64 MSI download failed.' }
       - name: Pure exact-PATH validator and run-all mocks
         run: |
+          .github/scripts/test-msi-diagnostics.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-diagnostics')
+          .github/scripts/test-msi-diagnostic-failures.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-diagnostic-failures')
           .github/scripts/test-msi-raw-fixture.ps1
           .github/scripts/test-msi-path-verification.ps1
       - name: Compile source-bound opt-in raw Registry fixture
@@ -216,6 +220,7 @@ jobs:
           path: |
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/**/*.log
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/**/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/**/*.jsonl
             ${{ env.P4KX_PACKAGE_TASK }}/portable-check/**/*.log
             ${{ env.P4KX_PACKAGE_TASK }}/portable-check/smoke/*.json
           if-no-files-found: ignore

@@ -166,3 +166,25 @@ one immutable goal and resolved path before InstallInitialize. All deferred and 
 use the same captured token. A genuine maintenance component noop cancels Neutral; disabled rollback
 is refused before Seal. A blocked downgrade does not reserve or mutate helper metadata. The native
 consumer validates those paths as part of the existing per-CPU lifecycle, not through a separate test framework.
+
+## Native lifecycle diagnostics
+
+`check-msi.ps1` runs its existing lifecycle in one hidden native PowerShell worker, preserving
+both the original PowerShell location and the separate native process directory. The first
+owned workflow step establishes a 35-minute deadline inside the 45-minute job. The worker's
+allowance is the smaller of ten minutes and the remaining deadline. Its parent uses the existing
+direct-process watchdog and five-second termination wait; process startup, synchronous console
+or file IO and callbacks are not a hard elapsed-time guarantee. Existing inner installer and
+fixture limits, source/CPU guards and uncertainty fences remain required.
+
+`installer-check/diagnostics` retains source/input identities, bounded UTC-millisecond phase
+rows in `phase-journal.jsonl`, captured worker output and `diagnostic-result.json`. Phase rows
+identify actual preamble, lifecycle, runtime, restore and cleanup boundaries. A completed
+operation and a failed cleanup have distinct terminal statuses. Diagnostic persistence failures
+preserve the original operation failure and do not bypass required profile cleanup.
+
+A timeout or incomplete journal leaves native completion unproven. The parent does not uninstall,
+restore Registry values, kill a process tree or infer that the Windows Installer service has
+finished. Diagnostics cannot replace the source-bound native runtime and exact-PATH release
+proofs. The infrastructure tests execute synthetic PowerShell children and mocked native
+adapters; they are not a reproduction of an installer timeout.
