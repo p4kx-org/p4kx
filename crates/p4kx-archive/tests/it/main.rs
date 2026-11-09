@@ -22,6 +22,7 @@ mod layout_v2_extensions;
 mod listing;
 mod malformed;
 mod no_launcher_log;
+mod observed_entry;
 mod overlong;
 mod ranged;
 mod read_only;

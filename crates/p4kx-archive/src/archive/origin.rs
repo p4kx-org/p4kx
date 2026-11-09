@@ -4,20 +4,28 @@
 use std::ptr;
 use std::sync::Arc;
 
-use crate::{Archive, ArchiveInputOrigin, Entry, EntryOrigin, EntryOriginStep};
+use crate::origin_ancestor::OriginAncestor;
+
+use crate::{Archive, ArchiveInputOrigin, Entry, EntryOrigin, EntryOriginStep, ObservedEntry};
 
 impl Archive {
+    /// Borrows evidence for an exact admitted Entry without copying variable source details.
+    /// Foreign Entries and detached clones return None.
+    #[must_use]
+    pub fn observed_entry<'archive>(
+        &'archive self,
+        entry: &'archive Entry,
+    ) -> Option<ObservedEntry<'archive>> {
+        let owned = self.entries.get(entry.index())?;
+        ptr::eq(owned, entry)
+            .then(|| ObservedEntry::new(&self.input_origin, &self.origin_ancestors, entry))
+    }
+
     /// Snapshots evidence for an exact borrowed Entry slot of this Archive.
     /// Foreign Entries and detached clones return None, including an equal numeric index.
     #[must_use]
     pub fn entry_origin(&self, entry: &Entry) -> Option<EntryOrigin> {
-        self.origin_step(entry).map(|step| {
-            EntryOrigin::new(
-                self.input_origin.clone(),
-                Arc::clone(&self.origin_ancestors),
-                step,
-            )
-        })
+        self.observed_entry(entry).map(|view| view.snapshot())
     }
 
     /// Returns this view's opaque root-input identity, shared with all its containers.
@@ -37,21 +45,24 @@ impl Archive {
                 .origin_ancestors
                 .iter()
                 .zip(origin.ancestors())
-                .all(|(owned, observed)| match (owned.as_deref(), observed) {
+                .all(|(owned, observed)| match (owned.step(), observed) {
                     (Some(owned), Some(observed)) => owned.index() == observed.index(),
                     _ => false,
                 })
     }
 
-    pub(super) fn child_origins(&self, entry: &Entry) -> Arc<[Option<Arc<EntryOriginStep>>]> {
+    pub(super) fn child_origins(&self, entry: &Entry) -> Arc<[OriginAncestor]> {
         let mut ancestors = Vec::with_capacity(self.origin_ancestors.len() + 1);
         ancestors.extend(self.origin_ancestors.iter().cloned());
-        ancestors.push(self.origin_step(entry));
+        ancestors.push(
+            self.origin_step(entry)
+                .map_or_else(OriginAncestor::unproved, OriginAncestor::Proven),
+        );
         ancestors.into()
     }
 
     fn origin_step(&self, entry: &Entry) -> Option<Arc<EntryOriginStep>> {
-        let owned = self.entries.get(entry.index())?;
-        ptr::eq(owned, entry).then(|| Arc::new(EntryOriginStep::of(entry)))
+        self.observed_entry(entry)
+            .map(|view| Arc::new(EntryOriginStep::of(view.entry())))
     }
 }

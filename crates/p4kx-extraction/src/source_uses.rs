@@ -5,11 +5,12 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 
 use crate::field_origin::FieldOrigin;
+use crate::source_details::{SourceCoordinateOmission, SourceDetails};
 use crate::source_evidence_error::{self, SourceEvidenceError};
 use crate::source_inventory::SourceInventory;
 use crate::source_registry::SourceRegistry;
 use crate::source_scope::{SourceInput, SourceScope};
-use crate::source_use::{InputScope, SourceUse};
+use crate::source_use::{InputScope, SourceLocation, SourceUse};
 use crate::source_value::{SourceValue, SourcedValue};
 
 /// Per-preparation physical source and use inventory shared by parallel field projections.
@@ -40,7 +41,20 @@ impl SourceUses {
         input: SourceInput<'_>,
         scope: InputScope,
     ) -> Result<SourceScope, SourceEvidenceError> {
-        let source = source_evidence_error::lock(&self.registry)?.observe(input);
+        self.observe_with_details(input, scope, SourceDetails::Full)
+    }
+
+    /// Retains original input proof independently of optional source detail capture.
+    ///
+    /// # Errors
+    /// Returns an error when a mutation interrupted the shared evidence registry.
+    pub fn observe_with_details(
+        &self,
+        input: SourceInput<'_>,
+        scope: InputScope,
+        details: SourceDetails,
+    ) -> Result<SourceScope, SourceEvidenceError> {
+        let source = source_evidence_error::lock(&self.registry)?.observe(input, details);
         Ok(SourceScope {
             registry: Arc::clone(&self.registry),
             source: source.id,
@@ -48,6 +62,36 @@ impl SourceUses {
             metadata: source.metadata,
             scope,
         })
+    }
+
+    /// Retains an actual registered use while omitting only its optional source coordinate.
+    ///
+    /// # Errors
+    /// Returns an error for a foreign owner or interrupted evidence registry.
+    pub fn opaque_use(
+        &self,
+        actual: &SourceUse,
+        reason: SourceCoordinateOmission,
+    ) -> Result<SourceUse, SourceEvidenceError> {
+        if !Arc::ptr_eq(&actual.identity, &self.identity) {
+            return Err(SourceEvidenceError::ForeignEvidence);
+        }
+        let mut registry = source_evidence_error::lock(&self.registry)?;
+        let registered = registry
+            .uses
+            .get(actual.reference())
+            .is_some_and(|row| Arc::ptr_eq(row, &actual.description));
+        if !registered {
+            return Err(SourceEvidenceError::ForeignEvidence);
+        }
+        let original = actual.description();
+        Ok(registry.register_use(
+            original.source(),
+            original.scope(),
+            SourceLocation::Opaque { reason },
+            original.role(),
+            actual.encryption(),
+        ))
     }
 
     /// Returns whether two preparation handles share the same original evidence authority.

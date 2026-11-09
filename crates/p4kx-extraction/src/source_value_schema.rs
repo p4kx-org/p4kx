@@ -5,31 +5,26 @@ use schemars::Schema;
 
 /// Couples the source state to its generic value without erasing nullable T.
 pub(crate) fn correlate(schema: &mut Schema) {
-    crate::projection_schema::require_properties(schema);
+    crate::field_origin::correlate_schema(schema);
     let Some(value) = schema
-        .get("properties")
-        .and_then(|properties| properties.get("value"))
-        .cloned()
+        .get_mut("properties")
+        .and_then(|properties| properties.as_object_mut())
+        .and_then(|properties| properties.insert("value".into(), true.into()))
     else {
         *schema = Schema::from(false);
         return;
     };
-    if let Some(properties) = schema
-        .get_mut("properties")
-        .and_then(|properties| properties.as_object_mut())
-    {
-        properties.insert("value".into(), true.into());
-    }
     let condition = schemars::json_schema!({
         "if": {"properties": {"state": {"const": "present"}}, "required": ["state"]},
         "then": {"properties": {"value": value}},
         "else": {"properties": {"value": {"type": "null"}}}
     });
-    let mut all = schema
-        .get("allOf")
-        .and_then(|value| value.as_array())
-        .cloned()
-        .unwrap_or_default();
-    all.push(condition.into());
-    schema.insert("allOf".into(), all.into());
+    if let Some(all) = schema
+        .get_mut("allOf")
+        .and_then(|value| value.as_array_mut())
+    {
+        all.push(condition.into());
+    } else {
+        schema.insert("allOf".into(), vec![condition].into());
+    }
 }

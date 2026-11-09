@@ -9,17 +9,18 @@ it.
 
 ## Versioning and consumers
 
-Version 3 is the catalog contract for 0.5.0 (ADR-0339). Consumers must accept version 3 before
-importing it. Tagged payload unions are closed: a new variant requires a version decision, unlike
+Version 3 is the only catalog output contract for 0.5.0 (ADR-0339). There is no version-2
+export mode, adapter or fallback. Consumers must accept version 3 before importing it. Tagged payload unions are closed: a new variant requires a version decision, unlike
 an unknown additive field or kind. The schema describes serialization, so emitted nullable payload
 fields are required even when their value is null. The previous released schema is retained as a
-compatibility-test fixture. Moving ResourceTypes to their canonical table and adding typed value
+historical version-boundary fixture. Moving ResourceTypes to their canonical table and adding typed value
 carriers is part of the breaking v3 migration, not an additive change to the released v2 shape.
 
 Every catalog kind and the shared CLI/GUI JSON and compressed catalog writers use version 3.
-The implemented canonical-table/per-value-origin step currently covers ResourceTypes and their
-nested values and text rows. Other catalog families retain their current shapes, and migration of
-all families and all 45 output-carrier families remains in progress. The complete target is
+The implemented canonical-table/per-value-origin step covers ResourceTypes, Commodities,
+Manufacturers and their documented nested values, presentation and text rows. Other catalog
+families retain their current shapes; migration of all families and tool-output carriers remains
+in progress. The complete target is
 [ADR-0356](adr/0356-catalog-v3-uses-canonical-source-typed-tables.md); it is not a claim of complete
 implementation. Other exported formats retain their independently documented versions.
 
@@ -52,7 +53,7 @@ The rule is ADR-0054 (amending ADR-0002):
 - **Version 2 (ADR-0161)** is breaking against version 1 in one respect: a paint also needs its own
   `RequiredTags` offered by the port or the ship (see "Paints"), so `paints[].shipGuids` lists
   fewer ships than version 1 did (40 fewer on LIVE 4.7). No field changed its name or type. The
-  Basetool import must accept version 2.
+  Historical artifacts from those releases use the version-2 schema.
   Version 2 also fixes a port whose name several parts of the vehicle file share (#677): the first
   such part gives the port its sizes, types and flags, as in the tree, so the `Radar_Helper` port
   of eight Ursa ships on LIVE 4.10 no longer lists `start_hidden` in its `flags`.

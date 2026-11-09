@@ -15,10 +15,11 @@ use crate::entry_identity::ContainerChain;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog};
 use crate::key_slot::KeySlot;
+use crate::origin_ancestor::OriginAncestor;
 use crate::source::Source;
 use crate::{
-    ArchiveError, ArchiveInputOrigin, Build, Entry, EntryIssue, EntryOriginStep, EntryReader,
-    InstallationStatus, OpenOptions, entry_reader, layout,
+    ArchiveError, ArchiveInputOrigin, Build, Entry, EntryIssue, EntryReader, InstallationStatus,
+    OpenOptions, entry_reader, layout,
 };
 
 mod key;
@@ -34,7 +35,7 @@ pub struct Archive {
     path: PathBuf,
     location: PathBuf,
     container_chain: ContainerChain,
-    origin_ancestors: Arc<[Option<Arc<EntryOriginStep>>]>,
+    origin_ancestors: Arc<[OriginAncestor]>,
     input_origin: ArchiveInputOrigin,
     file_len: u64,
     file_modified: Option<SystemTime>,

@@ -6,6 +6,8 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::Serialize;
 
 use crate::projection_schema;
+use crate::source_archive_binding::ArchiveSourceBinding;
+use crate::source_details::SourceDetails;
 use crate::source_use::SourceUseDescription;
 use crate::source_value::SourcedValue;
 use crate::{ArchiveByteRange, DecimalU64};
@@ -109,6 +111,16 @@ pub struct ArchiveEntrySource {
     pub(crate) declarations: SourcedValue<Vec<SourcedValue<SourceEncryptionDeclaration>>>,
 }
 
+/// Minimal original Entry proof when optional stored details were not retained.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = projection_schema::require_properties)]
+pub struct ArchiveEntryProof {
+    pub(crate) entry_index: DecimalU64,
+    #[schemars(extend("const" = "captureLimited"))]
+    pub(crate) details: SourceDetails,
+}
+
 /// Measured whole-Archive file facts independently of its stored Entry declarations.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -133,6 +145,8 @@ pub struct FileSource {
 pub enum PhysicalSourceKind {
     /// One physical Entry inside its observed root input.
     ArchiveEntry(ArchiveEntrySource),
+    /// Original Entry identity and encryption with explicitly limited stored details.
+    ArchiveEntryProof(ArchiveEntryProof),
     /// The completed whole-file read of an observed Archive input.
     ArchiveFile(ArchiveFileSource),
     /// One observed file input, without publication of its host path.
@@ -149,6 +163,9 @@ pub struct PhysicalSource {
     pub(crate) id: PhysicalSourceRef,
     pub(crate) ancestors: Vec<PhysicalSourceRef>,
     pub(crate) stored_encryption: SourceEncryptionState,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) binding: Option<ArchiveSourceBinding>,
     #[serde(flatten)]
     pub(crate) source: PhysicalSourceKind,
 }

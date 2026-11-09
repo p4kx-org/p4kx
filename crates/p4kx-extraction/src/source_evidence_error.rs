@@ -9,6 +9,9 @@ use thiserror::Error;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum SourceEvidenceError {
+    /// A runtime use does not belong to this original evidence authority.
+    #[error("source evidence belongs to another authority")]
+    ForeignEvidence,
     /// An owner unwound while mutating the protected evidence.
     #[error("source evidence was interrupted during mutation")]
     PoisonedEvidence,

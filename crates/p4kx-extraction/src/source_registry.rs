@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeMap;
-use std::fmt::Write as _;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use p4kx_archive::{ArchiveInputOrigin, EntryOrigin, EntryOriginStep};
+use p4kx_archive::{ArchiveInputOrigin, ObservedEntryBinding};
 
 use crate::DataForgeFileOrigin;
 use crate::field_origin::FieldOrigin;
+use crate::source_archive_binding::ArchiveSourceBinding;
+use crate::source_details::SourceDetails;
 use crate::source_inventory::{
     PhysicalSource, PhysicalSourceKind, PhysicalSourceRef, SourceEncryptionState,
 };
@@ -25,14 +26,18 @@ pub(crate) struct RegisteredSource {
     pub(crate) metadata: SourceEncryptionState,
 }
 
-enum InputIdentity {
-    Archive(ArchiveInputOrigin),
+pub(crate) enum InputIdentity {
+    Archive {
+        origin: ArchiveInputOrigin,
+        source_refs: HashMap<ObservedEntryBinding, PhysicalSourceRef>,
+    },
+    ArchiveView(ArchiveSourceBinding),
     File(DataForgeFileOrigin),
 }
 
 pub(crate) struct SourceRegistry {
     pub(crate) identity: Arc<()>,
-    inputs: Vec<InputIdentity>,
+    pub(crate) inputs: Vec<InputIdentity>,
     pub(crate) sources: BTreeMap<PhysicalSourceRef, PhysicalSource>,
     pub(crate) uses: BTreeMap<SourceUseRef, Arc<SourceUseDescription>>,
 }
@@ -47,9 +52,14 @@ impl SourceRegistry {
         }
     }
 
-    pub(crate) fn observe(&mut self, input: SourceInput<'_>) -> RegisteredSource {
+    pub(crate) fn observe(
+        &mut self,
+        input: SourceInput<'_>,
+        details: SourceDetails,
+    ) -> RegisteredSource {
         match input {
-            SourceInput::Archive(origin) => self.archive(origin),
+            SourceInput::Archive(origin) => self.archive(origin, details),
+            SourceInput::ArchiveView(observed) => self.archive_view(observed, details),
             SourceInput::ArchiveFile { input, byte_length } => {
                 let index = self.archive_input(input);
                 let id = PhysicalSourceRef(format!("a{index}:file"));
@@ -89,67 +99,17 @@ impl SourceRegistry {
         }
     }
 
-    fn archive(&mut self, origin: &EntryOrigin) -> RegisteredSource {
-        let input = self.archive_input(origin.input_origin());
-        let nonce = if origin.ancestors().any(|step| step.is_none()) {
-            format!("x{}", self.sources.len())
-        } else {
-            String::new()
-        };
-        let mut ancestors = Vec::new();
-        let mut path = String::new();
-        let mut effective = SourceEncryptionState::Unencrypted;
-        let mut metadata = effective;
-        let mut id = PhysicalSourceRef(String::new());
-        let steps = origin
-            .ancestors()
-            .chain(std::iter::once(Some(origin.entry())))
-            .enumerate();
-        // Integer formatting into String cannot return a formatting error.
-        for (position, step) in steps {
-            metadata = effective;
-            if let Some(step) = step {
-                let _formatted = write!(path, ".{}", step.index());
-                id = PhysicalSourceRef(format!("a{input}{nonce}{path}"));
-                self.archive_entry(id.clone(), &ancestors, step, metadata);
-                effective = effective.combine(SourceEncryptionState::of(step.encryption()));
-            } else {
-                let _formatted = write!(path, ".?{position}");
-                id = PhysicalSourceRef(format!("a{input}{nonce}{path}"));
-                self.unknown(id.clone(), ancestors.clone());
-                effective = effective.combine(SourceEncryptionState::Unknown);
-            }
-            ancestors.push(id.clone());
-        }
-        RegisteredSource {
-            id,
-            payload: effective,
-            metadata,
-        }
-    }
-
-    fn archive_entry(
-        &mut self,
-        id: PhysicalSourceRef,
-        ancestors: &[PhysicalSourceRef],
-        step: &EntryOriginStep,
-        metadata: SourceEncryptionState,
-    ) {
-        if !self.sources.contains_key(&id) {
-            let source =
-                source_registration::archive(self, id.clone(), ancestors.to_vec(), step, metadata);
-            self.sources.insert(id, source);
-        }
-    }
-
-    fn archive_input(&mut self, origin: &ArchiveInputOrigin) -> usize {
+    pub(crate) fn archive_input(&mut self, origin: &ArchiveInputOrigin) -> usize {
         if let Some(index) = self.inputs.iter().position(
-            |known| matches!(known, InputIdentity::Archive(value) if value.is_same_input(origin)),
+            |known| matches!(known, InputIdentity::Archive { origin: value, .. } if value.is_same_input(origin)),
         ) {
             return index;
         }
         let index = self.inputs.len();
-        self.inputs.push(InputIdentity::Archive(origin.clone()));
+        self.inputs.push(InputIdentity::Archive {
+            origin: origin.clone(),
+            source_refs: HashMap::new(),
+        });
         index
     }
 
@@ -164,11 +124,12 @@ impl SourceRegistry {
         index
     }
 
-    fn unknown(&mut self, id: PhysicalSourceRef, ancestors: Vec<PhysicalSourceRef>) {
+    pub(crate) fn unknown(&mut self, id: PhysicalSourceRef, ancestors: Vec<PhysicalSourceRef>) {
         self.sources.entry(id.clone()).or_insert(PhysicalSource {
             id,
             ancestors,
             stored_encryption: SourceEncryptionState::Unknown,
+            binding: None,
             source: PhysicalSourceKind::Unknown,
         });
     }

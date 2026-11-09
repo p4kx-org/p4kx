@@ -26,6 +26,12 @@ impl EntryOriginStep {
         self.index as usize
     }
 
+    /// Returns the original fixed-width admitted Entry ordinal.
+    #[must_use]
+    pub const fn ordinal(&self) -> u32 {
+        self.index
+    }
+
     /// Returns the stored Entry path without a machine host path.
     #[must_use]
     pub fn path(&self) -> &str {

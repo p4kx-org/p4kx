@@ -9,6 +9,9 @@ use serde_json::{Value, json};
 
 use super::TestResult;
 
+#[path = "origin_contract.rs"]
+mod origin_contract;
+
 #[test]
 fn nonpresent_states_require_null_and_all_immediate_fields() -> TestResult {
     let schema = schemars::schema_for!(SourcedValue<u32>);
@@ -142,7 +145,7 @@ fn fallible_mapping_propagates_errors_and_skips_nonpresent_values() -> TestResul
 
 #[test]
 fn origin_schema_rejects_unencrypted_claims_for_incomplete_sources() -> TestResult {
-    let value = SourceUses::new().value(SourceValue::Present(0_u32), &[], true);
+    let value = origin_contract::registered_value_with_encryption(false)?;
     check_filter_index(
         &serde_json::to_value(schemars::schema_for!(FieldOrigin))?,
         &serde_json::to_value(value.origin())?,
@@ -151,7 +154,7 @@ fn origin_schema_rejects_unencrypted_claims_for_incomplete_sources() -> TestResu
 
 #[test]
 fn sourced_value_schema_retains_the_origin_filter_constraint_when_flattened() -> TestResult {
-    let value = SourceUses::new().value(SourceValue::Present(0_u32), &[], true);
+    let value = origin_contract::registered_value_with_encryption(false)?;
     check_filter_index(
         &serde_json::to_value(schemars::schema_for!(SourcedValue<u32>))?,
         &serde_json::to_value(value)?,
@@ -182,7 +185,7 @@ fn check_filter_index(schema: &Value, original: &Value) -> TestResult {
         assert_eq!(
             validator.is_valid(&changed),
             allowed,
-            "only a false encryption claim requires a complete source set: {changed}"
+            "a witnessed false encryption claim requires a complete source set: {changed}"
         );
     }
     Ok(())

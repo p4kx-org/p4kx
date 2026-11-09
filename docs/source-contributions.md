@@ -24,6 +24,35 @@ methods, so callers cannot use them in const evaluation.
 `SourceUses::freeze` preserves the original sorted wire descriptions. Runtime owner
 tokens and handles are not serialized or restored by a metadata reader.
 
+`Archive::observed_entry` borrows an exact admitted Entry; a detached Entry copy with
+the same index does not qualify. `ObservedEntry` borrows stored details, while its
+`ObservedEntryBinding` retains only the original root/ancestor ownership and fixed
+coordinates. Unknown ancestor ownership remains distinct across independent opens;
+serialized IDs, structural equality or hashes cannot recreate that authority.
+`ObservedEntry::snapshot` is the explicit full-detail copy.
+
+`SourceInput::ArchiveView` registers the borrowed evidence in the same `SourceUses`
+inventory as a full Entry origin. `observe_with_details` selects `SourceDetails::Full`
+or `CaptureLimited` independently of physical identity and encryption. A limited
+observation retains an `archiveEntryProof` with the original decimal `entryIndex`
+and `details: "captureLimited"`, the real stored encryption and all ancestor rows.
+It does not claim that the payload is absent, unreadable or unsupported. Full detail
+can upgrade that same source row; a later limited observation cannot downgrade it
+or rebind existing source-use references. Fully proved default full-detail outputs
+retain their existing source/use representation. For unproved containing views,
+new ancestor registrations reuse their actual already-observed prefix rather than
+copy its identity from the current leaf. Such registrations can change subsequent
+document-local IDs and row counts; existing rows and use references remain intact.
+Repeated legacy full leaf observations retain their original rows. Explicit view
+reuse adopts the first actual registered row without removing later duplicate rows.
+
+`SourceScope::at_opaque` and `SourceUses::opaque_use` explicitly omit an optional
+coordinate with `SourceCoordinateOmission::CaptureLimit`. They keep the original
+source, byte domain, role and encryption witness. A contributing opaque use makes
+its field's contributor set incomplete, while a known encrypted witness still yields
+true. Attempts and untouched references do not taint another value. These operations
+impose no global metadata, writer or schema quota.
+
 ## Physical sources and byte domains
 
 | Observation | Retained meaning |
@@ -65,6 +94,12 @@ encrypted contributions dominate; false requires a complete contributor set of k
 plain inputs; other unproved cases remain null. A complete empty contributor set is
 valid for a literal tool value. Origin descriptions do not change payload state,
 game-text protection, key health or selection completeness.
+
+The owning schemas and metadata reader enforce the same correlations. References
+are distinct nonempty strings. False requires a complete set; a complete empty set
+requires false, and an incomplete empty set requires null. True always needs an
+actual contributing reference. A nonempty set can remain unknown even when complete.
+Unknown additive metadata remains allowed, independently of those control rules.
 
 ## Explicit reader policy
 

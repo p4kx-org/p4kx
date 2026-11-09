@@ -124,6 +124,9 @@ mod soundbank_convert;
 mod source;
 #[cfg(test)]
 mod source_ancestor_tests;
+mod source_archive;
+mod source_archive_binding;
+mod source_details;
 mod source_evidence_error;
 mod source_inventory;
 mod source_protection;
@@ -353,11 +356,12 @@ pub use report::{EntryFailure, ExtractionError, ExtractionReport};
 pub use resolved_texts::LanguageTexts;
 pub use selection::{UnknownEntries, select_entries};
 pub use sound::{MAX_SOUND_LEN, Sound};
+pub use source_details::{SourceCoordinateOmission, SourceDetails};
 pub use source_evidence_error::SourceEvidenceError;
 pub use source_inventory::{
-    ArchiveEntrySource, ArchiveFileSource, FileSource, PhysicalSource, PhysicalSourceKind,
-    PhysicalSourceRef, SourceDeclarationKind, SourceEncryptionDeclaration, SourceEncryptionState,
-    SourceInventory, SourceRecordFormat,
+    ArchiveEntryProof, ArchiveEntrySource, ArchiveFileSource, FileSource, PhysicalSource,
+    PhysicalSourceKind, PhysicalSourceRef, SourceDeclarationKind, SourceEncryptionDeclaration,
+    SourceEncryptionState, SourceInventory, SourceRecordFormat,
 };
 pub use source_scope::{SourceInput, SourceScope};
 pub use source_use::{

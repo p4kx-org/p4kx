@@ -4,9 +4,10 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use p4kx_archive::{ArchiveInputOrigin, EntryOrigin};
+use p4kx_archive::{ArchiveInputOrigin, EntryOrigin, ObservedEntry};
 
 use crate::DataForgeFileOrigin;
+use crate::source_details::SourceCoordinateOmission;
 use crate::source_evidence_error::{self, SourceEvidenceError};
 use crate::source_inventory::{PhysicalSourceRef, SourceEncryptionState};
 use crate::source_registry::SourceRegistry;
@@ -18,6 +19,8 @@ use crate::source_use::{InputScope, SourceLocation, SourceUse, SourceUseRole};
 pub enum SourceInput<'a> {
     /// An observed Archive Entry and its containing Entries.
     Archive(&'a EntryOrigin),
+    /// An exact borrowed Archive Entry without copied optional source details.
+    ArchiveView(ObservedEntry<'a>),
     /// One completed whole-Archive file read bound to its actual opaque input owner.
     ArchiveFile {
         /// Observed input identity retained by the owning Archive.
@@ -58,6 +61,31 @@ impl SourceScope {
             role,
             self.encryption(),
         ))
+    }
+
+    /// Registers an actual use whose optional coordinate capture was not admitted.
+    ///
+    /// # Errors
+    /// Returns an error when a mutation interrupted the shared evidence registry.
+    pub fn at_opaque(
+        &self,
+        role: SourceUseRole,
+        reason: SourceCoordinateOmission,
+    ) -> Result<SourceUse, SourceEvidenceError> {
+        self.at(SourceLocation::Opaque { reason }, role)
+    }
+
+    /// Compares a source with original Entry ownership without restoring authority from wire data.
+    ///
+    /// # Errors
+    /// Returns an error when a mutation interrupted the shared evidence registry.
+    pub fn matches_entry(&self, observed: &ObservedEntry<'_>) -> Result<bool, SourceEvidenceError> {
+        let registry = source_evidence_error::lock(&self.registry)?;
+        Ok(registry
+            .sources
+            .get(&self.source)
+            .and_then(|source| source.binding.as_ref())
+            .is_some_and(|binding| binding.matches(&observed.binding())))
     }
 
     /// Returns a view of this same physical source in the requested byte domain.

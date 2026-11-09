@@ -9,7 +9,7 @@ use serde::{Serialize, Serializer};
 
 use crate::projection_schema;
 use crate::source_inventory::SourceEncryptionState;
-use crate::source_use::{SourceUse, SourceUseRef};
+use crate::source_use::{SourceLocation, SourceUse, SourceUseRef};
 
 /// Shared authoritative uses and the immediate filter index for one data value.
 #[derive(Debug, Clone)]
@@ -19,22 +19,65 @@ pub struct FieldOrigin {
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = projection_schema::require_properties)]
-#[schemars(extend("allOf" = [{
-    "if": {
-        "properties": {"containsEncryptedSource": {"const": false}},
-        "required": ["containsEncryptedSource"]
-    },
-    "then": {"properties": {"sourceSetComplete": {"const": true}}}
-}]))]
+#[schemars(transform = correlate_schema)]
 struct OriginFields {
     contains_encrypted_source: Option<bool>,
     source_uses_refs: Vec<SourceUseRef>,
     source_set_complete: bool,
 }
 
+/// Correlates immediate-origin markers and requires distinct, nonempty references.
+pub(crate) fn correlate_schema(schema: &mut Schema) {
+    projection_schema::require_properties(schema);
+    let constraint = schemars::json_schema!({
+        "properties": {
+            "sourceUsesRefs": {
+                "uniqueItems": true,
+                "items": {"type": "string", "minLength": 1}
+            }
+        },
+        "allOf": [
+            {
+                "if": {
+                    "properties": {"containsEncryptedSource": {"const": false}},
+                    "required": ["containsEncryptedSource"]
+                },
+                "then": {"properties": {"sourceSetComplete": {"const": true}}}
+            },
+            {
+                "if": {
+                    "properties": {"sourceUsesRefs": {"maxItems": 0}},
+                    "required": ["sourceUsesRefs"]
+                },
+                "then": {
+                    "if": {
+                        "properties": {"sourceSetComplete": {"const": true}},
+                        "required": ["sourceSetComplete"]
+                    },
+                    "then": {"properties": {"containsEncryptedSource": {"const": false}}},
+                    "else": {"properties": {"containsEncryptedSource": {"type": "null"}}}
+                }
+            }
+        ]
+    })
+    .to_value();
+    if let Some(all) = schema
+        .get_mut("allOf")
+        .and_then(|value| value.as_array_mut())
+    {
+        if !all.contains(&constraint) {
+            all.push(constraint);
+        }
+    } else {
+        schema.insert("allOf".into(), vec![constraint].into());
+    }
+}
+
 impl FieldOrigin {
-    pub(crate) fn new<'a>(uses: impl IntoIterator<Item = &'a SourceUse>, complete: bool) -> Self {
+    pub(crate) fn new<'a>(
+        uses: impl IntoIterator<Item = &'a SourceUse>,
+        mut complete: bool,
+    ) -> Self {
         let mut refs = Vec::new();
         let mut encrypted = false;
         let mut unknown = !complete;
@@ -42,6 +85,13 @@ impl FieldOrigin {
             .into_iter()
             .filter(|source| source.role().contributes());
         for source in contributing {
+            if matches!(
+                source.description().location(),
+                SourceLocation::Opaque { .. }
+            ) {
+                complete = false;
+                unknown = true;
+            }
             refs.push(source.reference().clone());
             match source.encryption() {
                 SourceEncryptionState::Encrypted => encrypted = true,

@@ -7,6 +7,7 @@ use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
 use crate::projection_schema;
+use crate::source_details::SourceCoordinateOmission;
 use crate::source_inventory::{PhysicalSourceRef, SourceEncryptionState};
 use crate::{DecimalU64, Language};
 
@@ -81,7 +82,7 @@ impl InputScope {
     }
 }
 
-/// An exact logical position inside an already observed physical input.
+/// A retained source coordinate or an explicit omission inside an observed physical input.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[non_exhaustive]
 #[serde(
@@ -90,6 +91,11 @@ impl InputScope {
     rename_all_fields = "camelCase"
 )]
 pub enum SourceLocation {
+    /// An actual input use with explicitly omitted optional coordinates.
+    Opaque {
+        /// Why coordinate details were not retained.
+        reason: SourceCoordinateOmission,
+    },
     /// One field of the physical DataForge Record index.
     DataForge {
         /// Physical Record position, independent of nominal GUID aliases.
@@ -127,6 +133,7 @@ pub enum SourceLocation {
 impl SourceLocation {
     pub(crate) fn key(&self) -> String {
         match self {
+            Self::Opaque { reason } => format!("o:{}", reason.key()),
             Self::DataForge {
                 record_index,
                 field,
@@ -235,7 +242,7 @@ impl SourceUseDescription {
         self.role
     }
 
-    /// Returns the exact logical source location.
+    /// Returns the retained source coordinate or its explicit omission.
     #[must_use]
     pub const fn location(&self) -> &SourceLocation {
         &self.location

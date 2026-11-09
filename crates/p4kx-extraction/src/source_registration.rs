@@ -50,6 +50,7 @@ pub(crate) fn archive(
         id,
         ancestors,
         stored_encryption: SourceEncryptionState::of(step.encryption()),
+        binding: None,
         source: PhysicalSourceKind::ArchiveEntry(ArchiveEntrySource {
             entry_index: step.index(),
             path,
@@ -133,6 +134,7 @@ pub(crate) fn file(
         id,
         ancestors: Vec::new(),
         stored_encryption: SourceEncryptionState::Unknown,
+        binding: None,
         source: PhysicalSourceKind::File(FileSource { name, byte_length }),
     }
 }
@@ -151,6 +153,7 @@ pub(crate) fn archive_file(
         id,
         ancestors: Vec::new(),
         stored_encryption: SourceEncryptionState::Unknown,
+        binding: None,
         source: PhysicalSourceKind::ArchiveFile(ArchiveFileSource { byte_length }),
     }
 }

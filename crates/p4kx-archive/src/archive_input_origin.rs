@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::hash::Hasher;
 use std::sync::Arc;
 
 /// Opaque identity of one observed root Archive input, shared by its containers.
@@ -20,5 +21,9 @@ impl ArchiveInputOrigin {
     #[must_use]
     pub fn is_same_input(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.identity, &other.identity)
+    }
+
+    pub(crate) fn hash_identity<H: Hasher>(&self, state: &mut H) {
+        std::ptr::hash(Arc::as_ptr(&self.identity), state);
     }
 }
