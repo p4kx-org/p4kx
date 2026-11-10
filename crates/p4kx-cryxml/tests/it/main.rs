@@ -5,6 +5,7 @@
 
 mod comparison;
 mod corrupt;
+mod original_node;
 mod parse;
 mod text_depth;
 mod xml;

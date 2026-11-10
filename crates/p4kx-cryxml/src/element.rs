@@ -40,6 +40,18 @@ impl<'d> Element<'d> {
         Self { document, index }
     }
 
+    /// Returns the original node-table position in this element's owning document.
+    #[must_use]
+    pub const fn index(self) -> u32 {
+        self.index
+    }
+
+    /// Returns whether this element borrows the given actual parsed document.
+    #[must_use]
+    pub fn is_from(self, document: &Document<'_>) -> bool {
+        std::ptr::eq(self.document, document)
+    }
+
     fn node(self) -> Option<&'d Node> {
         self.document.nodes.get(self.index as usize)
     }
