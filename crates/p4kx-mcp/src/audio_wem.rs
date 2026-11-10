@@ -14,9 +14,6 @@ use crate::budget::{fill_within, json_len};
 use crate::error::{ToolError, capped};
 use crate::page::Page;
 
-/// The most places read, one after the other, to find one that holds the whole WEM.
-pub(crate) const MAX_ATTEMPTS: usize = 8;
-
 /// What the header of a WEM states about the sound.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Facts {
@@ -317,7 +314,7 @@ pub(crate) fn info(
     page.check(places.len())?;
     let mut first: Option<(LocationShape, WemShape)> = None;
     let mut failure: Option<ToolError> = None;
-    for place in places.iter().take(MAX_ATTEMPTS) {
+    for place in &places {
         let size = place.location.len;
         let outcome = read(opened, place, |held| {
             Ok(match held {

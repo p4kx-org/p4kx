@@ -7,7 +7,7 @@ use p4kx_extraction::AudioError;
 
 use crate::archives::Opened;
 use crate::audio_params::ExcerptParams;
-use crate::audio_wem::{Candidate, Facts, Held, MAX_ATTEMPTS, audio_error, candidates, read};
+use crate::audio_wem::{Candidate, Facts, Held, audio_error, candidates, read};
 use crate::audio_wem_shapes::ExcerptResult;
 use crate::audio_window::Window;
 use crate::error::ToolError;
@@ -81,7 +81,7 @@ pub(crate) fn excerpt(
     let (id, places) = candidates(opened, params.wem_id, params.path.as_deref())?;
     let mut prefetched = false;
     let mut failure: Option<ToolError> = None;
-    for place in places.iter().take(MAX_ATTEMPTS) {
+    for place in &places {
         match decode(opened, place, id, ask) {
             Ok(Some(done)) => return Ok(done),
             Ok(None) => prefetched = true,

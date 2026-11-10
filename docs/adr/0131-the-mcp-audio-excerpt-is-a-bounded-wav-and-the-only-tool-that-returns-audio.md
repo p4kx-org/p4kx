@@ -43,6 +43,19 @@ folder of a WEM selected by `path`. A cursor beyond the listing is rejected as s
 of the listing is known (the places of the WEM, the triggers of the Entity), before any WEM is
 read or any item is built.
 
+Candidate search follows the complete indexed list in its existing order: loose Entries first,
+then embedded locations in soundbank path order. Metadata selects the first whole WEM that
+parses; an excerpt selects the first candidate that decodes the requested window. Paging the
+location list does not bound that search. Only after all indexed candidates fail does metadata
+retain its first observed fallback shape, or the excerpt return its first actual error ahead of
+a prefetch-only result. Explicit Entry paths still select that one Entry.
+
+The calls keep one candidate source at a time and retain their existing source-byte, decode
+window and response limits. Total candidate work can grow with the indexed list and the bytes
+read or decoded in failed attempts; this is not a bounded-time guarantee. The current blocking
+tool runner has no request-cancellation token to pass into these loops. No candidate-count
+prefix substitutes for a complete negative result. A prefetch-only result describes these indexed locations.
+
 Memory per call, stated honestly: the source is read whole before it is parsed. A loose WEM up to
 512 MiB (the cap of `Sound`), a soundbank up to 32 MiB (the cap of the audio index; a larger
 Entry is refused by `list_soundbank_wems` and `get_wem_info`), plus the 1 MiB window and the

@@ -219,8 +219,10 @@ pub(crate) enum ToolError {
     /// No soundbank embeds the WEM and no loose WEM Entry has its ID.
     #[error("no soundbank embeds the WEM {0} and no loose WEM Entry has that ID")]
     UnknownWem(u32),
-    /// Only the prefetched start of the WEM is in the Archive.
-    #[error("the Archive holds only the prefetched start of the WEM {0}, which cannot be decoded")]
+    /// The indexed locations contain only the prefetched start of this WEM.
+    #[error(
+        "the indexed locations hold only the prefetched start of the WEM {0}, which cannot be decoded"
+    )]
     PrefetchOnly(u32),
     /// The soundbank Entry is larger than the audio tools read.
     #[error("the soundbank {path} is larger than the {limit} bytes the audio tools read")]
