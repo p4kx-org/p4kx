@@ -1,102 +1,83 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{StructValue, Value};
+use std::slice::Iter;
 
-const DEPTH: usize = 16;
+use p4kx_extraction::{Field, StructValue, Value};
 
 /// Returns the first struct, the root first and then depth first in stored order, that holds a
 /// field called `name`.
-pub(super) fn owner_of<'t, 'f>(
-    root: &'t StructValue<'f>,
+pub(super) fn owner_of<'tree, 'source>(
+    root: &'tree StructValue<'source>,
     name: &str,
-) -> Option<&'t StructValue<'f>> {
-    owner_below(root, name, DEPTH)
+) -> Option<&'tree StructValue<'source>> {
+    find(root, |structure| structure.field(name).is_some())
 }
 
 /// Returns the first struct, the root first and then depth first in stored order, that holds a
 /// field called any of `names`.
-pub(super) fn owner_of_any<'t, 'f>(
-    root: &'t StructValue<'f>,
+pub(super) fn owner_of_any<'tree, 'source>(
+    root: &'tree StructValue<'source>,
     names: &[&str],
-) -> Option<&'t StructValue<'f>> {
-    any_below(root, names, DEPTH)
-}
-
-fn any_below<'t, 'f>(
-    root: &'t StructValue<'f>,
-    names: &[&str],
-    depth: usize,
-) -> Option<&'t StructValue<'f>> {
-    if names.iter().any(|name| root.field(name).is_some()) {
-        return Some(root);
-    }
-    let depth = depth.checked_sub(1)?;
-    root.fields().iter().find_map(|field| match field.value() {
-        Value::Struct(inner) => any_below(inner, names, depth),
-        Value::Array(items) => items.iter().find_map(|item| match item {
-            Value::Struct(inner) => any_below(inner, names, depth),
-            _ => None,
-        }),
-        _ => None,
+) -> Option<&'tree StructValue<'source>> {
+    find(root, |structure| {
+        names.iter().any(|name| structure.field(name).is_some())
     })
 }
 
 /// Returns the first struct of the type `type_name`, the root first and then depth first in
 /// stored order.
-pub(super) fn struct_named<'t, 'f>(
-    root: &'t StructValue<'f>,
+pub(super) fn struct_named<'tree, 'source>(
+    root: &'tree StructValue<'source>,
     type_name: &str,
-) -> Option<&'t StructValue<'f>> {
-    named_below(root, type_name, DEPTH * 2)
+) -> Option<&'tree StructValue<'source>> {
+    find(root, |structure| structure.type_name() == type_name)
 }
 
-fn named_below<'t, 'f>(
-    root: &'t StructValue<'f>,
-    type_name: &str,
-    depth: usize,
-) -> Option<&'t StructValue<'f>> {
-    if root.type_name() == type_name {
+fn find<'tree, 'source>(
+    root: &'tree StructValue<'source>,
+    mut accepts: impl FnMut(&StructValue<'source>) -> bool,
+) -> Option<&'tree StructValue<'source>> {
+    if accepts(root) {
         return Some(root);
     }
-    let depth = depth.checked_sub(1)?;
-    root.fields()
-        .iter()
-        .find_map(|field| named_in(field.value(), type_name, depth))
-}
-
-fn named_in<'t, 'f>(
-    value: &'t Value<'f>,
-    type_name: &str,
-    depth: usize,
-) -> Option<&'t StructValue<'f>> {
-    match value {
-        Value::Struct(inner) => named_below(inner, type_name, depth),
-        Value::Array(items) => items
-            .iter()
-            .find_map(|item| named_in(item, type_name, depth)),
-        _ => None,
+    let mut parents = Vec::new();
+    let mut children = Children::Fields(root.fields().iter());
+    loop {
+        match children.next() {
+            Some(Value::Struct(structure)) => {
+                if accepts(structure) {
+                    return Some(structure);
+                }
+                parents.push(children);
+                children = Children::Fields(structure.fields().iter());
+            }
+            Some(Value::Array(items)) => {
+                parents.push(children);
+                children = Children::Values(items.iter());
+            }
+            Some(_) => {}
+            None => children = parents.pop()?,
+        }
     }
 }
 
-fn owner_below<'t, 'f>(
-    root: &'t StructValue<'f>,
-    name: &str,
-    depth: usize,
-) -> Option<&'t StructValue<'f>> {
-    if root.field(name).is_some() {
-        return Some(root);
-    }
-    let depth = depth.checked_sub(1)?;
-    root.fields()
-        .iter()
-        .find_map(|field| owner_in(field.value(), name, depth))
+enum Children<'tree, 'source> {
+    Fields(Iter<'tree, Field<'source>>),
+    Values(Iter<'tree, Value<'source>>),
 }
 
-fn owner_in<'t, 'f>(value: &'t Value<'f>, name: &str, depth: usize) -> Option<&'t StructValue<'f>> {
-    match value {
-        Value::Struct(inner) => owner_below(inner, name, depth),
-        Value::Array(items) => items.iter().find_map(|item| owner_in(item, name, depth)),
-        _ => None,
+impl<'tree, 'source> Iterator for Children<'tree, 'source> {
+    type Item = &'tree Value<'source>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Fields(fields) => fields.next().map(Field::value),
+            Self::Values(values) => values.next(),
+        }
     }
 }
+
+#[cfg(test)]
+#[path = "walk_tests.rs"]
+mod tests;

@@ -434,6 +434,12 @@ text. The additions are additive (ADR-0054); `kind` of a fire mode and
 follow ADR-0072; the blocks `miningLaser` and `miningModifier` and the fire-mode fields `hitType`,
 `fullDamageRange` and `zeroDamageRange` follow ADR-0262.
 
+Owner-field and named-structure lookups inspect every materialized owned descendant,
+starting at the root and then following stored field and array order depth first. They
+use an iterative stack proportional to active depth. These lookups impose no separate
+16- or 32-level cutoff. They do not follow Reference links; ammunition and other domain
+links use their stated readers. Canonical reader failures remain failures and are not
+proof that an unexamined source field is absent.
 | Block | Present when | Fields and sources |
 |-------|--------------|--------------------|
 | `weapon` | the item has `Components[SCItemWeaponComponentParams]` (ship weapons and FPS weapons) | `fireActions`: per element of `fireActions`, in stored order, with a sequence (`sequenceEntries`) flattened to its entries: `kind` (the struct, e.g. `SWeaponActionFireRapidParams`), `name`, `fireRate` (rounds per minute), `pelletCount` (as `pellets`; `pellets` where a Record states that instead) and `ammoCost` of `launchParams`, `heatPerShot`, `chargeTime`, `overchargeTime`, `cooldownTime` (each of the fire mode, when stated), and `damagePerSecond` (the damage types of the beam's `damagePerSecond`, the power of a mining laser; `null` for a mode without one), and `spread` (see below); a beam also has `hitType`, `fullDamageRange` and `zeroDamageRange` (the two ranges in metres); a parallel mode (`weaponActions`) is listed as its entries; a charged or wrapped mode reads `fireRate`, `launchParams` and `name` from its `weaponAction` when it has none of its own. `ammoCapacity`: `maxAmmoCount` of the ammo container, the magazine's capacity (see below). `ammo`: the `AmmoParams` Record that the container's `ammoParamsRecord` links to, `null` without a readable one: `speed`, `lifetime`, `damage` (the damage types of `projectileParams.damage`), `detonationDamage`, `detonationMinRadius` and `detonationMaxRadius` (from `explosionParams`) |
