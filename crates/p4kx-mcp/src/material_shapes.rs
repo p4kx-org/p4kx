@@ -81,7 +81,7 @@ pub(crate) struct MaterialShape {
     /// The palette colour the material takes, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) palette: Option<String>,
-    /// The texture slots in file order, at most 64.
+    /// Every admitted texture slot in file order.
     pub(crate) textures: Vec<TextureShape>,
     /// The number of texture slots in the file.
     pub(crate) texture_count: usize,
@@ -89,7 +89,7 @@ pub(crate) struct MaterialShape {
     pub(crate) public_params: Vec<ParamShape>,
     /// The number of shader parameters in the file.
     pub(crate) public_param_count: usize,
-    /// The material layers in file order, at most 64.
+    /// Every admitted material layer in file order.
     pub(crate) layers: Vec<LayerShape>,
     /// The number of material layers in the file.
     pub(crate) layer_count: usize,

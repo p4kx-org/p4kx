@@ -138,8 +138,7 @@ pub use model::{ChunkUsage, Lod, LodSelection, Mesh, Model, ModelChunk, ModelFil
 pub use model_chunk_layout::ModelChunkLayout;
 pub use model_options::{ModelIssue, PositionBox};
 pub use mtl::{
-    MAX_SUB_MATERIALS, MAX_TEXTURE_SLOTS, Material, MaterialFlags, MaterialLibrary, MaterialStatus,
-    TextureSlot,
+    MAX_SUB_MATERIALS, Material, MaterialFlags, MaterialLibrary, MaterialStatus, TextureSlot,
 };
 pub use mtl_error::MaterialError;
 pub use mtl_layer_cache::{
@@ -147,9 +146,7 @@ pub use mtl_layer_cache::{
 };
 pub use mtl_layers::LayerSurface;
 pub use mtl_load::{MaterialReading, request_path as material_library_path};
-pub use mtl_raw::{
-    Attributes, MAX_LAYERS, MAX_RAW_DEPTH, MAX_RAW_ELEMENTS, MaterialLayer, RawElement,
-};
+pub use mtl_raw::{Attributes, MAX_RAW_DEPTH, MAX_RAW_ELEMENTS, MaterialLayer, RawElement};
 pub use mtl_roles::{TextureRole, is_diffuse_map};
 pub use mtl_source::{
     AuthoredAttribute, AuthoredAttributeKind, AuthoredContent, ElementAuthored, MaterialEncoding,

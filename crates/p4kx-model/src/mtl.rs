@@ -13,9 +13,6 @@ use crate::{
 /// The most sub-materials a material library may hold; the engine allows 128.
 pub const MAX_SUB_MATERIALS: usize = 1024;
 
-/// The most texture slots one material may hold.
-pub const MAX_TEXTURE_SLOTS: usize = 64;
-
 /// The `MtlFlags` of a material, as the engine's `EMaterialFlags` define them.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct MaterialFlags(pub u32);
@@ -105,7 +102,7 @@ pub struct Material {
     /// The child elements that are neither `Textures`, `PublicParams`, `MatLayers` nor
     /// `SubMaterials`, as the file has them.
     pub elements: Vec<RawElement>,
-    /// What the reader's limits cut off, e.g. `layers beyond 64`; empty when nothing was.
+    /// Raw element fragments omitted by their element or depth limits.
     pub truncated: Vec<String>,
     /// Whether the diffuse map of a [relief decal](Self::is_relief_decal) candidate holds no colour
     /// of its own, as the resolver that loaded the library found out; `None` when it was not asked

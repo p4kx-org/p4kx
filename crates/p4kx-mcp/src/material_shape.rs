@@ -7,9 +7,6 @@ use crate::budget::Budget;
 use crate::error::ToolError;
 use crate::material_shapes::{LayerShape, MaterialShape, ParamShape, TextureShape};
 
-/// The most texture slots and layers listed per material.
-const MAX_LISTED: usize = 64;
-
 pub(crate) fn shape(id: usize, material: &Material) -> Result<MaterialShape, ToolError> {
     let mut text = Budget::new();
     let palette = material
@@ -48,7 +45,6 @@ fn textures(material: &Material, text: &mut Budget) -> Result<Vec<TextureShape>,
     material
         .textures
         .iter()
-        .take(MAX_LISTED)
         .map(|texture| {
             Ok(TextureShape {
                 map: text.text(&texture.map)?,
@@ -75,7 +71,6 @@ fn layers(material: &Material, text: &mut Budget) -> Result<Vec<LayerShape>, Too
     material
         .layers
         .iter()
-        .take(MAX_LISTED)
         .map(|layer| {
             Ok(LayerShape {
                 name: layer

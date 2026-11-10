@@ -12,9 +12,6 @@ pub const MAX_RAW_DEPTH: usize = 8;
 /// The most elements the reader keeps in the raw elements of one material.
 pub const MAX_RAW_ELEMENTS: usize = 4096;
 
-/// The most material layers one material may hold.
-pub const MAX_LAYERS: usize = 64;
-
 /// An attribute list as the file gives it: names and values in file order.
 pub type Attributes = Vec<(String, String)>;
 
@@ -69,7 +66,6 @@ impl MaterialLayer {
 pub(crate) struct Budget {
     left: usize,
     elements_cut: bool,
-    layers_cut: bool,
     depth_cut: bool,
 }
 
@@ -78,7 +74,6 @@ impl Budget {
         Self {
             left: MAX_RAW_ELEMENTS,
             elements_cut: false,
-            layers_cut: false,
             depth_cut: false,
         }
     }
@@ -96,9 +91,6 @@ impl Budget {
     /// Returns what the limits cut off, for [`Material::truncated`](crate::Material::truncated).
     pub(crate) fn cut(&self) -> Vec<String> {
         let mut cut = Vec::new();
-        if self.layers_cut {
-            cut.push(format!("layers beyond {MAX_LAYERS}"));
-        }
         if self.depth_cut {
             cut.push(format!("raw nesting beyond {MAX_RAW_DEPTH}"));
         }
@@ -143,7 +135,7 @@ pub(crate) fn raw<'a>(
         authored: element.syntax()?.into_owned(ordinal),
     }))
 }
-pub(crate) fn layers<'a>(element: impl XmlElement<'a>, budget: &mut Budget) -> Vec<MaterialLayer> {
+pub(crate) fn layers<'source>(element: impl XmlElement<'source>) -> Vec<MaterialLayer> {
     let mut layers = Vec::new();
     let lists = element
         .children()
@@ -152,13 +144,6 @@ pub(crate) fn layers<'a>(element: impl XmlElement<'a>, budget: &mut Budget) -> V
         .flat_map(XmlElement::children)
         .filter(|child| child.name().eq_ignore_ascii_case("Layer"))
     {
-        if layers.len() == MAX_LAYERS {
-            budget.layers_cut = true;
-            break;
-        }
-        if !budget.take() {
-            break;
-        }
         layers.push(MaterialLayer {
             attributes: attributes(layer),
             surface: None,

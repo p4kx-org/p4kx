@@ -25,6 +25,7 @@ mod material_observer;
 mod material_observer_baseline;
 mod material_observer_palette;
 mod material_observer_support;
+mod material_observer_texture_sites;
 mod material_raw;
 mod materials;
 mod model_chunk_layout;

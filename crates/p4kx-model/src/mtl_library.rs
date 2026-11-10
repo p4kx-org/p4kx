@@ -18,8 +18,7 @@ impl MaterialLibrary {
     /// Returns a typed encoding/XML/format or input-limit error when the source cannot be parsed,
     /// [`MaterialError::Xml`] when the text is malformed,
     /// [`MaterialError::NotMaterial`] when its root is no `Material`, and
-    /// [`MaterialError::TooMany`] when it holds more sub-materials or texture slots than the
-    /// limits allow.
+    /// [`MaterialError::TooMany`] when it holds more sub-materials than the limit allows.
     pub fn parse(path: &str, bytes: &[u8]) -> Result<Self, MaterialError> {
         mtl_source_read::parse(path, bytes)
     }

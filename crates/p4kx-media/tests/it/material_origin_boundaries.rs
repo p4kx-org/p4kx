@@ -20,7 +20,7 @@ fn material_origin_site_cut_retains_encryption_and_does_not_starve_other_fields(
     let mut limits = MaterialSourceLimits::default();
     limits.text_bytes = 1;
     let mut options = support::options();
-    options.limits.record_bytes = 16 << 10;
+    options.limits.record_bytes = 128 << 10;
     let fixture = Fixture::with(
         [support::material(
             MTL,

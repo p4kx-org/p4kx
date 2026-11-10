@@ -172,7 +172,7 @@ fn crowded() -> TestMtlMaterial {
 }
 
 #[test]
-fn nested_previews_keep_counts_and_shader_parameters_stay_complete() -> TestResult {
+fn material_lists_keep_every_original_value_and_count() -> TestResult {
     let install = Install::new(vec![TestEntry::stored(
         "Data/Objects/Test/crowded.mtl",
         TestMtl::multi(&[crowded()]).text_xml(),
@@ -199,13 +199,10 @@ fn nested_previews_keep_counts_and_shader_parameters_stay_complete() -> TestResu
     assert_eq!(material["public_param_count"], 70, "and counted");
     assert_eq!(
         material["layers"].as_array().map(Vec::len),
-        Some(64),
-        "layers capped"
+        Some(70),
+        "all original layers"
     );
-    assert_eq!(
-        material["layer_count"], 64,
-        "and counted, as far as the reader keeps them"
-    );
+    assert_eq!(material["layer_count"], 70, "all original layers counted");
     Ok(())
 }
 

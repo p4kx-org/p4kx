@@ -5,7 +5,7 @@ use std::cell::Cell;
 use std::convert::Infallible;
 
 use p4kx_model::{
-    MAX_TEXTURE_SLOTS, MaterialError, MaterialLibrary, MaterialReadError, MaterialReadField,
+    MAX_SUB_MATERIALS, MaterialError, MaterialLibrary, MaterialReadError, MaterialReadField,
     MaterialReadUse, MaterialSourceLimits,
 };
 
@@ -287,15 +287,19 @@ fn material_observer_does_not_publish_field_results_for_rejected_configuration_o
 }
 
 #[test]
-fn material_observer_keeps_existing_typed_texture_limit_after_partial_observations() {
-    let texture = "<Texture Map='TexSlot7' File='synthetic/stencil.tif'/>";
+fn material_observer_keeps_all_texture_slots_with_original_observations() -> TestResult {
+    crate::material_observer_texture_sites::check()
+}
+
+#[test]
+fn material_observer_keeps_a_typed_failure_after_actual_partial_observations() {
     let xml = format!(
-        "<Material><Textures>{}</Textures></Material>",
-        texture.repeat(MAX_TEXTURE_SLOTS + 1)
+        "<Material><SubMaterials>{}</SubMaterials></Material>",
+        "<Material/>".repeat(MAX_SUB_MATERIALS + 1)
     );
     let calls = Cell::new(0);
     let result = MaterialLibrary::parse_with_observer(
-        "synthetic/limit",
+        "synthetic/submaterial-limit",
         xml.as_bytes(),
         MaterialSourceLimits::default(),
         || Ok::<(), Infallible>(()),
@@ -308,15 +312,15 @@ fn material_observer_keeps_existing_typed_texture_limit_after_partial_observatio
         matches!(
             result,
             Err(MaterialReadError::Material(MaterialError::TooMany {
-                limit: MAX_TEXTURE_SLOTS,
-                ..
+                what: "sub-materials",
+                limit: MAX_SUB_MATERIALS,
             }))
         ),
-        "the original typed-slot bound remains authoritative"
+        "a genuine typed input failure remains a material error"
     );
     assert!(
         calls.get() > 0,
-        "callers can observe an earlier disposition before the whole parse fails"
+        "earlier original observations precede the failure"
     );
 }
 

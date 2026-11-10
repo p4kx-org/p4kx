@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::mtl::MAX_TEXTURE_SLOTS;
 use crate::mtl_raw::{self, Attributes, Budget};
 use crate::mtl_xml::XmlElement;
 use crate::{MaterialError, MaterialReadUse, TextureSlot};
@@ -47,12 +46,6 @@ pub(crate) fn textures<'source>(
             let file = texture.attribute("File").unwrap_or_default();
             if file.is_empty() {
                 continue;
-            }
-            if slots.len() == MAX_TEXTURE_SLOTS {
-                return Err(MaterialError::TooMany {
-                    what: "texture slots in one material",
-                    limit: MAX_TEXTURE_SLOTS,
-                });
             }
             let parsed = slot(texture, file, budget)?;
             slots.push(parsed.value);

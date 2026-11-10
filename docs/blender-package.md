@@ -372,9 +372,11 @@ refer to each other's descriptions. A layer whose file is missing, unreadable (a
 Layers are followed through 8 files; the layers of the eighth stay without a `material` and one
 issue says so.
 
-The reader keeps at most 64 layers and 4096 raw elements per material (the attribute values are
-bounded by the 16 MiB cap on a material file). What is cut off is listed in `issues` (`origin`
-`material`, `kind` `material`), and the rest of the file is read.
+The reader retains every admitted texture slot and layer declaration in source order, including
+empty and repeated layers. Unknown raw fragments retain the independent 4096-element and
+depth-8 budgets; cuts are listed in `issues` (`origin` `material`, `kind` `material`). The package's
+material Entry reader keeps its existing 16 MiB input admission, while direct Model parsing uses
+its caller's supplied bytes. Companion-file, retained-syntax and output budgets remain separate.
 
 Decals and wear are not separate objects in the game's files; they are materials: a decal is a
 material with the shader `MeshDecal` (its stencil colours in `parameters`, the placeholder

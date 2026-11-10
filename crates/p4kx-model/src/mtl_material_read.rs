@@ -44,7 +44,7 @@ pub(crate) fn material<'source, Interrupted>(
     observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
 ) -> Result<Material, MaterialReadError<Interrupted>> {
     let (textures, mut sites) = mtl_material_inputs::textures(element, budget)?;
-    let layers = mtl_raw::layers(element, budget);
+    let layers = mtl_raw::layers(element);
     let elements = mtl_raw::other_elements(element, budget)?;
     let mut read = DirectRead {
         element,

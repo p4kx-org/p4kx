@@ -35,9 +35,11 @@ to see a texture or to resolve a Loadout.
   cannot fit first is explicitly refused; other errors remain fatal.
   All admitted Entity notes are retained through the same bounded display and envelope admission;
   a note beyond the response budget causes an explicit refusal instead of disappearing.
-  Shader parameters are retained in full within the same item and response admission.
-  Remaining item lists retain their stated counts beside their previews: 64 texture slots,
-  layers and Entity issues, 16 item types per port and 16 sub-types per item type.
+  Texture slots, shader parameters and layers are retained in full within the same item and
+  response admission. Typed layers are independent of the Model reader's unknown raw-fragment
+  budget; an unrelated raw-fragment cut does not hide or refuse complete advertised layer fields.
+  Remaining item lists retain their stated counts beside their previews: 64 Entity issues,
+  16 item types per port and 16 sub-types per item type.
   These preview and depth limits require separate completeness/retrieval assessment; counts
   alone do not establish their sufficiency. Texture paths remain relative to `Data`. Existing
   input byte limits apply independently when returned names or paths are reused.
