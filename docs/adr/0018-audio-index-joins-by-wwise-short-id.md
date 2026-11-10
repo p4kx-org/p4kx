@@ -10,6 +10,11 @@ An event name is matched to an ID by Wwise's short ID, the 32-bit FNV-1 hash of 
 lower case; in the live data more than 95 % of the ships' triggers reach a soundbank this way.
 When two definitions name the same trigger, the first by Entry path wins.
 
+An admitted ATL trigger retains every authored Wwise event in definition order, including
+repeated event names and each localised flag. Searching event names examines this complete
+list. Source Entry size, XML-node admission and the total trigger-index bound are independent
+policies; result paging does not shorten a trigger’s retained source membership.
+
 The trigger references of an Entity are read from its Record when it is asked for, not indexed
 for every Entity; only the Entity's own Record tree is searched. The reverse index from trigger
 to Entities that #144 needs will be built lazily, on its first use, in its own `OnceLock` next to

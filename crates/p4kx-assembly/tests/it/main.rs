@@ -42,6 +42,8 @@ mod character_definitions;
 mod character_item_ports;
 mod character_skeletons;
 mod clothing_hidden;
+mod complete_atl_events;
+mod complete_atl_source;
 mod creature_animation;
 mod creature_skeleton;
 mod docked_vehicles;

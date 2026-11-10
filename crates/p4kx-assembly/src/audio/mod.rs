@@ -59,9 +59,6 @@ pub const MAX_ATL_NODES: u32 = 1 << 20;
 /// the ATL definition that brings the first of them is reported.
 pub const MAX_AUDIO_TRIGGERS: usize = 1 << 18;
 
-/// The most Wwise events one ATL trigger posts; further events are left out.
-pub const MAX_TRIGGER_EVENTS: usize = 256;
-
 /// The folder of the ATL definition Entries, ignoring ASCII case.
 pub const ATL_FOLDER: &str = "Data\\Libs\\GameAudio\\";
 

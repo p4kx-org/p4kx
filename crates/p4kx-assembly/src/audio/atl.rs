@@ -3,7 +3,7 @@
 
 use p4kx_cryxml::{Element, Xml};
 
-use super::{AudioFileError, MAX_ATL_NODES, MAX_TRIGGER_EVENTS, wwise_id};
+use super::{AudioFileError, MAX_ATL_NODES, wwise_id};
 
 /// A Wwise event an ATL trigger posts: its name and its short ID.
 ///
@@ -152,6 +152,5 @@ fn events<'a, N: AtlNode<'a>>(trigger: N) -> Box<[WwiseEvent]> {
                     .is_some_and(|value| value.eq_ignore_ascii_case("true")),
             })
         })
-        .take(MAX_TRIGGER_EVENTS)
         .collect()
 }
