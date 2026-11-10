@@ -190,9 +190,7 @@ fn weak_root_and_owned_instance_admissions_keep_header_applicability_distinct() 
         "an actual instance type cannot impersonate a Record header type"
     );
     assert_eq!(
-        admitted
-            .instance_location()
-            .map(Location::as_str),
+        admitted.instance_location().map(Location::as_str),
         Some("child"),
         "the actual same-parse owned-instance location survives"
     );
