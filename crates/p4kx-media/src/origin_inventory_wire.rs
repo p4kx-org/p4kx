@@ -164,6 +164,7 @@ pub(crate) enum LocationKind {
 #[serde(rename_all = "camelCase")]
 pub(crate) enum CoordinateOmission {
     CaptureLimit,
+    Unavailable,
 }
 
 pub(crate) struct TypedSeed<T>(pub(crate) std::marker::PhantomData<T>);
@@ -179,3 +180,7 @@ impl<'de, T: Deserialize<'de>> serde::de::DeserializeSeed<'de> for TypedSeed<T> 
 pub(crate) const fn seed<T>() -> TypedSeed<T> {
     TypedSeed(std::marker::PhantomData)
 }
+
+#[cfg(test)]
+#[path = "origin_opaque_reason_tests.rs"]
+mod opaque_reason_tests;

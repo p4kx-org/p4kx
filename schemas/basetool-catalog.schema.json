@@ -17591,6 +17591,11 @@
           "const": "captureLimit",
           "description": "Optional coordinate capture was not admitted.",
           "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "description": "A proved original contribution has no retained source coordinate.",
+          "type": "string"
         }
       ],
       "x-p4kx-vocabularyClass": "control"

@@ -24,12 +24,19 @@ pub enum SourceDetails {
 pub enum SourceCoordinateOmission {
     /// Optional coordinate capture was not admitted.
     CaptureLimit,
+    /// A proved original contribution has no retained source coordinate.
+    Unavailable,
 }
 
 impl SourceCoordinateOmission {
     pub(crate) const fn key(self) -> &'static str {
         match self {
             Self::CaptureLimit => "captureLimit",
+            Self::Unavailable => "unavailable",
         }
     }
 }
+
+#[cfg(test)]
+#[path = "source_coordinate_omission_tests.rs"]
+mod coordinate_tests;

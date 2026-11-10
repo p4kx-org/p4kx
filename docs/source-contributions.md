@@ -73,13 +73,18 @@ document-local IDs and row counts; existing rows and use references remain intac
 Repeated legacy full leaf observations retain their original rows. Explicit view
 reuse adopts the first actual registered row without removing later duplicate rows.
 
-`SourceScope::at_opaque` and `SourceUses::opaque_use` explicitly omit an optional
-coordinate with `SourceCoordinateOmission::CaptureLimit`. They keep the original
-source, byte domain, role and encryption witness. A contributing opaque use makes
-its field's contributor set incomplete, while a known encrypted witness still yields
-true. Attempts and untouched references do not taint another value. These operations
-impose no global metadata, writer or schema quota.
-
+`SourceScope::at_opaque` and `SourceUses::opaque_use` preserve an actual contributing
+source when its original coordinate is omitted. `SourceCoordinateOmission::CaptureLimit`
+is reserved for optional coordinates not admitted under the capture policy.
+`SourceCoordinateOmission::Unavailable` records a proved contribution whose original
+coordinate cannot be supplied by the owning operation. Retain exact original coordinates
+whenever available; this reason does not justify dropping reader evidence or replacing
+an avoidable traversal cut with an opaque location. Both reasons retain the original
+source, byte domain, role and encryption witness. A contributing opaque use makes the
+contributor set incomplete; a known encrypted witness still yields true. A read attempt
+alone remains Attempted and cannot become an opaque Conversion. These operations impose
+no new global metadata, writer or schema quota. The closed `p4kx.field-origins/1` omission
+vocabulary admits `captureLimit` and `unavailable`; missing and unknown reasons are refused.
 ## Physical sources and byte domains
 
 | Observation | Retained meaning |
