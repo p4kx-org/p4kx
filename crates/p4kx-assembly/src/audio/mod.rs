@@ -75,9 +75,6 @@ pub const MAX_LANGUAGES: usize = 1 << 10;
 /// The most objects a container path holds, the Event object included.
 pub const MAX_PATH_DEPTH: usize = 32;
 
-/// The most stingers one index holds; further ones are left out.
-pub const MAX_STINGERS: usize = 1 << 18;
-
 /// The most `PlayEvent` and `Trigger` actions that follow one another on one path.
 pub const MAX_ACTION_CHAIN: usize = 8;
 

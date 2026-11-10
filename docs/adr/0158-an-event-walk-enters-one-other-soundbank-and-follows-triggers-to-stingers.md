@@ -23,11 +23,14 @@ Decided for issue #597. Amends the resolution rules of ADR-0115 and builds on AD
   segment. The stingers of all soundbanks are kept in the audio index by trigger ID, with the
   soundbank that declares them, because on LIVE none of the 33 Trigger actions lies in the
   soundbank that declares the stinger it fires. A stinger without a segment (ID 0) is not kept.
-  The index keeps at most `MAX_STINGERS` stingers, each (trigger, soundbank, segment) once, and
-  takes at most that many from one soundbank. The stingers are followed in the soundbanks the
+  The index keeps every non-null stinger from each admitted soundbank, each
+  (trigger, soundbank, segment) once, in source order. Source-byte admission and the budgets of
+  an individual resolution walk are independent of this complete membership. The stingers are
+  followed in the soundbanks the
   language rules select, as for an Event; only when none of them is selected is it a
   `no_localisation` break. A Trigger action whose trigger no stinger names is a `missing` break
   with the trigger ID.
+- **Indexed stingers bind their declaring soundbank.** An equal object ID in the current soundbank does not replace the stinger’s indexed bank. Segment children are followed locally after entering that selected bank.
 - **One extra soundbank read per event and soundbank.** A walk starts in the soundbank that holds
   its Event and reads at most one other soundbank, on the first reference that leaves the first.
   It then moves between those two without reading again; a reference into a third soundbank is

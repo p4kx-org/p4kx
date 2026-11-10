@@ -18,7 +18,7 @@ impl TestHircObject {
     /// `markers` the names of its markers.
     #[must_use]
     pub fn music_segment(id: u32, children: &[u32], markers: &[&str]) -> Self {
-        Self::segment(id, children, markers, DEFAULT_STINGER)
+        Self::segment(id, children, markers, &[DEFAULT_STINGER])
     }
 
     /// A music segment object without markers whose one stinger plays the segment `segment_id`
@@ -30,11 +30,17 @@ impl TestHircObject {
         trigger_id: u32,
         segment_id: u32,
     ) -> Self {
-        Self::segment(id, children, &[], (trigger_id, segment_id))
+        Self::segment(id, children, &[], &[(trigger_id, segment_id)])
     }
 
-    fn segment(id: u32, children: &[u32], markers: &[&str], stinger: (u32, u32)) -> Self {
-        let mut body = music_node(children, stinger);
+    /// A music segment whose authored stingers are the ordered trigger/segment ID pairs.
+    #[must_use]
+    pub fn music_segment_with_stingers(id: u32, children: &[u32], stingers: &[(u32, u32)]) -> Self {
+        Self::segment(id, children, &[], stingers)
+    }
+
+    fn segment(id: u32, children: &[u32], markers: &[&str], stingers: &[(u32, u32)]) -> Self {
+        let mut body = music_node(children, stingers);
         body.extend_from_slice(&4000.5_f64.to_le_bytes());
         put_u32(&mut body, len_u32(markers));
         for (id, name) in (FIRST_MARKER_ID..).zip(markers) {
@@ -180,7 +186,7 @@ impl TestPlaylistItem {
     }
 }
 
-fn music_node(children: &[u32], stinger: (u32, u32)) -> Vec<u8> {
+fn music_node(children: &[u32], stingers: &[(u32, u32)]) -> Vec<u8> {
     let mut body = vec![0];
     body.extend_from_slice(&node_base(TestNodeBase::Full));
     put_u32(&mut body, len_u32(children));
@@ -192,15 +198,17 @@ fn music_node(children: &[u32], stinger: (u32, u32)) -> Vec<u8> {
     body.extend_from_slice(&120.0_f32.to_le_bytes());
     body.extend_from_slice(&[4, 4]);
     body.push(1);
-    put_u32(&mut body, 1);
-    put_u32(&mut body, stinger.0);
-    put_u32(&mut body, stinger.1);
-    body.extend_from_slice(&[0; 16]);
+    put_u32(&mut body, len_u32(stingers));
+    for &(trigger_id, segment_id) in stingers {
+        put_u32(&mut body, trigger_id);
+        put_u32(&mut body, segment_id);
+        body.extend_from_slice(&[0; 16]);
+    }
     body
 }
 
 fn transition_node(children: &[u32]) -> Vec<u8> {
-    let mut body = music_node(children, DEFAULT_STINGER);
+    let mut body = music_node(children, &[DEFAULT_STINGER]);
     put_u32(&mut body, 2);
     for with_object in [false, true] {
         put_u32(&mut body, 1);

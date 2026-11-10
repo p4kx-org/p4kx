@@ -85,7 +85,11 @@ impl<'i> Walk<'_, 'i> {
             return;
         }
         let wanted = wanted.or_else(|| self.path.is_empty().then_some(HircKind::Event));
-        let (bank, entered) = if find(&self.current.bank, id, wanted).is_some() {
+        let in_current = match via {
+            Via::At(position) => position == self.current.position,
+            Via::Local | Via::Bank(_) | Via::PlayEvent => true,
+        };
+        let (bank, entered) = if in_current && find(&self.current.bank, id, wanted).is_some() {
             (Rc::clone(&self.current.bank), None)
         } else {
             match self.banks.enter(self.current.position, id, via) {

@@ -14,7 +14,7 @@ use super::media::{Limits, LooseMedia, WemSource};
 use super::read::{folded_order, has_extension, starts_with_folder};
 use super::{
     ATL_FOLDER, AtlTrigger, AudioFileError, AudioIssue, DEFAULT_LANGUAGE, IndexedSoundbank,
-    MAX_AUDIO_TRIGGERS, MAX_STINGERS, WemLocation,
+    MAX_AUDIO_TRIGGERS, WemLocation,
 };
 
 /// The audio data of one Archive: every ATL trigger with its Wwise events, and for every Wwise
@@ -293,9 +293,6 @@ struct StingerList {
 impl StingerList {
     fn add(&mut self, bank: u32, stingers: &[MusicStinger]) {
         for stinger in stingers {
-            if self.seen.len() >= MAX_STINGERS {
-                return;
-            }
             let found = Stinger {
                 bank,
                 segment_id: stinger.segment_id,
@@ -337,16 +334,25 @@ mod tests {
     }
 
     #[test]
-    fn a_crafted_bank_cannot_grow_the_stinger_list_past_the_cap() {
-        let crafted: Vec<MusicStinger> = (0..2 * u32::try_from(MAX_STINGERS).unwrap_or(0))
-            .map(|number| stinger(number, 1))
-            .collect();
+    fn all_distinct_stinger_tuples_survive_multiple_banks() {
+        let crafted: Vec<MusicStinger> = (0..524_288).map(|number| stinger(number, 1)).collect();
         let mut list = StingerList::default();
         list.add(0, &crafted);
         list.add(1, &crafted);
-        assert_eq!(list.seen.len(), MAX_STINGERS);
-        assert_eq!(list.found.len(), MAX_STINGERS);
-        assert!(list.found.values().all(|found| found.len() == 1));
+        assert_eq!(
+            list.seen.len(),
+            2 * crafted.len(),
+            "every distinct bank tuple is retained"
+        );
+        assert_eq!(
+            list.found.len(),
+            crafted.len(),
+            "all original trigger identities survive"
+        );
+        assert!(
+            list.found.values().all(|found| found.len() == 2),
+            "each trigger keeps both distinct bank declarations"
+        );
     }
 
     #[test]
