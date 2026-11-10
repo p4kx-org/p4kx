@@ -28,8 +28,8 @@ impl Server {
         substring or a glob with * and ?, ignoring case, matched against trigger and event names; without it every trigger \
         is listed. Each result lists the trigger, the Wwise events it posts with the soundbanks that hold them, why it \
         leads to no soundbank if so, and, only if entities is above 0, the Entities that name it (entities: how many to list; the lookup \
-        reads the Record of every Entity on each call and takes seconds on a real Archive). Events and soundbanks \
-        per trigger are listed up to 25 and 10 with their totals. Paged in definition order with a cursor. The first call of a session reads \
+        reads the Record of every Entity on each call and takes seconds on a real Archive). Events are complete; at most 10 soundbanks \
+        per event are listed with their totals. Paged in definition order with a cursor. The first call of a session reads \
         every ATL definition and soundbank of the Archive. Retained text is complete within the existing 256 KiB response budget; an item that cannot fit first is refused. \
         The content may be forwarded by the client to third parties; \
         game texts and media must not be redistributed.",

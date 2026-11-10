@@ -3,8 +3,6 @@
 
 use p4kx_assembly::audio::{TriggerHit, Unmatched};
 
-use super::event::MAX_EVENTS;
-
 /// Owned trigger names and search decisions carried to the Forge worker.
 pub(super) struct HitPlan {
     pub(super) name: String,
@@ -19,11 +17,7 @@ impl HitPlan {
             name: hit.trigger().name().to_owned(),
             matched_trigger: hit.matched_by_trigger(),
             unmatched: hit.unmatched(),
-            matched_events: hit
-                .events()
-                .take(MAX_EVENTS)
-                .map(|(_, matched)| matched)
-                .collect(),
+            matched_events: hit.events().map(|(_, matched)| matched).collect(),
         }
     }
 }

@@ -67,8 +67,9 @@ nested values; exact JSON admission remains final. Display text uses the bounded
 An oversized later item retains the complete prefix and a cursor that retries that item;
 an oversized first item is refused. Other rendering errors remain fatal.
 
-The current previews retain up to 25 events per trigger, 10 soundbanks per event, 25 broken links
-and 20 issues with their stated totals. These limits need separate completeness/retrieval
+Event lists retain every admitted original event, including every actual search decision.
+The remaining previews retain up to 10 soundbanks per event, 25 broken links and 20 issues
+with their stated totals. These limits need separate completeness/retrieval
 assessment; totals alone do not justify omitted nested entries. Existing input byte caps remain
 independent: a complete returned trigger above 256 bytes is explicitly refused if passed to
 `resolve_audio_trigger`. Names within that cap and returned Entity/Entry paths within their

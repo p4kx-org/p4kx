@@ -33,6 +33,8 @@ to see a texture or to resolve a Loadout.
   independent formatter errors remain errors. Exact JSON admission still decides the page.
   An oversized later item ends the page with a cursor that retries that item. An item that
   cannot fit first is explicitly refused; other errors remain fatal.
+  All admitted Entity notes are retained through the same bounded display and envelope admission;
+  a note beyond the response budget causes an explicit refusal instead of disappearing.
   Item lists retain their stated counts beside their previews: 64 texture slots, shader
   parameters, layers and Entity issues, 16 item types per port and 16 sub-types per item type.
   These preview and depth limits require separate completeness/retrieval assessment; counts

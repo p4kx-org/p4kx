@@ -70,7 +70,7 @@ pub(crate) struct EntityShape {
     /// The number of such reasons.
     pub(crate) issue_count: usize,
     /// What the Loadout cannot decide without the game's spawn, in the form of `issues` but no
-    /// problem: nothing was kept from being read. Absent when there is none; at most 64.
+    /// problem: nothing was kept from being read. Absent when there is none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) notes: Vec<ErrorShape>,
 }

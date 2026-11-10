@@ -10,8 +10,6 @@ use crate::audio_shapes::{EntityTriggerShape, EventShape, TriggerEventShape, Tri
 use crate::budget::Budget;
 use crate::error::ToolError;
 
-/// The most events listed per trigger; the response states the original total.
-pub(super) const MAX_EVENTS: usize = 25;
 /// The most listed soundbanks per event; the response states the original total.
 const MAX_BANKS: usize = 10;
 
@@ -48,9 +46,7 @@ fn events<'index>(
     let mut listed = Vec::new();
     for (found, matched) in all {
         total += 1;
-        if listed.len() < MAX_EVENTS {
-            listed.push(event(found.event(), found.soundbanks(), matched, text)?);
-        }
+        listed.push(event(found.event(), found.soundbanks(), matched, text)?);
     }
     Ok((listed, total))
 }
@@ -61,13 +57,13 @@ pub(super) fn hit_events(
     matched: &[bool],
     text: &mut Budget,
 ) -> Result<(Vec<EventShape>, usize), ToolError> {
-    if matched.len() != trigger.events().len().min(MAX_EVENTS) {
+    if matched.len() != trigger.events().len() {
         return Err(ToolError::Refused(
             "selected audio event decisions do not match the index".to_owned(),
         ));
     }
     let mut listed = Vec::new();
-    for (source, matched) in trigger.events().iter().take(MAX_EVENTS).zip(matched) {
+    for (source, matched) in trigger.events().iter().zip(matched) {
         listed.push(event(
             source,
             index.event_soundbanks(source.id()),
@@ -115,7 +111,6 @@ pub(super) fn trigger(
             .trigger()
             .events()
             .iter()
-            .take(MAX_EVENTS)
             .map(|event| {
                 Ok(TriggerEventShape {
                     name: text.text(event.name())?,

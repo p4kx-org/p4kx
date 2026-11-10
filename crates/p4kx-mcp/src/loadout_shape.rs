@@ -59,7 +59,6 @@ fn entity(node: &EntityNode, text: &mut Budget) -> Result<EntityShape, ToolError
         notes: node
             .notes()
             .iter()
-            .take(MAX_ISSUES)
             .map(|error| loadout_error::shape(error, None, text))
             .collect::<Result<_, _>>()?,
     })

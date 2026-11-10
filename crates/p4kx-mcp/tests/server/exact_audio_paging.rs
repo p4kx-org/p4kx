@@ -96,7 +96,7 @@ fn exact_audio_later_oversized_trigger_preserves_prefix_and_retry() -> TestResul
 }
 
 #[test]
-fn exact_audio_unshown_events_and_later_unmaterialized_trigger_are_not_charged() -> TestResult {
+fn exact_audio_the_actual_huge26th_event_is_charged() -> TestResult {
     let mut texts = Texts::long();
     texts.events = (0..25).map(|index| format!("Play_Short_{index}")).collect();
     let huge = "H".repeat(300 << 10);
@@ -107,7 +107,27 @@ fn exact_audio_unshown_events_and_later_unmaterialized_trigger_are_not_charged()
     assert_eq!(
         texts.events.get(25),
         Some(&huge),
-        "the actual26th original value is huge"
+        "the actual26th event is huge"
+    );
+    let mut server = install.serve(&["--archive", "LIVE"])?;
+    check::too_large(
+        &mut server,
+        "search_audio_triggers",
+        &json!({"search":"Exact_","limit":1}),
+    )
+}
+
+#[test]
+fn exact_audio_later_unmaterialized_trigger_is_not_charged_after_complete_events() -> TestResult {
+    let mut texts = Texts::long();
+    texts.events = (0..26).map(|index| format!("Play_Short_{index}")).collect();
+    let huge = "H".repeat(300 << 10);
+    texts.later = format!("Exact_Unshown_{huge}");
+    let install = fixture::install(&texts, Encoding::Text)?;
+    exact_audio_source::original(&install, &texts)?;
+    assert!(
+        texts.later.len() > 300 << 10,
+        "the actual later trigger is huge"
     );
     let mut server = install.serve(&["--archive", "LIVE"])?;
     let first = server.ok(
@@ -120,11 +140,7 @@ fn exact_audio_unshown_events_and_later_unmaterialized_trigger_are_not_charged()
         Some(&json!(26)),
         "full actual event count"
     );
-    assert_eq!(
-        hit.get("events").and_then(Value::as_array).map(Vec::len),
-        Some(25),
-        "current retained preview contract only"
-    );
+    check::events(hit, &texts)?;
     assert_eq!(
         first
             .get("triggers")

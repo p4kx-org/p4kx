@@ -65,7 +65,7 @@ fn sounds() -> TestResult<Install> {
 }
 
 #[test]
-fn events_and_soundbanks_per_trigger_are_capped_with_their_totals() -> TestResult {
+fn events_are_complete_and_soundbank_previews_keep_their_totals() -> TestResult {
     let install = many()?;
     let mut server = serve(&install)?;
     let found = server.ok("search_audio_triggers", &json!({ "search": "Play_Many" }))?;
@@ -73,8 +73,8 @@ fn events_and_soundbanks_per_trigger_are_capped_with_their_totals() -> TestResul
     assert_eq!(hit["events_total"], EVENTS, "all events are counted");
     assert_eq!(
         hit["events"].as_array().map(Vec::len),
-        Some(25),
-        "25 listed"
+        Some(EVENTS),
+        "all original events listed"
     );
     assert_eq!(
         hit["events"][0]["soundbank_count"], BANKS,
@@ -92,8 +92,8 @@ fn events_and_soundbanks_per_trigger_are_capped_with_their_totals() -> TestResul
     );
     assert_eq!(
         resolved["trigger"]["events"].as_array().map(Vec::len),
-        Some(25),
-        "resolve lists 25"
+        Some(EVENTS),
+        "resolve lists every original event"
     );
     let long = server.ok("search_audio_triggers", &json!({ "search": "PPPP" }))?;
     let name = "P".repeat(300);
