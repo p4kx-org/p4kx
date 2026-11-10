@@ -145,7 +145,7 @@ pub struct TextureImagePlan {
     cross: bool,
     width: u32,
     height: u32,
-    remaining: Range<u32>,
+    remaining: Range<usize>,
 }
 
 impl TextureImagePlan {
@@ -176,6 +176,9 @@ impl TextureImagePlan {
             width = width.checked_mul(CROSS_COLUMNS).ok_or_else(overflow)?;
             height = height.checked_mul(CROSS_ROWS).ok_or_else(overflow)?;
         }
+        let count = header.images(level) / if cross { u64::from(CUBE_FACES) } else { 1 };
+        let count =
+            usize::try_from(count).map_err(|_| TextureError::UnsupportedImage { images: count })?;
         Ok(Self {
             header: *header,
             level,
@@ -185,7 +188,7 @@ impl TextureImagePlan {
             cross,
             width,
             height,
-            remaining: 0..header.array_size() * faces * slices,
+            remaining: 0..count,
         })
     }
 
@@ -225,9 +228,28 @@ impl Iterator for TextureImagePlan {
 
     fn next(&mut self) -> Option<Self::Item> {
         let index = self.remaining.next()?;
-        let layer = index / (self.faces * self.slices);
-        let face = (index / self.slices) % self.faces;
-        let slice = index % self.slices;
+        self.image(index)
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let index = self.remaining.nth(n)?;
+        self.image(index)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.remaining.size_hint()
+    }
+}
+
+impl TextureImagePlan {
+    /// Resolves an index from the checked range into its original u32 coordinates.
+    fn image(&self, index: usize) -> Option<TextureImage> {
+        let index = u64::try_from(index).ok()?;
+        let faces = u64::from(self.faces);
+        let slices = u64::from(self.slices);
+        let layer = u32::try_from(index / (faces * slices)).ok()?;
+        let face = u32::try_from((index / slices) % faces).ok()?;
+        let slice = u32::try_from(index % slices).ok()?;
         Some(TextureImage {
             level: self.level,
             layer,
@@ -238,10 +260,6 @@ impl Iterator for TextureImagePlan {
             format: self.format,
             suffix: self.suffix(layer, face, slice),
         })
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.remaining.size_hint()
     }
 }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_texture::{RgbaImage, sheet_columns, tile};
+use p4kx_texture::{RgbaImage, TextureError, sheet_columns, tile};
 
 use crate::texture_job::{Member, Role, role};
 use crate::{ConversionError, Texture};
@@ -31,8 +31,15 @@ impl Texture<'_> {
         match <[RgbaImage; 1]>::try_from(self.decode_images(level, true)?) {
             Ok([only]) => Ok(only),
             Err(units) => {
-                let count = u32::try_from(units.len()).unwrap_or(u32::MAX);
-                tile(&units, sheet_columns(count))
+                let count = units.len() as u64;
+                let overflow = || {
+                    ConversionError::of_texture(
+                        self.name(),
+                        TextureError::InvalidHeader("the texture size overflows"),
+                    )
+                };
+                let columns = u32::try_from(sheet_columns(count)).map_err(|_| overflow())?;
+                tile(&units, columns)
                     .map_err(|error| ConversionError::of_texture(self.name(), error))
             }
         }

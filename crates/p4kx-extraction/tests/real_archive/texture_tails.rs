@@ -69,7 +69,7 @@ fn classify(
         return Ok(Layout::RawWithoutColour);
     };
     let header = texture.header();
-    let surfaces = u64::from(header.surfaces());
+    let surfaces = header.surfaces();
     let size = tail.uncompressed_size();
     let fits = |bytes: u64, block: u32| {
         mip_chain(

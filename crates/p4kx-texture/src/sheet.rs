@@ -10,7 +10,7 @@ const CROSS_ROWS: u32 = 3;
 
 /// Returns the number of columns of a sheet of `units` images: the smallest square that holds them.
 #[must_use]
-pub const fn sheet_columns(units: u32) -> u32 {
+pub const fn sheet_columns(units: u64) -> u64 {
     let root = units.isqrt();
     if root * root == units { root } else { root + 1 }
 }
@@ -19,10 +19,10 @@ impl DdsHeader {
     /// Returns the number of units a preview of mip `level` lays out on one sheet: a full cubemap
     /// is one unit, its cross; every other face, array element and slice is one unit each.
     #[must_use]
-    pub const fn preview_units(&self, level: u32) -> u32 {
+    pub const fn preview_units(&self, level: u32) -> u64 {
         let images = self.images(level);
         if self.faces() == CUBE_FACES {
-            images / CUBE_FACES
+            images / CUBE_FACES as u64
         } else {
             images
         }
@@ -46,6 +46,8 @@ impl DdsHeader {
         let units = self.preview_units(level).max(1);
         let sheet_columns = sheet_columns(units);
         let sheet_rows = units.div_ceil(sheet_columns);
+        let sheet_columns = u32::try_from(sheet_columns).ok()?;
+        let sheet_rows = u32::try_from(sheet_rows).ok()?;
         Some([
             side(self.width())
                 .checked_mul(columns)?
@@ -77,15 +79,21 @@ pub fn tile(images: &[RgbaImage], columns: u32) -> Result<RgbaImage, TextureErro
         return Err(TextureError::SheetMismatch);
     }
     let overflow = || TextureError::InvalidHeader("the texture size overflows");
-    let count = u32::try_from(images.len()).map_err(|_| overflow())?;
-    let columns = columns.min(count);
+    let count = u64::try_from(images.len()).map_err(|_| overflow())?;
+    let columns = u64::from(columns).min(count);
     let rows = count.div_ceil(columns);
-    let to_usize = |value: u32| usize::try_from(value).map_err(|_| overflow());
-    let cell_row = to_usize(width)?.checked_mul(RGBA).ok_or_else(overflow)?;
+    let sheet_width = u64::from(width).checked_mul(columns).ok_or_else(overflow)?;
+    let sheet_height = u64::from(height).checked_mul(rows).ok_or_else(overflow)?;
+    let sheet_width = u32::try_from(sheet_width).map_err(|_| overflow())?;
+    let sheet_height = u32::try_from(sheet_height).map_err(|_| overflow())?;
+    let to_usize = |value: u64| usize::try_from(value).map_err(|_| overflow());
+    let cell_row = to_usize(u64::from(width))?
+        .checked_mul(RGBA)
+        .ok_or_else(overflow)?;
     let sheet_row = cell_row
         .checked_mul(to_usize(columns)?)
         .ok_or_else(overflow)?;
-    let cell_rows = to_usize(height)?;
+    let cell_rows = to_usize(u64::from(height))?;
     let len = sheet_row
         .checked_mul(cell_rows)
         .and_then(|cell_band| cell_band.checked_mul(to_usize(rows).ok()?))
@@ -103,7 +111,5 @@ pub fn tile(images: &[RgbaImage], columns: u32) -> Result<RgbaImage, TextureErro
             cell.copy_from_slice(source);
         }
     }
-    let sheet_width = width.checked_mul(columns).ok_or_else(overflow)?;
-    let sheet_height = height.checked_mul(rows).ok_or_else(overflow)?;
     RgbaImage::new(sheet_width, sheet_height, pixels)
 }

@@ -8,8 +8,6 @@ const CAPS2_CUBEMAP: u32 = 0x200;
 const CAPS2_CUBEMAP_FACES: u32 = 0xFC00;
 const CAPS2_VOLUME: u32 = 0x20_0000;
 const CUBE_FACES: u32 = 6;
-const MAX_DEPTH: u32 = 2048;
-const MAX_ARRAY_SIZE: u32 = 2048;
 const DIMENSION_TEXTURE3D: u32 = 4;
 const MISC_TEXTURECUBE: u32 = 0x4;
 pub(crate) const CRYENGINE_TRAILER: &[u8; 8] = b"CExtCEnd";
@@ -49,8 +47,7 @@ impl DdsHeader {
     ///
     /// Returns [`TextureError::NotDds`] when `bytes` does not start with a DDS header,
     /// [`TextureError::TruncatedHeader`] when it ends inside the header, and
-    /// [`TextureError::InvalidHeader`] when the header contradicts itself, has more than 2048
-    /// slices or array elements, or is a volume that is also a cubemap or an array.
+    /// [`TextureError::InvalidHeader`] when the topology contradicts itself or its byte extent overflows.
     pub fn parse(bytes: &[u8]) -> Result<Self, TextureError> {
         Self::from_raw(&DdsRawHeader::parse(bytes)?)
     }
@@ -144,12 +141,6 @@ impl DdsHeader {
         if self.width == 0 || self.height == 0 {
             return Err(TextureError::InvalidHeader("width or height is zero"));
         }
-        if self.depth > MAX_DEPTH {
-            return Err(TextureError::InvalidHeader("the depth is above 2048"));
-        }
-        if self.array_size > MAX_ARRAY_SIZE {
-            return Err(TextureError::InvalidHeader("the array size is above 2048"));
-        }
         if self.depth > 1 && self.surfaces() > 1 {
             return Err(TextureError::InvalidHeader(
                 "a volume cannot be a cubemap or an array",
@@ -223,8 +214,8 @@ impl DdsHeader {
 
     /// Returns the number of images per mip: faces times array elements.
     #[must_use]
-    pub const fn surfaces(&self) -> u32 {
-        self.faces.saturating_mul(self.array_size)
+    pub const fn surfaces(&self) -> u64 {
+        self.faces as u64 * self.array_size as u64
     }
 
     /// Returns the number of slices of mip `level`: the depth halved per level, at least 1.
@@ -239,8 +230,8 @@ impl DdsHeader {
     /// Returns the number of images in mip `level`: one per cubemap face, array element and
     /// slice.
     #[must_use]
-    pub const fn images(&self, level: u32) -> u32 {
-        self.surfaces().saturating_mul(self.slices(level))
+    pub const fn images(&self, level: u32) -> u64 {
+        self.surfaces() * self.slices(level) as u64
     }
 
     /// Returns the size in bytes of mip `level` with every face, array element and slice, or

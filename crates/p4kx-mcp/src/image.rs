@@ -138,7 +138,8 @@ fn check_budget(
 ) -> Result<(), ToolError> {
     let [width, height] = shown_size(header, level, face);
     let side = |full: u32| u64::from(full.checked_shr(level).unwrap_or(0).max(1));
-    let decoded = u64::from(header.images(level))
+    let decoded = header
+        .images(level)
         .saturating_mul(side(header.width()))
         .saturating_mul(side(header.height()));
     if u64::from(width) * u64::from(height) > max_pixels || decoded > max_pixels {

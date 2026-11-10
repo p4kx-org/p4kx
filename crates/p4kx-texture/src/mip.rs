@@ -45,7 +45,7 @@ impl Mip {
     /// Returns the number of images: 6 for a cubemap, the array size for an array, the slices of
     /// this mip for a volume, otherwise 1; the product when a texture is several of these.
     #[must_use]
-    pub const fn surfaces(&self) -> u32 {
+    pub const fn surfaces(&self) -> u64 {
         self.header.images(self.level)
     }
 
@@ -59,7 +59,7 @@ impl Mip {
     /// element by element for an array, slice by slice for a volume; `None` when there is no
     /// such image.
     #[must_use]
-    pub fn surface(&self, index: u32) -> Option<&[u8]> {
+    pub fn surface(&self, index: u64) -> Option<&[u8]> {
         if index >= self.surfaces() {
             return None;
         }
