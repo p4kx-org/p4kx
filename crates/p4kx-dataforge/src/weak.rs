@@ -62,7 +62,7 @@ impl<'f> TreeBuilder<'f> {
         let location = self
             .locations
             .entry(target)
-            .or_insert_with(|| Arc::new(Location::new(steps)))
+            .or_insert_with(|| Arc::new(Location::original_instance(steps, at)))
             .clone();
         Value::Reference(Box::new(Reference {
             owner: tree.owner,

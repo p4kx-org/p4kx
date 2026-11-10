@@ -48,6 +48,15 @@ impl<'borrow, 'source> ReferenceOrigin<'borrow, 'source> {
         }
     }
 
+    /// Borrows the original field and array ordinals, absent for a Record target.
+    /// Field ordinals refer to the visited struct's canonical fields, including inherited fields.
+    #[must_use]
+    pub fn instance_positions(&self) -> Option<&[u32]> {
+        self.reference
+            .location()
+            .and_then(Location::original_positions)
+    }
+
     /// Borrows the actual original instance location, absent for a Record target.
     #[must_use]
     pub fn instance_location(&self) -> Option<&Location<'source>> {

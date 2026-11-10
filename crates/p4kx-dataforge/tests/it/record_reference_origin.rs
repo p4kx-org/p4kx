@@ -5,7 +5,7 @@ use std::alloc::Layout;
 use std::io;
 
 use p4kx_dataforge::{
-    DataForge, Record, RecordTree, Reference, ReferenceOrigin, Value, ValueError,
+    DataForge, Location, Record, RecordTree, Reference, ReferenceOrigin, Value, ValueError,
 };
 use p4kx_testkit::TestValue;
 
@@ -192,7 +192,7 @@ fn weak_root_and_owned_instance_admissions_keep_header_applicability_distinct() 
     assert_eq!(
         admitted
             .instance_location()
-            .map(p4kx_dataforge::Location::as_str),
+            .map(Location::as_str),
         Some("child"),
         "the actual same-parse owned-instance location survives"
     );
@@ -241,6 +241,14 @@ fn report_layout() -> io::Result<()> {
         Layout::new::<ReferenceOrigin<'_, '_>>().align(),
         Layout::new::<Value<'_>>().size(),
         Layout::new::<Value<'_>>().align(),
+    )?;
+    writeln!(
+        io::stderr().lock(),
+        "LOCATION_ORIGIN_LAYOUT arch={} os={} location={}/{}",
+        std::env::consts::ARCH,
+        std::env::consts::OS,
+        Layout::new::<Location<'_>>().size(),
+        Layout::new::<Location<'_>>().align(),
     )
 }
 

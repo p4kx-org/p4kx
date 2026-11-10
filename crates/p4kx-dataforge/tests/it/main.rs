@@ -49,6 +49,8 @@ mod record_layout;
 mod record_metadata_baseline;
 mod record_name_tag;
 mod record_reference_origin;
+mod record_instance_position_source;
+mod record_instance_positions;
 mod record_reference_origin_source;
 mod record_texts;
 mod record_tree;

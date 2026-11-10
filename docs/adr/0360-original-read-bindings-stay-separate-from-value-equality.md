@@ -13,3 +13,9 @@ the original outcomes without inventing another operation or the current caller'
 selection. The [input API](../dataforge-input-origin.md#canonical-read-ownership) defines
 these boundaries; [per-datum contributions](0357-source-encryption-provenance-is-explicit-per-data-value.md)
 remain a separate output obligation.
+
+Owned-instance target admissions retain their original field/array tuples in the existing
+cached Location. This preserves duplicate-name distinctions without reconstructing ordinals
+from a display path. The private tuple is excluded from descriptive equality and canonical
+serialization; public logical Locations cannot create an original admission. Consumers still
+validate the actual owner and caller site before attributing target metadata.

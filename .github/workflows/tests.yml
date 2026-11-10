@@ -114,8 +114,9 @@ jobs:
           $os = [regex]::Escape($platform.os)
           $field = "^FIELD_STORAGE_LAYOUT arch=$arch os=$os field=[0-9]+/[0-9]+ storage=[0-9]+/[0-9]+ value=[0-9]+/[0-9]+ datatype=[0-9]+/[0-9]+$"
           $reference = "^REFERENCE_ORIGIN_LAYOUT arch=$arch os=$os reference=[0-9]+/[0-9]+ view=[0-9]+/[0-9]+ value=[0-9]+/[0-9]+$"
+          $location = "^LOCATION_ORIGIN_LAYOUT arch=$arch os=$os location=[0-9]+/[0-9]+$"
           $lines = @(Get-Content -LiteralPath $log)
-          if (@($lines | Where-Object { $_ -cmatch $field }).Count -ne 1 -or @($lines | Where-Object { $_ -cmatch $reference }).Count -ne 1) {
+          if (@($lines | Where-Object { $_ -cmatch $field }).Count -ne 1 -or @($lines | Where-Object { $_ -cmatch $reference }).Count -ne 1 -or @($lines | Where-Object { $_ -cmatch $location }).Count -ne 1) {
             throw 'Native format layout output is missing, duplicated or belongs to a different CPU/OS.'
           }
       - name: Upload native format layout evidence

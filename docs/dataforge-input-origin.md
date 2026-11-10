@@ -82,6 +82,18 @@ from the instance type or reconstruct a stored filename from the normalized path
 Reference value equality, Debug and canonical JSON/XML keep their descriptive contract;
 none serializes or restores the private original owner.
 
+For an owned-instance target, `ReferenceOrigin::instance_positions()` borrows the exact
+original field and array ordinals, including inherited fields. These positions distinguish
+physical fields with identical names; the logical location string cannot do that. Record
+targets return `None`. Public `Location::new` does not create an original receipt. The
+existing target cache retains one tuple per admitted instance, shared by Reference clones.
+Location equality, hashing, Debug, Display and canonical JSON/XML keep their semantic
+steps and text; equal positions alone never establish original ownership.
+
+The tuple adds one optional boxed-slice descriptor per Location and four payload bytes per
+original ordinal for an admitted instance, plus allocator overhead. No additional source
+read, target lookup or per-Reference allocation is introduced. Direct Location cloning
+copies its tuple; whole Reference clones continue to share the existing Location.
 These types are reexported by `p4kx-extraction`. They add no second source lookup or
 Record decode, per-field allocation, Archive dependency in DataForge, or new data limit.
 Their Rust memory layout is target dependent. An output adapter must still pair the
