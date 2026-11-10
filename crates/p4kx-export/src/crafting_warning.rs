@@ -47,7 +47,7 @@ pub enum CraftingWarning {
         details: Vec<String>,
     },
     /// This many harvestable locations have no starmap object although one is recorded above
-    /// their container: it is not in the starmap objects, 64 or more mining claim markers lie
+    /// their container: it is not in the starmap objects, mining claim markers form a cycle
     /// above, or a marker has no object above it. A container with no object recorded above is
     /// the normal case and not counted. `details` gives each reason with its number, ordered.
     HarvestLocationsWithoutObject {

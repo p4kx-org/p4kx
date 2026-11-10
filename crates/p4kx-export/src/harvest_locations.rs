@@ -13,9 +13,6 @@ use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::starmap_walk::Opened;
 
-/// The most objects followed upwards from a container to find the object it belongs to.
-const MAX_CHAIN: usize = 64;
-
 /// What the first `.soc` of a container says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Soc {
@@ -32,9 +29,8 @@ pub(crate) enum NoObject {
     NoneAbove,
     /// The object the container hangs below is not in the starmap objects.
     NotInCatalog,
-    /// [`MAX_CHAIN`] or more mining claim markers lie between the container and the first object
-    /// that is none.
-    ChainTooLong,
+    /// Mining claim markers form a cycle above the container.
+    MarkerCycle,
     /// A mining claim marker is the top of the chain, with no object above it.
     MarkerWithoutParent,
 }
@@ -47,7 +43,7 @@ impl NoObject {
             Self::NotInCatalog => {
                 "the object the container hangs below is not in the starmap objects"
             }
-            Self::ChainTooLong => "64 or more mining claim markers lie above the container",
+            Self::MarkerCycle => "mining claim markers form a cycle above the container",
             Self::MarkerWithoutParent => "a mining claim marker has no object above it",
         }
     }
@@ -97,14 +93,28 @@ impl Objects {
     /// a mining claim marker; the reason when there is none.
     pub(crate) fn location(&self, under: Option<Guid>) -> Result<CatalogGuid, NoObject> {
         let mut at = under.ok_or(NoObject::NoneAbove)?;
-        for _ in 0..MAX_CHAIN {
+        let mut fast = Some(at);
+        loop {
             let &(mining_claim, above) = self.by_guid.get(&at).ok_or(NoObject::NotInCatalog)?;
             if !mining_claim {
                 return Ok(CatalogGuid(at));
             }
             at = above.ok_or(NoObject::MarkerWithoutParent)?;
+            // The fast cursor detects cycles; the main cursor classifies terminal failures.
+            fast = fast
+                .and_then(|node| self.marker_parent(node))
+                .and_then(|node| self.marker_parent(node));
+            if fast == Some(at) {
+                return Err(NoObject::MarkerCycle);
+            }
         }
-        Err(NoObject::ChainTooLong)
+    }
+
+    fn marker_parent(&self, at: Guid) -> Option<Guid> {
+        match self.by_guid.get(&at) {
+            Some(&(true, above)) => above,
+            _ => None,
+        }
     }
 }
 
@@ -287,9 +297,13 @@ mod tests {
     }
 
     #[test]
-    fn sixty_four_markers_are_too_long() {
+    fn sixty_four_markers_reach_the_object_above() {
         let objects = markers_then_plain(64);
-        assert_eq!(objects.location(Some(guid(1))), Err(NoObject::ChainTooLong));
+        assert_eq!(
+            objects.location(Some(guid(1))),
+            Ok(CatalogGuid(guid(65))),
+            "all sixty-four original markers reach their terminal object"
+        );
         assert_eq!(objects.location(Some(guid(2))), Ok(CatalogGuid(guid(65))));
     }
 
@@ -329,3 +343,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "harvest_location_chain_tests.rs"]
+mod chain_tests;

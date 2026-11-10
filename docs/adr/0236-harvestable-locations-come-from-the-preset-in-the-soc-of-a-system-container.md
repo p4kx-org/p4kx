@@ -43,7 +43,7 @@ Evidence: LIVE 4.10, the `ReferenceIndex` of the DataForge, the entries of the A
   `.soc`; reading the `.soc` in the walk would couple the starmap walk to the harvest data for
   under 8 % of the build, so it is not done.
 - A location with no object says why when an object is recorded above its container: it is not
-  in the starmap objects, 64 or more mining claim markers lie above, or a marker has no object
+  in the starmap objects, mining claim markers form a cycle above, or a marker has no object
   above it. The warning `harvest_locations_without_object` counts them with a line per reason.
   A container with no object recorded above it, either because no Child reaches it or because it
   is reached with no object above (a system root), is the normal case and deliberately silent.

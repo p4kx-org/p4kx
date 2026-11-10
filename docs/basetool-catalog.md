@@ -2077,7 +2077,7 @@ object). `HPP_Stanton2c_Belt` is named by `stanton2c.socpak` and, a copy in the 
 No Record or container links the surface presets to a body: the Archive holds no planet container,
 and only the Hurston presets name a body in the folder of their `objectPresetPaths`, so they stay
 without a location (ADR-0236). When an object is recorded above a container but no object results
-(it is not in `starmapObjects`, 64 or more mining claim markers lie above, or a marker has no
+(it is not in `starmapObjects`, mining claim markers form a cycle above, or a marker has no
 object above it) the warning `harvest_locations_without_object` counts the rows with a line per
 reason. A container with no object recorded above it (no Child reaches it, or it is reached with
 no object above, as a system root) is the normal case and deliberately silent.
