@@ -31,6 +31,7 @@ Decided for issue #597. Amends the resolution rules of ADR-0115 and builds on AD
   `no_localisation` break. A Trigger action whose trigger no stinger names is a `missing` break
   with the trigger ID.
 - **Indexed stingers bind their declaring soundbank.** An equal object ID in the current soundbank does not replace the stinger’s indexed bank. Segment children are followed locally after entering that selected bank.
+- **Cycle identity.** Active objects are identified by their actually selected soundbank index position and object ID. Equal IDs in different Entries remain distinct. Target lookup precedes cycle checking; the soundbank-entry policy governs which targets may be loaded.
 - **One extra soundbank read per event and soundbank.** A walk starts in the soundbank that holds
   its Event and reads at most one other soundbank, on the first reference that leaves the first.
   It then moves between those two without reading again; a reference into a third soundbank is

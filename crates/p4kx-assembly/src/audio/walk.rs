@@ -39,13 +39,18 @@ pub(crate) fn event<'i>(banks: Banks<'_, 'i>, event: &'i WwiseEvent, budget: usi
     walk.found
 }
 
+struct ResolvedPathStep {
+    bank: u32,
+    step: PathStep,
+}
+
 struct Walk<'w, 'i> {
     index: &'i AudioIndex,
     choice: &'w LanguageChoice,
     banks: Banks<'w, 'i>,
     current: Loaded<'i>,
     event: &'i WwiseEvent,
-    path: Vec<PathStep>,
+    path: Vec<ResolvedPathStep>,
     objects: usize,
     budget: usize,
     chain: usize,
@@ -80,10 +85,6 @@ impl<'i> Walk<'_, 'i> {
             });
             return;
         }
-        if self.path.iter().any(|step| step.id == id) {
-            self.broke(BreakReason::Cycle { id });
-            return;
-        }
         let wanted = wanted.or_else(|| self.path.is_empty().then_some(HircKind::Event));
         let in_current = match via {
             Via::At(position) => position == self.current.position,
@@ -104,10 +105,24 @@ impl<'i> Walk<'_, 'i> {
             self.broke(BreakReason::Missing { id });
             return;
         };
+        let position = entered
+            .as_ref()
+            .map_or(self.current.position, |next| next.position);
+        if self
+            .path
+            .iter()
+            .any(|active| active.bank == position && active.step.id == id)
+        {
+            self.broke(BreakReason::Cycle { id });
+            return;
+        }
         let left = entered.map(|next| std::mem::replace(&mut self.current, next));
-        self.path.push(PathStep {
-            kind: node_kind(object),
-            id,
+        self.path.push(ResolvedPathStep {
+            bank: position,
+            step: PathStep {
+                kind: node_kind(object),
+                id,
+            },
         });
         self.visit(object);
         self.path.pop();
@@ -235,14 +250,18 @@ impl<'i> Walk<'_, 'i> {
         self.found.variants.push(SoundVariant {
             event: self.event,
             soundbank: self.current.soundbank,
-            sound_id: self.path.last().map_or(0, |step| step.id),
-            path: self.path.as_slice().into(),
+            sound_id: self.path.last().map_or(0, |step| step.step.id),
+            path: self.public_path(),
             source,
             location: located.location,
             localised: located.localised,
             language: located.language,
             fallback: located.fallback,
         });
+    }
+
+    fn public_path(&self) -> Box<[PathStep]> {
+        self.path.iter().map(|active| active.step).collect()
     }
 
     fn broke(&mut self, reason: BreakReason) {
@@ -253,7 +272,7 @@ impl<'i> Walk<'_, 'i> {
         self.found.breaks.push(BrokenLink {
             event: self.event,
             soundbank: Some(soundbank.unwrap_or(self.current.soundbank)),
-            path: self.path.as_slice().into(),
+            path: self.public_path(),
             reason,
         });
     }

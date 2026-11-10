@@ -211,3 +211,6 @@ fn assert_event(bank: &Soundbank<&[u8]>) -> TestResult {
     );
     Ok(())
 }
+
+#[path = "stinger_cycle_sites.rs"]
+mod cycle_sites;

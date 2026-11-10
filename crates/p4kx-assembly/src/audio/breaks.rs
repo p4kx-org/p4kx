@@ -55,7 +55,7 @@ pub enum BreakReason {
     /// The object is of a kind that is not followed, e.g. an actor-mixer.
     #[error("objects of this kind are not followed")]
     Unsupported,
-    /// The object refers back to an object on its own path.
+    /// The reference returns to the same object in the same soundbank Entry on its path.
     #[error("the object refers back to object {id} on its own path")]
     Cycle {
         /// The ID referred to.
