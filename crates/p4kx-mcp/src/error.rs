@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::error::Error;
+use std::fmt::Error as FormatError;
 use std::path::PathBuf;
 
 use p4kx_assembly::{ChangeError, EntityLookupError, LoadoutError};
@@ -258,6 +259,13 @@ pub(crate) enum ToolError {
     /// A result is not valid UTF-8.
     #[error("the result is not valid UTF-8")]
     Utf8(#[from] std::string::FromUtf8Error),
+    /// A response text formatter failed independently of the response budget.
+    #[error("cannot format response text")]
+    ResponseTextFormat {
+        /// The original formatter failure.
+        #[source]
+        source: FormatError,
+    },
     /// A result cannot be written.
     #[error("cannot write the result")]
     Write(#[from] std::io::Error),

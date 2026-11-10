@@ -25,6 +25,25 @@ impl Budget {
         }
     }
 
+    /// Copies complete text after reserving its UTF-8 bytes.
+    pub(crate) fn text(&mut self, value: &str) -> Result<String, ToolError> {
+        self.admit_text(value.len())?;
+        Ok(value.to_owned())
+    }
+
+    /// Reserves raw text bytes within the response budget.
+    pub(crate) fn admit_text(&mut self, bytes: usize) -> Result<(), ToolError> {
+        if self.take(bytes) {
+            Ok(())
+        } else {
+            Err(ToolError::TooLargeItem {
+                what: "response text".to_owned(),
+                limit: MAX_RESPONSE_LEN,
+                hint: "the complete text cannot fit in one response",
+            })
+        }
+    }
+
     /// Returns the bytes left.
     pub(crate) const fn left(self) -> usize {
         self.left
@@ -74,7 +93,11 @@ pub(crate) fn fill_within<T: Serialize>(
     }
     let mut taken = Vec::new();
     for item in items.into_iter().take(page.limit()) {
-        let item = item?;
+        let item = match item {
+            Ok(item) => item,
+            Err(ToolError::TooLargeItem { .. }) if !taken.is_empty() => break,
+            Err(error) => return Err(error),
+        };
         if !budget.take(json_len(&item).saturating_add(1)) {
             if taken.is_empty() {
                 return Err(ToolError::TooLargeItem {
@@ -163,6 +186,7 @@ impl Write for Capped {
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
     use std::io::Write;
 
     use super::{Budget, Capped, MAX_RESPONSE_LEN, fill, json_len};
@@ -174,8 +198,7 @@ mod tests {
     }
 
     #[test]
-    fn a_listing_page_ends_early_at_the_cap_and_continues_after_it()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn a_listing_page_ends_early_at_the_cap_and_continues_after_it() -> Result<(), Box<dyn Error>> {
         let page = Page::new(&"listing", None, Some(10))?;
         let (taken, next) = fill(page, 3, texts(&[100 << 10; 3]), String::clone)?;
         assert_eq!(taken.len(), 2, "two items fit the cap");
@@ -190,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn a_listing_page_holds_at_most_the_page_size() -> Result<(), Box<dyn std::error::Error>> {
+    fn a_listing_page_holds_at_most_the_page_size() -> Result<(), Box<dyn Error>> {
         let page = Page::new(&"listing", None, Some(2))?;
         let (taken, next) = fill(page, 3, texts(&[1, 1, 1]), String::clone)?;
         assert_eq!((taken.len(), next.is_some()), (2, true), "two and a cursor");
@@ -198,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn a_listing_item_larger_than_the_cap_is_an_error() -> Result<(), Box<dyn std::error::Error>> {
+    fn a_listing_item_larger_than_the_cap_is_an_error() -> Result<(), Box<dyn Error>> {
         let page = Page::new(&"listing", None, None)?;
         let result = fill(page, 1, texts(&[MAX_RESPONSE_LEN]), |_| "item".to_owned());
         assert!(
@@ -230,4 +253,43 @@ mod tests {
         assert!(capped.write_all(b"de").is_err(), "does not fit");
         assert_eq!(capped.into_bytes(), b"abc", "nothing of the refused write");
     }
+
+    #[test]
+    fn complete_text_admission_counts_utf8_and_keeps_refusals_atomic() -> Result<(), Box<dyn Error>>
+    {
+        let mut budget = Budget::new();
+        assert!(
+            budget.take(MAX_RESPONSE_LEN - 3),
+            "leave exactly three raw bytes"
+        );
+        assert_eq!(budget.text("é")?, "é", "copy the complete two-byte scalar");
+        assert_eq!(budget.left(), 1, "UTF-8 admission counts bytes");
+        assert!(
+            matches!(budget.text("xy"), Err(ToolError::TooLargeItem { .. })),
+            "a refused text cannot become a clipped prefix"
+        );
+        assert_eq!(budget.left(), 1, "a refusal consumes no remaining budget");
+        assert_eq!(budget.text("z")?, "z", "the remaining byte is usable");
+        Ok(())
+    }
+
+    #[test]
+    fn complete_text_admission_counts_each_output_occurrence() -> Result<(), Box<dyn Error>> {
+        let mut budget = Budget::new();
+        assert!(
+            budget.take(MAX_RESPONSE_LEN - 4),
+            "leave exactly four raw bytes"
+        );
+        assert_eq!(budget.text("abc")?, "abc", "the first occurrence fits");
+        assert!(
+            matches!(budget.text("abc"), Err(ToolError::TooLargeItem { .. })),
+            "equal text in another output cell needs its own bytes"
+        );
+        assert_eq!(budget.left(), 1, "the second occurrence was not copied");
+        Ok(())
+    }
 }
+
+#[cfg(test)]
+#[path = "budget_construction_tests.rs"]
+mod construction_tests;
