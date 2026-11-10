@@ -235,7 +235,7 @@ fn optional_material_observation_capture_can_stop_retaining_without_aborting_pay
 fn material_observer_does_not_publish_field_results_for_rejected_configuration_or_source() {
     let calls = Cell::new(0);
     let mut limits = MaterialSourceLimits::default();
-    limits.elements = 0;
+    limits.elements = Some(0);
     let result = MaterialLibrary::parse_with_observer(
         "synthetic/invalid",
         b"invalid",

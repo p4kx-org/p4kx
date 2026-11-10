@@ -19,8 +19,8 @@ pub enum MaterialEncoding {
 pub struct MaterialSourceLimits {
     /// Maximum input size accepted by the structured parser.
     pub source_bytes: usize,
-    /// Maximum authored elements retained over the whole library.
-    pub elements: usize,
+    /// Maximum retained authored elements, or `None` for no element-count bound.
+    pub elements: Option<usize>,
     /// Maximum owned text and syntax storage in the canonical authored tree.
     pub text_bytes: usize,
     /// Maximum authored element depth, with the root at zero.
@@ -31,7 +31,7 @@ impl Default for MaterialSourceLimits {
     fn default() -> Self {
         Self {
             source_bytes: 16 << 20,
-            elements: 4096,
+            elements: None,
             text_bytes: 4 << 20,
             depth: 32,
         }

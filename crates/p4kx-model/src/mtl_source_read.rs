@@ -43,7 +43,7 @@ pub(crate) fn read_observed<Interrupted>(
     mut observer: impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
 ) -> Result<MaterialLibrary, MaterialReadError<Interrupted>> {
     if limits.source_bytes == 0
-        || limits.elements == 0
+        || limits.elements == Some(0)
         || limits.text_bytes == 0
         || limits.depth > MAX_SOURCE_DEPTH
     {

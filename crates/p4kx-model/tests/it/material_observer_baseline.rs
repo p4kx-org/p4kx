@@ -121,7 +121,7 @@ fn material_observer_baseline_keeps_numeric_fallbacks_and_explicit_defaults() ->
 #[test]
 fn material_observer_baseline_keeps_configuration_and_checkpoint_failure_priority() {
     let mut limits = MaterialSourceLimits::default();
-    limits.elements = 0;
+    limits.elements = Some(0);
     let calls = Cell::new(0);
     let result = MaterialLibrary::parse_with("synthetic/limits", b"not XML", limits, || {
         calls.set(calls.get() + 1);

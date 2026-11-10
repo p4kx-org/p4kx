@@ -45,7 +45,7 @@ fn an_empty_child_list_at_depth_zero_is_complete_but_an_actual_child_is_diagnose
 #[test]
 fn element_and_text_bounds_are_explicit_and_never_compact_original_ordinals() -> TestResult {
     let mut limits = MaterialSourceLimits::default();
-    limits.elements = 1;
+    limits.elements = Some(1);
     let elements = read(b"<Material><Unknown/></Material>", limits)?;
     assert!(
         elements
@@ -55,7 +55,7 @@ fn element_and_text_bounds_are_explicit_and_never_compact_original_ordinals() ->
             .any(|loss| loss.kind == MaterialSourceLossKind::Elements),
         "element loss is explicit"
     );
-    limits.elements = 100;
+    limits.elements = Some(100);
     limits.text_bytes = 1000;
     let text = format!(
         "<Material><Tiny/><Huge Value='{}'/><Last/></Material>",

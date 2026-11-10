@@ -19,7 +19,7 @@ pub(crate) fn capture<'input, Interrupted>(
 ) -> Result<MaterialSource, MaterialReadError<Interrupted>> {
     let mut capture = Capture {
         limits,
-        elements: 0,
+        remaining_elements: limits.elements,
         bytes: 0,
         losses: Vec::new(),
         checkpoint,
@@ -38,7 +38,7 @@ pub(crate) fn capture<'input, Interrupted>(
 
 struct Capture<'checkpoint, Checkpoint> {
     limits: MaterialSourceLimits,
-    elements: usize,
+    remaining_elements: Option<usize>,
     bytes: usize,
     losses: Vec<MaterialSourceLoss>,
     checkpoint: &'checkpoint mut Checkpoint,
@@ -77,7 +77,7 @@ impl<Checkpoint> Capture<'_, Checkpoint> {
         Checkpoint: FnMut() -> Result<(), Interrupted>,
     {
         (self.checkpoint)().map_err(MaterialReadError::Interrupted)?;
-        if self.elements == self.limits.elements {
+        if self.remaining_elements == Some(0) {
             self.loss(MaterialSourceLossKind::Elements, indices);
             return Ok(None);
         }
@@ -96,7 +96,9 @@ impl<Checkpoint> Capture<'_, Checkpoint> {
         if !self.reserve(bytes, indices) {
             return Ok(None);
         }
-        self.elements += 1;
+        if let Some(remaining) = &mut self.remaining_elements {
+            *remaining -= 1;
+        }
         let mut children = Vec::new();
         let children_in_order = element.children().enumerate();
         for (position, child) in children_in_order {
@@ -110,7 +112,7 @@ impl<Checkpoint> Capture<'_, Checkpoint> {
                 children.push(child);
             }
             indices.pop();
-            if self.elements == self.limits.elements {
+            if self.remaining_elements == Some(0) {
                 if element.children().nth(position + 1).is_some() {
                     self.loss(MaterialSourceLossKind::Elements, indices);
                 }

@@ -19,6 +19,7 @@ mod layer_library;
 mod layer_surfaces;
 mod lods;
 mod material_authored;
+mod material_authored_complete_elements;
 mod material_authored_limits;
 mod material_library_lookup;
 mod material_observer;
