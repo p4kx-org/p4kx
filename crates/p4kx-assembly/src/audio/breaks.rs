@@ -33,9 +33,8 @@ pub enum BreakReason {
         /// The ID referred to.
         id: u32,
     },
-    /// A reference leads into a soundbank the walk does not enter: the Archive holds no soundbank
-    /// of the ID a Play action names, or the walk has already read its one other soundbank.
-    #[error("object {id} lies in soundbank {bank_id}, which the walk does not enter")]
+    /// A Play action names a soundbank absent from the eligible indexed candidates.
+    #[error("no eligible indexed soundbank {bank_id} holds object {id}")]
     OtherSoundbank {
         /// The ID referred to.
         id: u32,

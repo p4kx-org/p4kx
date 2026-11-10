@@ -20,7 +20,7 @@ pub(crate) struct Found<'i> {
 }
 
 /// Follows the Wwise event `event` through the `HIRC` section of the start soundbank of `banks`
-/// to its sounds, and from there into at most one other soundbank.
+/// to its sounds through indexed bank references.
 pub(crate) fn event<'i>(banks: Banks<'_, 'i>, event: &'i WwiseEvent, budget: usize) -> Found<'i> {
     let mut walk = Walk {
         index: banks.index,
@@ -39,8 +39,8 @@ pub(crate) fn event<'i>(banks: Banks<'_, 'i>, event: &'i WwiseEvent, budget: usi
     walk.found
 }
 
-struct ResolvedPathStep {
-    bank: u32,
+struct ResolvedPathStep<'index> {
+    owner: Loaded<'index>,
     step: PathStep,
 }
 
@@ -50,7 +50,7 @@ struct Walk<'w, 'i> {
     banks: Banks<'w, 'i>,
     current: Loaded<'i>,
     event: &'i WwiseEvent,
-    path: Vec<ResolvedPathStep>,
+    path: Vec<ResolvedPathStep<'i>>,
     objects: usize,
     budget: usize,
     chain: usize,
@@ -93,7 +93,12 @@ impl<'i> Walk<'_, 'i> {
         let (bank, entered) = if in_current && find(&self.current.bank, id, wanted).is_some() {
             (Rc::clone(&self.current.bank), None)
         } else {
-            match self.banks.enter(self.current.position, id, via) {
+            match self.banks.enter(
+                self.current.position,
+                id,
+                via,
+                self.path.iter().map(|active| &active.owner),
+            ) {
                 Ok(next) => (Rc::clone(&next.bank), Some(next)),
                 Err(refused) => {
                     self.broke_in(refused.bank, refused.reason);
@@ -108,17 +113,19 @@ impl<'i> Walk<'_, 'i> {
         let position = entered
             .as_ref()
             .map_or(self.current.position, |next| next.position);
+        #[cfg(test)]
+        self.banks.probe_selection(position, object.id, &bank);
         if self
             .path
             .iter()
-            .any(|active| active.bank == position && active.step.id == id)
+            .any(|active| active.owner.position == position && active.step.id == id)
         {
             self.broke(BreakReason::Cycle { id });
             return;
         }
         let left = entered.map(|next| std::mem::replace(&mut self.current, next));
         self.path.push(ResolvedPathStep {
-            bank: position,
+            owner: self.current.clone(),
             step: PathStep {
                 kind: node_kind(object),
                 id,

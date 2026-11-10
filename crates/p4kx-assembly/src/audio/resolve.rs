@@ -30,8 +30,8 @@ impl ArchiveAudio<'_> {
     /// gets a [`BreakReason::NoLocalisation`] break.
     ///
     /// Each soundbank holding one of the events is read again from the Archive, in parallel, and
-    /// dropped once followed. A walk that leaves its soundbank reads one other soundbank; the
-    /// events of one soundbank share the last other soundbank read. Where a reference names
+    /// dropped once followed. Active referenced banks share their decoded owners; events of one
+    /// start soundbank share the last foreign result. Where a reference names
     /// several soundbanks, one per language, a walk that has no language chosen follows the first
     /// in path order, so [`resolve_trigger`](Self::resolve_trigger) lists the first language only
     /// beyond the soundbank of the event (ADR-0033). Returns `None` when no ATL definition has the
