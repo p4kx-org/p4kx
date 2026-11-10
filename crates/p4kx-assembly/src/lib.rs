@@ -118,6 +118,8 @@ mod loadout_file_read;
 mod loadout_file_source;
 mod loadout_file_trace;
 mod markup;
+mod material_variant;
+mod material_variant_traits;
 mod merge;
 mod model_cache;
 mod node;
@@ -171,7 +173,7 @@ pub use entities::{ENTITY_TYPE, Entities};
 pub use entity_interior::{EntityContainer, EntityInterior, INTERIOR_NODE};
 pub use error::{AssemblyError, EntityLookupError, LoadoutError};
 pub use files::{ArchiveFiles, LoadoutFileError, LoadoutFiles, MAX_XML_LOADOUT_LEN};
-pub use geometry::{Geometry, GeometryVariant, MaterialVariant, PaletteRef};
+pub use geometry::{Geometry, GeometryVariant, PaletteRef};
 pub use hologram::HologramCamera;
 pub use interior::{
     Interior, InteriorForge, InteriorOptions, InteriorPart, InteriorPartKind, InteriorProgress,
@@ -190,6 +192,7 @@ pub use loadout_file_events::{LoadoutDocumentKind, LoadoutFileIdentity};
 pub use loadout_file_observation::LoadoutFileObservation;
 pub use loadout_file_read::LoadoutFileRead;
 pub use loadout_file_source::LoadoutFileSource;
+pub use material_variant::MaterialVariant;
 pub use model_cache::{CachedModels, DEFAULT_MODEL_CACHE_BYTES, ModelCache};
 pub use node_body::CharacterBody;
 pub use object_containers::{ContainerSource, ObjectContainerRef};
