@@ -6,9 +6,6 @@ use p4kx_dataforge::{Guid, StructValue, Value, ValueError};
 use crate::character_path::is_rigged_path_outside_human_rigs;
 use crate::read::{struct_field, struct_items, text};
 
-/// The deepest nesting of sub-geometry nodes that is read.
-const MAX_NESTED_SUB_GEOMETRY: usize = 4;
-
 /// The tint palette an Entity's geometry names (`Palette.TintPaletteRef`): the `TintPaletteTree`
 /// Record and the child of its tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -199,7 +196,7 @@ impl Geometry {
         };
         let mut variants = Vec::new();
         let mut level = vec![(node, Vec::<String>::new())];
-        for _ in 0..MAX_NESTED_SUB_GEOMETRY {
+        while !level.is_empty() {
             let mut next = Vec::new();
             for (parent, inherited) in &level {
                 for sub in struct_items(parent, "SubGeometry") {
@@ -213,9 +210,6 @@ impl Geometry {
                     }
                     next.push((sub, tags));
                 }
-            }
-            if next.is_empty() {
-                break;
             }
             level = next;
         }
@@ -297,3 +291,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "geometry_source_variants_tests.rs"]
+mod source_variants_tests;
