@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Contracts by their `id`: `timeToComplete`, `contractBuyInAmount` and the minimum standing;
-//! and the `minReputation` of every `SReputationStandingParams` a contract names.
-
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use p4kx_extraction::Guid;
@@ -12,59 +9,57 @@ use serde_json::Value;
 use super::{Findings, P4kx, elements, reference_guid};
 
 const STANDINGS: &str = "standings";
-
-/// The SCMDB lists of contracts and the category each is reported under.
 const LISTS: [(&str, &str); 2] = [
     ("contracts", "contracts"),
     ("legacyContracts", "legacy contracts"),
 ];
-
-/// The SCMDB fields of a contract that name a standing Record.
 const STANDING_SIDES: [&str; 2] = ["minStanding", "maxStanding"];
 
-/// The compared fields of one contract of a contract Record.
-#[derive(Debug, Default, PartialEq)]
+/// Every encountered compared projection of one contract ID.
+#[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct ContractFields {
-    time_to_complete: Option<f64>,
-    buy_in: Option<f64>,
-    /// The GUID `minStanding` links to; `None` when the field is absent or a null Reference.
-    min_standing: Option<String>,
+    occurrences: Vec<ContractOccurrence>,
 }
 
-impl ContractFields {
+#[derive(Debug, PartialEq, Eq)]
+struct ContractOccurrence {
+    min_standing: Option<String>,
+    results: Option<Value>,
+}
+
+impl ContractOccurrence {
     fn of(contract: &serde_json::Map<String, Value>) -> Self {
-        let results = contract.get("contractResults").unwrap_or(&Value::Null);
+        let results = contract.get("contractResults");
         Self {
-            time_to_complete: results["timeToComplete"].as_f64(),
-            buy_in: results["contractBuyInAmount"].as_f64(),
             min_standing: contract
                 .get("minStanding")
                 .and_then(reference_guid)
                 .map(str::to_owned),
+            results: results.cloned(),
         }
     }
 }
 
-/// Adds every object with a GUID `id` in the Record JSON `record` to `contracts`; a sub-contract
-/// is such an object too and has none of the compared fields.
+/// Collects authored ID occurrences without choosing a duplicate winner.
 pub(crate) fn collect_contracts(record: &Value, contracts: &mut HashMap<String, ContractFields>) {
-    match record {
-        Value::Object(object) => {
-            if let Some(id) = object.get("id").and_then(Value::as_str)
-                && id.parse::<Guid>().is_ok()
-            {
-                contracts
-                    .entry(id.to_owned())
-                    .or_insert_with(|| ContractFields::of(object));
+    let mut pending = vec![record];
+    while let Some(value) = pending.pop() {
+        match value {
+            Value::Object(object) => {
+                if let Some(id) = object.get("id").and_then(Value::as_str)
+                    && id.parse::<Guid>().is_ok()
+                {
+                    contracts
+                        .entry(id.to_owned())
+                        .or_default()
+                        .occurrences
+                        .push(ContractOccurrence::of(object));
+                }
+                pending.extend(object.values().rev());
             }
-            object
-                .values()
-                .for_each(|value| collect_contracts(value, contracts));
+            Value::Array(values) => pending.extend(values.iter().rev()),
+            _ => {}
         }
-        Value::Array(values) => values
-            .iter()
-            .for_each(|value| collect_contracts(value, contracts)),
-        _ => {}
     }
 }
 
@@ -85,12 +80,11 @@ pub(super) fn compare(merged: &Value, p4kx: &P4kx, findings: &mut Findings) {
             format!("{ident}: {guid} is no Record")
         });
         if let Some(record) = record {
-            findings.number(
+            findings.integer(
                 STANDINGS,
                 ident,
                 "minReputation",
-                scmdb["minReputation"].as_f64(),
-                record["minReputation"].as_f64(),
+                (scmdb.get("minReputation"), record.get("minReputation")),
             );
         }
     }
@@ -109,30 +103,47 @@ fn compare_contract(
         format!("{ident}: id {id} is in no contract Record")
     });
     let Some(contract) = contract else { return };
+    let Some(first) = contract.occurrences.first() else {
+        return;
+    };
+    let consistent = contract
+        .occurrences
+        .iter()
+        .all(|occurrence| occurrence == first);
+    findings.check(category, consistent, || {
+        format!(
+            "{ident}: {} conflicting source occurrences of id {id}",
+            contract.occurrences.len()
+        )
+    });
+    if !consistent {
+        return;
+    }
     findings.number_if_both(
         category,
         ident,
         "timeToComplete",
         scmdb["timeToComplete"].as_f64(),
-        contract.time_to_complete,
+        first
+            .results
+            .as_ref()
+            .and_then(|value| value["timeToComplete"].as_f64()),
     );
-    findings.number_if_both(
-        category,
-        ident,
-        "buyIn",
-        scmdb["buyIn"].as_f64(),
-        contract.buy_in,
-    );
+    let buy_in = first
+        .results
+        .as_ref()
+        .and_then(|value| value.get("contractBuyInAmount"));
+    findings.integer_if_both(category, ident, "buyIn", (scmdb.get("buyIn"), buy_in));
     findings.text_if_both(
         category,
         ident,
         "minStanding",
         scmdb["minStanding"]["guid"].as_str(),
-        contract.min_standing.as_deref(),
+        first.min_standing.as_deref(),
     );
 }
 
-/// Returns every standing a contract of `merged` names, by its GUID.
+/// Returns mentioned standing objects by their GUID.
 fn standings(merged: &Value) -> BTreeMap<&str, &Value> {
     LISTS
         .iter()

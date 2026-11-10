@@ -215,3 +215,6 @@ fn contract_fields_present_on_both_sides_are_compared() {
     assert_eq!(findings.absent_on_both("contracts", "minStanding"), 1);
     assert_eq!(findings.absent_on_one_side("contracts", "buyIn"), 1);
 }
+
+#[path = "tests_regressions.rs"]
+mod regressions;

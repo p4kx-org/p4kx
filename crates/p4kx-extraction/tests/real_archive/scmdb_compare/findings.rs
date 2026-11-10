@@ -37,12 +37,18 @@ fn numbers_agree(scmdb: f64, p4kx: f64) -> bool {
     (scmdb - p4kx).abs() <= ABSOLUTE_TOLERANCE.max(RELATIVE_TOLERANCE * scmdb.abs().max(p4kx.abs()))
 }
 
+fn exact_integer(value: &serde_json::Value) -> Option<&serde_json::Number> {
+    value
+        .as_number()
+        .filter(|number| number.is_i64() || number.is_u64())
+}
 /// The checks made per category, the per-field tallies and the disagreements found.
 #[derive(Debug, Default)]
 pub(crate) struct Findings {
     checks: BTreeMap<&'static str, usize>,
     fields: BTreeMap<(&'static str, String), FieldTally>,
     mismatches: BTreeMap<&'static str, Vec<String>>,
+    uncompared: BTreeMap<(&'static str, &'static str, &'static str), usize>,
 }
 
 impl Findings {
@@ -153,9 +159,83 @@ impl Findings {
         }
     }
 
-    /// Returns whether every check agreed.
+    /// Keeps an empty comparison family visible in the summary.
+    pub(crate) fn category(&mut self, category: &'static str) {
+        self.checks.entry(category).or_default();
+    }
+
+    /// Counts a reference occurrence whose source mapping is unproven.
+    pub(crate) fn uncomparable(
+        &mut self,
+        category: &'static str,
+        field: &'static str,
+        reason: &'static str,
+    ) {
+        self.category(category);
+        *self
+            .uncompared
+            .entry((category, field, reason))
+            .or_default() += 1;
+    }
+
+    /// Compares exact JSON integers, treating one-sided absence as disagreement.
+    pub(crate) fn integer(
+        &mut self,
+        category: &'static str,
+        ident: &str,
+        field: &str,
+        values: (Option<&serde_json::Value>, Option<&serde_json::Value>),
+    ) {
+        self.integer_field(category, ident, field, values, OneSided::Disagrees);
+    }
+
+    /// Compares exact JSON integers and tallies one-sided absence.
+    pub(crate) fn integer_if_both(
+        &mut self,
+        category: &'static str,
+        ident: &str,
+        field: &str,
+        values: (Option<&serde_json::Value>, Option<&serde_json::Value>),
+    ) {
+        self.integer_field(category, ident, field, values, OneSided::Tallied);
+    }
+
+    fn integer_field(
+        &mut self,
+        category: &'static str,
+        ident: &str,
+        field: &str,
+        values: (Option<&serde_json::Value>, Option<&serde_json::Value>),
+        one_sided: OneSided,
+    ) {
+        for value in <[_; 2]>::from(values).into_iter().flatten() {
+            if !value.is_null() && exact_integer(value).is_none() {
+                self.check(category, false, || {
+                    format!("{ident}: {field} is not an exact JSON integer: {value}")
+                });
+            }
+        }
+        self.field(
+            category,
+            ident,
+            field,
+            (
+                values.0.and_then(exact_integer),
+                values.1.and_then(exact_integer),
+            ),
+            one_sided,
+            |left, right| left == right,
+        );
+    }
+
+    /// Returns whether any compared value or required input disagreed.
+    pub(crate) fn has_mismatches(&self) -> bool {
+        !self.mismatches.is_empty()
+    }
+
+    /// Returns whether no disagreement or uncomparable occurrence was recorded.
     pub(crate) fn is_empty(&self) -> bool {
-        self.mismatches.is_empty()
+        !self.has_mismatches() && self.uncompared.is_empty()
     }
 
     /// Returns the number of disagreements of `category`.
@@ -204,6 +284,11 @@ impl Findings {
                     tally.absent_one_side
                 ));
             }
+        }
+        for ((category, field, reason), count) in &self.uncompared {
+            lines.push(format!(
+                "{category} / {field}: not compared {count} ({reason})"
+            ));
         }
         lines
     }
