@@ -7,9 +7,6 @@ use p4kx_gfx::{
 
 use crate::paint::{Area, Painter, TWIPS, rectangle};
 
-/// The most clip masks a screen holds; each costs the rasteriser a canvas-sized buffer.
-pub(crate) const MAX_CLIP_MASKS: usize = 24;
-
 const AXIS_ALIGNED: f32 = 1.0e-6;
 const SLACK: f32 = 1.0;
 
@@ -138,7 +135,6 @@ pub(crate) struct PaintState {
     transforms: Vec<Affine>,
     clips: Vec<Clip>,
     pub(crate) masks: Vec<SceneMask>,
-    pub(crate) mask_limit_hit: bool,
 }
 
 impl PaintState {
@@ -212,10 +208,6 @@ impl Painter {
         let clip = self.state.clips.get(at)?;
         if let Some(&(_, mask)) = clip.masks.iter().find(|(outer, _)| *outer == parent) {
             return Some(mask);
-        }
-        if self.state.masks.len() >= MAX_CLIP_MASKS {
-            self.state.mask_limit_hit = true;
-            return parent;
         }
         let (area, transform) = (clip.area, in_twips(clip.transform));
         let commands = if area.is_empty() {

@@ -24,7 +24,6 @@ use crate::widget::CanvasSizing;
 const STYLES: &str = "libs/foundry/records/ui/buildingblocks/styles";
 const DEFAULT_STYLE: &str = "libs/foundry/records/ui/buildingblocks/styles/default";
 const MAX_CANVAS_SIDE: f32 = 16_384.0;
-const CLIP_LIMIT: &str = "clipping stopped at the 24th mask: later content is not clipped";
 
 /// A screen composed into a scene, with what the composition left out.
 #[derive(Debug)]
@@ -37,13 +36,8 @@ pub struct Composed {
 }
 
 impl Composed {
-    /// Closes the composition that `cx` took part in: the canvas `path` of `size` pixels, with
-    /// the `variables` that were set.
-    fn finish(
-        cx: Context<'_>,
-        variables: Vec<VariableInForce>,
-        (path, [width, height]): (&str, [f32; 2]),
-    ) -> Self {
+    /// Completes the composition at the requested pixel size with the selected variables.
+    fn finish(cx: Context<'_>, variables: Vec<VariableInForce>, [width, height]: [f32; 2]) -> Self {
         let Context {
             painter,
             mut report,
@@ -53,9 +47,6 @@ impl Composed {
         report.shapes = painter.len();
         report.truncated |= painter.is_full();
         report.variables = variables;
-        if painter.state.mask_limit_hit {
-            report.note("Overflow", CLIP_LIMIT, path);
-        }
         #[expect(
             clippy::cast_possible_truncation,
             clippy::cast_sign_loss,
@@ -255,11 +246,7 @@ impl<'a, 'f> ScreenComposer<'a, 'f> {
             CanvasSizing::Size,
         );
         let variables = walk.variables_in_force();
-        Ok(Composed::finish(
-            cx,
-            variables,
-            (&root.record_path, [width, height]),
-        ))
+        Ok(Composed::finish(cx, variables, [width, height]))
     }
 
     fn context(&self, brand: Option<&str>, side: u32) -> Context<'a> {

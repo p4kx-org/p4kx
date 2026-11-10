@@ -8,6 +8,7 @@ mod brand_choice;
 mod canvas_cycles;
 mod canvas_reference;
 mod cascade;
+mod clip_source_complete;
 mod corners;
 mod errors;
 mod image_limits;
