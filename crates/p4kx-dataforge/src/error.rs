@@ -78,14 +78,6 @@ pub enum DataForgeError {
         /// The struct whose parents were followed.
         struct_index: u32,
     },
-    /// A struct has more ancestors than [`MAX_INHERITANCE_DEPTH`](crate::MAX_INHERITANCE_DEPTH).
-    #[error("struct {struct_index} of the DataForge has more than {limit} ancestors")]
-    InheritanceTooDeep {
-        /// The struct whose parents were followed.
-        struct_index: u32,
-        /// The largest number of structs in one chain.
-        limit: usize,
-    },
     /// A struct and its ancestors declare more fields than
     /// [`MAX_RECORD_FIELDS`](crate::MAX_RECORD_FIELDS).
     #[error("struct {struct_index} of the DataForge has {count} fields, more than {limit}")]

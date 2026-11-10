@@ -99,8 +99,7 @@ impl<'f> Record<'f> {
     /// # Errors
     ///
     /// Returns a [`DataForgeError`] when the Record's instance, the layout of a struct in it or a
-    /// name cannot be read: a cycle or more than
-    /// [`MAX_INHERITANCE_DEPTH`](crate::MAX_INHERITANCE_DEPTH) structs in a parent chain, fields
+    /// name cannot be read: a cycle in a parent chain, fields
     /// that do not fill the declared size, an unknown data type or an inline struct that does not
     /// exist; and when the tree would hold more than
     /// [`MAX_RECORD_VALUES`](crate::MAX_RECORD_VALUES) values.

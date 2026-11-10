@@ -3,10 +3,10 @@
 
 use rayon::prelude::*;
 
-use crate::dataforge::out_of_range;
+use crate::inheritance;
 use crate::rows::{NO_PARENT, StructDef};
 use crate::slot::Slot;
-use crate::{DataForge, DataForgeError, DataType, MAX_INHERITANCE_DEPTH, MAX_RECORD_FIELDS};
+use crate::{DataForge, DataForgeError, DataType, MAX_RECORD_FIELDS};
 
 /// One field of a struct as a Record tree lists it, with its bytes in an instance.
 #[derive(Clone, Copy)]
@@ -110,7 +110,7 @@ impl<'f> StructFields<'f> {
 /// Returns whether the struct at `index` or one of its ancestors is among `targets`.
 pub(crate) fn ancestors_include(forge: &DataForge<'_>, index: usize, targets: &[usize]) -> bool {
     let mut current = index;
-    for _ in 0..MAX_INHERITANCE_DEPTH {
+    for _ in 0..forge.struct_count() {
         if targets.contains(&current) {
             return true;
         }
@@ -134,7 +134,7 @@ fn fields_of<'f>(
     index: usize,
 ) -> Result<Vec<FieldDef<'f>>, DataForgeError> {
     let struct_index = u32::try_from(index).unwrap_or(u32::MAX);
-    let chain = chain_of(forge, index, struct_index)?;
+    let chain = inheritance::chain(forge, struct_index)?;
     let count: usize = chain
         .iter()
         .map(|(_, row)| usize::from(row.property_count))
@@ -171,34 +171,4 @@ fn fields_of<'f>(
         }
     }
     Ok(fields)
-}
-
-/// Returns the struct at `index` and its ancestors with their indices, the struct first.
-fn chain_of(
-    forge: &DataForge<'_>,
-    index: usize,
-    struct_index: u32,
-) -> Result<Vec<(u32, StructDef)>, DataForgeError> {
-    let mut chain = Vec::new();
-    let mut current = struct_index;
-    loop {
-        let row = usize::try_from(current)
-            .ok()
-            .and_then(|current| forge.structs.get(current))
-            .ok_or_else(|| out_of_range("struct", index, "struct", current.into()))?;
-        if chain.iter().any(|(seen, _)| *seen == current) {
-            return Err(DataForgeError::StructCycle { struct_index });
-        }
-        if chain.len() == MAX_INHERITANCE_DEPTH {
-            return Err(DataForgeError::InheritanceTooDeep {
-                struct_index,
-                limit: MAX_INHERITANCE_DEPTH,
-            });
-        }
-        chain.push((current, row));
-        if row.parent == NO_PARENT {
-            return Ok(chain);
-        }
-        current = row.parent;
-    }
 }

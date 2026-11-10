@@ -37,6 +37,20 @@ Any other string offset that is not the start of a terminated UTF-8 string stays
   is more likely a truncated or extended file than a harmless variation, so `open` fails with
   `InstanceSize`.
 - **Struct layout.** The fields of a struct must fill its declared size exactly (`StructLayout`).
+- **Struct inheritance.** Canonical Record layouts, Queries, completion, schema drift counts and
+  coverage follow every ancestor of a valid parent chain. Repeated original Struct indices are
+  `StructCycle`; an out-of-range parent remains invalid. Inheritance length is independent of
+  owned value nesting and has no fixed 64-Struct cutoff.
+
+The canonical and Query layout readers share one iterative ancestor check. One check takes work
+and scratch space proportional to the distinct ancestors visited, with expected constant-time
+index membership checks. Query schema preparation still visits the ancestry of each Struct;
+its total work can grow quadratically with the number of Structs, and expanded inherited field
+lists also have a real retention cost. A bound derived from the actual Struct table terminates
+cyclic Query-selection and completion walks; it is not a memory or performance guarantee.
+Owned value nesting, inherited field count and Record value budgets remain separate reader
+policies, not demonstrated DataForge format maxima. A successful build-specific scan does not
+prove that these policies are sufficient for every valid database.
 
 ## Unknown fields
 

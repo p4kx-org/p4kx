@@ -5,12 +5,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::dataforge::out_of_range;
-use crate::rows::{NO_PARENT, StructDef};
+use crate::inheritance;
 use crate::schema::CONVERSION_ATTRIBUTE;
 use crate::{DataForge, DataForgeError, DataType};
-
-/// The most structs one inheritance chain may hold, the struct itself included.
-pub const MAX_INHERITANCE_DEPTH: usize = 64;
 
 /// The most fields one struct may have, inherited ones included.
 pub const MAX_RECORD_FIELDS: usize = 1 << 16;
@@ -39,7 +36,7 @@ pub(crate) struct Layout<'f> {
 impl<'f> Layout<'f> {
     /// Reads the layout of the struct at `struct_index`, which must exist.
     pub(crate) fn of(forge: &'f DataForge<'f>, struct_index: u32) -> Result<Self, DataForgeError> {
-        let chain = chain(forge, struct_index)?;
+        let chain = inheritance::chain(forge, struct_index)?;
         let count: usize = chain
             .iter()
             .map(|(_, def)| usize::from(def.property_count))
@@ -73,37 +70,6 @@ impl<'f> Layout<'f> {
             type_name: forge.blob.get(record)?,
             fields: fields.into(),
         })
-    }
-}
-
-/// Returns the struct at `struct_index` and its ancestors, the struct itself first.
-fn chain(
-    forge: &DataForge<'_>,
-    struct_index: u32,
-) -> Result<Vec<(u32, StructDef)>, DataForgeError> {
-    let mut chain: Vec<(u32, StructDef)> = Vec::new();
-    let mut current = struct_index;
-    loop {
-        if chain.iter().any(|(index, _)| *index == current) {
-            return Err(DataForgeError::StructCycle { struct_index });
-        }
-        if chain.len() == MAX_INHERITANCE_DEPTH {
-            return Err(DataForgeError::InheritanceTooDeep {
-                struct_index,
-                limit: MAX_INHERITANCE_DEPTH,
-            });
-        }
-        let def = usize::try_from(current)
-            .ok()
-            .and_then(|index| forge.structs.get(index))
-            .ok_or_else(|| {
-                out_of_range("struct", struct_index as usize, "struct", current.into())
-            })?;
-        chain.push((current, def));
-        if def.parent == NO_PARENT {
-            return Ok(chain);
-        }
-        current = def.parent;
     }
 }
 

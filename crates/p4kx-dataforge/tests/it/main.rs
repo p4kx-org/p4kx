@@ -13,6 +13,7 @@ mod field_statistics_runs;
 mod fleet;
 mod format_drift;
 mod generator;
+mod inheritance_complete;
 mod invalid_values;
 mod nested;
 mod nested_xml;

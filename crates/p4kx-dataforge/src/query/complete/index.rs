@@ -8,7 +8,7 @@ use rayon::prelude::*;
 
 use crate::query::schema::StructFields;
 use crate::rows::NO_PARENT;
-use crate::{DataForge, DataType, MAX_INHERITANCE_DEPTH};
+use crate::{DataForge, DataType};
 
 /// The type and field names of one DataForge, read once and kept for completing Queries.
 ///
@@ -169,7 +169,7 @@ impl QuerySchema {
     /// Returns whether the struct at `index` is the struct at `base` or derives from it.
     pub(super) fn derives(&self, index: usize, base: usize) -> bool {
         let mut current = index;
-        for _ in 0..MAX_INHERITANCE_DEPTH {
+        for _ in 0..self.structs.len() {
             if current == base {
                 return true;
             }
