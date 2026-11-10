@@ -7,12 +7,6 @@ use crate::markup::{self, Budget, Element};
 /// The most bytes of a character definition that are read.
 pub(crate) const MAX_CDF_BYTES: u64 = 1 << 20;
 
-/// The most attachments of a character definition that are listed as left out.
-const MAX_LEFT_OUT: usize = 256;
-
-/// The most bone attachments of a character definition that are drawn.
-const MAX_BONE_ATTACHMENTS: usize = 64;
-
 /// What is drawn of a character definition (`.cdf`): the model of its first skin attachment, else
 /// of its first attachment, its bone attachments, and the files of the attachments that are not
 /// drawn.
@@ -108,13 +102,11 @@ fn sort_rest<'a>(
     let mut bones = Vec::new();
     let mut left_out = Vec::new();
     for (binding, attachment) in rest {
-        let bone = BoneAttachment::read(attachment, binding).filter(|bone| {
-            !is_character_definition(&bone.binding) && bones.len() < MAX_BONE_ATTACHMENTS
-        });
+        let bone = BoneAttachment::read(attachment, binding)
+            .filter(|bone| !is_character_definition(&bone.binding));
         match bone {
             Some(bone) => bones.push(bone),
-            None if left_out.len() < MAX_LEFT_OUT => left_out.push(slashes(binding)),
-            None => {}
+            None => left_out.push(slashes(binding)),
         }
     }
     (bones, left_out)
