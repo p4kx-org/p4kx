@@ -85,7 +85,7 @@ pub(crate) struct MaterialShape {
     pub(crate) textures: Vec<TextureShape>,
     /// The number of texture slots in the file.
     pub(crate) texture_count: usize,
-    /// The shader parameters in file order, at most 64.
+    /// Every admitted shader parameter in file order.
     pub(crate) public_params: Vec<ParamShape>,
     /// The number of shader parameters in the file.
     pub(crate) public_param_count: usize,

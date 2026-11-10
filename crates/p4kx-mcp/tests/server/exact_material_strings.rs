@@ -155,7 +155,7 @@ fn exact_material_paging_preserves_full_values_and_original_order() -> TestResul
 }
 
 #[test]
-fn exact_material_unshown_siblings_do_not_spend_the_item_text_budget() -> TestResult {
+fn exact_material_charges_all_parameters_and_keeps_later_items_lazy() -> TestResult {
     let huge = "z".repeat(300 * 1024);
     let mut material = TestMtlMaterial::new("shown");
     for index in 0..64 {
@@ -191,21 +191,7 @@ fn exact_material_unshown_siblings_do_not_spend_the_item_text_budget() -> TestRe
         "its complete original huge value exists before the MCP call"
     );
     let mut server = install.serve(&["--archive", "LIVE"])?;
-    let summary = server.ok("mtl_summary", &json!({"path":fixture::MATERIAL}))?;
-    let shown = check::material(&summary)?;
-    assert_eq!(
-        shown.get("public_param_count"),
-        Some(&json!(65)),
-        "the independent original total is retained"
-    );
-    assert_eq!(
-        shown
-            .get("public_params")
-            .and_then(Value::as_array)
-            .map(Vec::len),
-        Some(64),
-        "this batch preserves the existing explicit list preview policy"
-    );
+    check::too_large(&mut server, &json!({"path":fixture::MATERIAL}))?;
     unshown_material(&huge)
 }
 

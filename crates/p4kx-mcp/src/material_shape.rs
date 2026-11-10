@@ -7,7 +7,7 @@ use crate::budget::Budget;
 use crate::error::ToolError;
 use crate::material_shapes::{LayerShape, MaterialShape, ParamShape, TextureShape};
 
-/// The most texture slots, shader parameters and layers listed per material.
+/// The most texture slots and layers listed per material.
 const MAX_LISTED: usize = 64;
 
 pub(crate) fn shape(id: usize, material: &Material) -> Result<MaterialShape, ToolError> {
@@ -62,7 +62,6 @@ fn parameters(material: &Material, text: &mut Budget) -> Result<Vec<ParamShape>,
     material
         .public_params
         .iter()
-        .take(MAX_LISTED)
         .map(|(name, value)| {
             Ok(ParamShape {
                 name: text.text(name)?,

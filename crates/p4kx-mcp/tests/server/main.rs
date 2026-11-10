@@ -21,6 +21,7 @@ mod complete_audio_events;
 mod complete_loadout_notes;
 mod complete_loadout_notes_fixture;
 mod complete_loadout_notes_source;
+mod complete_material_parameters;
 mod containers;
 mod dataforge_cache;
 mod dataforge_file;
