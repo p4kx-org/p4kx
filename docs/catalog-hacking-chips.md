@@ -28,3 +28,12 @@ from modifier names.
 The chip declaration has no direct errorChance field in the surveyed Build. An authored
 modifier with that name remains an ordered value. HackableParams.baseErrorChance and
 controller/state interactions have their own owning source.
+
+## Real Archive verification
+
+With `P4KX_DATA_P4K` configured, the opt-in test
+`hacking_chip_components_match_actual_item_slots_and_modifier_sources` in the
+`p4kx-export` `real_archive` test binary checks the original Item slots, authored
+values, declarations and DCB provenance. Set `P4KX_EXPECT_HACKING_COMPONENTS` to
+require both chip families and at least one original modifier for a positive
+acceptance run. The test prints counts only.

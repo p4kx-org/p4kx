@@ -1,27 +1,26 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeMap;
 use std::time::SystemTime;
 
-use p4kx_export::{
-    CatalogOptions, CatalogPublicationMode, Kind, KindRule, build_catalog_from, is_kind_leftover,
-};
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, Kind, build_catalog_from};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, DataForgeOrigin, DataType, Filter,
-    InputScope, PointerProbe, Record, RecordTree, SourceEncryption, SourceInput, SourceUses,
-    StructValue, TreeBuilder, Value as Original,
+    InputScope, RecordTree, SourceEncryption, SourceInput, SourceUses, StructValue, TreeBuilder,
+    Value as Original,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
+use crate::real_archive_item_components::{
+    FILTER, Rows, cell, compare_identity, component_rows, has_component, require_state,
+    selected_item,
+};
 use crate::real_archive_item_durability::{self as proof, Trace};
 use crate::real_archive_verification;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
-type Rows<'catalog> = BTreeMap<(u32, usize), &'catalog Value>;
 
-const FILTER: &str = "libs/foundry/records/entities/*";
 const KINDS: &[(&str, &str)] = &[
     ("SSensorMineComponentParams", "sensorMine"),
     ("SExplosiveOrdnanceParams", "ordnance"),
@@ -99,7 +98,7 @@ fn compare(
     filter: &Filter,
     watch: &ArchiveWatch,
 ) -> TestResult<Counts> {
-    let mut rows = exported_rows(catalog)?;
+    let mut rows = component_rows(catalog, "/configurations/explosives/rows")?;
     let uses = proof::indexed(catalog, "/provenance/uses", "id")?;
     let DataForgeOrigin::Archive(entry) = origin else {
         return Err("expected an observed Archive DataForge".into());
@@ -124,13 +123,14 @@ fn compare(
         watch
             .poll()
             .map_err(|_| "Archive changed during source selection")?;
-        if !selected_item(&record, &rule, filter)? || !has_device(&mut trees, &record, &probes)? {
+        if !selected_item(&record, &rule, filter)? || !has_component(&mut trees, &record, &probes)?
+        {
             continue;
         }
         let tree = trees
             .build(&record)
             .map_err(|_| "read original explosive owner")?;
-        let trace = Trace::of(&tree, &uses, scope.source_ref().as_str(), encrypted);
+        let trace = Trace::of(&tree, &uses, &scope, encrypted);
         compare_components(&tree, &trace, &mut rows, &mut counts)?;
     }
     assert!(
@@ -144,51 +144,6 @@ fn compare(
         );
     }
     Ok(counts)
-}
-
-fn selected_item(record: &Record<'_>, rule: &KindRule, filter: &Filter) -> TestResult<bool> {
-    let path = record
-        .record_path()
-        .map_err(|_| "read original Record path")?;
-    if !filter.matches(path) || !rule.matches_path(path) {
-        return Ok(false);
-    }
-    let source_type = record
-        .type_name()
-        .map_err(|_| "read original Record type")?;
-    let name = record.name().map_err(|_| "read original Record name")?;
-    Ok(source_type == rule.type_name && !is_kind_leftover(Kind::Items, path, name))
-}
-
-fn has_device<'source>(
-    trees: &mut TreeBuilder<'source>,
-    record: &Record<'source>,
-    probes: &[PointerProbe<'source>],
-) -> TestResult<bool> {
-    for probe in probes {
-        if trees
-            .holds(probe, record)
-            .map_err(|_| "inspect original Components array")?
-        {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-fn exported_rows(catalog: &Value) -> TestResult<Rows<'_>> {
-    let mut rows = Rows::new();
-    let mut previous = None;
-    for row in proof::rows(catalog, "/configurations/explosives/rows")? {
-        let owner = u32::try_from(proof::number(row, "/ownerRecordIndex/value")?)?;
-        let slot = usize::try_from(proof::number(row, "/componentOrdinal/value")?)?;
-        let position = (owner, slot);
-        if previous.is_some_and(|key| key >= position) || rows.insert(position, row).is_some() {
-            return Err("exported device slots must be unique and follow physical order".into());
-        }
-        previous = Some(position);
-    }
-    Ok(rows)
 }
 
 fn compare_components<'source>(
@@ -234,30 +189,6 @@ fn compare_components<'source>(
     Ok(())
 }
 
-fn compare_identity<'source>(
-    tree: &RecordTree<'source>,
-    trace: &Trace<'_, 'source>,
-    original: &Original<'source>,
-    component: &StructValue<'source>,
-    kind: &str,
-    row: &Value,
-) -> TestResult {
-    assert!(
-        proof::text(row, "/ownerGuid/value")? == tree.guid().to_string(),
-        "the exported owner is the original physical Record"
-    );
-    assert!(
-        proof::text(row, "/sourceType/value")? == component.type_name()
-            && proof::text(row, "/configuration/value/type")? == kind,
-        "the device shape follows the original concrete component type"
-    );
-    trace.header(cell(row, "ownerGuid")?, "guid", "payload")?;
-    trace.header(cell(row, "ownerRecordIndex")?, "recordIndex", "selector")?;
-    trace.check(cell(row, "componentOrdinal")?, original, "conversion")?;
-    trace.part(cell(row, "sourceType")?, original, "$type", "selector")?;
-    trace.part(cell(row, "configuration")?, original, "$type", "selector")
-}
-
 fn compare_trigger<'source>(
     trace: &Trace<'_, 'source>,
     component: &StructValue<'source>,
@@ -275,7 +206,7 @@ fn compare_trigger<'source>(
     trace.part(exported, value, "$dataType", "selector")?;
     if matches!(value, Original::Error(_)) {
         require_state(exported, "unreadable")?;
-        trace.part(exported, value, "$value", "attempted")?;
+        trace.attempted_value(exported, value)?;
         return Ok(0);
     }
     if field.storage().data_type() != DataType::StrongPointer {
@@ -371,7 +302,7 @@ fn compare_scalar<'source>(
         Original::Null => ("null", "selector", true),
         Original::Error(_) => {
             require_state(exported, "unreadable")?;
-            return trace.part(exported, value, "$value", "attempted");
+            return trace.attempted_value(exported, value);
         }
         _ => ("invalid", "selector", true),
     };
@@ -381,17 +312,4 @@ fn compare_scalar<'source>(
         "the exported scalar preserves the exact original representation"
     );
     trace.check(exported, value, role)
-}
-
-fn require_state(cell: &Value, expected: &str) -> TestResult {
-    assert!(
-        proof::text(cell, "/state")? == expected,
-        "the carrier keeps the original read state"
-    );
-    Ok(())
-}
-
-fn cell<'row>(row: &'row Value, name: &str) -> TestResult<&'row Value> {
-    row.get(name)
-        .ok_or_else(|| "expected the authored field carrier".into())
 }

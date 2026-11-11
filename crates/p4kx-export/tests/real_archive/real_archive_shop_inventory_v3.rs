@@ -94,7 +94,7 @@ fn physical_shop_inventories_and_resolution_targets_match_the_installed_build() 
     report(&archive, definitions.len(), &relations, &survey)
 }
 
-fn verify_build(archive: &Archive, catalog: &Value) -> TestResult {
+pub(super) fn verify_build(archive: &Archive, catalog: &Value) -> TestResult {
     let build = archive.build().ok_or("complete actual Build identity")?;
     for (field, value) in [
         ("branch", build.branch()),

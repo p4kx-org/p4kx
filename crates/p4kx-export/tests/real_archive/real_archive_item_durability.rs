@@ -8,7 +8,8 @@ use std::time::SystemTime;
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, DataForgeOrigin, Field, InputScope,
-    RecordTree, SourceEncryption, SourceInput, SourceUses, Value as DataValue,
+    RecordTree, SourceEncryption, SourceInput, SourceLocation, SourceScope, SourceUseRole,
+    SourceUses, Value as DataValue,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::{Value, json};
@@ -76,7 +77,6 @@ fn compare(
     };
     let sources = SourceUses::new();
     let scope = sources.observe(SourceInput::Archive(entry), InputScope::Payload)?;
-    let source = scope.source_ref().as_str();
     let encrypted = match origin.encryption() {
         SourceEncryption::Encrypted => Some(true),
         SourceEncryption::Unencrypted => Some(false),
@@ -111,7 +111,7 @@ fn compare(
         if !matches!(health.field("Health"), Some(DataValue::Single(_))) {
             continue;
         }
-        let trace = Trace::of(&tree, &uses, source, encrypted);
+        let trace = Trace::of(&tree, &uses, &scope, encrypted);
         trace.check(&row["componentOrdinal"], component, "conversion")?;
         counts.insert(category, trace.health(row, health)?);
         if counts.len() == 3 {
@@ -164,8 +164,8 @@ fn ordinals<'source>(fields: &[Field<'source>]) -> HashMap<*const DataValue<'sou
 pub(super) struct Trace<'read, 'source> {
     ordinals: HashMap<*const DataValue<'source>, usize>,
     uses: &'read HashMap<&'read str, &'read Value>,
-    owner: String,
-    source: &'read str,
+    owner: u32,
+    scope: &'read SourceScope,
     encrypted: Option<bool>,
 }
 
@@ -173,14 +173,14 @@ impl<'read, 'source> Trace<'read, 'source> {
     pub(super) fn of(
         tree: &RecordTree<'source>,
         uses: &'read HashMap<&'read str, &'read Value>,
-        source: &'read str,
+        scope: &'read SourceScope,
         encrypted: Option<bool>,
     ) -> Self {
         Self {
             ordinals: ordinals(tree.fields()),
             uses,
-            owner: tree.record_index().to_string(),
-            source,
+            owner: tree.record_index(),
+            scope,
             encrypted,
         }
     }
@@ -254,7 +254,7 @@ impl<'read, 'source> Trace<'read, 'source> {
         self.location(
             cell,
             "dataforgeValue",
-            &json!([self.owner, ordinal.to_string()]),
+            &json!([self.owner.to_string(), ordinal.to_string()]),
             field,
             role,
         )
@@ -264,10 +264,77 @@ impl<'read, 'source> Trace<'read, 'source> {
         self.location(
             cell,
             "dataforgeRecordHeader",
-            &json!([self.owner]),
+            &json!([self.owner.to_string()]),
             field,
             role,
         )
+    }
+
+    pub(super) fn struct_name(&self, cell: &Value, index: u16) -> Result {
+        self.location(
+            cell,
+            "dataforgeStruct",
+            &json!([index.to_string()]),
+            "name",
+            "selector",
+        )
+    }
+
+    pub(super) fn attempted_value(&self, cell: &Value, raw: &DataValue<'source>) -> Result {
+        let ordinal = self
+            .ordinals
+            .get(&std::ptr::from_ref(raw))
+            .ok_or("original value ordinal")?;
+        self.attempted(
+            cell,
+            "dataforgeValue",
+            vec![u64::from(self.owner), u64::try_from(*ordinal)?],
+            "$value",
+        )
+    }
+
+    pub(super) fn attempted_struct_name(&self, cell: &Value, index: u16) -> Result {
+        self.attempted(cell, "dataforgeStruct", vec![u64::from(index)], "name")
+    }
+
+    fn attempted(&self, cell: &Value, namespace: &str, indices: Vec<u64>, field: &str) -> Result {
+        assert!(
+            cell.get("sourceSetComplete") == Some(&Value::Bool(false)),
+            "the unreadable source set is incomplete"
+        );
+        self.check_encryption(cell);
+        let observed = self
+            .scope
+            .at(
+                SourceLocation::Subresource {
+                    namespace: namespace.to_owned(),
+                    indices,
+                    field: field.to_owned(),
+                },
+                SourceUseRole::Attempted,
+            )
+            .map_err(|_| "observe exact attempted source")?;
+        let id = observed.reference().as_str();
+        assert!(
+            self.uses.contains_key(id),
+            "the original attempt appears in the source inventory"
+        );
+        let contributed = rows(cell, "/sourceUsesRefs")?
+            .iter()
+            .any(|reference| reference.as_str() == Some(id));
+        assert!(!contributed, "the failed attempt stays separate");
+        Ok(())
+    }
+
+    fn check_encryption(&self, cell: &Value) {
+        let marker = match self.encrypted {
+            Some(false) if cell.get("sourceSetComplete") == Some(&Value::Bool(false)) => None,
+            actual => actual,
+        };
+        assert!(
+            cell.get("containsEncryptedSource") == Some(&json!(marker)),
+            "the marker describes the DCB input"
+        );
     }
 
     fn location(
@@ -278,15 +345,13 @@ impl<'read, 'source> Trace<'read, 'source> {
         field: &str,
         role: &str,
     ) -> Result {
-        assert!(
-            cell.get("containsEncryptedSource") == Some(&json!(self.encrypted)),
-            "the marker describes the DCB input"
-        );
+        self.check_encryption(cell);
         let mut exact_use = false;
         for id in rows(cell, "/sourceUsesRefs")? {
             let id = id.as_str().ok_or("source use identifier")?;
             let usage = self.uses.get(id).ok_or("resolved source use")?;
-            exact_use |= usage.get("source").and_then(Value::as_str) == Some(self.source)
+            exact_use |= usage.get("source").and_then(Value::as_str)
+                == Some(self.scope.source_ref().as_str())
                 && usage.get("role").and_then(Value::as_str) == Some(role)
                 && usage.pointer("/location/namespace").and_then(Value::as_str) == Some(namespace)
                 && usage.pointer("/location/indices") == Some(indices)
