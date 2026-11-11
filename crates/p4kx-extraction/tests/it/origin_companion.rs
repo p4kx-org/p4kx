@@ -8,9 +8,9 @@ use std::io::{self, Write as _};
 use std::path::Path;
 
 use p4kx_extraction::{
-    FieldPath, InputScope, OriginArtifactBinding, OriginArtifactName, OriginCompanionRow,
-    OriginDigestWriter, OriginOutputAddress, SourceInput, SourceLocation, SourceUseRole,
-    SourceUses, read_observed_file, write_origin_companion,
+    DecimalU64, FieldPath, InputScope, OriginArtifactBinding, OriginArtifactName,
+    OriginCompanionRow, OriginDigestWriter, OriginOutputAddress, SourceInput, SourceLocation,
+    SourceUseRole, SourceUses, read_observed_file, write_origin_companion,
 };
 use serde_json::{Value, json};
 
@@ -123,4 +123,44 @@ fn emitted_fixture_rows() -> Result<Vec<Value>, Box<dyn Error>> {
         .filter(|line| !line.is_empty())
         .map(serde_json::from_slice)
         .collect::<Result<Vec<Value>, _>>()?)
+}
+
+#[test]
+fn text_fields_require_exact_decimal_ranges_and_a_logical_field() -> TestResult {
+    let schema = schemars::schema_for!(OriginCompanionRow<'static>).to_value();
+    let validator = jsonschema::validator_for(&schema)?;
+    let uses = SourceUses::new();
+    let origin = uses.origin(&[], false);
+    let address = OriginOutputAddress::TextBytes {
+        start: DecimalU64::new(2),
+        end_exclusive: DecimalU64::new(4),
+        field: FieldPath::parse("/changes/0/old")?,
+    };
+    let row = serde_json::to_value(OriginCompanionRow::Field {
+        address: &address,
+        origin: &origin,
+    })?;
+    assert_eq!(
+        row["address"],
+        json!({"type":"textBytes","start":"2","endExclusive":"4","field":"/changes/0/old"})
+    );
+    validator
+        .validate(&row)
+        .map_err(|error| error.to_string())?;
+    let mut no_field = row.clone();
+    no_field["address"]
+        .as_object_mut()
+        .ok_or("text address")?
+        .remove("field");
+    assert!(
+        !validator.is_valid(&no_field),
+        "a span needs its emitted logical field"
+    );
+    let mut numeric_start = row;
+    numeric_start["address"]["start"] = json!(2);
+    assert!(
+        !validator.is_valid(&numeric_start),
+        "offsets use exact decimal strings"
+    );
+    Ok(())
 }

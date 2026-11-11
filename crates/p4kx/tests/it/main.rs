@@ -36,6 +36,7 @@ mod character_package;
 mod chf;
 mod chf_diff;
 mod chf_diff_origins;
+mod chf_diff_text_origins;
 mod chf_glb;
 mod chf_glb_dressed;
 mod chf_names;

@@ -664,6 +664,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   a known name matches are shown as names; the raw path keeps them. It finds which field a control
   of the character customiser changes. Exit code 1 when the files differ, 0 when not; the JSON is
   described in [docs/cli-json.md](cli-json.md#p4kx-chf-diff-achf-bchf---json).
+  For text output, `--origin-stderr` writes a byte-addressed companion to stderr,
+  and `--origin-out <file>` saves it. A completed comparison with changes still exits with 1.
 - `p4kx chf glb <archive> <file> --out <file>` exports the head of a CHF character as one skinned
   GLB: the head skin of the character's head rig, its vertices moved by the character's face DNA
   into the character's neutral face (the neutral morphs of the DNA rig beside the skin, mixed by

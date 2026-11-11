@@ -25,6 +25,8 @@ mod character_package;
 mod chf;
 mod chf_diff;
 mod chf_diff_origins;
+mod chf_diff_text;
+mod chf_diff_text_output;
 mod chf_glb;
 mod chf_names;
 mod chf_origin_fields;

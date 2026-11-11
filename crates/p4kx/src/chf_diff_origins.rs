@@ -22,11 +22,25 @@ struct Side {
     complete: bool,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Projection {
+    Json,
+    Text,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DiffFieldOrigins {
     pub(crate) field_origins: FieldOrigins,
     pub(crate) provenance: SourceInventory,
+    #[serde(skip)]
+    dispositions: Vec<Option<FieldOrigin>>,
+}
+
+impl DiffFieldOrigins {
+    pub(crate) fn disposition(&self, row: usize) -> Option<&FieldOrigin> {
+        self.dispositions.get(row).and_then(Option::as_ref)
+    }
 }
 
 impl DiffOrigins {
@@ -49,6 +63,7 @@ impl DiffOrigins {
         &self,
         changes: &[ChfObservedChange],
         names: Option<&ObservedNames>,
+        projection: Projection,
     ) -> Result<DiffFieldOrigins> {
         let mut fields = FieldOrigins::new();
         for (path, side) in [("/a", &self.before), ("/b", &self.after)] {
@@ -69,7 +84,17 @@ impl DiffOrigins {
         if changes.is_empty() {
             fields.insert(FieldPath::parse("/changes")?, origin)?;
         }
+        let mut dispositions = Vec::new();
         for (index, change) in changes.iter().enumerate() {
+            if projection == Projection::Text {
+                let has_disposition =
+                    change.change().old.is_some() != change.change().new.is_some();
+                dispositions.push(
+                    has_disposition
+                        .then(|| self.disposition(change))
+                        .transpose()?,
+                );
+            }
             let data = self.change(change, names)?;
             for (key, origin) in ["path", "raw_path", "old", "new"].into_iter().zip(data) {
                 fields.insert(
@@ -81,7 +106,17 @@ impl DiffOrigins {
         Ok(DiffFieldOrigins {
             field_origins: fields,
             provenance: self.uses.freeze()?,
+            dispositions,
         })
+    }
+
+    fn disposition(&self, change: &ChfObservedChange) -> Result<FieldOrigin> {
+        let role = SourceUseRole::Selector;
+        let sources = [
+            self.before.at(change.before(), role)?,
+            self.after.at(change.after(), role)?,
+        ];
+        Ok(self.uses.origin(&sources, self.complete()))
     }
 
     fn change(

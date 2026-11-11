@@ -77,6 +77,15 @@ pub enum OriginOutputAddress {
         /// Category of the emitted field.
         field: OriginXmlField,
     },
+    /// One typed field in the emitted text.
+    TextBytes {
+        /// First byte in the emitted field.
+        start: DecimalU64,
+        /// First byte past the emitted field.
+        end_exclusive: DecimalU64,
+        /// Logical field carried by this text span.
+        field: FieldPath,
+    },
     /// A typed field at an exact JSON Pointer in the original artifact schema.
     JsonField {
         /// Exact field path.

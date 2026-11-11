@@ -111,6 +111,12 @@ pub(crate) struct ChfDiffArgs {
     /// Reads more names from this Data.p4k Archive, as `to-json` does.
     #[arg(long, value_name = "ARCHIVE")]
     pub(crate) archive: Option<PathBuf>,
+    /// Writes the raw text comparison's field-origin companion to stderr.
+    #[arg(long)]
+    pub(crate) origin_stderr: bool,
+    /// Saves the raw text comparison's field-origin companion to this file.
+    #[arg(long, value_name = "FILE")]
+    pub(crate) origin_out: Option<PathBuf>,
 }
 
 /// The material modes of `p4kx chf glb --materials`.

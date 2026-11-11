@@ -94,3 +94,10 @@ With raw JSON on stdout, `chf to-json --origin-stderr` emits the JSONL companion
 from its header through its end row in place of the usual name-count line.
 Archive warnings may still appear before or after that block. Use
 `--origin-out <file>` for a companion file. Raw stdout retains its original JSON.
+
+Text `p4kx chf diff` uses `textBytes` addresses when requested with
+`--origin-stderr` or `--origin-out <file>`. Each address has a half-open byte
+range and a logical field such as `/changes/0/old`, `/changes/0/status` or
+`/identical`. The status describes an added or removed value. A completed
+comparison with changes exits with 1. Its receipt still ends with the same
+completion row and binds the exact stdout text.

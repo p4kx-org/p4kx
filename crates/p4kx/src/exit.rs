@@ -18,6 +18,7 @@ use p4kx_screens::ScreenError;
 use crate::armour_loadout::UnreadableLoadout;
 use crate::channels::InvalidPath;
 use crate::chf::{InvalidChf, InvalidChfJson, UnreadableChfInput};
+use crate::chf_diff::TextOriginsNeedText;
 use crate::cryxml::{JsonNeedsOut, UnreadableInput};
 use crate::dcb_export::{
     ArchiveOptionRefused, CombinedNeedsXml, FlatConflict, NoRecordMatch, TextsNeedArchive,
@@ -338,6 +339,7 @@ fn is_output_or_query_error(error: &anyhow::Error) -> bool {
         || is_refused_folder(error)
         || error.downcast_ref::<ChangeError>().is_some()
         || error.downcast_ref::<JsonNeedsOut>().is_some()
+        || error.downcast_ref::<TextOriginsNeedText>().is_some()
         || error.downcast_ref::<InvalidQuery>().is_some()
         || error.downcast_ref::<JsonNeedsJsonFormat>().is_some()
         || error.downcast_ref::<JsonWithTable>().is_some()

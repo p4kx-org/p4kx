@@ -319,6 +319,35 @@
         },
         {
           "additionalProperties": false,
+          "description": "One typed field in the emitted text.",
+          "properties": {
+            "endExclusive": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte past the emitted field."
+            },
+            "field": {
+              "$ref": "#/$defs/FieldPath",
+              "description": "Logical field carried by this text span."
+            },
+            "start": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte in the emitted field."
+            },
+            "type": {
+              "const": "textBytes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "start",
+            "endExclusive",
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "A typed field at an exact JSON Pointer in the original artifact schema.",
           "properties": {
             "path": {
