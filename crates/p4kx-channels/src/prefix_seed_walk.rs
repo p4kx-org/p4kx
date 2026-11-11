@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::wine::WineEnvironment;
+use crate::wine_environment::PrefixDefaults;
+
+const MACOS_BOTTLES: &str = "Library/Application Support/CrossOver/Bottles";
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum SeedKind {
@@ -11,6 +14,7 @@ pub(crate) enum SeedKind {
     Steam,
     Library,
     Bottles,
+    CrossOver,
     Games,
 }
 
@@ -24,21 +28,32 @@ pub(crate) fn walk(environment: &WineEnvironment, mut visit: impl FnMut(SeedKind
     {
         return;
     }
+    if !explicit(&mut visit, SeedKind::Direct, &environment.wine_prefixes) {
+        return;
+    }
+    if environment.defaults == PrefixDefaults::MacOs {
+        macos(&mut visit, home, &environment.crossover_bottle_roots);
+        return;
+    }
+    unix(&mut visit, home, environment);
+}
+
+fn unix(
+    visit: &mut impl FnMut(SeedKind, &Path) -> bool,
+    home: Option<&Path>,
+    environment: &WineEnvironment,
+) {
     if let Some(home) = home
-        && !candidate(
-            &mut visit,
-            SeedKind::Direct,
-            &home.join("Games/star-citizen"),
-        )
+        && !candidate(visit, SeedKind::Direct, &home.join("Games/star-citizen"))
     {
         return;
     }
     if let Some(path) = environment.compat_data.as_deref()
-        && !candidate(&mut visit, SeedKind::Direct, &Path::new(path).join("pfx"))
+        && !candidate(visit, SeedKind::Direct, &Path::new(path).join("pfx"))
     {
         return;
     }
-    if !explicit(&mut visit, SeedKind::Steam, &environment.steam_roots) {
+    if !explicit(visit, SeedKind::Steam, &environment.steam_roots) {
         return;
     }
     let data = environment
@@ -47,30 +62,62 @@ pub(crate) fn walk(environment: &WineEnvironment, mut visit: impl FnMut(SeedKind
         .filter(|path| path.is_absolute())
         .map(Path::to_path_buf)
         .or_else(|| home.map(|path| path.join(".local/share")));
-    if !steam_defaults(&mut visit, home, data.as_deref()) {
+    if !steam_defaults(visit, home, data.as_deref()) {
         return;
     }
-    if !explicit(&mut visit, SeedKind::Library, &environment.steam_libraries) {
+    if !explicit(visit, SeedKind::Library, &environment.steam_libraries) {
         return;
     }
-    if !explicit(&mut visit, SeedKind::Bottles, &environment.bottles_roots) {
+    if !explicit(visit, SeedKind::Bottles, &environment.bottles_roots) {
         return;
     }
     if let Some(data) = data
-        && !candidate(&mut visit, SeedKind::Bottles, &data.join("bottles/bottles"))
+        && !candidate(visit, SeedKind::Bottles, &data.join("bottles/bottles"))
     {
+        return;
+    }
+    if !explicit(
+        visit,
+        SeedKind::CrossOver,
+        &environment.crossover_bottle_roots,
+    ) {
         return;
     }
     if let Some(home) = home {
         if !candidate(
-            &mut visit,
+            visit,
             SeedKind::Bottles,
             &home.join(".var/app/com.usebottles.bottles/data/bottles/bottles"),
         ) {
             return;
         }
-        candidate(&mut visit, SeedKind::Games, &home.join("Games"));
+        candidate(visit, SeedKind::Games, &home.join("Games"));
     }
+}
+
+fn macos(
+    visit: &mut impl FnMut(SeedKind, &Path) -> bool,
+    home: Option<&Path>,
+    configured_bottles: &[PathBuf],
+) {
+    if let Some(home) = home
+        && !candidate(visit, SeedKind::Direct, &home.join(".wine"))
+    {
+        return;
+    }
+    if !explicit(visit, SeedKind::CrossOver, configured_bottles) {
+        return;
+    }
+    if let Some(home) = home
+        && !candidate(visit, SeedKind::CrossOver, &home.join(MACOS_BOTTLES))
+    {
+        return;
+    }
+    candidate(
+        visit,
+        SeedKind::CrossOver,
+        &Path::new("/").join(MACOS_BOTTLES),
+    );
 }
 
 fn steam_defaults(
@@ -102,7 +149,7 @@ fn steam_defaults(
 fn explicit(
     visit: &mut impl FnMut(SeedKind, &Path) -> bool,
     kind: SeedKind,
-    paths: &[std::path::PathBuf],
+    paths: &[PathBuf],
 ) -> bool {
     paths.iter().all(|path| candidate(visit, kind, path))
 }

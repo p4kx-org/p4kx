@@ -70,6 +70,24 @@ impl SearchRecipe {
         self
     }
 
+    /// Replaces configured Wine prefixes and `CrossOver` bottle roots.
+    #[must_use]
+    pub fn with_wine_locations(
+        mut self,
+        prefixes: Vec<PathBuf>,
+        crossover_bottle_roots: Vec<PathBuf>,
+    ) -> Self {
+        if self.environment.is_some() || !prefixes.is_empty() || !crossover_bottle_roots.is_empty()
+        {
+            let environment = self
+                .environment
+                .get_or_insert_with(WineEnvironment::default);
+            environment.wine_prefixes = prefixes;
+            environment.crossover_bottle_roots = crossover_bottle_roots;
+        }
+        self
+    }
+
     /// Replaces manual inputs without adding a second discovery pass.
     #[must_use]
     pub fn with_manual(mut self, folders: Vec<PathBuf>, archives: Vec<PathBuf>) -> Self {

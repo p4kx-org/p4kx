@@ -9,6 +9,8 @@ mod config;
 mod fake;
 #[path = "prefix_discovery/limits.rs"]
 mod limits;
+#[path = "prefix_discovery/macos.rs"]
+mod macos;
 
 use std::error::Error;
 use std::ffi::OsString;

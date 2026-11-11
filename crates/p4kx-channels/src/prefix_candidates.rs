@@ -14,6 +14,7 @@ pub struct PrefixSeeds {
     pub(crate) steam_roots: Vec<PathBuf>,
     pub(crate) steam_libraries: Vec<PathBuf>,
     pub(crate) bottles: Vec<PathBuf>,
+    pub(crate) crossover: Vec<PathBuf>,
     pub(crate) games: Vec<PathBuf>,
 }
 
@@ -42,6 +43,12 @@ impl PrefixSeeds {
         &self.bottles
     }
 
+    /// Returns roots whose immediate children are `CrossOver` bottles.
+    #[must_use]
+    pub fn crossover_bottle_roots(&self) -> &[PathBuf] {
+        &self.crossover
+    }
+
     /// Returns roots whose immediate children are custom or Lutris prefixes.
     #[must_use]
     pub fn games_roots(&self) -> &[PathBuf] {
@@ -57,6 +64,7 @@ pub(crate) fn seeds(environment: &WineEnvironment) -> PrefixSeeds {
             SeedKind::Steam => &mut seeds.steam_roots,
             SeedKind::Library => &mut seeds.steam_libraries,
             SeedKind::Bottles => &mut seeds.bottles,
+            SeedKind::CrossOver => &mut seeds.crossover,
             SeedKind::Games => &mut seeds.games,
         };
         if !paths.iter().any(|known| known == path) {

@@ -6,11 +6,20 @@ P4KX discovers installed Channels and public patch labels from one shared launch
 
 `WineEnvironment::new(home, wine_prefix)` and the five public fields of `SearchPaths` remain available. Owned `WineEnvironment` builders add compatibility-data, XDG, Steam installation/library and Bottles roots. `SearchRecipe::standard()` captures platform/environment inputs once and refreshes filesystem topology on every request. `SearchRecipe::explicit(paths)` and the explicit `SearchPaths` snapshot API never look up the host process environment. `snapshot_with_manual` borrows current manual settings without cloning configured candidate vectors before admission.
 
-On Unix, standard candidates include, in this order:
+On Linux, standard candidates include, in this order:
 
 1. The absolute nonempty `WINEPREFIX`, `~/Games/star-citizen`, and `STEAM_COMPAT_DATA_PATH/pfx`.
 2. Configured Steam installations, `$XDG_DATA_HOME/Steam` (default `~/.local/share/Steam`), `~/.steam/steam`, `~/.steam/root`, and both known Flatpak Steam data aliases below `~/.var/app/com.valvesoftware.Steam/` (`data/Steam` and `.local/share/Steam`). Only `steamapps/libraryfolders.vdf` and `config/libraryfolders.vdf` are parsed, in that order. Both the numeric-path and numeric-object `path` layouts are accepted. Every configured/external library is examined at `steamapps/compatdata/<numeric-appid>/pfx`.
 3. Explicit Steam libraries, then explicit Bottles roots, `$XDG_DATA_HOME/bottles/bottles`, the Flatpak `~/.var/app/com.usebottles.bottles/data/bottles/bottles` root, and immediate `~/Games/*` candidates for Lutris/custom installations.
+
+On macOS, direct candidates are the absolute nonempty WINEPREFIX, explicitly configured Wine
+prefixes, then ~/.wine. Configured CrossOver bottle roots follow, then the [standard CrossOver locations](https://support.codeweavers.com/advanced-crossover-mac-configuration) in the user's
+~/Library/Application Support/CrossOver/Bottles and the system
+/Library/Application Support/CrossOver/Bottles. A CrossOver root contributes immediate child
+directories with a drive_c directory. Standard Linux Steam, Proton, Lutris and Bottles locations
+are not searched on macOS. SearchRecipe::with_wine_locations supplies explicit directories
+without reading the host environment for an otherwise explicit recipe. Discovery does not
+read CrossOver preferences or registries.
 
 No recursive home search takes place. Empty/relative environment inputs are ignored. A directory component first requires its exact spelling. If absent, only a unique ASCII-case match is accepted; ambiguous siblings produce a typed diagnostic. Returned host paths preserve the actual directory spelling. Symlink aliases of a discovered prefix are deduplicated by resolved identity, retaining the first priority.
 

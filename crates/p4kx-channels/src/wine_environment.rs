@@ -10,10 +10,20 @@ use crate::prefix_candidates::{self, PrefixSeeds};
 use crate::prefix_discovery;
 use crate::prefix_fs::{NativePrefixFileSystem, PrefixFileSystem};
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum PrefixDefaults {
+    #[default]
+    Linux,
+    MacOs,
+}
+
 /// Owned environment and configured roots used by Wine-prefix discovery.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WineEnvironment {
+    pub(crate) defaults: PrefixDefaults,
     pub(crate) home: Option<PathBuf>,
+    pub(crate) wine_prefixes: Vec<PathBuf>,
+    pub(crate) crossover_bottle_roots: Vec<PathBuf>,
     pub(crate) wine_prefix: Option<OsString>,
     pub(crate) compat_data: Option<OsString>,
     pub(crate) data_home: Option<PathBuf>,
@@ -26,8 +36,19 @@ impl WineEnvironment {
     /// Creates an environment from the home folder and the value of WINEPREFIX.
     #[must_use]
     pub const fn new(home: Option<PathBuf>, wine_prefix: Option<OsString>) -> Self {
+        Self::for_defaults(PrefixDefaults::Linux, home, wine_prefix)
+    }
+
+    const fn for_defaults(
+        defaults: PrefixDefaults,
+        home: Option<PathBuf>,
+        wine_prefix: Option<OsString>,
+    ) -> Self {
         Self {
+            defaults,
             home,
+            wine_prefixes: Vec::new(),
+            crossover_bottle_roots: Vec::new(),
             wine_prefix,
             compat_data: None,
             data_home: None,
@@ -37,12 +58,38 @@ impl WineEnvironment {
         }
     }
 
+    /// Creates an environment with the standard macOS Wine and `CrossOver` locations.
+    #[must_use]
+    pub const fn macos(home: Option<PathBuf>, wine_prefix: Option<OsString>) -> Self {
+        Self::for_defaults(PrefixDefaults::MacOs, home, wine_prefix)
+    }
+
     /// Captures the current process environment without filesystem discovery.
     #[must_use]
     pub fn from_process() -> Self {
-        Self::new(dirs::home_dir(), std::env::var_os("WINEPREFIX"))
-            .with_compat_data(std::env::var_os("STEAM_COMPAT_DATA_PATH"))
-            .with_data_home(std::env::var_os("XDG_DATA_HOME").map(PathBuf::from))
+        let home = dirs::home_dir();
+        let wine_prefix = std::env::var_os("WINEPREFIX");
+        if cfg!(target_os = "macos") {
+            Self::macos(home, wine_prefix)
+        } else {
+            Self::new(home, wine_prefix)
+                .with_compat_data(std::env::var_os("STEAM_COMPAT_DATA_PATH"))
+                .with_data_home(std::env::var_os("XDG_DATA_HOME").map(PathBuf::from))
+        }
+    }
+
+    /// Sets absolute Wine prefix paths in their supplied order.
+    #[must_use]
+    pub fn with_wine_prefixes(mut self, prefixes: Vec<PathBuf>) -> Self {
+        self.wine_prefixes = prefixes;
+        self
+    }
+
+    /// Sets roots containing immediate `CrossOver` bottle directories.
+    #[must_use]
+    pub fn with_crossover_bottle_roots(mut self, roots: Vec<PathBuf>) -> Self {
+        self.crossover_bottle_roots = roots;
+        self
     }
 
     /// Sets the explicit Steam compatibility-data directory, above its pfx directory.

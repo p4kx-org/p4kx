@@ -8,7 +8,7 @@ use crate::discovery_context::DiscoveryContext;
 use crate::discovery_limits::{DiscoveryLimit, DiscoveryLimits};
 use crate::discovery_report::DiscoveryReport;
 use crate::prefix_case;
-use crate::prefix_fs::PrefixFileSystem;
+use crate::prefix_fs::{DiscoveryPathKind, PrefixFileSystem};
 use crate::prefix_seed_walk::{self, SeedKind};
 use crate::steam_config;
 use crate::wine::WineEnvironment;
@@ -44,7 +44,9 @@ pub(crate) fn discover_in<F: PrefixFileSystem>(
             SeedKind::Direct => found.admit(context, path),
             SeedKind::Steam => libraries.steam_root(context, path, &mut found),
             SeedKind::Library => libraries.visit(context, path, &mut found),
-            SeedKind::Bottles | SeedKind::Games => children(context, path, &mut found),
+            SeedKind::Bottles | SeedKind::CrossOver | SeedKind::Games => {
+                children(context, path, kind, &mut found);
+            }
         }
         !context.budget.exhausted()
     });
@@ -82,6 +84,7 @@ impl Prefixes {
 fn children<F: PrefixFileSystem>(
     context: &mut DiscoveryContext<'_, F>,
     root: &Path,
+    kind: SeedKind,
     found: &mut Prefixes,
 ) {
     let Some(root) = prefix_case::absolute(context, root) else {
@@ -94,7 +97,14 @@ fn children<F: PrefixFileSystem>(
         if context.budget.exhausted() {
             return;
         }
-        found.admit(context, &root.join(name));
+        let prefix = root.join(name);
+        if kind == SeedKind::CrossOver
+            && (context.kind(&prefix) != Some(DiscoveryPathKind::Directory)
+                || prefix_case::descend(context, &prefix, &["drive_c"]).is_none())
+        {
+            continue;
+        }
+        found.admit(context, &prefix);
     }
 }
 
