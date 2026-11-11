@@ -50,6 +50,14 @@ fn complete(missing_geometry: Option<usize>) -> TestResult {
         );
         let tags: Vec<_> = (1..=level).map(|at| format!("{branch}-{at}")).collect();
         assert_eq!(variant.tags(), tags, "the exact parent tag chain survives");
+        let root_slot = if branch == "a" { 0 } else { 2 };
+        let slots: Vec<_> = std::iter::once(root_slot)
+            .chain(std::iter::repeat_n(0, level - 1))
+            .collect();
+        assert_eq!(
+            variant.source_slots, slots,
+            "the source path retains its original sparse ordinal"
+        );
     }
     Ok(())
 }

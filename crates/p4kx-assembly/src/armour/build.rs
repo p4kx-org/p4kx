@@ -162,6 +162,14 @@ fn part_of(
         model,
         archive_sources: Arc::clone(&found.archive_sources),
         definition_origin: found.definition_origin.clone(),
+        geometry_selector: job.geometry_selector.clone(),
+        material_selector: job.material_selector.clone().or_else(|| {
+            if job.material.is_none() && found.model.material_library.is_some() {
+                job.geometry_selector.clone()
+            } else {
+                None
+            }
+        }),
         materials: materials.status,
         material_archive_origins: materials.origins,
         palette: materials.palette,

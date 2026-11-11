@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_dataforge::Guid;
+use p4kx_extraction::SourceLocation;
 
 use super::{BodyVariant, ZoneChunk, ZoneList};
 use crate::node_geometry::select_variant;
@@ -17,11 +18,18 @@ pub(crate) enum Unfit {
     NoVariant,
 }
 
+#[derive(Clone, Copy)]
+pub(super) enum GeometryField {
+    Path,
+    MaterialPath,
+}
+
 /// The geometry worn on a body and whether it is the Record's main geometry, not a sub-geometry.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Worn<'a> {
     pub(crate) geometry: &'a Geometry,
     pub(crate) main: bool,
+    pub(crate) source_slots: &'a [usize],
 }
 
 /// An Entity worn on a body, with the geometry its Record names: the main geometry and the
@@ -30,6 +38,8 @@ pub(crate) struct Worn<'a> {
 pub struct Wearable {
     pub(crate) guid: Guid,
     pub(crate) record_path: String,
+    record_index: Option<u32>,
+    geometry_component: Option<usize>,
     pub(crate) class_name: String,
     pub(crate) item_type: String,
     pub(crate) geometry: Option<Geometry>,
@@ -44,6 +54,8 @@ impl Wearable {
         Self {
             guid: spec.guid,
             record_path: spec.record_path.clone(),
+            record_index: spec.record_index,
+            geometry_component: spec.geometry_component,
             class_name: crate::entities::class_name_of(&spec.name)
                 .unwrap_or(&spec.name)
                 .to_owned(),
@@ -97,9 +109,33 @@ impl Wearable {
                 Ok(Worn {
                     geometry: &found.geometry,
                     main: false,
+                    source_slots: &found.source_slots,
                 })
             },
         )
+    }
+
+    pub(super) fn geometry_field(
+        &self,
+        worn: Worn<'_>,
+        field: GeometryField,
+    ) -> Option<SourceLocation> {
+        let record_index = self.record_index?;
+        let component = self.geometry_component?;
+        let mut path = format!("Components[{component}].Geometry");
+        for slot in worn.source_slots {
+            path.push_str(".SubGeometry[");
+            path.push_str(&slot.to_string());
+            path.push(']');
+        }
+        path.push_str(match field {
+            GeometryField::Path => ".Geometry.Geometry.path",
+            GeometryField::MaterialPath => ".Geometry.Material.path",
+        });
+        Some(SourceLocation::DataForge {
+            record_index,
+            field: path,
+        })
     }
 
     /// Returns the GUID of the Entity's Record.
@@ -145,6 +181,7 @@ impl Wearable {
             return Ok(Worn {
                 geometry: &found.geometry,
                 main: false,
+                source_slots: &found.source_slots,
             });
         }
         let per_body = self.variants.iter().any(|found| {
@@ -160,6 +197,7 @@ impl Wearable {
             .map(|geometry| Worn {
                 geometry,
                 main: true,
+                source_slots: &[],
             })
             .ok_or(Unfit::NoGeometry)
     }
@@ -177,6 +215,7 @@ mod tests {
 
     fn variant(tags: &[&str], path: &str) -> GeometryVariant {
         GeometryVariant {
+            source_slots: Vec::new(),
             tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
             geometry: Geometry {
                 path: path.to_owned(),
@@ -190,6 +229,8 @@ mod tests {
         Wearable {
             guid: Guid::from_stored([0; 16]),
             record_path: String::new(),
+            record_index: None,
+            geometry_component: None,
             class_name: "Head_Teeth".to_owned(),
             item_type: "Char_Head_Teeth".to_owned(),
             geometry: None,

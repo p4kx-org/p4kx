@@ -4,8 +4,9 @@
 use std::collections::HashMap;
 
 use p4kx_dataforge::{DataForge, Guid, Value};
+use p4kx_extraction::SourceLocation;
 
-use super::{HeadItems, Wearable};
+use super::{HeadItems, HeadMaterial, Wearable};
 use crate::LoadoutResolver;
 use crate::read::{as_struct, indexed_struct_items, text};
 use crate::spec::PortSpec;
@@ -119,5 +120,14 @@ impl HeadItems for ForgeItems<'_, '_> {
     fn material_path(&self, material: Guid) -> Option<String> {
         self.material_target(material)
             .map(|target| target.path.clone())
+    }
+
+    fn material_observed(&self, material: Guid) -> Option<HeadMaterial> {
+        let target = self.material_target(material)?;
+        let source = SourceLocation::DataForge {
+            record_index: target.record,
+            field: format!("materialLookupTable.materials[{}].filePath", target.index),
+        };
+        Some(HeadMaterial::new(target.path.clone(), Some(source)))
     }
 }

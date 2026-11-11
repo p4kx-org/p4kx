@@ -4,7 +4,7 @@
 use p4kx_dataforge::{Guid, StructValue, Value, ValueError};
 
 use crate::character_path::is_rigged_path_outside_human_rigs;
-use crate::read::{struct_field, struct_items, text};
+use crate::read::{indexed_struct_items, struct_field, text};
 
 /// The tint palette an Entity's geometry names (`Palette.TintPaletteRef`): the `TintPaletteTree`
 /// Record and the child of its tree.
@@ -44,6 +44,7 @@ pub struct Geometry {
 pub struct GeometryVariant {
     pub(crate) tags: Vec<String>,
     pub(crate) geometry: Geometry,
+    pub(crate) source_slots: Vec<usize>,
 }
 
 impl GeometryVariant {
@@ -108,20 +109,22 @@ impl Geometry {
             return Vec::new();
         };
         let mut variants = Vec::new();
-        let mut level = vec![(node, Vec::<String>::new())];
+        let mut level = vec![(node, Vec::<String>::new(), Vec::<usize>::new())];
         while !level.is_empty() {
             let mut next = Vec::new();
-            for (parent, inherited) in &level {
-                for sub in struct_items(parent, "SubGeometry") {
+            for (parent, inherited, source) in &level {
+                for (slot, sub) in indexed_struct_items(parent, "SubGeometry") {
+                    let slots: Vec<_> = source.iter().copied().chain([slot]).collect();
                     let mut tags = inherited.clone();
                     tags.extend(text(sub, "Tags").split_whitespace().map(str::to_owned));
                     if let Some(geometry) = Self::of_node(sub) {
                         variants.push(GeometryVariant {
                             tags: tags.clone(),
                             geometry,
+                            source_slots: slots.clone(),
                         });
                     }
-                    next.push((sub, tags));
+                    next.push((sub, tags, slots));
                 }
             }
             level = next;

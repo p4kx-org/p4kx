@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use p4kx_dataforge::{Guid, RecordTree, StructValue, Value};
+use p4kx_dataforge::{Guid, RecordTree, StructValue};
 
 use crate::LoadoutXmlClassUse;
 use crate::armour::{ZoneList, read_zones};
@@ -15,7 +15,7 @@ use crate::manual_loadout::ManualLoadout;
 use crate::merge::port_key;
 use crate::outfit_read::OutfitInfo;
 use crate::port::{PortDefinition, read_definition};
-use crate::read::{as_struct, indexed_struct_items, struct_field, text, unsigned};
+use crate::read::{indexed_struct_items, struct_field, text, unsigned};
 pub(crate) use crate::spec_loadout::read_loadout;
 use crate::target_spec;
 pub(crate) use crate::target_spec::TargetSpec;
@@ -127,6 +127,7 @@ pub(crate) struct EntitySpec {
     pub(crate) loadout: Option<LoadoutSpec>,
     pub(crate) outfit: Option<OutfitInfo>,
     pub(crate) geometry: Option<Geometry>,
+    pub(crate) geometry_component: Option<usize>,
     pub(crate) variants: Vec<GeometryVariant>,
     pub(crate) vehicle: Option<VehicleSpec>,
     pub(crate) docked_vehicle: bool,
@@ -152,12 +153,11 @@ impl EntitySpec {
         for (at, port) in ports.iter().enumerate() {
             port_index.entry(port_key(&port.name)).or_insert(at);
         }
-        let geometry_component = components
-            .iter()
-            .find(|component| component.type_name() == GEOMETRY_RESOURCE);
-        let geometry = geometry_component.and_then(|component| Geometry::read(component));
+        let geometry_component =
+            component_slots(tree).find(|(_, component)| component.type_name() == GEOMETRY_RESOURCE);
+        let geometry = geometry_component.and_then(|(_, component)| Geometry::read(component));
         let variants = geometry_component
-            .map(|component| Geometry::read_variants(component))
+            .map(|(_, component)| Geometry::read_variants(component))
             .unwrap_or_default();
         let vehicle = components
             .iter()
@@ -173,7 +173,7 @@ impl EntitySpec {
                 .map(|definition| tag_words(text(definition, "Tags")))
                 .unwrap_or_default(),
             material_variants: geometry_component
-                .map(|component| MaterialVariant::read(component))
+                .map(|(_, component)| MaterialVariant::read(component))
                 .unwrap_or_default(),
             size: definition.and_then(|definition| unsigned(definition, "Size")),
             docked_vehicle: is_docked_vehicle_type(attach_type),
@@ -193,6 +193,7 @@ impl EntitySpec {
             loadout,
             outfit,
             geometry,
+            geometry_component: geometry_component.map(|(position, _)| position),
             variants,
             vehicle,
         }
@@ -254,17 +255,8 @@ fn read_default_loadout(
 /// Reads the item ports of the port containers among `components`, and the flags the containers
 /// give all their ports.
 fn read_ports(tree: &RecordTree<'_>, paths: &PathRead<'_>) -> (Vec<PortSpec>, Vec<String>) {
-    let components = match tree.field("Components") {
-        Some(Value::Array(items)) => &items[..],
-        _ => &[],
-    };
-    let containers = || {
-        components.iter().enumerate().filter_map(|(index, value)| {
-            as_struct(value)
-                .filter(|component| component.type_name() == PORT_CONTAINER)
-                .map(|component| (index, component))
-        })
-    };
+    let containers =
+        || component_slots(tree).filter(|(_, component)| component.type_name() == PORT_CONTAINER);
     let ports = containers()
         .flat_map(|(component_index, component)| {
             indexed_struct_items(component, "Ports").map(move |(port_index, port)| PortSpec {
@@ -288,11 +280,16 @@ fn read_ports(tree: &RecordTree<'_>, paths: &PathRead<'_>) -> (Vec<PortSpec>, Ve
     (ports, flags)
 }
 
+fn component_slots<'v, 'f>(
+    tree: &'v RecordTree<'f>,
+) -> impl Iterator<Item = (usize, &'v StructValue<'f>)> {
+    indexed_struct_items(tree.root(), "Components")
+}
+
 fn components_of<'v, 'f>(tree: &'v RecordTree<'f>) -> Vec<&'v StructValue<'f>> {
-    match tree.field("Components") {
-        Some(Value::Array(items)) => items.iter().filter_map(as_struct).collect(),
-        _ => Vec::new(),
-    }
+    component_slots(tree)
+        .map(|(_, component)| component)
+        .collect()
 }
 
 /// Reads the main geometry an Entity Record names, without its ports and Loadout.

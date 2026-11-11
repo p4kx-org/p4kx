@@ -4,11 +4,12 @@
 use std::sync::Arc;
 
 use p4kx_character::Dna;
+use p4kx_extraction::SourceLocation;
 
 use super::hidden;
 use super::piece::{Mount, Note, Source};
-use super::wearable::{Unfit, Worn};
-use super::{BodyVariant, Expressions, Look, PartOrigin, Piece, ZoneChunk};
+use super::wearable::{GeometryField, Unfit, Worn};
+use super::{BodyVariant, Expressions, Look, PartOrigin, Piece, Wearable, ZoneChunk};
 use crate::bespoke::{Bespoke, exists, missing_library};
 use crate::{Issue, IssueKind, MaterialVariant, ModelProvider, PaletteRef};
 
@@ -20,6 +21,8 @@ pub(super) struct Job {
     pub(super) label: String,
     pub(super) path: String,
     pub(super) material: Option<String>,
+    pub(super) geometry_selector: Option<SourceLocation>,
+    pub(super) material_selector: Option<SourceLocation>,
     pub(super) palette: Option<PaletteRef>,
     pub(super) shape: Option<Dna>,
     pub(super) expressions: Expressions,
@@ -40,6 +43,8 @@ impl Job {
             label: "body".to_owned(),
             path: path.to_owned(),
             material: None,
+            geometry_selector: None,
+            material_selector: None,
             palette: None,
             shape: None,
             expressions: Expressions::None,
@@ -120,7 +125,7 @@ pub(super) fn gather(
             .iter()
             .map(|note| piece_issue(piece, note_kind(note))),
     );
-    let (path, material, palette) = match &piece.source {
+    let mut selected = match &piece.source {
         Source::Body => return,
         Source::Failed(reason) => {
             let kind = IssueKind::PieceNotFound {
@@ -129,33 +134,27 @@ pub(super) fn gather(
             issues.push(piece_issue(piece, kind));
             return;
         }
-        Source::File { path, material } => (path.clone(), material.clone(), None),
-        Source::Wearable(wearable) => match wearable.geometry_selected(variant, &piece.selecting) {
-            Ok(Worn { geometry, main }) => {
-                if main && !is_skinned_file(geometry.path()) {
-                    let body = variant.code().to_owned();
-                    issues.push(piece_issue(piece, IssueKind::MainGeometryWorn { body }));
-                }
-                (
-                    geometry.path().to_owned(),
-                    chosen_material(piece, wearable, variant, geometry.material()),
-                    geometry.palette().cloned(),
-                )
-            }
-            Err(Unfit::NoGeometry) => {
-                issues.push(piece_issue(piece, IssueKind::NoWornGeometry));
-                return;
-            }
-            Err(Unfit::NoVariant) => {
-                let body = variant.code().to_owned();
-                issues.push(piece_issue(piece, IssueKind::NoVariantGeometry { body }));
-                return;
-            }
+        Source::File { path, material } => Selected {
+            path: path.clone(),
+            material: material.clone(),
+            ..Selected::default()
         },
+        Source::Wearable(wearable) => {
+            let Some(selected) = select_wearable(piece, wearable, variant, issues) else {
+                return;
+            };
+            selected
+        }
     };
-    let own = own_skin(piece, &path, models);
+    let own = own_skin(piece, &selected.path, models);
     let bespoke = own.is_some();
-    let material = existing_library(piece, material, bespoke, models, issues);
+    existing_library(piece, &mut selected, bespoke, models, issues);
+    if let Some(material) = &piece.material {
+        selected.material = Some(material.clone());
+        selected
+            .material_selector
+            .clone_from(&piece.material_source);
+    }
     let zones = covered_zones(piece, issues);
     jobs.push(Job {
         zones,
@@ -163,9 +162,11 @@ pub(super) fn gather(
         part: piece.name.clone(),
         owner: String::new(),
         label: piece.name.clone(),
-        path: own.unwrap_or(path),
-        material: piece.material.clone().or(material),
-        palette,
+        path: own.unwrap_or(selected.path),
+        material: selected.material,
+        geometry_selector: selected.geometry_selector,
+        material_selector: selected.material_selector,
+        palette: selected.palette,
         shape: piece.shape.clone(),
         expressions: piece.expressions.clone(),
         look: piece.look.clone(),
@@ -175,33 +176,80 @@ pub(super) fn gather(
     });
 }
 
-/// Returns `material` for a piece of a story character's head, or, when the Archive lacks that
-/// library, the head's own library for a part with a skin of its own, and none otherwise; the
-/// missing library is reported to `issues`. Other pieces keep `material`.
+#[derive(Default)]
+struct Selected {
+    path: String,
+    material: Option<String>,
+    geometry_selector: Option<SourceLocation>,
+    material_selector: Option<SourceLocation>,
+    palette: Option<PaletteRef>,
+}
+
+fn select_wearable(
+    piece: &Piece,
+    wearable: &Wearable,
+    variant: BodyVariant,
+    issues: &mut Vec<Issue>,
+) -> Option<Selected> {
+    let worn = match wearable.geometry_selected(variant, &piece.selecting) {
+        Ok(worn) => worn,
+        Err(reason) => {
+            let kind = match reason {
+                Unfit::NoGeometry => IssueKind::NoWornGeometry,
+                Unfit::NoVariant => IssueKind::NoVariantGeometry {
+                    body: variant.code().to_owned(),
+                },
+            };
+            issues.push(piece_issue(piece, kind));
+            return None;
+        }
+    };
+    let Worn { geometry, main, .. } = worn;
+    if main && !is_skinned_file(geometry.path()) {
+        let body = variant.code().to_owned();
+        issues.push(piece_issue(piece, IssueKind::MainGeometryWorn { body }));
+    }
+    let material = chosen_material(piece, wearable, variant, geometry.material());
+    let material_selector = if piece.variant_tags.is_empty() && material.is_some() {
+        wearable.geometry_field(worn, GeometryField::MaterialPath)
+    } else {
+        None
+    };
+    Some(Selected {
+        path: geometry.path().to_owned(),
+        material,
+        geometry_selector: wearable.geometry_field(worn, GeometryField::Path),
+        material_selector,
+        palette: geometry.palette().cloned(),
+    })
+}
+
+/// Replaces a missing material library of a story character's head.
 fn existing_library(
     piece: &Piece,
-    material: Option<String>,
+    selected: &mut Selected,
     bespoke: bool,
     models: &dyn ModelProvider,
     issues: &mut Vec<Issue>,
-) -> Option<String> {
-    let (Some(head), Some(library)) = (&piece.bespoke, &material) else {
-        return material;
+) {
+    let (Some(head), Some(library)) = (&piece.bespoke, &selected.material) else {
+        return;
     };
     let head_library = bespoke.then_some(head.library.as_str());
     let Some(missing) = missing_library(library, head_library, |name| !exists(name, models)) else {
-        return material;
+        return;
     };
     let reason = missing.reason;
     issues.push(piece_issue(piece, IssueKind::MaterialLibrary { reason }));
-    missing.replacement
+    selected.material = missing.replacement;
+    selected.material_selector = None;
 }
 
 /// Returns the material library of a worn Entity: the one its material tree has for the tags of
 /// the piece and the body, else the one of its geometry.
 fn chosen_material(
     piece: &Piece,
-    wearable: &super::Wearable,
+    wearable: &Wearable,
     variant: BodyVariant,
     geometry: Option<&str>,
 ) -> Option<String> {
@@ -220,6 +268,7 @@ fn chosen_material(
 fn restyle_body(jobs: &mut [Job], piece: &Piece) {
     if let Some(body) = jobs.first_mut() {
         body.material.clone_from(&piece.material);
+        body.material_selector.clone_from(&piece.material_source);
         body.look.clone_from(&piece.look);
     }
 }

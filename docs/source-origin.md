@@ -126,7 +126,11 @@ companion identifies glTF data in the JSON and binary chunks. A
 `glbJsonField` path is a JSON Pointer within the GLB JSON chunk. A
 `glbBinaryBytes` path identifies the written `/bufferViews/N` entry and
 provides its absolute, half-open byte range in the file, excluding alignment
-padding. Each addressed datum carries its own contributing source set.
+padding. Each addressed datum carries its own contributing source set. A
+DataForge selector identifies the original Record and stored array positions
+used to choose an item model or material library. A selected encrypted
+DataForge field can mark the result when the chosen model and texture files
+are clear.
 
 The `--json` report adds `originReceipt`, `fieldOrigins`, `provenance` and
 `textureImageOrigins`. Field origins use JSON Pointers into the report. The

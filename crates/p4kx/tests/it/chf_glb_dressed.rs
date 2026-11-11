@@ -14,7 +14,7 @@ use p4kx_extraction::OriginDigestWriter;
 use p4kx_testkit::{
     DRESSED_EYES, DRESSED_GONE_HAIR, DRESSED_HAIR, DRESSED_HAIR_OPACITY, DRESSED_HEAD_DIFFUSE,
     DRESSED_HEAD_MATERIAL, DRESSED_HEAD_MATERIAL_FILE, HEAD_REGIONS, HEAD_VERTICES, MALE_BODY_TYPE,
-    MALE_RIG_HASH, SplitDds, TestChf, TestItemPort, TestMaterial, TestSubMaterial,
+    MALE_RIG_HASH, SplitDds, TestChf, TestEntry, TestItemPort, TestMaterial, TestSubMaterial,
     TestTextureFormat, check_glb, dressed_entries, head_rig, test_key,
 };
 
@@ -23,6 +23,9 @@ use serde_json::Value;
 use crate::chf_glb::{archive, glb_with};
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+#[path = "chf_glb_selectors.rs"]
+mod selectors;
 
 fn stored(guid: u128) -> Result<[u8; 16], Box<dyn Error>> {
     let text = format!("{guid:032x}");
@@ -83,10 +86,7 @@ fn dressed_chf(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
     Ok(path)
 }
 
-#[test]
-fn a_dressed_character_is_written_with_eyes_hair_textures_and_a_report_of_what_is_missing()
--> TestResult {
-    let dir = tempfile::tempdir()?;
+fn textured_entries() -> Vec<TestEntry> {
     let rig = head_rig(HEAD_VERTICES, MALE_RIG_HASH).build();
     let mut entries = dressed_entries(Some(rig));
     let texture = SplitDds::new(TestTextureFormat::LegacyBgra8, 4, 4).mips(1);
@@ -94,6 +94,14 @@ fn a_dressed_character_is_written_with_eyes_hair_textures_and_a_report_of_what_i
         let dds = file.replace('/', "\\").replace(".tif", ".dds");
         entries.extend(texture.entries(&format!("Data\\{dds}")));
     }
+    entries
+}
+
+#[test]
+fn a_dressed_character_is_written_with_eyes_hair_textures_and_a_report_of_what_is_missing()
+-> TestResult {
+    let dir = tempfile::tempdir()?;
+    let entries = textured_entries();
     let head_material = format!("Data\\{}", DRESSED_HEAD_MATERIAL_FILE.replace('/', "\\"));
     let entries = entries
         .into_iter()

@@ -3,12 +3,23 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource};
+use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource, SourceLocation};
 
 use super::{Armour, ArmourPart, ShapeArchiveSources};
 use crate::PaletteRecords;
 
 impl ArmourPart {
+    /// Returns the original DataForge field that selected the model path.
+    #[must_use]
+    pub const fn geometry_selector(&self) -> Option<&SourceLocation> {
+        self.geometry_selector.as_ref()
+    }
+
+    /// Returns the original DataForge field that selected the material library.
+    #[must_use]
+    pub const fn material_selector(&self) -> Option<&SourceLocation> {
+        self.material_selector.as_ref()
+    }
     /// Returns the material library and layer reads selected for this part.
     #[must_use]
     pub fn material_archive_origins(&self) -> &MaterialArchiveOrigins {

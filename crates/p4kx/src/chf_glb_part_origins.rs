@@ -73,7 +73,7 @@ impl Part {
     ) -> Result<Self> {
         let mut found = Self::default();
         let files = part.model_archive_sources();
-        (found.selection, found.path) = selected_part(uses, part)?;
+        (found.selection, found.path) = selected_part(uses, part, forge)?;
         if emitted.geometry() {
             found.geometry.extend(&found.selection);
             for source in files
@@ -118,8 +118,14 @@ impl Part {
     }
 }
 
-fn selected_part(uses: &SourceUses, part: &ArmourPart) -> Result<(Contributors, Contributors)> {
+fn selected_part(
+    uses: &SourceUses,
+    part: &ArmourPart,
+    forge: &DataForgeOrigin,
+) -> Result<(Contributors, Contributors)> {
     let mut model = Contributors::default();
+    let selector = part.geometry_selector();
+    dataforge_selector(uses, &mut model, forge, selector)?;
     let primary = part
         .model_archive_sources()
         .iter()
@@ -135,7 +141,7 @@ fn selected_part(uses: &SourceUses, part: &ArmourPart) -> Result<(Contributors, 
         named.map_or(SourceInput::Unknown, SourceInput::Archive),
         InputScope::ArchiveDirectoryMetadata,
     )?;
-    let path = Contributors {
+    let mut path = Contributors {
         values: vec![scope.at(
             SourceLocation::Metadata {
                 field: "path".into(),
@@ -144,6 +150,7 @@ fn selected_part(uses: &SourceUses, part: &ArmourPart) -> Result<(Contributors, 
         )?],
         complete: named.is_some(),
     };
+    dataforge_selector(uses, &mut path, forge, selector)?;
     Ok((model, path))
 }
 
@@ -175,6 +182,7 @@ fn materials(
     for slot in emitted.material_slots() {
         let mut source = Contributors::default();
         source.entry(uses, archive.library(), SourceUseRole::Conversion)?;
+        dataforge_selector(uses, &mut source, forge, part.material_selector())?;
         for layer in emitted.material_layers(slot) {
             selected_layer(uses, &mut source, archive, slot, layer)?;
         }
@@ -206,6 +214,7 @@ pub(super) fn image_material(
     };
     let archive = part.material_archive_origins();
     found.entry(uses, archive.library(), SourceUseRole::Selector)?;
+    dataforge_selector(uses, found, forge, part.material_selector())?;
     for &layer in &source.layers {
         selected_layer(uses, found, archive, slot, layer)?;
     }
@@ -244,17 +253,35 @@ fn selected_layer(
     Ok(())
 }
 
+fn dataforge_selector(
+    uses: &SourceUses,
+    found: &mut Contributors,
+    forge: &DataForgeOrigin,
+    location: Option<&SourceLocation>,
+) -> Result<()> {
+    if let Some(location) = location {
+        let scope = uses.observe(dataforge_input(forge), InputScope::Payload)?;
+        found
+            .values
+            .push(scope.at(location.clone(), SourceUseRole::Selector)?);
+    }
+    Ok(())
+}
+
+const fn dataforge_input(forge: &DataForgeOrigin) -> SourceInput<'_> {
+    match forge {
+        DataForgeOrigin::Archive(entry) => SourceInput::Archive(entry),
+        _ => SourceInput::Unknown,
+    }
+}
+
 fn palette(
     uses: &SourceUses,
     found: &mut Contributors,
     forge: &DataForgeOrigin,
     records: PaletteRecords,
 ) -> Result<()> {
-    let source = match forge {
-        DataForgeOrigin::Archive(entry) => SourceInput::Archive(entry),
-        _ => SourceInput::Unknown,
-    };
-    let scope = uses.observe(source, InputScope::Payload)?;
+    let scope = uses.observe(dataforge_input(forge), InputScope::Payload)?;
     if let Some(selector) = records.selector {
         found.values.push(scope.at(
             SourceLocation::Subresource {

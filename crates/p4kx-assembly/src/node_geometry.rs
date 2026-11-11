@@ -133,6 +133,7 @@ mod tests {
 
     fn variant(tags: &str, path: &str) -> GeometryVariant {
         GeometryVariant {
+            source_slots: Vec::new(),
             tags: tags.split_whitespace().map(str::to_owned).collect(),
             geometry: Geometry {
                 path: path.to_owned(),

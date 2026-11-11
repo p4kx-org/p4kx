@@ -168,8 +168,9 @@ pub use animation_folders::{
 };
 pub use armour::{
     Armour, ArmourPart, BodyVariant, CharacterAnimations, Expressions, ForgeItems, Head, HeadError,
-    HeadItems, Look, LowerMorphSources, MAX_ANIMATION_VALUES, MAX_DNA_RIG_LEN, NpcHead, PartOrigin,
-    Piece, Replaced, RigArchiveRead, ShapeArchiveSources, Wearable, ZoneChunk, is_worn_type,
+    HeadItems, HeadMaterial, Look, LowerMorphSources, MAX_ANIMATION_VALUES, MAX_DNA_RIG_LEN,
+    NpcHead, PartOrigin, Piece, Replaced, RigArchiveRead, ShapeArchiveSources, Wearable, ZoneChunk,
+    is_worn_type,
 };
 pub use assembly::{
     Assembly, AssemblyOptions, MAX_ASSEMBLY_DEPTH, MAX_ASSEMBLY_PARTS, MAX_ASSEMBLY_VERTICES, Part,

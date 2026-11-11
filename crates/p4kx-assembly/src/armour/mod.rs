@@ -49,7 +49,7 @@ mod zones;
 use std::io::Write;
 use std::sync::Arc;
 
-use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource};
+use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource, SourceLocation};
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, MorphTarget, RigMount, RigPiece, TextureLoader,
     write_rigged_glb, write_rigged_glb_with,
@@ -58,7 +58,7 @@ use p4kx_model::{MaterialStatus, Model, UnresolvedLayers};
 
 pub use animate::{CharacterAnimations, MAX_ANIMATION_VALUES};
 pub use body::BodyVariant;
-pub use dress::HeadItems;
+pub use dress::{HeadItems, HeadMaterial};
 pub use expressions::Expressions;
 pub use forge_items::ForgeItems;
 pub use head::{Head, HeadError};
@@ -93,6 +93,8 @@ pub struct ArmourPart {
     pub(crate) model: Arc<Model>,
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
     pub(crate) definition_origin: Option<EntryOrigin>,
+    pub(crate) geometry_selector: Option<SourceLocation>,
+    pub(crate) material_selector: Option<SourceLocation>,
     pub(crate) materials: Arc<MaterialStatus>,
     pub(crate) material_archive_origins: Arc<MaterialArchiveOrigins>,
     pub(crate) palette: Option<materials::PaletteApplication>,

@@ -3,6 +3,7 @@
 
 use p4kx_character::{Character, Dna, Guid as ChfGuid, ItemPort, lowered_hash, skin_attachment};
 use p4kx_dataforge::Guid;
+use p4kx_extraction::SourceLocation;
 
 use super::piece::Note;
 use super::{Head, HeadError, Look, Piece, Wearable};
@@ -34,6 +35,24 @@ const PORTS: [&str; 16] = [
     SCALP_PORT,
 ];
 
+/// A material library selected by a Character's base-material GUID.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct HeadMaterial {
+    /// The chosen library path below Data.
+    pub path: String,
+    /// The original DataForge field that supplied the path, when observed.
+    pub source: Option<SourceLocation>,
+}
+
+impl HeadMaterial {
+    /// Returns a selected path with optional original DataForge evidence.
+    #[must_use]
+    pub const fn new(path: String, source: Option<SourceLocation>) -> Self {
+        Self { path, source }
+    }
+}
+
 /// Supplies what the items of a Character's head are made of.
 pub trait HeadItems {
     /// Reads the Entity `item` as something to wear.
@@ -46,6 +65,12 @@ pub trait HeadItems {
     /// Returns the material library, a path below `Data`, that the material `material` of a
     /// Character stands for, or `None` when it is in no lookup table.
     fn material_path(&self, material: Guid) -> Option<String>;
+
+    /// Returns the chosen library path with its original source field when observed.
+    fn material_observed(&self, material: Guid) -> Option<HeadMaterial> {
+        self.material_path(material)
+            .map(|path| HeadMaterial::new(path, None))
+    }
 }
 
 const fn forge_guid(guid: ChfGuid) -> Guid {
@@ -93,8 +118,8 @@ impl Dressing<'_> {
         };
         if choice.base_material != ChfGuid::default() {
             let base = forge_guid(choice.base_material);
-            piece = if let Some(path) = items.material_path(base) {
-                piece.with_material(path)
+            piece = if let Some(selected) = items.material_observed(base) {
+                piece.with_material_source(selected)
             } else {
                 piece.noting(Note::UnknownMaterial(base.to_string()))
             };
