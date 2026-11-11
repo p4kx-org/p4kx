@@ -13,6 +13,7 @@ mod bank_object_fields;
 mod bank_parse;
 mod bank_reader;
 mod bank_source;
+mod bank_source_container;
 mod bank_source_didx;
 mod bank_source_event;
 mod bank_source_hirc;
@@ -23,6 +24,7 @@ mod codec;
 mod error;
 mod hirc;
 mod hirc_action;
+mod hirc_container;
 mod hirc_event;
 mod hirc_layout;
 mod hirc_music;
@@ -55,6 +57,9 @@ pub use bank_object_fields::BankHircField;
 pub use bank_source::{
     BankObservedHeader, BankReadError, BankSectionCursor, BankSource, BankSourceSection,
 };
+pub use bank_source_container::{
+    BankContainerChild, BankContainerChildren, BankContainerRead, BankHircContainer,
+};
 pub use bank_source_didx::{BankDidx, BankDidxEntry, BankMediaInfo};
 pub use bank_source_event::{BankEvent, BankEventAction, BankEventRead, BankHircEvent};
 pub use bank_source_hirc::{
@@ -68,6 +73,7 @@ pub use hirc::{HircKind, HircObject, HircValue, MediaStorage, SoundSource};
 pub use hirc_action::{
     ActionTarget, BankActionFields, BankPlayBankDecision, BankPlayBankFields, PlayBank,
 };
+pub use hirc_container::BankContainerFields;
 pub use hirc_event::BankEventCountEncoding;
 pub use hirc_layout::HircLayout;
 pub use hirc_music::{

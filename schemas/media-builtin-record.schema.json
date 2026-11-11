@@ -2775,6 +2775,129 @@
       ],
       "type": "object"
     },
+    "ContainerPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ContainerRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-container",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HircContainerChildRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-container-child",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ContainerPayload"
+    },
+    "ContainerRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "child_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "children_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "container_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HircContainerKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "layout": {
+          "$ref": "#/$defs/HircContainerLayout"
+        },
+        "mode_code": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "node_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "suffix_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "layout",
+        "container_kind",
+        "parent_id",
+        "mode_code",
+        "child_count",
+        "node_range",
+        "children_range",
+        "suffix_range"
+      ],
+      "type": "object"
+    },
     "Continuation": {
       "oneOf": [
         {
@@ -3605,6 +3728,45 @@
         "raw_bits"
       ],
       "type": "object"
+    },
+    "HircContainerChildRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "child_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "ordinal",
+        "child_id",
+        "id_range"
+      ],
+      "type": "object"
+    },
+    "HircContainerKind": {
+      "enum": [
+        "random",
+        "sequence",
+        "switch",
+        "blend"
+      ],
+      "type": "string"
+    },
+    "HircContainerLayout": {
+      "enum": [
+        "decoded",
+        "malformed",
+        "unsupported"
+      ],
+      "type": "string"
     },
     "IdentifierValue": {
       "oneOf": [
@@ -11120,6 +11282,210 @@
                 "status": {
                   "const": "partial"
                 }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-container"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ContainerPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-container"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-container-child"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ContainerPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-container-child"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
               }
             }
           }

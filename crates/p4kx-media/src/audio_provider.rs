@@ -88,7 +88,7 @@ fn wem_field_groups() -> [FieldGroup; 5] {
     ]
 }
 
-fn bank_field_groups() -> [FieldGroup; 9] {
+fn bank_field_groups() -> [FieldGroup; 10] {
     [
         FieldGroup::new(
             "bank-directory",
@@ -109,6 +109,10 @@ fn bank_field_groups() -> [FieldGroup; 9] {
         FieldGroup::new(
             "bank-event-fields",
             "HIRC Event count encoding and original words, ordered action IDs, and exact residual ranges.",
+        ),
+        FieldGroup::new(
+            "bank-container-fields",
+            "Original HIRC container parent, kind, mode and ordered child IDs with exact byte ranges.",
         ),
         FieldGroup::new(
             "bank-sound-fields",

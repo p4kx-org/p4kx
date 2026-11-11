@@ -6,6 +6,7 @@ use serde_json::Value;
 use crate::audio_bank_failure::FAILURE_NAMESPACE as BANK_FAILURE;
 use crate::audio_bank_hirc::{HIRC_NAMESPACE, OBJECT_NAMESPACE};
 use crate::audio_bank_hirc_action::{self, ActionPayload};
+use crate::audio_bank_hirc_container::{self, ContainerPayload};
 use crate::audio_bank_hirc_event::{self, EventPayload};
 use crate::audio_bank_hirc_sound::{self, SoundPayload};
 use crate::audio_bank_media::MEDIA_NAMESPACE;
@@ -31,6 +32,7 @@ const BANK_PAYLOAD: &str = "BankPayload";
 const ACTION_PAYLOAD: &str = "ActionPayload";
 const EVENT_PAYLOAD: &str = "EventPayload";
 const SOUND_PAYLOAD: &str = "SoundPayload";
+const CONTAINER_PAYLOAD: &str = "ContainerPayload";
 const STID_PAYLOAD: &str = "BankStidPayload";
 
 struct Binding {
@@ -103,42 +105,52 @@ impl Binding {
     }
 }
 
-pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
+fn insert_audio_payloads(base: &mut Value) -> Result<(), MediaError> {
     schema_merge::insert_payload(
-        &mut base,
+        base,
         WEM_PAYLOAD,
         schema_merge::serialized_payload::<AudioPayload>(),
     )?;
     schema_merge::insert_payload(
-        &mut base,
+        base,
         BANK_PAYLOAD,
         schema_merge::serialized_payload::<BankPayload>(),
     )?;
     schema_merge::insert_payload(
-        &mut base,
+        base,
         STID_PAYLOAD,
         schema_merge::serialized_payload::<BankStidPayload<'static>>(),
     )?;
     schema_merge::insert_payload(
-        &mut base,
+        base,
         ANNOTATION_PAYLOAD,
         schema_merge::serialized_payload::<AnnotationPayload<'static>>(),
     )?;
     schema_merge::insert_payload(
-        &mut base,
+        base,
         ACTION_PAYLOAD,
         schema_merge::serialized_payload::<ActionPayload>(),
     )?;
     schema_merge::insert_payload(
-        &mut base,
+        base,
         EVENT_PAYLOAD,
         schema_merge::serialized_payload::<EventPayload>(),
     )?;
     schema_merge::insert_payload(
-        &mut base,
+        base,
         SOUND_PAYLOAD,
         schema_merge::serialized_payload::<SoundPayload>(),
     )?;
+    schema_merge::insert_payload(
+        base,
+        CONTAINER_PAYLOAD,
+        schema_merge::serialized_payload::<ContainerPayload>(),
+    )?;
+    Ok(())
+}
+
+pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
+    insert_audio_payloads(&mut base)?;
     let root = base
         .as_object_mut()
         .ok_or_else(|| MediaError::Contract("audio record schema is not an object".into()))?;
@@ -151,6 +163,8 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         wem_bindings()
             .iter()
             .chain(bank_bindings().iter())
+            .chain(hirc_bindings().iter())
+            .chain(std::iter::once(&BANK_FAILURE_BINDING))
             .chain(stid_bindings().iter())
             .chain(event_bindings().iter())
             .chain(annotation_bindings().iter())
@@ -193,7 +207,7 @@ const fn wem_bindings() -> [Binding; 4] {
     ]
 }
 
-const fn bank_bindings() -> [Binding; 8] {
+const fn bank_bindings() -> [Binding; 5] {
     [
         Binding::exact(
             BANK_PAYLOAD,
@@ -230,6 +244,11 @@ const fn bank_bindings() -> [Binding; 8] {
             1,
             StatusRule::Complete,
         ),
+    ]
+}
+
+const fn hirc_bindings() -> [Binding; 4] {
+    [
         Binding::exact(
             ACTION_PAYLOAD,
             audio_bank_hirc_action::NAMESPACE,
@@ -244,16 +263,31 @@ const fn bank_bindings() -> [Binding; 8] {
             2,
             StatusRule::MalformedLayout,
         ),
-        Binding {
-            schema: BANK_PAYLOAD,
-            namespace: BANK_FAILURE,
-            record_type: "bank-failure",
-            min_indices: 1,
-            max_indices: 2,
-            status: StatusRule::Failed,
-        },
+        Binding::exact(
+            CONTAINER_PAYLOAD,
+            audio_bank_hirc_container::NAMESPACE,
+            "bank-hirc-container",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            CONTAINER_PAYLOAD,
+            audio_bank_hirc_container::CHILD_NAMESPACE,
+            "bank-hirc-container-child",
+            3,
+            StatusRule::Complete,
+        ),
     ]
 }
+
+const BANK_FAILURE_BINDING: Binding = Binding {
+    schema: BANK_PAYLOAD,
+    namespace: BANK_FAILURE,
+    record_type: "bank-failure",
+    min_indices: 1,
+    max_indices: 2,
+    status: StatusRule::Failed,
+};
 
 const fn event_bindings() -> [Binding; 3] {
     [

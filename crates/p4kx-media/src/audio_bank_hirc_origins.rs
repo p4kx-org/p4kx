@@ -5,7 +5,7 @@ use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::bank::{BankHircObject, BankSourceSection};
 
 use crate::audio_bank_inventory::VersionSite;
-use crate::audio_bank_origins::{BankOrigins, EvidenceSite, section_routing};
+use crate::audio_bank_origins::{BankOrigins, EvidenceSite, complete_directory, section_routing};
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
@@ -19,26 +19,14 @@ pub(crate) fn object(
     writer: &MediaWriter<'_>,
 ) -> Result<PreparedRecordOrigins, MediaError> {
     let mut prepared = BankOrigins::new(input, writer)?;
-    let section = [object.section_ordinal()];
-    let ordinal = [object.section_ordinal(), object.ordinal()];
-    let body = [object.body_offset()];
-    let route = (
-        OriginSite::new("bnkHircPrefix", &ordinal, "objectRouting"),
-        SourceUseRole::Selector,
-    );
-    let section = prepared.capture([section_routing(&section)])?;
+    let sites = ObjectSites::new(object);
+    let route = sites.route();
+    let section = prepared.capture([section_routing(&sites.section)])?;
     let position = prepared.capture([route])?;
-    let extent = prepared.capture([
-        route,
-        (
-            OriginSite::new("bnkHircObject", &body, "bodyLength"),
-            SourceUseRole::Conversion,
-        ),
-    ])?;
-    prepared.field("/data/payload/section_ordinal", section.clone())?;
-    prepared.field("/subresource/indices/0", section)?;
+    let extent = prepared.capture([route, sites.extent(SourceUseRole::Conversion)])?;
+    prepared.field("/data/payload/section_ordinal", section)?;
     prepared.field("/data/payload/ordinal", position.clone())?;
-    prepared.indices(position.clone())?;
+    sites.indices_origin(&mut prepared, position.clone())?;
     prepared.range("/data/payload/header_range", &position, &position)?;
     prepared.range("/data/payload/body_range", &position, &extent)?;
     for (path, field) in [
@@ -48,13 +36,13 @@ pub(crate) fn object(
         let evidence = prepared.capture([
             route,
             (
-                OriginSite::new("bnkHircObject", &body, field),
+                OriginSite::new("bnkHircObject", &sites.body, field),
                 SourceUseRole::Payload,
             ),
         ])?;
         prepared.field(path, evidence)?;
     }
-    let kind = object_kind(&prepared, route, &body, version)?;
+    let kind = object_kind(&prepared, route, &sites.body, version)?;
     prepared.field("/data/payload/kind", kind)?;
     Ok(prepared.finish())
 }
@@ -128,4 +116,63 @@ pub(crate) fn summary(
         prepared.subtree("/issues", end)?;
     }
     Ok(prepared.finish())
+}
+
+pub(crate) struct ObjectSites {
+    section: [u64; 1],
+    object: [u64; 2],
+    body: [u64; 1],
+}
+
+impl ObjectSites {
+    pub(crate) const fn new(object: &BankHircObject) -> Self {
+        Self {
+            section: [object.section_ordinal()],
+            object: [object.section_ordinal(), object.ordinal()],
+            body: [object.body_offset()],
+        }
+    }
+
+    pub(crate) const fn indices(&self) -> [u64; 2] {
+        self.object
+    }
+
+    pub(crate) const fn route(&self) -> EvidenceSite<'_> {
+        (
+            OriginSite::new("bnkHircPrefix", &self.object, "objectRouting"),
+            SourceUseRole::Selector,
+        )
+    }
+
+    pub(crate) const fn extent(&self, role: SourceUseRole) -> EvidenceSite<'_> {
+        (
+            OriginSite::new("bnkHircObject", &self.body, "bodyLength"),
+            role,
+        )
+    }
+
+    pub(crate) const fn versioned<'a>(&'a self, version: &'a [u64; 1]) -> [EvidenceSite<'a>; 4] {
+        [
+            self.route(),
+            complete_directory("bankVersionSelection"),
+            (
+                OriginSite::new("bnkHircObject", &self.body, "typeCode"),
+                SourceUseRole::Selector,
+            ),
+            (
+                OriginSite::new("bnkBkhd", version, "version"),
+                SourceUseRole::Selector,
+            ),
+        ]
+    }
+
+    pub(crate) fn indices_origin(
+        &self,
+        prepared: &mut BankOrigins<'_, '_, '_>,
+        position: OriginContributions,
+    ) -> Result<(), MediaError> {
+        prepared.indices(position)?;
+        let section = prepared.capture([section_routing(&self.section)])?;
+        prepared.field("/subresource/indices/0", section)
+    }
 }

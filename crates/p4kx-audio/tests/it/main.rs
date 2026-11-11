@@ -16,6 +16,7 @@ mod bnk_quirks;
 mod bnk_sound_layout;
 mod bnk_source;
 mod bnk_source_action;
+mod bnk_source_container;
 mod bnk_source_event;
 mod bnk_source_sound;
 mod bnk_source_stid;

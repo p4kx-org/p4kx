@@ -14,6 +14,8 @@ use super::{TestResult, privacy};
 
 #[path = "audio_bank_accounting.rs"]
 mod bank;
+#[path = "audio_container_accounting.rs"]
+mod container;
 
 const MAX_SAMPLE_BYTES: u64 = 8 << 20;
 const MAX_PROBES_PER_KIND: usize = 32;
@@ -22,10 +24,16 @@ const MAX_PROBES_PER_KIND: usize = 32;
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn original_audio_directories_and_retained_ranges_reconcile()
 -> Result<(), privacy::VerificationFailure> {
-    privacy::redact(verify())
+    privacy::redact(verify_archives(verify_archive))
 }
 
-fn verify() -> TestResult {
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn original_hirc_containers_and_children_reconcile() -> Result<(), privacy::VerificationFailure> {
+    privacy::redact(verify_archives(verify_archive_containers))
+}
+
+fn verify_archives(verify_archive: impl Fn(&Path) -> TestResult) -> TestResult {
     verify_archive(&p4kx_testkit::real_archive_path()?)?;
     if let Some(second) = p4kx_testkit::real_archive_b_path() {
         verify_archive(&second)?;
@@ -38,37 +46,84 @@ fn verify_archive(path: &Path) -> TestResult {
     let watch = ArchiveWatch::new(&archive);
     let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
     for suffix in [".wem", ".bnk"] {
-        let sample = sample(&archive, &watch, suffix)?;
-        let mut options = ExportOptions {
-            kinds: vec![MediaKind::Audio],
-            include: Some(sample.filter),
-            exclude: Exclusion::parse(["*.pak", "*.socpak"])?,
-            ..ExportOptions::default()
-        };
-        options.limits.entry_bytes = MAX_SAMPLE_BYTES;
-        options.limits.source_bytes = MAX_SAMPLE_BYTES;
-        let output = tempfile::tempdir()?;
-        let ExportOutcome::Published { index, .. } =
-            p4kx_media::export(&archive, output.path(), &options)?
-        else {
-            return Err("one selected audio Entry must publish completely".into());
-        };
-        let rows = records(output.path(), &index, &sample.original, sample.entry_index)?;
-        for row in &rows {
-            require(
-                schema.is_valid(&serde_json::to_value(row)?),
-                "built-in audio schema",
-            )?;
-        }
-        if suffix == ".wem" {
-            verify_wem(&sample.original, &rows)?;
-        } else {
-            bank::verify(&sample.original, &rows)?;
-        }
-        output.close()?;
+        let sample = sample(&archive, &watch, suffix, |original| {
+            if suffix == ".wem" {
+                Wem::parse(original).is_ok()
+            } else {
+                Soundbank::parse(original)
+                    .is_ok_and(|bank| !bank.objects().is_empty() && bank.wems().len() > 0)
+            }
+        })?;
+        verify_sample(&archive, sample, &schema, |original, rows| {
+            if suffix == ".wem" {
+                verify_wem(original, rows)
+            } else {
+                bank::verify(original, rows)?;
+                Ok(())
+            }
+        })?;
         watch.check()?;
     }
     Ok(())
+}
+
+fn verify_archive_containers(path: &Path) -> TestResult {
+    let archive = Archive::open_with_key(path, Some(p4kx_testkit::real_archive_key()?))?;
+    let watch = ArchiveWatch::new(&archive);
+    let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
+    let sample = sample(
+        &archive,
+        &watch,
+        ".bnk",
+        container::has_containers_with_children,
+    )?;
+    let counts = verify_sample(&archive, sample, &schema, |original, rows| {
+        let bank = bank::verify(original, rows)?;
+        container::verify(&bank, original, rows)
+    })?;
+    watch.check()?;
+    report_container_counts(counts.containers, counts.children);
+    Ok(())
+}
+
+#[expect(
+    clippy::print_stderr,
+    reason = "the opt-in test reports only aggregate coverage"
+)]
+fn report_container_counts(containers: usize, children: usize) {
+    eprintln!("HIRC container records={containers}, child records={children}");
+}
+
+fn verify_sample<T>(
+    archive: &Archive,
+    sample: Sample,
+    schema: &jsonschema::Validator,
+    compare: impl FnOnce(&[u8], &[MediaRecord]) -> TestResult<T>,
+) -> TestResult<T> {
+    let mut options = ExportOptions {
+        kinds: vec![MediaKind::Audio],
+        include: Some(sample.filter),
+        exclude: Exclusion::parse(["*.pak", "*.socpak"])?,
+        ..ExportOptions::default()
+    };
+    options.limits.entry_bytes = MAX_SAMPLE_BYTES;
+    options.limits.source_bytes = MAX_SAMPLE_BYTES;
+    let output = tempfile::tempdir()?;
+    let ExportOutcome::Published { index, .. } =
+        p4kx_media::export(archive, output.path(), &options)?
+    else {
+        return Err("one selected audio Entry must publish completely".into());
+    };
+    let rows = records(output.path(), &index, &sample.original, sample.entry_index)?;
+    for row in &rows {
+        require(
+            schema.is_valid(&serde_json::to_value(row)?),
+            "built-in audio schema",
+        )?;
+    }
+    let result = compare(&sample.original, &rows)?;
+    output.close()?;
+    Ok(result)
 }
 
 struct Sample {
@@ -77,7 +132,12 @@ struct Sample {
     original: Vec<u8>,
 }
 
-fn sample(archive: &Archive, watch: &ArchiveWatch, suffix: &str) -> TestResult<Sample> {
+fn sample(
+    archive: &Archive,
+    watch: &ArchiveWatch,
+    suffix: &str,
+    applicable: impl Fn(&[u8]) -> bool,
+) -> TestResult<Sample> {
     let candidates = archive.entries().iter().enumerate().filter(|(_, entry)| {
         !entry.path().contains(['*', '?'])
             && has_suffix(entry, suffix)
@@ -98,13 +158,7 @@ fn sample(archive: &Archive, watch: &ArchiveWatch, suffix: &str) -> TestResult<S
         archive
             .open_entry_verified(entry)?
             .read_to_end(&mut original)?;
-        let applicable = if suffix == ".wem" {
-            Wem::parse(original.as_slice()).is_ok()
-        } else {
-            Soundbank::parse(original.as_slice())
-                .is_ok_and(|bank| !bank.objects().is_empty() && bank.wems().len() > 0)
-        };
-        if applicable {
+        if applicable(&original) {
             return Ok(Sample {
                 filter,
                 entry_index,

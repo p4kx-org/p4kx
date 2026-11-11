@@ -9,7 +9,10 @@ use super::{TestResult, at, range, require};
 
 const DIDX_TRIPLET_BYTES: usize = 12;
 
-pub(super) fn verify(input: &[u8], rows: &[MediaRecord]) -> TestResult {
+pub(super) fn verify<'input>(
+    input: &'input [u8],
+    rows: &[MediaRecord],
+) -> TestResult<Soundbank<&'input [u8]>> {
     let bank = Soundbank::parse(input)?;
     let original = bank.sections().collect::<Vec<_>>();
     let actual = at(rows, "audio-bank-section").collect::<Vec<_>>();
@@ -41,7 +44,7 @@ pub(super) fn verify(input: &[u8], rows: &[MediaRecord]) -> TestResult {
             _ => {}
         }
     }
-    Ok(())
+    Ok(bank)
 }
 
 fn verify_hirc(

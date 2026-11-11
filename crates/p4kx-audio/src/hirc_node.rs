@@ -3,9 +3,9 @@
 
 use crate::bank_object_fields::{self, BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
-use crate::{BankError, HircKind, SectionId};
+use crate::{BankError, SectionId};
 
-const ID_LEN: usize = 4;
+pub(crate) const ID_LEN: usize = 4;
 const FX_LEN: usize = 6;
 const METADATA_FX_LEN: usize = 6;
 pub(crate) const PROP_LEN: usize = 5;
@@ -16,13 +16,8 @@ const AUTOMATION_LEN: usize = 12;
 const AUX_BUSES_LEN: usize = 16;
 const ADVANCED_SETTINGS_LEN: usize = 6;
 const STATE_VALUE_LEN: usize = 6;
-const CURVE_POINT_LEN: usize = 12;
-const RANDOM_SEQUENCE_PARAMS_LEN: usize = 24;
-const PLAYLIST_ITEM_LEN: usize = 8;
-const SWITCH_PARAMS_LEN: usize = 13;
-const SWITCH_GROUP_LEN: usize = 1 + ID_LEN + ID_LEN + 1;
+pub(crate) const CURVE_POINT_LEN: usize = 12;
 const PATH_HEADER_LEN: usize = 1 + 4;
-const SEQUENCE_MODE: u8 = 1;
 const HAS_POSITIONING: u8 = 0b0000_0001;
 const HAS_3D: u8 = 0b0000_0010;
 const POSITION_TYPE_SHIFT: u8 = 5;
@@ -53,61 +48,6 @@ pub struct Container {
     pub parent_id: u32,
     /// The IDs of the child nodes, in bank order.
     pub children: Vec<u32>,
-}
-
-/// Decodes a container body after its ID; every byte of it must be used.
-pub(crate) fn container(
-    kind: HircKind,
-    fields: &mut SectionReader<'_>,
-) -> Result<Container, BankError> {
-    let parent_id = node_base(fields)?;
-    let (kind, children) = match kind {
-        HircKind::SwitchContainer => {
-            fields.skip(SWITCH_GROUP_LEN)?;
-            let children = children(fields)?;
-            skip_switch_groups(fields)?;
-            let count = fields.u32()?;
-            skip_items(fields, count, SWITCH_PARAMS_LEN)?;
-            (ContainerKind::Switch, children)
-        }
-        HircKind::LayerContainer => {
-            let children = children(fields)?;
-            skip_layers(fields)?;
-            fields.u8()?;
-            (ContainerKind::Blend, children)
-        }
-        HircKind::RandomSequenceContainer => {
-            fields.skip(RANDOM_SEQUENCE_PARAMS_LEN - 2)?;
-            let mode = fields.u8()?;
-            fields.u8()?;
-            let children = children(fields)?;
-            let count = fields.u16()?;
-            skip_items(fields, u32::from(count), PLAYLIST_ITEM_LEN)?;
-            let kind = if mode == SEQUENCE_MODE {
-                ContainerKind::Sequence
-            } else {
-                ContainerKind::Random
-            };
-            (kind, children)
-        }
-        _ => {
-            return Err(BankError::invalid(
-                SectionId::HIRC,
-                "the object is not a container",
-            ));
-        }
-    };
-    if fields.remaining() > 0 {
-        return Err(BankError::invalid(
-            SectionId::HIRC,
-            "bytes follow the fields of a container",
-        ));
-    }
-    Ok(Container {
-        kind,
-        parent_id,
-        children,
-    })
 }
 
 /// Original words that locate and supply the parent in a node base.
@@ -207,7 +147,7 @@ fn skip_states<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
     Ok(())
 }
 
-fn skip_rtpcs<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
+pub(crate) fn skip_rtpcs<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
     for _ in 0..fields.read_u16()?.value {
         fields.skip_bytes((ID_LEN + 2) as u64)?;
         fields.read_variable_length(SectionId::HIRC)?;
@@ -218,42 +158,37 @@ fn skip_rtpcs<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
     Ok(())
 }
 
-fn skip_switch_groups(fields: &mut SectionReader<'_>) -> Result<(), BankError> {
-    for _ in 0..fields.u32()? {
-        fields.u32()?;
-        let nodes = fields.u32()?;
-        skip_items(fields, nodes, ID_LEN)?;
-    }
-    Ok(())
-}
-
-fn skip_layers(fields: &mut SectionReader<'_>) -> Result<(), BankError> {
-    for _ in 0..fields.u32()? {
-        fields.u32()?;
-        skip_rtpcs(fields)?;
-        fields.skip(ID_LEN + 1)?;
-        for _ in 0..fields.u32()? {
-            fields.u32()?;
-            let points = fields.u32()?;
-            skip_items(fields, points, CURVE_POINT_LEN)?;
-        }
-    }
-    Ok(())
-}
-
 pub(crate) fn children(fields: &mut SectionReader<'_>) -> Result<Vec<u32>, BankError> {
-    let count = usize::try_from(fields.u32()?).unwrap_or(usize::MAX);
-    if count > fields.remaining() / ID_LEN {
-        return Err(BankError::invalid(
-            SectionId::HIRC,
-            "a container lists more children than its body holds",
-        ));
+    let count = fields.u32()?;
+    checked_child_bytes(count, fields.remaining_bytes())?;
+    read_children(fields, count)
+}
+
+pub(crate) fn checked_child_bytes(count: u32, available: u64) -> Result<u64, BankError> {
+    let required = u64::from(count) * ID_LEN as u64;
+    if required > available {
+        return Err(child_count_error());
     }
-    let mut children = Vec::with_capacity(count);
+    Ok(required)
+}
+
+pub(crate) fn read_children(
+    fields: &mut SectionReader<'_>,
+    count: u32,
+) -> Result<Vec<u32>, BankError> {
+    let capacity = usize::try_from(count).map_err(|_| child_count_error())?;
+    let mut children = Vec::with_capacity(capacity);
     for _ in 0..count {
         children.push(fields.u32()?);
     }
     Ok(children)
+}
+
+const fn child_count_error() -> BankError {
+    BankError::invalid(
+        SectionId::HIRC,
+        "a container lists more children than its body holds",
+    )
 }
 
 pub(crate) fn skip_items<F: ObjectFields>(

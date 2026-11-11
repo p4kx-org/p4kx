@@ -25,6 +25,7 @@ mod artifact_placement;
 mod audio_bank_failure;
 mod audio_bank_hirc;
 mod audio_bank_hirc_action;
+mod audio_bank_hirc_container;
 mod audio_bank_hirc_event;
 mod audio_bank_hirc_origins;
 mod audio_bank_hirc_sound;

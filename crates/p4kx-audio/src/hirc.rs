@@ -7,16 +7,17 @@ use std::ops::Range;
 use crate::bank_reader::SectionReader;
 use crate::bank_structure::{HircEnvelope, OBJECT_HEADER_LEN, OBJECT_ID_LEN};
 use crate::hirc_action::{self, ActionTarget};
+use crate::hirc_container;
 use crate::hirc_event;
 use crate::hirc_layout::has_decoder;
 use crate::hirc_music::{MusicPlaylist, MusicSegment, MusicSwitch, MusicTrack};
 use crate::hirc_music_parse;
-use crate::hirc_node::{self, Container};
+use crate::hirc_node::Container;
 use crate::hirc_source;
 use crate::{BankError, SectionId};
 
 const LAST_SOUND_WITHOUT_CACHE_ID_VERSION: u32 = 150;
-const CONTAINER_VERSION: u32 = 154;
+pub(crate) const CONTAINER_VERSION: u32 = 154;
 const LAST_KNOWN_VERSION: u32 = 154;
 const LAST_OLD_TYPE_NUMBERING_VERSION: u32 = 126;
 const PLUGIN_TYPE_MASK: u32 = 0x0F;
@@ -320,7 +321,7 @@ fn value(
         | HircKind::LayerContainer
             if version == CONTAINER_VERSION =>
         {
-            HircValue::Container(hirc_node::container(kind, fields)?)
+            HircValue::Container(hirc_container::container(kind, fields)?)
         }
         HircKind::MusicSegment if version == CONTAINER_VERSION => {
             HircValue::MusicSegment(Box::new(hirc_music_parse::segment(fields)?))

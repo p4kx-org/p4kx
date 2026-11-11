@@ -7,6 +7,7 @@ mod archive;
 mod archive_layout;
 mod audio_bank_hirc_action_origins;
 mod audio_bank_hirc_action_provider;
+mod audio_bank_hirc_container_provider;
 mod audio_bank_hirc_event_provider;
 mod audio_bank_hirc_sound_provider;
 mod audio_bank_provider;

@@ -15,7 +15,8 @@ use crate::audio_bank_payload::{BankEntryRange, BankHircRecord, BankObjectRecord
 use crate::audio_bank_projection::BankProjection;
 use crate::{
     MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource, audio_bank_hirc_action,
-    audio_bank_hirc_event, audio_bank_hirc_origins, audio_bank_hirc_sound,
+    audio_bank_hirc_container, audio_bank_hirc_event, audio_bank_hirc_origins,
+    audio_bank_hirc_sound,
 };
 
 pub(crate) const HIRC_NAMESPACE: &str = "audio-bank-hirc";
@@ -82,6 +83,9 @@ fn emit_semantic<R: Read + Seek>(
             action.status,
             writer,
         ),
+        (BankHircSemantic::Container(container), Some(version)) => {
+            audio_bank_hirc_container::project(projection, version, *container, writer)
+        }
         (BankHircSemantic::Event(event), Some(version)) => {
             audio_bank_hirc_event::project(projection, version, event, writer)
         }

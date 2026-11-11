@@ -10,13 +10,15 @@ use std::path::{Path, PathBuf};
 use p4kx_archive::Archive;
 use p4kx_audio::{AudioError, EmbeddedWem, MediaClass, Soundbank};
 pub use p4kx_audio::{
-    BankActionFields, BankActionRead, BankDeclaredLengthSource, BankDidx, BankDidxEntry, BankEvent,
-    BankEventAction, BankEventCountEncoding, BankEventRead, BankHirc, BankHircAction,
-    BankHircEvent, BankHircField, BankHircObject, BankHircSemantic, BankHircSound,
-    BankMediaClassSource, BankMediaInfo, BankNodeParentFields, BankObservedHeader,
+    BankActionFields, BankActionRead, BankContainerChild, BankContainerChildren,
+    BankContainerFields, BankContainerRead, BankDeclaredLengthSource, BankDidx, BankDidxEntry,
+    BankEvent, BankEventAction, BankEventCountEncoding, BankEventRead, BankHirc, BankHircAction,
+    BankHircContainer, BankHircEvent, BankHircField, BankHircObject, BankHircSemantic,
+    BankHircSound, BankMediaClassSource, BankMediaInfo, BankNodeParentFields, BankObservedHeader,
     BankPlayBankDecision, BankPlayBankFields, BankReadError, BankSectionCursor,
     BankSoundContinuation, BankSoundFields, BankSoundNodeBase, BankSoundNodeFields, BankSoundRead,
-    BankSource, BankSourceSection, BankStid, BankStidName, MediaStorage, SoundSource,
+    BankSource, BankSourceSection, BankStid, BankStidName, ContainerKind, MediaStorage,
+    SoundSource,
 };
 use rayon::prelude::*;
 

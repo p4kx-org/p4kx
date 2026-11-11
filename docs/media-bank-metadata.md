@@ -16,6 +16,8 @@ Short IDs and display paths may repeat. The source's exact verified bytes are in
 | `audio-bank-hirc-event-action` | `bank-hirc-event-action` | HIRC section, Event object and action ordinals |
 | `audio-bank-hirc-event-tail` | `bank-hirc-event-tail` | HIRC section and Event object ordinals |
 | `audio-bank-hirc-sound` | `bank-hirc-sound` | HIRC section and Sound object ordinals |
+| `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
+| `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
 | `audio-bank-hirc` | `bank-hirc` | HIRC section ordinal |
 | `audio-bank-stid` | `bank-stid` | STID section ordinal |
 | `audio-bank-name` | `bank-name` | STID section and name ordinals |
@@ -65,6 +67,16 @@ counts and the word immediately before the parent. An admitted source plug-in bl
 its declared length and exact raw parameter range. A malformed Sound contributes its
 successfully read fields and checked ranges to diagnostic output. An unsupported version
 retains the original body and reports its layout explicitly.
+
+Container rows preserve the version 154 Random, Sequence, Switch and Blend layout, original
+parent ID and declared child count. The Random/Sequence row carries the original mode byte.
+Each child ID is emitted in authored order with its own word range, including repeated IDs.
+The checked node range, admitted child extent and suffix range refer to the retained bank.
+A malformed suffix retains the admitted child rows. A child count that exceeds the original
+body retains the count and leaves the child extent absent. Earlier undecoded versions retain
+their physical object rows. Later unsupported versions report their layout explicitly.
+The opt-in `original_hirc_containers_and_children_reconcile` test checks
+the projected rows and retained child words against the slice reader.
 
 STID header rows retain the authored string type and name count. Each name row carries its
 original ID and byte count, exact header and name ranges, original bytes and UTF-8 result.

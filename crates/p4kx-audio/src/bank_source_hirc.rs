@@ -6,11 +6,13 @@ use std::ops::Range;
 
 use crate::bank_object_fields::SeekObjectFields;
 use crate::bank_reader::SectionReader;
+use crate::bank_source_container::{self, BankHircContainer};
 use crate::bank_source_event;
 use crate::bank_source_sound::{self, BankHircSound};
 use crate::bank_structure::{HircEnvelope, OBJECT_HEADER_LEN, OBJECT_ID_LEN};
-use crate::hirc;
+use crate::hirc::{self, CONTAINER_VERSION};
 use crate::hirc_action;
+use crate::hirc_container::Layout as ContainerLayout;
 use crate::hirc_source;
 use crate::read_at::SeekSource;
 use crate::{
@@ -135,6 +137,8 @@ pub enum BankHircSemantic<'input, R> {
     Event(BankHircEvent<'input, R>),
     /// Owner-bound Sound interpretation.
     Sound(Box<BankHircSound>),
+    /// Owner-bound container interpretation and ordered children.
+    Container(Box<BankHircContainer<'input, R>>),
 }
 
 impl<R> BankHircSemantic<'_, R> {
@@ -146,6 +150,7 @@ impl<R> BankHircSemantic<'_, R> {
             Self::Action(action) => &action.object,
             Self::Event(event) => &event.object,
             Self::Sound(sound) => &sound.object,
+            Self::Container(container) => &container.object,
         }
     }
 }
@@ -252,7 +257,23 @@ impl<R: Read + Seek> BankHirc<'_, R> {
             Ok(object) => object,
             Err(cause) => return Some(Err(cause)),
         };
-        let result = match object.kind(version) {
+        let kind = object.kind(version);
+        if version >= CONTAINER_VERSION
+            && let Some(layout) = ContainerLayout::of(kind)
+        {
+            return Some(
+                bank_source_container::observe(
+                    self.input,
+                    &mut self.stopped,
+                    object,
+                    version,
+                    kind,
+                    layout,
+                )
+                .map(|container| BankHircSemantic::Container(Box::new(container))),
+            );
+        }
+        let result = match kind {
             HircKind::Event => {
                 return Some(
                     bank_source_event::observe(self.input, &mut self.stopped, object, version)
