@@ -29,6 +29,17 @@ pub(crate) fn write_replacing_protected<T>(
     cancel: Option<&CancelToken>,
     write: impl FnOnce(&mut BufWriter<File>) -> io::Result<T>,
 ) -> io::Result<T> {
+    write_replacing_before(out, protection, cancel, write, || Ok(()))
+}
+
+/// Stages a replacement and runs one guarded action just before the final rename.
+pub(crate) fn write_replacing_before<T>(
+    out: &Path,
+    protection: Option<&ArchiveWriteProtection>,
+    cancel: Option<&CancelToken>,
+    write: impl FnOnce(&mut BufWriter<File>) -> io::Result<T>,
+    before_publish: impl FnOnce() -> io::Result<()>,
+) -> io::Result<T> {
     let uncancelled = CancelToken::new();
     let actual_cancel = cancel.unwrap_or(&uncancelled);
     let check = |path: &Path| {
@@ -49,6 +60,11 @@ pub(crate) fn write_replacing_protected<T>(
             .into_inner()
             .map_err(io::IntoInnerError::into_error)?
             .sync_all()?;
+        ownership
+            .ensure_writable(&temporary, actual_cancel.flag())
+            .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
+        check(out)?;
+        before_publish()?;
         ownership
             .ensure_writable(&temporary, actual_cancel.flag())
             .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;

@@ -141,7 +141,7 @@ impl Sound {
             None,
         )?;
         if observe {
-            sound.original = observed_file(
+            sound.original = ObservedFileOrigin::of_read(
                 path,
                 &file,
                 FileStamp::from_metadata(&metadata),
@@ -258,20 +258,6 @@ impl Sound {
             },
         }
     }
-}
-
-fn observed_file(
-    path: &Path,
-    handle: &File,
-    before: FileStamp,
-    byte_length: usize,
-) -> io::Result<Option<ObservedFileOrigin>> {
-    let absolute = std::path::absolute(path)?;
-    let after = FileStamp::from_metadata(&handle.metadata()?);
-    let stable = byte_length as u64 == before.size()
-        && after == before
-        && FileStamp::of(&absolute)? == before;
-    Ok(stable.then(|| ObservedFileOrigin::new(absolute, before)))
 }
 
 /// Reads all of `reader`, or `None` when it holds more than `limit` bytes; at most

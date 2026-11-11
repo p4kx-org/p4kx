@@ -1,10 +1,133 @@
 ---
-source: crates/p4kx/tests/json.rs
+source: crates/p4kx/tests/it/json.rs
 expression: json
 ---
 {
   "byte_order": "little",
+  "fieldOrigins": {
+    "/byte_order": {
+      "containsEncryptedSource": null,
+      "sourceSetComplete": true,
+      "sourceUsesRefs": [
+        "u2:f0:payload:payload:s12:cryxmlHeader0:9:byteOrder"
+      ]
+    },
+    "/format": {
+      "containsEncryptedSource": null,
+      "sourceSetComplete": true,
+      "sourceUsesRefs": [
+        "u2:f0:payload:payload:s12:cryxmlHeader0:9:signature"
+      ]
+    },
+    "/input": {
+      "containsEncryptedSource": null,
+      "sourceSetComplete": true,
+      "sourceUsesRefs": [
+        "u2:f0:fileMetadata:payload:m4:path"
+      ]
+    },
+    "/originReceipt": {
+      "containsEncryptedSource": false,
+      "sourceSetComplete": true,
+      "sourceUsesRefs": []
+    },
+    "/output": {
+      "containsEncryptedSource": false,
+      "sourceSetComplete": true,
+      "sourceUsesRefs": []
+    }
+  },
   "format": "CryXmlB",
   "input": "[DIR]/vehicle.xml",
-  "output": "[DIR]/converted.xml"
+  "originReceipt": "converted.xml.p4kx-origin.jsonl",
+  "output": "[DIR]/converted.xml",
+  "provenance": {
+    "sources": [
+      {
+        "ancestors": [],
+        "byteLength": {
+          "containsEncryptedSource": null,
+          "sourceSetComplete": true,
+          "sourceUsesRefs": [
+            "u2:f0:fileMetadata:payload:m10:byteLength"
+          ],
+          "state": "present",
+          "value": "107"
+        },
+        "id": "f0",
+        "kind": "file",
+        "name": {
+          "containsEncryptedSource": null,
+          "sourceSetComplete": true,
+          "sourceUsesRefs": [
+            "u2:f0:fileMetadata:payload:m4:name"
+          ],
+          "state": "present",
+          "value": "vehicle.xml"
+        },
+        "storedEncryption": "unknown"
+      }
+    ],
+    "uses": [
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u2:f0:fileMetadata:payload:m10:byteLength",
+        "location": {
+          "field": "byteLength",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "fileMetadata",
+        "source": "f0"
+      },
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u2:f0:fileMetadata:payload:m4:name",
+        "location": {
+          "field": "name",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "fileMetadata",
+        "source": "f0"
+      },
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u2:f0:fileMetadata:payload:m4:path",
+        "location": {
+          "field": "path",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "fileMetadata",
+        "source": "f0"
+      },
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u2:f0:payload:payload:s12:cryxmlHeader0:9:byteOrder",
+        "location": {
+          "field": "byteOrder",
+          "indices": [],
+          "namespace": "cryxmlHeader",
+          "type": "subresource"
+        },
+        "role": "payload",
+        "scope": "payload",
+        "source": "f0"
+      },
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u2:f0:payload:payload:s12:cryxmlHeader0:9:signature",
+        "location": {
+          "field": "signature",
+          "indices": [],
+          "namespace": "cryxmlHeader",
+          "type": "subresource"
+        },
+        "role": "payload",
+        "scope": "payload",
+        "source": "f0"
+      }
+    ]
+  }
 }

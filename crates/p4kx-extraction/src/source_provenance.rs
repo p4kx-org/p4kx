@@ -7,6 +7,11 @@ pub use crate::field_origins::{FieldOrigins, FieldOriginsError};
 pub use crate::field_origins_seed::FieldOriginsSeed;
 pub use crate::field_path::{FieldPath, FieldPathError};
 pub use crate::field_path_seed::FieldPathSeed;
+pub use crate::origin_artifact::{OriginArtifactDigest, OriginArtifactName, OriginDigestWriter};
+pub use crate::origin_companion::{
+    OriginArtifactBinding, OriginCompanionRow, OriginOutputAddress, OriginXmlField,
+    SOURCE_ORIGIN_FORMAT, SOURCE_ORIGIN_VERSION, write_origin_companion,
+};
 pub use crate::origin_reader_limits::OriginReaderLimits;
 pub use crate::source_details::{SourceCoordinateOmission, SourceDetails};
 pub use crate::source_encryption_evidence::SourceDeclarationEvidence;

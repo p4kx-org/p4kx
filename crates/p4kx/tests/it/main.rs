@@ -47,6 +47,7 @@ mod compare_schema;
 mod convert_folder;
 mod coverage;
 mod cryxml;
+mod cryxml_origins;
 mod dcb;
 mod dcb_export;
 mod dcb_export_combined;

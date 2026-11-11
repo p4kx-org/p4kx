@@ -2492,6 +2492,13 @@ side holds at most 128 MiB of text and about 9 bytes of bookkeeping per line.
 unchanged; `byte_order` is `little`, `big`, or `null` for text XML. `--json` needs `--out`,
 because the XML would otherwise share stdout with the JSON; without it the exit code is 2.
 
+The summary also includes `originReceipt` with the sibling companion's filename,
+`fieldOrigins` keyed by JSON Pointer, and `provenance` with the physical sources and
+uses. A standalone file has unknown original P4K encryption. The chosen output and
+companion names are independent of the input bytes. The companion addresses each emitted
+binary CryXml datum and binds it to the final artifact by relative name, byte length and
+SHA-256. See [Standalone field origins](source-origin.md).
+
 ## `p4kx chf glb <archive> <file> --out <file> --json`
 
 ```json

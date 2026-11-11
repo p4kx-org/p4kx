@@ -86,7 +86,10 @@ mod model_observed;
 mod model_source;
 mod model_source_glb;
 mod model_textures;
+mod observed_file_origin;
 mod options;
+mod origin_artifact;
+mod origin_companion;
 #[cfg(test)]
 mod origin_reader_admission_tests;
 mod origin_reader_limits;
@@ -204,7 +207,7 @@ pub use coverage::{
 };
 pub use dataforge::{DATAFORGE_ENTRIES, DataForgeEntry, DataForgeLoadError, MAX_DATAFORGE_SIZE};
 pub use dataforge_file::is_dataforge_file;
-pub use dataforge_file_origin::{DataForgeFileOrigin, ObservedFileOrigin};
+pub use dataforge_file_origin::DataForgeFileOrigin;
 pub use dataforge_origin::DataForgeOrigin;
 pub use dataforge_source::DataForgeSource;
 pub use dds_raw_info::{DdsDx10Info, DdsLegacyInfo, DdsPixelFormatInfo};
@@ -249,6 +252,7 @@ pub use model_info_animations::{AnimationInfo, UnreadInfo};
 pub use model_info_materials::{LibraryInfo, MaterialInfo};
 pub use model_source::ModelSource;
 pub use model_textures::{ArchiveTextures, MAX_MODEL_TEXTURE_PIXELS};
+pub use observed_file_origin::{ObservedFileOrigin, ObservedFileRead, read_observed_file};
 pub use options::{
     AudioConversion, CancelToken, ConflictPolicy, ExtractOptions, Progress, TextureConversion,
 };
@@ -361,16 +365,7 @@ pub use report::{EntryFailure, ExtractionError, ExtractionReport};
 pub use resolved_texts::LanguageTexts;
 pub use selection::{UnknownEntries, select_entries};
 pub use sound::{MAX_SOUND_LEN, Sound};
-pub use source_provenance::{
-    ArchiveEntryProof, ArchiveEntrySource, ArchiveFileSource, EncryptionFieldEvidence, FieldOrigin,
-    FieldOriginSeed, FieldOrigins, FieldOriginsError, FieldOriginsSeed, FieldPath, FieldPathError,
-    FieldPathSeed, FileSource, InputScope, OriginReaderLimits, PhysicalSource, PhysicalSourceKind,
-    PhysicalSourceRef, SharedFieldOrigin, SourceCoordinateOmission, SourceDeclarationEvidence,
-    SourceDeclarationKind, SourceDetails, SourceEncryptionDeclaration, SourceEncryptionState,
-    SourceEvidenceError, SourceInput, SourceInventory, SourceLocation, SourceRecordFormat,
-    SourceScope, SourceUse, SourceUseDescription, SourceUseRef, SourceUseRole, SourceUses,
-    SourceValue, SourceValueState, SourcedValue,
-};
+pub use source_provenance::*;
 pub use target::{
     create_default_target, create_default_target_protected, default_target_name, utc_rfc3339,
 };

@@ -40,7 +40,12 @@ fn valid(index: usize, character: char) -> bool {
 /// Reusable scratch space that turns an element's attribute names into distinct XML names.
 #[derive(Default)]
 pub(crate) struct AttributeNames<'d> {
-    names: Vec<Cow<'d, str>>,
+    names: Vec<ResolvedName<'d>>,
+}
+
+pub(crate) struct ResolvedName<'d> {
+    pub(crate) name: Cow<'d, str>,
+    pub(crate) disambiguated: bool,
 }
 
 impl<'d> AttributeNames<'d> {
@@ -49,10 +54,12 @@ impl<'d> AttributeNames<'d> {
     pub(crate) fn resolve(
         &mut self,
         attributes: impl Iterator<Item = Attribute<'d>>,
-    ) -> &[Cow<'d, str>] {
+    ) -> &[ResolvedName<'d>] {
         self.names.clear();
-        self.names
-            .extend(attributes.map(|attribute| sanitized(attribute.name())));
+        self.names.extend(attributes.map(|attribute| ResolvedName {
+            name: sanitized(attribute.name()),
+            disambiguated: false,
+        }));
         if has_duplicates(&self.names) {
             make_unique(&mut self.names);
         }
@@ -60,23 +67,25 @@ impl<'d> AttributeNames<'d> {
     }
 }
 
-fn has_duplicates(names: &[Cow<'_, str>]) -> bool {
+fn has_duplicates(names: &[ResolvedName<'_>]) -> bool {
     if names.len() <= PAIRWISE_LIMIT {
-        return names
-            .iter()
-            .enumerate()
-            .any(|(index, name)| names.iter().skip(index + 1).any(|other| other == name));
+        return names.iter().enumerate().any(|(index, name)| {
+            names
+                .iter()
+                .skip(index + 1)
+                .any(|other| other.name == name.name)
+        });
     }
     let mut seen = HashSet::with_capacity(names.len());
-    !names.iter().all(|name| seen.insert(&**name))
+    !names.iter().all(|name| seen.insert(&*name.name))
 }
 
-fn make_unique(names: &mut [Cow<'_, str>]) {
+fn make_unique(names: &mut [ResolvedName<'_>]) {
     let mut taken: HashSet<String> = HashSet::with_capacity(names.len());
     let mut next_suffix: HashMap<String, u64> = HashMap::new();
     for name in names.iter_mut() {
-        if taken.contains(&**name) {
-            let base = name.to_string();
+        if taken.contains(&*name.name) {
+            let base = name.name.to_string();
             let suffix = next_suffix.entry(base.clone()).or_insert(2);
             let unique = loop {
                 let candidate = format!("{base}_{suffix}");
@@ -85,8 +94,9 @@ fn make_unique(names: &mut [Cow<'_, str>]) {
                     break candidate;
                 }
             };
-            *name = Cow::Owned(unique);
+            name.name = Cow::Owned(unique);
+            name.disambiguated = true;
         }
-        taken.insert(name.to_string());
+        taken.insert(name.name.to_string());
     }
 }

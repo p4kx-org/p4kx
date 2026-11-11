@@ -101,7 +101,19 @@ impl Document<'_> {
     ///
     /// Returns the first error of `out`.
     pub fn write_xml<W: Write>(&self, out: W) -> io::Result<()> {
-        crate::write::write(self, out)
+        self.write_xml_observed(out, |_| Ok(()))
+    }
+
+    /// Writes the XML and observes the original source coordinates of emitted fields.
+    ///
+    /// # Errors
+    /// Returns the first output or observation error.
+    pub fn write_xml_observed<W: Write>(
+        &self,
+        out: W,
+        observe: impl FnMut(crate::XmlWriteField) -> io::Result<()>,
+    ) -> io::Result<()> {
+        crate::write::write(self, out, observe)
     }
 }
 

@@ -13,4 +13,10 @@ pub(crate) struct CryXmlArgs {
     /// Writes the XML to this file instead of stdout; needed with --json.
     #[arg(long, value_name = "FILE")]
     pub(crate) out: Option<PathBuf>,
+    /// Writes the raw stdout stream's field-origin companion to stderr.
+    #[arg(long, conflicts_with = "out")]
+    pub(crate) origin_stderr: bool,
+    /// Saves the raw stdout stream's field-origin companion to this file.
+    #[arg(long, value_name = "FILE", conflicts_with = "out")]
+    pub(crate) origin_out: Option<PathBuf>,
 }

@@ -481,6 +481,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   characters a name cannot hold, `:` included, become `_`, a repeated attribute name gets the
   first free suffix `_2`, `_3`, Ã¢â‚¬Â¦, and bytes that are not UTF-8 read as `?`. A file that already
   is text XML is written unchanged. A truncated or corrupt file is an error and writes nothing.
+  A successful `--out` also writes a sibling `<file>.p4kx-origin.jsonl`. With XML on stdout,
+  `--origin-stderr` writes the companion to stderr and `--origin-out <file>` saves a copy.
+  See [Standalone field origins](source-origin.md) for the binding and per-datum markers.
 - `p4kx texture info <archive> <entry>` prints the format, size, depth, mip count, array size,
   cubemap faces and number of mip parts of a DDS texture; `p4kx texture merge <archive> <entry>
   --out <file>` merges the header Entry and its mip parts `<entry>.1` Ã¢â‚¬Â¦ `<entry>.N` into one

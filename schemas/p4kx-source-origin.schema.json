@@ -1,0 +1,1806 @@
+{
+  "$defs": {
+    "ArchiveEntryProof": {
+      "description": "Minimal original Entry proof when optional stored details were not retained.",
+      "properties": {
+        "details": {
+          "$ref": "#/$defs/SourceDetails",
+          "const": "captureLimited"
+        },
+        "entryIndex": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "details",
+        "entryIndex"
+      ],
+      "type": "object"
+    },
+    "ArchiveEntrySource": {
+      "description": "Physical Archive Entry facts, retaining all stored declaration occurrences.",
+      "properties": {
+        "declarations": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSourceEncryptionDeclaration"
+        },
+        "entryIndex": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordFormat": {
+          "$ref": "#/$defs/SourceRecordFormat"
+        },
+        "recordRange": {
+          "description": "Exact half-open extent in immediately owning source coordinates.",
+          "properties": {
+            "length": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Number of bytes, including an explicitly empty extent."
+            },
+            "offset": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Original start measured from this Archive source, not the backing root file."
+            }
+          },
+          "required": [
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "zipFlags": {
+          "$ref": "#/$defs/SourcedValueOfuint16"
+        }
+      },
+      "required": [
+        "declarations",
+        "entryIndex",
+        "path",
+        "recordFormat",
+        "recordRange",
+        "zipFlags"
+      ],
+      "type": "object"
+    },
+    "ArchiveFileSource": {
+      "description": "Measured whole-Archive file facts independently of its stored Entry declarations.",
+      "properties": {
+        "byteLength": {
+          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+        }
+      },
+      "required": [
+        "byteLength"
+      ],
+      "type": "object"
+    },
+    "ArtifactName": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "encoding": {
+              "const": "utf8",
+              "type": "string"
+            },
+            "value": {
+              "pattern": "^(?!\\.{1,2}$)[^/\\\\:\\u0000]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "encoding",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "encoding": {
+              "const": "unixBytes",
+              "type": "string"
+            },
+            "value": {
+              "items": {
+                "format": "uint8",
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "encoding",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "encoding": {
+              "const": "windowsUtf16",
+              "type": "string"
+            },
+            "value": {
+              "items": {
+                "format": "uint16",
+                "maximum": 65535,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "encoding",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DecimalU64": {
+      "description": "Canonical unsigned 64-bit decimal text, from 0 through 18446744073709551615.",
+      "maxLength": 20,
+      "not": {
+        "pattern": "[^0-9]"
+      },
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|1844674407370955[0-0][0-9]{3}|18446744073709551[0-5][0-9]{2}|184467440737095516[0-0][0-9]{1}|1844674407370955161[0-4][0-9]{0}|18446744073709551615)$",
+      "type": "string"
+    },
+    "FieldPath": {
+      "description": "An exact escaped JSON Pointer into one complete output record.",
+      "pattern": "^(?:/(?:[^~]|~[01])*)?$",
+      "type": "string"
+    },
+    "FileSource": {
+      "description": "Observed standalone-file facts without a claim of original P4K lineage.",
+      "properties": {
+        "byteLength": {
+          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "byteLength",
+        "name"
+      ],
+      "type": "object"
+    },
+    "InputScope": {
+      "description": "The source byte domain interpreted by one use.",
+      "oneOf": [
+        {
+          "const": "payload",
+          "description": "The Entry or standalone file's payload, including every containing Entry.",
+          "type": "string"
+        },
+        {
+          "const": "archiveDirectoryMetadata",
+          "description": "Directory facts, with only containing Entries affecting their origin.",
+          "type": "string"
+        },
+        {
+          "const": "fileMetadata",
+          "description": "Observed standalone-file metadata without original P4K lineage proof.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "OriginArtifactBinding": {
+      "description": "A file artifact or the raw stdout stream addressed by a companion.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A sibling file identified by its relative basename and measured bytes.",
+          "properties": {
+            "byteLength": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "path": {
+              "$ref": "#/$defs/OriginArtifactName",
+              "description": "Exact relative artifact basename."
+            },
+            "sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "type": {
+              "const": "file",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path",
+            "byteLength",
+            "sha256"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A raw stdout stream identified by its measured bytes.",
+          "properties": {
+            "byteLength": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "type": {
+              "const": "stdout",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "byteLength",
+            "sha256"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OriginArtifactName": {
+      "$ref": "#/$defs/ArtifactName",
+      "description": "One relative artifact basename in its exact native spelling."
+    },
+    "OriginOutputAddress": {
+      "description": "The exact datum within a bound standalone artifact.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "The entire payload of an opaque byte copy or output.",
+          "properties": {
+            "type": {
+              "const": "opaquePayload",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One typed field in the emitted XML.",
+          "properties": {
+            "endExclusive": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte past the emitted field."
+            },
+            "field": {
+              "$ref": "#/$defs/OriginXmlField",
+              "description": "Category of the emitted field."
+            },
+            "start": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte in the emitted field."
+            },
+            "type": {
+              "const": "xmlBytes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "start",
+            "endExclusive",
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A typed field at an exact JSON Pointer in the original artifact schema.",
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/FieldPath",
+              "description": "Exact field path."
+            },
+            "type": {
+              "const": "jsonField",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OriginXmlField": {
+      "description": "The XML value represented by one emitted byte range.",
+      "oneOf": [
+        {
+          "const": "elementName",
+          "description": "Opening element name.",
+          "type": "string"
+        },
+        {
+          "const": "closingElementName",
+          "description": "Closing element name.",
+          "type": "string"
+        },
+        {
+          "const": "attributeName",
+          "description": "Attribute name.",
+          "type": "string"
+        },
+        {
+          "const": "attributeValue",
+          "description": "Attribute value.",
+          "type": "string"
+        },
+        {
+          "const": "text",
+          "description": "Element text.",
+          "type": "string"
+        }
+      ]
+    },
+    "PhysicalSource": {
+      "description": "One physical source, independent of the roles in which data values use it.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ArchiveEntrySource",
+          "description": "One physical Entry inside its observed root input.",
+          "properties": {
+            "kind": {
+              "const": "archiveEntry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ArchiveEntryProof",
+          "description": "Original Entry identity and encryption with explicitly limited stored details.",
+          "properties": {
+            "kind": {
+              "const": "archiveEntryProof",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ArchiveFileSource",
+          "description": "The completed whole-file read of an observed Archive input.",
+          "properties": {
+            "kind": {
+              "const": "archiveFile",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/FileSource",
+          "description": "One observed file input, without publication of its host path.",
+          "properties": {
+            "kind": {
+              "const": "file",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A source or ancestor whose physical binding is not known.",
+          "properties": {
+            "kind": {
+              "const": "unknown",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "ancestors": {
+          "items": {
+            "$ref": "#/$defs/PhysicalSourceRef"
+          },
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/PhysicalSourceRef"
+        },
+        "storedEncryption": {
+          "$ref": "#/$defs/SourceEncryptionState"
+        }
+      },
+      "required": [
+        "ancestors",
+        "id",
+        "storedEncryption"
+      ],
+      "type": "object"
+    },
+    "PhysicalSourceRef": {
+      "description": "A document-local physical-source reference, without a machine address.",
+      "type": "string"
+    },
+    "SourceCoordinateOmission": {
+      "description": "Why an actual contributing use omits its optional source coordinate.",
+      "oneOf": [
+        {
+          "const": "captureLimit",
+          "description": "Optional coordinate capture was not admitted.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "description": "A proved original contribution has no retained source coordinate.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceDeclarationKind": {
+      "description": "The physical field supplying an encryption declaration.",
+      "oneOf": [
+        {
+          "const": "cigExtraBlock",
+          "description": "The CIG 0x5002 extra block.",
+          "type": "string"
+        },
+        {
+          "const": "p4kV2Field",
+          "description": "The P4K v2 encryption word.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "A future uninterpreted declaration kind.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceDetails": {
+      "description": "Detail retention independently of original input identity and encryption proof.",
+      "oneOf": [
+        {
+          "const": "full",
+          "description": "Retain complete stored paths and declaration details.",
+          "type": "string"
+        },
+        {
+          "const": "captureLimited",
+          "description": "Retain original ownership and encryption proof without variable detail copies.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceEncryptionDeclaration": {
+      "description": "An observed encryption declaration whose values originate in directory metadata.",
+      "properties": {
+        "declaredBlockLength": {
+          "$ref": "#/$defs/SourcedValueOfuint16"
+        },
+        "kind": {
+          "$ref": "#/$defs/SourceDeclarationKind"
+        },
+        "rawBytes": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_uint8"
+        },
+        "rawWord": {
+          "$ref": "#/$defs/SourcedValueOfuint16"
+        },
+        "valueOffset": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "declaredBlockLength",
+        "kind",
+        "rawBytes",
+        "rawWord",
+        "valueOffset"
+      ],
+      "type": "object"
+    },
+    "SourceEncryptionState": {
+      "description": "Conservatively interpreted encryption of a stored physical source.",
+      "oneOf": [
+        {
+          "const": "encrypted",
+          "description": "The source is proved encrypted.",
+          "type": "string"
+        },
+        {
+          "const": "unencrypted",
+          "description": "The source is proved unencrypted.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "Stored evidence does not establish either state.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceLocation": {
+      "description": "A retained source coordinate or an explicit omission inside an observed physical input.",
+      "oneOf": [
+        {
+          "description": "An actual input use with explicitly omitted optional coordinates.",
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/SourceCoordinateOmission",
+              "description": "Why coordinate details were not retained."
+            },
+            "type": {
+              "const": "opaque",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One field of the physical DataForge Record index.",
+          "properties": {
+            "field": {
+              "description": "Exact owned-field path, including stored list positions.",
+              "type": "string"
+            },
+            "recordIndex": {
+              "description": "Physical Record position, independent of nominal GUID aliases.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "dataForge",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "recordIndex",
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A localization lookup addressed by its retained authored selector.",
+          "properties": {
+            "language": {
+              "description": "The language Entry used by the lookup.",
+              "type": "string"
+            },
+            "selector": {
+              "$ref": "#/$defs/SourceUseRef",
+              "description": "The source use holding the actual lookup key."
+            },
+            "type": {
+              "const": "localizationLookup",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "language",
+            "selector"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One exact logical field inside an already observed structured source subresource.",
+          "properties": {
+            "field": {
+              "description": "Original source field or token-range label within that object.",
+              "type": "string"
+            },
+            "indices": {
+              "description": "Original source ordinals, including repeated declarations and unknown slots.",
+              "items": {
+                "$ref": "#/$defs/DecimalU64"
+              },
+              "type": "array"
+            },
+            "namespace": {
+              "description": "Format-owned namespace for the original source object.",
+              "type": "string"
+            },
+            "type": {
+              "const": "subresource",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "namespace",
+            "indices",
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A directory or standalone input metadata field.",
+          "properties": {
+            "field": {
+              "description": "Exact metadata field, including stored occurrence positions.",
+              "type": "string"
+            },
+            "type": {
+              "const": "metadata",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "field"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "SourceRecordFormat": {
+      "description": "The exact declaration-bearing directory record format.",
+      "oneOf": [
+        {
+          "const": "zipCentralDirectory",
+          "description": "A ZIP central-directory record, including CIG extensions.",
+          "type": "string"
+        },
+        {
+          "const": "p4kV2",
+          "description": "A fixed P4K v2 directory record.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "A future record format not interpreted by this exporter.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceUseDescription": {
+      "description": "One source-use inventory row, kept separately from the field's actual contribution set.",
+      "properties": {
+        "effectiveEncryption": {
+          "$ref": "#/$defs/SourceEncryptionState"
+        },
+        "id": {
+          "$ref": "#/$defs/SourceUseRef"
+        },
+        "location": {
+          "$ref": "#/$defs/SourceLocation"
+        },
+        "role": {
+          "$ref": "#/$defs/SourceUseRole"
+        },
+        "scope": {
+          "$ref": "#/$defs/InputScope"
+        },
+        "source": {
+          "$ref": "#/$defs/PhysicalSourceRef"
+        }
+      },
+      "required": [
+        "effectiveEncryption",
+        "id",
+        "location",
+        "role",
+        "scope",
+        "source"
+      ],
+      "type": "object"
+    },
+    "SourceUseRef": {
+      "description": "A document-local source-use identifier, independent of addresses or pointer values.",
+      "type": "string"
+    },
+    "SourceUseRole": {
+      "description": "Whether an observed input actually contributes to the emitted data value.",
+      "oneOf": [
+        {
+          "const": "payload",
+          "description": "Retained payload bytes or facts.",
+          "type": "string"
+        },
+        {
+          "const": "selector",
+          "description": "An authored selector used to select this result.",
+          "type": "string"
+        },
+        {
+          "const": "conversion",
+          "description": "A used input to the value's conversion.",
+          "type": "string"
+        },
+        {
+          "const": "attempted",
+          "description": "A planned or failed input without a retained contribution.",
+          "type": "string"
+        },
+        {
+          "const": "reference",
+          "description": "An untouched reference target.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceValueState": {
+      "description": "The interpretation state of one typed source value.",
+      "oneOf": [
+        {
+          "const": "present",
+          "description": "A value is present.",
+          "type": "string"
+        },
+        {
+          "const": "absent",
+          "description": "The field is absent.",
+          "type": "string"
+        },
+        {
+          "const": "null",
+          "description": "The source explicitly stores null.",
+          "type": "string"
+        },
+        {
+          "const": "unreadable",
+          "description": "The source value cannot be read.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "The concrete source shape is unsupported.",
+          "type": "string"
+        },
+        {
+          "const": "invalid",
+          "description": "The typed value is invalid.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfSourceEncryptionDeclaration": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfSourceEncryptionDeclaration"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_uint8": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "format": "uint8",
+                  "maximum": 255,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfDecimalU64": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/DecimalU64"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSourceEncryptionDeclaration": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SourceEncryptionDeclaration"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfstring": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfuint16": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "format": "uint16",
+                "maximum": 65535,
+                "minimum": 0,
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One JSONL row in a portable standalone source-origin companion.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Format and measured artifact binding.",
+      "properties": {
+        "binding": {
+          "$ref": "#/$defs/OriginArtifactBinding",
+          "description": "Exact bound artifact."
+        },
+        "format": {
+          "description": "Fixed format identifier.",
+          "pattern": "^p4kx-source-origin$",
+          "type": "string"
+        },
+        "formatVersion": {
+          "description": "Fixed wire version.",
+          "pattern": "^1[.]0$",
+          "type": "string"
+        },
+        "type": {
+          "const": "header",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "format",
+        "formatVersion",
+        "binding"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "One original physical source.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/PhysicalSource",
+          "description": "Shared physical evidence."
+        },
+        "type": {
+          "const": "source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "source"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "One observed use of a physical source.",
+      "properties": {
+        "sourceUse": {
+          "$ref": "#/$defs/SourceUseDescription",
+          "description": "Shared source-use evidence."
+        },
+        "type": {
+          "const": "sourceUse",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sourceUse"
+      ],
+      "type": "object"
+    },
+    {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      ],
+      "description": "One emitted field with its immediate origin.",
+      "properties": {
+        "address": {
+          "$ref": "#/$defs/OriginOutputAddress",
+          "description": "Exact artifact address."
+        },
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "type": {
+          "const": "field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "address",
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs"
+      ],
+      "type": "object",
+      "unevaluatedProperties": false
+    },
+    {
+      "additionalProperties": false,
+      "description": "Explicit completion and observed row counts.",
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Number of addressed output fields."
+        },
+        "sourceUses": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Number of original use rows."
+        },
+        "sources": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Number of original source rows."
+        },
+        "type": {
+          "const": "end",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sources",
+        "sourceUses",
+        "fields"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "OriginCompanionRow"
+}

@@ -28,6 +28,7 @@ mod source_start_tag;
 mod source_syntax;
 mod strings;
 mod write;
+mod xml_write_field;
 
 pub use comparison::{TreeComparison, compare_trees};
 pub use depth::{MAX_TEXT_DEPTH, TextTooDeep, check_text_depth};
@@ -43,3 +44,4 @@ pub use source_document::{SourceDocument, SourceReadError, SourceReadOptions};
 pub use source_element::SourceElement;
 pub use source_position::{SourceAttributePosition, SourceElementPosition};
 pub use source_syntax::{SourceSpanError, SourceSyntax};
+pub use xml_write_field::{XmlFieldKind, XmlWriteField};
