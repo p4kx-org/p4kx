@@ -6,6 +6,7 @@ use roxmltree::{Children as TextChildren, Node as TextNode};
 use crate::element::{Children, Element};
 use crate::source_attribute::{SourceAttribute, SourceAttributes};
 use crate::source_position::{self, SourceElementPosition};
+use crate::source_syntax::{SourceSpanError, SourceSyntax};
 
 /// A borrowed element of a parsed XML source.
 #[derive(Debug, Clone, Copy)]
@@ -61,6 +62,17 @@ impl<'document> SourceElement<'document> {
                 source_position::original_range(node.range(), prefix_bytes),
             ),
             ElementView::CryXml(element) => SourceElementPosition::CryXml(element.index()),
+        }
+    }
+
+    /// Reads the authored syntax of this element.
+    ///
+    /// # Errors
+    /// Returns an error if the original text opener has no valid source span.
+    pub fn syntax(self) -> Result<SourceSyntax<'document>, SourceSpanError> {
+        match self.view {
+            ElementView::Text { node, prefix_bytes } => SourceSyntax::text(node, prefix_bytes),
+            ElementView::CryXml(element) => Ok(SourceSyntax::from_cryxml_element(element)),
         }
     }
 

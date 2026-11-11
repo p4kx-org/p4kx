@@ -9,9 +9,16 @@ Text element and attribute coordinates are half-open byte ranges in the original
 the offset of a leading UTF-8 BOM. The full attribute span preserves its original QName,
 whitespace, quote spelling and value literal. Parsed text names expose local spelling and namespace
 URIs. The Assembly lookup takes the first local-name match, including qualified attributes.
-Text namespace declarations and mixed content remain in the original element byte range.
-CryXml coordinates identify the actual node and attribute table indices. Binary names retain
-the binary decoder's spelling. `SourceDocument::is_lossy` reports repaired CryXml string-table bytes.
+The authored syntax view exposes exact QNames, ordered attributes and namespace declarations,
+decoded values, original value lexemes and original declaration coordinates. Text, comments,
+processing instructions and child elements keep their parser order and original byte extents.
+An exact text extent may include adjacent lexical pieces such as a CDATA section.
+The document view includes parser-observed prolog and epilog content.
+
+CryXml coordinates identify actual node and attribute table indices. Binary names retain
+the binary decoder's spelling and duplicate attributes retain separate table positions. Each
+CryXml node's text slot is separate from the order of its children. `SourceDocument::is_lossy`
+reports repaired CryXml string-table bytes.
 
 ## Bounds
 

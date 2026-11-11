@@ -93,7 +93,6 @@ mod mtl_unresolved;
 mod mtl_vertex_colours;
 mod mtl_xml;
 mod mtl_xml_source;
-mod mtl_xml_tokens;
 mod nmc;
 mod object_container;
 mod palette;

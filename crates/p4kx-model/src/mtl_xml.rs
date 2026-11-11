@@ -21,7 +21,7 @@ pub(crate) trait XmlElement<'a>: Copy {
 
 impl<'a> XmlElement<'a> for Element<'a> {
     fn syntax(self) -> Result<Syntax<'a>, MaterialError> {
-        Ok(mtl_xml_source::cryxml(self))
+        mtl_xml_source::cryxml(self)
     }
 
     fn name(self) -> &'a str {

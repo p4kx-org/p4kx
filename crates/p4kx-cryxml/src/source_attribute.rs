@@ -39,6 +39,10 @@ impl<'document> SourceAttribute<'document> {
     pub const fn position(&self) -> &SourceAttributePosition {
         &self.position
     }
+
+    pub(crate) const fn into_position(self) -> SourceAttributePosition {
+        self.position
+    }
 }
 
 pub(crate) enum SourceAttributes<'document> {

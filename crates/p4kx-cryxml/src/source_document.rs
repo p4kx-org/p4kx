@@ -11,6 +11,7 @@ use crate::document::Document;
 use crate::error::CryXmlError;
 use crate::format::Format;
 use crate::read::{self, Xml};
+use crate::source_content::SourceContents;
 use crate::source_element::SourceElement;
 
 /// Admission policy for the text parser.
@@ -108,6 +109,18 @@ impl<'input> SourceDocument<'input> {
         match &self.document {
             ParsedDocument::Text { .. } => false,
             ParsedDocument::CryXml(document) => document.is_lossy(),
+        }
+    }
+
+    /// Returns original document-level content and the root element in parser order.
+    #[must_use]
+    pub fn content(&self) -> SourceContents<'_> {
+        match &self.document {
+            ParsedDocument::Text {
+                document,
+                prefix_bytes,
+            } => SourceContents::text_document(document.root(), *prefix_bytes),
+            ParsedDocument::CryXml(document) => SourceContents::cryxml_document(document.root()),
         }
     }
 

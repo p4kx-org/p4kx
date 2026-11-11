@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
-
-use p4kx_cryxml::Element;
+use p4kx_cryxml::{Element, SourceContent, SourceDeclarationKind, SourceSyntax};
 
 use crate::MaterialError;
 use crate::mtl_source::{
     AuthoredAttribute, AuthoredAttributeKind, AuthoredContent, ElementAuthored,
 };
-use crate::mtl_xml_tokens;
 
 pub(crate) struct Syntax<'input> {
     name: &'input str,
@@ -139,147 +136,72 @@ impl Content<'_> {
     }
 }
 
-pub(crate) fn cryxml(element: Element<'_>) -> Syntax<'_> {
-    let attributes = element
-        .attributes()
-        .map(|attribute| {
-            let name = attribute.name();
-            let kind = if name == "xmlns" {
-                AttributeKind::Namespace { prefix: None }
-            } else if let Some(prefix) = name.strip_prefix("xmlns:") {
-                AttributeKind::Namespace {
-                    prefix: Some(prefix),
-                }
-            } else {
-                AttributeKind::Attribute { namespace: None }
-            };
-            Attribute {
-                name,
-                value: attribute.value(),
-                lexeme: None,
-                kind,
-            }
-        })
-        .collect();
-    Syntax {
-        name: element.name(),
-        namespace: None,
-        attributes,
-        content: element
-            .children()
-            .enumerate()
-            .map(|(ordinal, _)| Content::Element { ordinal })
-            .collect(),
-        binary_text: element.content(),
-    }
+pub(crate) fn cryxml(element: Element<'_>) -> Result<Syntax<'_>, MaterialError> {
+    source(&SourceSyntax::from_cryxml_element(element), None)
 }
 
 pub(crate) fn text<'document, 'input: 'document>(
     element: roxmltree::Node<'document, 'input>,
 ) -> Result<Syntax<'document>, MaterialError> {
-    let source = element.document().input_text();
-    let tag = mtl_xml_tokens::start_tag(source, element.range())?;
-    let namespaces: HashMap<Option<&str>, &str> = element
-        .namespaces()
-        .map(|namespace| (namespace.name(), namespace.uri()))
-        .collect();
-    let mut decoded = element.attributes();
+    let syntax = SourceSyntax::from_text_element(element).map_err(|_| MaterialError::SourceSpan)?;
+    source(&syntax, element.tag_name().namespace())
+}
+
+fn source<'document>(
+    syntax: &SourceSyntax<'document>,
+    namespace: Option<&'document str>,
+) -> Result<Syntax<'document>, MaterialError> {
     let mut attributes = Vec::new();
-    for token in tag.attributes {
-        let namespace_prefix = if token.name == "xmlns" {
-            Some(None)
-        } else {
-            token.name.strip_prefix("xmlns:").map(Some)
-        };
-        let (value, kind) = if let Some(prefix) = namespace_prefix {
-            let value = if token.value.is_empty() {
-                ""
-            } else {
-                *namespaces.get(&prefix).ok_or(MaterialError::SourceSpan)?
-            };
-            (value, AttributeKind::Namespace { prefix })
-        } else {
-            let attribute = decoded.next().ok_or(MaterialError::SourceSpan)?;
-            let local = token
-                .name
-                .rsplit_once(':')
-                .map_or(token.name, |(_, local)| local);
-            if attribute.name() != local {
-                return Err(MaterialError::SourceSpan);
+    for declaration in syntax.declarations() {
+        let declaration = declaration.map_err(|_| MaterialError::SourceSpan)?;
+        let kind = match declaration.kind() {
+            SourceDeclarationKind::Attribute { namespace } => {
+                AttributeKind::Attribute { namespace }
             }
-            (
-                attribute.value(),
-                AttributeKind::Attribute {
-                    namespace: attribute.namespace(),
-                },
-            )
+            SourceDeclarationKind::Namespace { prefix } => AttributeKind::Namespace { prefix },
+            _ => return Err(MaterialError::SourceSpan),
         };
         attributes.push(Attribute {
-            name: token.name,
-            value,
-            lexeme: Some(token.value),
+            name: declaration.qualified_name(),
+            value: declaration.value(),
+            lexeme: declaration.lexeme(),
             kind,
         });
     }
-    if decoded.next().is_some() {
-        return Err(MaterialError::SourceSpan);
-    }
     Ok(Syntax {
-        name: tag.name,
-        namespace: element.tag_name().namespace(),
+        name: syntax.qualified_name(),
+        namespace,
         attributes,
-        content: content(element, tag.name)?,
-        binary_text: None,
+        content: content(syntax)?,
+        binary_text: syntax.binary_text().map(|text| text.value()),
     })
 }
 
-fn content<'document, 'input: 'document>(
-    element: roxmltree::Node<'document, 'input>,
-    qualified_name: &str,
+fn content<'document>(
+    syntax: &SourceSyntax<'document>,
 ) -> Result<Vec<Content<'document>>, MaterialError> {
-    let source = element.document().input_text();
     let mut content = Vec::new();
-    let mut ordinal = 0;
-    let range = element.range();
-    let element_text = source.get(range.clone()).ok_or(MaterialError::SourceSpan)?;
-    let closing = closing_tag_start(element_text, qualified_name)? + range.start;
-    let mut children = element.children().peekable();
-    while let Some(child) = children.next() {
-        if child.is_element() {
-            content.push(Content::Element { ordinal });
-            ordinal = ordinal.checked_add(1).ok_or(MaterialError::SourceSpan)?;
-        } else if child.is_text() {
-            let value = child.text().unwrap_or_default();
-            let end = children.peek().map_or(closing, |next| next.range().start);
-            let lexeme = source
-                .get(child.range().start..end)
-                .ok_or(MaterialError::SourceSpan)?;
-            content.push(Content::Text { value, lexeme });
-        } else if child.is_comment() {
-            content.push(Content::Comment {
-                value: child.text().unwrap_or_default(),
-            });
-        } else if let Some(instruction) = child.pi() {
-            content.push(Content::ProcessingInstruction {
-                target: instruction.target,
-                value: instruction.value,
-            });
-        }
+    let mut ordinal = 0_usize;
+    for item in syntax.content().map_err(|_| MaterialError::SourceSpan)? {
+        let value = match item.map_err(|_| MaterialError::SourceSpan)? {
+            SourceContent::Element(_) => {
+                let item = Content::Element { ordinal };
+                ordinal = ordinal.checked_add(1).ok_or(MaterialError::SourceSpan)?;
+                item
+            }
+            SourceContent::Text(text) => Content::Text {
+                value: text.value(),
+                lexeme: text.lexeme().ok_or(MaterialError::SourceSpan)?,
+            },
+            SourceContent::Comment(text) => Content::Comment {
+                value: text.value(),
+            },
+            SourceContent::ProcessingInstruction { target, value, .. } => {
+                Content::ProcessingInstruction { target, value }
+            }
+            _ => return Err(MaterialError::SourceSpan),
+        };
+        content.push(value);
     }
     Ok(content)
-}
-
-fn closing_tag_start(source: &str, qualified_name: &str) -> Result<usize, MaterialError> {
-    if source.ends_with("/>") {
-        return Ok(source.len());
-    }
-    let end = source.strip_suffix('>').ok_or(MaterialError::SourceSpan)?;
-    let end = end.trim_end_matches(|character: char| character.is_ascii_whitespace());
-    let before_name = end
-        .strip_suffix(qualified_name)
-        .ok_or(MaterialError::SourceSpan)?;
-    let before_close = before_name
-        .strip_suffix("</")
-        .ok_or(MaterialError::SourceSpan)?;
-    Ok(before_close.len())
 }

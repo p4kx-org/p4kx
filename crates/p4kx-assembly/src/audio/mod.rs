@@ -11,7 +11,6 @@ mod cache;
 mod entity;
 mod error;
 mod export;
-mod hash;
 mod index;
 mod index_read;
 mod language;
@@ -40,9 +39,9 @@ pub use export::{
     ExportFailure, ExportOptions, ExportReport, ExportState, ExportWatch, ExportedSound,
     SoundFormat,
 };
-pub use hash::wwise_id;
 pub use index::AudioIndex;
 pub use language::LanguageChoice;
+pub use p4kx_audio::wwise_id;
 pub use references::{TriggerReference, TriggerScope, trigger_references, trigger_references_in};
 pub use search::{MAX_SEARCH_PAGE, SearchPage, TriggerHit};
 pub use sounds::{NodeKind, PathStep, SoundVariant, SourceKind, TriggerSounds, WemLocation};

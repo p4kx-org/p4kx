@@ -68,6 +68,7 @@ mod wem_metadata;
 mod wem_metadata_read;
 mod wem_source;
 mod wem_text;
+mod wwise_id;
 
 pub use bank_error::{BankError, BankWarning, SectionId};
 pub use bank_inline_state_rows::{BankInlineStateRow, BankInlineStateRows};
@@ -155,3 +156,4 @@ pub use wem_source::{
     WemSource,
 };
 pub use wem_text::{WemCueText, WemTextUtf8};
+pub use wwise_id::wwise_id;

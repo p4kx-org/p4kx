@@ -11,6 +11,7 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use p4kx_archive::{Archive, Entry, EntryOrigin};
+pub use p4kx_audio::wwise_id;
 use p4kx_audio::{AudioError, OggReport, WavReport, Wem};
 pub use p4kx_audio::{
     ByteOrder, WemChunkCursor, WemChunkEntry, WemCodecSource, WemCue, WemCuePoint, WemCueText,
