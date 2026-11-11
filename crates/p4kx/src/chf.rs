@@ -198,7 +198,7 @@ fn observed_json(args: &ChfToJsonArgs, input: &ObservedFileRead, chf: &Chf) -> R
     })
 }
 
-fn read_chf(file: &Path, bytes: &[u8]) -> Result<Chf, InvalidChf> {
+pub(crate) fn read_chf(file: &Path, bytes: &[u8]) -> Result<Chf, InvalidChf> {
     Chf::read(bytes).map_err(|source| InvalidChf {
         path: file.to_owned(),
         source,
@@ -304,7 +304,10 @@ pub(crate) fn read_capped(path: &Path, limit: u64) -> Result<Vec<u8>, Unreadable
     Ok(bytes)
 }
 
-fn read_capped_observed(path: &Path, limit: u64) -> Result<ObservedFileRead, UnreadableChfInput> {
+pub(crate) fn read_capped_observed(
+    path: &Path,
+    limit: u64,
+) -> Result<ObservedFileRead, UnreadableChfInput> {
     let input =
         read_observed_file_limit(path, limit + 1).map_err(|source| UnreadableChfInput::Io {
             path: path.to_owned(),

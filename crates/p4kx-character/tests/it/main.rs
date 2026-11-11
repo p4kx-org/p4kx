@@ -5,6 +5,7 @@
 
 mod chf;
 mod diff;
+mod diff_origins;
 mod face_pose;
 mod json;
 mod limits;

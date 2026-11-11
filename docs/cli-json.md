@@ -2635,6 +2635,12 @@ order; the order of face parts and blends is their meaning and is compared by po
 code is 1 when the files differ (`identical` false) and 0 when not, as for `compare`; a file that
 is no CHF exits with 3.
 
+The report also carries `fieldOrigins` keyed by the exact report pointer and
+`provenance` for both files. Each change's `old` and `new` uses identify the
+original value or membership query on the corresponding side. Name lookups
+used in the readable path and order text can carry Archive sources. The raw
+hash path and comparison result derive from the CHF values.
+
 ## `p4kx chf to-json <file> --out <file> --json` and `p4kx chf from-json <file> --out <file> --json`
 
 ```json

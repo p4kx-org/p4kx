@@ -32,7 +32,7 @@ fn field<'rows>(rows: &'rows [Value], path: &str) -> Result<&'rows Value, Box<dy
         .ok_or_else(|| format!("missing field {path}").into())
 }
 
-fn write_mixed_fixture(archive: &Path, chf: &Path, corrupt: bool) -> TestResult {
+pub(super) fn write_mixed_fixture(archive: &Path, chf: &Path, corrupt: bool) -> TestResult {
     let forge = dressed_entries(None)
         .into_iter()
         .find(|entry| entry.path() == "Data\\Game2.dcb")

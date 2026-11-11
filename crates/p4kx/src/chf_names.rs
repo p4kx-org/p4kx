@@ -6,7 +6,7 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use anyhow::Result;
-use p4kx_assembly::character::{Chf, ChfJsonName, NameSummary, NameTable};
+use p4kx_assembly::character::{Chf, ChfJsonName, ChfNameKind, NameSummary, NameTable};
 use p4kx_assembly::{
     ArchiveModels, ChfNameContributions, ForgeItems, LoadoutResolver, ObservedChfNames,
     archive_names, archive_names_observed,
@@ -44,14 +44,15 @@ pub(crate) fn names_for_all(archive: Option<&Path>, chfs: &[&Chf]) -> Result<Nam
 }
 
 pub(crate) struct ObservedNames {
-    names: ObservedChfNames,
+    names: NameTable,
+    tables: Vec<ObservedChfNames>,
     forge: SourceScope,
     complete: bool,
 }
 
 impl ObservedNames {
     pub(crate) const fn table(&self) -> &NameTable {
-        self.names.names()
+        &self.names
     }
 
     pub(crate) fn contributions(
@@ -59,9 +60,24 @@ impl ObservedNames {
         name: ChfJsonName,
         input: &SourceScope,
     ) -> Result<Option<ChfNameContributions>> {
-        let mut contributions =
-            self.names
-                .contributions(name.kind(), name.hash(), input, &self.forge)?;
+        self.lookup(name.kind(), name.hash(), &[input])
+    }
+
+    pub(crate) fn lookup(
+        &self,
+        kind: ChfNameKind,
+        hash: u32,
+        inputs: &[&SourceScope],
+    ) -> Result<Option<ChfNameContributions>> {
+        let winner = self
+            .tables
+            .iter()
+            .zip(inputs)
+            .find(|(table, _)| table.names().get(kind, hash).is_some());
+        let Some((table, input)) = winner else {
+            return Ok(None);
+        };
+        let mut contributions = table.contributions(kind, hash, input, &self.forge)?;
         if let Some(contributions) = &mut contributions {
             contributions.complete &= self.complete;
         }
@@ -70,6 +86,10 @@ impl ObservedNames {
 }
 
 pub(crate) fn observed(path: &Path, chf: &Chf, uses: &SourceUses) -> Result<ObservedNames> {
+    observed_all(path, &[chf], uses)
+}
+
+pub(crate) fn observed_all(path: &Path, chfs: &[&Chf], uses: &SourceUses) -> Result<ObservedNames> {
     let archive = crate::key::open(path)?;
     let entry = DataForgeEntry::read(&archive)?;
     let origin = match entry.origin() {
@@ -79,14 +99,22 @@ pub(crate) fn observed(path: &Path, chf: &Chf, uses: &SourceUses) -> Result<Obse
     let source = uses.observe(origin, InputScope::Payload)?;
     let forge = entry.open()?;
     let mut resolver = LoadoutResolver::new(&forge);
-    let names = archive_names_observed(
-        &chf.character,
-        &mut ForgeItems::new(&mut resolver),
-        &ArchiveModels::new(&archive),
-        uses,
-    )?;
+    let models = ArchiveModels::new(&archive);
+    let mut names = NameTable::builtin();
+    let mut tables = Vec::with_capacity(chfs.len());
+    for chf in chfs {
+        let table = archive_names_observed(
+            &chf.character,
+            &mut ForgeItems::new(&mut resolver),
+            &models,
+            uses,
+        )?;
+        names.merge(table.names());
+        tables.push(table);
+    }
     Ok(ObservedNames {
         names,
+        tables,
         forge: source,
         complete: matches!(origin, SourceInput::Archive(_)),
     })
