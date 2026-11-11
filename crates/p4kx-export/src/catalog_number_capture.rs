@@ -35,6 +35,14 @@ pub(crate) enum NumberOccurrence {
     BlueprintValue { ordinal: u64 },
     TemplateValue { ordinal: u64 },
     ItemComponentValue { ordinal: u64 },
+    AuthoredDefinitionValue { ordinal: u64 },
+}
+
+/// The emitted owner of an exact source scalar.
+#[derive(Clone, Copy)]
+pub(crate) enum AuthoredNumberOwner {
+    ItemComponent,
+    Definition,
 }
 
 /// A lossless numeric token retained by the actual raw-field reader.
@@ -49,18 +57,24 @@ pub(crate) struct CapturedNumber {
 }
 
 impl CapturedNumber {
-    /// Retains the original Single only when the selected component reader emits its exact bits.
-    pub(crate) fn item_component<'scope, 'read, 'source>(
+    /// Retains the exact original Single emitted by a selected component or definition.
+    pub(crate) fn authored_single<'scope, 'read, 'source>(
         originals: &OriginalFlowFields<'scope, 'read, 'source>,
         fact: &OriginalValueFact<'scope, 'read, 'source>,
+        owner: AuthoredNumberOwner,
     ) -> Result<Option<Self>, CatalogError> {
         let Some(token @ FloatToken::Single(_)) = FloatToken::read(fact.value()) else {
             return Ok(None);
         };
         Ok(Some(Self {
             record_index: originals.record_index(),
-            occurrence: NumberOccurrence::ItemComponentValue {
-                ordinal: fact.ordinal(),
+            occurrence: match owner {
+                AuthoredNumberOwner::ItemComponent => NumberOccurrence::ItemComponentValue {
+                    ordinal: fact.ordinal(),
+                },
+                AuthoredNumberOwner::Definition => NumberOccurrence::AuthoredDefinitionValue {
+                    ordinal: fact.ordinal(),
+                },
             },
             field: originals.logical_path(fact)?,
             token,

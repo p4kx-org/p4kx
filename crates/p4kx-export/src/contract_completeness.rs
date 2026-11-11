@@ -31,6 +31,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) blueprint_categories: KindCompleteness<'a>,
     /// The ordinary filtered selection of authored category databases.
     pub(crate) blueprint_category_lists: KindCompleteness<'a>,
+    /// The filtered physical `ExplosionRecord` selection.
+    pub(crate) explosion_definitions: KindCompleteness<'a>,
     /// The completeness of `gameplayProperties`.
     pub(crate) gameplay_properties: KindCompleteness<'a>,
     /// The completeness of `qualityDistributions`.
@@ -133,6 +135,7 @@ impl<'a> Completeness<'a> {
             resource_types: completeness,
             blueprint_categories: completeness,
             blueprint_category_lists: completeness,
+            explosion_definitions: completeness,
             gameplay_properties: completeness,
             quality_distributions: completeness,
             quality_quantizations: completeness,

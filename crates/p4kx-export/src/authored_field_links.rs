@@ -90,7 +90,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
             &mut Vec<SourceUse>,
         ) -> Result<Option<(OriginalValuePart, T)>, CatalogError>,
     ) -> Result<SourcedValue<T>, CatalogError> {
-        let Some((_, fact)) = self.originals.field(Some(self.owner), name)? else {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
             return self.absent();
         };
         let mut selectors = Vec::new();

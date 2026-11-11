@@ -2,12 +2,14 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::Collected;
-use crate::guid_text::sort_by_guid;
+use crate::guid_text::{CatalogGuid, sort_by_guid};
 
 impl Collected<'_> {
     /// Orders the failures and the picked kinds by the text of the GUID.
     pub(super) fn order(&mut self) {
         self.order_failures();
+        self.explosion_definitions
+            .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         sort_by_guid(&mut self.manufacturers, |entity| entity.guid);
         sort_by_guid(&mut self.items, |entity| entity.guid);
         sort_by_guid(&mut self.ships, |entity| entity.guid);

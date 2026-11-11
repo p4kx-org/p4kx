@@ -7,6 +7,7 @@ use crate::Kind;
 use crate::blueprint_category::BlueprintCategory;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
+use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::contract::{
     Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
     MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup, ResourceType, Ship,
@@ -51,6 +52,8 @@ pub(crate) enum Picked<'f> {
     BlueprintCategory(BlueprintCategory<'f>),
     /// One original category database list.
     BlueprintCategoryList(PreparedBlueprintCategoryList<'f>),
+    /// One original explosion definition.
+    ExplosionDefinition(Box<PreparedExplosionDefinition<'f>>),
     /// A starmap object.
     Starmap(StarmapObject<'f>),
     /// A mineable element.
@@ -122,6 +125,7 @@ impl<'f> Picked<'f> {
             | Kind::Blueprints
             | Kind::BlueprintCategories
             | Kind::BlueprintCategoryLists
+            | Kind::ExplosionDefinitions
             | Kind::GameplayProperties
             | Kind::QualityDistributions
             | Kind::QualityQuantizations

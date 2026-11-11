@@ -59,6 +59,7 @@ impl Kind {
             Self::Tags => 49,
             Self::BlueprintCategoryLists => 50,
             Self::ShopInventories => 51,
+            Self::ExplosionDefinitions => 52,
         }
     }
 }

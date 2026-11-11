@@ -43,6 +43,39 @@ pub(super) fn database(unknown: bool) -> DataForgeBuilder {
         ))
 }
 
+pub(super) fn independent_definitions() -> DataForgeBuilder {
+    schema()
+        .record(
+            TestRecord::new(
+                0x7581,
+                "ExplosionRecord",
+                "ExplosionRecord.Later",
+                "libs/foundry/records/fixtures/explosions/later.xml",
+            )
+            .value(
+                "explosionParams",
+                node(
+                    TestInstance::new("ExplosionParams").value("pressure", TestValue::Single(0.0)),
+                ),
+            ),
+        )
+        .record(
+            TestRecord::new(
+                0x7580,
+                "ExplosionRecord",
+                "ExplosionRecord.Earlier",
+                "libs/foundry/records/fixtures/explosions/earlier.xml",
+            )
+            .value(
+                "explosionParams",
+                node(
+                    TestInstance::new("ExplosionParams")
+                        .value("pressure", TestValue::Single(f32::INFINITY)),
+                ),
+            ),
+        )
+}
+
 fn schema() -> DataForgeBuilder {
     let health = TestStruct::new("SHealthComponentParams")
         .parent("DataForgeComponentParams")

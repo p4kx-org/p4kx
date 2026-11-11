@@ -74,6 +74,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "harvestableLocations": {"status": "complete"},
             "shops": {"status": "complete"},
             "shopInventories": {"status": "complete"},
+            "explosionDefinitions": {"status": "complete"},
             "factionReputations": {"status": "complete"},
             "reputationScopes": {"status": "complete"},
             "reputationStandings": {"status": "complete"},
@@ -150,6 +151,7 @@ pub(crate) fn minimal_catalog() -> Value {
         "definitions": {"contractGenerators": absent_table(), "blueprints": blueprints::definitions(), "contractTemplates": absent_table(), "missionBrokerEntries": absent_table(), "lootPoolFilters": loot::filters(), "blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
             "tags": tags::definitions(),
+            "explosionDefinitions": absent_table(),
             "shopInventories": {"availability": "absent", "meaning": "offlineDesignTime", "rows": []}},
         "configurations": {
             "blueprintTiers": blueprints::tiers(),

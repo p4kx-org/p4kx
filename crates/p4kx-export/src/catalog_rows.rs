@@ -3,6 +3,7 @@
 
 use p4kx_extraction::{Filter, Guid};
 
+use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_number_health::EmittedNumber;
 use crate::catalog_row::{CatalogRow, CatalogRows};
 use crate::collected::Collected;
@@ -32,6 +33,14 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
     append_resources(&mut emitted, collected);
     append(
         &mut emitted,
+        Kind::ExplosionDefinitions,
+        collected
+            .explosion_definitions
+            .iter()
+            .map(|row| (row.physical_guid, row.physical_path)),
+    );
+    append(
+        &mut emitted,
         Kind::Blueprints,
         collected
             .blueprints
@@ -39,23 +48,7 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
             .map(|row| (row.definition.physical_guid.0, row.definition.physical_path)),
     );
     append_missions(&mut emitted, collected);
-    append(
-        &mut emitted,
-        Kind::LootPoolFilters,
-        collected
-            .loot_kinds
-            .filters
-            .iter()
-            .map(|row| (row.physical_guid.0, row.physical_path)),
-    );
-    append(
-        &mut emitted,
-        Kind::GameplayProperties,
-        collected
-            .gameplay_properties
-            .iter()
-            .map(|row| (row.physical_guid.0, row.physical_path)),
-    );
+    append_gameplay_definitions(&mut emitted, collected);
     append(
         &mut emitted,
         Kind::StarmapObjects,
@@ -70,6 +63,26 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
         numbers: numbers(collected),
         template_numbers: template_numbers(collected),
     }
+}
+
+fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
+    append(
+        emitted,
+        Kind::LootPoolFilters,
+        collected
+            .loot_kinds
+            .filters
+            .iter()
+            .map(|row| (row.physical_guid.0, row.physical_path)),
+    );
+    append(
+        emitted,
+        Kind::GameplayProperties,
+        collected
+            .gameplay_properties
+            .iter()
+            .map(|row| (row.physical_guid.0, row.physical_path)),
+    );
 }
 
 fn template_numbers(collected: &Collected<'_>) -> Vec<TemplateNumbers> {
@@ -164,44 +177,7 @@ fn append<'source>(
 
 fn numbers(collected: &Collected<'_>) -> Vec<EmittedNumber> {
     let mut numbers = Vec::new();
-    for (kind, values) in collected
-        .resource_types
-        .iter()
-        .map(|row| (Kind::ResourceTypes, &row.numbers))
-        .chain(
-            collected
-                .blueprints
-                .iter()
-                .map(|row| (Kind::Blueprints, &row.definition.numbers)),
-        )
-        .chain(
-            collected
-                .gameplay_properties
-                .iter()
-                .map(|row| (Kind::GameplayProperties, &row.numbers)),
-        )
-        .chain(
-            collected
-                .quality
-                .distributions
-                .iter()
-                .map(|row| (Kind::QualityDistributions, &row.numbers)),
-        )
-        .chain(
-            collected
-                .quality
-                .quantizations
-                .iter()
-                .map(|row| (Kind::QualityQuantizations, &row.numbers)),
-        )
-        .chain(
-            collected
-                .loot_kinds
-                .filters
-                .iter()
-                .map(|row| (Kind::LootPoolFilters, &row.numbers)),
-        )
-    {
+    for (kind, values) in definition_number_groups(collected) {
         numbers.extend(
             values
                 .iter()
@@ -221,4 +197,52 @@ fn numbers(collected: &Collected<'_>) -> Vec<EmittedNumber> {
             }),
     );
     numbers
+}
+
+fn definition_number_groups<'rows>(
+    collected: &'rows Collected<'_>,
+) -> impl Iterator<Item = (Kind, &'rows [CapturedNumber])> {
+    collected
+        .resource_types
+        .iter()
+        .map(|row| (Kind::ResourceTypes, row.numbers.as_slice()))
+        .chain(
+            collected
+                .explosion_definitions
+                .iter()
+                .map(|row| (Kind::ExplosionDefinitions, row.numbers.as_slice())),
+        )
+        .chain(
+            collected
+                .blueprints
+                .iter()
+                .map(|row| (Kind::Blueprints, row.definition.numbers.as_slice())),
+        )
+        .chain(
+            collected
+                .gameplay_properties
+                .iter()
+                .map(|row| (Kind::GameplayProperties, row.numbers.as_slice())),
+        )
+        .chain(
+            collected
+                .quality
+                .distributions
+                .iter()
+                .map(|row| (Kind::QualityDistributions, row.numbers.as_slice())),
+        )
+        .chain(
+            collected
+                .quality
+                .quantizations
+                .iter()
+                .map(|row| (Kind::QualityQuantizations, row.numbers.as_slice())),
+        )
+        .chain(
+            collected
+                .loot_kinds
+                .filters
+                .iter()
+                .map(|row| (Kind::LootPoolFilters, row.numbers.as_slice())),
+        )
 }

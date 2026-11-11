@@ -108,7 +108,8 @@ impl<'source> NumberCaptures<'source> {
                     NumberOccurrence::TemplateValue { .. } => {}
                     NumberOccurrence::LootValue { ordinal }
                     | NumberOccurrence::BlueprintValue { ordinal }
-                    | NumberOccurrence::ItemComponentValue { ordinal } => {
+                    | NumberOccurrence::ItemComponentValue { ordinal }
+                    | NumberOccurrence::AuthoredDefinitionValue { ordinal } => {
                         if matches!(actual.occurrence, NumberOccurrence::BlueprintValue { .. })
                             && number.kind != Kind::Blueprints
                         {
@@ -199,7 +200,9 @@ impl Coverage<'_, '_> {
         }
         if matches!(
             self.kind,
-            Some(Kind::LootPoolFilters | Kind::Blueprints | Kind::Items)
+            Some(
+                Kind::LootPoolFilters | Kind::Blueprints | Kind::Items | Kind::ExplosionDefinitions
+            )
         ) {
             return self.owned(required);
         }
@@ -236,6 +239,10 @@ impl Coverage<'_, '_> {
             ),
             Some(Kind::Items) => (
                 NumberOccurrence::ItemComponentValue { ordinal },
+                ResourceNumberContract::Single,
+            ),
+            Some(Kind::ExplosionDefinitions) => (
+                NumberOccurrence::AuthoredDefinitionValue { ordinal },
                 ResourceNumberContract::Single,
             ),
             _ => return false,

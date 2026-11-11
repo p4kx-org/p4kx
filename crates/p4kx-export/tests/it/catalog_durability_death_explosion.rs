@@ -13,6 +13,9 @@ use crate::health_origin_assertions as proof;
 #[path = "catalog_death_explosion_fixture.rs"]
 mod fixture;
 
+#[path = "catalog_explosion_definitions.rs"]
+mod definitions;
+
 const FIELD: &str = "deathExplosionParams";
 const ORIGINAL_FIELD: &str = "DeathExplosionParams";
 

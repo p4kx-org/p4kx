@@ -52,6 +52,23 @@ array order survive.
 Unsupported variants retain their type evidence in diagnostic output. The durability rows carry
 the links to separately owned gas, tag, interaction and other definitions.
 
+## Explosion definitions
+
+The `deathExplosionParams` value identifies the original `ExplosionBaseParams`,
+`ExplosionParams` or `ExplosionByRecordParams` alternative. The inline payload retains the
+authored radii, angles, orientation and offsets, pressure and terrain fields, audiovisual
+controls, and optional flashbang, shockwave and fragment settings. Damage retains its
+authored channel breakdown or macro and total. Single values preserve source bits and units.
+The catalog does not calculate effectiveness or convert units from their names.
+
+`definitions.explosionDefinitions` independently selects physical `ExplosionRecord` Records by
+type under the ordinary Record Filter. Rows are ordered by nominal GUID and physical Record
+index and retain the canonical Record header and the original `explosionParams` Class.
+The same typed parameter reader supplies these definitions and inline Health values.
+A Health Record reference can resolve even when its definition was filtered out. A readable
+target whose type disagrees with the authored declaration retains its physical identity and
+`unexpectedTargetType` status. A dangling reference retains its stored GUID.
+
 ## Degradation and Distortion source fields
 
 `SDegradationParams` retains `StopDegradingIfDestroyed` and `accumulators`. Each accumulator

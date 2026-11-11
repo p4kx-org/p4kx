@@ -139,6 +139,7 @@ fn origins<'source>(
                 | Kind::GameplayProperties
                 | Kind::Blueprints
                 | Kind::LootPoolFilters
+                | Kind::ExplosionDefinitions
                 | Kind::Tags
                 | Kind::Commodities
                 | Kind::ResourceTypes

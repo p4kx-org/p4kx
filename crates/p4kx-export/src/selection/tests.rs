@@ -60,7 +60,13 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 Kind::LegacyLootArchetypes => assert_eq!(by_path, Some(Kind::LootArchetypes)),
                 Kind::MissionBrokerEntries => assert_eq!(by_path, Some(Kind::ContractTemplates)),
                 Kind::ResourceTypes => assert_eq!(by_path, Some(Kind::ResourceGroups)),
-                Kind::BlueprintCategoryLists => assert_eq!(by_path, Some(Kind::Tags)),
+                Kind::BlueprintCategoryLists | Kind::ExplosionDefinitions => {
+                    assert_eq!(
+                        by_path,
+                        Some(Kind::Tags),
+                        "type disambiguates an unrestricted path"
+                    );
+                }
                 _ => assert_eq!(by_path, by_record, "{kind} by path at {path}"),
             }
         }

@@ -13,6 +13,7 @@ use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
+use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::contract::{
     BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
@@ -72,6 +73,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) resource_types: Vec<ResourceType<'f>>,
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'f>>,
     pub(crate) blueprint_category_lists: Vec<PreparedBlueprintCategoryList<'f>>,
+    pub(crate) explosion_definitions: Vec<PreparedExplosionDefinition<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayPropertyDefinition<'f>>,
     pub(crate) quality: QualityRows<'f>,
     pub(crate) blueprint_pools: Vec<BlueprintPool<'f>>,
@@ -146,8 +148,8 @@ impl<'f> Collected<'f> {
     }
 
     fn from_crafting(crafting: CraftingKinds<'f>) -> Self {
-        let skipped = Self::crafting_skipped(&crafting);
         Self {
+            skipped: Self::crafting_skipped(&crafting),
             ledger: crafting.ledger,
             tags: crate::catalog_v3::tag_catalog::TagRows::default(),
             manufacturers: Vec::new(),
@@ -162,6 +164,7 @@ impl<'f> Collected<'f> {
             resource_types: Vec::new(),
             blueprint_categories: Vec::new(),
             blueprint_category_lists: Vec::new(),
+            explosion_definitions: Vec::new(),
             gameplay_properties: crafting.properties,
             quality: crafting.quality,
             blueprint_pools: crafting.pools,
@@ -204,7 +207,6 @@ impl<'f> Collected<'f> {
             playability: PlayabilitySummary::default(),
             failures: crafting.failures,
             warnings: crafting.warnings,
-            skipped,
         }
     }
 
@@ -241,6 +243,7 @@ impl<'f> Collected<'f> {
             Picked::ResourceType(entity) => self.resource_types.push(*entity),
             Picked::BlueprintCategory(entity) => self.blueprint_categories.push(entity),
             Picked::BlueprintCategoryList(entity) => self.blueprint_category_lists.push(entity),
+            Picked::ExplosionDefinition(entity) => self.explosion_definitions.push(*entity),
             Picked::Starmap(entity) => self.starmap_objects.push(entity),
             Picked::Mineable(entity) => self.mineable_elements.push(entity),
             Picked::Refining(entity) => self.refining_processes.push(entity),

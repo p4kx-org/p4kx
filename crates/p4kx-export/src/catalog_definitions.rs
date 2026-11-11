@@ -7,6 +7,7 @@ use serde::Serialize;
 use crate::blueprint_category::BlueprintCategoryDefinition;
 use crate::broker_definition::BrokerDefinition;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::explosion_definition::ExplosionDefinition;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
 use crate::commodity_contract::CommodityDefinition;
@@ -36,6 +37,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) quality_quantizations: CatalogTable<QualityQuantizationDefinition<'source>>,
     pub(crate) tags: CatalogTable<super::tag_catalog::TagDefinition<'source>>,
     pub(crate) shop_inventories: ShopInventoryTable,
+    pub(crate) explosion_definitions: CatalogTable<ExplosionDefinition<'source>>,
     pub(crate) resource_groups:
         CatalogTable<super::resource_group_catalog::ResourceGroupDefinition<'source>>,
     pub(crate) resource_types: CatalogTable<ResourceType<'source>>,

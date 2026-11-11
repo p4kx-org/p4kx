@@ -3,9 +3,11 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value};
+use p4kx_extraction::{
+    DataType, SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value,
+};
 
-use crate::catalog_number_capture::CapturedNumber;
+use crate::catalog_number_capture::{AuthoredNumberOwner, CapturedNumber};
 use crate::catalog_read::original::{
     OriginalDatum, OriginalFlowFields, OriginalValueFact, OriginalValuePart,
 };
@@ -24,13 +26,14 @@ pub(super) struct ReadHealth {
     pub(super) legacy_value: Option<f32>,
 }
 
-/// Reads typed members of one actual component or one of its owned structs.
+/// Reads typed members in one admitted Record or owned struct.
 #[derive(Clone, Copy)]
 pub(super) struct Observed<'reader, 'scope, 'read, 'source> {
     originals: &'reader OriginalFlowFields<'scope, 'read, 'source>,
-    owner: &'reader Fact<'scope, 'read, 'source>,
+    owner: Option<&'reader Fact<'scope, 'read, 'source>>,
     capture: &'reader dyn FieldCapture<'source>,
     numbers: &'reader RefCell<Vec<CapturedNumber>>,
+    number_owner: AuthoredNumberOwner,
 }
 
 impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> {
@@ -42,9 +45,24 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
     ) -> Self {
         Self {
             originals,
-            owner,
+            owner: Some(owner),
             capture,
             numbers,
+            number_owner: AuthoredNumberOwner::ItemComponent,
+        }
+    }
+
+    pub(super) const fn definition(
+        originals: &'reader OriginalFlowFields<'scope, 'read, 'source>,
+        capture: &'reader dyn FieldCapture<'source>,
+        numbers: &'reader RefCell<Vec<CapturedNumber>>,
+    ) -> Self {
+        Self {
+            originals,
+            owner: None,
+            capture,
+            numbers,
+            number_owner: AuthoredNumberOwner::Definition,
         }
     }
 
@@ -79,7 +97,9 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
             let Value::Single(number) = value else {
                 return Ok(None);
             };
-            if let Some(number) = CapturedNumber::item_component(self.originals, fact)? {
+            if let Some(number) =
+                CapturedNumber::authored_single(self.originals, fact, self.number_owner)?
+            {
                 self.numbers.borrow_mut().push(number);
             }
             Ok(Some(ResourceFloat32::new(*number)))
@@ -157,7 +177,7 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         notes: &mut Vec<FieldError>,
         decode: impl FnOnce(&Fact<'scope, 'read, 'source>) -> Result<Option<T>, CatalogError>,
     ) -> Result<SourcedValue<T>, CatalogError> {
-        let Some((_, fact)) = self.originals.field(Some(self.owner), name)? else {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
             return self.absent();
         };
         let state = match fact.value() {
@@ -182,11 +202,34 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         notes: &mut Vec<FieldError>,
         decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<T>, CatalogError> {
-        let Some((_, fact)) = self.originals.field(Some(self.owner), name)? else {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
             return self.absent();
         };
         let (part, state) = self.owned_state(name, fact, expected, notes, decode)?;
         self.bind_field(fact, part, state, SourceUseRole::Selector)
+    }
+
+    pub(super) fn inline_class<T>(
+        &self,
+        name: &str,
+        expected: &[&str],
+        notes: &mut Vec<FieldError>,
+        decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
+            return self.absent();
+        };
+        let (part, state) = if fact.field().storage().data_type() == DataType::Class {
+            self.owned_state(name, fact, expected, notes, decode)?
+        } else {
+            (
+                OriginalValuePart::Value,
+                self.failure(name, fact.value(), "a nullable Class", notes)?,
+            )
+        };
+        let mut cell = self.field_datum(fact, part, state, SourceUseRole::Selector)?;
+        cell.contribute(fact.observe(OriginalValuePart::DataType, SourceUseRole::Selector)?);
+        Ok(cell.into_cell(self.originals.sources()))
     }
 
     pub(super) fn array<T>(
@@ -196,7 +239,7 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         notes: &mut Vec<FieldError>,
         mut decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
-        let Some((_, fact)) = self.originals.field(Some(self.owner), name)? else {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
             return self.absent();
         };
         let state = match fact.value() {
@@ -237,7 +280,10 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
             Value::Struct(source) if types.contains(&source.type_name()) => (
                 OriginalValuePart::ConcreteType,
                 SourceValue::Present(decode(
-                    Self::new(self.originals, fact, self.capture, self.numbers),
+                    Self {
+                        owner: Some(fact),
+                        ..*self
+                    },
                     notes,
                 )?),
             ),
@@ -271,7 +317,10 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
     }
 
     fn structure(&self) -> Result<&'read StructValue<'source>, CatalogError> {
-        let Value::Struct(source) = self.owner.value() else {
+        let Some(owner) = self.owner else {
+            return Ok(self.originals.root());
+        };
+        let Value::Struct(source) = owner.value() else {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         };
         Ok(source)
@@ -284,7 +333,10 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         expected: &'static str,
         notes: &mut Vec<FieldError>,
     ) -> Result<SourceValue<T>, CatalogError> {
-        let path = self.originals.logical_path(self.owner)?;
+        let path = self.owner.map_or_else(
+            || Ok(String::new()),
+            |owner| self.originals.logical_path(owner),
+        )?;
         let violation = FieldViolation::invalid(self.structure()?, &path, name, value, expected);
         let body = self.capture.field_failure(&violation)?;
         notes.push(violation.into_error().with_body(body));
@@ -298,7 +350,7 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
     fn absent<T>(&self) -> Result<SourcedValue<T>, CatalogError> {
         Ok(self.originals.sources().value(
             SourceValue::Absent,
-            &[self.kind()?, self.originals.survey(Some(self.owner))?],
+            &[self.kind()?, self.originals.survey(self.owner)?],
             true,
         ))
     }
@@ -329,7 +381,9 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
     }
 
     fn kind(&self) -> Result<SourceUse, CatalogError> {
-        self.owner
-            .observe(OriginalValuePart::ConcreteType, SourceUseRole::Selector)
+        self.owner.map_or_else(
+            || self.originals.observe_type(self.originals.root()),
+            |owner| owner.observe(OriginalValuePart::ConcreteType, SourceUseRole::Selector),
+        )
     }
 }

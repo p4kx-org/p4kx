@@ -229,6 +229,10 @@ fn assemble<R>(
         definitions: CatalogDefinitions {
             blueprints: blueprints.definitions,
             shop_inventories: collected.shop_inventories,
+            explosion_definitions: crate::catalog_v3::explosion_definition::table(
+                &forge,
+                collected.explosion_definitions,
+            ),
             contract_generators: CatalogTable::new(
                 &forge,
                 &["ContractGenerator"],

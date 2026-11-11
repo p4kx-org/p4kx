@@ -24,6 +24,9 @@ mod authored_fields;
 #[path = "durability_link.rs"]
 mod authored_link;
 
+#[path = "explosion_definition.rs"]
+pub(crate) mod explosion_definition;
+
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
 #[path = "catalog_durability.rs"]

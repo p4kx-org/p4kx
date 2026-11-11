@@ -31,6 +31,7 @@ pub(super) fn check(catalog: &Value, kind: Kind) -> TestResult {
             Kind::BlueprintCategories => source_type == "BlueprintCategoryRecord",
             Kind::BlueprintCategoryLists => source_type == "BlueprintCategoryDatabaseRecord",
             Kind::GameplayProperties => source_type == "CraftingGameplayPropertyDef",
+            Kind::ExplosionDefinitions => source_type == "ExplosionRecord",
             Kind::QualityQuantizations => source_type == "CraftingQualityQuantizationRecord",
             _ => false,
         };
@@ -55,10 +56,16 @@ pub(super) fn check_original_properties(catalog: &Value, forge: &DataForge<'_>) 
     check_original(catalog, forge, Kind::GameplayProperties)
 }
 
+/// Checks the independently selected `ExplosionRecord` headers against their original Records.
+pub(super) fn check_original_explosions(catalog: &Value, forge: &DataForge<'_>) -> TestResult {
+    check_original(catalog, forge, Kind::ExplosionDefinitions)
+}
+
 fn check_original(catalog: &Value, forge: &DataForge<'_>, kind: Kind) -> TestResult {
     let expected_type = match kind {
         Kind::BlueprintCategoryLists => "BlueprintCategoryDatabaseRecord",
         Kind::GameplayProperties => "CraftingGameplayPropertyDef",
+        Kind::ExplosionDefinitions => "ExplosionRecord",
         _ => {
             return Err(
                 "original metadata check requires a declared physical source family".into(),
