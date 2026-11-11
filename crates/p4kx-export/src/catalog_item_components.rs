@@ -141,7 +141,7 @@ pub(crate) fn read<'source>(
     for (value, kind) in components {
         let component = originals.fact(value)?;
         let owner = ComponentOwner::read(tree, &context, &originals, component)?;
-        let observed = Observed::new(&originals, component, &capture, &numbers);
+        let observed = Observed::new(&originals, input, component, &capture, &numbers);
         result.push(kind, owner, observed)?;
     }
     result.rows.numbers = numbers.into_inner();

@@ -111,11 +111,13 @@ fn declared_base(
             .sources()
             .value(SourceValue::Unsupported, &storage_inputs, true));
     }
-    let (name, use_) = input.declared_struct_name(storage.target())?;
+    let (name, use_) = input.declared_struct_name(storage.target(), SourceUseRole::Payload)?;
     let mut inputs = storage_inputs.to_vec();
     inputs.push(fact.observe(OriginalValuePart::Target, SourceUseRole::Selector)?);
     inputs.push(use_);
-    let name = name.map_or(SourceValue::Unreadable, SourceValue::Present);
+    let name = name.map_or(SourceValue::Unreadable, |name| {
+        SourceValue::Present(name.to_owned())
+    });
     let complete = matches!(name, SourceValue::Present(_));
     Ok(fields.sources().value(name, &inputs, complete))
 }

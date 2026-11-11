@@ -58,15 +58,15 @@ impl<'read, 'source> OriginalCatalogInput<'read, 'source> {
     pub(crate) fn declared_struct_name(
         &self,
         index: u16,
-    ) -> Result<(Option<String>, SourceUse), CatalogError> {
+        role: SourceUseRole,
+    ) -> Result<(Option<&str>, SourceUse), CatalogError> {
         let name = self
             .forge
             .structs()
             .nth(usize::from(index))
-            .and_then(|structure| structure.name().ok())
-            .map(str::to_owned);
+            .and_then(|structure| structure.name().ok());
         let role = if name.is_some() {
-            SourceUseRole::Payload
+            role
         } else {
             SourceUseRole::Attempted
         };

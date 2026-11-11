@@ -12,6 +12,8 @@ use crate::catalog_tags_fixture as tags;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
+#[path = "catalog_hacking_empty_target.rs"]
+mod empty_target;
 #[path = "catalog_hacking_components_fixture.rs"]
 mod fixture;
 use fixture::{CHARGES, Case, MODIFIERS};

@@ -5,6 +5,7 @@ use std::cell::RefCell;
 
 use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value};
 
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::{AuthoredNumberOwner, CapturedNumber};
 use crate::catalog_read::original::{
     OriginalDatum, OriginalFlowFields, OriginalValueFact, OriginalValuePart,
@@ -30,6 +31,7 @@ pub(super) struct ReadHealth {
 #[derive(Clone, Copy)]
 pub(super) struct Observed<'reader, 'scope, 'read, 'source> {
     originals: &'reader OriginalFlowFields<'scope, 'read, 'source>,
+    input: &'reader OriginalCatalogInput<'reader, 'source>,
     owner: Option<&'reader Fact<'scope, 'read, 'source>>,
     capture: &'reader dyn FieldCapture<'source>,
     numbers: &'reader RefCell<Vec<CapturedNumber>>,
@@ -39,12 +41,14 @@ pub(super) struct Observed<'reader, 'scope, 'read, 'source> {
 impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> {
     pub(super) const fn new(
         originals: &'reader OriginalFlowFields<'scope, 'read, 'source>,
+        input: &'reader OriginalCatalogInput<'reader, 'source>,
         owner: &'reader Fact<'scope, 'read, 'source>,
         capture: &'reader dyn FieldCapture<'source>,
         numbers: &'reader RefCell<Vec<CapturedNumber>>,
     ) -> Self {
         Self {
             originals,
+            input,
             owner: Some(owner),
             capture,
             numbers,
@@ -54,11 +58,13 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
 
     pub(super) const fn definition(
         originals: &'reader OriginalFlowFields<'scope, 'read, 'source>,
+        input: &'reader OriginalCatalogInput<'reader, 'source>,
         capture: &'reader dyn FieldCapture<'source>,
         numbers: &'reader RefCell<Vec<CapturedNumber>>,
     ) -> Self {
         Self {
             originals,
+            input,
             owner: None,
             capture,
             numbers,

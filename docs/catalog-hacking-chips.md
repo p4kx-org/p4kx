@@ -16,7 +16,8 @@ configuration keeps the original array and all its elements in order. Repeated n
 arrays and unrecognized names are valid source declarations. Names keep their exact original
 text with the conservative protection for unclassified authored strings. Values keep their
 exact Single bits and nullable finite decimal, with no common unit inferred from the name.
-The table assigns no precedence to repeated names. Absence, explicit null, unreadable values,
+An empty array retains its original declared target. An unrelated Class target is unsupported
+even when it has no elements. The table assigns no precedence to repeated names. Absence, explicit null, unreadable values,
 unsupported concrete types and invalid storage remain distinct source states.
 
 An Entity's original Tag references are in declarations.entityTags. Join the sourced

@@ -70,7 +70,7 @@ pub(crate) fn read<'source>(
     CatalogFields::observed(tree.root(), "", &context, &capture)?
         .check_observed(&[PARAMETERS], &mut notes)?;
     let numbers = RefCell::new(Vec::new());
-    let fields = Observed::definition(&originals, &capture, &numbers);
+    let fields = Observed::definition(&originals, input, &capture, &numbers);
     let explosion_params = fields.inline_class(
         PARAMETERS,
         &["ExplosionParams"],

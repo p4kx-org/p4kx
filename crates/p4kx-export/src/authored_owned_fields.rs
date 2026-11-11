@@ -6,7 +6,7 @@ use p4kx_extraction::{DataType, SourceUseRole, SourceValue, SourcedValue, Value}
 use super::{Fact, Observed};
 use crate::CatalogError;
 use crate::catalog_read::original::OriginalValuePart;
-use crate::source_fields::FieldError;
+use crate::source_fields::{FieldError, FieldViolation};
 
 #[derive(Clone, Copy)]
 enum OwnedStorage {
@@ -119,7 +119,11 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
             return self.absent();
         };
         let storage = fact.field().storage();
-        let state = if storage.data_type() == DataType::Class && storage.is_array() {
+        let class_array = storage.data_type() == DataType::Class && storage.is_array();
+        if class_array && matches!(fact.value(), Value::Array(values) if values.is_empty()) {
+            return self.empty_class_array(fact, types, notes);
+        }
+        let state = if class_array {
             self.array_state(name, fact, types, notes, decode)?
         } else {
             self.failure(name, fact.value(), "a nullable Class array", notes)?
@@ -134,6 +138,45 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
             cell.contribute(fact.observe(part, SourceUseRole::Selector)?);
         }
         Ok(cell.into_cell(self.originals.sources()))
+    }
+
+    fn empty_class_array<T>(
+        &self,
+        fact: &'reader Fact<'scope, 'read, 'source>,
+        types: &[&str],
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
+        fact.check_input(self.input)?;
+        let (name, declaration) = self
+            .input
+            .declared_struct_name(fact.field().storage().target(), SourceUseRole::Selector)?;
+        let state = match name {
+            Some(name) if types.contains(&name) => SourceValue::Present(Vec::new()),
+            Some(_) => SourceValue::Unsupported,
+            None => SourceValue::Unreadable,
+        };
+        if !matches!(state, SourceValue::Present(_)) {
+            let path = self.owner.map_or_else(
+                || Ok(String::new()),
+                |owner| self.originals.logical_path(owner),
+            )?;
+            let violation = FieldViolation::unsupported(self.structure()?, &path, fact.field());
+            let body = self.capture.field_failure(&violation)?;
+            notes.push(violation.into_error().with_body(body));
+        }
+        let inputs = [
+            self.kind()?,
+            fact.observe(OriginalValuePart::Value, SourceUseRole::Selector)?,
+            fact.observe(OriginalValuePart::FieldName, SourceUseRole::Selector)?,
+            fact.observe(OriginalValuePart::DataType, SourceUseRole::Selector)?,
+            fact.observe(OriginalValuePart::IsArray, SourceUseRole::Selector)?,
+            fact.observe(OriginalValuePart::Target, SourceUseRole::Selector)?,
+            declaration,
+        ];
+        Ok(self
+            .originals
+            .sources()
+            .value(state, &inputs, name.is_some()))
     }
 
     fn array_state<T>(

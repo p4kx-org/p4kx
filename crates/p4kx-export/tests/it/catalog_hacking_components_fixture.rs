@@ -11,6 +11,7 @@ pub(super) const OWNER: u128 = 0x7801;
 pub(super) const CHARGES: &str = "HackingChipParams";
 pub(super) const MODIFIERS: &str = "RemovableChipParams";
 pub(super) const MODIFIER: &str = "RemovableChipValue";
+pub(super) const WRONG_TARGET: &str = "FixtureUnrelatedModifier";
 pub(super) const BAD_OFFSET: u32 = u32::MAX - 1;
 pub(super) const NAMES: [&str; 3] = ["ErrorChance", "ErrorChance", "FixtureUnknownModifier"];
 pub(super) const SINGLES: [f32; 3] = [0.0, -0.0, 1.25];
@@ -19,21 +20,22 @@ pub(super) const SINGLES: [f32; 3] = [0.0, -0.0, 1.25];
 pub(super) enum Case {
     Valid,
     WrongStorage,
+    WrongEmptyTarget,
     Unreadable,
 }
 
 pub(super) fn database(case: Case) -> DataForgeBuilder {
-    let storage = if matches!(case, Case::WrongStorage) {
-        TestType::StrongPointer(MODIFIER.to_owned())
-    } else {
-        TestType::Class(MODIFIER.to_owned())
+    let storage = match case {
+        Case::WrongStorage => TestType::StrongPointer(MODIFIER.to_owned()),
+        Case::WrongEmptyTarget => TestType::Class(WRONG_TARGET.to_owned()),
+        Case::Valid | Case::Unreadable => TestType::Class(MODIFIER.to_owned()),
     };
     schema(storage)
         .record(
             item(OWNER, "fixture_hacking_chip", "Misc", slots(case)).value(
                 "tags",
                 tags::references(&[match case {
-                    Case::Valid | Case::WrongStorage => tags::ROOT,
+                    Case::Valid | Case::WrongStorage | Case::WrongEmptyTarget => tags::ROOT,
                     Case::Unreadable => tags::MISSING,
                 }]),
             ),
@@ -67,6 +69,7 @@ fn schema(storage: TestType) -> DataForgeBuilder {
                 ),
         )
         .structure(TestStruct::new("DataForgeComponentParams"))
+        .structure(TestStruct::new(WRONG_TARGET))
         .structure(
             TestStruct::new("SAttachableComponentParams")
                 .parent("DataForgeComponentParams")
@@ -99,6 +102,9 @@ fn slots(case: Case) -> Vec<TestValue> {
         .zip(SINGLES)
         .map(|(name, number)| modifier(TestValue::text(name), number))
         .collect();
+    if matches!(case, Case::WrongEmptyTarget) {
+        modifiers.clear();
+    }
     if matches!(case, Case::Unreadable) {
         modifiers.insert(
             0,
