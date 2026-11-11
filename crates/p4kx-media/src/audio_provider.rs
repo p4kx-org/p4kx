@@ -88,6 +88,10 @@ fn field_groups() -> Vec<FieldGroup> {
                 "opus-ogg-conversion",
                 "Requested Ogg output from Wwise, Switch and embedded Ogg Opus layouts, with checked and emitted input ranges.",
             ),
+            FieldGroup::new(
+                "opus-wav-conversion",
+                "Requested WAV from Wwise, Switch and embedded Ogg Opus layouts, with exact consumed packet ranges.",
+            ),
             FieldGroup::new_with_unsupported_projection(
                 "compressed-audio-conversion",
                 "Other encoded WEM payloads remain available through exact retained ranges.",

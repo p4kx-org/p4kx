@@ -9613,6 +9613,16 @@
                 }
               ]
             },
+            "opus_inputs": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/OpusInputs"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "sample_count": {
               "$ref": "#/$defs/DecimalU64"
             },

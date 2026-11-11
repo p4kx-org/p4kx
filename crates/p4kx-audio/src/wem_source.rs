@@ -9,7 +9,8 @@ use thiserror::Error;
 use crate::read_at::SeekSource;
 use crate::riff::{RiffDirectory, RiffHeader, TailPolicy};
 use crate::{
-    AudioError, ByteOrder, WemCue, WemList, WemMetadata, WemOpusOgg, WemSourceChunk, WemVorbisOgg,
+    AudioError, ByteOrder, WemCue, WemList, WemMetadata, WemOpusOgg, WemOpusWav, WemSourceChunk,
+    WemVorbisOgg,
 };
 
 /// A failure to inspect a seekable WEM source.
@@ -71,6 +72,14 @@ impl<R: Read + Seek> WemInspection<'_, R> {
     /// Returns the original format or physical input failure before output is written.
     pub fn opus_ogg(&mut self) -> Result<WemOpusOgg<'_, R>, WemReadError> {
         crate::opus::prepare_ogg(&mut self.source.input, self.source.header, &self.metadata)
+    }
+
+    /// Prepares 16-bit PCM WAV from this inspected Opus source.
+    ///
+    /// # Errors
+    /// Returns the original source failure or a WAV size error before writing.
+    pub fn opus_wav(&mut self) -> Result<WemOpusWav<'_, R>, WemReadError> {
+        crate::opus::prepare_wav(&mut self.source.input, self.source.header, &self.metadata)
     }
 }
 

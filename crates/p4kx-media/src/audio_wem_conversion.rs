@@ -8,19 +8,17 @@ use std::path::Path;
 use p4kx_extraction::sound::{
     WemInspection, WemMetadata, WemOriginField, WemOriginPlan, WemPcmWav, WemPcmWriteError,
 };
-use p4kx_extraction::{AudioError, Codec, DecimalU64, WavReport};
+use p4kx_extraction::{AudioError, Codec};
 
 use super::WemProjection;
 use crate::audio_payload::{
-    AudioPayload, ConversionFailure, ConversionOutcome, EncodedAudioFormat, WemConversion, WemLoop,
-    WrittenAudio, WrittenSignal, WrittenWavFormat,
+    AudioPayload, ConversionFailure, ConversionOutcome, EncodedAudioFormat, WemConversion,
+    WrittenAudio, WrittenWavFormat,
 };
 use crate::audio_record_origins as origins;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_prepared::PreparedRecordOrigins;
-use crate::{
-    Artifact, ArtifactExtension, MediaError, MediaIssue, MediaWriter, Severity, Status, error,
-};
+use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, error};
 
 #[path = "audio_wem_conversion_evidence.rs"]
 mod evidence;
@@ -30,8 +28,11 @@ mod ogg_artifact;
 mod opus;
 #[path = "audio_wem_vorbis.rs"]
 mod vorbis;
+#[path = "audio_wem_wav_artifact.rs"]
+mod wav_artifact;
 
 use self::evidence::{ArtifactEvidence, capture_fields};
+use self::wav_artifact::WavArtifact;
 
 pub(crate) const CONVERSION_NAMESPACE: &str = "audio-wem-conversion";
 
@@ -52,16 +53,16 @@ pub(super) fn project<R: Read + Seek>(
     format: EncodedAudioFormat,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
+    if inspected.metadata().codec() == Codec::Opus {
+        let converted = opus::convert(projection, inspected, format, writer)?;
+        return publish(projection, inspected.metadata(), format, converted, writer);
+    }
     match format {
         EncodedAudioFormat::Wav => {
             let converted = match inspected.wav() {
                 Ok(conversion) => Ok(Completed::write(projection, conversion, writer)?),
                 Err(cause) => Err(cause),
             };
-            publish(projection, inspected.metadata(), format, converted, writer)
-        }
-        EncodedAudioFormat::Ogg if inspected.metadata().codec() == Codec::Opus => {
-            let converted = opus::convert(projection, inspected, writer)?;
             publish(projection, inspected.metadata(), format, converted, writer)
         }
         EncodedAudioFormat::Ogg => {
@@ -131,8 +132,7 @@ impl CompletedConversion for Completed {
 }
 
 struct Completed {
-    artifact: Artifact,
-    report: WavReport,
+    output: WavArtifact,
     source: Range<u64>,
     evidence: ArtifactEvidence,
 }
@@ -147,27 +147,16 @@ impl Completed {
         let source = conversion.source_range();
         let evidence =
             ArtifactEvidence::capture(projection, conversion.metadata(), &source, writer)?;
-        let manifest = evidence.manifest(writer)?;
         let input = Path::new(projection.path);
-        let artifact = writer.converted_artifact_with_origins(
-            ArtifactExtension::new("wav")?,
-            &manifest,
-            |sink| {
-                conversion.write(sink).map_err(|cause| match cause {
-                    WemPcmWriteError::Input(cause) => error::io(input, cause),
-                    WemPcmWriteError::Output(cause) => error::io(Path::new("WAV encoder"), cause),
-                    other => error::io(input, io::Error::other(other)),
-                })
-            },
-        )?;
-        if artifact.size != report.size {
-            return Err(MediaError::Contract(
-                "WAV report and verified artifact sizes differ".into(),
-            ));
-        }
+        let output = wav_artifact::write(report, &evidence, writer, |sink| {
+            conversion.write(sink).map_err(|cause| match cause {
+                WemPcmWriteError::Input(cause) => error::io(input, cause),
+                WemPcmWriteError::Output(cause) => error::io(Path::new("WAV encoder"), cause),
+                other => error::io(input, io::Error::other(other)),
+            })
+        })?;
         Ok(Self {
-            artifact,
-            report,
+            output,
             source,
             evidence,
         })
@@ -176,17 +165,9 @@ impl Completed {
     fn payload(self, projection: &WemProjection<'_>) -> Result<WrittenAudio, MediaError> {
         Ok(WrittenAudio::Pcm {
             actual_format: WrittenWavFormat::Wav,
-            signal: WrittenSignal {
-                artifact: self.artifact,
-                channels: self.report.channels,
-                sample_rate: self.report.sample_rate,
-                sample_count: DecimalU64::new(self.report.sample_count),
-                loop_points: self
-                    .report
-                    .loop_points
-                    .map(|points| WemLoop::from_frames(points.start, points.end)),
-            },
+            signal: self.output.signal(),
             source_range: projection.range(self.source.start, self.source.end)?,
+            opus_inputs: None,
         })
     }
 }
@@ -273,7 +254,7 @@ impl<'source, 'info, 'writer, 'run> ConversionOrigins<'source, 'info, 'writer, '
                 self.combine([origin])?,
             )?;
         }
-        if completed.report.loop_points.is_some() {
+        if completed.output.report.loop_points.is_some() {
             for (field, origin) in LOOP_FIELDS {
                 self.field(&format!("{LOOP_POINTS}/{field}"), self.combine([origin])?)?;
             }

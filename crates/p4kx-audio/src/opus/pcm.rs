@@ -7,8 +7,10 @@ use std::panic::{self, AssertUnwindSafe};
 use opus_pure::OpusDecoder;
 
 use super::framing::{self, MAX_PACKET_SAMPLES};
+use super::header::StreamHeader;
 use super::layout::{Layout, SILENT};
-use super::{OPUS_RATE, OpusError, OpusStream};
+use super::stream::{PacketCount, PacketSource, WriteError};
+use super::{OPUS_RATE, OpusError};
 use crate::{AudioError, WavReport, Wem};
 
 const PANICKED: &str = "the decoder failed";
@@ -20,58 +22,59 @@ impl<B: AsRef<[u8]>> Wem<B> {
         let stream = self.opus_stream()?;
         let (header, report) = self.decoded_wav_header(stream.frames())?;
         out.write_all(&header).map_err(AudioError::Write)?;
-        stream.write_pcm(out)?;
+        let mut packets = stream.packets().map_err(AudioError::InvalidOpus)?;
+        write(&stream.header, &stream.count, &mut packets, out).map_err(WriteError::into_audio)?;
         Ok(report)
     }
 }
 
-impl OpusStream<'_> {
-    /// Decodes the packets and writes the playable frames as interleaved little-endian 16-bit
-    /// samples in the WEM's speaker order.
-    fn write_pcm(&self, out: &mut impl Write) -> Result<(), AudioError> {
-        let invalid = AudioError::InvalidOpus;
-        let mut decoders = Decoders::new(&self.header.layout).map_err(invalid)?;
-        let mut packets = self.packets().map_err(invalid)?;
-        let width = self.header.layout.decoded_channels();
-        let mut skip = usize::from(self.count.pre_skip);
-        let mut remaining = self.count.frames;
-        let mut bytes = Vec::new();
-        let gain = Gain::new(self.header.output_gain);
-        while remaining > 0 {
-            let index = packets.index();
-            let Some(packet) = packets.next_packet() else {
-                break;
-            };
-            let decoded = decoders
-                .decode(packet.map_err(invalid)?, index)
-                .map_err(invalid)?;
-            let frames = decoded.len() / width;
-            let skipped = skip.min(frames);
-            skip -= skipped;
-            let take = usize::try_from(remaining)
-                .map_or(frames - skipped, |left| left.min(frames - skipped));
-            bytes.clear();
-            for frame in decoded.chunks_exact(width).skip(skipped).take(take) {
-                for &channel in &self.header.layout.wav_order {
-                    let sample = if channel == SILENT {
-                        0
-                    } else {
-                        frame.get(usize::from(channel)).copied().unwrap_or_default()
-                    };
-                    bytes.extend_from_slice(&gain.apply(sample).to_le_bytes());
-                }
+/// Decodes the selected packets to interleaved little-endian 16-bit frames in the WEM's order.
+pub(super) fn write<S: PacketSource>(
+    header: &StreamHeader,
+    count: &PacketCount,
+    packets: &mut S,
+    out: &mut (impl Write + ?Sized),
+) -> Result<(), WriteError<S::Error>> {
+    let invalid = |cause: OpusError| WriteError::Input(cause.into());
+    let mut decoders = Decoders::new(&header.layout).map_err(invalid)?;
+    let width = header.layout.decoded_channels();
+    let mut skip = usize::from(count.pre_skip);
+    let mut remaining = count.frames;
+    let mut bytes = Vec::new();
+    let gain = Gain::new(header.output_gain);
+    let mut index = 0;
+    while remaining > 0 {
+        let Some(packet) = packets.read_packet().map_err(WriteError::Input)? else {
+            break;
+        };
+        let decoded = decoders.decode(packet, index).map_err(invalid)?;
+        index += 1;
+        let frames = decoded.len() / width;
+        let skipped = skip.min(frames);
+        skip -= skipped;
+        let take =
+            usize::try_from(remaining).map_or(frames - skipped, |left| left.min(frames - skipped));
+        bytes.clear();
+        for frame in decoded.chunks_exact(width).skip(skipped).take(take) {
+            for &channel in &header.layout.wav_order {
+                let sample = if channel == SILENT {
+                    0
+                } else {
+                    frame.get(usize::from(channel)).copied().unwrap_or_default()
+                };
+                bytes.extend_from_slice(&gain.apply(sample).to_le_bytes());
             }
-            out.write_all(&bytes).map_err(AudioError::Write)?;
-            remaining -= take as u64;
         }
-        if remaining > 0 {
-            return Err(invalid(OpusError::MissingSamples {
-                expected: self.count.frames,
-                decoded: self.count.frames - remaining,
-            }));
-        }
-        Ok(())
+        out.write_all(&bytes).map_err(WriteError::Output)?;
+        remaining -= take as u64;
     }
+    if remaining > 0 {
+        return Err(invalid(OpusError::MissingSamples {
+            expected: count.frames,
+            decoded: count.frames - remaining,
+        }));
+    }
+    Ok(())
 }
 
 /// The output gain of an `OpusHead`, applied to every decoded sample.

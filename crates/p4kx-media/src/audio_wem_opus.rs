@@ -1,22 +1,26 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{Read, Seek};
+use std::io::{self, Read, Seek};
 use std::ops::Range;
 use std::path::Path;
 
 use p4kx_extraction::sound::{
-    WemInspection, WemMetadata, WemOpusRanges, WemOpusWriteError, WemOriginField, WemOriginPlan,
-    WemReadError,
+    WemInspection, WemMetadata, WemOpusOgg, WemOpusRanges, WemOpusWav, WemOpusWriteError,
+    WemOriginField, WemOriginPlan, WemReadError,
 };
 use p4kx_extraction::{AudioError, Codec, SourceUseRole};
 
-use super::ogg_artifact::{self, OggArtifact, join};
+use super::evidence::{join, prove_framed};
+use super::ogg_artifact::{self, OggArtifact};
+use super::wav_artifact::{self, WavArtifact};
 use super::{
     ArtifactEvidence, CompletedConversion, ConversionOrigins, SOURCE_RANGE, WemProjection,
     capture_fields,
 };
-use crate::audio_payload::{OpusInputs, WrittenAudio, WrittenOggFormat};
+use crate::audio_payload::{
+    EncodedAudioFormat, OpusInputs, WrittenAudio, WrittenOggFormat, WrittenWavFormat,
+};
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
 use crate::{MediaError, MediaWriter, error};
@@ -24,38 +28,112 @@ use crate::{MediaError, MediaWriter, error};
 const INPUTS: &str = "/data/payload/outcome/payload/opus_inputs";
 
 pub(super) struct CompletedOpus {
-    output: OggArtifact,
+    output: OpusArtifact,
     ranges: WemOpusRanges,
     origins: OpusOrigins,
+}
+
+enum OpusArtifact {
+    Ogg(OggArtifact),
+    Wav(WavArtifact),
+}
+
+enum PreparedOpus<'source, R> {
+    Ogg(WemOpusOgg<'source, R>),
+    Wav(WemOpusWav<'source, R>),
+}
+
+impl<R> PreparedOpus<'_, R> {
+    const fn metadata(&self) -> &WemMetadata {
+        match self {
+            Self::Ogg(plan) => plan.metadata(),
+            Self::Wav(plan) => plan.metadata(),
+        }
+    }
+
+    const fn ranges(&self) -> &WemOpusRanges {
+        match self {
+            Self::Ogg(plan) => plan.ranges(),
+            Self::Wav(plan) => plan.ranges(),
+        }
+    }
+}
+
+impl<R: Read + Seek> PreparedOpus<'_, R> {
+    fn write(
+        self,
+        input: &Path,
+        evidence: &ArtifactEvidence,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<OpusArtifact, MediaError> {
+        match self {
+            Self::Ogg(plan) => {
+                let output = ogg_artifact::write(
+                    Codec::Opus,
+                    plan.sample_count(),
+                    evidence,
+                    writer,
+                    |sink| {
+                        plan.write(sink)
+                            .map_err(|cause| write_error(input, "Ogg encoder", cause))
+                    },
+                )?;
+                Ok(OpusArtifact::Ogg(output))
+            }
+            Self::Wav(plan) => {
+                let output = wav_artifact::write(plan.report(), evidence, writer, |sink| {
+                    plan.write(sink)
+                        .map_err(|cause| write_error(input, "WAV encoder", cause))
+                })?;
+                Ok(OpusArtifact::Wav(output))
+            }
+        }
+    }
 }
 
 pub(super) fn convert<R: Read + Seek>(
     projection: &WemProjection<'_>,
     inspected: &mut WemInspection<'_, R>,
+    format: EncodedAudioFormat,
     writer: &mut MediaWriter<'_>,
 ) -> Result<Result<CompletedOpus, AudioError>, MediaError> {
     let input = Path::new(projection.path);
-    let conversion = match inspected.opus_ogg() {
+    let conversion = match format {
+        EncodedAudioFormat::Ogg => inspected.opus_ogg().map(PreparedOpus::Ogg),
+        EncodedAudioFormat::Wav => inspected.opus_wav().map(PreparedOpus::Wav),
+    };
+    let conversion = match conversion {
         Ok(conversion) => conversion,
         Err(WemReadError::Format(cause)) => return Ok(Err(cause)),
         Err(WemReadError::Io(cause)) => return Err(error::io(input, cause)),
         Err(cause) => return Err(MediaError::Contract(cause.to_string())),
     };
     let ranges = conversion.ranges().clone();
-    let frames = conversion.sample_count();
     let origins = OpusOrigins::capture(projection, conversion.metadata(), &ranges, writer)?;
-    let output = ogg_artifact::write(Codec::Opus, frames, &origins.artifact, writer, |sink| {
-        conversion.write(sink).map_err(|cause| match cause {
-            WemOpusWriteError::Input(WemReadError::Io(cause)) => error::io(input, cause),
-            WemOpusWriteError::Output(cause) => error::io(Path::new("Ogg encoder"), cause),
-            other => MediaError::Contract(other.to_string()),
-        })
-    })?;
+    let output = match conversion.write(input, &origins.artifact, writer) {
+        Ok(output) => output,
+        Err(MediaError::Io { path, source }) => match source.downcast::<AudioError>() {
+            Ok(cause) => return Ok(Err(cause)),
+            Err(source) => return Err(MediaError::Io { path, source }),
+        },
+        Err(cause) => return Err(cause),
+    };
     Ok(Ok(CompletedOpus {
         output,
         ranges,
         origins,
     }))
+}
+
+fn write_error(input: &Path, output: &str, cause: WemOpusWriteError) -> MediaError {
+    match cause {
+        WemOpusWriteError::Input(WemReadError::Io(cause)) => error::io(input, cause),
+        WemOpusWriteError::Input(WemReadError::Format(cause)) => {
+            error::io(input, io::Error::new(io::ErrorKind::InvalidData, cause))
+        }
+        WemOpusWriteError::Output(cause) => error::io(Path::new(output), cause),
+        other => MediaError::Contract(other.to_string()),
+    }
 }
 
 impl CompletedConversion for CompletedOpus {
@@ -64,8 +142,11 @@ impl CompletedConversion for CompletedOpus {
         proof: &mut ConversionOrigins<'_, '_, '_, '_>,
         projection: &WemProjection<'_>,
     ) -> Result<WrittenAudio, MediaError> {
-        self.origins
-            .prove(proof, self.output.report.loop_points.is_some())?;
+        let has_loop = match &self.output {
+            OpusArtifact::Ogg(output) => output.report.loop_points.is_some(),
+            OpusArtifact::Wav(output) => output.report.loop_points.is_some(),
+        };
+        self.origins.prove(proof, has_loop)?;
         let range = |range: Range<u64>| projection.range(range.start, range.end);
         let WemOpusRanges {
             format,
@@ -75,16 +156,26 @@ impl CompletedConversion for CompletedOpus {
             emitted_data,
             ..
         } = self.ranges;
-        Ok(WrittenAudio::Opus {
-            actual_format: WrittenOggFormat::Ogg,
-            signal: self.output.signal(),
-            source_range: range(emitted_data)?,
-            opus_inputs: Box::new(OpusInputs {
-                format: range(format)?,
-                seek_table: seek_table.map(range).transpose()?,
-                embedded_headers: embedded_headers.map(range).transpose()?,
-                checked_data: range(checked_data)?,
-            }),
+        let source_range = range(emitted_data)?;
+        let inputs = Box::new(OpusInputs {
+            format: range(format)?,
+            seek_table: seek_table.map(range).transpose()?,
+            embedded_headers: embedded_headers.map(range).transpose()?,
+            checked_data: range(checked_data)?,
+        });
+        Ok(match self.output {
+            OpusArtifact::Ogg(output) => WrittenAudio::Opus {
+                actual_format: WrittenOggFormat::Ogg,
+                signal: output.signal(),
+                source_range,
+                opus_inputs: inputs,
+            },
+            OpusArtifact::Wav(output) => WrittenAudio::Pcm {
+                actual_format: WrittenWavFormat::Wav,
+                signal: output.signal(),
+                source_range,
+                opus_inputs: Some(inputs),
+            },
         })
     }
 }
@@ -177,7 +268,7 @@ impl OpusOrigins {
                 .into_iter()
                 .chain(self.headers.iter()),
         )?;
-        ogg_artifact::prove(proof, channels, &self.frames, &self.artifact, has_loop)?;
+        prove_framed(proof, channels, &self.frames, &self.artifact, has_loop)?;
         let selected = join(proof.writer, [&self.emitted, &self.frames])?;
         proof.range_at(SOURCE_RANGE, &selected)?;
         let inputs = join(

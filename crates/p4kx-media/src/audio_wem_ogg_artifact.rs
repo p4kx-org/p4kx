@@ -3,12 +3,10 @@
 
 use std::io::Write;
 
-use p4kx_extraction::sound::WemOriginField;
 use p4kx_extraction::{Codec, DecimalU64, OggReport};
 
-use super::{ArtifactEvidence, ConversionOrigins, LOOP_FIELDS, LOOP_POINTS, OUTCOME};
+use super::ArtifactEvidence;
 use crate::audio_payload::{WemLoop, WrittenSignal};
-use crate::origin_contributions::OriginContributions;
 use crate::{Artifact, ArtifactExtension, MediaError, MediaWriter};
 
 pub(super) struct OggArtifact {
@@ -61,38 +59,4 @@ pub(super) fn write(
         ));
     }
     Ok(OggArtifact { artifact, report })
-}
-
-pub(super) fn prove(
-    proof: &mut ConversionOrigins<'_, '_, '_, '_>,
-    channels: OriginContributions,
-    frames: &OriginContributions,
-    artifact: &ArtifactEvidence,
-    has_loop: bool,
-) -> Result<(), MediaError> {
-    proof.common_success(channels)?;
-    proof.field(&format!("{OUTCOME}/payload/sample_count"), frames.clone())?;
-    let loop_points = join(
-        proof.writer,
-        [&proof.combine([WemOriginField::Loop])?, frames],
-    )?;
-    proof.field(LOOP_POINTS, loop_points)?;
-    if has_loop {
-        for (path, field) in LOOP_FIELDS {
-            let evidence = join(proof.writer, [&proof.combine([field])?, frames])?;
-            proof.field(&format!("{LOOP_POINTS}/{path}"), evidence)?;
-        }
-    }
-    proof.artifact(artifact)
-}
-
-pub(super) fn join<'a>(
-    writer: &MediaWriter<'_>,
-    parts: impl IntoIterator<Item = &'a OriginContributions>,
-) -> Result<OriginContributions, MediaError> {
-    let mut capture = writer.capture_origins();
-    for part in parts {
-        capture.include(part, writer)?;
-    }
-    Ok(capture.finish())
 }

@@ -8,14 +8,15 @@ use thiserror::Error;
 
 use super::OpusError;
 use super::header::{Format, SWITCH_FMT_LEN, StreamHeader};
+use super::pcm;
 use super::seek_packets::{Binding, Framing};
 use super::stream::{self, PacketCount, PacketSource, WriteError};
 use crate::read_at::{ReadAt, SeekSource};
 use crate::riff::RiffHeader;
 use crate::wem_metadata_read::selected_chunks;
-use crate::{AudioError, Codec, OggReport, WemMetadata, WemReadError, WemSourceChunk};
+use crate::{AudioError, Codec, OggReport, WavReport, WemMetadata, WemReadError, WemSourceChunk};
 
-/// Original WEM-relative ranges used for one seekable Ogg Opus conversion.
+/// Original WEM-relative ranges used for a seekable Opus conversion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct WemOpusRanges {
@@ -31,7 +32,7 @@ pub struct WemOpusRanges {
     pub emitted_data: Range<u64>,
 }
 
-/// Failure during a prepared seekable Ogg Opus write.
+/// Failure during a prepared seekable Opus output.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum WemOpusWriteError {
@@ -39,12 +40,38 @@ pub enum WemOpusWriteError {
     #[error(transparent)]
     Input(#[from] WemReadError),
     /// The converted bytes could not be written.
-    #[error("cannot write the converted Ogg Opus")]
+    #[error("cannot write the converted Opus audio")]
     Output(#[source] io::Error),
+    /// PCM replay consumed a different original packet extent than preparation selected.
+    #[error("Opus replay used {actual} packet bytes, expected {expected}")]
+    ReplayRangeChanged {
+        /// Number of bytes selected during preparation.
+        expected: u64,
+        /// Number of bytes covered by the replayed packet prefix.
+        actual: u64,
+    },
+}
+
+impl From<WriteError<WemReadError>> for WemOpusWriteError {
+    fn from(error: WriteError<WemReadError>) -> Self {
+        match error {
+            WriteError::Input(error) => Self::Input(error),
+            WriteError::Output(error) => Self::Output(error),
+        }
+    }
 }
 
 /// Prepared Ogg Opus output bound to the admitted packet source.
-pub struct WemOpusOgg<'source, R> {
+pub struct WemOpusOgg<'source, R>(PreparedOpus<'source, R>);
+
+/// Prepared 16-bit PCM WAV output bound to the admitted Opus packets.
+pub struct WemOpusWav<'source, R> {
+    source: PreparedOpus<'source, R>,
+    wav_header: Vec<u8>,
+    report: WavReport,
+}
+
+struct PreparedOpus<'source, R> {
     input: &'source mut SeekSource<R>,
     metadata: &'source WemMetadata,
     binding: Binding,
@@ -57,19 +84,19 @@ impl<R> WemOpusOgg<'_, R> {
     /// Returns the selected metadata of this original source.
     #[must_use]
     pub const fn metadata(&self) -> &WemMetadata {
-        self.metadata
+        self.0.metadata
     }
 
     /// Returns exact physical extents of the selected packet source.
     #[must_use]
     pub const fn ranges(&self) -> &WemOpusRanges {
-        &self.ranges
+        &self.0.ranges
     }
 
     /// Returns the output frame count after applying pre-skip and any authored trim.
     #[must_use]
     pub const fn sample_count(&self) -> u64 {
-        self.count.frames
+        self.0.count.frames
     }
 }
 
@@ -79,23 +106,60 @@ impl<R: Read + Seek> WemOpusOgg<'_, R> {
     /// # Errors
     /// Returns original input or sink failure. A failure can leave the sink partially written.
     pub fn write(self, output: &mut (impl Write + ?Sized)) -> Result<OggReport, WemOpusWriteError> {
-        let mut packets = self.binding.packets(self.input);
-        packets.skip_embedded_headers()?;
-        stream::write(
-            &self.header,
-            &self.count,
+        let source = self.0;
+        let mut packets = source.binding.audio_packets(source.input)?;
+        Ok(stream::write(
+            &source.header,
+            &source.count,
             &mut packets,
-            self.metadata.loop_points(),
+            source.metadata.loop_points(),
             output,
-        )
-        .map_err(|cause| match cause {
-            WriteError::Input(cause) => WemOpusWriteError::Input(cause),
-            WriteError::Output(cause) => WemOpusWriteError::Output(cause),
-        })
+        )?)
     }
 }
 
-pub(crate) fn prepare<'source, R: Read + Seek>(
+impl<R> WemOpusWav<'_, R> {
+    /// Returns the original metadata used by this WAV.
+    #[must_use]
+    pub const fn metadata(&self) -> &WemMetadata {
+        self.source.metadata
+    }
+
+    /// Returns the report for a successful write.
+    #[must_use]
+    pub const fn report(&self) -> WavReport {
+        self.report
+    }
+
+    /// Returns the checked physical ranges and the prefix selected for decoding.
+    #[must_use]
+    pub const fn ranges(&self) -> &WemOpusRanges {
+        &self.source.ranges
+    }
+}
+
+impl<R: Read + Seek> WemOpusWav<'_, R> {
+    /// Decodes deterministic little-endian PCM WAV with bounded packet and sample buffers.
+    ///
+    /// # Errors
+    /// Returns the original read, decode or sink failure, which can leave the sink partially written.
+    pub fn write(self, output: &mut (impl Write + ?Sized)) -> Result<(), WemOpusWriteError> {
+        let source = self.source;
+        let mut packets = source.binding.audio_packets(source.input)?;
+        output
+            .write_all(&self.wav_header)
+            .map_err(WemOpusWriteError::Output)?;
+        pcm::write(&source.header, &source.count, &mut packets, output)?;
+        let actual = packets.checked_end();
+        let expected = source.count.emitted_end;
+        if actual != expected {
+            return Err(WemOpusWriteError::ReplayRangeChanged { expected, actual });
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn prepare_ogg<'source, R: Read + Seek>(
     input: &'source mut SeekSource<R>,
     riff: RiffHeader,
     metadata: &'source WemMetadata,
@@ -103,6 +167,31 @@ pub(crate) fn prepare<'source, R: Read + Seek>(
     if metadata.codec() != Codec::Opus {
         return Err(AudioError::UnsupportedOggCodec(metadata.codec()).into());
     }
+    prepare(input, riff, metadata).map(WemOpusOgg)
+}
+
+pub(crate) fn prepare_wav<'source, R: Read + Seek>(
+    input: &'source mut SeekSource<R>,
+    riff: RiffHeader,
+    metadata: &'source WemMetadata,
+) -> Result<WemOpusWav<'source, R>, WemReadError> {
+    if metadata.codec() != Codec::Opus {
+        return Err(AudioError::UnsupportedCodec(metadata.codec()).into());
+    }
+    let source = prepare(input, riff, metadata)?;
+    let (wav_header, report) = metadata.decoded_wav_header(source.count.frames)?;
+    Ok(WemOpusWav {
+        source,
+        wav_header,
+        report,
+    })
+}
+
+fn prepare<'source, R: Read + Seek>(
+    input: &'source mut SeekSource<R>,
+    riff: RiffHeader,
+    metadata: &'source WemMetadata,
+) -> Result<PreparedOpus<'source, R>, WemReadError> {
     let Declaration {
         format,
         seek,
@@ -147,7 +236,7 @@ pub(crate) fn prepare<'source, R: Read + Seek>(
         checked_data: start..start + packets.checked_end(),
         emitted_data: start..start + count.emitted_end,
     };
-    Ok(WemOpusOgg {
+    Ok(PreparedOpus {
         input,
         metadata,
         binding,

@@ -17,8 +17,8 @@ use std::io::Write;
 
 pub use error::OpusError;
 pub(crate) use header::TAG_SWITCH;
-pub(crate) use seek::prepare as prepare_ogg;
-pub use seek::{WemOpusOgg, WemOpusRanges, WemOpusWriteError};
+pub use seek::{WemOpusOgg, WemOpusRanges, WemOpusWav, WemOpusWriteError};
+pub(crate) use seek::{prepare_ogg, prepare_wav};
 
 use self::header::{Header, StreamHeader};
 use self::packets::{Framing, Packets};
@@ -49,10 +49,7 @@ impl<B: AsRef<[u8]>> Wem<B> {
             self.loop_points(),
             out,
         )
-        .map_err(|error| match error {
-            WriteError::Input(error) => AudioError::InvalidOpus(error),
-            WriteError::Output(error) => AudioError::Write(error),
-        })
+        .map_err(WriteError::into_audio)
     }
 
     /// Reads the header of an Opus WEM and checks and counts its packets.

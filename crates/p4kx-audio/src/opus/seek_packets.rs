@@ -25,6 +25,15 @@ pub(super) enum Framing {
 }
 
 impl Binding {
+    pub(super) fn audio_packets<'a, R: Read + Seek>(
+        &self,
+        input: &'a mut SeekSource<R>,
+    ) -> Result<SeekPackets<'a, R>, WemReadError> {
+        let mut packets = self.packets(input);
+        packets.skip_embedded_headers()?;
+        Ok(packets)
+    }
+
     pub(super) fn packets<'a, R: Read + Seek>(
         &self,
         input: &'a mut SeekSource<R>,
@@ -68,7 +77,7 @@ impl<R: Read + Seek> SeekPackets<'_, R> {
         }
     }
 
-    pub(super) fn skip_embedded_headers(&mut self) -> Result<(), WemReadError> {
+    fn skip_embedded_headers(&mut self) -> Result<(), WemReadError> {
         if let Self::Ogg(packets) = self {
             for _ in 0..2 {
                 packets

@@ -15,9 +15,9 @@ use p4kx_audio::{AudioError, OggReport, WavReport, Wem};
 pub use p4kx_audio::{
     ByteOrder, WemChunkCursor, WemChunkEntry, WemCodecSource, WemCue, WemCuePoint, WemCueText,
     WemCueTextRegion, WemInfoSource, WemInspection, WemList, WemListItem, WemListPayload,
-    WemLoopEnd, WemLoopSource, WemMetadata, WemOpusOgg, WemOpusRanges, WemOpusWriteError,
-    WemPcmWav, WemPcmWriteError, WemReadError, WemSampleCountSource, WemSource, WemSourceChunk,
-    WemTextUtf8, WemVorbisOgg, WemVorbisRanges, WemVorbisWriteError,
+    WemLoopEnd, WemLoopSource, WemMetadata, WemOpusOgg, WemOpusRanges, WemOpusWav,
+    WemOpusWriteError, WemPcmWav, WemPcmWriteError, WemReadError, WemSampleCountSource, WemSource,
+    WemSourceChunk, WemTextUtf8, WemVorbisOgg, WemVorbisRanges, WemVorbisWriteError,
 };
 
 #[path = "wem_origin_plan.rs"]

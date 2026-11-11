@@ -108,6 +108,8 @@ pub(crate) enum WrittenAudio {
         #[serde(flatten)]
         signal: WrittenSignal,
         source_range: SourceRange,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        opus_inputs: Option<Box<OpusInputs>>,
     },
     Vorbis {
         actual_format: WrittenOggFormat,

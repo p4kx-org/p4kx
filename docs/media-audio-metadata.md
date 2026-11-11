@@ -84,12 +84,13 @@ Request 16-bit PCM WAV output with the following command.
 
     p4kx media export ARCHIVE --out DIR --kind audio --audio-format wav
 
-The provider writes 16-bit little-endian WAV from PCM, IMA ADPCM and PTADPCM in the first
+The provider writes 16-bit little-endian WAV from PCM, IMA ADPCM, PTADPCM and Opus in the first
 selected DATA chunk. It handles standalone WEMs and complete WEMs in an unambiguously resolved
 BNK DATA range. The WAV preserves the channel count, playback rate and applicable loop. PCM
 uses complete frames. IMA ADPCM also decodes a final block whose channel sub-blocks fit the
 original bytes. PTADPCM uses complete blocks. Unused tail bytes and extra chunks stay in the
-raw artifact.
+raw artifact. Opus WAV uses the original Wwise seek-size table, Switch packet framing or embedded
+Ogg pages. It applies the pre-skip, channel order, output gain and checked sample trim.
 
 Request deterministic Ogg artifacts from Wwise Vorbis or Opus with the following command.
 
@@ -105,9 +106,9 @@ writer.
 The `audio-wem-conversion` and `audio-bank-wem-conversion` namespaces contain one
 `wem-conversion` record per eligible occurrence. The `written` outcome records the
 requested and actual formats, source codec, decoded dimensions and loop, original
-half-open range of consumed PCM frames, coded ADPCM blocks or emitted Ogg packet data, and verified
+half-open range of consumed PCM frames, coded ADPCM blocks or selected compressed packet data, and verified
 artifact path, length and SHA-256. Ogg Vorbis rows add `vorbis_inputs` with the original
-average-byte-rate word, configuration and size-prefixed setup packet ranges. Ogg Opus rows add
+average-byte-rate word, configuration and size-prefixed setup packet ranges. Opus source rows add
 `opus_inputs` with the selected format prefix, checked DATA range and any selected seek words or
 embedded header pages. The emitted Opus source range can end before the checked range after an
 authored sample trim. Artifact origins retain the selected inputs and ranges independently. Embedded

@@ -11,7 +11,8 @@ use p4kx_extraction::sound::{
 };
 use p4kx_extraction::{AudioError, Codec, SourceUseRole};
 
-use super::ogg_artifact::{self, OggArtifact, join};
+use super::evidence::{join, prove_framed};
+use super::ogg_artifact::{self, OggArtifact};
 use super::{
     ArtifactEvidence, CompletedConversion, ConversionOrigins, SOURCE_RANGE, WemProjection,
     capture_fields,
@@ -87,7 +88,7 @@ impl CompletedOgg {
     }
 
     fn prove(&self, proof: &mut ConversionOrigins<'_, '_, '_, '_>) -> Result<(), MediaError> {
-        ogg_artifact::prove(
+        prove_framed(
             proof,
             proof.combine([WemOriginField::Channels])?,
             &self.origins.frames,

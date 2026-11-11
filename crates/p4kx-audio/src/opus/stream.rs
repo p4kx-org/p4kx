@@ -8,7 +8,7 @@ use super::header::{self, StreamHeader};
 use super::packets;
 use super::{OPUS_RATE, OpusError};
 use crate::loops::insert_comments;
-use crate::{Codec, Loop, OggReport, OggWriter};
+use crate::{AudioError, Codec, Loop, OggReport, OggWriter};
 
 const SERIAL: u32 = 0x5034_4B4F;
 const SWITCH_PRE_SKIP_DIVISOR: u32 = 8;
@@ -79,6 +79,15 @@ impl PacketCount {
 pub(super) enum WriteError<E> {
     Input(E),
     Output(io::Error),
+}
+
+impl WriteError<OpusError> {
+    pub(super) fn into_audio(self) -> AudioError {
+        match self {
+            Self::Input(error) => AudioError::InvalidOpus(error),
+            Self::Output(error) => AudioError::Write(error),
+        }
+    }
 }
 
 pub(super) fn write<S: PacketSource>(

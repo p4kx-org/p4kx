@@ -6,7 +6,7 @@ use std::ops::Range;
 use p4kx_extraction::sound::{WemFormatField, WemMetadata, WemOriginField, WemOriginPlan};
 use p4kx_extraction::{Codec, SourceUseRole};
 
-use super::WemProjection;
+use super::{ConversionOrigins, LOOP_FIELDS, LOOP_POINTS, OUTCOME, WemProjection};
 use crate::audio_record_origins as origins;
 use crate::audio_wem_origins;
 use crate::origin_capture::OriginSite;
@@ -112,6 +112,40 @@ pub(super) fn capture_fields(
     for field in fields {
         let planned = audio_wem_origins::planned(projection, plan, field, writer)?;
         capture.include(&planned, writer)?;
+    }
+    Ok(capture.finish())
+}
+
+pub(super) fn prove_framed(
+    proof: &mut ConversionOrigins<'_, '_, '_, '_>,
+    channels: OriginContributions,
+    frames: &OriginContributions,
+    artifact: &ArtifactEvidence,
+    has_loop: bool,
+) -> Result<(), MediaError> {
+    proof.common_success(channels)?;
+    proof.field(&format!("{OUTCOME}/payload/sample_count"), frames.clone())?;
+    let loop_points = join(
+        proof.writer,
+        [&proof.combine([WemOriginField::Loop])?, frames],
+    )?;
+    proof.field(LOOP_POINTS, loop_points)?;
+    if has_loop {
+        for (path, field) in LOOP_FIELDS {
+            let evidence = join(proof.writer, [&proof.combine([field])?, frames])?;
+            proof.field(&format!("{LOOP_POINTS}/{path}"), evidence)?;
+        }
+    }
+    proof.artifact(artifact)
+}
+
+pub(super) fn join<'a>(
+    writer: &MediaWriter<'_>,
+    parts: impl IntoIterator<Item = &'a OriginContributions>,
+) -> Result<OriginContributions, MediaError> {
+    let mut capture = writer.capture_origins();
+    for part in parts {
+        capture.include(part, writer)?;
     }
     Ok(capture.finish())
 }

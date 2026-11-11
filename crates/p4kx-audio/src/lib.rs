@@ -123,7 +123,7 @@ pub use hirc_source::{
 pub use loops::Loop;
 pub use media_class::{BankDeclaredLengthSource, BankMediaClassSource, MediaClass};
 pub use ogg::OggWriter;
-pub use opus::{OpusError, WemOpusOgg, WemOpusRanges, WemOpusWriteError};
+pub use opus::{OpusError, WemOpusOgg, WemOpusRanges, WemOpusWav, WemOpusWriteError};
 pub use riff::{ByteOrder, WemSourceChunk};
 pub use soundbank::{BankHeader, EmbeddedWem, Section, Soundbank};
 pub use vorbis::{

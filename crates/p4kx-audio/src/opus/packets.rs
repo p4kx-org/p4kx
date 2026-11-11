@@ -56,11 +56,6 @@ impl<'a> Packets<'a> {
         })
     }
 
-    /// Returns the index the next packet will have.
-    pub(crate) const fn index(&self) -> u64 {
-        self.index
-    }
-
     /// Returns the next audio packet, or `None` after the last one.
     pub(crate) fn next_packet(&mut self) -> Option<Result<&[u8], OpusError>> {
         let index = self.index;
