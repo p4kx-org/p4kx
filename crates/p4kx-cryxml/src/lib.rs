@@ -18,6 +18,10 @@ mod format;
 mod header;
 mod names;
 mod read;
+mod source_attribute;
+mod source_document;
+mod source_element;
+mod source_position;
 mod strings;
 mod write;
 
@@ -28,3 +32,7 @@ pub use element::{Attribute, Attributes, Children, Element};
 pub use error::{CryXmlError, Table};
 pub use format::{ByteOrder, Format, Signature, detect};
 pub use read::{Xml, read};
+pub use source_attribute::SourceAttribute;
+pub use source_document::{SourceDocument, SourceReadError, SourceReadOptions};
+pub use source_element::SourceElement;
+pub use source_position::{SourceAttributePosition, SourceElementPosition};

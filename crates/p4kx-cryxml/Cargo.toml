@@ -13,11 +13,11 @@ layer = "format"
 
 [dependencies]
 p4kx-foundation.workspace = true
+roxmltree.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
 p4kx-testkit.workspace = true
-roxmltree.workspace = true
 
 [lints]
 workspace = true

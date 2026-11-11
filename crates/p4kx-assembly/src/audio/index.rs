@@ -7,20 +7,21 @@ use std::collections::{HashMap, HashSet};
 use p4kx_archive::{Archive, Entry};
 use p4kx_audio::MusicStinger;
 use p4kx_extraction::CancelToken;
+use p4kx_extraction::sound::wwise_path;
 
 use super::index_read::{BankRead, DefinitionRead, read_definitions, read_soundbanks};
 use super::language::SOUND_FOLDER;
 use super::media::{Limits, LooseMedia, WemSource};
 use super::read::{folded_order, has_extension, starts_with_folder};
 use super::{
-    ATL_FOLDER, AtlTrigger, AudioFileError, AudioIssue, DEFAULT_LANGUAGE, IndexedSoundbank,
-    MAX_AUDIO_TRIGGERS, WemLocation,
+    AtlTrigger, AudioFileError, AudioIssue, DEFAULT_LANGUAGE, IndexedSoundbank, MAX_AUDIO_TRIGGERS,
+    WemLocation,
 };
 
 /// The audio data of one Archive: every ATL trigger with its Wwise events, and for every Wwise
 /// event ID the soundbanks whose `HIRC` section holds the event.
 ///
-/// [`AudioIndex::build`] reads the ATL definitions below [`ATL_FOLDER`] and every `.bnk` Entry
+/// [`AudioIndex::build`] reads the ATL definitions below [`super::ATL_FOLDER`] and every `.bnk` Entry
 /// once, in parallel; an Entry that cannot be read is left out and kept as an [`AudioIssue`].
 /// Triggers are looked up by name ignoring ASCII case, events by ID; when several definitions
 /// name the same trigger, the first by Entry path wins.
@@ -60,9 +61,7 @@ impl AudioIndex {
             .entries()
             .iter()
             .enumerate()
-            .filter(|(_, entry)| {
-                starts_with_folder(entry.path(), ATL_FOLDER) && has_extension(entry.path(), "xml")
-            })
+            .filter(|(_, entry)| wwise_path::is_atl_definition(entry.path()))
             .collect();
         let mut bank_entries: Vec<(usize, &Entry)> = archive
             .entries()

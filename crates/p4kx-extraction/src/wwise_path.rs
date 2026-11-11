@@ -6,6 +6,17 @@
 /// Canonical Archive path prefix for Wwise sources.
 pub const SOUND_FOLDER: &str = "Data\\Sounds\\wwise\\";
 
+/// Canonical Archive path prefix for ATL XML definitions.
+pub const ATL_FOLDER: &str = "Data\\Libs\\GameAudio\\";
+
+/// Returns whether this path is an XML Entry in the ATL definition directory.
+#[must_use]
+pub fn is_atl_definition(path: &str) -> bool {
+    relative_path(path, ATL_FOLDER)
+        .and_then(|relative| relative.rsplit_once('.'))
+        .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("xml"))
+}
+
 const MEDIA_FOLDER: &str = "Media";
 
 /// Language placement observed in a recognized Wwise directory layout.
@@ -94,14 +105,19 @@ fn loose_file(path: &str) -> Option<(&str, Folder<'_>)> {
 }
 
 fn wwise_file<'p>(path: &'p str, extension: &str) -> Option<(&'p str, &'p str)> {
-    let (prefix, rest) = path.split_at_checked(SOUND_FOLDER.len())?;
-    if !prefix.bytes().zip(SOUND_FOLDER.bytes()).all(|(a, b)| {
-        let a = if a == b'/' { b'\\' } else { a };
-        a.eq_ignore_ascii_case(&b)
-    }) {
-        return None;
-    }
+    let rest = relative_path(path, SOUND_FOLDER)?;
     let (folders, file) = rest.rsplit_once(['\\', '/']).unwrap_or(("", rest));
     let (stem, actual) = file.rsplit_once('.')?;
     (actual.eq_ignore_ascii_case(extension) && !stem.is_empty()).then_some((folders, stem))
+}
+
+fn relative_path<'p>(path: &'p str, prefix: &str) -> Option<&'p str> {
+    let (root, rest) = path.split_at_checked(prefix.len())?;
+    root.bytes()
+        .zip(prefix.bytes())
+        .all(|(actual, expected)| {
+            let actual = if actual == b'/' { b'\\' } else { actual };
+            actual.eq_ignore_ascii_case(&expected)
+        })
+        .then_some(rest)
 }

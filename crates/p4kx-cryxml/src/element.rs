@@ -56,6 +56,10 @@ impl<'d> Element<'d> {
         self.document.nodes.get(self.index as usize)
     }
 
+    pub(crate) fn first_attribute_index(self) -> u32 {
+        self.node().map_or(0, |node| node.first_attribute)
+    }
+
     /// Returns the element's name as stored in the file.
     #[must_use]
     pub fn name(self) -> &'d str {

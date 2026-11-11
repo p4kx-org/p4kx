@@ -7,5 +7,6 @@ mod comparison;
 mod corrupt;
 mod original_node;
 mod parse;
+mod source_document;
 mod text_depth;
 mod xml;

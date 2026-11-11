@@ -28,6 +28,8 @@ mod walk;
 mod walk_banks;
 mod wem_selection;
 
+pub use p4kx_extraction::sound::wwise_path::ATL_FOLDER;
+
 pub use atl::{AtlTrigger, WwiseEvent};
 pub use banks::IndexedSoundbank;
 pub use breaks::{BreakReason, BrokenLink};
@@ -60,9 +62,6 @@ pub const MAX_ATL_NODES: u32 = 1 << 20;
 /// The most audio triggers one index holds; once it is full, further triggers are left out and
 /// the ATL definition that brings the first of them is reported.
 pub const MAX_AUDIO_TRIGGERS: usize = 1 << 18;
-
-/// The folder of the ATL definition Entries, ignoring ASCII case.
-pub const ATL_FOLDER: &str = "Data\\Libs\\GameAudio\\";
 
 /// The language folder the game reads when its settings name none.
 pub const DEFAULT_LANGUAGE: &str = "English(US)";
