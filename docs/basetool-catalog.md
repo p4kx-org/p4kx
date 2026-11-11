@@ -1664,28 +1664,24 @@ same union; `valueType` stays. On LIVE every property that has a value struct st
 values grow the catalog from 208.5 MB to 214.1 MB decompressed and from 3.82 MB to 3.89 MB as
 `.json.zst`.
 
-**Mission flow.** A trigger has `note` (the developer's `description`), a `condition` and an
-`action`, either `null` when absent. A condition is tagged by `type`: `tokenState` (`objectiveId`,
-the `id` of an entry of `objectives`, and `tokenState`), `allTokensState` and `anyTokensState`
-(`tokenState`), `onMissionStart` (no fields), `and` and `or` (`conditions`), `not` (`condition`) and
-`propertyIsSet` (`propertyVariable`). An action is tagged by `type`: `stateChange` (`toState`),
-`tokenStateChange` (`objectiveId`, `toState`) and `pickRandomMissionPhase` (`phases`, each
-`objectiveId` and `probability`, and `toState`). A state is `active`,
-`completed`, `failed` or `abandoned`. A stored enum name the catalog does not know is `null`, like
-the values of every closed set, and is counted in the warning `unknown_template_values` of the
-build. A weak pointer that points to nothing, to a token without an `id` or to a struct outside the
-Record has a `null` link.
+**Mission flow.** Each `configurations.missionFlows` row points to the original Template or Broker
+owner and its flow declaration. The trigger, condition and action meanings are stored on nodes
+of that owner's `source.values` arena. References identify those owner-local nodes. Triggers retain
+the source description and the selected condition and action. Conditions and actions are tagged
+by `type`. A leaf action can be a `stateChange`, `tokenStateChange` or
+`pickRandomMissionPhase`. The last stores ordered phase references. Weak objective links carry
+the original resolution state and owner binding.
 
-A token without an `id` (or a nil one) and the phases below it are left out. Every readable phase
-is retained in source preorder with its immediate parent; there is no additional exporter phase
-depth cutoff. Canonical reader resource-policy errors remain explicit and prevent complete Normal
-publication. A Record whose conditions nest deeper than 16, or with a condition, an action or a
-modifier of a struct the catalog does not know, still fails projection. A future Build that meets such a struct therefore
-lacks the whole Record: it is not in the kind, the summary counts it in the `failed` list of the
-build (`p4kx catalog` prints it, with the record path and the struct name as reason, and exits with
-code 1). Normal publication refuses that incomplete result. An explicit diagnostic artifact can
-retain contracts whose template GUID resolves to no entry; its `exportHealth` identifies the
-failure, so consumers preserve the affected stored data rather than infer removal.
+- `multipleActions` stores the original `actionsField` and its ordered `actions` references.
+- `pickRandomAction` stores the original `actionsField` and its ordered `entries`. A declared
+  entry links its original `value`, `actionField`, optional child `action` and
+  `probabilityField`. `probabilityInterpretation` describes the original Single value. Its
+  exact IEEE-754 bits and protection marker are read through the field reference.
+
+The arena preserves repeated occurrences, authored nulls and readable prefixes of malformed
+data. Action and condition graphs are traversed iteratively. Canonical reader resource-policy
+errors and unsupported required meanings prevent complete Normal publication. Diagnostic
+publication retains readable owner data and the original error in `exportHealth`.
 
 ### Mission broker entries
 

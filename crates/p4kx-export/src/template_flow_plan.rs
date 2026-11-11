@@ -6,6 +6,9 @@ use std::collections::BTreeMap;
 use p4kx_extraction::Value;
 
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact};
+use crate::catalog_template_modules::template_action_layout::{
+    ActionLayout, ENTRY_ACTION, RANDOM_ENTRY_TYPE,
+};
 use crate::{CatalogError, ExportAccountingError};
 
 #[derive(Clone, Copy)]
@@ -14,6 +17,7 @@ pub(crate) enum FlowRole {
     Condition,
     Action,
     RandomPhase,
+    RandomActionEntry,
 }
 
 pub(crate) struct RoleSelection<'fields, 'scope, 'read, 'source> {
@@ -94,6 +98,22 @@ fn children<'fields, 'scope, 'read, 'source>(
     let Value::Struct(source) = selected.fact.value() else {
         return Ok(());
     };
+    match selected.role {
+        FlowRole::Action => action_children(fields, selected, source.type_name(), pending),
+        FlowRole::RandomActionEntry => entry_child(fields, selected, source.type_name(), pending),
+        FlowRole::RandomPhase => Ok(()),
+        FlowRole::Trigger | FlowRole::Condition => {
+            trigger_or_condition(fields, selected, source.type_name(), pending)
+        }
+    }
+}
+
+fn trigger_or_condition<'fields, 'scope, 'read, 'source>(
+    fields: &'fields OriginalFlowFields<'scope, 'read, 'source>,
+    selected: &RoleSelection<'fields, 'scope, 'read, 'source>,
+    type_name: &str,
+    pending: &mut Vec<RoleSelection<'fields, 'scope, 'read, 'source>>,
+) -> Result<(), CatalogError> {
     let mut push = |name: &str, role: FlowRole, many: bool| -> Result<(), CatalogError> {
         let Some((_, field)) = fields.field(Some(selected.fact), name)? else {
             return Ok(());
@@ -115,25 +135,81 @@ fn children<'fields, 'scope, 'read, 'source>(
             push("action", FlowRole::Action, false)?;
             push("condition", FlowRole::Condition, false)?;
         }
-        FlowRole::Condition => match source
-            .type_name()
+        FlowRole::Condition => match type_name
             .strip_prefix("MissionFlowCondition_")
-            .unwrap_or_else(|| source.type_name())
+            .unwrap_or(type_name)
         {
             "AND" | "OR" => push("conditions", FlowRole::Condition, true)?,
             "NOT" => push("condition", FlowRole::Condition, false)?,
             _ => {}
         },
-        FlowRole::Action
-            if source
-                .type_name()
-                .strip_prefix("MissionFlowAction_")
-                .unwrap_or_else(|| source.type_name())
-                == "PickRandomMissionPhase" =>
-        {
-            push("missionPhases", FlowRole::RandomPhase, true)?;
+        _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+    }
+    Ok(())
+}
+
+fn action_children<'fields, 'scope, 'read, 'source>(
+    fields: &'fields OriginalFlowFields<'scope, 'read, 'source>,
+    selected: &RoleSelection<'fields, 'scope, 'read, 'source>,
+    type_name: &str,
+    pending: &mut Vec<RoleSelection<'fields, 'scope, 'read, 'source>>,
+) -> Result<(), CatalogError> {
+    let layout = ActionLayout::of(type_name);
+    let (array, role) = match layout {
+        ActionLayout::PickRandomMissionPhase => (
+            fields
+                .field(Some(selected.fact), "missionPhases")?
+                .map(|(_, field)| field),
+            FlowRole::RandomPhase,
+        ),
+        layout @ (ActionLayout::MultipleActions | ActionLayout::PickRandomAction) => {
+            let declared = layout
+                .wrapper_field()
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            let array = declared
+                .original(fields, selected.fact)?
+                .filter(|fact| declared.allows(fact));
+            let role = if matches!(layout, ActionLayout::MultipleActions) {
+                FlowRole::Action
+            } else {
+                FlowRole::RandomActionEntry
+            };
+            (array, role)
         }
-        FlowRole::Action | FlowRole::RandomPhase => {}
+        _ => return Ok(()),
+    };
+    if let Some(array) = array {
+        pending.extend(
+            fields
+                .structs(array)?
+                .into_iter()
+                .rev()
+                .map(|fact| RoleSelection {
+                    fact,
+                    role,
+                    required: selected.required,
+                }),
+        );
+    }
+    Ok(())
+}
+
+fn entry_child<'fields, 'scope, 'read, 'source>(
+    fields: &'fields OriginalFlowFields<'scope, 'read, 'source>,
+    selected: &RoleSelection<'fields, 'scope, 'read, 'source>,
+    type_name: &str,
+    pending: &mut Vec<RoleSelection<'fields, 'scope, 'read, 'source>>,
+) -> Result<(), CatalogError> {
+    if type_name == RANDOM_ENTRY_TYPE
+        && let Some(fact) = ENTRY_ACTION.original(fields, selected.fact)?
+        && ENTRY_ACTION.allows(fact)
+        && matches!(fact.value(), Value::Struct(_))
+    {
+        pending.push(RoleSelection {
+            fact,
+            role: FlowRole::Action,
+            required: selected.required,
+        });
     }
     Ok(())
 }

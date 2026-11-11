@@ -18,6 +18,12 @@ pub(crate) mod scoped_location_shape;
 #[path = "spawn_tag_text.rs"]
 pub(crate) mod spawn_tag_text;
 
+#[path = "template_action_layout.rs"]
+pub(crate) mod template_action_layout;
+
+#[path = "template_action_wrappers.rs"]
+pub(crate) mod template_action_wrappers;
+
 #[path = "template_action_meaning.rs"]
 pub(crate) mod template_action_meaning;
 

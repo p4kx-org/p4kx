@@ -175,6 +175,7 @@ mod flow_root_output;
 mod flow_root_positions;
 mod flow_root_source;
 mod flow_root_tests;
+mod flow_wrapper_tests;
 mod gameplay_v3_conservation;
 #[path = "../real_archive/catalog_v3_consumer.rs"]
 mod gameplay_v3_consumer;

@@ -34,10 +34,48 @@ pub(crate) enum ActionMeaning {
         mission_phases_field: FlowFieldBinding,
         phases: Vec<SourceValueRef>,
     },
+    MultipleActions {
+        actions_field: FlowFieldBinding,
+        actions: Vec<SourceValueRef>,
+    },
+    PickRandomAction {
+        actions_field: FlowFieldBinding,
+        entries: Vec<RandomActionEntry>,
+    },
     Unsupported,
 }
 
-/// The established finite-f32 recipe result without a second approximate numeric datum.
+/// One authored slot of a random action array and its original field bindings.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[schemars(transform = every_field_required)]
+pub(crate) enum RandomActionEntry {
+    Declared {
+        value: SourceValueRef,
+        action_field: FlowFieldBinding,
+        action: Option<SourceValueRef>,
+        probability_field: FlowFieldBinding,
+        probability_interpretation: ProbabilityInterpretation,
+    },
+    Null {
+        value: SourceValueRef,
+    },
+    Unreadable {
+        value: SourceValueRef,
+    },
+    Unsupported {
+        value: SourceValueRef,
+    },
+    Invalid {
+        value: SourceValueRef,
+    },
+}
+
+/// The numeric interpretation of one original probability field.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]

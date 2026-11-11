@@ -90,7 +90,10 @@ pub(crate) fn read<'source>(
     )?;
     let projected = match (root, failure) {
         (Some(error), _) => Err(error),
-        (None, Some(error)) => Err(Box::new(BrokerProjectionFailure::read(&admission, &error)?)),
+        (None, Some(error)) => Err(Box::new(BrokerProjectionFailure::read(
+            &admission,
+            error.as_ref(),
+        )?)),
         (None, None) => match crate::broker_projection_read::read(
             &members,
             &mut references,

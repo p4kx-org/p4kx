@@ -115,6 +115,22 @@ raw cell's own contributions. Known nil/empty/null/wrong-shaped source facts rem
 values with separate interpretation controls. Unresolved/error cases retain their actual original
 inputs and completeness; no target/header GUID or successful target admission is invented.
 
+`multipleActions` binds `actionsField` to the declared StrongPointer array and lists its
+ordered owner-local `actions`. `pickRandomAction` binds `actionsField` to the declared
+inline Class array and lists ordered `entries`. A declared entry includes the original `value`,
+`actionField`, optional `action`, `probabilityField` and `probabilityInterpretation`. The
+probability binding refers to the original Single cell with its exact IEEE-754 bits and origin.
+The entry union distinguishes original null, unreadable, unsupported and invalid slots.
+An authored null child has a raw value reference. An absent child declaration is expressed
+through the action field's declaration survey. The same arena stores nested wrappers and
+all readable child actions.
+
+The opt-in source comparison `selected_flow_action_wrappers_match_the_original_owner_graph`
+checks selected Template Records against their original action graphs. Set `P4KX_DATA_P4K`
+for the installed Archive and `P4KX_EXPECT_FLOW_ACTION_WRAPPERS=1` when that Build must
+contain both wrappers. Run the named test with `cargo test -p p4kx-export --test real_archive`
+and `-- --ignored`.
+
 Required unsupported meaning remains a failure. A fully emitted D owner stays successfully
 projected while its required C interpretation reports DerivedProjection failure with the same
 actual Record subject and original cause. Normal refuses; Diagnostic retains the readable raw

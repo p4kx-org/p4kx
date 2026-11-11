@@ -81,3 +81,17 @@ struct the catalog does not know fails the Record instead of hiding behind an es
   3,436,476 bytes of ADR-0313. Against the limits that is 5.9 % of the upload limit of
   64,000,000 bytes (headroom 60.2 MB) and 20.6 % of the decompressed limit of 1,000,000,000 bytes
   (headroom 794 MB).
+
+## Schema 3 action wrappers
+
+Template and Broker action meanings share a strict schema-v3 union. `multipleActions` refers to
+the original ordered action slots. `pickRandomAction` refers to the original ordered entry
+slots and binds each entry's action and Single probability within the same owning Record.
+The source arena retains the authored values and field provenance. These references preserve
+ownership and slot identity without copying each nested subtree into the meaning table.
+
+The export walks nested actions iteratively and checks cancellation throughout the walk.
+It retains raw probabilities and resolves objective links in the owning Record. Unknown
+or malformed actions remain explicit projection failures with original evidence. Diagnostic
+publication preserves their source slots. The released schema-v2 validator remains a frozen
+historical boundary.

@@ -162,16 +162,33 @@ impl Links<'_, '_> {
     }
 
     fn action(&mut self, reference: &Value) -> PartsResult {
-        let action = required(self.mission.follow(reference)?, "action")?;
-        match graph::text(action, "/type")? {
-            "tokenStateChange" => self.objective(action)?,
-            "pickRandomMissionPhase" => {
-                for reference in graph::array(action, "phases")? {
-                    self.objective(required(self.mission.follow(reference)?, "randomPhase")?)?;
-                }
+        let mut pending = vec![reference];
+        while let Some(reference) = pending.pop() {
+            let node = self.mission.follow(reference)?;
+            if node.pointer("/value/value/type").and_then(Value::as_str) != Some("struct") {
+                continue;
             }
-            "stateChange" => {}
-            _ => return Err("known selected mission flow action".into()),
+            let action = required(node, "action")?;
+            match graph::text(action, "/type")? {
+                "tokenStateChange" => self.objective(action)?,
+                "pickRandomMissionPhase" => {
+                    for reference in graph::array(action, "phases")? {
+                        self.objective(required(self.mission.follow(reference)?, "randomPhase")?)?;
+                    }
+                }
+                "multipleActions" => {
+                    pending.extend(graph::array(action, "actions")?.iter().rev());
+                }
+                "pickRandomAction" => {
+                    for entry in graph::array(action, "entries")?.iter().rev() {
+                        if graph::text(entry, "/type")? == "declared" {
+                            pending.extend(nullable(entry, "action")?);
+                        }
+                    }
+                }
+                "stateChange" => {}
+                _ => return Err("known selected mission flow action".into()),
+            }
         }
         Ok(())
     }

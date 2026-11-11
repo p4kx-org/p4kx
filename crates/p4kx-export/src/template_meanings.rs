@@ -5,6 +5,11 @@ use std::collections::BTreeMap;
 
 use p4kx_extraction::{DecimalU64, Value};
 
+use crate::catalog_read::original::OriginalValueFact;
+use crate::catalog_template_modules::template_action_layout::{
+    ActionLayout, ENTRY_ACTION, ENTRY_PROBABILITY, RANDOM_ENTRY_TYPE,
+};
+use crate::record_read::ReadError;
 use crate::source_fields::FieldCapture;
 use crate::template_action_meaning::{ActionMeaning, RandomPhaseMeaning};
 use crate::template_flow_plan::{FlowPlan, FlowRole, RoleSelection};
@@ -32,7 +37,7 @@ pub(crate) struct FlowMeanings<'members, 'fields, 'scope, 'read, 'source> {
 
 pub(crate) struct PreparedFlow<'members, 'fields, 'scope, 'read, 'source> {
     pub(crate) meanings: FlowMeanings<'members, 'fields, 'scope, 'read, 'source>,
-    pub(crate) failure: Option<TemplateError>,
+    pub(crate) failure: Option<ReadError>,
 }
 
 pub(crate) fn read<'fields, 'scope, 'read, 'source>(
@@ -44,7 +49,7 @@ pub(crate) fn read<'fields, 'scope, 'read, 'source>(
 ) -> Result<
     (
         crate::template_source::TemplateSource<'source>,
-        Option<TemplateError>,
+        Option<ReadError>,
     ),
     CatalogError,
 > {
@@ -85,7 +90,7 @@ fn role_meaning<'fields, 'scope, 'read, 'source>(
     role: &RoleSelection<'fields, 'scope, 'read, 'source>,
     unknowns: Option<&Unknowns>,
     capture: &dyn FieldCapture<'source>,
-    failure: &mut Option<TemplateError>,
+    failure: &mut Option<ReadError>,
 ) -> Result<Meanings, CatalogError> {
     let mut value = Meanings::default();
     match role.role {
@@ -118,8 +123,8 @@ fn role_meaning<'fields, 'scope, 'read, 'source>(
                 role.fact,
                 unknowns.filter(|_| role.required && failure.is_none()),
             )?;
-            if matches!(action, ActionMeaning::Unsupported) && role.required && failure.is_none() {
-                *failure = Some(unknown("missionFlow action", role.fact.value(), capture)?);
+            if role.required && failure.is_none() {
+                *failure = action_failure(members, role.fact, &action, capture)?;
             }
             value.action = Some(action);
         }
@@ -128,8 +133,52 @@ fn role_meaning<'fields, 'scope, 'read, 'source>(
                 members, references, role.fact,
             )?);
         }
+        FlowRole::RandomActionEntry => {
+            if role.required && failure.is_none() {
+                *failure = entry_failure(members, role.fact, capture)?;
+            }
+        }
     }
     Ok(value)
+}
+
+fn action_failure<'scope, 'read, 'source>(
+    members: &TemplateMembers<'_, 'scope, 'read, 'source>,
+    fact: &OriginalValueFact<'scope, 'read, 'source>,
+    action: &ActionMeaning,
+    capture: &dyn FieldCapture<'source>,
+) -> Result<Option<ReadError>, CatalogError> {
+    if matches!(action, ActionMeaning::Unsupported) {
+        return unknown("missionFlow action", fact.value(), capture).map(Some);
+    }
+    let Value::Struct(source) = fact.value() else {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    };
+    ActionLayout::of(source.type_name())
+        .wrapper_field()
+        .map_or_else(
+            || Ok(None),
+            |declaration| declaration.failure(members.fields(), fact, capture),
+        )
+}
+
+fn entry_failure<'scope, 'read, 'source>(
+    members: &TemplateMembers<'_, 'scope, 'read, 'source>,
+    fact: &OriginalValueFact<'scope, 'read, 'source>,
+    capture: &dyn FieldCapture<'source>,
+) -> Result<Option<ReadError>, CatalogError> {
+    let Value::Struct(source) = fact.value() else {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    };
+    if source.type_name() != RANDOM_ENTRY_TYPE {
+        return unknown("missionFlow random action entry", fact.value(), capture).map(Some);
+    }
+    for declaration in [ENTRY_ACTION, ENTRY_PROBABILITY] {
+        if let Some(error) = declaration.failure(members.fields(), fact, capture)? {
+            return Ok(Some(error));
+        }
+    }
+    Ok(None)
 }
 
 impl<'members, 'fields, 'scope, 'read, 'source>
@@ -171,11 +220,13 @@ fn unknown<'source>(
     field: &'static str,
     value: &Value<'source>,
     capture: &dyn FieldCapture<'source>,
-) -> Result<TemplateError, CatalogError> {
+) -> Result<ReadError, CatalogError> {
     match value {
         Value::Struct(source) => {
             let body = capture.unknown_type(source, field)?;
-            Ok(TemplateError::unknown(field, source).with_body(body))
+            Ok(Box::new(
+                TemplateError::unknown(field, source).with_body(body),
+            ))
         }
         _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),
     }

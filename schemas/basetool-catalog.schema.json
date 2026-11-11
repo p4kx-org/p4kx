@@ -201,6 +201,52 @@
         },
         {
           "properties": {
+            "actions": {
+              "items": {
+                "$ref": "#/$defs/SourceValueRef"
+              },
+              "type": "array"
+            },
+            "actionsField": {
+              "$ref": "#/$defs/FlowFieldBinding"
+            },
+            "type": {
+              "const": "multipleActions",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "actionsField",
+            "actions"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "actionsField": {
+              "$ref": "#/$defs/FlowFieldBinding"
+            },
+            "entries": {
+              "items": {
+                "$ref": "#/$defs/RandomActionEntry"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "pickRandomAction",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "actionsField",
+            "entries"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
             "type": {
               "const": "unsupported",
               "type": "string"
@@ -14747,7 +14793,7 @@
       "type": "object"
     },
     "ProbabilityInterpretation": {
-      "description": "The established finite-f32 recipe result without a second approximate numeric datum.",
+      "description": "The numeric interpretation of one original probability field.",
       "enum": [
         "finite",
         "nonfinite",
@@ -16485,6 +16531,115 @@
         "pingCooldownTime"
       ],
       "type": "object"
+    },
+    "RandomActionEntry": {
+      "description": "One authored slot of a random action array and its original field bindings.",
+      "oneOf": [
+        {
+          "properties": {
+            "action": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SourceValueRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "actionField": {
+              "$ref": "#/$defs/FlowFieldBinding"
+            },
+            "probabilityField": {
+              "$ref": "#/$defs/FlowFieldBinding"
+            },
+            "probabilityInterpretation": {
+              "$ref": "#/$defs/ProbabilityInterpretation"
+            },
+            "type": {
+              "const": "declared",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SourceValueRef"
+            }
+          },
+          "required": [
+            "type",
+            "value",
+            "actionField",
+            "action",
+            "probabilityField",
+            "probabilityInterpretation"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "null",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SourceValueRef"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "unreadable",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SourceValueRef"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SourceValueRef"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invalid",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SourceValueRef"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
     },
     "RandomPhaseMeaning": {
       "description": "One actual random-phase entry's bindings into the canonical source inventory.",

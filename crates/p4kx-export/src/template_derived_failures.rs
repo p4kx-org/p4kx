@@ -10,7 +10,6 @@ use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{DerivedFailure, ExportLedger};
 use crate::record_observation::RecordObservation;
 use crate::record_read::ReadError;
-use crate::template_issues::TemplateError;
 use crate::template_property_plan::SelectedProperty;
 use crate::template_source_members::TemplateMembers;
 use crate::{CatalogError, CatalogReadFailure, Kind};
@@ -58,12 +57,12 @@ impl TemplateErrors {
         self,
         input: &OriginalCatalogInput<'_, '_>,
         record: &Record<'source>,
-        flow_failure: Option<TemplateError>,
+        flow_failure: Option<ReadError>,
         ledger: &mut ExportLedger,
         failures: &mut Vec<CatalogReadFailure<'source>>,
     ) -> Result<(), CatalogError> {
         let mut errors = self.before_flow;
-        errors.extend(flow_failure.map(|error| Box::new(error) as ReadError));
+        errors.extend(flow_failure);
         errors.extend(self.after_flow);
         retain(input, record, errors, ledger, failures)
     }
