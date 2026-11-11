@@ -7,7 +7,7 @@ use p4kx_extraction::bank::{BankHircMusicPlaylist, BankMusicPlaylistRead, BankMu
 
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_music_segment::MusicChildField;
-use crate::audio_bank_music_value::MusicStingerRecord;
+use crate::audio_bank_music_value::{MusicNodeChildRecord, MusicStingerRecord};
 use crate::audio_bank_projection::BankProjection;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
@@ -18,7 +18,7 @@ mod payload;
 
 use self::origins::PlaylistSites;
 pub(crate) use self::payload::MusicPlaylistPayload;
-use self::payload::{PlaylistChildRecord, PlaylistItemRecord, PlaylistLayout, PlaylistRecord};
+use self::payload::{PlaylistItemRecord, PlaylistLayout, PlaylistRecord};
 
 pub(crate) const NAMESPACE: &str = "audio-bank-music-playlist";
 pub(crate) const CHILD: &str = "audio-bank-music-playlist-child";
@@ -63,7 +63,7 @@ fn emit(
             (
                 CHILD,
                 ordinal,
-                MusicPlaylistPayload::Child(PlaylistChildRecord::new(ordinal, &id)),
+                MusicPlaylistPayload::Child(MusicNodeChildRecord::new(ordinal, &id)),
                 sites
                     .node()
                     .child(input, ordinal, &id.range, MusicChildField::Child, writer)?,

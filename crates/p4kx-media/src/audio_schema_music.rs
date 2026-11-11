@@ -5,6 +5,7 @@ use serde_json::Value;
 
 use crate::audio_bank_music_playlist::{self, MusicPlaylistPayload};
 use crate::audio_bank_music_segment::{self, MusicSegmentPayload};
+use crate::audio_bank_music_switch::{self, MusicSwitchPayload};
 use crate::audio_bank_music_track::{self, MusicTrackPayload};
 use crate::audio_schema_status::StatusRule;
 use crate::{MediaError, schema_merge};
@@ -13,6 +14,7 @@ use super::Binding;
 
 const MUSIC_PLAYLIST_PAYLOAD: &str = "MusicPlaylistPayload";
 const MUSIC_SEGMENT_PAYLOAD: &str = "MusicSegmentPayload";
+const MUSIC_SWITCH_PAYLOAD: &str = "MusicSwitchPayload";
 const MUSIC_TRACK_PAYLOAD: &str = "MusicTrackPayload";
 
 pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
@@ -30,13 +32,19 @@ pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
         base,
         MUSIC_PLAYLIST_PAYLOAD,
         schema_merge::serialized_payload::<MusicPlaylistPayload>(),
+    )?;
+    schema_merge::insert_payload(
+        base,
+        MUSIC_SWITCH_PAYLOAD,
+        schema_merge::serialized_payload::<MusicSwitchPayload>(),
     )
 }
 
-pub(super) const fn bindings() -> [Binding; 12] {
+pub(super) const fn bindings() -> [Binding; 18] {
     let [segment, track_id, segment_stinger, marker] = segment_bindings();
     let [track, source, clip, switch_member] = track_bindings();
     let [playlist, child, playlist_stinger, item] = playlist_bindings();
+    let [switch, switch_child, switch_stinger, group, node, target] = switch_bindings();
     [
         segment,
         track_id,
@@ -50,6 +58,59 @@ pub(super) const fn bindings() -> [Binding; 12] {
         child,
         playlist_stinger,
         item,
+        switch,
+        switch_child,
+        switch_stinger,
+        group,
+        node,
+        target,
+    ]
+}
+
+const fn switch_bindings() -> [Binding; 6] {
+    [
+        Binding::exact(
+            MUSIC_SWITCH_PAYLOAD,
+            audio_bank_music_switch::NAMESPACE,
+            "bank-music-switch",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            MUSIC_SWITCH_PAYLOAD,
+            audio_bank_music_switch::CHILD,
+            "bank-music-switch-child",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            MUSIC_SWITCH_PAYLOAD,
+            audio_bank_music_switch::STINGER,
+            "bank-music-switch-stinger",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            MUSIC_SWITCH_PAYLOAD,
+            audio_bank_music_switch::GROUP,
+            "bank-music-switch-group",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            MUSIC_SWITCH_PAYLOAD,
+            audio_bank_music_switch::NODE,
+            "bank-music-switch-node",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            MUSIC_SWITCH_PAYLOAD,
+            audio_bank_music_switch::TARGET,
+            "bank-music-switch-target",
+            3,
+            StatusRule::Complete,
+        ),
     ]
 }
 

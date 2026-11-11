@@ -94,7 +94,7 @@ fn wem_field_groups() -> [FieldGroup; 5] {
     ]
 }
 
-fn bank_field_groups() -> [FieldGroup; 13] {
+fn bank_field_groups() -> [FieldGroup; 14] {
     [
         FieldGroup::new(
             "bank-directory",
@@ -127,6 +127,10 @@ fn bank_field_groups() -> [FieldGroup; 13] {
         FieldGroup::new(
             "bank-music-segment-fields",
             "Original MusicSegment node, meter, tracks, stingers and marker values with exact source ranges.",
+        ),
+        FieldGroup::new(
+            "bank-music-switch-fields",
+            "Original MusicSwitch group and physical decision-node words, checked target paths and transition extents.",
         ),
         FieldGroup::new(
             "bank-music-track-fields",

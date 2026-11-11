@@ -7,6 +7,7 @@ use crate::bank_source_container::{self, BankHircContainer};
 use crate::bank_source_event;
 use crate::bank_source_music_playlist::{self, BankHircMusicPlaylist};
 use crate::bank_source_music_segment::{self, BankHircMusicSegment};
+use crate::bank_source_music_switch::{self, BankHircMusicSwitch};
 use crate::bank_source_music_track::{self, BankHircMusicTrack};
 use crate::bank_source_sound::{self, BankHircSound};
 use crate::hirc::CONTAINER_VERSION;
@@ -33,6 +34,8 @@ pub enum BankHircSemantic<'input, R> {
     MusicPlaylist(Box<BankHircMusicPlaylist<'input, R>>),
     /// Owner-bound music segment interpretation and ordered values.
     MusicSegment(Box<BankHircMusicSegment<'input, R>>),
+    /// Owner-bound music switch interpretation and original decision-tree rows.
+    MusicSwitch(Box<BankHircMusicSwitch<'input, R>>),
     /// Owner-bound music track interpretation and ordered source rows.
     MusicTrack(Box<BankHircMusicTrack<'input, R>>),
 }
@@ -49,6 +52,7 @@ impl<R> BankHircSemantic<'_, R> {
             Self::Container(container) => &container.object,
             Self::MusicPlaylist(playlist) => &playlist.object,
             Self::MusicSegment(segment) => &segment.object,
+            Self::MusicSwitch(switch) => &switch.object,
             Self::MusicTrack(track) => &track.object,
         }
     }
@@ -99,6 +103,7 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                     )
                     .map(|segment| BankHircSemantic::MusicSegment(Box::new(segment)));
                 }
+                HircKind::MusicSwitch => return self.music_switch(object, version),
                 HircKind::MusicTrack => {
                     return bank_source_music_track::observe(
                         self.input,
@@ -123,6 +128,15 @@ impl<R: Read + Seek> BankHirc<'_, R> {
             }
         }
         self.primitive(object, kind, version)
+    }
+
+    fn music_switch(
+        &mut self,
+        object: BankHircObject,
+        version: u32,
+    ) -> Result<BankHircSemantic<'_, R>, BankReadError> {
+        bank_source_music_switch::observe(self.input, &mut self.stopped, object, version)
+            .map(|switch| BankHircSemantic::MusicSwitch(Box::new(switch)))
     }
 
     fn primitive(

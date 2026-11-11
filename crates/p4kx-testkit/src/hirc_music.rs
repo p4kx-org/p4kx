@@ -85,11 +85,6 @@ impl TestHircObject {
     /// It lists `children` and two transition rules, the second with a transition object.
     #[must_use]
     pub fn music_switch(id: u32, children: &[u32], group_id: u32, targets: &[u32]) -> Self {
-        let mut body = transition_node(children);
-        body.push(1);
-        put_u32(&mut body, 1);
-        put_u32(&mut body, group_id);
-        body.push(0);
         let mut tree = Vec::new();
         put_u32(&mut tree, 0);
         put_u16(&mut tree, 1);
@@ -102,9 +97,27 @@ impl TestHircObject {
             put_u16(&mut tree, 50);
             put_u16(&mut tree, 100);
         }
-        put_u32(&mut body, len_u32(&tree));
+        Self::music_switch_with_tree(id, children, &[(group_id, SWITCH_GROUP)], &tree)
+    }
+
+    /// A music switch with original ordered group IDs, group types and decision tree bytes.
+    #[must_use]
+    pub fn music_switch_with_tree(
+        id: u32,
+        children: &[u32],
+        groups: &[(u32, u8)],
+        tree: &[u8],
+    ) -> Self {
+        let mut body = transition_node(children);
+        body.push(1);
+        put_u32(&mut body, len_u32(groups));
+        for &(id, _) in groups {
+            put_u32(&mut body, id);
+        }
+        body.extend(groups.iter().map(|&(_, code)| code));
+        put_u32(&mut body, len_u32(tree));
         body.push(0);
-        body.extend_from_slice(&tree);
+        body.extend_from_slice(tree);
         Self::raw(12, id, body)
     }
 

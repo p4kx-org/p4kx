@@ -22,6 +22,20 @@ Short IDs and display paths may repeat. The source's exact verified bytes are in
 | `audio-bank-music-segment-child` | `bank-music-segment-child` | HIRC section, segment and child ordinals |
 | `audio-bank-music-segment-stinger` | `bank-music-segment-stinger` | HIRC section, segment and stinger ordinals |
 | `audio-bank-music-segment-marker` | `bank-music-segment-marker` | HIRC section, segment and marker ordinals |
+| `audio-bank-music-track` | `bank-music-track` | HIRC section and track object ordinals |
+| `audio-bank-music-track-source` | `bank-music-track-source` | HIRC section and track and source ordinals |
+| `audio-bank-music-track-clip` | `bank-music-track-clip` | HIRC section and track and clip ordinals |
+| `audio-bank-music-track-switch-member` | `bank-music-track-switch-member` | HIRC section and track and switch-member ordinals |
+| `audio-bank-music-playlist` | `bank-music-playlist` | HIRC section and playlist object ordinals |
+| `audio-bank-music-playlist-child` | `bank-music-playlist-child` | HIRC section and playlist and child ordinals |
+| `audio-bank-music-playlist-stinger` | `bank-music-playlist-stinger` | HIRC section and playlist and stinger ordinals |
+| `audio-bank-music-playlist-item` | `bank-music-playlist-item` | HIRC section and playlist and item ordinals |
+| `audio-bank-music-switch` | `bank-music-switch` | HIRC section and switch object ordinals |
+| `audio-bank-music-switch-child` | `bank-music-switch-child` | HIRC section and switch and child ordinals |
+| `audio-bank-music-switch-stinger` | `bank-music-switch-stinger` | HIRC section and switch and stinger ordinals |
+| `audio-bank-music-switch-group` | `bank-music-switch-group` | HIRC section and switch and group ordinals |
+| `audio-bank-music-switch-node` | `bank-music-switch-node` | HIRC section and switch and physical node ordinals |
+| `audio-bank-music-switch-target` | `bank-music-switch-target` | HIRC section and switch and traversal target ordinals |
 | `audio-bank-hirc` | `bank-hirc` | HIRC section ordinal |
 | `audio-bank-stid` | `bank-stid` | STID section ordinal |
 | `audio-bank-name` | `bank-name` | STID section and name ordinals |
@@ -105,6 +119,15 @@ raw weight and shuffle selector bytes. The play mode and selector interpretation
 available. The transition rule count and checked complete-rule prefix locate the original
 scheduling bytes in the retained bank. A truncated item leaves earlier complete rows
 available and reports the malformed layout.
+
+Version 154 MusicSwitch rows retain the music node, ordered children and stingers, raw
+continue-playback and decision mode bytes, argument group IDs and type codes, and the checked
+transition rule extent. Physical node rows expose the original key, packed link word, weight
+and probability in file order, including unvisited nodes. Target rows follow the checked
+nonzero-target traversal in order, with physical node indices, levels and ancestor indices.
+Repeated visits to a physical node remain separate. A malformed path retains its preceding
+checked targets and available physical nodes. The original tree extent refers to the retained
+bank and can be shorter than its declared size for a truncated tree.
 
 STID header rows retain the authored string type and name count. Each name row carries its
 original ID and byte count, exact header and name ranges, original bytes and UTF-8 result.

@@ -28,6 +28,11 @@ pub use p4kx_audio::{
     BankHircMusicPlaylist, BankMusicPlaylistFields, BankMusicPlaylistItem, BankMusicPlaylistRead,
     BankMusicPlaylistRow, BankMusicPlaylistRows, BankMusicTransitionFields, MusicPlayMode,
 };
+pub use p4kx_audio::{
+    BankHircMusicSwitch, BankMusicSwitchBranch, BankMusicSwitchFields, BankMusicSwitchGroup,
+    BankMusicSwitchNode, BankMusicSwitchRead, BankMusicSwitchRow, BankMusicSwitchRows,
+    BankMusicSwitchTarget,
+};
 use rayon::prelude::*;
 
 use crate::entry_content::find_entry;

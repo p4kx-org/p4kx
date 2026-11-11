@@ -409,7 +409,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   explicit physical-target resolution and actual read receipts; filtered targets stay unselected.
   The Audio stream preserves [standalone and embedded WEM metadata](media-audio-metadata.md),
   original RIFF chunk ranges, cue and LIST annotations, and [soundbank metadata](media-bank-metadata.md)
-  including typed Action and Event fields. Raw bytes and immediate field origins stay available.
+  including typed Action, Event, Sound, container and music fields. Raw bytes and immediate
+  field origins stay available.
   Use `--audio-format wav` to add WAV artifacts for complete 16-bit PCM WEMs. The default
   `raw` retains metadata and source bytes. Unsupported codec conversions prevent complete
   publication. A diagnostic generation can retain the original source and conversion failure.

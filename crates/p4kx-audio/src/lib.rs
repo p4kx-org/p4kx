@@ -19,6 +19,7 @@ mod bank_source_event;
 mod bank_source_hirc;
 mod bank_source_music_playlist;
 mod bank_source_music_segment;
+mod bank_source_music_switch;
 mod bank_source_music_track;
 mod bank_source_sound;
 mod bank_stid;
@@ -35,6 +36,8 @@ mod hirc_music_node;
 mod hirc_music_parse;
 mod hirc_music_playlist;
 mod hirc_music_segment;
+mod hirc_music_switch;
+mod hirc_music_switch_traversal;
 mod hirc_music_track;
 mod hirc_music_transition;
 mod hirc_node;
@@ -81,6 +84,9 @@ pub use bank_source_music_segment::{
     BankHircMusicSegment, BankMusicMarker, BankMusicSegmentRead, BankMusicSegmentRow,
     BankMusicSegmentRows,
 };
+pub use bank_source_music_switch::{
+    BankHircMusicSwitch, BankMusicSwitchRead, BankMusicSwitchRow, BankMusicSwitchRows,
+};
 pub use bank_source_music_track::{BankHircMusicTrack, BankMusicTrackRead, BankMusicTrackRows};
 pub use bank_source_sound::{BankHircSound, BankSoundRead};
 pub use bank_stid::{BankStid, BankStidName};
@@ -101,6 +107,8 @@ pub use hirc_music::{
 pub use hirc_music_node::{BankMusicNodeFields, BankMusicStinger};
 pub use hirc_music_playlist::BankMusicPlaylistItem;
 pub use hirc_music_segment::BankMusicSegmentFields;
+pub use hirc_music_switch::{BankMusicSwitchFields, BankMusicSwitchGroup, BankMusicSwitchNode};
+pub use hirc_music_switch_traversal::{BankMusicSwitchBranch, BankMusicSwitchTarget};
 pub use hirc_music_track::{
     BankMusicTrackClip, BankMusicTrackFields, BankMusicTrackRow, BankMusicTrackSource,
     BankMusicTrackSwitchFields,

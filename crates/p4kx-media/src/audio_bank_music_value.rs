@@ -4,7 +4,7 @@
 use std::ops::Range;
 
 use p4kx_extraction::DecimalU64;
-use p4kx_extraction::bank::{BankMusicNodeFields, BankMusicStinger};
+use p4kx_extraction::bank::{BankHircField, BankMusicNodeFields, BankMusicStinger};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -61,6 +61,24 @@ impl MusicStingerRecord {
             trigger_id: value.trigger_id.value,
             segment_id: value.segment_id.value,
             opaque_range: entry_range(&value.opaque_range),
+        }
+    }
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MusicNodeChildRecord {
+    ordinal: DecimalU64,
+    child_id: u32,
+    id_range: BankEntryRange,
+}
+
+impl MusicNodeChildRecord {
+    pub(crate) const fn new(ordinal: u64, child: &BankHircField<u32>) -> Self {
+        Self {
+            ordinal: DecimalU64::new(ordinal),
+            child_id: child.value,
+            id_range: entry_range(&child.range),
         }
     }
 }

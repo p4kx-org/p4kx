@@ -18,7 +18,10 @@ use crate::{
     audio_bank_hirc_container, audio_bank_hirc_event, audio_bank_hirc_origins,
     audio_bank_hirc_sound,
 };
-use crate::{audio_bank_music_playlist, audio_bank_music_segment, audio_bank_music_track};
+use crate::{
+    audio_bank_music_playlist, audio_bank_music_segment, audio_bank_music_switch,
+    audio_bank_music_track,
+};
 
 pub(crate) const HIRC_NAMESPACE: &str = "audio-bank-hirc";
 pub(crate) const OBJECT_NAMESPACE: &str = "audio-bank-object";
@@ -92,6 +95,9 @@ fn emit_semantic<R: Read + Seek>(
         }
         (BankHircSemantic::MusicSegment(segment), Some(version)) => {
             audio_bank_music_segment::project(projection, version, *segment, writer)
+        }
+        (BankHircSemantic::MusicSwitch(switch), Some(version)) => {
+            audio_bank_music_switch::project(projection, version, *switch, writer)
         }
         (BankHircSemantic::MusicTrack(track), Some(version)) => {
             audio_bank_music_track::project(projection, version, *track, writer)

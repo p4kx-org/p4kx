@@ -8,6 +8,9 @@ use p4kx_extraction::bank::{BankHircObject, BankMusicPlaylistFields, BankMusicPl
 
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_music_segment::MusicSites;
+use crate::audio_bank_music_transition_origins::{
+    MusicTransitionSites, TransitionNames, field, span,
+};
 use crate::audio_bank_origins::{BankOrigins, EvidenceSite};
 use crate::origin_capture::OriginSite;
 use crate::origin_input::MediaOriginInput;
@@ -15,13 +18,11 @@ use crate::origin_prepared::PreparedRecordOrigins;
 use crate::{MediaError, MediaWriter};
 
 const NAMESPACE: &str = "bnkHircMusicPlaylist";
-const RULE_COUNT: &str = "musicPlaylistTransitionRuleCount";
 const ITEM_COUNT: &str = "musicPlaylistItemCount";
 
 pub(super) struct PlaylistSites<'a> {
     node: MusicSites<'a>,
-    rule_count: Option<[u64; 2]>,
-    rules_range: Option<[u64; 2]>,
+    transitions: MusicTransitionSites,
     item_count: Option<[u64; 2]>,
 }
 
@@ -33,12 +34,13 @@ impl<'a> PlaylistSites<'a> {
     ) -> Self {
         Self {
             node: MusicSites::for_node(object, version, &fields.node, NAMESPACE),
-            rule_count: fields
-                .transitions
-                .rule_count
-                .as_ref()
-                .map(|word| span(&word.range)),
-            rules_range: fields.transitions.rules_range.as_ref().map(span),
+            transitions: MusicTransitionSites::new(
+                &fields.transitions,
+                TransitionNames {
+                    count: "musicPlaylistTransitionRuleCount",
+                    extent: "musicPlaylistTransitionRuleExtent",
+                },
+            ),
             item_count: fields.item_count.as_ref().map(|word| span(&word.range)),
         }
     }
@@ -54,7 +56,7 @@ impl<'a> PlaylistSites<'a> {
         writer: &MediaWriter<'_>,
     ) -> Result<PreparedRecordOrigins, MediaError> {
         let mut prepared = self.node.prepare_node_header(input, writer)?;
-        self.transitions(&mut prepared)?;
+        self.transitions.write(&self.node, &mut prepared)?;
         let items = prepared.capture(
             self.after_transitions().chain(
                 self.item_count
@@ -73,30 +75,6 @@ impl<'a> PlaylistSites<'a> {
             prepared.subtree("/issues", layout)?;
         }
         Ok(prepared.finish())
-    }
-
-    fn transitions(&self, prepared: &mut BankOrigins<'_, '_, '_>) -> Result<(), MediaError> {
-        let count = prepared.capture(
-            self.node.after_node().chain(
-                self.rule_count
-                    .as_ref()
-                    .map(|range| field(range, RULE_COUNT, SourceUseRole::Payload)),
-            ),
-        )?;
-        prepared.field("/data/payload/transition_rule_count", count)?;
-        let start = prepared.capture(
-            self.node.after_node().chain(
-                self.rule_count
-                    .as_ref()
-                    .map(|range| field(range, RULE_COUNT, SourceUseRole::Selector)),
-            ),
-        )?;
-        if self.rules_range.is_some() {
-            let end = prepared.capture(self.after_transitions())?;
-            prepared.range("/data/payload/transition_rules_range", &start, &end)
-        } else {
-            prepared.field("/data/payload/transition_rules_range", start)
-        }
     }
 
     pub(super) fn item(
@@ -126,20 +104,7 @@ impl<'a> PlaylistSites<'a> {
     }
 
     fn after_transitions(&self) -> impl Iterator<Item = EvidenceSite<'_>> + Clone {
-        self.node
-            .after_node()
-            .chain(
-                self.rule_count
-                    .as_ref()
-                    .map(|range| field(range, RULE_COUNT, SourceUseRole::Selector)),
-            )
-            .chain(self.rules_range.as_ref().map(|range| {
-                field(
-                    range,
-                    "musicPlaylistTransitionRuleExtent",
-                    SourceUseRole::Selector,
-                )
-            }))
+        self.transitions.following(&self.node)
     }
 
     fn item_list(&self) -> impl Iterator<Item = EvidenceSite<'_>> + Clone {
@@ -256,18 +221,6 @@ const fn interpreted(item: &BankMusicPlaylistItem) -> [ItemWord<'_>; 3] {
             &item.shuffle_code.range,
         ),
     ]
-}
-
-const fn span(range: &Range<u64>) -> [u64; 2] {
-    [range.start, range.end]
-}
-
-const fn field<'a>(
-    range: &'a [u64; 2],
-    name: &'static str,
-    role: SourceUseRole,
-) -> EvidenceSite<'a> {
-    (OriginSite::new("bnkHircField", range, name), role)
 }
 
 const fn route<'a>(indices: &'a [u64], name: &'static str) -> EvidenceSite<'a> {

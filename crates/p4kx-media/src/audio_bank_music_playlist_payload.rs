@@ -2,13 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::DecimalU64;
-use p4kx_extraction::bank::{
-    BankHircField, BankMusicPlaylistFields, BankMusicPlaylistItem, MusicPlayMode,
-};
+use p4kx_extraction::bank::{BankMusicPlaylistFields, BankMusicPlaylistItem, MusicPlayMode};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::audio_bank_music_value::{MusicFloat, MusicNodeValues, MusicStingerRecord, entry_range};
+use crate::audio_bank_music_value::{
+    MusicFloat, MusicNodeChildRecord, MusicNodeValues, MusicStingerRecord, entry_range,
+};
 use crate::audio_bank_payload::BankEntryRange;
 
 #[derive(Serialize, JsonSchema)]
@@ -22,7 +22,7 @@ pub(crate) enum MusicPlaylistPayload {
     #[serde(rename = "bank-music-playlist")]
     Playlist(PlaylistRecord),
     #[serde(rename = "bank-music-playlist-child")]
-    Child(PlaylistChildRecord),
+    Child(MusicNodeChildRecord),
     #[serde(rename = "bank-music-playlist-stinger")]
     Stinger(MusicStingerRecord),
     #[serde(rename = "bank-music-playlist-item")]
@@ -83,24 +83,6 @@ impl PlaylistRecord {
                 .map(|word| word.value),
             transition_rules_range: fields.transitions.rules_range.as_ref().map(entry_range),
             item_count: fields.item_count.as_ref().map(|word| word.value),
-        }
-    }
-}
-
-#[derive(Serialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct PlaylistChildRecord {
-    ordinal: DecimalU64,
-    child_id: u32,
-    id_range: BankEntryRange,
-}
-
-impl PlaylistChildRecord {
-    pub(super) const fn new(ordinal: u64, child: &BankHircField<u32>) -> Self {
-        Self {
-            ordinal: DecimalU64::new(ordinal),
-            child_id: child.value,
-            id_range: entry_range(&child.range),
         }
     }
 }

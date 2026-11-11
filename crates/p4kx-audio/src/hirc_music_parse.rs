@@ -8,11 +8,13 @@ use crate::hirc_music::{
 use crate::hirc_music_node::{self, BankMusicNodeFields, STINGER_LEN};
 use crate::hirc_music_playlist::{self, PLAYLIST_ITEM_LEN};
 use crate::hirc_music_segment::{self, BankMusicSegmentFields, finish};
+use crate::hirc_music_switch::{
+    self, BankMusicSwitchFields, BankMusicSwitchNode, NODE_LEN, SwitchGroups,
+};
+use crate::hirc_music_switch_traversal::Traversal;
 use crate::hirc_music_transition::{self, BankMusicTransitionFields};
-use crate::hirc_node::{self, ID_LEN, skip_items};
+use crate::hirc_node::{self, ID_LEN};
 use crate::{BankError, SectionId};
-
-const TREE_NODE_LEN: usize = 12;
 
 pub(crate) fn segment(fields: &mut SectionReader<'_>) -> Result<MusicSegment, BankError> {
     let node = node(fields)?;
@@ -38,17 +40,19 @@ pub(crate) fn segment(fields: &mut SectionReader<'_>) -> Result<MusicSegment, Ba
 
 pub(crate) fn switch(fields: &mut SectionReader<'_>) -> Result<MusicSwitch, BankError> {
     let (node, rule_count) = transition_node(fields)?;
-    fields.u8()?;
-    let depth = fields.u32()?;
-    let mut group_ids = Vec::with_capacity(capacity(fields, depth, ID_LEN + 1));
-    for _ in 0..depth {
-        group_ids.push(fields.u32()?);
+    let mut observed = BankMusicSwitchFields::default();
+    let mut groups = SwitchGroups::default();
+    let mut group_ids = Vec::new();
+    let tree = hirc_music_switch::header(fields, &mut observed, &mut groups, |id| {
+        group_ids.push(id.value);
+    })?;
+    let size = usize::try_from(tree.byte_len).unwrap_or(usize::MAX);
+    let original = fields.bytes(size)?;
+    let mut traversal = Traversal::new(tree.checked_nodes()?, tree.depth);
+    let mut targets = Vec::new();
+    while let Some(target) = traversal.next_target(|index| slice_node(original, index))? {
+        targets.push(target.id.value);
     }
-    skip_items(fields, depth, 1)?;
-    let size = usize::try_from(fields.u32()?).unwrap_or(usize::MAX);
-    fields.u8()?;
-    let tree = fields.bytes(size)?;
-    let targets = targets(tree, depth)?;
     finish(fields)?;
     Ok(MusicSwitch {
         node,
@@ -58,47 +62,14 @@ pub(crate) fn switch(fields: &mut SectionReader<'_>) -> Result<MusicSwitch, Bank
     })
 }
 
-fn targets(tree: &[u8], depth: u32) -> Result<Vec<u32>, BankError> {
-    let invalid = |reason| BankError::invalid(SectionId::HIRC, reason);
-    if !tree.len().is_multiple_of(TREE_NODE_LEN) {
-        return Err(invalid("a decision tree is no whole number of nodes"));
-    }
-    let nodes = tree.len() / TREE_NODE_LEN;
-    let mut targets = Vec::new();
-    if nodes == 0 {
-        return Ok(targets);
-    }
-    let mut pending = vec![(0_usize, 0_u32)];
-    let mut visited = 0_usize;
-    while let Some((index, level)) = pending.pop() {
-        visited += 1;
-        let node = tree
-            .get(index * TREE_NODE_LEN..)
-            .and_then(<[u8]>::first_chunk::<TREE_NODE_LEN>)
-            .ok_or_else(|| invalid("a decision tree node lies outside the tree"))?;
-        let [_, _, _, _, a, b, c, d, ..] = *node;
-        if level >= depth {
-            let target = u32::from_le_bytes([a, b, c, d]);
-            if target != 0 {
-                targets.push(target);
-            }
-            continue;
-        }
-        let first = usize::from(u16::from_le_bytes([a, b]));
-        let count = usize::from(u16::from_le_bytes([c, d]));
-        if first.checked_add(count).is_none_or(|end| end > nodes) {
-            return Err(invalid(
-                "a decision tree node lists children outside the tree",
-            ));
-        }
-        if pending.len().saturating_add(count) > nodes - visited {
-            return Err(invalid(
-                "a decision tree lists more children than it has nodes left",
-            ));
-        }
-        pending.extend((first..first + count).rev().map(|child| (child, level + 1)));
-    }
-    Ok(targets)
+fn slice_node(tree: &[u8], index: u32) -> Result<BankMusicSwitchNode, BankError> {
+    let invalid = || hirc_music_switch::invalid("a decision tree node lies outside the tree");
+    let offset = usize::try_from(u64::from(index) * u64::from(NODE_LEN)).map_err(|_| invalid())?;
+    let bytes = tree
+        .get(offset..)
+        .and_then(<[u8]>::first_chunk::<{ NODE_LEN as usize }>)
+        .ok_or_else(invalid)?;
+    hirc_music_switch::node(&mut SectionReader::new(SectionId::HIRC, bytes))
 }
 
 pub(crate) fn playlist(fields: &mut SectionReader<'_>) -> Result<MusicPlaylist, BankError> {
