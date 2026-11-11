@@ -8,6 +8,8 @@ use p4kx_extraction::Archive;
 use p4kx_media::{ExportOutcome, Index, MediaRecord};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
+pub(super) mod audio_provider;
+
 pub(super) type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 pub(super) fn archive(root: &Path) -> Result<Archive, Box<dyn std::error::Error>> {

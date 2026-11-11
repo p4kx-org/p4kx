@@ -1,31 +1,27 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::error::Error;
 use std::fs;
 use std::path::Path;
 
 use p4kx_extraction::{Archive, Checksum, Exclusion, Filter, OpenOptions, SourceEncryption, Wem};
 use p4kx_media::{
-    Artifact, ByteScope, ExportOptions, Identity, Index, MediaError, MediaKind, Source, Status,
+    Artifact, ByteScope, ExportOptions, Index, MediaError, MediaKind, Source, Status,
 };
-use p4kx_testkit::{ArchiveBuilder, TestCodec, TestContainer, TestEntry, TestWem, test_key};
+use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry, test_key};
 use serde_json::json;
 use sha2::{Digest as _, Sha256};
 
-use super::support;
+use crate::support;
+use crate::support::audio_provider::{
+    CONTAINER, Origins, Owner, TestResult, check_identity, read_rows, wem_bytes,
+};
 
 #[path = "audio_provider_chunks.rs"]
 mod chunks;
-#[path = "audio_provider_origins.rs"]
-mod origins;
-use self::origins::{Origins, read_rows};
-
-type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const SAME: &str = "Audio/same.WEM";
 const CHILD: &str = "Audio\\child.wem";
-const CONTAINER: &str = "audio.socpak";
 const WEM_HEADER: &str = "audio-wem";
 const FORMAT_BODY: &str = "44";
 const DATA_BODY: &str = "68";
@@ -86,15 +82,6 @@ fn the_unregistered_audio_control_kind_refuses_before_publication() -> TestResul
         "unavailable kinds publish no destination"
     );
     Ok(())
-}
-
-fn wem_bytes() -> Vec<u8> {
-    let stereo_format = [1, 0, 2, 0, 0x80, 0xBB, 0, 0, 0, 0xEE, 2, 0, 4, 0, 16, 0];
-    TestWem::pcm(TestCodec::Pcm, 1, 22_050, &[0, 1, 2, 3])
-        .chunk(*b"fmt ", stereo_format)
-        .tail_chunk(*b"fmt ", [0; 16])
-        .tail_chunk(*b"data", [0; 32])
-        .bytes()
 }
 
 fn check_original_bytes(bytes: &[u8]) -> TestResult {
@@ -201,16 +188,6 @@ fn check_selection(index: &Index) -> TestResult {
     Ok(())
 }
 
-#[derive(Clone, Copy)]
-struct Owner {
-    path: &'static str,
-    entry: usize,
-    parent: Option<usize>,
-    stored: &'static str,
-    metadata: bool,
-    payload: bool,
-}
-
 const OWNERS: [Owner; 3] = [
     Owner {
         path: SAME,
@@ -237,31 +214,6 @@ const OWNERS: [Owner; 3] = [
         payload: true,
     },
 ];
-
-fn check_identity(source: &Source, owner: Owner) -> TestResult {
-    let Identity::Entry { containers, entry } = &source.identity else {
-        return Err("physical WEM Entry".into());
-    };
-    assert_eq!(
-        (entry.path.as_str(), entry.entry_index),
-        (owner.path, owner.entry),
-        "selected leaf identity"
-    );
-    assert_eq!(
-        containers.len(),
-        usize::from(owner.parent.is_some()),
-        "ordered physical ancestor count"
-    );
-    if let Some(expected) = owner.parent {
-        let parent = containers.first().ok_or("WEM containing Entry")?;
-        assert_eq!(
-            (parent.path.as_str(), parent.entry_index),
-            (CONTAINER, expected),
-            "exact unselected containing Entry"
-        );
-    }
-    Ok(())
-}
 
 fn check_raw(base: &Path, index: &Index, bytes: &[u8], origins: &Origins) -> TestResult {
     let sources: Vec<Source> = read_rows(base.join(&index.source_manifest.path))?;

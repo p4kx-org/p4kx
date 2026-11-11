@@ -3,6 +3,9 @@
 
 //! Bounded WEM reads and original input evidence.
 
+#[path = "wwise_path.rs"]
+pub mod wwise_path;
+
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};

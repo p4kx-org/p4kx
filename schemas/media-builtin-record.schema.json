@@ -1781,6 +1781,28 @@
       ],
       "title": "AudioPayload"
     },
+    "AudioSourceLanguage": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/DirectoryLanguage"
+            },
+            "record_type": {
+              "const": "source-language",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "AudioSourceLanguage"
+    },
     "BankDataLink": {
       "oneOf": [
         {
@@ -3402,6 +3424,21 @@
         "algorithm",
         "scope",
         "hex"
+      ],
+      "type": "object"
+    },
+    "DirectoryLanguage": {
+      "additionalProperties": false,
+      "properties": {
+        "language_folder": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "language_folder"
       ],
       "type": "object"
     },
@@ -12496,6 +12533,84 @@
               },
               "status": {
                 "const": "failed"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-source-language"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AudioSourceLanguage"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "source-language"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 0,
+                    "minItems": 0
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
               }
             }
           }

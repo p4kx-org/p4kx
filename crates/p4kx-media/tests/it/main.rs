@@ -17,6 +17,7 @@ mod audio_bank_music_track_provider;
 mod audio_bank_provider;
 mod audio_bank_stid_provider;
 mod audio_provider_sources;
+mod audio_source_language;
 mod audio_wem_annotations_provider;
 mod audio_wem_failure_schema;
 mod budgets;

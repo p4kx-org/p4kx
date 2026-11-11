@@ -74,7 +74,7 @@ impl LooseMedia {
         }
         let mut count = 0_usize;
         for source in wems {
-            let Some(LooseName { id, language }) = loose_name(source.path) else {
+            let Some(LooseName { id, language, .. }) = loose_name(source.path) else {
                 continue;
             };
             let language = language.map_or(Some(NO_LANGUAGE), |name| {

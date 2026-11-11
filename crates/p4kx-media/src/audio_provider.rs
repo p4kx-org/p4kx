@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::sound::wwise_path;
+
 use crate::audio_bank_source;
+use crate::audio_source_language;
 use crate::audio_wem_projection::{self, WemProjection};
+use crate::origin_contract::OriginProfile;
 use crate::required_reader::RequiredReader;
 use crate::{
     Capability, FieldGroup, MediaError, MediaKind, MediaWriter, Projection, Provider, SourceContext,
@@ -32,6 +36,13 @@ impl Provider for AudioProvider {
             return Ok(Projection::Skipped);
         };
         let input = context.origin_input(writer)?;
+        let placement = match kind {
+            AudioSource::Bank => (wwise_path::bank_folder(path), OriginProfile::AudioBank),
+            AudioSource::Wem => (wwise_path::loose_folder(path), OriginProfile::AudioWem),
+        };
+        if let (Some(folder), profile) = placement {
+            audio_source_language::project(&input, folder, profile, writer)?;
+        }
         let reader = RequiredReader::open(
             context.payload,
             context.entry.path(),
@@ -57,6 +68,10 @@ fn field_groups() -> Vec<FieldGroup> {
         .into_iter()
         .chain(bank_field_groups())
         .chain([
+            FieldGroup::new(
+                "source-language",
+                "Physical Wwise language-folder placement from selected BNK and loose WEM directory paths.",
+            ),
             FieldGroup::new(
                 "pcm-wav-conversion",
                 "Requested WAV output from complete PCM WEMs, with source frame ranges and verified artifact mappings.",

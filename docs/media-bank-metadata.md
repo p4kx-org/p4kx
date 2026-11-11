@@ -5,6 +5,14 @@ BNK Entry and streams its original physical directory into `audio.jsonl`. The ph
 identity includes the Archive fingerprint, containing Entry chain and leaf Entry index.
 Short IDs and display paths may repeat. The source's exact verified bytes are in `source.raw`.
 
+A recognized Wwise BNK or loose WEM path emits one `audio-source-language` row at empty
+indices. Its `data.record_type` is `source-language`. `data.payload.language_folder` holds the
+original directory name, or `null` for a recognized neutral placement. An unrecognized path
+omits this row. The archive directory path is the source of the field. The BNK's numeric BKHD
+language ID has its own payload receipt. Embedded WEMs share their owning BNK's physical
+source identity. The folder describes physical placement independently of requested language
+and fallback selection.
+
 | Namespace | `data.record_type` | Original subresource indices |
 | --- | --- | --- |
 | `audio-bank` | `bank` | BKHD section ordinal |

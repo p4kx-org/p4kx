@@ -16,6 +16,7 @@ use crate::audio_bank_stid::{NAME_NAMESPACE, STID_NAMESPACE, STID_TAIL_NAMESPACE
 use crate::audio_bank_stid_payload::BankStidPayload;
 use crate::audio_payload::AudioPayload;
 use crate::audio_schema_status::StatusRule;
+use crate::audio_source_language::{self, AudioSourceLanguage};
 use crate::audio_wem_annotation::FAILURE_NAMESPACE as ANNOTATION_FAILURE;
 use crate::audio_wem_annotation_payload::AnnotationPayload;
 use crate::audio_wem_cue::{CUE_NAMESPACE, POINT_NAMESPACE, TAIL_NAMESPACE};
@@ -29,6 +30,7 @@ mod music;
 #[path = "audio_schema_wem.rs"]
 mod wem;
 
+const SOURCE_LANGUAGE: &str = "AudioSourceLanguage";
 const WEM_PAYLOAD: &str = "AudioPayload";
 const ANNOTATION_PAYLOAD: &str = "AnnotationPayload";
 const BANK_PAYLOAD: &str = "BankPayload";
@@ -149,6 +151,11 @@ fn insert_audio_payloads(base: &mut Value) -> Result<(), MediaError> {
         CONTAINER_PAYLOAD,
         schema_merge::serialized_payload::<ContainerPayload>(),
     )?;
+    schema_merge::insert_payload(
+        base,
+        SOURCE_LANGUAGE,
+        schema_merge::serialized_payload::<AudioSourceLanguage<'static>>(),
+    )?;
     music::insert_payload(base)
 }
 
@@ -165,6 +172,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
     constraints.extend(
         wem::bindings()
             .iter()
+            .chain(std::iter::once(&SOURCE_LANGUAGE_BINDING))
             .chain(bank_bindings().iter())
             .chain(hirc_bindings().iter())
             .chain(music::bindings().iter())
@@ -256,6 +264,14 @@ const fn hirc_bindings() -> [Binding; 4] {
         ),
     ]
 }
+
+const SOURCE_LANGUAGE_BINDING: Binding = Binding::exact(
+    SOURCE_LANGUAGE,
+    audio_source_language::NAMESPACE,
+    audio_source_language::RECORD_TYPE,
+    0,
+    StatusRule::Complete,
+);
 
 const BANK_FAILURE_BINDING: Binding = Binding {
     schema: BANK_PAYLOAD,

@@ -54,6 +54,7 @@ mod audio_provider;
 mod audio_record_origins;
 mod audio_schema;
 mod audio_schema_status;
+mod audio_source_language;
 mod audio_wem_annotation;
 mod audio_wem_annotation_origins;
 mod audio_wem_annotation_payload;

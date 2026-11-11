@@ -4,7 +4,8 @@
 use p4kx_media::{MediaRecord, Status};
 use serde_json::json;
 
-use super::{OWNERS, Origins, TestResult, check_identity};
+use super::OWNERS;
+use crate::support::audio_provider::{Origins, TestResult, check_identity};
 
 const CHUNKS: [([u8; 4], u64, u64, u64); 5] = [
     (*b"fmt ", 12, 20, 36),
