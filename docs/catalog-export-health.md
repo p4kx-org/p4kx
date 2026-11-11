@@ -148,9 +148,9 @@ uses `recovered_archive_directory` or `archive_recovery_limit`; every potentiall
 inventory and stages stay incomplete. Observed counts remain lower bounds, with no fabricated
 Entry-zero/Record failure or estimated lost count. Merely enabling recovery on a healthy directory
 does not change health.
-`fieldInventoryComplete` establishes that owned materialized fields were inspected within the
-canonical depth/value budgets. An absent optional field, explicit empty value or dangling target
-with retained identity is represented distinctly from an unreadable field. The field inspection
+`fieldInventoryComplete` establishes that the inspection visited every owned materialized value.
+An absent optional field, explicit empty value or dangling target with retained identity is
+represented distinctly from an unreadable field. The field inspection
 does not follow References into other owners. A retained row can have a failed field or derived
 operation; it still counts as written while the relevant stage and diagnostics remain incomplete.
 

@@ -46,12 +46,12 @@ ship with a failed loadout keeps its written ship row and zero omitted ship Reco
 secondary operation is counted separately. Row fan-out and intentionally skipped rows have their
 own row units. Archive Entry readers identify their different source mode.
 
-Each successful canonical read has a bounded, cancellable field inspection before optional typed
-helpers. It walks owned structs and arrays only, never follows Reference graphs, and applies the
-canonical depth and value limits. Immutable inspection proofs can be reused for another explicit
-role or kind by physical source index, without another decode or field walk. A retained row with
-a failed field remains projected and written while health explains the field failure and refuses
-normal publication. Inspection limits are explicit incomplete evidence, not successful absence.
+Each successful canonical read has a cancellable field inspection before optional typed helpers.
+It visits every owned struct and array value and retains References at their owning sites.
+Immutable inspection proofs can be reused for another explicit role or kind by physical source
+index. A retained row with a failed field remains projected and written while health explains
+the field failure and refuses normal publication. Canonical read and inspection failures remain
+explicit in the operation outcome or its health report.
 
 Diagnostics distinguish optional absence, explicit empty values, dangling References, outside-owner
 weak pointers, unsupported values, malformed values and actual read failures. Represented dangling

@@ -7,9 +7,9 @@ retains its field path and actual physical target Record index/GUID, including r
 
 The Record/tree pairing, original parent/container ordinals, exact non-finite payloads, first
 walk failure and sticky cancellation remain authoritative. A failure returns an error rather than
-a successful partial inspection. Errors already present in the canonical tree are still visited;
-canonical depth/value-limit errors retain their incomplete-inventory diagnostic. Removing the
-Inspector's cuts does not remove the upstream DataForge reader's resource policies.
+a successful partial inspection. The walk visits errors retained in the canonical tree.
+Upstream source validation, allocation errors and caller-selected budgets follow the
+[canonical materialization contract](0368-dataforge-materialization-budgets.md).
 
 One inspection shares exact immutable source-type, target-type and target-path spellings. String
 equality selects storage only: it grants no original source, field, Record or target authority.
