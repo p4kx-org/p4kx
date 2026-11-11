@@ -6,9 +6,11 @@ use std::io::{Read, Seek};
 use crate::BankReadError;
 use crate::bank_node_fx_slots::BankNodeFxSlots;
 use crate::bank_node_property_rows::BankNodePropertyRows;
+use crate::bank_positioning_rows::BankPositioningRows;
 use crate::bank_source_sound::BankHircSound;
 use crate::hirc_node_aux::{self, BankNodeUserAuxBuses};
 use crate::hirc_node_fx::BankNodeFxKind;
+use crate::hirc_node_positioning::BankPositioningTableKind;
 use crate::hirc_node_property::BankNodePropertyKind;
 use crate::hirc_source::BankSoundNodeBase;
 use crate::read_at::SeekSource;
@@ -57,6 +59,15 @@ impl<'input, R> BankHircSoundNode<'input, R> {
             Some(base) => hirc_node_aux::user_buses(self.input, &base.aux),
             None => Ok(None),
         }
+    }
+
+    /// Borrows checked rows in the selected positioning table.
+    pub fn positioning_rows(
+        &mut self,
+        kind: BankPositioningTableKind,
+    ) -> Option<BankPositioningRows<'_, R>> {
+        let range = base(&self.sound)?.playback.positioning.table(kind)?.clone();
+        Some(BankPositioningRows::new(self.input, kind, range))
     }
 
     /// Borrows the original property list when its count was read.

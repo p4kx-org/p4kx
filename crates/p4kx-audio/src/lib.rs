@@ -14,6 +14,7 @@ mod bank_node_fx_slots;
 mod bank_node_property_rows;
 mod bank_object_fields;
 mod bank_parse;
+mod bank_positioning_rows;
 mod bank_reader;
 mod bank_rtpc_rows;
 mod bank_source;
@@ -50,6 +51,8 @@ mod hirc_music_transition;
 mod hirc_node;
 mod hirc_node_aux;
 mod hirc_node_fx;
+mod hirc_node_playback;
+mod hirc_node_positioning;
 mod hirc_node_property;
 mod hirc_node_state;
 mod hirc_plugin;
@@ -84,6 +87,9 @@ pub use bank_node_property_rows::{
     BankNodePropertyRow, BankNodePropertyRows, BankNodePropertyValue,
 };
 pub use bank_object_fields::BankHircField;
+pub use bank_positioning_rows::{
+    BankPositioningRow, BankPositioningRowFields, BankPositioningRows, BankPositioningVector,
+};
 pub use bank_rtpc_rows::{BankRtpcRow, BankRtpcRows};
 pub use bank_source::{
     BankObservedHeader, BankReadError, BankSectionCursor, BankSource, BankSourceSection,
@@ -141,6 +147,10 @@ pub use hirc_music_transition::BankMusicTransitionFields;
 pub use hirc_node::{BankNodeParentFields, Container, ContainerKind};
 pub use hirc_node_aux::{BankNodeAuxFields, BankNodeUserAuxBuses};
 pub use hirc_node_fx::{BankNodeFxFields, BankNodeFxKind, BankNodeFxList};
+pub use hirc_node_playback::{BankNodeAdvancedFields, BankNodePlaybackFields};
+pub use hirc_node_positioning::{
+    BankNodePositioningFields, BankPositioningModes, BankPositioningTableKind,
+};
 pub use hirc_node_property::{
     BankNodePropertyExtent, BankNodePropertyExtents, BankNodePropertyKind,
 };

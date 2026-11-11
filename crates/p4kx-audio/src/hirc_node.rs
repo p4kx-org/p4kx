@@ -7,6 +7,8 @@ use crate::bank_object_fields::{self, BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
 use crate::hirc_node_aux::{self, BankNodeAuxFields};
 use crate::hirc_node_fx::{self, BankNodeFxFields, BankNodeFxKind, BankNodeFxList};
+use crate::hirc_node_playback::{self, BankNodePlaybackFields};
+use crate::hirc_node_positioning;
 use crate::hirc_node_property::{self, BankNodePropertyExtents};
 use crate::hirc_node_state;
 use crate::hirc_rtpc::{self, BankRtpcExtent};
@@ -17,15 +19,6 @@ use crate::{BankError, SectionId};
 pub(crate) const ID_LEN: usize = 4;
 pub(crate) const PROP_LEN: usize = 5;
 pub(crate) const RANGED_PROP_LEN: usize = 9;
-const VERTEX_LEN: usize = 16;
-const PATH_ITEM_LEN: usize = 8;
-const AUTOMATION_LEN: usize = 12;
-const ADVANCED_SETTINGS_LEN: usize = 6;
-const PATH_HEADER_LEN: usize = 1 + 4;
-const HAS_POSITIONING: u8 = 0b0000_0001;
-const HAS_3D: u8 = 0b0000_0010;
-const POSITION_TYPE_SHIFT: u8 = 5;
-const POSITION_TYPE_MASK: u8 = 0b11;
 
 /// The kind of a container object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -103,6 +96,7 @@ pub(crate) fn read_base<F: ObjectFields>(
         observed,
         &mut BankNodePropertyExtents::default(),
         &mut BankNodeAuxFields::default(),
+        &mut BankNodePlaybackFields::default(),
         &mut None,
         &mut None,
     )
@@ -113,15 +107,16 @@ pub(crate) fn read_base_observed<F: ObjectFields>(
     observed: &mut BankNodeParentFields,
     properties: &mut BankNodePropertyExtents,
     aux: &mut BankNodeAuxFields,
+    playback: &mut BankNodePlaybackFields,
     state: &mut Option<Range<u64>>,
     rtpc: &mut Option<BankRtpcExtent>,
 ) -> Result<u32, F::Error> {
     let parent = read_parent(fields, observed)?;
     fields.read_array::<1>()?;
     hirc_node_property::scan(fields, properties)?;
-    skip_positioning(fields)?;
+    hirc_node_positioning::scan(fields, &mut playback.positioning)?;
     hirc_node_aux::scan(fields, aux)?;
-    fields.skip_bytes(ADVANCED_SETTINGS_LEN as u64)?;
+    hirc_node_playback::advanced(fields, &mut playback.advanced)?;
     *state = Some(hirc_node_state::skip(fields)?);
     hirc_rtpc::scan(fields, rtpc)?;
     Ok(parent)
@@ -148,23 +143,6 @@ fn read_parent<F: ObjectFields>(
     let id = parent.value;
     observed.parent_id = Some(parent);
     Ok(id)
-}
-
-fn skip_positioning<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
-    let bits = fields.read_u8()?.value;
-    if bits & HAS_POSITIONING == 0 || bits & HAS_3D == 0 {
-        return Ok(());
-    }
-    fields.read_array::<1>()?;
-    if (bits >> POSITION_TYPE_SHIFT) & POSITION_TYPE_MASK == 0 {
-        return Ok(());
-    }
-    fields.skip_bytes(PATH_HEADER_LEN as u64)?;
-    let vertices = fields.read_u32()?.value;
-    skip_items(fields, vertices, VERTEX_LEN)?;
-    let items = fields.read_u32()?.value;
-    skip_items(fields, items, PATH_ITEM_LEN)?;
-    skip_items(fields, items, AUTOMATION_LEN)
 }
 
 pub(crate) fn skip_rtpcs<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {

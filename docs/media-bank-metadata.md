@@ -57,6 +57,9 @@ and fallback selection.
 | `audio-bank-hirc-node-fx` | `bank-hirc-node-fx` | HIRC section, owning Sound or ActorMixer object and effect list ordinals |
 | `audio-bank-hirc-node-fx-slot` | `bank-hirc-node-fx-slot` | HIRC section, owning object, effect list and physical slot ordinals |
 | `audio-bank-hirc-node-aux` | `bank-hirc-node-aux` | HIRC section and Sound or ActorMixer object ordinals |
+| `audio-bank-hirc-node-positioning` | `bank-hirc-node-positioning` | HIRC section and Sound or ActorMixer object ordinals |
+| `audio-bank-hirc-node-positioning-path` | `bank-hirc-node-positioning-path` | HIRC section, owning object, physical positioning table and row ordinals |
+| `audio-bank-hirc-node-advanced-settings` | `bank-hirc-node-advanced-settings` | HIRC section and Sound or ActorMixer object ordinals |
 | `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
 | `audio-bank-music-segment` | `bank-music-segment` | HIRC section and segment object ordinals |
@@ -254,6 +257,22 @@ The summaries distinguish an absent optional Sound node, an unsupported bank
 version, a region unavailable because an earlier read failed and a malformed
 region with a checked prefix. Complete earlier declarations remain available when
 a later region, State, RTPC or child list is malformed.
+
+Version-154 Sound and ActorMixer positioning summaries include the original
+positioning flags, panner and 3D position codes, the parent override and any
+separate 3D flags. A selected automation block records its original path mode,
+signed transition time, vertex and playlist counts, and checked table ranges.
+Path table indices 0, 1 and 2 identify vertices, playlist items and automation
+ranges. Rows preserve physical order, signed durations, original playlist
+offsets and counts, and coordinate binary32 words. Finite coordinates also
+carry their numeric value. A short table retains independently readable words
+and reports a partial row when its first word fits.
+
+Advanced settings summaries record the two original flag bytes, virtual queue
+and below-threshold behavior codes, and the original instance limit. Each
+checked value has its own owning-bank receipt. The summaries distinguish a
+missing optional Sound node, an unsupported version, a region unavailable
+because an earlier read failed and a reached region with truncated fields.
 
 Property row index 2 selects list 0 for scalar properties and list 1 for ranged modifiers.
 Index 3 is the property's original position within that list. Each ID retains an individual

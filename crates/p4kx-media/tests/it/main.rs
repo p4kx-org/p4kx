@@ -19,6 +19,7 @@ mod audio_bank_music_segment_provider;
 mod audio_bank_music_switch_provider;
 mod audio_bank_music_track_provider;
 mod audio_bank_node_fx_provider;
+mod audio_bank_node_positioning_provider;
 mod audio_bank_node_properties_fixture;
 mod audio_bank_node_properties_provider;
 mod audio_bank_provider;

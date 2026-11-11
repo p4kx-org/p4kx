@@ -7,16 +7,20 @@ use std::ops::Range;
 use p4kx_extraction::BankError;
 use p4kx_extraction::bank::{
     BankContainerRead, BankHircActorMixer, BankHircObject, BankHircSoundNode, BankNodeAuxFields,
-    BankNodeFxKind, BankNodeFxSlots, BankNodeParentFields, BankNodeUserAuxBuses,
-    BankSoundContinuation, BankSoundRead,
+    BankNodeFxKind, BankNodeFxSlots, BankNodeParentFields, BankNodePlaybackFields,
+    BankNodeUserAuxBuses, BankPositioningRows, BankPositioningTableKind, BankSoundContinuation,
+    BankSoundRead,
 };
 
 use crate::audio_bank_inventory::VersionSite;
+use crate::audio_bank_node_advanced;
 use crate::audio_bank_node_aux;
 use crate::audio_bank_node_declaration_payload::NodeDeclaration;
 use crate::audio_bank_node_fx;
 use crate::audio_bank_node_origins::{NodeKind, NodeSites};
+use crate::audio_bank_node_positioning;
 use crate::audio_bank_origins::BankOrigins;
+use crate::audio_bank_positioning_rows;
 use crate::audio_bank_projection::BankProjection;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status};
 
@@ -36,6 +40,7 @@ pub(crate) struct Declarations<'context, 'source> {
 struct Source<'fields> {
     fields: Option<&'fields BankNodeParentFields>,
     aux: Option<&'fields BankNodeAuxFields>,
+    playback: Option<&'fields BankNodePlaybackFields>,
     disposition: Disposition<'fields>,
 }
 
@@ -88,6 +93,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
                 Ok(Source {
                     fields: Some(&fields.node),
                     aux: Some(&fields.aux),
+                    playback: Some(&fields.playback),
                     disposition,
                 })
             }
@@ -103,6 +109,16 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
             Self::ActorMixer(node) => node.user_aux_buses(),
         }
         .map_err(|cause| bank.replay_failure(cause))
+    }
+
+    fn positioning_rows(
+        &mut self,
+        kind: BankPositioningTableKind,
+    ) -> Option<BankPositioningRows<'_, R>> {
+        match self {
+            Self::Sound(node) => node.positioning_rows(kind),
+            Self::ActorMixer(node) => node.positioning_rows(kind),
+        }
     }
 
     fn slots(&mut self, kind: BankNodeFxKind) -> Option<BankNodeFxSlots<'_, R>> {
@@ -140,6 +156,7 @@ fn sound_source<'node, R>(
     Ok(Source {
         fields: base.map(|base| &base.fields),
         aux: base.map(|base| &base.aux),
+        playback: base.map(|base| &base.playback),
         disposition,
     })
 }
@@ -173,12 +190,38 @@ pub(crate) fn emit<R: Read + Seek>(
         buses.as_ref(),
         writer,
     )?;
+    playback_summaries(&declarations, source.disposition, source.playback, writer)?;
     for kind in LISTS {
         if let Some(slots) = owner.slots(kind) {
             audio_bank_node_fx::slots(&declarations, kind, slots, writer)?;
         }
     }
+    for kind in audio_bank_node_positioning::TABLES {
+        if let Some(rows) = owner.positioning_rows(kind) {
+            audio_bank_positioning_rows::emit(&declarations, kind, rows, writer)?;
+        }
+    }
     Ok(())
+}
+
+fn playback_summaries(
+    declarations: &Declarations<'_, '_>,
+    disposition: Disposition<'_>,
+    playback: Option<&BankNodePlaybackFields>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    audio_bank_node_positioning::summary(
+        declarations,
+        disposition,
+        playback.map(|fields| &fields.positioning),
+        writer,
+    )?;
+    audio_bank_node_advanced::summary(
+        declarations,
+        disposition,
+        playback.map(|fields| &fields.advanced),
+        writer,
+    )
 }
 
 pub(crate) fn unsupported(
@@ -195,7 +238,8 @@ pub(crate) fn unsupported(
     for kind in LISTS {
         audio_bank_node_fx::summary(&declarations, kind, Disposition::Unsupported, None, writer)?;
     }
-    audio_bank_node_aux::summary(&declarations, Disposition::Unsupported, None, None, writer)
+    audio_bank_node_aux::summary(&declarations, Disposition::Unsupported, None, None, writer)?;
+    playback_summaries(&declarations, Disposition::Unsupported, None, writer)
 }
 
 impl Declarations<'_, '_> {

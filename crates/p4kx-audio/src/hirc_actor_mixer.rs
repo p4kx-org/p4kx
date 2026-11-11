@@ -7,6 +7,7 @@ use crate::bank_object_fields::{BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
 use crate::hirc_node::{self, BankNodeParentFields, ID_LEN};
 use crate::hirc_node_aux::BankNodeAuxFields;
+use crate::hirc_node_playback::BankNodePlaybackFields;
 use crate::hirc_node_property::BankNodePropertyExtents;
 use crate::hirc_rtpc::BankRtpcExtent;
 use crate::{BankError, SectionId};
@@ -39,6 +40,8 @@ pub struct BankActorMixerFields {
     pub properties: BankNodePropertyExtents,
     /// Original auxiliary routing fields.
     pub aux: BankNodeAuxFields,
+    /// Original positioning and advanced playback settings.
+    pub playback: BankNodePlaybackFields,
     /// Traversed node prefix, including checked opaque bytes.
     pub node_range: Option<Range<u64>>,
     /// Complete checked extent of the inline State chunk, when available.
@@ -71,6 +74,7 @@ pub(crate) fn head<F: ObjectFields>(
         &mut observed.node,
         &mut observed.properties,
         &mut observed.aux,
+        &mut observed.playback,
         &mut observed.state_chunk,
         &mut observed.rtpc_chunk,
     );

@@ -49,6 +49,11 @@ pub use p4kx_audio::{
     BankHircSoundStates, BankInlineStateRow, BankInlineStateRows, BankSoundStateRead,
     BankStateBinding, BankStateGroup,
 };
+pub use p4kx_audio::{
+    BankNodeAdvancedFields, BankNodePlaybackFields, BankNodePositioningFields,
+    BankPositioningModes, BankPositioningRow, BankPositioningRowFields, BankPositioningRows,
+    BankPositioningTableKind, BankPositioningVector,
+};
 use rayon::prelude::*;
 
 use crate::entry_content::find_entry;

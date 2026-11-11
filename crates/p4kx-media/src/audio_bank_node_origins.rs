@@ -23,6 +23,8 @@ pub(crate) enum NodeKind {
     Properties,
     Fx,
     Aux,
+    Positioning,
+    AdvancedSettings,
 }
 
 impl NodeKind {
@@ -34,6 +36,8 @@ impl NodeKind {
             Self::Properties => "bnkHircNodeProperties",
             Self::Fx => "bnkHircNodeFx",
             Self::Aux => "bnkHircNodeAux",
+            Self::Positioning => "bnkHircNodePositioning",
+            Self::AdvancedSettings => "bnkHircNodeAdvancedSettings",
         }
     }
 
@@ -45,6 +49,8 @@ impl NodeKind {
             Self::Properties => "nodePropertyRowPosition",
             Self::Fx => "nodeFxSlotPosition",
             Self::Aux => "nodeAuxRowPosition",
+            Self::Positioning => "nodePositioningRowPosition",
+            Self::AdvancedSettings => "nodeAdvancedRowPosition",
         }
     }
 
@@ -56,6 +62,8 @@ impl NodeKind {
             Self::Properties => "nodePropertyExtent",
             Self::Fx => "nodeFxExtent",
             Self::Aux => "nodeAuxExtent",
+            Self::Positioning => "nodePositioningExtent",
+            Self::AdvancedSettings => "nodeAdvancedExtent",
         }
     }
 }
