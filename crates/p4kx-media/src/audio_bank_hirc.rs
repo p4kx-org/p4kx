@@ -86,6 +86,7 @@ fn emit_semantic<R: Read + Seek>(
             &action.object,
             version,
             action.status,
+            &inventory.hirc_objects,
             writer,
         ),
         (BankHircSemantic::Container(container), Some(version)) => {

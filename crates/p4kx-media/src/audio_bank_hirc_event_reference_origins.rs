@@ -4,8 +4,8 @@
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::bank::{BankEventAction, BankHircObject};
 
-use crate::audio_bank_hirc_origins::ObjectSites;
-use crate::audio_bank_origins::{BankOrigins, EvidenceSite, complete_directory, section_routing};
+use crate::audio_bank_hirc_origins::{ObjectSites, inventory_sites};
+use crate::audio_bank_origins::{BankOrigins, EvidenceSite};
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
@@ -26,14 +26,13 @@ pub(super) fn resolution(
     let action_indices = sites.action_indices(action.ordinal);
     let authored = action_evidence(&prepared, sites, &action_range, &action_indices)?;
     prepared.indices(authored)?;
-    let observed = prepared.capture(sites.base().into_iter().chain([
-        action_word(&action_range),
-        complete_directory("hircSections"),
-        (
-            OriginSite::new("bnkHircInventory", &[], "observedObjectEnvelopes"),
-            SourceUseRole::Selector,
-        ),
-    ]))?;
+    let observed = prepared.capture(
+        sites
+            .base()
+            .into_iter()
+            .chain([action_word(&action_range)])
+            .chain(inventory_sites()),
+    )?;
     for field in [
         "/data/payload/observed_candidates",
         "/data/payload/matching_candidates",
@@ -64,31 +63,19 @@ pub(super) fn candidate(
     let action_range = [action.action_id.range.start, action.action_id.range.end];
     let action_indices = sites.action_indices(action.ordinal);
     let target_sites = ObjectSites::new(target);
-    let target_indices = target_sites.indices();
-    let target_section = [target_indices[0]];
-    let body = [target.body_offset()];
-    let evidence = prepared.capture(sites.base().into_iter().chain([
-        action_word(&action_range),
-        target_sites.route(),
-        (
-            OriginSite::new("bnkHircObject", &body, "objectId"),
-            SourceUseRole::Selector,
-        ),
-        (
-            OriginSite::new("bnkHircObject", &body, "typeCode"),
-            SourceUseRole::Payload,
-        ),
-    ]))?;
+    let evidence = prepared.capture(
+        sites
+            .base()
+            .into_iter()
+            .chain([action_word(&action_range)])
+            .chain(target_sites.target_sites()),
+    )?;
     prepared.indices(evidence.clone())?;
     let authored = action_evidence(&prepared, sites, &action_range, &action_indices)?;
     for ordinal in 0..action_indices.len() {
         prepared.field(&format!("/subresource/indices/{ordinal}"), authored.clone())?;
     }
-    let section = prepared.capture([section_routing(&target_section)])?;
-    let position = prepared.capture([target_sites.route()])?;
-    prepared.field("/data/payload/target_section_ordinal", section)?;
-    prepared.field("/data/payload/target_object_ordinal", position)?;
-    prepared.field("/data/payload/target_type_code", evidence.clone())?;
+    target_sites.target_fields(&mut prepared, &evidence)?;
     prepared.field("/data/payload/action_candidate", evidence)?;
     Ok(prepared.finish())
 }

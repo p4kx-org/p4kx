@@ -118,6 +118,16 @@ pub(crate) fn summary(
     Ok(prepared.finish())
 }
 
+pub(crate) const fn inventory_sites() -> [EvidenceSite<'static>; 2] {
+    [
+        complete_directory("hircSections"),
+        (
+            OriginSite::new("bnkHircInventory", &[], "observedObjectEnvelopes"),
+            SourceUseRole::Selector,
+        ),
+    ]
+}
+
 pub(crate) struct ObjectSites {
     section: [u64; 1],
     object: [u64; 2],
@@ -142,6 +152,32 @@ impl ObjectSites {
             OriginSite::new("bnkHircPrefix", &self.object, "objectRouting"),
             SourceUseRole::Selector,
         )
+    }
+
+    pub(crate) const fn target_sites(&self) -> [EvidenceSite<'_>; 3] {
+        [
+            self.route(),
+            (
+                OriginSite::new("bnkHircObject", &self.body, "objectId"),
+                SourceUseRole::Selector,
+            ),
+            (
+                OriginSite::new("bnkHircObject", &self.body, "typeCode"),
+                SourceUseRole::Payload,
+            ),
+        ]
+    }
+
+    pub(crate) fn target_fields(
+        &self,
+        prepared: &mut BankOrigins<'_, '_, '_>,
+        evidence: &OriginContributions,
+    ) -> Result<(), MediaError> {
+        let section = prepared.capture([section_routing(&self.section)])?;
+        let position = prepared.capture([self.route()])?;
+        prepared.field("/data/payload/target_section_ordinal", section)?;
+        prepared.field("/data/payload/target_object_ordinal", position)?;
+        prepared.field("/data/payload/target_type_code", evidence.clone())
     }
 
     pub(crate) const fn extent(&self, role: SourceUseRole) -> EvidenceSite<'_> {

@@ -20,6 +20,8 @@ and fallback selection.
 | `audio-bank-media` | `bank-media` | DIDX section and triplet ordinals |
 | `audio-bank-object` | `bank-object` | HIRC section and object ordinals |
 | `audio-bank-hirc-action` | `bank-hirc-action` | HIRC section and object ordinals |
+| `audio-bank-hirc-action-target-resolution` | `bank-hirc-action-target-resolution` | Local Play or PlayEvent target inventory and foreign lookup availability |
+| `audio-bank-hirc-action-target-candidate` | `bank-hirc-action-target-candidate` | One same-ID local HIRC object with its physical type and match flag |
 | `audio-bank-hirc-event` | `bank-hirc-event` | HIRC section and Event object ordinals |
 | `audio-bank-hirc-event-action` | `bank-hirc-event-action` | HIRC section, Event object and action ordinals |
 | `audio-bank-hirc-event-action-resolution` | `bank-hirc-event-action-resolution` | Same HIRC section, Event object and action ordinals |
@@ -91,6 +93,22 @@ value, with receipts for the decision that applied. Each word has its own origin
 byte range. Both skipped-property counts are selectors for the PlayBank fields.
 An unsupported Action layout retains the original body and reports its layout explicitly.
 A malformed Action contributes the fields read before the failure to diagnostic output.
+
+Decoded Play and PlayEvent actions emit a target resolution with the original target ID.
+Its `local` object classifies the current bank's physical HIRC candidates and reports their
+observed and matching counts. Play admits any same-ID local object. PlayEvent requires an
+Event and still lists same-ID objects of other kinds with `matches_target_kind: false`.
+Candidate rows keep every occurrence in physical HIRC order. Each points to its original
+`audio-bank-object` by section and object ordinal. An incomplete local HIRC inventory reports
+`unavailable` and retains every observed candidate.
+
+The `foreign` status is `local-only` for Play without a nonzero bank ID. A matching local
+object takes precedence over a named bank or a remote Event search and produces `local-match`.
+A foreign selector with no observed local match produces `unavailable`. The reason is
+`target-not-read` after a complete local scan or `incomplete-local-inventory` when the local
+scan cannot establish absence. The selector retains the authored bank ID or Event route.
+The candidate rows record physical possibilities. Playback applies its own bank and language
+selection.
 
 Event rows preserve the original action count and its byte range. Versions through 122 use a
 little-endian unsigned 32-bit count. Versions 123 through 154 use a Wwise variable-length count.

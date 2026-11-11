@@ -18,6 +18,40 @@
             "payload"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ActionTargetResolution"
+            },
+            "record_type": {
+              "const": "bank-hirc-action-target-resolution",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ActionTargetCandidate"
+            },
+            "record_type": {
+              "const": "bank-hirc-action-target-candidate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
         }
       ],
       "title": "ActionPayload"
@@ -130,6 +164,55 @@
           "type": "object"
         }
       ]
+    },
+    "ActionTargetCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "matches_target_kind": {
+          "type": "boolean"
+        },
+        "target_object_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_section_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_type_code": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "target_section_ordinal",
+        "target_object_ordinal",
+        "target_type_code",
+        "matches_target_kind"
+      ],
+      "type": "object"
+    },
+    "ActionTargetResolution": {
+      "additionalProperties": false,
+      "properties": {
+        "foreign": {
+          "$ref": "#/$defs/ForeignLookup"
+        },
+        "local": {
+          "$ref": "#/$defs/LocalTargetInventory"
+        },
+        "target_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "target_id",
+        "local",
+        "foreign"
+      ],
+      "type": "object"
     },
     "Algorithm": {
       "description": "Integrity algorithm, without conflating CRC checks with cryptographic hashes.",
@@ -4000,6 +4083,104 @@
       ],
       "type": "object"
     },
+    "ForeignLookup": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "local-only",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "local-match",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/ForeignTarget"
+            }
+          },
+          "required": [
+            "status",
+            "target"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/ForeignUnavailable"
+            },
+            "status": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/ForeignTarget"
+            }
+          },
+          "required": [
+            "status",
+            "target",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ForeignTarget": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "bank_id": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "bank",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "bank_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "event",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ForeignUnavailable": {
+      "enum": [
+        "target-not-read",
+        "incomplete-local-inventory"
+      ],
+      "type": "string"
+    },
     "HircContainerChildRecord": {
       "additionalProperties": false,
       "properties": {
@@ -4513,6 +4694,30 @@
         "body_range",
         "padding_range",
         "content"
+      ],
+      "type": "object"
+    },
+    "LocalTargetInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates_complete": {
+          "type": "boolean"
+        },
+        "matching_candidates": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "observed_candidates": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "resolution": {
+          "$ref": "#/$defs/Resolution"
+        }
+      },
+      "required": [
+        "resolution",
+        "observed_candidates",
+        "matching_candidates",
+        "candidates_complete"
       ],
       "type": "object"
     },
@@ -14350,6 +14555,162 @@
                 "status": {
                   "const": "partial"
                 }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-action-target-resolution"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ActionPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-action-target-resolution"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-action-target-candidate"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ActionPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-action-target-candidate"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
               }
             }
           }

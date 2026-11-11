@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::audio_bank_hirc_action;
+use crate::audio_bank_hirc_action::reference as action_target;
 use crate::audio_bank_hirc_container;
 use crate::audio_bank_hirc_sound;
 use crate::audio_bank_hirc_sound::loose as sound_loose;
@@ -10,15 +11,35 @@ use crate::audio_schema_status::StatusRule;
 
 use super::{ACTION_PAYLOAD, Binding, CONTAINER_PAYLOAD, SOUND_PAYLOAD};
 
-pub(super) const fn bindings() -> [Binding; 8] {
+const ACTION: Binding = Binding::exact(
+    ACTION_PAYLOAD,
+    audio_bank_hirc_action::NAMESPACE,
+    "bank-hirc-action",
+    2,
+    StatusRule::MalformedLayout,
+);
+
+const ACTION_TARGET_RESOLUTION: Binding = Binding::exact(
+    ACTION_PAYLOAD,
+    action_target::RESOLUTION_NAMESPACE,
+    "bank-hirc-action-target-resolution",
+    2,
+    StatusRule::Complete,
+);
+
+const ACTION_TARGET_CANDIDATE: Binding = Binding::exact(
+    ACTION_PAYLOAD,
+    action_target::CANDIDATE_NAMESPACE,
+    "bank-hirc-action-target-candidate",
+    3,
+    StatusRule::Complete,
+);
+
+pub(super) const fn bindings() -> [Binding; 10] {
     [
-        Binding::exact(
-            ACTION_PAYLOAD,
-            audio_bank_hirc_action::NAMESPACE,
-            "bank-hirc-action",
-            2,
-            StatusRule::MalformedLayout,
-        ),
+        ACTION,
+        ACTION_TARGET_RESOLUTION,
+        ACTION_TARGET_CANDIDATE,
         Binding::exact(
             SOUND_PAYLOAD,
             audio_bank_hirc_sound::NAMESPACE,

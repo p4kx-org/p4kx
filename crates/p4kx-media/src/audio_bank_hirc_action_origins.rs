@@ -13,10 +13,11 @@ use crate::origin_input::MediaOriginInput;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::{MediaError, MediaWriter};
 
-struct Sites {
+pub(super) struct Sites {
     ordinal: [u64; 2],
     body: [u64; 1],
     bkhd: [u64; 1],
+    version: u32,
     action_type: Option<[u64; 2]>,
     target: Option<[u64; 2]>,
     select_type: bool,
@@ -33,17 +34,14 @@ struct PlaySites {
 
 pub(super) fn prepare(
     input: &MediaOriginInput,
-    object: &BankHircObject,
-    version: VersionSite,
-    fields: Option<&BankActionFields>,
+    sites: &Sites,
     has_issue: bool,
     writer: &MediaWriter<'_>,
 ) -> Result<PreparedRecordOrigins, MediaError> {
-    let sites = Sites::new(object, version, fields);
     let mut prepared = BankOrigins::new(input, writer)?;
     let routing = prepared.capture([sites.route()])?;
     prepared.indices(routing)?;
-    let section = prepared.capture([section_routing(&[object.section_ordinal()])])?;
+    let section = prepared.capture([section_routing(&[sites.ordinal[0]])])?;
     prepared.field("/subresource/indices/0", section)?;
     sites.scalar_fields(&mut prepared)?;
     sites.play_bank(&mut prepared)?;
@@ -64,7 +62,7 @@ pub(super) fn prepare(
 }
 
 impl Sites {
-    fn new(
+    pub(super) fn new(
         object: &BankHircObject,
         version: VersionSite,
         fields: Option<&BankActionFields>,
@@ -83,6 +81,7 @@ impl Sites {
             ordinal: [object.section_ordinal(), object.ordinal()],
             body: [object.body_offset()],
             bkhd: [version.body_offset],
+            version: version.version,
             action_type: fields
                 .and_then(|fields| fields.action_type.as_ref())
                 .map(field_range),
@@ -98,14 +97,48 @@ impl Sites {
         }
     }
 
-    const fn route(&self) -> EvidenceSite<'_> {
+    pub(super) const fn indices(&self) -> [u64; 2] {
+        self.ordinal
+    }
+
+    pub(super) const fn version(&self) -> u32 {
+        self.version
+    }
+
+    pub(super) fn target_site(&self) -> Result<EvidenceSite<'_>, MediaError> {
+        self.target
+            .as_ref()
+            .map(|range| action_site(range, "targetId", SourceUseRole::Selector))
+            .ok_or_else(|| {
+                MediaError::Contract("decoded Action lacks its original target ID".into())
+            })
+    }
+
+    pub(super) fn action_selector(&self) -> Result<EvidenceSite<'_>, MediaError> {
+        self.action_type
+            .as_ref()
+            .map(|range| action_site(range, "actionType", SourceUseRole::Selector))
+            .ok_or_else(|| MediaError::Contract("decoded Action lacks its original type".into()))
+    }
+
+    pub(super) fn bank_selectors(&self) -> impl Iterator<Item = EvidenceSite<'_>> {
+        self.play.iter().flat_map(|play| {
+            let id = play
+                .bank_id
+                .as_ref()
+                .map(|range| action_site(range, "bankId", SourceUseRole::Selector));
+            play.counts().into_iter().flatten().chain(id)
+        })
+    }
+
+    pub(super) const fn route(&self) -> EvidenceSite<'_> {
         (
             OriginSite::new("bnkHircPrefix", &self.ordinal, "objectRouting"),
             SourceUseRole::Selector,
         )
     }
 
-    const fn base(&self) -> [EvidenceSite<'_>; 4] {
+    pub(super) const fn base(&self) -> [EvidenceSite<'_>; 4] {
         [
             self.route(),
             complete_directory("bankVersionSelection"),

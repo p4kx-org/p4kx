@@ -161,7 +161,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-action-fields",
-            "HIRC Action type and target, version-gated PlayBank ID and type, and exact original field receipts.",
+            "HIRC Action type and target, original PlayBank words, local Play and PlayEvent candidates, and foreign lookup availability.",
         ),
         FieldGroup::new(
             "bank-event-fields",

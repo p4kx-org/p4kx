@@ -10,10 +10,15 @@ use serde::Serialize;
 
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_projection::BankProjection;
+use crate::hirc_object_index::HircObjectIndex;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
 #[path = "audio_bank_hirc_action_origins.rs"]
 mod origins;
+#[path = "audio_bank_hirc_action_reference.rs"]
+pub(crate) mod reference;
+
+use self::reference::{ActionTargetCandidate, ActionTargetResolution};
 
 pub(crate) const NAMESPACE: &str = "audio-bank-hirc-action";
 
@@ -26,6 +31,10 @@ pub(crate) const NAMESPACE: &str = "audio-bank-hirc-action";
 )]
 pub(crate) enum ActionPayload {
     BankHircAction(ActionRecord),
+    #[serde(rename = "bank-hirc-action-target-resolution")]
+    TargetResolution(ActionTargetResolution),
+    #[serde(rename = "bank-hirc-action-target-candidate")]
+    TargetCandidate(ActionTargetCandidate),
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -103,15 +112,17 @@ pub(crate) fn project(
     object: &BankHircObject,
     version: VersionSite,
     action: BankActionRead,
+    objects: &HircObjectIndex,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let (record, fields, status, issue) = match action {
+    let (record, fields, status, issue, target) = match action {
         BankActionRead::NotAction => return Ok(()),
         BankActionRead::Decoded { target, fields } => (
             ActionRecord::decoded(target),
             Some(fields),
             Status::Complete,
             None,
+            Some(target),
         ),
         BankActionRead::Malformed { error, fields } => (
             ActionRecord::malformed(&fields),
@@ -123,6 +134,7 @@ pub(crate) fn project(
                 Severity::Error,
                 error.to_string(),
             )),
+            None,
         ),
         BankActionRead::Unsupported { error } => (
             ActionRecord::unsupported(),
@@ -134,6 +146,7 @@ pub(crate) fn project(
                 Severity::Info,
                 error.to_string(),
             )),
+            None,
         ),
         _ => {
             return Err(MediaError::Contract(
@@ -141,19 +154,17 @@ pub(crate) fn project(
             ));
         }
     };
-    let prepared = origins::prepare(
-        projection.input,
-        object,
-        version,
-        fields.as_ref(),
-        issue.is_some(),
-        writer,
-    )?;
+    let sites = origins::Sites::new(object, version, fields.as_ref());
+    let prepared = origins::prepare(projection.input, &sites, issue.is_some(), writer)?;
     prepared.write(
         writer,
         &Subresource::new(NAMESPACE, vec![object.section_ordinal(), object.ordinal()]),
         status,
         &ActionPayload::BankHircAction(record),
         issue.as_slice(),
-    )
+    )?;
+    if let Some(target) = target {
+        reference::project(projection, &sites, target, objects, writer)?;
+    }
+    Ok(())
 }
