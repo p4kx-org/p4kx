@@ -10,7 +10,7 @@ use crate::layer_plan::Layered;
 use crate::texture_cache::Decoded;
 use crate::texture_loader::LoadedTexture;
 use crate::texture_make::{Made, Outcome, encode, load as load_texture};
-use crate::texture_origins::{TextureComponents, TextureReadUse};
+use crate::texture_origins::{TextureComponents, TexturePaletteUse, TextureReadUse};
 use crate::texture_plan::{Failure, Job};
 use crate::texture_report::TextureRole;
 use crate::texture_roles::Source;
@@ -71,6 +71,7 @@ fn loaded_maps(
 pub(crate) struct LayerImage {
     pub(crate) image: RgbaImage,
     sources: Vec<TextureReadUse>,
+    material_layers: Vec<usize>,
 }
 
 fn uses(
@@ -98,6 +99,15 @@ fn uses(
         sources.push(sized_by.contribution(TextureComponents::Dimensions));
     }
     sources
+}
+
+fn used_positions(layered: &Layered, used_layers: usize) -> Vec<usize> {
+    layered
+        .layers
+        .iter()
+        .enumerate()
+        .filter_map(|(index, layer)| (used_layers & (1 << index) != 0).then_some(layer.at))
+        .collect()
 }
 
 /// Blends the base colour image of a layered material from the diffuse maps of its layers; `None`
@@ -130,6 +140,7 @@ pub(crate) fn bake_base(
             })
             .map(|pixels| LayerImage {
                 image: pixels.image,
+                material_layers: used_positions(layered, pixels.used_layers),
                 sources: uses(
                     sized_by,
                     mask.as_deref(),
@@ -153,6 +164,8 @@ pub(crate) fn make_base(
     outcome.layered = true;
     Some(made.map_err(|error| error.to_string()).and_then(|baked| {
         outcome.texture_sources = baked.sources;
+        outcome.material_layers = baked.material_layers;
+        outcome.palette_use = TexturePaletteUse::Layers;
         encode(&baked.image)
     }))
 }
@@ -203,6 +216,7 @@ pub(crate) fn make_normal(
                     &loaded,
                     pixels.sampled_maps,
                 );
+                outcome.material_layers = used_positions(layered, pixels.used_layers);
                 encode(&pixels.image)
             }),
     )

@@ -108,11 +108,7 @@ fn write_rigged<'m>(
     }
     let total = write_file(&root, &layout, &images, out)?;
     if let Some(emission) = emission {
-        *emission = RiggedGlbEmission::of(
-            &instances,
-            &layout,
-            std::mem::take(&mut images.image_sources),
-        );
+        *emission = RiggedGlbEmission::of(&instances, &layout, &mut images);
     }
     let defaulted = instances
         .iter()

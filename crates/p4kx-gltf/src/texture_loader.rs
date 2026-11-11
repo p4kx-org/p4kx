@@ -28,6 +28,7 @@ pub struct LoadedTexture {
     /// rather than the opaque value a format without alpha decodes to.
     pub has_alpha: bool,
     read: Option<TextureReadId>,
+    fallback: bool,
 }
 
 impl LoadedTexture {
@@ -38,6 +39,7 @@ impl LoadedTexture {
             image,
             has_alpha,
             read: None,
+            fallback: false,
         }
     }
 
@@ -48,10 +50,16 @@ impl LoadedTexture {
         self
     }
 
+    const fn with_fallback(mut self) -> Self {
+        self.fallback = true;
+        self
+    }
+
     pub(crate) const fn contribution(&self, components: TextureComponents) -> TextureReadUse {
         TextureReadUse {
             read: self.read,
             components,
+            fallback: self.fallback,
         }
     }
 }
@@ -116,7 +124,7 @@ impl TextureLoader for WithFallbacks<'_> {
                 .own
                 .get(path)
                 .map_or(Err(TextureLoadError::NotFound), |own| {
-                    self.inner.load(own, mip)
+                    self.inner.load(own, mip).map(LoadedTexture::with_fallback)
                 }),
             other => other,
         }

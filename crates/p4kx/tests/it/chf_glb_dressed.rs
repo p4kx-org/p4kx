@@ -10,12 +10,12 @@ use std::path::{Path, PathBuf};
 use p4kx_assembly::character::{BODY_COLOR, Guid, lowered_hash, skin_attachment};
 use p4kx_testkit::{
     DRESSED_EYES, DRESSED_GONE_HAIR, DRESSED_HAIR, DRESSED_HAIR_OPACITY, DRESSED_HEAD_DIFFUSE,
-    DRESSED_HEAD_MATERIAL, HEAD_REGIONS, HEAD_VERTICES, MALE_BODY_TYPE, MALE_RIG_HASH, SplitDds,
-    TestChf, TestItemPort, TestMaterial, TestSubMaterial, TestTextureFormat, check_glb,
-    dressed_entries, head_rig,
+    DRESSED_HEAD_MATERIAL, DRESSED_HEAD_MATERIAL_FILE, HEAD_REGIONS, HEAD_VERTICES, MALE_BODY_TYPE,
+    MALE_RIG_HASH, SplitDds, TestChf, TestItemPort, TestMaterial, TestSubMaterial,
+    TestTextureFormat, check_glb, dressed_entries, head_rig, test_key,
 };
 
-use crate::chf_glb::{archive, glb};
+use crate::chf_glb::{archive, glb_with};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -89,11 +89,23 @@ fn a_dressed_character_is_written_with_eyes_hair_textures_and_a_report_of_what_i
         let dds = file.replace('/', "\\").replace(".tif", ".dds");
         entries.extend(texture.entries(&format!("Data\\{dds}")));
     }
+    let head_material = format!("Data\\{}", DRESSED_HEAD_MATERIAL_FILE.replace('/', "\\"));
+    let entries = entries
+        .into_iter()
+        .map(|entry| {
+            if entry.path().eq_ignore_ascii_case(&head_material) {
+                entry.encrypted()
+            } else {
+                entry
+            }
+        })
+        .collect();
     let archive = archive(dir.path(), entries)?;
     let file = dressed_chf(dir.path())?;
     let out = dir.path().join("dressed.glb");
 
-    let run = glb(&archive, &file, &out, true)?;
+    let key = test_key().to_hex();
+    let run = glb_with(&archive, &file, &out, true, &["--key", &key])?;
 
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let value: serde_json::Value = serde_json::from_str(&run.stdout)?;
@@ -120,7 +132,33 @@ fn a_dressed_character_is_written_with_eyes_hair_textures_and_a_report_of_what_i
         value["textured_materials"].as_u64().unwrap_or(0) >= 2,
         "{value}"
     );
-    assert!(check_glb(&fs::read(&out)?).is_ok(), "a valid GLB");
+    check_image_origins(&out, &value)
+}
+
+fn check_image_origins(out: &Path, value: &serde_json::Value) -> TestResult {
+    let bytes = fs::read(out)?;
+    let checked = check_glb(&bytes)?;
+    for (name, encrypted) in [("shader_head", true), ("hair_test_m", false)] {
+        let image = checked
+            .document
+            .materials()
+            .find(|material| material.name() == Some(name))
+            .and_then(|material| material.pbr_metallic_roughness().base_color_texture())
+            .ok_or("material base colour image")?
+            .texture()
+            .source()
+            .index();
+        let field = value
+            .pointer(&format!(
+                "/textureImageOrigins/{image}/containsEncryptedSource"
+            ))
+            .and_then(serde_json::Value::as_bool);
+        assert_eq!(
+            field,
+            Some(encrypted),
+            "the selected image source of {name}"
+        );
+    }
     Ok(())
 }
 

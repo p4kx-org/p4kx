@@ -220,6 +220,7 @@ fn layer_colour(layer: &LayerPlan, tile: Option<&Tile<'_>>, uv: (f32, f32)) -> [
 pub(crate) struct LayerPixels {
     pub(crate) image: RgbaImage,
     pub(crate) sampled_maps: usize,
+    pub(crate) used_layers: usize,
 }
 
 /// Returns the base colour image of `layered` of `size` texels: the layers' diffuse maps, tiled,
@@ -234,8 +235,10 @@ pub(crate) fn base_colour(
 ) -> Result<LayerPixels, TextureError> {
     let size = (width as usize, height as usize);
     let sampled_maps = AtomicUsize::new(0);
+    let used_layers = AtomicUsize::new(0);
     let image = fill(width, height, |y, out| {
         let mut sampled_row = 0;
+        let mut layer_row = 0;
         let mut shares = [0.0_f32; MAX_BAKED_LAYERS];
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
             let uv = (centre(x, size.0), centre(y, size.1));
@@ -251,6 +254,7 @@ pub(crate) fn base_colour(
                 if share <= 0.0 {
                     continue;
                 }
+                layer_row |= 1 << index;
                 if tile.is_some() {
                     sampled_row |= 1 << index;
                 }
@@ -263,10 +267,12 @@ pub(crate) fn base_colour(
             *target = [encode(red), encode(green), encode(blue), OPAQUE];
         }
         sampled_maps.fetch_or(sampled_row, Ordering::Relaxed);
+        used_layers.fetch_or(layer_row, Ordering::Relaxed);
     })?;
     Ok(LayerPixels {
         image,
         sampled_maps: sampled_maps.into_inner(),
+        used_layers: used_layers.into_inner(),
     })
 }
 
@@ -340,9 +346,11 @@ pub(crate) fn normal_colour(
         }
         sampled_maps.fetch_or(sampled_row, Ordering::Relaxed);
     })?;
+    let sampled_maps = sampled_maps.into_inner();
     Ok(LayerPixels {
         image,
-        sampled_maps: sampled_maps.into_inner(),
+        sampled_maps,
+        used_layers: sampled_maps,
     })
 }
 

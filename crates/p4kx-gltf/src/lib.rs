@@ -97,7 +97,9 @@ pub use scene::{Scene, SceneNode, ScenePart, write_scene_glb, write_scene_glb_wi
 pub use scene_light::{SceneLight, SceneLightKind};
 pub use shading::{Shading, shading};
 pub use texture_loader::{LoadedTexture, TextureLoadError, TextureLoader};
-pub use texture_origins::{TextureComponents, TextureReadId, TextureReadUse};
+pub use texture_origins::{
+    TextureComponents, TextureMaterialSource, TextureReadId, TextureReadUse,
+};
 pub use texture_plan::{MAX_TEXTURE_IMAGES, MAX_TEXTURE_PIXELS};
 pub use texture_report::{TextureFallback, TextureRole};
 pub use texture_roles::diffuse_texture_path;

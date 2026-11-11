@@ -42,3 +42,4 @@ pub use model_material_origins::{
     ArchiveMaterialRead, ArchiveMaterialReads, MaterialArchiveOrigins, MaterialLayerOrigin,
 };
 pub use p4kx_archive::EncryptionFieldEvidence;
+pub use p4kx_gltf::{RiggedGlbEmission, RiggedPartEmission, TextureMaterialSource};

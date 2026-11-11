@@ -61,3 +61,55 @@ fn the_observed_writer_keeps_the_glb_and_reports_only_emitted_geometry_and_mater
     assert!(hidden.material_slots().next().is_none());
     Ok(())
 }
+
+#[test]
+fn a_resolved_layer_with_no_rendered_share_does_not_supply_an_emitted_material() -> TestResult {
+    let model = TestModel::cube().with_material_library("layered");
+    let main = TestMtl::single(
+        &TestMtlMaterial::new("layered")
+            .layer_with(&[("Path", "layers/used")])
+            .layer_with(&[("Path", "layers/unused")]),
+    );
+    let layer = TestMtl::single(&TestMtlMaterial::new("surface"));
+    let mut entries = armour_entries();
+    entries.extend([
+        TestEntry::stored(r"Data\Objects\Test\layered.cgf", model.cgf()),
+        TestEntry::stored(r"Data\Objects\Test\layered.cgfm", model.cgfm()),
+        TestEntry::stored(r"Data\Objects\Test\layered.mtl", main.cryxml()),
+        TestEntry::stored(r"Data\layers\used.mtl", layer.cryxml()),
+        TestEntry::stored(r"Data\layers\unused.mtl", layer.cryxml()).encrypted(),
+    ]);
+    let fixture = fixture(entries)?;
+    let archive = Archive::open_with_key(&fixture.path, Some(p4kx_testkit::test_key()))?;
+    let models = ArchiveModels::new(&archive);
+    let armour = Armour::build(
+        BodyVariant::Male,
+        &[Piece::file("layered", "Objects/Test/layered.cgf", None)],
+        &models,
+        &AssemblyOptions::default(),
+    )?;
+    let mut glb = Vec::new();
+    let (_, emission) = armour.write_glb_animated_observed(
+        &armour.animate(&[], &models),
+        &GlbOptions::default(),
+        &models.textures(),
+        &mut glb,
+    )?;
+    let [_, part] = armour.parts() else {
+        return Err("expected one layered piece".into());
+    };
+    let unused = part
+        .material_archive_origins()
+        .layer(0, 1)
+        .ok_or("resolved unused layer")?;
+    assert_eq!(
+        unused.entry().encryption(),
+        p4kx_extraction::SourceEncryption::Encrypted
+    );
+    assert_eq!(unused.source_material(), Some(0));
+    let [_, rendered] = emission.parts() else {
+        return Err("expected one emitted layered piece".into());
+    };
+    assert_eq!(rendered.material_layers(0).collect::<Vec<_>>(), [0]);
+    Ok(())
+}

@@ -18,7 +18,7 @@ type Numbered = (usize, Job);
 /// normal images only a fallback uses, so that when the budget of images runs out, every
 /// material has its colours before a layered one has its normals; returns the jobs with the
 /// numbers in `wanted` following them.
-pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> Vec<Job> {
+pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> (Vec<Job>, Vec<usize>) {
     let primary: HashSet<usize> = wanted
         .iter()
         .flat_map(|wish| wish.jobs.into_iter().flatten())
@@ -57,7 +57,10 @@ pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> Vec<Job
             *job = moved.get(*job).copied().unwrap_or(*job);
         }
     }
-    numbered.into_iter().map(|(_, (_, job))| job).collect()
+    numbered
+        .into_iter()
+        .map(|(_, (old, job))| (job, old))
+        .unzip()
 }
 
 /// Returns for each of `len` jobs the layered normal jobs of the materials that use it only as

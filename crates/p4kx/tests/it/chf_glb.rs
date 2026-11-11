@@ -13,6 +13,9 @@ use p4kx_testkit::{
     check_glb, head_entries, head_rig,
 };
 
+#[path = "chf_glb_origins.rs"]
+mod origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 pub(crate) struct Run {
@@ -55,7 +58,7 @@ pub(crate) fn glb(
     glb_with(archive, chf, out, json, &[])
 }
 
-fn glb_with(
+pub(super) fn glb_with(
     archive: &Path,
     chf: &Path,
     out: &Path,
@@ -186,6 +189,11 @@ fn a_head_whose_rig_is_missing_is_reported_as_skipped_and_exits_with_one() -> Te
     let value: serde_json::Value = serde_json::from_str(&json.stdout)?;
     assert_eq!(value["skipped"], 2, "the head and the teeth");
     assert_eq!(value["issues"][0]["kind"], "shape_failed");
+    assert_eq!(
+        value["fieldOrigins"]["/issues/0/kind"]["sourceSetComplete"],
+        false
+    );
+    assert!(out.with_file_name("c.glb.p4kx-origin.jsonl").is_file());
     Ok(())
 }
 

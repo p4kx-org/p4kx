@@ -40,4 +40,34 @@ pub struct TextureReadUse {
     pub read: Option<TextureReadId>,
     /// The components consumed by the output image.
     pub components: TextureComponents,
+    /// Whether the loaded bytes came through a secondary texture-name fallback.
+    pub fallback: bool,
+}
+
+/// The material values a texture conversion used.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub(crate) enum TexturePaletteUse {
+    /// The image conversion used no palette-controlled values.
+    #[default]
+    None,
+    /// The image conversion used the material's diffuse or specular shading.
+    Shading,
+    /// The image conversion used stencil decal colours.
+    Decal,
+    /// The image conversion used tint values of the selected layers.
+    Layers,
+}
+
+/// The material that supplied the selected job for an embedded image.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextureMaterialSource {
+    /// The part that supplied the selected job.
+    pub part: usize,
+    /// The material's library slot, if the source is not the built-in material.
+    pub slot: Option<usize>,
+    /// The original material-layer positions used by the conversion.
+    pub layers: Vec<usize>,
+    /// Whether the image conversion used palette-controlled values.
+    pub uses_palette: bool,
 }

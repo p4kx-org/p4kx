@@ -115,3 +115,23 @@ set as incomplete.
 `provenance`. The stage and explicit size options have independent origins.
 A diagnostic field whose contributing inputs cannot be established carries an
 unknown marker.
+
+## CHF GLB
+
+`p4kx chf glb` writes a sibling `<output>.p4kx-origin.jsonl` companion. Its
+file binding records the final GLB basename, byte length and SHA-256. The
+opaque payload row links the character input and the model, rig, material,
+palette, texture and animation reads used by the written model.
+
+The `--json` report adds `originReceipt`, `fieldOrigins`, `provenance` and
+`textureImageOrigins`. Field origins use JSON Pointers into the report. The
+texture array gives the origin of each embedded image by its zero-based GLB
+image index. A normal image can use a clear color mip while a roughness image
+from the same texture uses an encrypted alpha mip. The image origin also
+includes the selected material, any contributing layers and an applied
+palette when their values affect the image.
+
+Original P4K lineage for the standalone CHF remains unknown. Report values
+whose contributing reads cannot be proved carry an incomplete origin. A
+successfully written partial model has a companion for its actual bytes and
+retains its existing issue and exit-code behavior.

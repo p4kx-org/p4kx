@@ -13,7 +13,7 @@ use crate::shading::shading;
 use crate::texture_assemble::Wish;
 use crate::texture_loader::{TextureLoader, WithFallbacks};
 use crate::texture_make::{Budget, run_guarded};
-use crate::texture_origins::TextureReadUse;
+use crate::texture_origins::{TextureMaterialSource, TextureReadUse};
 use crate::texture_pixels::Tints;
 use crate::texture_report::{TextureFallback, TextureRole};
 use crate::texture_roles::{Source, Sources, draws_by_opacity_map, sources_with};
@@ -163,6 +163,7 @@ pub(crate) struct SlotImages {
 pub(crate) struct TextureSet {
     pub(crate) images: Vec<EncodedImage>,
     pub(crate) image_sources: Vec<Vec<TextureReadUse>>,
+    pub(crate) image_materials: Vec<Option<TextureMaterialSource>>,
     pub(crate) slots: BTreeMap<(usize, Slot), SlotImages>,
     pub(crate) fallbacks: Vec<TextureFallback>,
 }
@@ -197,6 +198,7 @@ impl TextureSet {
     /// material keeps its plain colour for it.
     pub(crate) fn build(parts: &[PartSlots<'_>], mip: u32, loader: &dyn TextureLoader) -> Self {
         let mut jobs: Vec<Job> = Vec::new();
+        let mut authors = Vec::new();
         let mut known: HashMap<Key, usize> = HashMap::new();
         let mut wanted: Vec<Wish> = Vec::new();
         for requested in parts {
@@ -205,6 +207,7 @@ impl TextureSet {
                 let mut add = |job: Job| -> usize {
                     *known.entry(job.key.clone()).or_insert_with(|| {
                         jobs.push(job);
+                        authors.push((requested.part, slot, material));
                         jobs.len() - 1
                     })
                 };
@@ -219,7 +222,7 @@ impl TextureSet {
                 });
             }
         }
-        let jobs = layer_normals_last(jobs, &mut wanted);
+        let (jobs, order) = layer_normals_last(jobs, &mut wanted);
         let guards = fallback_guards(&wanted, jobs.len());
         let own: HashMap<String, String> = parts
             .iter()
@@ -234,7 +237,11 @@ impl TextureSet {
             };
             run_guarded(&jobs, mip, &loader, Budget::DEFAULT, &guards)
         };
-        Self::assemble(&wanted, outcomes)
+        let authors: Vec<_> = order
+            .into_iter()
+            .map(|old| authors.get(old).copied())
+            .collect();
+        Self::assemble(&wanted, outcomes, &authors)
     }
 
     /// Returns the images the material of `slot` of the model instance `part` is drawn with.
