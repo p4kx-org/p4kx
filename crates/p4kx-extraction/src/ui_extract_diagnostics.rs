@@ -5,6 +5,7 @@ use std::io;
 
 use p4kx_gfx::{BitmapSource, FailureOrigin, TagSite};
 
+use super::ui_bitmap_sources;
 use super::ui_extract_evidence::{Report, invalid};
 use crate::ui_external::ExternalPath;
 use crate::{ConversionError, SourceUse, SourceUseRole, UiSourceSite as Site};
@@ -75,7 +76,12 @@ impl Report<'_, '_> {
                         "external image failure names another kind of bitmap",
                     ));
                 };
-                self.external_selectors(&mut uses, tag, ExternalPath::select(image))?;
+                ui_bitmap_sources::external_selectors(
+                    &self.source,
+                    &mut uses,
+                    tag,
+                    ExternalPath::select(image),
+                )?;
                 uses.push(self.source.name_use().map_err(io::Error::other)?);
                 self.source.is_bound()
             }

@@ -7,15 +7,14 @@ use std::io::Write;
 use std::path::Path;
 
 use p4kx_gfx::{Assets, Bitmap, BitmapSource, GfxError, MorphShape, RgbaImage, Shape};
-use p4kx_texture::{MipByteSpans, RgbaImage as DdsImage};
 
+use super::ui_bitmap_decode::{BitmapRead, DecodedPixels};
 use crate::budget::{Budget, Lease};
 use crate::output_file::write_error;
-use crate::texture_preview_png::input::PreviewInputs;
 use crate::ui_external::{self, ExternalPath};
 use crate::{
-    ConversionError, DirectoryCommit, DirectoryReceipt, DiskTextures, FieldPath, Texture,
-    UiAssetKind, UiMovie, WrittenUiAsset,
+    ConversionError, DirectoryCommit, DirectoryReceipt, DiskTextures, FieldPath, UiAssetKind,
+    UiMovie, WrittenUiAsset,
 };
 
 /// A definition, or a bitmap with the sub-images that cut it, written by one parallel job.
@@ -61,25 +60,9 @@ pub(crate) struct JobResult<'owner, 'archive> {
     pub(crate) bitmap: Option<BitmapRead<'archive>>,
 }
 
-pub(crate) struct BitmapRead<'archive> {
-    pub(crate) order: usize,
-    pub(crate) pixels: BitmapPixels<'archive>,
-}
-
-pub(crate) enum BitmapPixels<'archive> {
-    Embedded {
-        used_jpeg_tables: bool,
-    },
-    External {
-        selection: ExternalPath,
-        inputs: Box<PreviewInputs<'archive, MipByteSpans>>,
-    },
-}
-
 struct DecodedBitmap<'budget, 'archive> {
-    image: RgbaImage,
+    decoded: DecodedPixels<'archive>,
     _lease: Lease<'budget>,
-    pixels: BitmapPixels<'archive>,
 }
 
 impl<'owner> Outcome<'owner> {
@@ -216,13 +199,14 @@ impl<'archive> UiMovie<'archive> {
                     };
                 }
             };
-        let mut outcomes = vec![png(order, base.id, &decoded.image)];
+        let mut outcomes = vec![png(order, base.id, &decoded.decoded.image)];
         for &(order, cut) in cuts {
             let BitmapSource::SubImage(sub) = &cut.source else {
                 continue;
             };
             outcomes.push(
                 decoded
+                    .decoded
                     .image
                     .crop(
                         (u32::from(sub.x1), u32::from(sub.y1)),
@@ -238,24 +222,9 @@ impl<'archive> UiMovie<'archive> {
             outcomes,
             bitmap: Some(BitmapRead {
                 order,
-                pixels: decoded.pixels,
+                pixels: decoded.decoded.pixels,
             }),
         }
-    }
-
-    /// Decodes the first mip of the texture of the external image `id`.
-    pub(crate) fn texture_image(
-        &self,
-        id: u16,
-        texture: &Texture<'_>,
-    ) -> Result<RgbaImage, ConversionError> {
-        self.rgba_image(id, texture.decode_mip(0)?)
-    }
-
-    fn rgba_image(&self, id: u16, decoded: DdsImage) -> Result<RgbaImage, ConversionError> {
-        let (width, height) = (decoded.width(), decoded.height());
-        RgbaImage::from_pixels(width, height, decoded.into_pixels())
-            .map_err(|source| self.asset_error(id, source))
     }
 
     fn decode_bitmap<'budget>(
@@ -271,28 +240,21 @@ impl<'archive> UiMovie<'archive> {
                 let texture = ui_external::open_external(self, bitmap.id, image, files)?;
                 let header = texture.header();
                 let lease = budget.take(u64::from(header.width()) * u64::from(header.height()));
-                let (decoded, inputs) = texture.decode_mip_with_inputs(0)?;
-                let selection = ExternalPath::select(image);
+                let decoded =
+                    self.external_bitmap_pixels(bitmap.id, &texture, ExternalPath::select(image))?;
                 Ok(DecodedBitmap {
-                    image: self.rgba_image(bitmap.id, decoded)?,
+                    decoded,
                     _lease: lease,
-                    pixels: BitmapPixels::External {
-                        selection,
-                        inputs: Box::new(inputs),
-                    },
                 })
             }
             BitmapSource::SubImage(_) => Err(self.cut_error(bitmap)),
             BitmapSource::Lossless(_) | BitmapSource::Jpeg(_) => {
                 let (width, height) = assets.bitmap_size(bitmap).map_err(gfx)?;
                 let lease = budget.take(u64::from(width) * u64::from(height));
-                let decoded = assets.decode_bitmap_observed(bitmap).map_err(gfx)?;
+                let decoded = self.embedded_bitmap_pixels(assets, bitmap)?;
                 Ok(DecodedBitmap {
-                    image: decoded.image,
+                    decoded,
                     _lease: lease,
-                    pixels: BitmapPixels::Embedded {
-                        used_jpeg_tables: decoded.used_jpeg_tables,
-                    },
                 })
             }
         }

@@ -98,7 +98,8 @@ pub use movie::{Movie, ObservedAssets};
 pub use movie_source::{MovieSource, MovieSpan, TagItemSite, TagSite};
 pub use place::{ColorTransform, Filter, FilterKind, Placement};
 pub use raster::{
-    Background, CanvasSize, MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE, Raster, RasterOptions,
+    Background, CanvasSize, MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE, ObservedRaster, Raster,
+    RasterOptions,
 };
 pub use raster_budget::{MAX_COVERAGE_FACTOR, MAX_SVG_BYTES};
 pub use scene::{
@@ -111,7 +112,7 @@ pub use scene_report::{MAX_SPRITE_DEPTH, SkipReason, Skipped};
 pub use scene_text::MAX_SCENE_GLYPHS;
 pub use shape::{MAX_SHAPE_RECORDS, NewStyles, Shape, ShapeRecord, StyleChange};
 pub use style::{FillStyle, Gradient, GradientStop, LineStyle};
-pub use svg::SvgReport;
+pub use svg::{ObservedSvgReport, SvgReport};
 pub use tag::tag_name;
 pub use text::{EditLayout, EditText, GlyphEntry, MAX_TEXT_GLYPHS, StaticText, TextRecord};
 pub use text_fonts::{Localise, TextOptions};

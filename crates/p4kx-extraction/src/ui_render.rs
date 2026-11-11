@@ -4,8 +4,8 @@
 use std::path::Path;
 
 use p4kx_gfx::{
-    GfxError, Localise, MAX_BITMAP_PIXELS, RasterOptions, RgbaImage, Scene, Skipped, TagFailure,
-    TextOptions,
+    Assets, GfxError, Localise, MAX_BITMAP_PIXELS, Raster, RasterOptions, RgbaImage, Scene,
+    Skipped, TagFailure, TextOptions,
 };
 use p4kx_localization::decode_line_breaks;
 
@@ -45,9 +45,9 @@ pub struct UiRender {
 }
 
 /// A composed first frame with its decoded bitmaps.
-pub(crate) struct ComposedFrame {
+pub(crate) struct ComposedFrame<'archive> {
     pub(crate) scene: Scene,
-    pub(crate) bitmaps: FrameBitmaps,
+    pub(crate) bitmaps: FrameBitmaps<'archive>,
     pub(crate) tag_failures: Vec<TagFailure>,
     pub(crate) imports: ImportReport,
 }
@@ -60,7 +60,7 @@ impl UiRender {
     }
 }
 
-impl UiMovie<'_> {
+impl<'archive> UiMovie<'archive> {
     /// Renders the first frame of the main timeline, with its sprites, to an image.
     ///
     /// The bitmaps the frame fills with are decoded in parallel as [`UiMovie::extract_assets`]
@@ -79,13 +79,7 @@ impl UiMovie<'_> {
             .scene
             .rasterize(&frame.bitmaps.images, options)
             .map_err(|source| self.frame_error(source))?;
-        Ok(UiRender {
-            image: raster.image,
-            skipped: raster.skipped,
-            bitmap_failures: frame.bitmaps.failures,
-            tag_failures: frame.tag_failures,
-            imports: frame.imports,
-        })
+        Ok(frame.into_render(raster))
     }
 
     /// Composes the first frame and decodes the bitmaps it fills with, after checking that the
@@ -93,8 +87,15 @@ impl UiMovie<'_> {
     pub(crate) fn compose_frame(
         &self,
         options: &RasterOptions,
-    ) -> Result<ComposedFrame, ConversionError> {
-        let mut assets = self.movie().assets();
+    ) -> Result<ComposedFrame<'archive>, ConversionError> {
+        self.compose_frame_with_assets(options, self.movie().assets())
+    }
+
+    pub(crate) fn compose_frame_with_assets(
+        &self,
+        options: &RasterOptions,
+        mut assets: Assets<'_>,
+    ) -> Result<ComposedFrame<'archive>, ConversionError> {
         let ini = self
             .texts()
             .map(|texts| {
@@ -187,5 +188,17 @@ impl UiMovie<'_> {
                 })
         })?;
         Ok(render)
+    }
+}
+
+impl ComposedFrame<'_> {
+    pub(crate) fn into_render(self, raster: Raster) -> UiRender {
+        UiRender {
+            image: raster.image,
+            skipped: raster.skipped,
+            bitmap_failures: self.bitmaps.failures,
+            tag_failures: self.tag_failures,
+            imports: self.imports,
+        }
     }
 }

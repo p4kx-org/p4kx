@@ -5,12 +5,11 @@ use std::io;
 
 use p4kx_gfx::{ObservedAssets, TagSite};
 
+use super::ui_bitmap_decode::BitmapRead;
+use super::ui_bitmap_sources;
 use super::ui_extract::{ObservedUiExtraction, UiAssetFailure, UiAssetKind, UiExtraction};
 use crate::output_file::write_error;
-use crate::ui_external::ExternalPath;
-use crate::ui_jobs::{
-    ArtifactFields, BitmapPixels, BitmapRead, CommittedUiAsset, JobResult, Outcome,
-};
+use crate::ui_jobs::{ArtifactFields, CommittedUiAsset, JobResult, Outcome};
 use crate::{
     ConversionError, DirectoryCommit, DirectoryReceipt, FieldOrigin, FieldOrigins, FieldPath,
     OriginOutputAddress, SourceUse, SourceUseRole, SourceUses, UiMovie, UiMovieEvidence,
@@ -146,7 +145,13 @@ impl<'owner> ExtractionResults<'owner> {
             ArtifactFields::Png => {
                 let bitmap =
                     bitmap.ok_or_else(|| invalid("committed bitmap has no decoded input"))?;
-                let (content, complete) = report.bitmap(tag, order, bitmap)?;
+                let (content, complete) = ui_bitmap_sources::contributions(
+                    &report.source,
+                    &report.decoded.origins,
+                    &report.uses,
+                    order,
+                    bitmap,
+                )?;
                 self.artifact_fields.push((
                     index,
                     OriginOutputAddress::OpaquePayload,
@@ -213,47 +218,6 @@ impl Report<'_, '_> {
             .ok_or_else(|| invalid("UI artifact has no physical GFx definition"))
     }
 
-    fn bitmap(
-        &self,
-        definition: TagSite,
-        order: usize,
-        bitmap: &BitmapRead<'_>,
-    ) -> io::Result<(Vec<SourceUse>, bool)> {
-        let base = *self
-            .decoded
-            .origins
-            .bitmaps
-            .get(bitmap.order)
-            .ok_or_else(|| invalid("decoded bitmap has no base definition"))?;
-        let mut uses = self.tag_value(Site::Body(base), "baseBitmapId", Selector)?;
-        if order != bitmap.order {
-            uses.push(self.decoded_use(Site::Body(definition), "atlasImageId", Selector)?);
-            uses.push(self.decoded_use(Site::Body(definition), "cropRectangle", Conversion)?);
-        }
-        let complete = match &bitmap.pixels {
-            BitmapPixels::Embedded { used_jpeg_tables } => {
-                uses.push(self.decoded_use(Site::Body(base), "embeddedBitmap", Conversion)?);
-                if *used_jpeg_tables {
-                    let tables = self
-                        .decoded
-                        .origins
-                        .jpeg_tables
-                        .ok_or_else(|| invalid("bitmap decoder used unobserved JPEG tables"))?;
-                    uses.push(self.decoded_use(Site::Body(tables), "jpegTables", Conversion)?);
-                }
-                true
-            }
-            BitmapPixels::External { selection, inputs } => {
-                self.external_selectors(&mut uses, base, *selection)?;
-                let dds = inputs.register(&self.uses, 0).map_err(io::Error::other)?;
-                dds.append_pixel_uses(&mut uses).map_err(io::Error::other)?;
-                uses.extend(dds.alpha_lookup_uses().map_err(io::Error::other)?);
-                dds.is_complete()
-            }
-        };
-        Ok((uses, complete && self.source.is_bound()))
-    }
-
     fn written(
         &mut self,
         index: usize,
@@ -274,19 +238,6 @@ impl Report<'_, '_> {
             .chain(content.iter().cloned())
             .collect::<Vec<_>>();
         self.bind(&path, &all, complete)
-    }
-
-    pub(super) fn external_selectors(
-        &self,
-        uses: &mut Vec<SourceUse>,
-        definition: TagSite,
-        selected: ExternalPath,
-    ) -> io::Result<()> {
-        uses.push(self.decoded_use(Site::Body(definition), selected.field(), Selector)?);
-        if matches!(selected, ExternalPath::ExportName) {
-            uses.push(self.decoded_use(Site::Body(definition), "fileName", Selector)?);
-        }
-        Ok(())
     }
 
     fn collections(

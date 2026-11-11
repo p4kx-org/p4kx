@@ -7,7 +7,8 @@ use p4kx_gfx::{Assets, Bitmap, BitmapSource, RgbaImage, SubImage};
 use rayon::prelude::*;
 
 use crate::budget::Budget;
-use crate::ui_external;
+use crate::ui_external::{self, ExternalPath};
+use crate::ui_service::ui_bitmap_decode::{BitmapRead, DecodedPixels};
 use crate::{
     ConversionError, DiskTextures, MAX_UI_RENDER_BITMAP_PIXELS, Texture, UiBitmapFailure, UiMovie,
 };
@@ -15,51 +16,96 @@ use crate::{
 /// A bitmap the frame needs and the bitmaps of the frame cut from it, in ascending ID order.
 struct Base<'b, 'c> {
     bitmap: &'b Bitmap<'c>,
-    users: Vec<(u16, Option<SubImage>)>,
+    order: usize,
+    users: Vec<User>,
+}
+
+#[derive(Clone, Copy)]
+struct User {
+    id: u16,
+    order: usize,
+    cut: Option<SubImage>,
 }
 
 /// Where the pixels of a base come from, opened but not decoded.
 enum Source<'a, 'b, 'c> {
     Embedded(&'b Bitmap<'c>),
-    External(Box<Texture<'a>>),
+    External {
+        texture: Box<Texture<'a>>,
+        selection: ExternalPath,
+    },
 }
 
 /// A base whose pixels may be kept, with its source and pixel count.
 type Granted<'a, 'b, 'c> = (Base<'b, 'c>, Source<'a, 'b, 'c>, u64);
 
-/// The decoded images of the users of one base, or why each failed.
-type Decoded = Vec<(u16, Result<RgbaImage, ConversionError>)>;
+#[derive(Default)]
+struct Decoded<'archive> {
+    pictures: Vec<(User, RgbaImage)>,
+    failures: Vec<UiBitmapFailure>,
+    source: Option<BitmapRead<'archive>>,
+}
 
-/// The bitmaps a rendered frame fills with, decoded, and those that could not be.
-pub(crate) struct FrameBitmaps {
+struct BitmapLocation {
+    order: usize,
+    group: usize,
+}
+
+/// The bitmaps a rendered frame fills with and their observed definitions.
+pub(crate) struct FrameBitmaps<'archive> {
     pub(crate) images: HashMap<u16, RgbaImage>,
     pub(crate) failures: Vec<UiBitmapFailure>,
+    sources: Vec<BitmapRead<'archive>>,
+    locations: HashMap<u16, BitmapLocation>,
+}
+
+impl<'archive> FrameBitmaps<'archive> {
+    pub(crate) fn source(&self, bitmap: u16) -> Option<(usize, &BitmapRead<'archive>)> {
+        let location = self.locations.get(&bitmap)?;
+        self.sources
+            .get(location.group)
+            .map(|base| (location.order, base))
+    }
 }
 
 impl<'a> UiMovie<'a> {
     /// Decodes the bitmaps `ids` in parallel, each bitmap that sub-images cut once; the kept
     /// images hold at most [`MAX_UI_RENDER_BITMAP_PIXELS`], granted in ascending ID order.
-    pub(crate) fn frame_bitmaps(&self, assets: &Assets<'_>, ids: &[u16]) -> FrameBitmaps {
+    pub(crate) fn frame_bitmaps(&self, assets: &Assets<'_>, ids: &[u16]) -> FrameBitmaps<'a> {
         let mut failures = Vec::new();
         let bases = self.group(assets, ids, &mut failures);
         let files = DiskTextures::default();
         let granted = self.grant(assets, bases, &mut failures, &files);
         let budget = Budget::new(MAX_UI_RENDER_BITMAP_PIXELS);
-        let decoded: Vec<Decoded> = granted
+        let decoded: Vec<Decoded<'a>> = granted
             .into_par_iter()
             .map(|(base, source, pixels)| self.decode(assets, &base, source, pixels, &budget))
             .collect();
-        let mut images = HashMap::with_capacity(ids.len());
-        for (id, result) in decoded.into_iter().flatten() {
-            match result {
-                Ok(image) => {
-                    images.insert(id, image);
+        let mut result = FrameBitmaps {
+            images: HashMap::with_capacity(ids.len()),
+            failures,
+            sources: Vec::new(),
+            locations: HashMap::with_capacity(ids.len()),
+        };
+        for decoded in decoded {
+            result.failures.extend(decoded.failures);
+            if let Some(source) = decoded.source {
+                let group = result.sources.len();
+                result.sources.push(source);
+                for (user, image) in decoded.pictures {
+                    result.images.insert(user.id, image);
+                    result.locations.insert(
+                        user.id,
+                        BitmapLocation {
+                            order: user.order,
+                            group,
+                        },
+                    );
                 }
-                Err(error) => failures.push(UiBitmapFailure { id, error }),
             }
         }
-        failures.sort_by_key(|failure| failure.id);
-        FrameBitmaps { images, failures }
+        result.failures.sort_by_key(|failure| failure.id);
+        result
     }
 
     /// Groups the bitmaps `ids` under the bitmap each is or is cut from.
@@ -69,22 +115,24 @@ impl<'a> UiMovie<'a> {
         ids: &[u16],
         failures: &mut Vec<UiBitmapFailure>,
     ) -> BTreeMap<u16, Base<'b, 'c>> {
-        let mut by_id: HashMap<u16, &Bitmap<'_>> = HashMap::with_capacity(assets.bitmaps.len());
-        for bitmap in &assets.bitmaps {
-            by_id.entry(bitmap.id).or_insert(bitmap);
+        let mut by_id = HashMap::with_capacity(assets.bitmaps.len());
+        for (order, bitmap) in assets.bitmaps.iter().enumerate() {
+            by_id.entry(bitmap.id).or_insert((order, bitmap));
         }
         let mut bases: BTreeMap<u16, Base<'_, '_>> = BTreeMap::new();
         for &id in ids {
-            let Some(&bitmap) = by_id.get(&id) else {
+            let Some(&(order, bitmap)) = by_id.get(&id) else {
                 let movie = self.name().to_owned();
                 let error = ConversionError::UiBitmapMissing { movie, id };
                 failures.push(UiBitmapFailure { id, error });
                 continue;
             };
-            let (base, cut) = match &bitmap.source {
+            let (base_order, base, cut) = match &bitmap.source {
                 BitmapSource::SubImage(sub) => match by_id.get(&sub.image_id) {
-                    Some(&base) if !matches!(base.source, BitmapSource::SubImage(_)) => {
-                        (base, Some(*sub))
+                    Some(&(base_order, base))
+                        if !matches!(base.source, BitmapSource::SubImage(_)) =>
+                    {
+                        (base_order, base, Some(*sub))
                     }
                     _ => {
                         let error = self.cut_error(bitmap);
@@ -92,16 +140,17 @@ impl<'a> UiMovie<'a> {
                         continue;
                     }
                 },
-                _ => (bitmap, None),
+                _ => (order, bitmap, None),
             };
             bases
                 .entry(base.id)
                 .or_insert_with(|| Base {
                     bitmap: base,
+                    order: base_order,
                     users: Vec::new(),
                 })
                 .users
-                .push((id, cut));
+                .push(User { id, order, cut });
         }
         bases
     }
@@ -133,7 +182,8 @@ impl<'a> UiMovie<'a> {
                         kept += needed;
                         granted.push((base, source, pixels));
                     } else {
-                        for &(id, _) in &base.users {
+                        for user in &base.users {
+                            let id = user.id;
                             let error = ConversionError::UiRenderBitmaps {
                                 movie: self.name().to_owned(),
                                 id,
@@ -158,8 +208,9 @@ impl<'a> UiMovie<'a> {
         failures: &mut Vec<UiBitmapFailure>,
     ) {
         let mut error = Some(error);
-        for &(id, cut) in &base.users {
-            let error = if cut.is_none()
+        for user in &base.users {
+            let id = user.id;
+            let error = if user.cut.is_none()
                 && let Some(error) = error.take()
             {
                 error
@@ -184,7 +235,13 @@ impl<'a> UiMovie<'a> {
             let texture = ui_external::open_external(self, bitmap.id, image, files)?;
             let header = texture.header();
             let pixels = u64::from(header.width()) * u64::from(header.height());
-            return Ok((Source::External(Box::new(texture)), pixels));
+            return Ok((
+                Source::External {
+                    texture: Box::new(texture),
+                    selection: ExternalPath::select(image),
+                },
+                pixels,
+            ));
         }
         let (width, height) = assets
             .bitmap_size(bitmap)
@@ -199,54 +256,69 @@ impl<'a> UiMovie<'a> {
         &self,
         assets: &Assets<'_>,
         base: &Base<'_, '_>,
-        source: Source<'_, '_, '_>,
+        source: Source<'a, '_, '_>,
         pixels: u64,
         budget: &Budget,
-    ) -> Decoded {
+    ) -> Decoded<'a> {
         let id = base.bitmap.id;
-        let image = {
+        let decoded = {
             let _lease = budget.take(pixels);
             match source {
-                Source::Embedded(bitmap) => assets
-                    .decode_bitmap(bitmap)
-                    .map_err(|source| self.asset_error(id, source)),
-                Source::External(texture) => self.texture_image(id, &texture),
+                Source::Embedded(bitmap) => self.embedded_bitmap_pixels(assets, bitmap),
+                Source::External { texture, selection } => {
+                    self.external_bitmap_pixels(id, &texture, selection)
+                }
             }
         };
-        let image = match image {
-            Ok(image) => image,
+        match decoded {
+            Ok(decoded) => self.produce_frame_bitmaps(base, decoded),
             Err(error) => {
-                let mut failures = Vec::new();
-                self.fail_users(base, error, &mut failures);
-                return failures
-                    .into_iter()
-                    .map(|failure| (failure.id, Err(failure.error)))
-                    .collect();
+                let mut result = Decoded::default();
+                self.fail_users(base, error, &mut result.failures);
+                result
             }
-        };
+        }
+    }
+
+    fn produce_frame_bitmaps(
+        &self,
+        base: &Base<'_, '_>,
+        decoded: DecodedPixels<'a>,
+    ) -> Decoded<'a> {
         let mut whole = None;
-        let mut results = Vec::with_capacity(base.users.len());
-        for &(user, cut) in &base.users {
-            let Some(sub) = cut else {
+        let mut result = Decoded {
+            pictures: Vec::with_capacity(base.users.len()),
+            failures: Vec::new(),
+            source: Some(BitmapRead {
+                order: base.order,
+                pixels: decoded.pixels,
+            }),
+        };
+        for &user in &base.users {
+            let Some(sub) = user.cut else {
                 whole = Some(user);
                 continue;
             };
-            let piece = image
-                .crop(
-                    (u32::from(sub.x1), u32::from(sub.y1)),
-                    (u32::from(sub.x2), u32::from(sub.y2)),
-                )
-                .ok_or_else(|| ConversionError::UiSubImage {
-                    movie: self.name().to_owned(),
-                    id: user,
-                    image_id: id,
+            if let Some(piece) = decoded.image.crop(
+                (u32::from(sub.x1), u32::from(sub.y1)),
+                (u32::from(sub.x2), u32::from(sub.y2)),
+            ) {
+                result.pictures.push((user, piece));
+            } else {
+                result.failures.push(UiBitmapFailure {
+                    id: user.id,
+                    error: ConversionError::UiSubImage {
+                        movie: self.name().to_owned(),
+                        id: user.id,
+                        image_id: base.bitmap.id,
+                    },
                 });
-            results.push((user, piece));
+            }
         }
         if let Some(user) = whole {
-            results.push((user, Ok(image)));
+            result.pictures.push((user, decoded.image));
         }
-        results
+        result
     }
 }
 
@@ -254,8 +326,8 @@ impl<'a> UiMovie<'a> {
 fn kept_pixels(base: &Base<'_, '_>, pixels: u64) -> u64 {
     base.users
         .iter()
-        .map(|&(_, cut)| {
-            cut.map_or(pixels, |sub| {
+        .map(|user| {
+            user.cut.map_or(pixels, |sub| {
                 u64::from(sub.x2.saturating_sub(sub.x1)) * u64::from(sub.y2.saturating_sub(sub.y1))
             })
         })

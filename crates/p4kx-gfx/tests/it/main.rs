@@ -8,6 +8,7 @@ mod display_list;
 mod fonts_sprites;
 mod header;
 mod imports;
+mod render_bitmap_inputs;
 mod render_limits;
 mod render_scene;
 mod render_shapes;

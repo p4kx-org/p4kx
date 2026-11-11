@@ -383,20 +383,16 @@ pub use texture_png::{CUBE_FACE_NAMES, CubemapLayout, PngReport};
 pub use textures::{
     ObservedPreviewPng, PreviewPng, PreviewPngEvidence, PreviewTextureEvidence, Texture,
 };
-use ui_service::{ui_extract, ui_jobs, ui_movie};
+use ui_service::{ui_jobs, ui_movie};
 
-pub use ui_extract::{
-    ObservedUiExtraction, UiAssetFailure, UiAssetKind, UiExtraction, WrittenUiAsset,
-};
 pub use ui_images::{ArchiveImages, MAX_SCREEN_TEXTURE_PIXELS};
 pub use ui_imports::{
     ImportIssue, ImportReport, MAX_IMPORT_BYTES, MAX_IMPORT_DEPTH, MAX_IMPORTED_FONTS,
     MAX_IMPORTED_MOVIES, UnresolvedImport,
 };
-pub use ui_movie::{MAX_UI_MOVIE_LEN, UiMovie};
 pub use ui_render::{MAX_UI_RENDER_BITMAP_PIXELS, UiBitmapFailure, UiRender};
 pub use ui_screen_texts::ScreenTexts;
-pub use ui_service::ui_movie_evidence::{UiMovieEvidence, UiSourceSite};
+pub use ui_service::*;
 pub use ui_svg::UiSvg;
 pub use verify::{VerificationReport, VerifyOptions, verify};
 pub use watch::{ArchiveChanged, ArchiveWatch, DEFAULT_WATCH_INTERVAL, FileStamp};

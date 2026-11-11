@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::io::{self, Write};
 
 use base64::engine::general_purpose::STANDARD;
@@ -34,6 +34,16 @@ pub struct SvgReport {
     pub skipped: Vec<Skipped>,
 }
 
+/// An SVG document report with the bitmaps embedded in its bytes.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ObservedSvgReport {
+    /// Dimensions and diagnostics from the ordinary SVG writer.
+    pub svg: SvgReport,
+    /// Sorted bitmap IDs whose image data were emitted.
+    pub bitmap_inputs: Vec<u16>,
+}
+
 impl Scene {
     /// Writes the scene to `out` as an SVG document, with the decoded `bitmaps` its bitmap fills
     /// name, by ID.
@@ -64,13 +74,52 @@ impl Scene {
         self.write_svg_with(bitmaps, options, title, out, &RasterLimits::DEFAULT)
     }
 
+    /// Writes the SVG and records the actual embedded bitmap inputs.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Scene::write_svg`].
+    pub fn write_svg_observed<W: Write>(
+        &self,
+        bitmaps: &HashMap<u16, RgbaImage>,
+        options: &RasterOptions,
+        title: Option<&str>,
+        out: W,
+    ) -> Result<ObservedSvgReport, GfxError> {
+        let mut bitmap_inputs = BTreeSet::new();
+        let svg = self.write_svg_observing(
+            bitmaps,
+            options,
+            title,
+            out,
+            &RasterLimits::DEFAULT,
+            Some(&mut bitmap_inputs),
+        )?;
+        Ok(ObservedSvgReport {
+            svg,
+            bitmap_inputs: bitmap_inputs.into_iter().collect(),
+        })
+    }
+
     pub(crate) fn write_svg_with<W: Write>(
+        &self,
+        bitmaps: &HashMap<u16, RgbaImage>,
+        options: &RasterOptions,
+        title: Option<&str>,
+        out: W,
+        limits: &RasterLimits,
+    ) -> Result<SvgReport, GfxError> {
+        self.write_svg_observing(bitmaps, options, title, out, limits, None)
+    }
+
+    fn write_svg_observing<W: Write>(
         &self,
         bitmaps: &HashMap<u16, RgbaImage>,
         options: &RasterOptions,
         title: Option<&str>,
         mut out: W,
         limits: &RasterLimits,
+        bitmap_inputs: Option<&mut BTreeSet<u16>>,
     ) -> Result<SvgReport, GfxError> {
         let (width, height, root) = canvas(self, options.size)?;
         let paths: Vec<Vec<Option<tiny_skia::Path>>> = self
@@ -100,7 +149,7 @@ impl Scene {
             size: (width, height),
         };
         let mut capped = Capped::new(&mut out, limits.svg_bytes);
-        let written = document.write(&mut capped, title, background);
+        let written = document.write(&mut capped, title, background, bitmap_inputs);
         if capped.exceeded() {
             return Err(GfxError::SvgTooLarge {
                 limit: limits.svg_bytes,
@@ -144,6 +193,7 @@ impl Document<'_> {
         out: &mut impl Write,
         title: Option<&str>,
         background: Option<Rgba>,
+        bitmap_inputs: Option<&mut BTreeSet<u16>>,
     ) -> Result<(), WriteError> {
         let (width, height) = self.size;
         writeln!(out, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")?;
@@ -166,7 +216,7 @@ impl Document<'_> {
             out.write_all(b"/>\n")?;
         }
         out.write_all(b"<defs>\n")?;
-        self.write_images(out)?;
+        self.write_images(out, bitmap_inputs)?;
         self.write_masks(out)?;
         self.write_groups(out)?;
         out.write_all(b"</defs>\n")?;
@@ -179,7 +229,11 @@ impl Document<'_> {
         Ok(())
     }
 
-    fn write_images(&self, out: &mut impl Write) -> Result<(), WriteError> {
+    fn write_images(
+        &self,
+        out: &mut impl Write,
+        mut bitmap_inputs: Option<&mut BTreeSet<u16>>,
+    ) -> Result<(), WriteError> {
         for (index, image) in self.plan.images.iter().enumerate() {
             let Some(source) = self.bitmaps.get(&image.id) else {
                 continue;
@@ -211,6 +265,9 @@ impl Document<'_> {
             encoder.finish()?;
             drop(encoder);
             out.write_all(b"\"/>\n")?;
+            if let Some(inputs) = bitmap_inputs.as_deref_mut() {
+                inputs.insert(image.id);
+            }
         }
         Ok(())
     }

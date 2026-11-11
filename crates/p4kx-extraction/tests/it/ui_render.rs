@@ -154,3 +154,112 @@ fn external_images_and_sub_images_fill_shapes_and_missing_ones_are_listed() -> T
     assert!(!render.is_complete(), "incomplete");
     Ok(())
 }
+
+#[test]
+fn only_painted_bitmaps_bind_the_actual_selected_movie_and_dds_entries() -> TestResult {
+    const ATLAS: &str = "Data/UI/atlas.dds";
+    const OFFSCREEN: &str = "Data/UI/outside.dds";
+    const MOVIE: &str = "Data/UI/paint.gfx";
+
+    let folder = tempfile::tempdir()?;
+    let data = folder.path().join("synthetic.p4k");
+    let movie = painted_movie();
+    let mut archive = ArchiveBuilder::new().entry(TestEntry::stored(MOVIE, movie));
+    let atlas = SplitDds::new(TestTextureFormat::LegacyBgra8, 8, 4)
+        .split(2)
+        .alpha(TestTextureFormat::R8);
+    for entry in atlas.entries(ATLAS) {
+        let encrypt = entry.path() == "Data/UI/atlas.dds.2a";
+        archive = archive.entry(if encrypt { entry.encrypted() } else { entry });
+    }
+    for entry in SplitDds::new(TestTextureFormat::LegacyBgra8, 8, 4).entries(OFFSCREEN) {
+        archive = archive.entry(entry.encrypted());
+    }
+    archive.write_to(&data)?;
+
+    let archive = Archive::open_with_key(&data, Some(p4kx_testkit::test_key()))?;
+    let movie = UiMovie::from_archive(&archive, MOVIE)?;
+    let options = RasterOptions {
+        size: CanvasSize::Stage,
+        background: Background::Transparent,
+    };
+    let ordinary = movie.render(&options)?;
+    let observed = movie.render_with_bitmap_sources(&options)?;
+    assert_eq!(ordinary.image, observed.render.image);
+    assert_eq!(ordinary.skipped, observed.render.skipped);
+    assert!(ordinary.bitmap_failures.is_empty());
+    assert!(observed.render.bitmap_failures.is_empty());
+    assert_eq!(observed.bitmaps.len(), 1);
+    let painted = observed.bitmaps.first().ok_or("on-canvas paint")?;
+    assert_eq!(painted.id, 3);
+    assert_eq!(painted.origin.contains_encrypted_source(), Some(true));
+    assert!(painted.origin.source_set_complete());
+    check_bitmap_sources(&observed.provenance)
+}
+
+fn painted_movie() -> Vec<u8> {
+    let cut = filled(11, 3, (80, 40));
+    let outside = filled(12, 4, (80, 40));
+    TestMovie::new(TestSignature::Cfx)
+        .stage(16, 8)
+        .tag(
+            1009,
+            &external_image_body(2, 2, 19, (8, 4), ("atlas", "atlas.tif")),
+        )
+        .tag(1008, &sub_image_body(3, 2, [2, 1, 6, 3]))
+        .tag(
+            1009,
+            &external_image_body(2, 2, 19, (8, 4), ("duplicate", "outside.dds")),
+        )
+        .tag(
+            1009,
+            &external_image_body(4, 2, 19, (8, 4), ("outside", "outside.dds")),
+        )
+        .tag(cut.code(), &cut.body())
+        .tag(outside.code(), &outside.body())
+        .tag(26, &TestPlace::new(1, 11).body2())
+        .tag(26, &TestPlace::new(2, 12).at(10_000, 0).body2())
+        .tag(1, &[])
+        .bytes()
+}
+
+fn check_bitmap_sources(provenance: &p4kx_extraction::SourceInventory) -> TestResult {
+    let inventory = serde_json::to_value(provenance)?;
+    let mut paths: Vec<_> = inventory
+        .get("sources")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("physical sources")?
+        .iter()
+        .filter_map(|input| {
+            input
+                .pointer("/path/value")
+                .and_then(serde_json::Value::as_str)
+        })
+        .collect();
+    paths.sort_unstable();
+    assert_eq!(
+        paths,
+        [
+            "Data/UI/atlas.dds",
+            "Data/UI/atlas.dds.2",
+            "Data/UI/atlas.dds.2a",
+            "Data/UI/atlas.dds.a",
+            "Data/UI/paint.gfx",
+        ],
+        "only the physically selected atlas, its alpha and their mip parts are used"
+    );
+    let uses = inventory
+        .get("uses")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("source uses")?;
+    assert!(
+        uses.iter().any(|usage| {
+            usage
+                .pointer("/location/field")
+                .and_then(serde_json::Value::as_str)
+                == Some("cropRectangle")
+        }),
+        "the authored crop chooses the emitted bitmap's pixels"
+    );
+    Ok(())
+}
