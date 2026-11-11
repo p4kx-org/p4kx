@@ -188,7 +188,7 @@ fn numbers(collected: &Collected<'_>) -> Vec<EmittedNumber> {
     }
     numbers.extend(
         collected
-            .durability
+            .item_components
             .numbers
             .iter()
             .cloned()

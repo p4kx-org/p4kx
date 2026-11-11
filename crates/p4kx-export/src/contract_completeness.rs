@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::Filter;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -194,4 +195,12 @@ pub(crate) enum KindCompleteness<'a> {
         /// The Filter text.
         filter: &'a str,
     },
+}
+
+impl<'a> KindCompleteness<'a> {
+    pub(crate) fn for_filter(filter: Option<&'a Filter>) -> Self {
+        filter.map_or(Self::Complete, |filter| Self::Partial {
+            filter: filter.as_str(),
+        })
+    }
 }

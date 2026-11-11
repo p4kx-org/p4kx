@@ -111,13 +111,7 @@ fn compare(
         if !matches!(health.field("Health"), Some(DataValue::Single(_))) {
             continue;
         }
-        let trace = Trace {
-            ordinals: ordinals(tree.fields()),
-            uses: &uses,
-            owner: owner.to_string(),
-            source,
-            encrypted,
-        };
+        let trace = Trace::of(&tree, &uses, source, encrypted);
         trace.check(&row["componentOrdinal"], component, "conversion")?;
         counts.insert(category, trace.health(row, health)?);
         if counts.len() == 3 {
@@ -167,7 +161,7 @@ fn ordinals<'source>(fields: &[Field<'source>]) -> HashMap<*const DataValue<'sou
     output
 }
 
-struct Trace<'read, 'source> {
+pub(super) struct Trace<'read, 'source> {
     ordinals: HashMap<*const DataValue<'source>, usize>,
     uses: &'read HashMap<&'read str, &'read Value>,
     owner: String,
@@ -175,7 +169,22 @@ struct Trace<'read, 'source> {
     encrypted: Option<bool>,
 }
 
-impl<'source> Trace<'_, 'source> {
+impl<'read, 'source> Trace<'read, 'source> {
+    pub(super) fn of(
+        tree: &RecordTree<'source>,
+        uses: &'read HashMap<&'read str, &'read Value>,
+        source: &'read str,
+        encrypted: Option<bool>,
+    ) -> Self {
+        Self {
+            ordinals: ordinals(tree.fields()),
+            uses,
+            owner: tree.record_index().to_string(),
+            source,
+            encrypted,
+        }
+    }
+
     fn health(&self, row: &Value, health: &p4kx_extraction::StructValue<'source>) -> Result<usize> {
         let mut count = self.fields(row, health, SCALARS)?;
         if let Some(DataValue::Struct(resistance)) = health.field("DamageResistances")
@@ -223,42 +232,75 @@ impl<'source> Trace<'_, 'source> {
         Ok(count)
     }
 
-    fn check(&self, cell: &Value, raw: &DataValue<'source>, role: &str) -> Result {
+    pub(super) fn check(&self, cell: &Value, raw: &DataValue<'source>, role: &str) -> Result {
+        assert!(
+            cell.get("sourceSetComplete") == Some(&Value::Bool(true)),
+            "the exact source set is complete"
+        );
+        self.part(cell, raw, "$value", role)
+    }
+
+    pub(super) fn part(
+        &self,
+        cell: &Value,
+        raw: &DataValue<'source>,
+        field: &str,
+        role: &str,
+    ) -> Result {
         let ordinal = self
             .ordinals
             .get(&std::ptr::from_ref(raw))
             .ok_or("original value ordinal")?;
-        let expected = json!([self.owner, ordinal.to_string()]);
-        let references = rows(cell, "/sourceUsesRefs")?;
-        assert_eq!(
-            cell["containsEncryptedSource"],
-            json!(self.encrypted),
+        self.location(
+            cell,
+            "dataforgeValue",
+            &json!([self.owner, ordinal.to_string()]),
+            field,
+            role,
+        )
+    }
+
+    pub(super) fn header(&self, cell: &Value, field: &str, role: &str) -> Result {
+        self.location(
+            cell,
+            "dataforgeRecordHeader",
+            &json!([self.owner]),
+            field,
+            role,
+        )
+    }
+
+    fn location(
+        &self,
+        cell: &Value,
+        namespace: &str,
+        indices: &Value,
+        field: &str,
+        role: &str,
+    ) -> Result {
+        assert!(
+            cell.get("containsEncryptedSource") == Some(&json!(self.encrypted)),
             "the marker describes the DCB input"
         );
-        assert_eq!(
-            cell["sourceSetComplete"], true,
-            "the exact source set is complete"
-        );
-        let mut exact_value = false;
-        for id in references {
+        let mut exact_use = false;
+        for id in rows(cell, "/sourceUsesRefs")? {
             let id = id.as_str().ok_or("source use identifier")?;
             let usage = self.uses.get(id).ok_or("resolved source use")?;
-            exact_value |= usage["source"] == self.source
-                && usage["role"] == role
-                && usage.pointer("/location/namespace").and_then(Value::as_str)
-                    == Some("dataforgeValue")
-                && usage.pointer("/location/indices") == Some(&expected)
-                && usage.pointer("/location/field").and_then(Value::as_str) == Some("$value");
+            exact_use |= usage.get("source").and_then(Value::as_str) == Some(self.source)
+                && usage.get("role").and_then(Value::as_str) == Some(role)
+                && usage.pointer("/location/namespace").and_then(Value::as_str) == Some(namespace)
+                && usage.pointer("/location/indices") == Some(indices)
+                && usage.pointer("/location/field").and_then(Value::as_str) == Some(field);
         }
         assert!(
-            exact_value,
-            "the source use must address the actual DCB Record and exact original field"
+            exact_use,
+            "the source use addresses the actual DCB occurrence"
         );
         Ok(())
     }
 }
 
-fn rows<'catalog>(value: &'catalog Value, path: &str) -> Result<&'catalog [Value]> {
+pub(super) fn rows<'catalog>(value: &'catalog Value, path: &str) -> Result<&'catalog [Value]> {
     value
         .pointer(path)
         .and_then(Value::as_array)
@@ -266,7 +308,7 @@ fn rows<'catalog>(value: &'catalog Value, path: &str) -> Result<&'catalog [Value
         .ok_or_else(|| format!("missing array at {path}").into())
 }
 
-fn indexed<'catalog>(
+pub(super) fn indexed<'catalog>(
     value: &'catalog Value,
     path: &str,
     key: &str,
@@ -280,14 +322,14 @@ fn indexed<'catalog>(
         .collect()
 }
 
-fn text<'row>(value: &'row Value, path: &str) -> Result<&'row str> {
+pub(super) fn text<'row>(value: &'row Value, path: &str) -> Result<&'row str> {
     value
         .pointer(path)
         .and_then(Value::as_str)
         .ok_or_else(|| format!("missing text at {path}").into())
 }
 
-fn number(value: &Value, path: &str) -> Result<u64> {
+pub(super) fn number(value: &Value, path: &str) -> Result<u64> {
     value
         .pointer(path)
         .and_then(Value::as_u64)

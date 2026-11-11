@@ -203,7 +203,10 @@ fn assemble<R>(
         collected.resource_groups,
         collected.resource_group_members,
     );
-    let durability = crate::catalog_v3::catalog_durability::tables(&forge, collected.durability);
+    let durability =
+        crate::catalog_v3::catalog_durability::tables(&forge, collected.item_components.durability);
+    let explosives =
+        crate::catalog_v3::catalog_explosives::table(&forge, collected.item_components.explosives);
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
         source: source(
@@ -212,7 +215,7 @@ fn assemble<R>(
             options.public_patches,
             key_use,
         ),
-        completeness: Completeness::of_every_kind(completeness_of(options)),
+        completeness: Completeness::of_every_kind(KindCompleteness::for_filter(options.filter)),
         export_health: health.clone(),
         items: collected.items,
         ships: collected.ships,
@@ -309,6 +312,7 @@ fn assemble<R>(
             durability: durability.health,
             degradation: durability.degradation,
             distortion: durability.distortion,
+            explosives,
             contract_templates: CatalogTable::new(
                 &forge,
                 &["ContractTemplate"],
@@ -392,12 +396,4 @@ fn assemble<R>(
         },
         output,
     ))
-}
-
-fn completeness_of<'o>(options: &'o CatalogOptions<'_>) -> KindCompleteness<'o> {
-    options.filter.map_or(KindCompleteness::Complete, |filter| {
-        KindCompleteness::Partial {
-            filter: filter.as_str(),
-        }
-    })
 }

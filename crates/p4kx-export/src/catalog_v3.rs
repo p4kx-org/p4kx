@@ -27,8 +27,21 @@ mod authored_link;
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;
 
+#[path = "authored_effect_resource.rs"]
+mod authored_effect_resource;
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
+#[path = "catalog_explosives.rs"]
+pub(crate) mod catalog_explosives;
+#[path = "catalog_item_components.rs"]
+pub(crate) mod catalog_item_components;
+#[path = "item_component_owner.rs"]
+mod item_component_owner;
+#[path = "ordnance_fields.rs"]
+mod ordnance_fields;
+#[path = "sensor_mine.rs"]
+mod sensor_mine;
+
 #[path = "catalog_durability.rs"]
 pub(crate) mod catalog_durability;
 #[path = "tag_catalog.rs"]

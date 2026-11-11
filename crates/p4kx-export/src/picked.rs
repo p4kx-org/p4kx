@@ -38,7 +38,7 @@ pub(crate) enum Picked<'f> {
         entity: Item<'f>,
         line: ClassLine,
         ports: bool,
-        durability: crate::catalog_v3::catalog_durability::DurabilityRows<'f>,
+        components: crate::catalog_v3::catalog_item_components::ItemComponentRows<'f>,
     },
     /// A ship and the vehicle facts its paints are derived from.
     Ship(Ship<'f>, VehicleFacts),
@@ -159,7 +159,7 @@ impl<'f> Picked<'f> {
             entity: item,
             line,
             ports: carries_ports(tree),
-            durability: crate::catalog_v3::catalog_durability::DurabilityRows::default(),
+            components: crate::catalog_v3::catalog_item_components::ItemComponentRows::default(),
         }
     }
 

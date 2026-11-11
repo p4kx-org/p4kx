@@ -205,6 +205,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the sourced definition carriers |
 | `definitions.blueprints` | Physical Blueprint Records and their complete original value arenas in GUID order |
 | `configurations.durability`, `configurations.degradation`, `configurations.distortion` | Original item component occurrences, raw values and provenance. [Item durability](catalog-durability.md) |
+| `configurations.explosives` | Original sensor mine triggers and explosive ordnance settings by physical Item and component position. [Explosive components](catalog-explosives.md) |
 | `configurations.blueprintTiers` | Every interpreted tier with cost relationships, normalized values and Research |
 | `projections.blueprintPresentation` | Source-backed name, category, product, default availability, dismantle and first-tier ingredient links |
 | `definitions.resourceGroups`, `declarations.resourceGroupMembers`, `projections.resourceGroupParents` | Physical group definitions, every ordered authored membership and the first-selected parent with direct per-value origins ([contract](catalog-resource-groups.md)) |

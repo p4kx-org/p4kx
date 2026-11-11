@@ -3,9 +3,7 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{
-    DataType, SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value,
-};
+use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value};
 
 use crate::catalog_number_capture::{AuthoredNumberOwner, CapturedNumber};
 use crate::catalog_read::original::{
@@ -18,6 +16,8 @@ use crate::{CatalogError, ExportAccountingError};
 
 #[path = "authored_field_links.rs"]
 mod links;
+#[path = "authored_owned_fields.rs"]
+mod owned_fields;
 
 type Fact<'scope, 'read, 'source> = OriginalValueFact<'scope, 'read, 'source>;
 
@@ -170,6 +170,14 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         self.structure().map(StructValue::type_name)
     }
 
+    pub(super) fn source_type_value(&self) -> Result<SourcedValue<&'source str>, CatalogError> {
+        Ok(self.originals.sources().value(
+            SourceValue::Present(self.source_type()?),
+            &[self.kind()?],
+            true,
+        ))
+    }
+
     fn scalar<T>(
         &self,
         name: &str,
@@ -193,109 +201,6 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
             SourceUseRole::Selector
         };
         self.bind_field(fact, OriginalValuePart::Value, state, role)
-    }
-
-    pub(super) fn owned<T>(
-        &self,
-        name: &str,
-        expected: &[&str],
-        notes: &mut Vec<FieldError>,
-        decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
-    ) -> Result<SourcedValue<T>, CatalogError> {
-        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
-            return self.absent();
-        };
-        let (part, state) = self.owned_state(name, fact, expected, notes, decode)?;
-        self.bind_field(fact, part, state, SourceUseRole::Selector)
-    }
-
-    pub(super) fn inline_class<T>(
-        &self,
-        name: &str,
-        expected: &[&str],
-        notes: &mut Vec<FieldError>,
-        decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
-    ) -> Result<SourcedValue<T>, CatalogError> {
-        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
-            return self.absent();
-        };
-        let (part, state) = if fact.field().storage().data_type() == DataType::Class {
-            self.owned_state(name, fact, expected, notes, decode)?
-        } else {
-            (
-                OriginalValuePart::Value,
-                self.failure(name, fact.value(), "a nullable Class", notes)?,
-            )
-        };
-        let mut cell = self.field_datum(fact, part, state, SourceUseRole::Selector)?;
-        cell.contribute(fact.observe(OriginalValuePart::DataType, SourceUseRole::Selector)?);
-        Ok(cell.into_cell(self.originals.sources()))
-    }
-
-    pub(super) fn array<T>(
-        &self,
-        name: &str,
-        types: &[&str],
-        notes: &mut Vec<FieldError>,
-        mut decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
-    ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
-        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
-            return self.absent();
-        };
-        let state = match fact.value() {
-            Value::Null => SourceValue::Null,
-            Value::Array(values) => {
-                let mut rows = Vec::with_capacity(values.len());
-                for (index, original) in values.iter().enumerate() {
-                    let element = self.originals.fact(original)?;
-                    let path = format!("{name}[{index}]");
-                    let (part, state) =
-                        self.owned_state(&path, element, types, notes, &mut decode)?;
-                    let mut cell = element.bind(part, state, SourceUseRole::Selector, true)?;
-                    cell.contribute(self.kind()?);
-                    rows.push(cell.into_cell(self.originals.sources()));
-                }
-                SourceValue::Present(rows)
-            }
-            value => self.failure(name, value, "a nullable Array", notes)?,
-        };
-        self.bind_field(
-            fact,
-            OriginalValuePart::Value,
-            state,
-            SourceUseRole::Selector,
-        )
-    }
-
-    fn owned_state<T>(
-        &self,
-        name: &str,
-        fact: &'reader Fact<'scope, 'read, 'source>,
-        types: &[&str],
-        notes: &mut Vec<FieldError>,
-        decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
-    ) -> Result<(OriginalValuePart, SourceValue<T>), CatalogError> {
-        Ok(match fact.value() {
-            Value::Null => (OriginalValuePart::Value, SourceValue::Null),
-            Value::Struct(source) if types.contains(&source.type_name()) => (
-                OriginalValuePart::ConcreteType,
-                SourceValue::Present(decode(
-                    Self {
-                        owner: Some(fact),
-                        ..*self
-                    },
-                    notes,
-                )?),
-            ),
-            Value::Struct(source) => (
-                OriginalValuePart::ConcreteType,
-                self.unsupported(fact, source, notes)?,
-            ),
-            other => (
-                OriginalValuePart::Value,
-                self.failure(name, other, "a nullable Struct", notes)?,
-            ),
-        })
     }
 
     fn unsupported<T>(

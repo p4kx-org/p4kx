@@ -5,6 +5,8 @@
 mod death_explosion;
 #[path = "catalog_durability_event_actions.rs"]
 mod event_actions;
+#[path = "catalog_explosive_components.rs"]
+mod explosives;
 #[path = "catalog_durability_lifecycle.rs"]
 mod lifecycle;
 #[path = "catalog_durability_nested.rs"]

@@ -1555,6 +1555,86 @@
       ],
       "type": "object"
     },
+    "BombFields": {
+      "description": "The five bomb-specific fields beside the shared ordnance settings.",
+      "properties": {
+        "altitudeRtpc": {
+          "$ref": "#/$defs/SourcedValueOfRtpc"
+        },
+        "armTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "audioParams": {
+          "$ref": "#/$defs/SourcedValueOfOrdnanceAudio"
+        },
+        "centreOfPressureOffsetY": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "clusterParams": {
+          "$ref": "#/$defs/SourcedValueOfOrdnanceCluster"
+        },
+        "collisionDelayTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "dragAreaRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "emissionsParams": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfOrdnanceEmission"
+        },
+        "enableLifetime": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "explosionParams": {
+          "$ref": "#/$defs/SourcedValueOfExplosionParameters"
+        },
+        "explosionSafetyDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "igniteTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxAltitudeForAudioRtpc": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxArmableOverride": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "maxLifetime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maximumDropAngleFromFlatFlight": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "projectileProximity": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "requiresLauncher": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "altitudeRtpc",
+        "armTime",
+        "audioParams",
+        "centreOfPressureOffsetY",
+        "clusterParams",
+        "collisionDelayTime",
+        "dragAreaRadius",
+        "emissionsParams",
+        "enableLifetime",
+        "explosionParams",
+        "explosionSafetyDistance",
+        "igniteTime",
+        "maxAltitudeForAudioRtpc",
+        "maxArmableOverride",
+        "maxLifetime",
+        "maximumDropAngleFromFlatFlight",
+        "projectileProximity",
+        "requiresLauncher"
+      ],
+      "type": "object"
+    },
     "BrokerDefinition": {
       "description": "One physical Broker owner and its single complete original-value inventory.",
       "properties": {
@@ -2185,6 +2265,9 @@
         "durability": {
           "$ref": "#/$defs/CatalogTableOfDurability"
         },
+        "explosives": {
+          "$ref": "#/$defs/CatalogTableOfExplosive"
+        },
         "itemRecoveryEconomy": {
           "$ref": "#/$defs/CatalogTableOfItemRecoveryEconomy"
         },
@@ -2210,6 +2293,7 @@
         "degradation",
         "distortion",
         "durability",
+        "explosives",
         "itemRecoveryEconomy",
         "itemRecoveryOverrides",
         "itemRecoveryPolicy",
@@ -2707,6 +2791,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ExplosionDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfExplosive": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/Explosive"
           },
           "type": "array"
         }
@@ -6538,6 +6641,120 @@
         "defaultVolume"
       ],
       "type": "object"
+    },
+    "Explosive": {
+      "description": "One original explosive device component on its selected Item owner.",
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "configuration": {
+          "$ref": "#/$defs/SourcedValueOfExplosiveConfiguration"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "configuration",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "ExplosiveConfiguration": {
+      "description": "The device-specific shape selected by the actual component type.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "sensorMine",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SensorMine"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "ordnance",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/OrdnanceFields"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "bomb",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/BombFields"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "spaceMine",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/OrdnanceFields"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "missile",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/OrdnanceFields"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
     },
     "ExportDiagnostic": {
       "description": "One aggregate diagnostic with deterministic examples and sourced subject identities.",
@@ -10693,6 +10910,29 @@
       ],
       "type": "object"
     },
+    "LaserTrigger": {
+      "properties": {
+        "laserHitOffset": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "laserLength": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "laserOffset": {
+          "$ref": "#/$defs/SourcedValueOfDamageVector"
+        },
+        "mineFront": {
+          "$ref": "#/$defs/SourcedValueOfDamageVector"
+        }
+      },
+      "required": [
+        "laserHitOffset",
+        "laserLength",
+        "laserOffset",
+        "mineFront"
+      ],
+      "type": "object"
+    },
     "LegacyLootArchetype": {
       "description": "An older loot archetype: a `LootArchetype` Record under `lootgeneration/lootarchetypes`, the\nweighted tags of item a table entry stands for.",
       "properties": {
@@ -14028,6 +14268,155 @@
       ],
       "type": "object"
     },
+    "OrdnanceAudio": {
+      "properties": {
+        "engineIgniteAudioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        },
+        "releaseAudioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        },
+        "trailAudioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        },
+        "trailStopAudioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        }
+      },
+      "required": [
+        "engineIgniteAudioTrigger",
+        "releaseAudioTrigger",
+        "trailAudioTrigger",
+        "trailStopAudioTrigger"
+      ],
+      "type": "object"
+    },
+    "OrdnanceCluster": {
+      "properties": {
+        "detachAngleIncrement": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "detachAngleInitial": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "detachAngleRelativeToGravity": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "detachAngleResetCount": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "detachDelay": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "detachSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "impactDetachTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "launchDetachTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "detachAngleIncrement",
+        "detachAngleInitial",
+        "detachAngleRelativeToGravity",
+        "detachAngleResetCount",
+        "detachDelay",
+        "detachSpeed",
+        "impactDetachTime",
+        "launchDetachTime"
+      ],
+      "type": "object"
+    },
+    "OrdnanceEmission": {
+      "properties": {
+        "active": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "decayRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxValue": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minValue": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "riseRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "active",
+        "decayRate",
+        "maxValue",
+        "minValue",
+        "riseRate"
+      ],
+      "type": "object"
+    },
+    "OrdnanceFields": {
+      "description": "The inherited settings of one authored explosive ordnance component.",
+      "properties": {
+        "armTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "audioParams": {
+          "$ref": "#/$defs/SourcedValueOfOrdnanceAudio"
+        },
+        "clusterParams": {
+          "$ref": "#/$defs/SourcedValueOfOrdnanceCluster"
+        },
+        "collisionDelayTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "emissionsParams": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfOrdnanceEmission"
+        },
+        "enableLifetime": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "explosionParams": {
+          "$ref": "#/$defs/SourcedValueOfExplosionParameters"
+        },
+        "explosionSafetyDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "igniteTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxArmableOverride": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "maxLifetime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "projectileProximity": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "requiresLauncher": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "armTime",
+        "audioParams",
+        "clusterParams",
+        "collisionDelayTime",
+        "emissionsParams",
+        "enableLifetime",
+        "explosionParams",
+        "explosionSafetyDistance",
+        "igniteTime",
+        "maxArmableOverride",
+        "maxLifetime",
+        "projectileProximity",
+        "requiresLauncher"
+      ],
+      "type": "object"
+    },
     "OriginalErrorPool": {
       "description": "The exact negative parser-pool identifier from an original error.",
       "type": "string"
@@ -15885,6 +16274,49 @@
       ],
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
+    },
+    "ProximityTrigger": {
+      "properties": {
+        "angleHorizontal": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "angleVertical": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "center": {
+          "$ref": "#/$defs/SourcedValueOfDamageVector"
+        },
+        "front": {
+          "$ref": "#/$defs/SourcedValueOfDamageVector"
+        },
+        "guideLaserLength": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxRaysPerMine": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "radius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "up": {
+          "$ref": "#/$defs/SourcedValueOfDamageVector"
+        },
+        "warningRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "angleHorizontal",
+        "angleVertical",
+        "center",
+        "front",
+        "guideLaserLength",
+        "maxRaysPerMine",
+        "radius",
+        "up",
+        "warningRadius"
+      ],
+      "type": "object"
     },
     "PublicNameRef": {
       "description": "A reference into the public short-name domain.",
@@ -18674,6 +19106,76 @@
       ],
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
+    },
+    "SensorMine": {
+      "description": "The authored mine sensor, its original visual and selected trigger form.",
+      "properties": {
+        "friendlyFire": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "laserVfx": {
+          "$ref": "#/$defs/SourcedValueOfParticleResource"
+        },
+        "triggerType": {
+          "$ref": "#/$defs/SourcedValueOfSensorMineTrigger"
+        }
+      },
+      "required": [
+        "friendlyFire",
+        "laserVfx",
+        "triggerType"
+      ],
+      "type": "object"
+    },
+    "SensorMineTrigger": {
+      "description": "The actual owned trigger type admitted at the mine's `TriggerType` slot.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "laser",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/LaserTrigger"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "proximity",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ProximityTrigger"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
     },
     "SequencerTask": {
       "description": "The concrete sequencer task authored by a Health component.",
@@ -23166,6 +23668,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfMaelstromEvent"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfOrdnanceEmission": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfOrdnanceEmission"
                 },
                 "type": "array"
               }
@@ -28053,6 +28688,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfExplosiveConfiguration": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ExplosiveConfiguration"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfFactLayer": {
       "allOf": [
         {
@@ -32637,6 +33402,396 @@
                   "number",
                   "null"
                 ]
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfOrdnanceAudio": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/OrdnanceAudio"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfOrdnanceCluster": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/OrdnanceCluster"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfOrdnanceEmission": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/OrdnanceEmission"
               }
             }
           }
@@ -38097,6 +39252,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/Rtpc"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSensorMineTrigger": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SensorMineTrigger"
               }
             }
           }

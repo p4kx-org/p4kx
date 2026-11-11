@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use super::observed::Observed;
 use crate::CatalogError;
+use crate::catalog_v3::authored_effect_resource::Rtpc;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -144,25 +145,6 @@ impl DegradeFromParent {
             resource_delta_type: source.enumeration("resourceDeltaType", notes)?,
             resource_type: source.enumeration("resourceType", notes)?,
             resource_to_degradation_rate: source.single("resourceToDegradationRate", notes)?,
-        })
-    }
-}
-
-/// The authored audio RTPC identifier.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct Rtpc {
-    rtpc: SourcedValue<String>,
-}
-
-impl Rtpc {
-    pub(super) fn read(
-        source: Observed<'_, '_, '_, '_>,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<Self, CatalogError> {
-        Ok(Self {
-            rtpc: source.string("rtpc", notes)?,
         })
     }
 }

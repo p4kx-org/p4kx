@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use crate::CatalogError;
 use crate::catalog_v3::authored_damage::DamageVector;
+use crate::catalog_v3::authored_effect_resource::{AudioResource, ParticleResource};
 use crate::catalog_v3::authored_fields::Observed;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
@@ -74,41 +75,6 @@ impl ExplosionEffects {
                 MaterialEffect::read,
             )?,
             particle_strength: source.single("particleStrength", notes)?,
-        })
-    }
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[schemars(transform = every_field_required)]
-struct ParticleResource {
-    path: SourcedValue<String>,
-}
-
-impl ParticleResource {
-    fn read(
-        source: Observed<'_, '_, '_, '_>,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<Self, CatalogError> {
-        Ok(Self {
-            path: source.string("path", notes)?,
-        })
-    }
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-struct AudioResource {
-    audio_trigger: SourcedValue<String>,
-}
-
-impl AudioResource {
-    fn read(
-        source: Observed<'_, '_, '_, '_>,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<Self, CatalogError> {
-        Ok(Self {
-            audio_trigger: source.string("audioTrigger", notes)?,
         })
     }
 }
