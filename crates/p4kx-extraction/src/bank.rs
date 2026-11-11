@@ -25,8 +25,9 @@ pub use p4kx_audio::{
     MusicTrackKind, SoundSource,
 };
 pub use p4kx_audio::{
-    BankHircMusicPlaylist, BankMusicPlaylistFields, BankMusicPlaylistItem, BankMusicPlaylistRead,
-    BankMusicPlaylistRow, BankMusicPlaylistRows, BankMusicTransitionFields, MusicPlayMode,
+    BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistItem,
+    BankMusicPlaylistRead, BankMusicPlaylistRow, BankMusicPlaylistRows, BankMusicTransitionFields,
+    MusicPlayMode,
 };
 pub use p4kx_audio::{
     BankHircMusicSwitch, BankMusicSwitchBranch, BankMusicSwitchFields, BankMusicSwitchGroup,

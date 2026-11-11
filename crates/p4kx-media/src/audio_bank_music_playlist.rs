@@ -3,7 +3,9 @@
 
 use std::io::{Read, Seek};
 
-use p4kx_extraction::bank::{BankHircMusicPlaylist, BankMusicPlaylistRead, BankMusicPlaylistRow};
+use p4kx_extraction::bank::{
+    BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistRead, BankMusicPlaylistRow,
+};
 
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_music_segment::MusicChildField;
@@ -43,9 +45,10 @@ pub(crate) fn project<R: Read + Seek>(
             &payload,
             issue.as_slice(),
         )?;
-    for row in playlist.rows {
+    let mut rows = playlist.rows;
+    while let Some(row) = rows.next() {
         let row = row.map_err(|cause| projection.replay_failure(cause))?;
-        emit(projection, &sites, row, writer)?;
+        emit(projection, &sites, row, rows.current_item_depth(), writer)?;
     }
     Ok(())
 }
@@ -54,6 +57,7 @@ fn emit(
     projection: &BankProjection<'_>,
     sites: &PlaylistSites<'_>,
     row: BankMusicPlaylistRow,
+    depth: Option<&BankMusicPlaylistDepth>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let input = projection.input;
@@ -80,11 +84,14 @@ fn emit(
         }
         BankMusicPlaylistRow::Item { ordinal, value } => {
             let ordinal = u64::from(ordinal);
+            let depth = depth.ok_or_else(|| {
+                MediaError::Contract("MusicPlaylist item has no nesting receipt".into())
+            })?;
             (
                 ITEM,
                 ordinal,
-                MusicPlaylistPayload::Item(PlaylistItemRecord::new(ordinal, &value)),
-                sites.item(input, ordinal, &value, writer)?,
+                MusicPlaylistPayload::Item(PlaylistItemRecord::new(ordinal, &value, depth.value)),
+                sites.item(input, ordinal, &value, depth, writer)?,
             )
         }
         _ => return Err(MediaError::Contract("unexpected MusicPlaylist row".into())),

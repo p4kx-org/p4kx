@@ -6314,6 +6314,11 @@
           "minimum": 0,
           "type": "integer"
         },
+        "depth": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
         "item_id": {
           "format": "uint32",
           "minimum": 0,
@@ -6382,6 +6387,7 @@
       },
       "required": [
         "ordinal",
+        "depth",
         "segment_id",
         "item_id",
         "children",

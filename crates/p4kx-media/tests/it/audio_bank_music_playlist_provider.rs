@@ -45,6 +45,7 @@ fn music_playlist_export_keeps_raw_items_node_rows_and_transition_range() -> Tes
     check_item(item);
     let evidence = Origins::read(&base)?;
     check_flags(&evidence, ordinal, bank.len())?;
+    check_depth(&evidence, ordinal, bank.len())?;
     let (_, playlist) = row(&records, PLAYLIST, &[1, 0])?;
     assert_eq!(playlist.status, Status::Complete);
     assert_eq!(
@@ -103,6 +104,7 @@ fn check_item(item: &MediaRecord) {
     for (field, expected) in [
         ("segment_id", json!(SEGMENT)),
         ("item_id", json!(2)),
+        ("depth", json!(1)),
         ("play_mode_code", json!(MODE)),
         ("play_mode", json!("other")),
         ("loops", json!(-7)),
@@ -117,6 +119,23 @@ fn check_item(item: &MediaRecord) {
             "authored field {field}"
         );
     }
+}
+
+fn check_depth(evidence: &Origins, row: usize, end: usize) -> TestResult {
+    let uses = evidence.uses(row, 1, "/data/payload/depth")?;
+    let expected = json!({
+        "type": "subresource",
+        "namespace": "bnkHircPlaylistChildCounts",
+        "indices": [(end - 52).to_string(), "1", "30", "4"],
+        "field": "precedingCounts",
+    });
+    assert!(
+        uses.iter()
+            .any(|used| used.get("location") == Some(&expected)
+                && used.get("role") == Some(&json!("selector"))),
+        "the item depth uses only the original earlier child-count word"
+    );
+    Ok(())
 }
 
 fn check_flags(evidence: &Origins, row: usize, end: usize) -> TestResult {

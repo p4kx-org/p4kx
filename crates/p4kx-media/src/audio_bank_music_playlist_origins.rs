@@ -4,7 +4,9 @@
 use std::ops::Range;
 
 use p4kx_extraction::SourceUseRole;
-use p4kx_extraction::bank::{BankHircObject, BankMusicPlaylistFields, BankMusicPlaylistItem};
+use p4kx_extraction::bank::{
+    BankHircObject, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistItem,
+};
 
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_music_segment::MusicSites;
@@ -82,6 +84,7 @@ impl<'a> PlaylistSites<'a> {
         input: &MediaOriginInput,
         ordinal: u64,
         item: &BankMusicPlaylistItem,
+        depth: &BankMusicPlaylistDepth,
         writer: &MediaWriter<'_>,
     ) -> Result<PreparedRecordOrigins, MediaError> {
         let mut prepared = BankOrigins::new(input, writer)?;
@@ -92,6 +95,18 @@ impl<'a> PlaylistSites<'a> {
         )?;
         self.node.row_identity(&mut prepared, &position)?;
         prepared.range("/data/payload/item_range", &position, &position)?;
+        let preceding = depth.preceding_child_counts().map(|coordinates| {
+            (
+                OriginSite::new("bnkHircPlaylistChildCounts", coordinates, "precedingCounts"),
+                SourceUseRole::Selector,
+            )
+        });
+        let evidence = prepared.capture(
+            self.item_list()
+                .chain([route(&indices, "playlistItemRouting")])
+                .chain(preceding),
+        )?;
+        prepared.field("/data/payload/depth", evidence)?;
         for word in authored(item).into_iter().chain(interpreted(item)) {
             let bytes = span(word.range);
             let evidence = prepared.capture(self.item_list().chain([

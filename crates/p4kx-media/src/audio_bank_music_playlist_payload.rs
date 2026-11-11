@@ -91,6 +91,7 @@ impl PlaylistRecord {
 #[serde(deny_unknown_fields)]
 pub(crate) struct PlaylistItemRecord {
     ordinal: DecimalU64,
+    depth: usize,
     segment_id: u32,
     item_id: u32,
     children: u32,
@@ -109,10 +110,11 @@ pub(crate) struct PlaylistItemRecord {
 }
 
 impl PlaylistItemRecord {
-    pub(super) fn new(ordinal: u64, item: &BankMusicPlaylistItem) -> Self {
+    pub(super) fn new(ordinal: u64, item: &BankMusicPlaylistItem, depth: usize) -> Self {
         let value = item.value();
         Self {
             ordinal: DecimalU64::new(ordinal),
+            depth,
             segment_id: value.segment_id,
             item_id: value.item_id,
             children: value.children,

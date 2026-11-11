@@ -76,6 +76,50 @@ fn music_playlist_keeps_original_items_and_opaque_transition_rules() -> TestResu
     Ok(())
 }
 
+#[test]
+fn music_playlist_replays_legacy_item_depth_with_the_exact_predecessor_words() -> TestResult {
+    let bytes = fixture(154)?;
+    let slice = Soundbank::parse(bytes.as_slice())?;
+    let HircValue::MusicPlaylist(legacy) =
+        &slice.objects().first().ok_or("fixture playlist")?.value
+    else {
+        return Err("legacy MusicPlaylist layout".into());
+    };
+    let mut source = open(&bytes)?;
+    let (header, mut hirc) = parts(&mut source)?;
+    let Some(BankHircSemantic::MusicPlaylist(playlist)) =
+        hirc.next_semantic(&header).transpose()?
+    else {
+        return Err("checked MusicPlaylist layout".into());
+    };
+    let first_child_count = u64::try_from(bytes.len() - 2 * ITEM_BYTES + 2 * size_of::<u32>())?;
+    let mut rows = playlist.rows;
+    let mut depths = Vec::new();
+    while let Some(row) = rows.next() {
+        if let BankMusicPlaylistRow::Item { ordinal, .. } = row? {
+            let observed = rows.current_item_depth().ok_or("current playlist depth")?;
+            let expected = (ordinal != 0).then_some([first_child_count, 1, 30, 4]);
+            assert_eq!(
+                observed.preceding_child_counts(),
+                expected.as_ref(),
+                "only previous child count words select the depth"
+            );
+            depths.push(observed.value);
+        }
+    }
+    assert_eq!(depths, [0, 1], "authored group and its child");
+    assert_eq!(
+        depths,
+        legacy.item_depths().collect::<Vec<_>>(),
+        "same nesting exposed by ObjectView"
+    );
+    assert!(
+        rows.current_item_depth().is_none(),
+        "no current item after exhaustion"
+    );
+    Ok(())
+}
+
 fn check_rules(bytes: &[u8], fields: &BankMusicPlaylistFields) -> TestResult {
     let rules = fields
         .transitions

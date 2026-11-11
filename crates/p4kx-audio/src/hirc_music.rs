@@ -6,6 +6,7 @@
 use std::fmt;
 
 use crate::hirc::SoundSource;
+use crate::hirc_music_playlist_depth::PlaylistDepth;
 
 /// The tempo and time signature of a music node.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -270,19 +271,9 @@ impl MusicPlaylist {
     /// Returns the nesting depth of every item, 0 for an item of the top group: an item with
     /// `children` of N is followed by its N child items (each with their own).
     pub fn item_depths(&self) -> impl Iterator<Item = usize> + '_ {
-        let mut open: Vec<u32> = Vec::new();
-        self.items.iter().map(move |item| {
-            while open.last() == Some(&0) {
-                open.pop();
-            }
-            let depth = open.len();
-            if let Some(left) = open.last_mut() {
-                *left = left.saturating_sub(1);
-            }
-            if item.children > 0 {
-                open.push(item.children);
-            }
-            depth
-        })
+        let mut depth = PlaylistDepth::default();
+        self.items
+            .iter()
+            .map(move |item| depth.advance(item.children))
     }
 }

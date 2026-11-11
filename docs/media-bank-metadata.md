@@ -115,8 +115,11 @@ keeps the preceding complete rows. Other layouts retain the physical HIRC object
 Version 154 MusicPlaylist rows retain the music node, ordered children and stingers, and
 items in their original order. Each item preserves its original segment and item IDs,
 following child count, play mode code, signed loop counts, weight, avoid-repeat count and
-raw weight and shuffle selector bytes. The play mode and selector interpretations are also
-available. The transition rule count and checked complete-rule prefix locate the original
+raw weight and shuffle selector bytes. Each item also carries its interpreted play mode,
+selector booleans and zero-based nesting depth. The depth uses the prior original child counts.
+Its `bnkHircPlaylistChildCounts` source use encodes the first count offset, count of preceding
+words, byte stride, and byte width, in that order.
+The transition rule count and checked complete-rule prefix locate the original
 scheduling bytes in the retained bank. A truncated item leaves earlier complete rows
 available and reports the malformed layout.
 

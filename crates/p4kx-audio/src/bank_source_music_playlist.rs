@@ -8,6 +8,7 @@ use crate::bank_structure::OBJECT_ID_LEN;
 use crate::hirc::CONTAINER_VERSION;
 use crate::hirc_music_node::{self, BankMusicNodeFields, MusicList, MusicNodeLists, STINGER_LEN};
 use crate::hirc_music_playlist::{self, BankMusicPlaylistItem, PLAYLIST_ITEM_LEN};
+use crate::hirc_music_playlist_depth::PlaylistDepth;
 use crate::hirc_music_segment;
 use crate::hirc_music_transition::{self, BankMusicTransitionFields};
 use crate::hirc_node::ID_LEN;
@@ -23,7 +24,7 @@ pub struct BankHircMusicPlaylist<'input, R> {
     pub status: BankMusicPlaylistRead,
     /// Successfully observed original fields.
     pub fields: BankMusicPlaylistFields,
-    /// Fixed-memory cursor over complete original rows.
+    /// Bounded cursor over complete original rows.
     pub rows: BankMusicPlaylistRows<'input, R>,
 }
 
@@ -123,13 +124,40 @@ impl Lists {
     }
 }
 
-/// Bounded cursor over original child IDs, stingers and playlist items.
+/// One derived playlist depth and its original preceding child-count word geometry.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct BankMusicPlaylistDepth {
+    /// Nesting depth of the current item, starting at zero.
+    pub value: usize,
+    preceding_child_counts: Option<[u64; 4]>,
+}
+
+impl BankMusicPlaylistDepth {
+    /// Returns original first offset, word count, stride and word width for preceding child counts.
+    #[must_use]
+    pub const fn preceding_child_counts(&self) -> Option<&[u64; 4]> {
+        self.preceding_child_counts.as_ref()
+    }
+}
+
+/// Bounded original row cursor with a stack proportional to item nesting.
 pub struct BankMusicPlaylistRows<'input, R> {
     input: &'input mut SeekSource<R>,
     stopped: &'input mut bool,
     lists: Lists,
     list: Option<ListKind>,
     next: u32,
+    depths: PlaylistDepth,
+    item_depth: Option<BankMusicPlaylistDepth>,
+}
+
+impl<R> BankMusicPlaylistRows<'_, R> {
+    /// Returns the depth receipt of the current item row, when present.
+    #[must_use]
+    pub const fn current_item_depth(&self) -> Option<&BankMusicPlaylistDepth> {
+        self.item_depth.as_ref()
+    }
 }
 
 impl<R: Read + Seek> BankMusicPlaylistRows<'_, R> {
@@ -150,10 +178,19 @@ impl<R: Read + Seek> BankMusicPlaylistRows<'_, R> {
                 ordinal,
                 value: hirc_music_node::stinger(&mut reader)?,
             },
-            ListKind::Items => BankMusicPlaylistRow::Item {
-                ordinal,
-                value: hirc_music_playlist::item(&mut reader)?,
-            },
+            ListKind::Items => {
+                let value = hirc_music_playlist::item(&mut reader)?;
+                self.item_depth = Some(BankMusicPlaylistDepth {
+                    value: self.depths.advance(value.children.value),
+                    preceding_child_counts: (ordinal > 0).then_some([
+                        value.children.range.start - position,
+                        u64::from(ordinal),
+                        PLAYLIST_ITEM_LEN as u64,
+                        value.children.range.end - value.children.range.start,
+                    ]),
+                });
+                BankMusicPlaylistRow::Item { ordinal, value }
+            }
         })
     }
 }
@@ -162,6 +199,7 @@ impl<R: Read + Seek> Iterator for BankMusicPlaylistRows<'_, R> {
     type Item = Result<BankMusicPlaylistRow, BankReadError>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        self.item_depth = None;
         if *self.stopped {
             return None;
         }
@@ -217,6 +255,8 @@ pub(crate) fn observe<'input, R: Read + Seek>(
             lists,
             list: Some(ListKind::Children),
             next: 0,
+            depths: PlaylistDepth::default(),
+            item_depth: None,
         },
     })
 }

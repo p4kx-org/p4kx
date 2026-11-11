@@ -35,6 +35,7 @@ mod hirc_music;
 mod hirc_music_node;
 mod hirc_music_parse;
 mod hirc_music_playlist;
+mod hirc_music_playlist_depth;
 mod hirc_music_segment;
 mod hirc_music_switch;
 mod hirc_music_switch_traversal;
@@ -77,8 +78,8 @@ pub use bank_source_hirc::{
     BankActionRead, BankHirc, BankHircAction, BankHircObject, BankHircSemantic,
 };
 pub use bank_source_music_playlist::{
-    BankHircMusicPlaylist, BankMusicPlaylistFields, BankMusicPlaylistRead, BankMusicPlaylistRow,
-    BankMusicPlaylistRows,
+    BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistRead,
+    BankMusicPlaylistRow, BankMusicPlaylistRows,
 };
 pub use bank_source_music_segment::{
     BankHircMusicSegment, BankMusicMarker, BankMusicSegmentRead, BankMusicSegmentRow,
