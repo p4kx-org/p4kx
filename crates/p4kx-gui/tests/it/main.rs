@@ -93,6 +93,7 @@ mod headless;
 mod image_preview;
 mod image_preview_layers;
 mod image_preview_limits;
+mod image_preview_origins;
 mod imaging;
 mod info_models;
 mod interior_cancel;

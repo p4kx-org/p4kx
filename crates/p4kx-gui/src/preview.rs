@@ -10,6 +10,7 @@ mod bank_cache_tests;
 mod contents;
 mod entry_bytes;
 mod image;
+mod image_provenance;
 mod reading;
 mod soundbank;
 mod texture_info;
@@ -26,6 +27,7 @@ pub(crate) use bank_cache::BankCache;
 pub use contents::PreviewContents;
 pub(crate) use contents::{HEX_ROW_LEN, printable};
 pub use image::{ImagePreview, ImageStatus, MipStatus};
+pub use image_provenance::{ImageHeaderProvenance, ImageMipProvenance};
 #[cfg(test)]
 use reading::read;
 use reading::{Spawned, spawn};

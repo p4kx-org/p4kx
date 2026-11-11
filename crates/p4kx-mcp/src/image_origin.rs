@@ -8,13 +8,10 @@ use p4kx_extraction::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use DdsHeaderField::{ArraySize, Depth, Faces, Format, Height, MipCount, Prefix, Width};
+use DdsHeaderField::{ArraySize, Depth, Faces, Format, Height, MipCount, Width};
 use SourceUseRole::{Conversion, Payload, Selector};
 
 const TOPOLOGY: &[DdsHeaderField] = &[Faces, ArraySize, Depth];
-const PIXELS: &[DdsHeaderField] = &[
-    Prefix, Format, Width, Height, MipCount, Faces, ArraySize, Depth,
-];
 
 /// Each key addresses its value in the complete MCP tool result.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -138,24 +135,10 @@ fn rendered_origins(
     mip_selector: &[SourceUse],
     face_selector: &[SourceUse],
 ) -> Result<(FieldOrigin, FieldOrigin), SourceEvidenceError> {
-    let mut alpha_lookup = vec![evidence.color.name_use(Selector)?];
+    let alpha_lookup = evidence.alpha_lookup_uses()?;
     let mut png = mip_selector.to_vec();
     png.extend_from_slice(face_selector);
-    append_image_inputs(&evidence.color, &mut png)?;
-    if let Some(alpha) = &evidence.alpha {
-        alpha_lookup.push(alpha.name_use(Selector)?);
-        append_image_inputs(alpha, &mut png)?;
-    }
+    evidence.append_pixel_uses(&mut png)?;
     png.extend_from_slice(&alpha_lookup);
     Ok((uses.origin(&png, true), uses.origin(&alpha_lookup, true)))
-}
-
-fn append_image_inputs(
-    texture: &PreviewTextureEvidence,
-    png: &mut Vec<SourceUse>,
-) -> Result<(), SourceEvidenceError> {
-    png.extend(texture.header_uses(PIXELS, Conversion)?);
-    png.push(texture.header_size_use()?);
-    png.push(texture.mip().clone());
-    Ok(())
 }

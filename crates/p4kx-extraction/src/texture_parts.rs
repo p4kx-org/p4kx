@@ -53,12 +53,16 @@ impl Read for PartReader<'_> {
 }
 
 impl<'a> Parts<'a> {
-    /// Finds the Entry at `path`, its parts and its alpha tail in one parallel pass over the
-    /// Archive, or `None` when no Entry has that path.
+    /// Finds the header, its parts and its alpha tail in one pass over the Archive.
+    /// A selected header has already been bound to its original Entry.
     ///
     /// A path ending in `.a` names an alpha tail itself; its parts are `.1a` . `.Na` and it has
     /// no alpha tail of its own.
-    pub(crate) fn in_archive(archive: &'a Archive, path: &str) -> Option<Found<'a>> {
+    pub(crate) fn in_archive(
+        archive: &'a Archive,
+        path: &str,
+        selected: Option<SourceEntry<'a>>,
+    ) -> Option<Found<'a>> {
         let (base, is_alpha) = split_alpha(path);
         let source: &'a dyn EntrySource = archive;
         let found: Vec<(Role, SourceEntry<'a>)> = source
@@ -82,10 +86,12 @@ impl<'a> Parts<'a> {
             }
             parts
         };
-        let header = find(if is_alpha {
-            Role::AlphaHeader
-        } else {
-            Role::Header
+        let header = selected.or_else(|| {
+            find(if is_alpha {
+                Role::AlphaHeader
+            } else {
+                Role::Header
+            })
         })?;
         let alpha = if is_alpha {
             None

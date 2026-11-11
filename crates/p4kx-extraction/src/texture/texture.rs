@@ -4,7 +4,7 @@
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use p4kx_archive::Archive;
+use p4kx_archive::{Archive, Entry};
 use p4kx_texture::{
     DdsHeader, DdsRawHeader, LocatedMip, MergeReport, Mip, MipPayloadLocation, RgbaImage,
     TextureError, merge, merge_alpha, read_mip_with_location,
@@ -13,6 +13,7 @@ use p4kx_texture::{
 use crate::disk_parts::DiskParts;
 use crate::output_file::{read_error, write_replacing_protected};
 use crate::path_index::PathIndex;
+use crate::source::SourceEntry;
 use crate::source_protection::SourceProtection;
 use crate::texture_parts::{Found, Parts};
 use crate::texture_preview_png::input::{PreviewInputs, TexturePreviewInput};
@@ -48,8 +49,22 @@ impl<'a> Texture<'a> {
     /// Returns [`ConversionError::UnknownEntry`] when no Entry has that path, and another
     /// [`ConversionError`] when the Entry cannot be read or holds no DDS header.
     pub fn from_archive(archive: &'a Archive, path: &str) -> Result<Self, ConversionError> {
-        let found = Parts::in_archive(archive, path)
+        let found = Parts::in_archive(archive, path, None)
             .ok_or_else(|| UnknownEntries(vec![path.to_owned()]))?;
+        Self::from_found(found)
+    }
+
+    /// Opens the physical header Entry selected from its owning Archive.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unknown-Entry error for a foreign Entry, or the original DDS read error.
+    pub fn from_entry(archive: &'a Archive, entry: &'a Entry) -> Result<Self, ConversionError> {
+        let path = entry.path();
+        let missing = || UnknownEntries(vec![path.to_owned()]);
+        archive.observed_entry(entry).ok_or_else(missing)?;
+        let selected = SourceEntry::of_archive(archive, entry);
+        let found = Parts::in_archive(archive, path, Some(selected)).ok_or_else(missing)?;
         Self::from_found(found)
     }
 
@@ -121,6 +136,10 @@ impl<'a> Texture<'a> {
     #[must_use]
     pub const fn header(&self) -> &DdsHeader {
         &self.header
+    }
+
+    pub(crate) const fn raw_header(&self) -> DdsRawHeader {
+        self.raw_header
     }
 
     /// Returns all captured source header words and separate normalized topology without I/O.

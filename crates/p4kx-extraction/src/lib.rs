@@ -157,7 +157,7 @@ mod texture_names;
 mod texture_outputs;
 mod texture_parts;
 mod texture_png;
-mod texture_preview;
+pub mod texture_preview;
 mod texture_preview_png;
 mod texture_siblings;
 mod textures;

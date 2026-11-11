@@ -94,6 +94,7 @@ fn sample_args() -> Vec<(&'static str, FluentValue<'static>)> {
         ("id", "1234".into()),
         ("bank", "Data\\Sounds\\ship.bnk".into()),
         ("column", "13".into()),
+        ("shortcut", "Ctrl+Enter".into()),
         ("page", "1".into()),
         ("pages", "3".into()),
         ("max", "120".into()),

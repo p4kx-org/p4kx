@@ -7,6 +7,7 @@ use egui::{
     Color32, Id, Rect, Role, ScrollArea, Sense, TextureId, Ui, Vec2, WidgetInfo, pos2, vec2,
 };
 use fluent_bundle::FluentValue;
+use p4kx_extraction::FieldOrigin;
 
 use super::search::eyebrow;
 use crate::theme::desktop::{IMAGE_LABEL_GAP, IMAGE_SELECTOR_GAP, ROW_HEIGHT, SPINNER_INLINE};
@@ -15,25 +16,37 @@ use crate::widgets::frames;
 use crate::widgets::indicator::spinner;
 use crate::widgets::scroll_region;
 use crate::widgets::summary::{Fact, FactsStrip};
-use crate::widgets::tab;
+use crate::widgets::{tab, tooltip};
 use crate::{
-    ImagePreview, ImageStatus, ImageText, Language, MipStatus, ScrollText, Text, Texts, TextureInfo,
+    ImageHeaderProvenance, ImageMipProvenance, ImagePreview, ImageStatus, ImageText, Language,
+    MipStatus, ScrollText, Text, Texts, TextureInfo,
 };
 
 /// Shows the mip selector of an opened texture: one segment per mip a texture may be on this
 /// display, labelled with the mip's longer side, `level` pressed. Returns the level clicked.
-fn mip_selector(ui: &mut Ui, texts: &Texts, info: &TextureInfo, level: Option<u32>) -> Option<u32> {
+fn mip_selector(
+    ui: &mut Ui,
+    texts: &Texts,
+    info: &TextureInfo,
+    level: Option<u32>,
+    origins: Option<&ImageHeaderProvenance>,
+) -> Option<u32> {
     let first = info.first_showable_level(max_side(ui))?;
     let labels = info.mip_labels().get(first as usize..)?;
     let active = level
         .and_then(|level| level.checked_sub(first))
         .map(|offset| offset as usize);
     let mut clicked = None;
-    ui.horizontal(|ui| {
+    let selector = ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = IMAGE_LABEL_GAP;
         ui.label(eyebrow(&texts.get(ImageText::Mip)));
         clicked = tab::segments(ui, labels, active);
     });
+    if let Some(origins) = origins {
+        tooltip::hover(selector.response, |ui| {
+            tooltip::line(ui, origin_text(texts, &origins.mip_label));
+        });
+    }
     ui.add_space(IMAGE_SELECTOR_GAP);
     clicked
         .and_then(|index| u32::try_from(index).ok())
@@ -46,7 +59,11 @@ pub(super) fn show(ui: &mut Ui, texts: &Texts, path: &str, image: &ImagePreview)
     let path_arg = || ("path", FluentValue::from(path.to_owned()));
     let status = image.status();
     if let ImageStatus::Opened(info, _) = status {
-        facts(ui, texts, image.serial(), info).show(ui);
+        let rect = facts(ui, texts, image.serial(), info).show(ui);
+        if let Some(origins) = image.header_provenance() {
+            let response = ui.interact(rect, ui.scope_id().with("texture-origins"), Sense::hover());
+            tooltip::hover(response, |ui| header_origins(ui, texts, info, origins));
+        }
     }
     frames::preview_body()
         .show(ui, |ui| match status {
@@ -69,8 +86,9 @@ pub(super) fn show(ui: &mut Ui, texts: &Texts, path: &str, image: &ImagePreview)
                 None
             }
             ImageStatus::Opened(info, mip) => {
-                let clicked = mip_selector(ui, texts, info, image.level());
-                let fitted = mip_body(ui, texts, path, info, mip);
+                let clicked =
+                    mip_selector(ui, texts, info, image.level(), image.header_provenance());
+                let fitted = mip_body(ui, texts, path, info, mip, image.mip_provenance());
                 clicked.or(fitted)
             }
         })
@@ -83,6 +101,7 @@ fn mip_body(
     path: &str,
     info: &TextureInfo,
     mip: MipStatus<'_>,
+    origins: Option<&ImageMipProvenance>,
 ) -> Option<u32> {
     match mip {
         MipStatus::Unchosen if info.first_showable_level(max_side(ui)).is_none() => {
@@ -109,7 +128,7 @@ fn mip_body(
         }
         MipStatus::Decoded(level, Some(texture)) => {
             if let Some(size) = info.image_size(level) {
-                picture(ui, texts, (level, size), texture);
+                picture(ui, texts, (level, size), texture, origins);
             }
             None
         }
@@ -121,6 +140,7 @@ fn picture(
     texts: &Texts,
     (level, [width, height]): (u32, [u32; 2]),
     texture: TextureId,
+    origins: Option<&ImageMipProvenance>,
 ) {
     let size = vec2(points(width), points(height)) / ui.ctx().pixels_per_point();
     let scroll = ScrollArea::both()
@@ -147,9 +167,51 @@ fn picture(
                 let shown = Rect::from_center_size(rect.center(), size);
                 let whole = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
                 ui.painter().image(texture, shown, whole, Color32::WHITE);
+                if let Some(origins) = origins {
+                    tooltip::hover(response, |ui| mip_origins(ui, texts, origins));
+                }
             })
         },
     );
+}
+
+fn origin_text(texts: &Texts, origin: &FieldOrigin) -> String {
+    texts.get(match origin.contains_encrypted_source() {
+        Some(true) => ImageText::OriginEncrypted,
+        Some(false) => ImageText::OriginPlain,
+        None => ImageText::OriginUnknown,
+    })
+}
+
+fn origin_row(ui: &mut Ui, texts: &Texts, field: ImageText, origin: &FieldOrigin) {
+    ui.horizontal(|ui| {
+        ui.strong(texts.get(field));
+        tooltip::line(ui, origin_text(texts, origin));
+    });
+}
+
+fn header_origins(ui: &mut Ui, texts: &Texts, info: &TextureInfo, origins: &ImageHeaderProvenance) {
+    for (field, origin) in [
+        (ImageText::Format, &origins.format),
+        (ImageText::Size, &origins.width),
+        (ImageText::Mips, &origins.mip_count),
+        (ImageText::Faces, &origins.cubemap_faces),
+    ] {
+        origin_row(ui, texts, field, origin);
+    }
+    if info.layers().is_some() {
+        origin_row(ui, texts, ImageText::Layers, &origins.layers);
+    }
+}
+
+fn mip_origins(ui: &mut Ui, texts: &Texts, origins: &ImageMipProvenance) {
+    for (field, origin) in [
+        (ImageText::Mip, &origins.level),
+        (ImageText::Size, &origins.width),
+        (ImageText::Pixels, &origins.pixels),
+    ] {
+        origin_row(ui, texts, field, origin);
+    }
 }
 
 /// Claims the space left for the image and returns its size in pixels once it is the same in

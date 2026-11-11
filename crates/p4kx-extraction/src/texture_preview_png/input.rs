@@ -7,8 +7,8 @@ use p4kx_texture::{DdsHeaderField, DdsRawHeader, MipByteSpans, MipPayloadLocatio
 use crate::source::SourceEntry;
 use crate::texture_parts::Parts;
 use crate::{
-    InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceScope, SourceUse,
-    SourceUseRole, SourceUses,
+    FieldOrigin, InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceScope,
+    SourceUse, SourceUseRole, SourceUses,
 };
 
 #[derive(Debug)]
@@ -104,12 +104,12 @@ impl TexturePreviewInput<'_, MipByteSpans> {
         uses: &SourceUses,
         level: u32,
     ) -> Result<PreviewTextureEvidence, SourceEvidenceError> {
-        let header = observe(uses, self.header)?;
+        let header = PreviewHeaderEvidence::of_read(uses, self.header, self.raw)?;
         let sibling = match self.payload {
             PayloadEntry::Header => None,
             PayloadEntry::Split(entry) => Some(observe(uses, entry)?),
         };
-        let payload = sibling.as_ref().unwrap_or(&header);
+        let payload = sibling.as_ref().unwrap_or(&header.scope);
         let spans = self.spans;
         let mip = payload.at(
             SourceLocation::Subresource {
@@ -125,12 +125,7 @@ impl TexturePreviewInput<'_, MipByteSpans> {
             },
             SourceUseRole::Conversion,
         )?;
-        Ok(PreviewTextureEvidence {
-            raw: self.raw,
-            header,
-            archive_ancestry: self.header.map(|entry| entry.ancestors().len()),
-            mip,
-        })
+        Ok(PreviewTextureEvidence { header, mip })
     }
 }
 
@@ -154,12 +149,42 @@ pub struct PreviewPngEvidence {
     pub alpha: Option<PreviewTextureEvidence>,
 }
 
-/// The observed header and selected mip bytes of one texture in the PNG.
+impl PreviewPngEvidence {
+    /// Registers the selected color and alpha inputs that supplied the preview pixels.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the evidence inventory was interrupted.
+    pub fn append_pixel_uses(&self, uses: &mut Vec<SourceUse>) -> Result<(), SourceEvidenceError> {
+        use DdsHeaderField::{ArraySize, Depth, Faces, Format, Height, MipCount, Prefix, Width};
+        let fields = [
+            Prefix, Format, Width, Height, MipCount, Faces, ArraySize, Depth,
+        ];
+        for texture in std::iter::once(&self.color).chain(self.alpha.as_ref()) {
+            uses.extend(texture.header_uses(&fields, SourceUseRole::Conversion)?);
+            uses.push(texture.header_size_use()?);
+            uses.push(texture.mip().clone());
+        }
+        Ok(())
+    }
+
+    /// Registers the stored names used to select the color header and its alpha sibling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the evidence inventory was interrupted.
+    pub fn alpha_lookup_uses(&self) -> Result<Vec<SourceUse>, SourceEvidenceError> {
+        std::iter::once(&self.color)
+            .chain(self.alpha.as_ref())
+            .map(|texture| texture.name_use(SourceUseRole::Selector))
+            .collect()
+    }
+}
+
+/// The observed header and selected mip bytes of one texture in the decoded image.
 #[derive(Debug)]
 pub struct PreviewTextureEvidence {
-    raw: DdsRawHeader,
-    header: SourceScope,
-    archive_ancestry: Option<usize>,
+    header: PreviewHeaderEvidence,
     mip: SourceUse,
 }
 
@@ -174,23 +199,16 @@ impl PreviewTextureEvidence {
         fields: &[DdsHeaderField],
         role: SourceUseRole,
     ) -> Result<Vec<SourceUse>, SourceEvidenceError> {
-        fields
-            .iter()
-            .flat_map(|&field| self.raw.words_for(field))
-            .map(|word| {
-                self.header.at(
-                    SourceLocation::Subresource {
-                        namespace: "ddsHeader".into(),
-                        indices: vec![word.offset, word.length],
-                        field: word.name.into(),
-                    },
-                    role,
-                )
-            })
-            .collect()
+        self.header.header_uses(fields, role)
     }
 
-    /// Returns the selected mip payload that supplied pixels to the PNG.
+    /// Returns the original header evidence.
+    #[must_use]
+    pub const fn header(&self) -> &PreviewHeaderEvidence {
+        &self.header
+    }
+
+    /// Returns the selected mip payload that supplied pixels to the preview.
     #[must_use]
     pub const fn mip(&self) -> &SourceUse {
         &self.mip
@@ -202,7 +220,7 @@ impl PreviewTextureEvidence {
     ///
     /// Returns an error if the evidence inventory was interrupted.
     pub fn name_use(&self, role: SourceUseRole) -> Result<SourceUse, SourceEvidenceError> {
-        self.metadata_use("path", role)
+        self.header.name_use(role)
     }
 
     /// Registers the header Entry length used to locate the selected mip storage.
@@ -211,7 +229,86 @@ impl PreviewTextureEvidence {
     ///
     /// Returns an error if the evidence inventory was interrupted.
     pub fn header_size_use(&self) -> Result<SourceUse, SourceEvidenceError> {
-        self.metadata_use("uncompressedSize", SourceUseRole::Selector)
+        self.header
+            .metadata_use("uncompressedSize", SourceUseRole::Selector)
+    }
+
+    /// Registers the displayed stored names of the header and its containers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the evidence inventory was interrupted.
+    pub fn path_origin(&self, uses: &SourceUses) -> Result<FieldOrigin, SourceEvidenceError> {
+        self.header.path_origin(uses)
+    }
+}
+
+/// The authored words of an actual opened texture header.
+#[derive(Debug)]
+pub struct PreviewHeaderEvidence {
+    raw: DdsRawHeader,
+    scope: SourceScope,
+    archive_ancestry: Option<usize>,
+}
+
+impl PreviewHeaderEvidence {
+    pub(crate) fn of_header(
+        uses: &SourceUses,
+        parts: &Parts<'_>,
+        raw: DdsRawHeader,
+    ) -> Result<Self, SourceEvidenceError> {
+        let entry = match parts {
+            Parts::Source { header, .. } => header.observed_entry(),
+            Parts::Files(_) => None,
+        };
+        Self::of_read(uses, entry, raw)
+    }
+
+    fn of_read(
+        uses: &SourceUses,
+        entry: Option<ObservedEntry<'_>>,
+        raw: DdsRawHeader,
+    ) -> Result<Self, SourceEvidenceError> {
+        Ok(Self {
+            raw,
+            scope: observe(uses, entry)?,
+            archive_ancestry: entry.map(|entry| entry.ancestors().len()),
+        })
+    }
+
+    /// Registers the exact original words used by the requested header fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the evidence inventory was interrupted.
+    pub fn header_uses(
+        &self,
+        fields: &[DdsHeaderField],
+        role: SourceUseRole,
+    ) -> Result<Vec<SourceUse>, SourceEvidenceError> {
+        fields
+            .iter()
+            .flat_map(|&field| self.raw.words_for(field))
+            .map(|word| {
+                self.scope.at(
+                    SourceLocation::Subresource {
+                        namespace: "ddsHeader".into(),
+                        indices: vec![word.offset, word.length],
+                        field: word.name.into(),
+                    },
+                    role,
+                )
+            })
+            .collect()
+    }
+
+    /// Registers only the opened Entry's stored name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the evidence inventory was interrupted.
+    pub fn name_use(&self, role: SourceUseRole) -> Result<SourceUse, SourceEvidenceError> {
+        self.metadata_use("path", role)
     }
 
     fn metadata_use(
@@ -224,7 +321,7 @@ impl PreviewTextureEvidence {
         } else {
             InputScope::FileMetadata
         };
-        self.header.for_scope(scope).at(
+        self.scope.for_scope(scope).at(
             SourceLocation::Metadata {
                 field: field.into(),
             },
@@ -237,14 +334,11 @@ impl PreviewTextureEvidence {
     /// # Errors
     ///
     /// Returns an error if the evidence inventory was interrupted.
-    pub fn path_origin(
-        &self,
-        uses: &SourceUses,
-    ) -> Result<crate::FieldOrigin, SourceEvidenceError> {
+    pub fn path_origin(&self, uses: &SourceUses) -> Result<FieldOrigin, SourceEvidenceError> {
         let mut names = vec![self.name_use(SourceUseRole::Payload)?];
         let mut complete = true;
         for ordinal in 0..self.archive_ancestry.unwrap_or(0) {
-            if let Some(ancestor) = self.header.ancestor(ordinal)? {
+            if let Some(ancestor) = self.scope.ancestor(ordinal)? {
                 names.push(
                     ancestor
                         .for_scope(InputScope::ArchiveDirectoryMetadata)

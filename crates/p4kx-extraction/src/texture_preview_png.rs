@@ -3,7 +3,7 @@
 
 pub(crate) mod input;
 
-use p4kx_texture::{MipByteSpans, TextureError, write_png};
+use p4kx_texture::{MipByteSpans, write_png};
 
 use self::input::PreviewInputs;
 use crate::{ConversionError, SourceEvidenceError, SourceUses, Texture};
@@ -62,8 +62,7 @@ impl<'a> Texture<'a> {
     /// # Errors
     ///
     /// Returns the errors of [`Texture::decode_preview`] and [`Texture::decode_surfaces`], and a
-    /// [`ConversionError`] wrapping [`TextureError::UnsupportedImage`] when the texture has no
-    /// such face.
+    /// [`ConversionError`] when the texture has no such face.
     pub fn preview_png(
         &self,
         level: u32,
@@ -83,27 +82,8 @@ impl<'a> Texture<'a> {
         level: u32,
         face: Option<usize>,
     ) -> Result<ObservedPreviewPng<'a>, ConversionError> {
-        let (mut images, inputs) = self.decode_surfaces_with_inputs(level)?;
-        let bad_face = || {
-            ConversionError::of_texture(
-                self.name(),
-                TextureError::UnsupportedImage {
-                    images: self.header().images(level),
-                },
-            )
-        };
-        let image = match face {
-            None => self.layout_preview(images)?,
-            Some(face) => {
-                if face >= images.len() || self.header().faces() < 2 {
-                    return Err(bad_face());
-                }
-                images.swap_remove(face)
-            }
-        };
-        let inputs = inputs
-            .selected(face.map(|index| index as u64))
-            .ok_or_else(bad_face)?;
+        let observed = self.decode_preview_selected(level, face)?;
+        let image = observed.image;
         let mut png = Vec::new();
         write_png(&image, &mut png)
             .map_err(|error| ConversionError::of_texture(self.name(), error))?;
@@ -114,7 +94,7 @@ impl<'a> Texture<'a> {
                 height: image.height(),
                 png,
             },
-            inputs,
+            inputs: observed.inputs,
         })
     }
 }
