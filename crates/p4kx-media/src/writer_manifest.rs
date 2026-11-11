@@ -9,12 +9,13 @@ use crate::MediaWriter;
 use crate::artifact::BoundedLine;
 use crate::origin_contract::OriginStream;
 use crate::origin_input::MediaOriginInput;
+use crate::origin_prepared::PreparedRecordOrigins;
 use crate::origin_subject::OriginSubject;
 use crate::{Artifact, MediaError, Source, error, json_output, output_operation};
 
 impl MediaWriter<'_> {
     pub(crate) fn artifact(&mut self, artifact: &Artifact) -> Result<(), MediaError> {
-        self.write_artifact_manifest(artifact, None, InputScope::Payload)
+        self.write_artifact_manifest(artifact, None, InputScope::Payload, None)
     }
 
     pub(crate) fn artifact_with_input(
@@ -23,7 +24,15 @@ impl MediaWriter<'_> {
         input: &MediaOriginInput,
         scope: InputScope,
     ) -> Result<(), MediaError> {
-        self.write_artifact_manifest(artifact, Some(input), scope)
+        self.write_artifact_manifest(artifact, Some(input), scope, None)
+    }
+
+    pub(crate) fn artifact_with_origins(
+        &mut self,
+        artifact: &Artifact,
+        origins: &PreparedRecordOrigins,
+    ) -> Result<(), MediaError> {
+        self.write_artifact_manifest(artifact, None, InputScope::Payload, Some(origins))
     }
 
     fn write_artifact_manifest(
@@ -31,6 +40,7 @@ impl MediaWriter<'_> {
         artifact: &Artifact,
         input: Option<&MediaOriginInput>,
         scope: InputScope,
+        origins: Option<&PreparedRecordOrigins>,
     ) -> Result<(), MediaError> {
         self.checkpoint()?;
         let result = (|| {
@@ -51,6 +61,7 @@ impl MediaWriter<'_> {
                 input,
                 Some(scope),
                 OriginSubject::Artifact,
+                origins,
             )?;
             self.manifest
                 .write_all(&line.bytes)
@@ -97,6 +108,7 @@ impl MediaWriter<'_> {
             input,
             None,
             OriginSubject::Source(source),
+            None,
         )?;
         let result = self
             .sources

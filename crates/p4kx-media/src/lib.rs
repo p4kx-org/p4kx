@@ -268,7 +268,7 @@ pub use directory_context::DirectoryContext;
 pub use directory_issue::DirectoryIssue;
 pub use directory_lookup::DirectoryLookup;
 pub use error::{ExtractionCounts, MediaError};
-pub use export::{ExportOptions, ExportOutcome, export, export_with};
+pub use export::{AudioOutput, ExportOptions, ExportOutcome, export, export_with};
 pub use identifier::{IntegerWidth, OriginalIdentifier};
 pub use input_lookup::{EntryInput, InputLookup};
 pub use input_receipt::{InputOmission, InputReceipt};

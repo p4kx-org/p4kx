@@ -12,6 +12,7 @@ pub(crate) enum StatusRule {
     DuplicateSection,
     MediaRange,
     MalformedLayout,
+    Conversion,
     ShortListItem,
 }
 
@@ -31,6 +32,10 @@ impl StatusRule {
             Self::MalformedLayout => partial_if(
                 &["data", "payload", "layout"],
                 &serde_json::json!("malformed"),
+            ),
+            Self::Conversion => partial_if(
+                &["data", "payload", "outcome", "type"],
+                &serde_json::json!("failed"),
             ),
             Self::ShortListItem => partial_if(
                 &["data", "payload", "content", "type"],

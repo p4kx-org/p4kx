@@ -9,6 +9,9 @@ use p4kx_audio::{
 };
 use p4kx_testkit::{TestCodec, TestWem};
 
+#[path = "wem_source_pcm_wav.rs"]
+mod pcm_wav;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 #[test]

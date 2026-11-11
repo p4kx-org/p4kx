@@ -11,9 +11,9 @@ use p4kx_archive::{Archive, Entry, EntryOrigin};
 use p4kx_audio::{AudioError, OggReport, WavReport, Wem};
 pub use p4kx_audio::{
     ByteOrder, WemChunkCursor, WemChunkEntry, WemCodecSource, WemCue, WemCuePoint, WemCueText,
-    WemCueTextRegion, WemInfoSource, WemList, WemListItem, WemListPayload, WemLoopEnd,
-    WemLoopSource, WemMetadata, WemReadError, WemSampleCountSource, WemSource, WemSourceChunk,
-    WemTextUtf8,
+    WemCueTextRegion, WemInfoSource, WemInspection, WemList, WemListItem, WemListPayload,
+    WemLoopEnd, WemLoopSource, WemMetadata, WemPcmWav, WemPcmWriteError, WemReadError,
+    WemSampleCountSource, WemSource, WemSourceChunk, WemTextUtf8,
 };
 
 #[path = "wem_origin_plan.rs"]

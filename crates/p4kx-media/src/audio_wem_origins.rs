@@ -129,7 +129,7 @@ fn selected_loop(
     Ok(())
 }
 
-fn planned(
+pub(crate) fn planned(
     projection: &WemProjection<'_>,
     plan: &WemOriginPlan<'_>,
     field: WemOriginField,

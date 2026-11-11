@@ -14,7 +14,8 @@ use crate::artifact::Stream;
 use crate::checkpoint::Checkpoint;
 use crate::contract::Tally;
 use crate::{
-    Artifact, Capability, Counts, KindSummary, Limits, MediaError, MediaKind, Source, Status,
+    Artifact, AudioOutput, Capability, Counts, KindSummary, Limits, MediaError, MediaKind, Source,
+    Status,
 };
 
 pub(crate) struct KindStream<'a> {
@@ -46,6 +47,7 @@ pub struct MediaWriter<'a> {
     pub(crate) output_bytes: u64,
     pub(crate) artifacts: u64,
     pub(crate) diagnostic: bool,
+    pub(crate) audio_output: AudioOutput,
     pub(crate) reference_queries: u64,
     pub(crate) origins: OriginState,
     pub(crate) origin_transport: OriginTransport<'a>,
@@ -91,6 +93,7 @@ impl<'a> MediaWriter<'a> {
             output_bytes: 0,
             artifacts: 0,
             diagnostic,
+            audio_output: AudioOutput::Raw,
             reference_queries: 0,
             origins: OriginState::new(limits.record_bytes),
             origin_transport,

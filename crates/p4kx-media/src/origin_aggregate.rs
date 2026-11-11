@@ -20,7 +20,7 @@ pub(crate) fn resolve(
     match resolver.subject {
         OriginSubject::Record(_) if pointer.is_empty() => record(resolver, prepared).map(Some),
         OriginSubject::Artifact if pointer.is_empty() || pointer == "/digest" => {
-            artifact(resolver, pointer).map(Some)
+            artifact(resolver, pointer, prepared).map(Some)
         }
         _ if pointer == "/data"
             || (pointer == "/data/payload" && (shader(resolver) || prepared_data(resolver))) =>
@@ -62,6 +62,7 @@ fn record(
 fn artifact(
     resolver: &OriginResolver<'_>,
     pointer: &str,
+    prepared: Option<&PreparedRecordOrigins>,
 ) -> Result<OriginContributions, MediaError> {
     let members: &[&str] = if pointer.is_empty() {
         &["/path", "/size", "/digest"]
@@ -70,7 +71,7 @@ fn artifact(
     };
     let mut capture = OriginCapture::with_limit(resolver.owner, resolver.detail_bytes);
     for member in members {
-        capture.include_original(&resolver.resolve(member, None)?)?;
+        capture.include_original(&resolver.resolve(member, prepared)?)?;
     }
     Ok(capture.finish())
 }

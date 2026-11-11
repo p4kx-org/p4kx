@@ -5,6 +5,7 @@ use std::io::Write;
 
 use crate::artifact_placement;
 use crate::converted_sink::{ConvertedSink, Encoded};
+use crate::origin_prepared::PreparedRecordOrigins;
 use crate::output_operation;
 use crate::temporary_file::TemporaryFile;
 use crate::{Artifact, ArtifactExtension, MediaError, MediaWriter};
@@ -18,6 +19,25 @@ impl MediaWriter<'_> {
     pub fn converted_artifact(
         &mut self,
         extension: ArtifactExtension<'_>,
+        encode: impl FnOnce(&mut dyn Write) -> Result<(), MediaError>,
+    ) -> Result<Artifact, MediaError> {
+        self.encode_conversion(extension, None, encode)
+    }
+
+    pub(crate) fn converted_artifact_with_origins(
+        &mut self,
+        extension: ArtifactExtension<'_>,
+        origins: &PreparedRecordOrigins,
+        encode: impl FnOnce(&mut dyn Write) -> Result<(), MediaError>,
+    ) -> Result<Artifact, MediaError> {
+        origins.require_writer(self)?;
+        self.encode_conversion(extension, Some(origins), encode)
+    }
+
+    fn encode_conversion(
+        &mut self,
+        extension: ArtifactExtension<'_>,
+        origins: Option<&PreparedRecordOrigins>,
         encode: impl FnOnce(&mut dyn Write) -> Result<(), MediaError>,
     ) -> Result<Artifact, MediaError> {
         self.require_output_callback()?;
@@ -35,7 +55,7 @@ impl MediaWriter<'_> {
         let result = encoded.and_then(|encoded| {
             self.checkpoint()?;
             output_operation::checked(temporary.sync_all(), self.checkpoint())?;
-            self.place_conversion(extension, encoded, &mut temporary)
+            self.place_conversion(extension, encoded, &mut temporary, origins)
         });
         temporary.finish(result)
     }
@@ -45,6 +65,7 @@ impl MediaWriter<'_> {
         extension: ArtifactExtension<'_>,
         encoded: Encoded,
         temporary: &mut TemporaryFile<'_>,
+        origins: Option<&PreparedRecordOrigins>,
     ) -> Result<Artifact, MediaError> {
         let artifact = Artifact {
             path: format!("chunks/{}.{}", encoded.digest.hex, extension.as_str()),
@@ -57,7 +78,11 @@ impl MediaWriter<'_> {
             temporary,
             "converted artifact content-address collision",
         )?;
-        self.artifact(&artifact)?;
+        if let Some(origins) = origins {
+            self.artifact_with_origins(&artifact, origins)?;
+        } else {
+            self.artifact(&artifact)?;
+        }
         self.converted_output(created)?;
         self.checkpoint()?;
         Ok(artifact)

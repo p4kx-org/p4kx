@@ -398,7 +398,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   JSON lists every binding with its device, input and activation mode ([ADR-0180](adr/0180-the-action-map-export-lists-every-default-binding-of-the-default-profile.md)).
   A label whose key has no text in `--language` (English by default) stays empty.
 - `p4kx media export <archive> --out <directory> [--kind <kind>] [--filter <filter>]
-  [--exclude <filter>] [--conflict skip|overwrite|if-changed] [--diagnostic]` writes the
+  [--exclude <filter>] [--conflict skip|overwrite|if-changed] [--audio-format raw|wav] [--diagnostic]` writes the
   versioned `p4kx-media` inventory as JSONL streams, exact decoded raw payloads and an atomic
   `media-index.json`. Repeat `--kind` and `--exclude` for explicit selections. Omission selects
   all registered providers (`archive`, `shader`, `material` and `audio`). The shader stream preserves
@@ -410,6 +410,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   The Audio stream preserves [standalone and embedded WEM metadata](media-audio-metadata.md),
   original RIFF chunk ranges, cue and LIST annotations, and [soundbank metadata](media-bank-metadata.md)
   including typed Action and Event fields. Raw bytes and immediate field origins stay available.
+  Use `--audio-format wav` to add WAV artifacts for complete 16-bit PCM WEMs. The default
+  `raw` retains metadata and source bytes. Unsupported codec conversions prevent complete
+  publication. A diagnostic generation can retain the original source and conversion failure.
   A known kind without a provider
   fails explicitly. Incomplete diagnostic generations remain separate from the complete root
   index. Byte, count, nesting and reference limits are exposed as `--max-*` options; their defaults,

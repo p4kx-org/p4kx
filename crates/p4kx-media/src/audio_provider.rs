@@ -56,10 +56,16 @@ fn field_groups() -> Vec<FieldGroup> {
     wem_field_groups()
         .into_iter()
         .chain(bank_field_groups())
-        .chain([FieldGroup::new_with_unsupported_projection(
-            "audio-conversion",
-            "No WAV or OGG conversion is performed.",
-        )])
+        .chain([
+            FieldGroup::new(
+                "pcm-wav-conversion",
+                "Requested WAV output from complete PCM WEMs, with source frame ranges and verified artifact mappings.",
+            ),
+            FieldGroup::new_with_unsupported_projection(
+                "compressed-audio-conversion",
+                "Compressed WEM payloads remain available through exact retained ranges.",
+            ),
+        ])
         .collect()
 }
 

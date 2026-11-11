@@ -20,9 +20,14 @@ use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::{
-    ByteOrder, MediaError, MediaWriter, OffsetBasis, SourceRange, Status, Subresource,
+    AudioOutput, ByteOrder, MediaError, MediaWriter, OffsetBasis, SourceRange, Status, Subresource,
     audio_chunk_origins, audio_wem_origins,
 };
+
+#[path = "audio_wem_conversion.rs"]
+mod conversion;
+
+pub(crate) use conversion::CONVERSION_NAMESPACE;
 
 pub(crate) const WEM_NAMESPACE: &str = "audio-wem";
 pub(crate) const CHUNK_NAMESPACE: &str = "audio-wem-chunk";
@@ -64,8 +69,13 @@ pub(crate) fn project<R: Read + Seek>(
         Err(cause) => return projection.read_failure(WemPhase::RiffHeader, cause, writer),
     };
     let riff_end = source.riff_end();
-    match source.read_metadata() {
-        Ok(metadata) => projection.header(&metadata, riff_end, writer)?,
+    match source.inspect() {
+        Ok(mut inspected) => {
+            projection.header(inspected.metadata(), riff_end, writer)?;
+            if writer.audio_output == AudioOutput::Wav {
+                conversion::wav(projection, &mut inspected, writer)?;
+            }
+        }
         Err(cause) => projection.read_failure(WemPhase::Summary, cause, writer)?,
     }
     audio_wem_annotation::directory(projection, &mut source, writer)
@@ -228,11 +238,9 @@ impl<'source> WemProjection<'source> {
                 seconds: DecimalU64::new(value.as_secs()),
                 nanoseconds: value.subsec_nanos(),
             }),
-            loop_points: metadata.loop_points().map(|points| WemLoop {
-                start: DecimalU64::new(points.start),
-                end: DecimalU64::new(points.end),
-                frames: DecimalU64::new(points.frames()),
-            }),
+            loop_points: metadata
+                .loop_points()
+                .map(|points| WemLoop::from_frames(points.start, points.end)),
             riff_end_exclusive: self.offset(riff_end)?,
             trailing_length: DecimalU64::new(trailing),
         });

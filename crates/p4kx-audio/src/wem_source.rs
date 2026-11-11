@@ -35,6 +35,25 @@ pub struct WemSource<R> {
     owner: Arc<()>,
 }
 
+#[path = "wem_pcm_wav.rs"]
+mod pcm_wav;
+
+pub use pcm_wav::{WemPcmWav, WemPcmWriteError};
+
+/// Decoded WEM metadata bound to its actual seekable source.
+pub struct WemInspection<'source, R> {
+    source: &'source mut WemSource<R>,
+    metadata: WemMetadata,
+}
+
+impl<R> WemInspection<'_, R> {
+    /// Borrows the metadata and original occurrences from this inspection.
+    #[must_use]
+    pub const fn metadata(&self) -> &WemMetadata {
+        &self.metadata
+    }
+}
+
 /// An independent cursor bound to one WEM source.
 pub struct WemChunkCursor {
     directory: RiffDirectory,
@@ -85,6 +104,18 @@ impl<R: Read + Seek> WemSource<R> {
     /// Returns an error for incomplete required chunks, invalid format or an input read/seek failure.
     pub fn read_metadata(&mut self) -> Result<WemMetadata, WemReadError> {
         WemMetadata::read(&mut self.input, self.header)
+    }
+
+    /// Inspects the selected WEM metadata and binds subsequent reads to the same source.
+    ///
+    /// # Errors
+    /// Returns the original WEM metadata or input failure.
+    pub fn inspect(&mut self) -> Result<WemInspection<'_, R>, WemReadError> {
+        let metadata = self.read_metadata()?;
+        Ok(WemInspection {
+            source: self,
+            metadata,
+        })
     }
 
     /// Returns the original byte order declared by the RIFF signature.

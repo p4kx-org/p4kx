@@ -77,6 +77,30 @@ retained BNK Entry. Counts and trailing lengths describe the individual WEM. In 
 receipts, WEM coordinates follow the two DIDX ordinals and keep their original WEM-local
 interpretation. Separate receipts identify the actual triplet, DATA extent and RIFF selection.
 
+## Optional PCM WAV output
+
+By default, the Audio provider retains the original bytes and writes the metadata above.
+Request PCM WAV conversion with the following command.
+
+    p4kx media export ARCHIVE --out DIR --kind audio --audio-format wav
+
+The provider writes 16-bit little-endian WAV from complete frames in the first selected
+PCM DATA chunk. It handles standalone WEMs and complete WEMs in an unambiguously resolved
+BNK DATA range. The WAV preserves the channel count, playback rate and applicable loop.
+Partial input frames and extra chunks stay in the raw artifact.
+
+The `audio-wem-conversion` and `audio-bank-wem-conversion` namespaces contain one
+`wem-conversion` record per eligible occurrence. The `written` outcome records the
+requested and actual formats, source codec, decoded dimensions and loop, original
+half-open frame byte range, and verified artifact path, length and SHA-256. Embedded
+ranges are absolute within the retained bank, with the DIDX section and triplet as
+subresource indices. Equal WAV bytes can share one file, while the conversion rows and
+artifact-manifest occurrences retain their own physical source uses and encryption markers.
+
+A complete WEM whose codec cannot produce WAV receives an `unsupported-codec` conversion
+outcome. Normal export reports projection loss. A diagnostic generation retains the
+original source and the failure. Prefetch and opaque media retain their raw metadata.
+
 ## Read and publication boundaries
 
 The seekable metadata reader uses the retained Entry and the generation's input-byte, metadata

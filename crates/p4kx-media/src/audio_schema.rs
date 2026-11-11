@@ -19,15 +19,15 @@ use crate::audio_schema_status::StatusRule;
 use crate::audio_wem_annotation::FAILURE_NAMESPACE as ANNOTATION_FAILURE;
 use crate::audio_wem_annotation_payload::AnnotationPayload;
 use crate::audio_wem_cue::{CUE_NAMESPACE, POINT_NAMESPACE, TAIL_NAMESPACE};
-use crate::audio_wem_diagnostic::{FAILURE_NAMESPACE as WEM_FAILURE, OPAQUE_NAMESPACE};
+use crate::audio_wem_diagnostic::OPAQUE_NAMESPACE;
 use crate::audio_wem_list::{ITEM_NAMESPACE, LIST_NAMESPACE};
-use crate::audio_wem_projection::{
-    CHUNK_NAMESPACE, EMBEDDED_INDEX_COUNT, WEM_NAMESPACE, embedded_namespace,
-};
+use crate::audio_wem_projection::{EMBEDDED_INDEX_COUNT, embedded_namespace};
 use crate::{MediaError, schema_merge};
 
 #[path = "audio_schema_music.rs"]
 mod music;
+#[path = "audio_schema_wem.rs"]
+mod wem;
 
 const WEM_PAYLOAD: &str = "AudioPayload";
 const ANNOTATION_PAYLOAD: &str = "AnnotationPayload";
@@ -163,7 +163,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         .as_array_mut()
         .ok_or_else(|| MediaError::Contract("media record allOf is not an array".into()))?;
     constraints.extend(
-        wem_bindings()
+        wem::bindings()
             .iter()
             .chain(bank_bindings().iter())
             .chain(hirc_bindings().iter())
@@ -174,7 +174,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             .chain(annotation_bindings().iter())
             .map(Binding::constraint),
     );
-    for binding in wem_bindings()
+    for binding in wem::bindings()
         .into_iter()
         .filter(|binding| binding.namespace != OPAQUE_NAMESPACE)
         .chain(annotation_bindings())
@@ -182,33 +182,6 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         constraints.push(binding.embedded_constraint()?);
     }
     Ok(base)
-}
-
-const fn wem_bindings() -> [Binding; 4] {
-    [
-        Binding::exact(WEM_PAYLOAD, WEM_NAMESPACE, "wem", 0, StatusRule::Complete),
-        Binding::exact(
-            WEM_PAYLOAD,
-            CHUNK_NAMESPACE,
-            "wem-chunk",
-            1,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            WEM_PAYLOAD,
-            OPAQUE_NAMESPACE,
-            "wem-opaque",
-            0,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            WEM_PAYLOAD,
-            WEM_FAILURE,
-            "wem-failure",
-            1,
-            StatusRule::Failed,
-        ),
-    ]
 }
 
 const fn bank_bindings() -> [Binding; 5] {

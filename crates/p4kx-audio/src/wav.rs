@@ -5,7 +5,7 @@ use std::io::Write;
 
 use crate::adpcm::Layout;
 use crate::loops::SMPL_CHUNK_LEN;
-use crate::{AudioError, ByteOrder, Codec, Loop, Wem};
+use crate::{AudioError, ByteOrder, Codec, Loop, Wem, WemMetadata};
 
 const BITS_PER_SAMPLE: u16 = 16;
 const FORMAT_PCM: u16 = 0x0001;
@@ -16,7 +16,7 @@ const EXTENSION_LEN: u16 = 22;
 const SUBTYPE_PCM: [u8; 16] = [
     0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71,
 ];
-const SWAP_BUFFER_LEN: usize = 64 * 1024;
+pub(crate) const PCM_TRANSFER_BYTES: usize = 64 * 1024;
 
 /// What [`Wem::write_wav`] wrote.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,6 +75,38 @@ impl<B: AsRef<[u8]>> Wem<B> {
         Ok(report)
     }
 
+    pub(crate) fn decoded_wav_header(
+        &self,
+        frames: u64,
+    ) -> Result<(Vec<u8>, WavReport), AudioError> {
+        self.metadata().decoded_wav_header(frames)
+    }
+
+    fn write_pcm_wav(&self, out: &mut impl Write) -> Result<WavReport, AudioError> {
+        let channels = self.channels();
+        let block_align = wav_block_align(channels)?;
+        let frames = self.data().len() / usize::from(block_align);
+        let data = self
+            .data()
+            .get(..frames * usize::from(block_align))
+            .unwrap_or_default();
+        let (header, loop_points) = self.metadata().wav_header(block_align, data.len())?;
+        out.write_all(&header).map_err(AudioError::Write)?;
+        match self.byte_order() {
+            ByteOrder::Little => out.write_all(data).map_err(AudioError::Write)?,
+            ByteOrder::Big => write_swapped(data, out)?,
+        }
+        Ok(WavReport {
+            channels,
+            sample_rate: self.sample_rate(),
+            sample_count: frames as u64,
+            size: (header.len() + data.len()) as u64,
+            loop_points,
+        })
+    }
+}
+
+impl WemMetadata {
     /// Returns the WAV header and the report for `frames` decoded 16-bit frames.
     pub(crate) fn decoded_wav_header(
         &self,
@@ -99,29 +131,6 @@ impl<B: AsRef<[u8]>> Wem<B> {
             loop_points,
         };
         Ok((header, report))
-    }
-
-    fn write_pcm_wav(&self, out: &mut impl Write) -> Result<WavReport, AudioError> {
-        let channels = self.channels();
-        let block_align = wav_block_align(channels)?;
-        let frames = self.data().len() / usize::from(block_align);
-        let data = self
-            .data()
-            .get(..frames * usize::from(block_align))
-            .unwrap_or_default();
-        let (header, loop_points) = self.wav_header(block_align, data.len())?;
-        out.write_all(&header).map_err(AudioError::Write)?;
-        match self.byte_order() {
-            ByteOrder::Little => out.write_all(data).map_err(AudioError::Write)?,
-            ByteOrder::Big => write_swapped(data, out)?,
-        }
-        Ok(WavReport {
-            channels,
-            sample_rate: self.sample_rate(),
-            sample_count: frames as u64,
-            size: (header.len() + data.len()) as u64,
-            loop_points,
-        })
     }
 
     fn wav_header(
@@ -191,18 +200,24 @@ impl<B: AsRef<[u8]>> Wem<B> {
 }
 
 fn write_swapped(data: &[u8], out: &mut impl Write) -> Result<(), AudioError> {
-    let mut buffer = vec![0; SWAP_BUFFER_LEN.min(data.len())];
-    for chunk in data.chunks(SWAP_BUFFER_LEN) {
-        let (samples, _) = chunk.as_chunks::<2>();
-        let (swapped, _) = buffer.as_chunks_mut::<2>();
-        for (target, sample) in swapped.iter_mut().zip(samples) {
-            let [high, low] = *sample;
-            *target = [low, high];
-        }
-        out.write_all(buffer.get(..chunk.len()).unwrap_or_default())
-            .map_err(AudioError::Write)?;
+    let mut buffer = vec![0; PCM_TRANSFER_BYTES.min(data.len())];
+    for chunk in data.chunks(PCM_TRANSFER_BYTES) {
+        let target = buffer
+            .get_mut(..chunk.len())
+            .ok_or(AudioError::InvalidFormat(
+                "the PCM output buffer is out of bounds",
+            ))?;
+        target.copy_from_slice(chunk);
+        swap_pcm_samples(target);
+        out.write_all(target).map_err(AudioError::Write)?;
     }
     Ok(())
+}
+
+pub(crate) fn swap_pcm_samples(bytes: &mut [u8]) {
+    for [first, second] in bytes.as_chunks_mut::<2>().0 {
+        std::mem::swap(first, second);
+    }
 }
 
 fn wav_block_align(channels: u16) -> Result<u16, AudioError> {

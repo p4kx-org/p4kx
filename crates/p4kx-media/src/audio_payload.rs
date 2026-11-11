@@ -5,7 +5,7 @@ use p4kx_extraction::DecimalU64;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{ByteOrder, SourceRange};
+use crate::{Artifact, ByteOrder, SourceRange};
 
 #[derive(Serialize, JsonSchema)]
 #[serde(
@@ -19,6 +19,7 @@ pub(crate) enum AudioPayload {
     WemChunk(WemChunk),
     WemOpaque(WemOpaque),
     WemFailure(WemFailure),
+    WemConversion(WemConversion),
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -60,6 +61,68 @@ pub(crate) struct WemLoop {
     /// First excluded frame.
     pub(crate) end: DecimalU64,
     pub(crate) frames: DecimalU64,
+}
+
+impl WemLoop {
+    pub(crate) const fn from_frames(start: u64, end: u64) -> Self {
+        Self {
+            start: DecimalU64::new(start),
+            end: DecimalU64::new(end),
+            frames: DecimalU64::new(end.saturating_sub(start)),
+        }
+    }
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WemConversion {
+    pub(crate) requested_format: EncodedAudioFormat,
+    pub(crate) source_codec: &'static str,
+    pub(crate) outcome: ConversionOutcome,
+}
+
+#[derive(Clone, Copy, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum EncodedAudioFormat {
+    Wav,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(
+    tag = "type",
+    content = "payload",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+pub(crate) enum ConversionOutcome {
+    Written(WrittenWav),
+    Failed(ConversionFailure),
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WrittenWav {
+    pub(crate) actual_format: EncodedAudioFormat,
+    pub(crate) actual_codec: &'static str,
+    pub(crate) artifact: Artifact,
+    pub(crate) source_range: SourceRange,
+    pub(crate) channels: u16,
+    pub(crate) sample_rate: u32,
+    pub(crate) sample_count: DecimalU64,
+    pub(crate) loop_points: Option<WemLoop>,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(
+    tag = "type",
+    content = "payload",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+pub(crate) enum ConversionFailure {
+    UnsupportedCodec,
+    WaveTooLarge,
+    InvalidRepresentation { detail: String },
 }
 
 #[derive(Serialize, JsonSchema)]

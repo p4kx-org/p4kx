@@ -6,7 +6,10 @@ use std::fs;
 use p4kx_testkit::{ArchiveBuilder, TestCodec, TestEntry, TestWem};
 use predicates::prelude::predicate;
 
-type TestResult = Result<(), Box<dyn std::error::Error>>;
+#[path = "media_pcm_wav.rs"]
+mod pcm_wav;
+
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 #[test]
 fn media_export_runs_the_permanent_provider_and_emits_the_1_0_contract() -> TestResult {

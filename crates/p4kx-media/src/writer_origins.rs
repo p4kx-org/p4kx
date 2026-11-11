@@ -161,7 +161,11 @@ impl MediaWriter<'_> {
         input: Option<&MediaOriginInput>,
         artifact_scope: Option<InputScope>,
         subject: OriginSubject<'_>,
+        prepared: Option<&PreparedRecordOrigins>,
     ) -> Result<(), MediaError> {
+        if let Some(prepared) = prepared {
+            prepared.require_writer(self)?;
+        }
         if input.is_some_and(|input| !self.origins.owner.is_same_inventory(&input.owner)) {
             return Err(origin_error::foreign());
         }
@@ -176,7 +180,16 @@ impl MediaWriter<'_> {
             subresource: None,
             detail_bytes: self.limits.record_bytes,
         };
-        self.origin_transport
-            .emit(stream, OriginProfile::Unmigrated, payload, &resolver, None)
+        self.origin_transport.emit(
+            stream,
+            OriginProfile::Unmigrated,
+            payload,
+            &resolver,
+            prepared,
+        )?;
+        if let Some(prepared) = prepared {
+            prepared.require_consumed()?;
+        }
+        Ok(())
     }
 }

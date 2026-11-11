@@ -41,6 +41,7 @@ pub(crate) fn build(
         checkpoint,
         options.diagnostic,
     )?;
+    writer.audio_output = options.audio_output;
     writer.origins.observe_root(archive, size)?;
     writer.bind_build(archive, &mut root)?;
     root_callbacks(&root, providers, &mut writer)?;

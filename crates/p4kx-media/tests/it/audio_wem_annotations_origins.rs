@@ -29,13 +29,26 @@ impl Origins {
         owner: usize,
         path: &str,
     ) -> TestResult<Vec<&Value>> {
+        self.for_stream("records", record, owner, path)
+    }
+
+    pub(super) fn for_stream(
+        &self,
+        stream: &str,
+        record: usize,
+        owner: usize,
+        path: &str,
+    ) -> TestResult<Vec<&Value>> {
         let position = record.to_string();
         let field = self
             .fields
             .iter()
             .find(|row| {
                 row.get("field").and_then(Value::as_str) == Some(path)
-                    && row.pointer("/scope/stream/kind").and_then(Value::as_str) == Some("audio")
+                    && row.pointer("/scope/stream/type").and_then(Value::as_str) == Some(stream)
+                    && (stream != "records"
+                        || row.pointer("/scope/stream/kind").and_then(Value::as_str)
+                            == Some("audio"))
                     && row.pointer("/scope/ordinal").and_then(Value::as_str)
                         == Some(position.as_str())
             })

@@ -10,6 +10,17 @@ use crate::export_run;
 use crate::generation::Generation;
 use crate::{Index, Limits, MediaError, MediaKind, Provider, ProviderRegistry};
 
+/// Additional audio artifacts written from eligible retained WEM sources.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AudioOutput {
+    /// Retains original bytes and metadata.
+    #[default]
+    Raw,
+    /// Writes complete 16-bit PCM WEM frames as WAV.
+    Wav,
+}
+
 /// Settings of one media generation.
 #[derive(Debug, Clone, Default)]
 pub struct ExportOptions {
@@ -27,6 +38,8 @@ pub struct ExportOptions {
     pub cancel: CancelToken,
     /// Retains diagnosed incomplete generations without replacing a complete root index.
     pub diagnostic: bool,
+    /// Additional audio artifact format.
+    pub audio_output: AudioOutput,
 }
 
 /// Observable result of a generation attempt.

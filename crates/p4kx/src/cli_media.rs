@@ -3,8 +3,8 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Subcommand};
-use p4kx_media::{Limits, MediaKind};
+use clap::{Args, Subcommand, ValueEnum};
+use p4kx_media::{AudioOutput, Limits, MediaKind};
 
 use crate::cli_conflict::Conflict;
 
@@ -35,6 +35,21 @@ pub(crate) enum MediaAction {
     },
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub(crate) enum MediaAudioFormat {
+    Raw,
+    Wav,
+}
+
+impl From<MediaAudioFormat> for AudioOutput {
+    fn from(value: MediaAudioFormat) -> Self {
+        match value {
+            MediaAudioFormat::Raw => Self::Raw,
+            MediaAudioFormat::Wav => Self::Wav,
+        }
+    }
+}
+
 /// Selection, publication and bounds of one media export.
 #[derive(Debug, Args)]
 pub(crate) struct MediaExportArgs {
@@ -60,6 +75,9 @@ pub(crate) struct MediaExportArgs {
     /// Retains incomplete projections as diagnostic generations; they never replace a complete index.
     #[arg(long)]
     pub(crate) diagnostic: bool,
+    /// Keep raw audio metadata or add WAV artifacts from complete PCM WEMs.
+    #[arg(long = "audio-format", value_enum, default_value_t = MediaAudioFormat::Raw)]
+    pub(crate) audio_format: MediaAudioFormat,
     /// Resource limits applied before the next unit of work.
     #[command(flatten)]
     pub(crate) limits: MediaLimitsArgs,

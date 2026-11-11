@@ -1760,6 +1760,23 @@
             "payload"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/WemConversion"
+            },
+            "record_type": {
+              "const": "wem-conversion",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
         }
       ],
       "title": "AudioPayload"
@@ -2989,6 +3006,100 @@
         }
       ]
     },
+    "ConversionFailure": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "unsupported-codec",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "wave-too-large",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "detail": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "detail"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "invalid-representation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ConversionOutcome": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/WrittenWav"
+            },
+            "type": {
+              "const": "written",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ConversionFailure"
+            },
+            "type": {
+              "const": "failed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "CountEncoding": {
       "enum": [
         "fixed-u32",
@@ -3402,6 +3513,12 @@
         "calendar"
       ],
       "type": "object"
+    },
+    "EncodedAudioFormat": {
+      "enum": [
+        "wav"
+      ],
+      "type": "string"
     },
     "EntryMetadataInfo": {
       "allOf": [
@@ -7826,6 +7943,26 @@
       ],
       "type": "object"
     },
+    "WemConversion": {
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "$ref": "#/$defs/ConversionOutcome"
+        },
+        "requested_format": {
+          "$ref": "#/$defs/EncodedAudioFormat"
+        },
+        "source_codec": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requested_format",
+        "source_codec",
+        "outcome"
+      ],
+      "type": "object"
+    },
     "WemDuration": {
       "additionalProperties": false,
       "properties": {
@@ -8115,6 +8252,58 @@
         "chunk-directory"
       ],
       "type": "string"
+    },
+    "WrittenWav": {
+      "additionalProperties": false,
+      "properties": {
+        "actual_codec": {
+          "type": "string"
+        },
+        "actual_format": {
+          "$ref": "#/$defs/EncodedAudioFormat"
+        },
+        "artifact": {
+          "$ref": "#/$defs/Artifact"
+        },
+        "channels": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "loop_points": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WemLoop"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sample_count": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "sample_rate": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_range": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "actual_format",
+        "actual_codec",
+        "artifact",
+        "source_range",
+        "channels",
+        "sample_rate",
+        "sample_count",
+        "loop_points"
+      ],
+      "type": "object"
     },
     "ZipHeaderInfo": {
       "description": "Lossless fixed ZIP directory words without interpreting their flags or host system.",
@@ -10611,6 +10800,139 @@
               },
               "status": {
                 "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-wem-conversion"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AudioPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-conversion"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 0,
+                    "minItems": 0
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "outcome": {
+                          "properties": {
+                            "type": {
+                              "const": "failed"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "outcome"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
               }
             }
           }
@@ -13349,6 +13671,139 @@
               },
               "status": {
                 "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-wem-conversion"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AudioPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-conversion"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "outcome": {
+                          "properties": {
+                            "type": {
+                              "const": "failed"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "outcome"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
               }
             }
           }

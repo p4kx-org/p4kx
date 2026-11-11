@@ -109,5 +109,8 @@ pub use wem_info_source::{
 };
 pub use wem_list::{WemCueTextRegion, WemList, WemListItem, WemListPayload};
 pub use wem_metadata::WemMetadata;
-pub use wem_source::{WemChunkCursor, WemChunkEntry, WemReadError, WemSource};
+pub use wem_source::{
+    WemChunkCursor, WemChunkEntry, WemInspection, WemPcmWav, WemPcmWriteError, WemReadError,
+    WemSource,
+};
 pub use wem_text::{WemCueText, WemTextUtf8};
