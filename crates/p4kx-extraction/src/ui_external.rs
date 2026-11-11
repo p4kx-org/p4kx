@@ -7,6 +7,36 @@ use crate::ui_disk_path::{self, DiskPathError};
 use crate::ui_movie::Origin;
 use crate::{ConversionError, DiskTextures, Texture, UiMovie};
 
+#[derive(Clone, Copy)]
+pub(crate) enum ExternalPath {
+    FileName,
+    ExportName,
+}
+
+impl ExternalPath {
+    pub(crate) const fn select(image: &ExternalImage) -> Self {
+        if image.file_name.is_empty() {
+            Self::ExportName
+        } else {
+            Self::FileName
+        }
+    }
+
+    pub(crate) const fn field(self) -> &'static str {
+        match self {
+            Self::FileName => "fileName",
+            Self::ExportName => "exportName",
+        }
+    }
+
+    const fn value(self, image: &ExternalImage) -> &String {
+        match self {
+            Self::FileName => &image.file_name,
+            Self::ExportName => &image.export_name,
+        }
+    }
+}
+
 /// Opens the DDS texture the external image `image` of the definition `id` names, looked up
 /// relative to the movie in its Archive or, confined to the movie's `Data` folder, on disk.
 pub(crate) fn open_external<'a>(
@@ -15,11 +45,7 @@ pub(crate) fn open_external<'a>(
     image: &ExternalImage,
     files: &DiskTextures,
 ) -> Result<Texture<'a>, ConversionError> {
-    let file_name = if image.file_name.is_empty() {
-        &image.export_name
-    } else {
-        &image.file_name
-    };
+    let file_name = ExternalPath::select(image).value(image);
     let missing = |tried| ConversionError::ExternalImageMissing {
         movie: movie.name().to_owned(),
         id,

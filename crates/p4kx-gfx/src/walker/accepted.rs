@@ -146,7 +146,11 @@ impl<'a> Walker<'a, '_> {
                 });
                 Unknown
             }
-            0 | 5 | 8 | 9 | 11 | 28 | 33 | 37 => {
+            8 => {
+                self.assets.jpeg_tables.get_or_insert(tag.body);
+                AcceptedTag::JpegTables
+            }
+            0 | 5 | 9 | 11 | 28 | 33 | 37 => {
                 self.read_other(tag)?;
                 Other
             }
@@ -160,9 +164,6 @@ impl<'a> Walker<'a, '_> {
     fn read_other(&mut self, tag: &Tag<'a>) -> Result<(), GfxError> {
         let assets = &mut self.assets;
         match tag.code {
-            8 => {
-                assets.jpeg_tables.get_or_insert(tag.body);
-            }
             9 => {
                 assets.background.get_or_insert(tag.reader().rgb()?);
             }

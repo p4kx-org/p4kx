@@ -1824,6 +1824,19 @@ each a `style_change` (a `move_to` position and new style numbers), a `straight_
 `delta`, or a `curved_edge` with its `control` and `anchor` deltas. With `--json` failures are
 not repeated on stderr. The exit code is 1 when `failed` is not empty.
 
+`originReceipt` is the relative name `.p4kx-origin.jsonl` when this run wrote files,
+or null when it wrote none. `fieldOrigins` gives the immediate marker and source
+uses for exact pointers in the summary, such as `/extracted/0/id` and
+`/extracted/0/size`. The definition supplies the ID. The written length also
+depends on the actual decoded inputs, including a selected external DDS color
+or alpha part. The `provenance` inventory resolves those source-use references.
+
+The [directory companion](source-origin.md#directory-publication) binds each
+committed file by its relative name, byte length and SHA-256. Its PNGs have one
+opaque payload origin. Shape and morph JSON have a receipt for each JSON Pointer.
+A sub-image cites its crop declaration and the actual base bitmap inputs. A
+standalone input's original Archive encryption is unknown.
+
 ## `p4kx ui render <archive> <entry> --out <file.png> [--svg] [--size <W>x<H>|<W>] [--background …] [--lang <language>] --json`
 
 Also `p4kx ui render <file> --out <file.png> --json` for a GFx or SWF file on disk.

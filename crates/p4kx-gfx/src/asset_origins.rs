@@ -133,6 +133,8 @@ pub struct AssetOrigins {
     pub morph_shapes: Vec<TagSite>,
     /// Physical bitmap occurrences in output order.
     pub bitmaps: Vec<TagSite>,
+    /// First admitted shared JPEG tables.
+    pub jpeg_tables: Option<TagSite>,
     /// Physical font occurrences and applied overrides in output order.
     pub fonts: Vec<FontOrigins>,
     /// Physical sprite occurrences in output order.
@@ -193,6 +195,9 @@ impl AssetOrigins {
             AcceptedTag::Shape => self.shapes.push(tag),
             AcceptedTag::Morph => self.morph_shapes.push(tag),
             AcceptedTag::Bitmap => self.bitmaps.push(tag),
+            AcceptedTag::JpegTables => {
+                self.jpeg_tables.get_or_insert(tag);
+            }
             AcceptedTag::Font => self.fonts.push(FontOrigins {
                 definition: tag,
                 info: None,
@@ -224,6 +229,7 @@ pub(crate) enum AcceptedTag {
     Shape,
     Morph,
     Bitmap,
+    JpegTables,
     Font,
     Exports(usize),
     Exporter,

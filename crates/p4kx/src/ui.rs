@@ -26,7 +26,7 @@ pub(crate) fn run(args: &UiArgs, as_json: bool) -> Result<ExitCode> {
             with_movie(source, None, as_json, |movie| assets(movie, as_json))
         }
         UiAction::Extract { source, out } => {
-            with_movie(source, None, false, |movie| extract(movie, out, as_json))
+            with_movie(source, None, true, |movie| extract(movie, out, as_json))
         }
         UiAction::Render {
             source,

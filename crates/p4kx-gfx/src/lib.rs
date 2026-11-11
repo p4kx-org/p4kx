@@ -83,7 +83,8 @@ pub use asset_origins::{
 };
 pub use assets::{Assets, OtherDefinition, TagCount, TagFailure, UnknownTag};
 pub use bitmap::{
-    Bitmap, BitmapSource, EmbeddedFormat, ExternalImage, ImageFileFormat, Jpeg, Lossless, SubImage,
+    Bitmap, BitmapSource, DecodedBitmap, EmbeddedFormat, ExternalImage, ImageFileFormat, Jpeg,
+    Lossless, SubImage,
 };
 pub use error::GfxError;
 pub use face::{FontFace, MISSING_GLYPH_EM, missing_glyph};

@@ -124,6 +124,12 @@ impl<'source> DirectoryReceipt<'source> {
         })
     }
 
+    /// Returns the canonical directory companion destination.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.receipt
+    }
+
     /// Commits one measured artifact through the protected output writer.
     ///
     /// # Errors

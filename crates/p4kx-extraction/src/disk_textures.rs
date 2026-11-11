@@ -65,6 +65,13 @@ impl DiskTextures {
             .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
     }
 
+    pub(crate) fn open_file_with_path(&self, path: &Path) -> io::Result<(PathBuf, File)> {
+        self.with_path(path, |actual| {
+            File::open(actual).map(|file| (actual.to_path_buf(), file))
+        })?
+        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
+    }
+
     fn with_path<T>(
         &self,
         path: &Path,

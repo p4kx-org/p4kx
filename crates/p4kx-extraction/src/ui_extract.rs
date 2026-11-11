@@ -7,10 +7,13 @@ use std::path::{Path, PathBuf};
 use p4kx_gfx::{Assets, Bitmap, BitmapSource, GfxError, MAX_BITMAP_PIXELS, TagFailure};
 use rayon::prelude::*;
 
+use super::{ui_extract_evidence, ui_json_fields};
 use crate::budget::Budget;
 use crate::output_file::write_error;
-use crate::ui_jobs::{Job, Outcome, jobs};
-use crate::{ConversionError, DiskTextures, UiMovie};
+use crate::ui_jobs::{ArtifactFields, Job, JobResult, Outcome, UiJobOutput, jobs};
+use crate::{
+    ConversionError, DirectoryReceipt, DiskTextures, FieldOrigins, SourceInventory, UiMovie,
+};
 
 /// The pixels the parallel bitmap jobs of one extraction may hold decoded at the same time.
 const PIXEL_BUDGET: u64 = 2 * MAX_BITMAP_PIXELS;
@@ -80,6 +83,41 @@ pub struct UiExtraction {
     pub tag_failures: Vec<TagFailure>,
 }
 
+/// An extraction summary with immediate source origins and its directory companion.
+#[derive(Debug)]
+pub struct ObservedUiExtraction {
+    pub(super) extraction: UiExtraction,
+    pub(super) fields: FieldOrigins,
+    pub(super) inventory: SourceInventory,
+    pub(super) receipt: Option<PathBuf>,
+}
+
+impl ObservedUiExtraction {
+    /// Returns the original extraction summary.
+    #[must_use]
+    pub const fn extraction(&self) -> &UiExtraction {
+        &self.extraction
+    }
+
+    /// Returns the per-field origins of the structured extraction summary.
+    #[must_use]
+    pub const fn fields(&self) -> &FieldOrigins {
+        &self.fields
+    }
+
+    /// Returns the actual original inputs of the summary and published artifacts.
+    #[must_use]
+    pub const fn inventory(&self) -> &SourceInventory {
+        &self.inventory
+    }
+
+    /// Returns the relative companion basename when this extraction committed artifacts.
+    #[must_use]
+    pub fn receipt(&self) -> Option<&Path> {
+        self.receipt.as_deref()
+    }
+}
+
 impl UiExtraction {
     /// Returns whether every tag was read and every definition written.
     #[must_use]
@@ -88,7 +126,7 @@ impl UiExtraction {
     }
 }
 
-impl UiMovie<'_> {
+impl<'archive> UiMovie<'archive> {
     /// Writes every bitmap of the movie as an 8-bit RGBA PNG and every shape and morph shape as
     /// JSON in twips into `folder`, in parallel, replacing existing files; a definition that fails
     /// leaves no file and does not stop the others. Of several definitions of one kind with the
@@ -101,33 +139,38 @@ impl UiMovie<'_> {
     ///
     /// # Errors
     ///
-    /// Returns [`ConversionError::Write`] when `folder` cannot be created.
+    /// Returns output-directory or companion publication errors.
     pub fn extract_assets(&self, folder: &Path) -> Result<UiExtraction, ConversionError> {
-        crate::check_protected_output(folder, self.write_protection()?, None)?;
+        self.extract_assets_observed(folder)
+            .map(|result| result.extraction)
+    }
+
+    /// Extracts the assets and returns their observed origin summary.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of an asset extraction.
+    pub fn extract_assets_observed(
+        &self,
+        folder: &Path,
+    ) -> Result<ObservedUiExtraction, ConversionError> {
+        let protection = self.write_protection()?;
+        crate::check_protected_output(folder, protection, None)?;
         fs::create_dir_all(folder).map_err(|source| write_error(folder, source))?;
-        let mut assets = self.movie().assets();
+        let publication = DirectoryReceipt::new(folder, protection)
+            .map_err(|source| write_error(folder, source))?;
+        let output = UiJobOutput {
+            folder,
+            publication: &publication,
+        };
+        let observed = self.movie().assets_observed();
         let budget = Budget::new(PIXEL_BUDGET);
         let files = DiskTextures::default();
-        let mut outcomes: Vec<Outcome> = {
-            let jobs = jobs(&assets);
-            jobs.par_iter()
-                .flat_map_iter(|job| self.run_job(&assets, job, folder, &budget, &files))
-                .collect()
-        };
-        outcomes.sort_by_key(|outcome| outcome.order);
-        let mut extraction = UiExtraction::default();
-        for outcome in outcomes {
-            match outcome.result {
-                Ok(written) => extraction.written.push(written),
-                Err(error) => extraction.failures.push(UiAssetFailure {
-                    kind: outcome.kind,
-                    id: outcome.id,
-                    error,
-                }),
-            }
-        }
-        extraction.tag_failures = std::mem::take(&mut assets.failures);
-        Ok(extraction)
+        let outcomes = jobs(&observed.assets)
+            .par_iter()
+            .map(|job| self.run_job(&observed.assets, job, &output, &budget, &files))
+            .collect();
+        ui_extract_evidence::complete(self, &publication, observed, outcomes)
     }
 
     pub(crate) fn asset_error(&self, id: u16, source: GfxError) -> ConversionError {
@@ -138,34 +181,42 @@ impl UiMovie<'_> {
         }
     }
 
-    fn run_job(
+    fn run_job<'owner>(
         &self,
         assets: &Assets<'_>,
         job: &Job<'_, '_>,
-        folder: &Path,
+        output: &UiJobOutput<'owner, '_>,
         budget: &Budget,
         files: &DiskTextures,
-    ) -> Vec<Outcome> {
+    ) -> JobResult<'owner, 'archive> {
         match job {
-            Job::Shape(order, shape) => {
-                vec![
-                    self.write_file(*order, folder, UiAssetKind::Shape, shape.id, |out| {
-                        shape.write_json(out)
-                    }),
-                ]
-            }
-            Job::MorphShape(order, morph) => {
-                vec![
-                    self.write_file(*order, folder, UiAssetKind::MorphShape, morph.id, |out| {
-                        morph.write_json(out)
-                    }),
-                ]
-            }
+            Job::Shape(order, shape) => JobResult::single(self.write_file(
+                *order,
+                output,
+                UiAssetKind::Shape,
+                shape.id,
+                |out| {
+                    ui_json_fields::write(*shape, out)
+                        .map(ArtifactFields::Json)
+                        .map_err(GfxError::Write)
+                },
+            )),
+            Job::MorphShape(order, morph) => JobResult::single(self.write_file(
+                *order,
+                output,
+                UiAssetKind::MorphShape,
+                morph.id,
+                |out| {
+                    ui_json_fields::write(*morph, out)
+                        .map(ArtifactFields::Json)
+                        .map_err(GfxError::Write)
+                },
+            )),
             Job::MissingBase(order, sub) => {
-                vec![Outcome::bitmap(*order, sub.id, Err(self.cut_error(sub)))]
+                JobResult::single(Outcome::bitmap(*order, sub.id, Err(self.cut_error(sub))))
             }
             Job::Bitmaps { base, cuts } => {
-                self.write_bitmaps(assets, *base, cuts, folder, budget, files)
+                self.write_bitmaps(assets, *base, cuts, output, budget, files)
             }
         }
     }

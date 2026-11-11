@@ -67,6 +67,13 @@ impl DiskParts {
         self.files.open_file(&self.header)
     }
 
+    pub(crate) fn open_with_path(&self, part: Option<u32>) -> io::Result<(PathBuf, File)> {
+        part.map_or_else(
+            || self.files.open_file_with_path(&self.header),
+            |index| self.files.open_file_with_path(&self.part_path(index)),
+        )
+    }
+
     pub(crate) fn part_len(&self, index: u32) -> io::Result<Option<u64>> {
         self.files.part_len(&self.part_path(index))
     }

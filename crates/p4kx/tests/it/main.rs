@@ -139,6 +139,7 @@ mod texture_png;
 mod texture_source_info;
 mod ui;
 mod ui_asset_origins;
+mod ui_extract_origins;
 mod ui_hologram;
 mod ui_panel;
 mod ui_render;

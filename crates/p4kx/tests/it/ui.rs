@@ -240,7 +240,13 @@ fn extract_as_json() -> TestResult {
     )?;
 
     assert_eq!(code, Some(1), "partial failure");
-    insta::assert_snapshot!(json);
+    let mut report: Value = serde_json::from_str(&json)?;
+    assert_eq!(report["originReceipt"], ".p4kx-origin.jsonl");
+    let fields = report.as_object_mut().ok_or("extract report")?;
+    assert!(fields.remove("fieldOrigins").is_some());
+    assert!(fields.remove("provenance").is_some());
+    assert!(fields.remove("originReceipt").is_some());
+    insta::assert_snapshot!(serde_json::to_string_pretty(&report)?);
     Ok(())
 }
 

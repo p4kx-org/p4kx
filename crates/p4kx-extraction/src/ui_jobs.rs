@@ -2,16 +2,21 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{HashMap, HashSet};
-use std::fs::{self, File};
-use std::io::BufWriter;
+use std::ffi::OsStr;
+use std::io::Write;
 use std::path::Path;
 
 use p4kx_gfx::{Assets, Bitmap, BitmapSource, GfxError, MorphShape, RgbaImage, Shape};
+use p4kx_texture::{MipByteSpans, RgbaImage as DdsImage};
 
 use crate::budget::{Budget, Lease};
-use crate::output_file::{write_error, write_replacing_protected};
-use crate::ui_external;
-use crate::{ConversionError, DiskTextures, Texture, UiAssetKind, UiMovie, WrittenUiAsset};
+use crate::output_file::write_error;
+use crate::texture_preview_png::input::PreviewInputs;
+use crate::ui_external::{self, ExternalPath};
+use crate::{
+    ConversionError, DirectoryCommit, DirectoryReceipt, DiskTextures, FieldPath, Texture,
+    UiAssetKind, UiMovie, WrittenUiAsset,
+};
 
 /// A definition, or a bitmap with the sub-images that cut it, written by one parallel job.
 pub(crate) enum Job<'b, 'c> {
@@ -28,25 +33,75 @@ pub(crate) enum Job<'b, 'c> {
     MorphShape(usize, &'b MorphShape),
 }
 
-/// What one definition's job did, with its place in file order.
-pub(crate) struct Outcome {
+pub(crate) struct UiJobOutput<'owner, 'source> {
+    pub(crate) folder: &'owner Path,
+    pub(crate) publication: &'owner DirectoryReceipt<'source>,
+}
+
+pub(crate) struct Outcome<'owner> {
     pub(crate) order: usize,
     pub(crate) kind: UiAssetKind,
     pub(crate) id: u16,
-    pub(crate) result: Result<WrittenUiAsset, ConversionError>,
+    pub(crate) result: Result<CommittedUiAsset<'owner>, ConversionError>,
 }
 
-impl Outcome {
+pub(crate) struct CommittedUiAsset<'owner> {
+    pub(crate) written: WrittenUiAsset,
+    pub(crate) fields: ArtifactFields,
+    pub(crate) receipt: DirectoryCommit<'owner>,
+}
+
+pub(crate) enum ArtifactFields {
+    Png,
+    Json(Vec<FieldPath>),
+}
+
+pub(crate) struct JobResult<'owner, 'archive> {
+    pub(crate) outcomes: Vec<Outcome<'owner>>,
+    pub(crate) bitmap: Option<BitmapRead<'archive>>,
+}
+
+pub(crate) struct BitmapRead<'archive> {
+    pub(crate) order: usize,
+    pub(crate) pixels: BitmapPixels<'archive>,
+}
+
+pub(crate) enum BitmapPixels<'archive> {
+    Embedded {
+        used_jpeg_tables: bool,
+    },
+    External {
+        selection: ExternalPath,
+        inputs: Box<PreviewInputs<'archive, MipByteSpans>>,
+    },
+}
+
+struct DecodedBitmap<'budget, 'archive> {
+    image: RgbaImage,
+    _lease: Lease<'budget>,
+    pixels: BitmapPixels<'archive>,
+}
+
+impl<'owner> Outcome<'owner> {
     pub(crate) const fn bitmap(
         order: usize,
         id: u16,
-        result: Result<WrittenUiAsset, ConversionError>,
+        result: Result<CommittedUiAsset<'owner>, ConversionError>,
     ) -> Self {
         Self {
             order,
             kind: UiAssetKind::Bitmap,
             id,
             result,
+        }
+    }
+}
+
+impl<'owner> JobResult<'owner, '_> {
+    pub(crate) fn single(outcome: Outcome<'owner>) -> Self {
+        Self {
+            outcomes: vec![outcome],
+            bitmap: None,
         }
     }
 }
@@ -96,33 +151,34 @@ pub(crate) fn jobs<'b, 'c>(assets: &'b Assets<'c>) -> Vec<Job<'b, 'c>> {
     jobs
 }
 
-impl UiMovie<'_> {
-    /// Writes one definition's file through `write`, replacing it.
-    pub(crate) fn write_file(
+impl<'archive> UiMovie<'archive> {
+    pub(crate) fn write_file<'owner>(
         &self,
         order: usize,
-        folder: &Path,
+        output: &UiJobOutput<'owner, '_>,
         kind: UiAssetKind,
         id: u16,
-        write: impl FnOnce(&mut BufWriter<File>) -> Result<(), GfxError>,
-    ) -> Outcome {
-        let path = folder.join(format!("{}_{id}.{}", kind.name(), kind.extension()));
-        let result = self
-            .write_protection()
-            .and_then(|protection| {
-                write_replacing_protected(&path, protection, None, |writer| {
-                    write(writer).map_err(|source| match source {
-                        GfxError::Write(source) => write_error(&path, source),
-                        source => self.asset_error(id, source),
-                    })
+        write: impl FnOnce(&mut dyn Write) -> Result<ArtifactFields, GfxError>,
+    ) -> Outcome<'owner> {
+        let basename = format!("{}_{id}.{}", kind.name(), kind.extension());
+        let path = output.folder.join(&basename);
+        let result = output
+            .publication
+            .write(OsStr::new(&basename), |writer| {
+                write(writer).map_err(|source| match source {
+                    GfxError::Write(source) => write_error(&path, source),
+                    source => self.asset_error(id, source),
                 })
             })
-            .and_then(|()| fs::metadata(&path).map_err(|source| write_error(&path, source)))
-            .map(|metadata| WrittenUiAsset {
-                kind,
-                id,
-                size: metadata.len(),
-                path: path.clone(),
+            .map(|(fields, receipt)| CommittedUiAsset {
+                written: WrittenUiAsset {
+                    kind,
+                    id,
+                    size: receipt.byte_length(),
+                    path,
+                },
+                fields,
+                receipt,
             });
         Outcome {
             order,
@@ -132,22 +188,21 @@ impl UiMovie<'_> {
         }
     }
 
-    /// Decodes a bitmap once within the pixel budget and writes it and the sub-images cutting it.
-    pub(crate) fn write_bitmaps(
+    pub(crate) fn write_bitmaps<'owner>(
         &self,
         assets: &Assets<'_>,
         (order, base): (usize, &Bitmap<'_>),
         cuts: &[(usize, &Bitmap<'_>)],
-        folder: &Path,
+        output: &UiJobOutput<'owner, '_>,
         budget: &Budget,
         files: &DiskTextures,
-    ) -> Vec<Outcome> {
+    ) -> JobResult<'owner, 'archive> {
         let png = |order, id, image: &RgbaImage| {
-            self.write_file(order, folder, UiAssetKind::Bitmap, id, |out| {
-                image.write_png(out)
+            self.write_file(order, output, UiAssetKind::Bitmap, id, |out| {
+                image.write_png(out).map(|()| ArtifactFields::Png)
             })
         };
-        let (image, _lease) =
+        let decoded =
             match self.decode_bitmap(assets, base, budget, files) {
                 Ok(decoded) => decoded,
                 Err(error) => {
@@ -155,16 +210,20 @@ impl UiMovie<'_> {
                     outcomes.extend(cuts.iter().map(|&(order, cut)| {
                         Outcome::bitmap(order, cut.id, Err(self.cut_error(cut)))
                     }));
-                    return outcomes;
+                    return JobResult {
+                        outcomes,
+                        bitmap: None,
+                    };
                 }
             };
-        let mut outcomes = vec![png(order, base.id, &image)];
+        let mut outcomes = vec![png(order, base.id, &decoded.image)];
         for &(order, cut) in cuts {
             let BitmapSource::SubImage(sub) = &cut.source else {
                 continue;
             };
             outcomes.push(
-                image
+                decoded
+                    .image
                     .crop(
                         (u32::from(sub.x1), u32::from(sub.y1)),
                         (u32::from(sub.x2), u32::from(sub.y2)),
@@ -175,7 +234,13 @@ impl UiMovie<'_> {
                     ),
             );
         }
-        outcomes
+        JobResult {
+            outcomes,
+            bitmap: Some(BitmapRead {
+                order,
+                pixels: decoded.pixels,
+            }),
+        }
     }
 
     /// Decodes the first mip of the texture of the external image `id`.
@@ -184,32 +249,51 @@ impl UiMovie<'_> {
         id: u16,
         texture: &Texture<'_>,
     ) -> Result<RgbaImage, ConversionError> {
-        let decoded = texture.decode_mip(0)?;
+        self.rgba_image(id, texture.decode_mip(0)?)
+    }
+
+    fn rgba_image(&self, id: u16, decoded: DdsImage) -> Result<RgbaImage, ConversionError> {
         let (width, height) = (decoded.width(), decoded.height());
         RgbaImage::from_pixels(width, height, decoded.into_pixels())
             .map_err(|source| self.asset_error(id, source))
     }
 
-    fn decode_bitmap<'b>(
+    fn decode_bitmap<'budget>(
         &self,
         assets: &Assets<'_>,
         bitmap: &Bitmap<'_>,
-        budget: &'b Budget,
+        budget: &'budget Budget,
         files: &DiskTextures,
-    ) -> Result<(RgbaImage, Lease<'b>), ConversionError> {
+    ) -> Result<DecodedBitmap<'budget, 'archive>, ConversionError> {
         let gfx = |source| self.asset_error(bitmap.id, source);
         match &bitmap.source {
             BitmapSource::External(image) => {
                 let texture = ui_external::open_external(self, bitmap.id, image, files)?;
                 let header = texture.header();
                 let lease = budget.take(u64::from(header.width()) * u64::from(header.height()));
-                Ok((self.texture_image(bitmap.id, &texture)?, lease))
+                let (decoded, inputs) = texture.decode_mip_with_inputs(0)?;
+                let selection = ExternalPath::select(image);
+                Ok(DecodedBitmap {
+                    image: self.rgba_image(bitmap.id, decoded)?,
+                    _lease: lease,
+                    pixels: BitmapPixels::External {
+                        selection,
+                        inputs: Box::new(inputs),
+                    },
+                })
             }
             BitmapSource::SubImage(_) => Err(self.cut_error(bitmap)),
             BitmapSource::Lossless(_) | BitmapSource::Jpeg(_) => {
                 let (width, height) = assets.bitmap_size(bitmap).map_err(gfx)?;
                 let lease = budget.take(u64::from(width) * u64::from(height));
-                Ok((assets.decode_bitmap(bitmap).map_err(gfx)?, lease))
+                let decoded = assets.decode_bitmap_observed(bitmap).map_err(gfx)?;
+                Ok(DecodedBitmap {
+                    image: decoded.image,
+                    _lease: lease,
+                    pixels: BitmapPixels::Embedded {
+                        used_jpeg_tables: decoded.used_jpeg_tables,
+                    },
+                })
             }
         }
     }

@@ -52,11 +52,23 @@ impl ObservedFileOrigin {
         before: FileStamp,
         byte_length: usize,
     ) -> io::Result<Option<Self>> {
+        if byte_length as u64 == before.size() {
+            Self::of_extent(path, handle, before, byte_length as u64)
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub(crate) fn of_extent(
+        path: &Path,
+        handle: &File,
+        before: FileStamp,
+        extent: u64,
+    ) -> io::Result<Option<Self>> {
         let absolute = std::path::absolute(path)?;
         let after = FileStamp::from_metadata(&handle.metadata()?);
-        let stable = byte_length as u64 == before.size()
-            && after == before
-            && FileStamp::of(&absolute)? == before;
+        let stable =
+            extent <= before.size() && after == before && FileStamp::of(&absolute)? == before;
         Ok(stable.then(|| Self::new(absolute, before)))
     }
 }

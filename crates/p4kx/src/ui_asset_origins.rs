@@ -5,10 +5,9 @@ mod definitions;
 mod timelines;
 
 use anyhow::{Result, ensure};
-use p4kx_extraction::gfx::{MovieSpan, SpanRuns, TagSite};
 use p4kx_extraction::{
-    FieldOrigins, FieldPath, InputScope, SourceInput, SourceInventory, SourceLocation, SourceScope,
-    SourceUse, SourceUseRole, SourceUses, UiMovie,
+    FieldOrigins, FieldPath, SourceInventory, SourceUse, SourceUseRole, SourceUses, UiMovie,
+    UiMovieEvidence, UiSourceSite as Site,
 };
 use serde::Serialize;
 
@@ -41,136 +40,34 @@ pub(super) fn print(movie: &UiMovie<'_>) -> Result<bool> {
 
 struct Projection {
     uses: SourceUses,
-    source: SourceScope,
-    bound: bool,
-    name_scope: InputScope,
-    decoded_from: Vec<SourceUse>,
+    source: UiMovieEvidence,
     fields: FieldOrigins,
-}
-
-#[derive(Clone, Copy)]
-enum Site<'a> {
-    Bytes(MovieSpan),
-    Header(TagSite),
-    Body(TagSite),
-    Item(TagSite, usize),
-    Survey(MovieSpan),
-    Runs(u16, &'a SpanRuns),
-}
-
-impl Site<'_> {
-    fn coordinates(self, compressed: bool) -> (&'static str, Vec<u64>) {
-        let domain = |direct, decoded| if compressed { decoded } else { direct };
-        match self {
-            Self::Bytes(span) => (
-                domain("gfxBytes", "gfxDecodedBytes"),
-                span_indices(span).to_vec(),
-            ),
-            Self::Header(tag) => (
-                domain("gfxTagHeader", "gfxDecodedTagHeader"),
-                vec![
-                    u64::from(tag.code),
-                    tag.header.offset as u64,
-                    tag.header.length as u64,
-                ],
-            ),
-            Self::Body(tag) => (domain("gfxTag", "gfxDecodedTag"), tag_indices(tag).to_vec()),
-            Self::Item(tag, ordinal) => {
-                let mut indices = tag_indices(tag).to_vec();
-                indices.push(ordinal as u64);
-                (domain("gfxTagItem", "gfxDecodedTagItem"), indices)
-            }
-            Self::Survey(span) => (
-                domain("gfxSurvey", "gfxDecodedSurvey"),
-                span_indices(span).to_vec(),
-            ),
-            Self::Runs(code, runs) => {
-                let mut indices = vec![u64::from(code)];
-                for run in runs.runs() {
-                    indices.extend([
-                        run.first.offset as u64,
-                        run.first.length as u64,
-                        run.stride as u64,
-                        run.count as u64,
-                    ]);
-                }
-                (domain("gfxTagRuns", "gfxDecodedTagRuns"), indices)
-            }
-        }
-    }
-}
-
-fn tag_indices(tag: TagSite) -> [u64; 5] {
-    [
-        u64::from(tag.code),
-        tag.header.offset as u64,
-        tag.header.length as u64,
-        tag.body.offset as u64,
-        tag.body.length as u64,
-    ]
-}
-
-const fn span_indices(span: MovieSpan) -> [u64; 2] {
-    [span.offset as u64, span.length as u64]
 }
 
 impl Projection {
     fn new(movie: &UiMovie<'_>) -> Result<Self> {
         let uses = SourceUses::new();
-        let input = movie.source_input();
-        let source = uses.observe(input.unwrap_or(SourceInput::Unknown), InputScope::Payload)?;
-        let mut result = Self {
+        let source = UiMovieEvidence::observe(movie, &uses)?;
+        Ok(Self {
             uses,
             source,
-            bound: input.is_some(),
-            name_scope: match input {
-                Some(SourceInput::Archive(_) | SourceInput::ArchiveView(_)) => {
-                    InputScope::ArchiveDirectoryMetadata
-                }
-                _ => InputScope::FileMetadata,
-            },
-            decoded_from: Vec::new(),
             fields: FieldOrigins::new(),
-        };
-        let read = movie.movie().read_source();
-        if let Some(compressed) = read.compressed {
-            result.decoded_from = vec![
-                result.original(read.signature, "compressionSignature", Selector)?,
-                result.original(read.declared_length, "decodedLengthLimit", Selector)?,
-                result.original(compressed, "compressedPayload", Conversion)?,
-            ];
-        }
-        Ok(result)
+        })
     }
 
     fn header(&mut self, movie: &UiMovie<'_>) -> Result<()> {
         let read = movie.movie().read_source();
-        let name = self.source.for_scope(self.name_scope).at(
-            SourceLocation::Metadata {
-                field: "path".into(),
-            },
-            Payload,
-        )?;
+        let name = self.source.name_use()?;
         self.bind("/movie", &[name], true)?;
         for (path, field, span, role) in [
             ("/signature", "signature", read.signature, Payload),
             ("/version", "version", read.version, Payload),
             ("/compression", "signature", read.signature, Conversion),
         ] {
-            let original = self.original(span, field, role)?;
+            let original = self.source.original(span, field, role)?;
             self.bind(path, &[original], true)?;
         }
-        let mut length = self.decoded_from.clone();
-        if length.is_empty() {
-            length.push(self.original(read.signature, "compressionSignature", Selector)?);
-            length.push(self.original(read.declared_length, "declaredLength", Selector)?);
-            length.push(self.use_at(
-                "gfxMovieInput",
-                "measuredByteExtent",
-                vec![0, read.input_length as u64],
-                Conversion,
-            )?);
-        }
+        let length = self.source.length_uses()?;
         self.bind("/length", &length, true)?;
         self.rect("/stage", Site::Bytes(read.stage), "stage")?;
         self.logical(
@@ -192,35 +89,13 @@ impl Projection {
     fn bind(&mut self, path: &str, actual: &[SourceUse], complete: bool) -> Result<()> {
         self.fields.insert(
             FieldPath::parse(path)?,
-            self.uses.origin(actual, complete && self.bound),
+            self.uses.origin(actual, complete && self.source.is_bound()),
         )?;
         Ok(())
     }
 
-    fn original(&self, span: MovieSpan, field: &str, role: SourceUseRole) -> Result<SourceUse> {
-        self.use_at("gfxMovieInput", field, span_indices(span).to_vec(), role)
-    }
-
-    fn use_at(
-        &self,
-        namespace: &str,
-        field: &str,
-        indices: Vec<u64>,
-        role: SourceUseRole,
-    ) -> Result<SourceUse> {
-        Ok(self.source.at(
-            SourceLocation::Subresource {
-                namespace: namespace.into(),
-                indices,
-                field: field.into(),
-            },
-            role,
-        )?)
-    }
-
     fn decoded(&self, site: Site<'_>, field: &str, role: SourceUseRole) -> Result<SourceUse> {
-        let (namespace, indices) = site.coordinates(!self.decoded_from.is_empty());
-        self.use_at(namespace, field, indices, role)
+        Ok(self.source.decoded(site, field, role)?)
     }
 
     fn bind_decoded(
@@ -229,7 +104,7 @@ impl Projection {
         mut actual: Vec<SourceUse>,
         complete: bool,
     ) -> Result<()> {
-        actual.extend_from_slice(&self.decoded_from);
+        self.source.append_decoding(&mut actual);
         self.bind(path, &actual, complete)
     }
 

@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "texture/decode.rs"]
+mod decode;
 #[path = "texture/disk.rs"]
 mod disk;
+#[path = "texture/disk_mip.rs"]
+mod disk_mip;
+#[path = "texture_preview_png/input/header.rs"]
+pub(crate) mod preview_header;
 #[path = "texture/texture.rs"]
 mod texture;
 

@@ -7,9 +7,11 @@ use p4kx_texture::{DdsHeaderField, DdsRawHeader, MipByteSpans, MipPayloadLocatio
 use crate::source::SourceEntry;
 use crate::texture_parts::Parts;
 use crate::{
-    FieldOrigin, InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceScope,
+    FieldOrigin, InputScope, ObservedFileOrigin, SourceEvidenceError, SourceInput, SourceLocation,
     SourceUse, SourceUseRole, SourceUses,
 };
+
+pub use crate::textures::preview_header::PreviewHeaderEvidence;
 
 #[derive(Debug)]
 pub(crate) struct PreviewInputs<'a, Spans> {
@@ -19,16 +21,44 @@ pub(crate) struct PreviewInputs<'a, Spans> {
 
 #[derive(Debug)]
 pub(crate) struct TexturePreviewInput<'a, Spans> {
-    header: Option<ObservedEntry<'a>>,
+    header: ReadInput<'a>,
     payload: PayloadEntry<'a>,
     raw: DdsRawHeader,
     spans: Spans,
+    disk_selection: Option<DiskSelection>,
 }
 
 #[derive(Debug)]
 enum PayloadEntry<'a> {
     Header,
-    Split(Option<ObservedEntry<'a>>),
+    Split(ReadInput<'a>),
+}
+
+#[derive(Debug)]
+enum ReadInput<'archive> {
+    Archive(ObservedEntry<'archive>),
+    File(ObservedFileOrigin),
+    Unknown,
+}
+
+impl ReadInput<'_> {
+    const fn input(&self) -> SourceInput<'_> {
+        match self {
+            Self::Archive(entry) => SourceInput::ArchiveView(*entry),
+            Self::File(file) => SourceInput::File(file),
+            Self::Unknown => SourceInput::Unknown,
+        }
+    }
+
+    const fn is_bound(&self) -> bool {
+        !matches!(self, Self::Unknown)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct DiskSelection {
+    pub(crate) raw: DdsRawHeader,
+    pub(crate) input: Option<ObservedFileOrigin>,
 }
 
 impl<'a> TexturePreviewInput<'a, MipPayloadLocation> {
@@ -37,18 +67,22 @@ impl<'a> TexturePreviewInput<'a, MipPayloadLocation> {
         raw: DdsRawHeader,
         location: MipPayloadLocation,
     ) -> Self {
+        let archive_input =
+            |entry: Option<ObservedEntry<'a>>| entry.map_or(ReadInput::Unknown, ReadInput::Archive);
         let (header, payload) = match parts {
             Parts::Source { header, parts, .. } => (
-                header.observed_entry(),
+                archive_input(header.observed_entry()),
                 location.part_index().map_or(PayloadEntry::Header, |part| {
-                    PayloadEntry::Split(parts.get(&part).and_then(SourceEntry::observed_entry))
+                    PayloadEntry::Split(archive_input(
+                        parts.get(&part).and_then(SourceEntry::observed_entry),
+                    ))
                 }),
             ),
             Parts::Files(_) => (
-                None,
-                location
-                    .part_index()
-                    .map_or(PayloadEntry::Header, |_| PayloadEntry::Split(None)),
+                ReadInput::Unknown,
+                location.part_index().map_or(PayloadEntry::Header, |_| {
+                    PayloadEntry::Split(ReadInput::Unknown)
+                }),
             ),
         };
         Self {
@@ -56,6 +90,25 @@ impl<'a> TexturePreviewInput<'a, MipPayloadLocation> {
             payload,
             raw,
             spans: location,
+            disk_selection: None,
+        }
+    }
+
+    pub(crate) fn from_disk(
+        raw: DdsRawHeader,
+        location: MipPayloadLocation,
+        header: Option<ObservedFileOrigin>,
+        part: Option<ObservedFileOrigin>,
+        selection: DiskSelection,
+    ) -> Self {
+        Self {
+            header: header.map_or(ReadInput::Unknown, ReadInput::File),
+            payload: location.part_index().map_or(PayloadEntry::Header, |_| {
+                PayloadEntry::Split(part.map_or(ReadInput::Unknown, ReadInput::File))
+            }),
+            raw,
+            spans: location,
+            disk_selection: Some(selection),
         }
     }
 
@@ -65,6 +118,7 @@ impl<'a> TexturePreviewInput<'a, MipPayloadLocation> {
             payload: self.payload,
             raw: self.raw,
             spans: self.spans.spans(image)?,
+            disk_selection: self.disk_selection,
         })
     }
 }
@@ -104,10 +158,10 @@ impl TexturePreviewInput<'_, MipByteSpans> {
         uses: &SourceUses,
         level: u32,
     ) -> Result<PreviewTextureEvidence, SourceEvidenceError> {
-        let header = PreviewHeaderEvidence::of_read(uses, self.header, self.raw)?;
-        let sibling = match self.payload {
+        let header = PreviewHeaderEvidence::of_read(uses, self.header.input(), self.raw)?;
+        let sibling = match &self.payload {
             PayloadEntry::Header => None,
-            PayloadEntry::Split(entry) => Some(observe(uses, entry)?),
+            PayloadEntry::Split(entry) => Some(uses.observe(entry.input(), InputScope::Payload)?),
         };
         let payload = sibling.as_ref().unwrap_or(&header.scope);
         let spans = self.spans;
@@ -125,18 +179,36 @@ impl TexturePreviewInput<'_, MipByteSpans> {
             },
             SourceUseRole::Conversion,
         )?;
-        Ok(PreviewTextureEvidence { header, mip })
+        let selection = self
+            .disk_selection
+            .as_ref()
+            .map(|selection| {
+                PreviewHeaderEvidence::of_read(
+                    uses,
+                    selection
+                        .input
+                        .as_ref()
+                        .map_or(SourceInput::Unknown, SourceInput::File),
+                    selection.raw,
+                )
+            })
+            .transpose()?;
+        let complete = self.header.is_bound()
+            && match &self.payload {
+                PayloadEntry::Header => true,
+                PayloadEntry::Split(input) => input.is_bound(),
+            }
+            && self
+                .disk_selection
+                .as_ref()
+                .is_none_or(|selection| selection.input.is_some());
+        Ok(PreviewTextureEvidence {
+            header,
+            mip,
+            selection,
+            complete,
+        })
     }
-}
-
-fn observe(
-    uses: &SourceUses,
-    entry: Option<ObservedEntry<'_>>,
-) -> Result<SourceScope, SourceEvidenceError> {
-    uses.observe(
-        entry.map_or(SourceInput::Unknown, SourceInput::ArchiveView),
-        InputScope::Payload,
-    )
 }
 
 /// Registered source evidence for the selected color and optional merged alpha texture.
@@ -161,11 +233,18 @@ impl PreviewPngEvidence {
             Prefix, Format, Width, Height, MipCount, Faces, ArraySize, Depth,
         ];
         for texture in std::iter::once(&self.color).chain(self.alpha.as_ref()) {
+            if let Some(selection) = &texture.selection {
+                uses.extend(selection.header_uses(&fields, SourceUseRole::Selector)?);
+            }
             uses.extend(texture.header_uses(&fields, SourceUseRole::Conversion)?);
             uses.push(texture.header_size_use()?);
             uses.push(texture.mip().clone());
         }
         Ok(())
+    }
+
+    pub(crate) fn is_complete(&self) -> bool {
+        self.color.complete && self.alpha.as_ref().is_none_or(|alpha| alpha.complete)
     }
 
     /// Registers the stored names used to select the color header and its alpha sibling.
@@ -186,6 +265,8 @@ impl PreviewPngEvidence {
 pub struct PreviewTextureEvidence {
     header: PreviewHeaderEvidence,
     mip: SourceUse,
+    selection: Option<PreviewHeaderEvidence>,
+    complete: bool,
 }
 
 impl PreviewTextureEvidence {
@@ -220,7 +301,10 @@ impl PreviewTextureEvidence {
     ///
     /// Returns an error if the evidence inventory was interrupted.
     pub fn name_use(&self, role: SourceUseRole) -> Result<SourceUse, SourceEvidenceError> {
-        self.header.name_use(role)
+        self.selection
+            .as_ref()
+            .unwrap_or(&self.header)
+            .name_use(role)
     }
 
     /// Registers the header Entry length used to locate the selected mip storage.
@@ -229,8 +313,7 @@ impl PreviewTextureEvidence {
     ///
     /// Returns an error if the evidence inventory was interrupted.
     pub fn header_size_use(&self) -> Result<SourceUse, SourceEvidenceError> {
-        self.header
-            .metadata_use("uncompressedSize", SourceUseRole::Selector)
+        self.selection.as_ref().unwrap_or(&self.header).size_use()
     }
 
     /// Registers the displayed stored names of the header and its containers.
@@ -240,119 +323,5 @@ impl PreviewTextureEvidence {
     /// Returns an error if the evidence inventory was interrupted.
     pub fn path_origin(&self, uses: &SourceUses) -> Result<FieldOrigin, SourceEvidenceError> {
         self.header.path_origin(uses)
-    }
-}
-
-/// The authored words of an actual opened texture header.
-#[derive(Debug)]
-pub struct PreviewHeaderEvidence {
-    raw: DdsRawHeader,
-    scope: SourceScope,
-    archive_ancestry: Option<usize>,
-}
-
-impl PreviewHeaderEvidence {
-    pub(crate) fn of_header(
-        uses: &SourceUses,
-        parts: &Parts<'_>,
-        raw: DdsRawHeader,
-    ) -> Result<Self, SourceEvidenceError> {
-        let entry = match parts {
-            Parts::Source { header, .. } => header.observed_entry(),
-            Parts::Files(_) => None,
-        };
-        Self::of_read(uses, entry, raw)
-    }
-
-    fn of_read(
-        uses: &SourceUses,
-        entry: Option<ObservedEntry<'_>>,
-        raw: DdsRawHeader,
-    ) -> Result<Self, SourceEvidenceError> {
-        Ok(Self {
-            raw,
-            scope: observe(uses, entry)?,
-            archive_ancestry: entry.map(|entry| entry.ancestors().len()),
-        })
-    }
-
-    /// Registers the exact original words used by the requested header fields.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the evidence inventory was interrupted.
-    pub fn header_uses(
-        &self,
-        fields: &[DdsHeaderField],
-        role: SourceUseRole,
-    ) -> Result<Vec<SourceUse>, SourceEvidenceError> {
-        fields
-            .iter()
-            .flat_map(|&field| self.raw.words_for(field))
-            .map(|word| {
-                self.scope.at(
-                    SourceLocation::Subresource {
-                        namespace: "ddsHeader".into(),
-                        indices: vec![word.offset, word.length],
-                        field: word.name.into(),
-                    },
-                    role,
-                )
-            })
-            .collect()
-    }
-
-    /// Registers only the opened Entry's stored name.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the evidence inventory was interrupted.
-    pub fn name_use(&self, role: SourceUseRole) -> Result<SourceUse, SourceEvidenceError> {
-        self.metadata_use("path", role)
-    }
-
-    fn metadata_use(
-        &self,
-        field: &'static str,
-        role: SourceUseRole,
-    ) -> Result<SourceUse, SourceEvidenceError> {
-        let scope = if self.archive_ancestry.is_some() {
-            InputScope::ArchiveDirectoryMetadata
-        } else {
-            InputScope::FileMetadata
-        };
-        self.scope.for_scope(scope).at(
-            SourceLocation::Metadata {
-                field: field.into(),
-            },
-            role,
-        )
-    }
-
-    /// Registers the displayed stored names of the header and its containers.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the evidence inventory was interrupted.
-    pub fn path_origin(&self, uses: &SourceUses) -> Result<FieldOrigin, SourceEvidenceError> {
-        let mut names = vec![self.name_use(SourceUseRole::Payload)?];
-        let mut complete = true;
-        for ordinal in 0..self.archive_ancestry.unwrap_or(0) {
-            if let Some(ancestor) = self.scope.ancestor(ordinal)? {
-                names.push(
-                    ancestor
-                        .for_scope(InputScope::ArchiveDirectoryMetadata)
-                        .at(
-                            SourceLocation::Metadata {
-                                field: "path".into(),
-                            },
-                            SourceUseRole::Payload,
-                        )?,
-                );
-            } else {
-                complete = false;
-            }
-        }
-        Ok(uses.origin(&names, complete))
     }
 }

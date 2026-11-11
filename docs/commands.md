@@ -577,6 +577,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   and every shape as `shape_<id>.json` (morph shapes as `morph_shape_<id>.json`) in twips as the
   movie stores them; an external image is decoded from the DDS texture it names next to the
   movie (on disk only inside the movie's `Data` folder), a sub-image is cut from its bitmap.
+  Extract writes `.p4kx-origin.jsonl` for the committed assets, with byte bindings and exact
+  source uses. A partial run records the assets it actually wrote. The JSON summary includes
+  `originReceipt`, `fieldOrigins`, and `provenance`.
   Both also take a movie file on disk, compressed (`CWS`, `CFX`, `ZWS`) or not (`FWS`,
   `GFX`).
 - `p4kx ui render <archive> <entry> --out <file.png> [--size <W>x<H>|<W>] [--background
