@@ -14,7 +14,7 @@ use rayon::prelude::*;
 use super::anchor::{Anchor, anchors};
 use super::expressions::{Expressions, Morphs};
 use super::vec3::Vec3;
-use crate::ModelProvider;
+use crate::{ModelProvider, ProvidedModel};
 
 /// Reads the skin at `path` at level 0, lets `make` turn it into the model as it is worn and its
 /// morph targets, and carries the targets to `to`, the mesh of a lower level.
@@ -27,17 +27,28 @@ pub(super) fn from_level_zero(
     (to, selection): (&Mesh, &Expressions),
     make: impl FnOnce(Model) -> Result<(Model, Morphs), String>,
 ) -> Result<Morphs, String> {
+    from_level_zero_observed(path, models, (to, selection), |base| {
+        make(base.model).map(|(model, morphs)| (model, morphs, ()))
+    })
+    .map(|(morphs, ())| morphs)
+}
+
+pub(super) fn from_level_zero_observed<T>(
+    path: &str,
+    models: &dyn ModelProvider,
+    (to, selection): (&Mesh, &Expressions),
+    make: impl FnOnce(ProvidedModel) -> Result<(Model, Morphs, T), String>,
+) -> Result<(Morphs, T), String> {
     let base = models
         .model(path, 0)
-        .map_err(|failure| format!("{path} cannot be read at level 0: {failure}"))?
-        .model;
-    let (model, morphs) = make(base)?;
+        .map_err(|failure| format!("{path} cannot be read at level 0: {failure}"))?;
+    let (model, morphs, origin) = make(base)?;
     let from = model
         .lods
         .first()
         .and_then(|lod| lod.meshes.first())
         .ok_or_else(|| format!("{path} has no mesh at level 0"))?;
-    Ok(carry(morphs, from, to, selection))
+    Ok((carry(morphs, from, to, selection), origin))
 }
 
 /// Carries the targets of `morphs`, made on the mesh `from`, to the mesh `to`; a target that moves

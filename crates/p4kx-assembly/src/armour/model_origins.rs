@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource};
 
-use super::{Armour, ArmourPart};
+use super::{Armour, ArmourPart, ShapeArchiveSources};
 use crate::PaletteRecords;
 
 impl ArmourPart {
@@ -17,6 +19,18 @@ impl ArmourPart {
     #[must_use]
     pub fn palette_records_for(&self, slot: usize) -> Option<PaletteRecords> {
         self.palette.as_ref()?.records_for(slot)
+    }
+
+    /// Returns the original model and rig inputs used to shape this part.
+    #[must_use]
+    pub fn shape_archive_sources(&self) -> &[Arc<ShapeArchiveSources>] {
+        &self.shape_sources
+    }
+
+    /// Returns whether a facial rig supplied joints to the assembled skeleton.
+    #[must_use]
+    pub const fn has_facial_rig(&self) -> bool {
+        self.face.is_some()
     }
 
     /// Returns the physical model and companion inputs selected for this part.

@@ -190,6 +190,18 @@ pub trait ModelProvider: Sync {
         Err(ModelFailure::Missing)
     }
 
+    /// Reads a file with the physical Archive Entry when the provider can prove it.
+    fn file_observed(
+        &self,
+        path: &str,
+        limit: u64,
+    ) -> (
+        Option<p4kx_extraction::EntryOrigin>,
+        Result<Vec<u8>, ModelFailure>,
+    ) {
+        (None, self.file(path, limit))
+    }
+
     /// Poses `model`, read from the landing gear's geometry `path`, at the end of the clip that
     /// deploys the gear, and returns the posed copy; `None` when the source has no such clip. The
     /// default has none.

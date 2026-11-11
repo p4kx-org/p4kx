@@ -46,6 +46,7 @@ fn check_blink(made: &Followed, what: &str) -> TestResult {
 
 fn move_of(head: &Arc<Model>) -> HeadMove {
     HeadMove {
+        shape_sources: None,
         before: Arc::clone(head),
         after: Arc::clone(head),
         morphs: vec![blink()],

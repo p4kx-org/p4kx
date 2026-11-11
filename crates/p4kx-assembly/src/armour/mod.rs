@@ -6,6 +6,7 @@
 
 mod anchor;
 mod animate;
+mod animate_rig;
 mod body;
 mod body_zones;
 mod build;
@@ -36,6 +37,7 @@ mod piece;
 mod read_models;
 mod sample;
 mod shape;
+mod shape_origins;
 #[cfg(test)]
 mod test_models;
 mod uncover;
@@ -65,6 +67,7 @@ pub use look::Look;
 pub use npc::NpcHead;
 pub use piece::Piece;
 pub use shape::MAX_DNA_RIG_LEN;
+pub use shape_origins::{LowerMorphSources, RigArchiveRead, ShapeArchiveSources};
 pub use wearable::Wearable;
 pub use zones::ZoneChunk;
 pub(crate) use zones::{ZoneList, covered, read_zones, uncovered};
@@ -93,6 +96,7 @@ pub struct ArmourPart {
     pub(crate) materials: Arc<MaterialStatus>,
     pub(crate) material_archive_origins: Arc<MaterialArchiveOrigins>,
     pub(crate) palette: Option<materials::PaletteApplication>,
+    pub(crate) shape_sources: Vec<Arc<ShapeArchiveSources>>,
     pub(crate) morphs: Vec<MorphTarget>,
     pub(crate) follows: Vec<usize>,
     pub(crate) face: Option<Arc<facial::FaceLink>>,

@@ -8,7 +8,7 @@ use p4kx_gltf::{
     write_rigged_glb_animated_observed,
 };
 
-use super::{Armour, ArmourPart, CharacterAnimations};
+use super::{Armour, ArmourPart, CharacterAnimations, RigArchiveRead};
 
 impl CharacterAnimations<'_> {
     /// Returns the original input positions of animations passed to the GLB writer, in its order.
@@ -17,6 +17,13 @@ impl CharacterAnimations<'_> {
             .iter()
             .map(|(index, _, _)| *index)
             .chain(self.sampled_indices.iter().copied())
+    }
+
+    /// Returns the rig read used by a sampled animation in writer order.
+    #[must_use]
+    pub fn rig_read_for(&self, animation: usize) -> Option<&RigArchiveRead> {
+        let sampled = animation.checked_sub(self.keys.len())?;
+        self.sampled_rigs.get(sampled)?.as_ref()
     }
 
     pub(super) fn rig_animations(&self) -> Vec<RigAnimation<'_>> {

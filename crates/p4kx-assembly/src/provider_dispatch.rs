@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_extraction::model::{LayerBudget, MaterialStatus, Model};
-use p4kx_extraction::{ArchiveMaterialRead, ModelSource};
+use p4kx_extraction::{ArchiveMaterialRead, EntryOrigin, ModelSource};
 
 use super::{ArchiveModels, ModelFailure, ModelProvider, ProvidedModel};
 use crate::cdf::is_character_definition;
@@ -51,6 +51,14 @@ impl ModelProvider for ArchiveModels<'_> {
     fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {
         let entry = self.file_entry(path).ok_or(ModelFailure::Missing)?;
         self.read_file_entry(entry, limit)
+    }
+
+    fn file_observed(
+        &self,
+        path: &str,
+        limit: u64,
+    ) -> (Option<EntryOrigin>, Result<Vec<u8>, ModelFailure>) {
+        self.observed_file(path, limit)
     }
 
     fn deployed(&self, path: &str, model: &Model) -> Result<Option<Model>, ModelFailure> {
