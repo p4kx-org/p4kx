@@ -5,9 +5,7 @@ use std::fs::{self, File, Metadata, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::{
-    ArchiveWriteProtection, CancelToken, OwnedDirectoryPermit, check_protected_output,
-};
+use crate::{ArchiveWriteProtection, CancelToken, OwnedDirectoryPermit, check_protected_output};
 
 pub(super) const LOCK_NAME: &str = ".p4kx-origin.lock";
 
@@ -23,11 +21,10 @@ impl ReceiptLock {
         protection: Option<&ArchiveWriteProtection>,
         cancel: &CancelToken,
     ) -> io::Result<Self> {
-        let permit =
-            p4kx_extraction::validated_output_directory(directory, None, cancel.flag(), |root| {
-                regular_file(&root.join(LOCK_NAME)).map(|_| ())
-            })
-            .map_err(p4kx_extraction::OwnedOutputError::into_io_error)?;
+        let permit = crate::validated_output_directory(directory, None, cancel.flag(), |root| {
+            regular_file(&root.join(LOCK_NAME)).map(|_| ())
+        })
+        .map_err(crate::OwnedOutputError::into_io_error)?;
         let path = permit.path().join(LOCK_NAME);
         permit
             .ensure_namespace_writable(&path, cancel.flag())
@@ -113,6 +110,6 @@ pub(super) fn invalid(detail: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, detail)
 }
 
-pub(super) fn protection_error(error: p4kx_extraction::WriteProtectionError) -> io::Error {
+pub(super) fn protection_error(error: crate::WriteProtectionError) -> io::Error {
     io::Error::new(io::ErrorKind::PermissionDenied, error)
 }

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::io::{self, Write};
 use std::path::{Component, Path};
 
 use p4kx_archive::Checksum;
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::DecimalU64;
@@ -17,7 +17,7 @@ use crate::DecimalU64;
 #[serde(transparent)]
 pub struct OriginArtifactName(ArtifactName);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
 #[serde(
     tag = "encoding",
     content = "value",
@@ -26,15 +26,7 @@ pub struct OriginArtifactName(ArtifactName);
 )]
 enum ArtifactName {
     Utf8(#[schemars(regex(pattern = r"^(?!\.{1,2}$)[^/\\:\u0000]+$"))] String),
-    #[cfg_attr(
-        not(unix),
-        expect(dead_code, reason = "Portable readers accept native Unix names")
-    )]
     UnixBytes(Vec<u8>),
-    #[cfg_attr(
-        not(windows),
-        expect(dead_code, reason = "Portable readers accept native Windows names")
-    )]
     WindowsUtf16(Vec<u16>),
 }
 
@@ -58,6 +50,39 @@ impl OriginArtifactName {
             _ => native_name(name)?,
         };
         Ok(Self(name))
+    }
+
+    pub(crate) fn decode_basename(value: serde_json::Value) -> io::Result<OsString> {
+        Self(serde_json::from_value(value)?).native_basename()
+    }
+
+    pub(crate) fn native_basename(&self) -> io::Result<OsString> {
+        let name = match &self.0 {
+            ArtifactName::Utf8(text) => OsString::from(text),
+            #[cfg(unix)]
+            ArtifactName::UnixBytes(bytes) => {
+                use std::os::unix::ffi::OsStrExt as _;
+                OsStr::from_bytes(bytes).to_owned()
+            }
+            #[cfg(windows)]
+            ArtifactName::WindowsUtf16(units) => {
+                use std::os::windows::ffi::OsStringExt as _;
+                OsString::from_wide(units)
+            }
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "origin basename uses another platform's native encoding",
+                ));
+            }
+        };
+        if Self::from_basename(&name)? != *self {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "origin basename is not canonical",
+            ));
+        }
+        Ok(name)
     }
 }
 
@@ -98,6 +123,12 @@ pub struct OriginArtifactDigest {
     byte_length: DecimalU64,
     #[schemars(regex(pattern = "^[0-9a-f]{64}$"))]
     sha256: String,
+}
+
+impl OriginArtifactDigest {
+    pub(crate) const fn byte_length(&self) -> u64 {
+        self.byte_length.get()
+    }
 }
 
 /// A stream that measures only bytes accepted by its actual sink.

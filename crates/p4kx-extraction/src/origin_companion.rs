@@ -29,6 +29,8 @@ pub enum OriginArtifactBinding {
         #[serde(flatten)]
         digest: OriginArtifactDigest,
     },
+    /// A directory whose committed files are bound by the artifact table.
+    Directory,
     /// A raw stdout stream identified by its measured bytes.
     Stdout {
         /// Actual written byte length and digest.
@@ -103,6 +105,19 @@ pub enum OriginCompanionRow<'receipt> {
         /// Exact bound artifact.
         binding: &'receipt OriginArtifactBinding,
     },
+    /// One committed file in a directory companion's artifact table.
+    Artifact {
+        /// Exact relative basename.
+        path: &'receipt OriginArtifactName,
+        /// Actual written byte length and digest.
+        #[serde(flatten)]
+        digest: &'receipt OriginArtifactDigest,
+    },
+    /// Completes the ordered directory artifact table.
+    ArtifactTableEnd {
+        /// Number of committed file bindings.
+        artifacts: DecimalU64,
+    },
     /// One original physical source.
     Source {
         /// Shared physical evidence.
@@ -116,6 +131,16 @@ pub enum OriginCompanionRow<'receipt> {
     /// One emitted field with its immediate origin.
     Field {
         /// Exact artifact address.
+        address: &'receipt OriginOutputAddress,
+        /// Actual uses and derived immediate marker.
+        #[serde(flatten)]
+        origin: &'receipt FieldOrigin,
+    },
+    /// One emitted field of the indicated committed file.
+    ArtifactField {
+        /// Zero-based position in the completed artifact table.
+        artifact: DecimalU64,
+        /// Exact address within that file.
         address: &'receipt OriginOutputAddress,
         /// Actual uses and derived immediate marker.
         #[serde(flatten)]
@@ -155,12 +180,7 @@ pub fn write_origin_companion<'receipt>(
     fields: impl IntoIterator<Item = (&'receipt OriginOutputAddress, &'receipt FieldOrigin)>,
 ) -> io::Result<()> {
     row(&mut writer, &OriginCompanionRow::header(binding))?;
-    for source in inventory.sources() {
-        row(&mut writer, &OriginCompanionRow::Source { source })?;
-    }
-    for source_use in inventory.uses() {
-        row(&mut writer, &OriginCompanionRow::SourceUse { source_use })?;
-    }
+    write_inventory(&mut writer, inventory)?;
     let mut count = 0_u64;
     for (address, origin) in fields {
         row(&mut writer, &OriginCompanionRow::Field { address, origin })?;
@@ -168,8 +188,34 @@ pub fn write_origin_companion<'receipt>(
             .checked_add(1)
             .ok_or_else(|| io::Error::other("origin field count exceeds u64"))?;
     }
+    write_end(&mut writer, inventory, count)
+}
+
+pub(crate) fn row(writer: &mut impl Write, row: &OriginCompanionRow<'_>) -> io::Result<()> {
+    serde_json::to_writer(&mut *writer, row)?;
+    writer.write_all(b"\n")
+}
+
+pub(crate) fn write_inventory(
+    writer: &mut impl Write,
+    inventory: &SourceInventory,
+) -> io::Result<()> {
+    for source in inventory.sources() {
+        row(writer, &OriginCompanionRow::Source { source })?;
+    }
+    for source_use in inventory.uses() {
+        row(writer, &OriginCompanionRow::SourceUse { source_use })?;
+    }
+    Ok(())
+}
+
+pub(crate) fn write_end(
+    writer: &mut impl Write,
+    inventory: &SourceInventory,
+    count: u64,
+) -> io::Result<()> {
     row(
-        &mut writer,
+        writer,
         &OriginCompanionRow::End {
             sources: DecimalU64::new(inventory.sources().len() as u64),
             source_uses: DecimalU64::new(inventory.uses().len() as u64),
@@ -177,9 +223,4 @@ pub fn write_origin_companion<'receipt>(
         },
     )?;
     writer.flush()
-}
-
-fn row(writer: &mut impl Write, row: &OriginCompanionRow<'_>) -> io::Result<()> {
-    serde_json::to_writer(&mut *writer, row)?;
-    writer.write_all(b"\n")
 }

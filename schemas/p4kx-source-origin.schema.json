@@ -230,6 +230,20 @@
         },
         {
           "additionalProperties": false,
+          "description": "A directory whose committed files are bound by the artifact table.",
+          "properties": {
+            "type": {
+              "const": "directory",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "A raw stdout stream identified by its measured bytes.",
           "properties": {
             "byteLength": {
@@ -1627,6 +1641,53 @@
     },
     {
       "additionalProperties": false,
+      "description": "One committed file in a directory companion's artifact table.",
+      "properties": {
+        "byteLength": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "path": {
+          "$ref": "#/$defs/OriginArtifactName",
+          "description": "Exact relative basename."
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "type": {
+          "const": "artifact",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "path",
+        "byteLength",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Completes the ordered directory artifact table.",
+      "properties": {
+        "artifacts": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Number of committed file bindings."
+        },
+        "type": {
+          "const": "artifactTableEnd",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "artifacts"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
       "description": "One original physical source.",
       "properties": {
         "source": {
@@ -1764,6 +1825,120 @@
       },
       "required": [
         "type",
+        "address",
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs"
+      ],
+      "type": "object",
+      "unevaluatedProperties": false
+    },
+    {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      ],
+      "description": "One emitted field of the indicated committed file.",
+      "properties": {
+        "address": {
+          "$ref": "#/$defs/OriginOutputAddress",
+          "description": "Exact address within that file."
+        },
+        "artifact": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Zero-based position in the completed artifact table."
+        },
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "type": {
+          "const": "artifactField",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "artifact",
         "address",
         "containsEncryptedSource",
         "sourceSetComplete",

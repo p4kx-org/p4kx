@@ -43,6 +43,7 @@ mod model_observed;
 mod model_textures;
 mod non_utf8_paths;
 mod origin_companion;
+mod origin_directory;
 mod path_index;
 mod portable_entry_names;
 mod portable_record_names;

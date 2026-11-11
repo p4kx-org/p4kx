@@ -26,6 +26,7 @@ p4kx-localization.workspace = true
 p4kx-texture.workspace = true
 crc32c.workspace = true
 rayon.workspace = true
+same-file.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -41,7 +42,6 @@ p4kx-testkit.workspace = true
 png.workspace = true
 rayon.workspace = true
 roxmltree.workspace = true
-same-file.workspace = true
 tempfile.workspace = true
 
 [lints]

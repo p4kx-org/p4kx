@@ -63,6 +63,7 @@ mod field_origins_seed;
 mod field_origins_tests;
 mod field_path;
 mod field_path_seed;
+mod file_receipt;
 mod filter;
 mod folder_cache;
 mod folder_convert;
@@ -90,6 +91,7 @@ mod observed_file_origin;
 mod options;
 mod origin_artifact;
 mod origin_companion;
+mod origin_file_io;
 #[cfg(test)]
 mod origin_reader_admission_tests;
 mod origin_reader_limits;

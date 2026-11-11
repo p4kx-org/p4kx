@@ -6,7 +6,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use p4kx_extraction::{
+use crate::{
     InputScope, SourceInput, SourceLocation, SourceUseRole, SourceUses, read_observed_file,
     write_origin_companion,
 };
@@ -39,10 +39,7 @@ fn publish(output: &FileReceipt<'_>, source: &Path) -> TestResult {
                 writer,
                 binding,
                 &inventory,
-                [(
-                    &p4kx_extraction::OriginOutputAddress::OpaquePayload,
-                    &origin,
-                )],
+                [(&crate::OriginOutputAddress::OpaquePayload, &origin)],
             )
         },
     )?;

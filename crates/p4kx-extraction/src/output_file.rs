@@ -37,6 +37,17 @@ pub fn write_replacing_protected<T>(
     cancel: Option<&CancelToken>,
     write: impl FnOnce(&mut BufWriter<File>) -> Result<T, ConversionError>,
 ) -> Result<T, ConversionError> {
+    write_replacing_protected_before(out, protection, cancel, write, |_| Ok(()))
+        .map(|(written, ())| written)
+}
+
+pub(crate) fn write_replacing_protected_before<T, Context>(
+    out: &Path,
+    protection: Option<&ArchiveWriteProtection>,
+    cancel: Option<&CancelToken>,
+    write: impl FnOnce(&mut BufWriter<File>) -> Result<T, ConversionError>,
+    before_publish: impl FnOnce(&Path) -> Result<Context, ConversionError>,
+) -> Result<(T, Context), ConversionError> {
     check_protected_output(out, protection, cancel)?;
     let (temporary, file, ownership) = create_temporary(out, protection, cancel)?;
     let mut writer = BufWriter::with_capacity(WRITE_BUFFER_LEN, file);
@@ -50,9 +61,12 @@ pub fn write_replacing_protected<T>(
             .and_then(|()| {
                 ownership.ensure_writable(&temporary, cancel_flag(cancel))?;
                 check_protected_output(out, protection, cancel)?;
-                fs::rename(&temporary, out).map_err(|source| write_error(out, source))
-            })
-            .map(|()| value),
+                let context = before_publish(&temporary)?;
+                ownership.ensure_writable(&temporary, cancel_flag(cancel))?;
+                check_protected_output(out, protection, cancel)?;
+                fs::rename(&temporary, out).map_err(|source| write_error(out, source))?;
+                Ok((value, context))
+            }),
         Err(error) => {
             drop(writer);
             Err(error)
@@ -363,3 +377,7 @@ mod tests {
         assert!(!out.exists());
     }
 }
+
+#[cfg(test)]
+#[path = "output_file_precommit_test.rs"]
+mod precommit_test;

@@ -50,6 +50,31 @@ file companion names, publication lock names and unrelated existing files are
 reserved. The write guards reject destinations that alias the observed input or
 lie inside a protected installation.
 
+## Directory publication
+
+A directory writer binds its committed files in the reserved
+`.p4kx-origin.jsonl`. The `header` binding type is `directory`. Each
+`artifact` row gives the exact relative basename, measured SHA-256 and
+decimal-string byte length. An `artifactTableEnd` row gives the number of
+artifact rows in their publication order. Source and use rows follow this
+table. Each `artifactField` row identifies a zero-based artifact ordinal
+as a decimal string and the address within that file. The final `end`
+row counts these fields. Readers verify both counts, every reference, and
+the named file's actual bytes before relying on its origin.
+
+Cooperating writers hold the same directory lock while publishing the
+artifacts and their companion. Each file retains its own staged-write
+commit. The first replacement invalidates the old directory companion
+before the artifact is renamed. A new companion identifies only files
+committed by that run, including the successfully written files of a
+partial run. A run that fails before replacing any file can keep the
+earlier companion. An interruption after invalidation can leave published
+bytes with unknown origin.
+
+A file replacement also invalidates any existing sibling or directory
+companion that covers the replaced name. A verified directory artifact
+table for disjoint names remains usable after a single-file replacement.
+
 ## CHF conversion
 
 `p4kx chf to-json` addresses the exact scalar and empty-container JSON values

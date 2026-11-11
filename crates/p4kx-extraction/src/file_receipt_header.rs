@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
 use std::path::Path;
 
-use p4kx_extraction::{OriginArtifactName, SOURCE_ORIGIN_FORMAT, SOURCE_ORIGIN_VERSION};
+use crate::{OriginArtifactName, SOURCE_ORIGIN_FORMAT, SOURCE_ORIGIN_VERSION};
 use serde_json::{Value, json};
 
 use super::lock::{invalid, regular_file};
@@ -14,21 +14,33 @@ use super::lock::{invalid, regular_file};
 pub(super) enum ReceiptOwner<'name> {
     File(&'name OriginArtifactName),
     Stdout,
+    Directory,
 }
 
 pub(super) fn check_existing(path: &Path, owner: ReceiptOwner<'_>) -> io::Result<bool> {
+    Ok(open_existing(path, owner)?.is_some())
+}
+
+pub(super) fn open_existing(
+    path: &Path,
+    owner: ReceiptOwner<'_>,
+) -> io::Result<Option<BufReader<File>>> {
     if regular_file(path)?.is_none() {
-        return Ok(false);
+        return Ok(None);
     }
     let mut binding = match owner {
         ReceiptOwner::File(path) => json!({"type": "file", "path": path}),
         ReceiptOwner::Stdout => json!({"type": "stdout"}),
+        ReceiptOwner::Directory => json!({"type": "directory"}),
     };
-    let shape = binding
-        .as_object_mut()
-        .ok_or_else(|| invalid("invalid origin binding"))?;
-    shape.insert("byteLength".to_owned(), Value::String(u64::MAX.to_string()));
-    shape.insert("sha256".to_owned(), Value::String("f".repeat(64)));
+    let measured = !matches!(owner, ReceiptOwner::Directory);
+    if measured {
+        let shape = binding
+            .as_object_mut()
+            .ok_or_else(|| invalid("invalid origin binding"))?;
+        shape.insert("byteLength".to_owned(), Value::String(u64::MAX.to_string()));
+        shape.insert("sha256".to_owned(), Value::String("f".repeat(64)));
+    }
     let expected = json!({
         "type": "header",
         "format": SOURCE_ORIGIN_FORMAT,
@@ -44,12 +56,12 @@ pub(super) fn check_existing(path: &Path, owner: ReceiptOwner<'_>) -> io::Result
     };
     let mut actual: Value = serde_json::from_slice(json)
         .map_err(|_| invalid("the existing companion has no valid origin header"))?;
-    if !normalize_measurement(&mut actual) || actual != expected {
+    if (measured && !normalize_measurement(&mut actual)) || actual != expected {
         return Err(invalid(
             "the existing companion belongs to another artifact or format",
         ));
     }
-    Ok(true)
+    Ok(Some(reader.into_inner()))
 }
 
 fn normalize_measurement(header: &mut Value) -> bool {
