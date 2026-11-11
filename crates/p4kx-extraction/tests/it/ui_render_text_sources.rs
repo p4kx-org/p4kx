@@ -91,18 +91,18 @@ fn assert_leaf_export(provenance: &SourceInventory) -> TestResult {
 fn an_encrypted_candidate_that_lacks_the_export_supplies_no_drawn_font_data() -> TestResult {
     let folder = tempfile::tempdir()?;
     let rejected = "Data\\UI\\Screens\\SWF\\font.gfx";
-    let used = "Data\\UI\\Q\\font.gfx";
+    let selected = "Data\\UI\\Q\\font.gfx";
     let archive = archive(
         folder.path(),
         vec![
             TestEntry::zstd(CLIENT, client("font.gfx", "$Font")),
             TestEntry::zstd(rejected, font_movie("$Other")).encrypted(),
-            TestEntry::zstd(used, font_movie("$Font")),
+            TestEntry::zstd(selected, font_movie("$Font")),
         ],
     )?;
     let movie = UiMovie::from_archive(&archive, CLIENT)?;
     let observed = movie.render_with_bitmap_sources(&options())?;
-    assert_eq!(observed.render.imports.movies, [rejected, used]);
+    assert_eq!(observed.render.imports.movies, [rejected, selected]);
     let drawn = observed.glyphs.first().ok_or("drawn outline")?;
     assert_eq!(drawn.origin.contains_encrypted_source(), Some(false));
     assert!(drawn.origin.source_set_complete());
@@ -111,11 +111,25 @@ fn an_encrypted_candidate_that_lacks_the_export_supplies_no_drawn_font_data() ->
         .get("sources")
         .and_then(Value::as_array)
         .ok_or("source inventory")?;
+    let rejected_id = sources
+        .iter()
+        .find(|source| source.pointer("/path/value").and_then(Value::as_str) == Some(rejected))
+        .and_then(|source| source.get("id"))
+        .ok_or("reported import name")?;
+    let outline = serde_json::to_value(&drawn.origin)?;
+    let actual = outline
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("outline uses")?;
+    let uses = inventory
+        .get("uses")
+        .and_then(Value::as_array)
+        .ok_or("source uses")?;
     assert!(
-        sources.iter().all(|source| {
-            source.pointer("/path/value").and_then(Value::as_str) != Some(rejected)
-        }),
-        "a read movie that supplied no glyph cannot contribute to the drawn outline"
+        uses.iter()
+            .filter(|usage| usage.get("source") == Some(rejected_id))
+            .all(|usage| { usage.get("id").is_none_or(|id| !actual.contains(id)) }),
+        "a reported import name cannot contribute to the drawn outline"
     );
     Ok(())
 }

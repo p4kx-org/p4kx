@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io;
+use p4kx_gfx::RasterOptions;
 
-use p4kx_gfx::{AssetOrigins, Background, RasterOptions};
-
-use super::ui_render_glyph_sources::{self, UiRenderedFontMetrics, UiRenderedGlyph};
-use super::ui_render_localization::{self, UiRenderedLocalization};
-use super::{ui_bitmap_sources, ui_render_geometry};
+use super::ui_render_frame_evidence::BackendInputs;
+use super::ui_render_glyph_sources::{UiRenderedFontMetrics, UiRenderedGlyph};
+use super::ui_render_localization::UiRenderedLocalization;
+use super::ui_render_summary::RenderSummaryOrigins;
 use crate::output_file::read_error;
-use crate::ui_render::ComposedFrame;
-use crate::{
-    ConversionError, FieldOrigin, SourceInventory, SourceUses, UiMovie, UiMovieEvidence, UiRender,
-};
+use crate::{ConversionError, FieldOrigin, SourceInventory, UiMovie, UiRender};
 
 /// One bitmap supplied to an actual on-canvas paint operation.
 #[derive(Debug)]
@@ -42,6 +38,9 @@ pub struct UiRenderBitmapSources {
     pub localizations: Vec<UiRenderedLocalization>,
     /// The physical sources and uses referenced by the drawing origins.
     pub provenance: SourceInventory,
+    /// Aggregate origin of the encoded PNG payload.
+    pub artifact_origin: FieldOrigin,
+    pub(crate) summary: RenderSummaryOrigins,
 }
 
 impl UiMovie<'_> {
@@ -64,9 +63,15 @@ impl UiMovie<'_> {
             .register_frame_evidence(
                 &observed.origins,
                 &frame,
-                &raster.item_inputs,
-                &raster.bitmap_inputs,
-                options.background,
+                &BackendInputs {
+                    items: &raster.item_inputs,
+                    bitmaps: &raster.bitmap_inputs,
+                    masks: &[],
+                    title: false,
+                    diagnostics_complete: raster.raster.skipped.is_empty()
+                        && frame.has_no_omissions(),
+                },
+                options,
             )
             .map_err(|source| read_error(self.name().as_ref(), source))?;
         Ok(UiRenderBitmapSources {
@@ -77,61 +82,8 @@ impl UiMovie<'_> {
             font_metrics: evidence.font_metrics,
             localizations: evidence.localizations,
             provenance: evidence.provenance,
+            artifact_origin: evidence.artifact_origin,
+            summary: evidence.summary,
         })
     }
-
-    fn register_frame_evidence(
-        &self,
-        origins: &AssetOrigins,
-        frame: &ComposedFrame<'_>,
-        item_inputs: &[usize],
-        bitmap_inputs: &[u16],
-        background: Background,
-    ) -> io::Result<FrameEvidence> {
-        let uses = SourceUses::new();
-        let movie = UiMovieEvidence::observe(self, &uses).map_err(io::Error::other)?;
-        let movie_geometry =
-            ui_render_geometry::register(&uses, &movie, origins, frame, item_inputs, background)?;
-        let text = ui_render_glyph_sources::register(&uses, &movie, origins, frame, item_inputs)?;
-        let localizations = ui_render_localization::register(
-            &uses,
-            &movie,
-            origins,
-            self.texts(),
-            text.localised_definitions,
-        )?;
-        let mut bitmaps = Vec::new();
-        for &id in bitmap_inputs {
-            let (order, source) = frame.bitmaps.source(id).ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "drawn bitmap has no decoded source",
-                )
-            })?;
-            let (contributions, complete) =
-                ui_bitmap_sources::contributions(&movie, origins, &uses, order, source)?;
-            bitmaps.push(UiRenderedBitmap {
-                id,
-                origin: uses.origin(&contributions, complete),
-            });
-        }
-        let provenance = uses.freeze().map_err(io::Error::other)?;
-        Ok(FrameEvidence {
-            bitmaps,
-            movie_geometry,
-            glyphs: text.glyphs,
-            font_metrics: text.metrics,
-            localizations,
-            provenance,
-        })
-    }
-}
-
-struct FrameEvidence {
-    bitmaps: Vec<UiRenderedBitmap>,
-    movie_geometry: FieldOrigin,
-    glyphs: Vec<UiRenderedGlyph>,
-    font_metrics: Vec<UiRenderedFontMetrics>,
-    localizations: Vec<UiRenderedLocalization>,
-    provenance: SourceInventory,
 }

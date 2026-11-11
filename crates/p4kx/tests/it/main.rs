@@ -143,6 +143,7 @@ mod ui_extract_origins;
 mod ui_hologram;
 mod ui_panel;
 mod ui_render;
+mod ui_render_origins;
 mod ui_render_svg;
 mod ui_render_text;
 mod ui_screens;

@@ -594,6 +594,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   (exit code 1). A movie is
   untrusted: placements, paths, conversions, masks, the canvas and the area the fills cover are
   bounded, and what lies beyond a limit is listed instead of drawn.
+  Movie PNG and SVG files have a sibling `<file>.p4kx-origin.jsonl` companion
+  that binds the bytes and records the actual inputs.
+
 - `p4kx ui render Ã¢â‚¬Â¦ --lang <language>` resolves the localisation keys (`@key`, with `,P=`
   parameters) of text fields in the `global.ini` of that language of the Archive; it needs an ENTRY.
   A key the language does not hold is drawn as it is and listed. The language is also the

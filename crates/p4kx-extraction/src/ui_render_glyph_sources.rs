@@ -7,8 +7,9 @@ use std::io;
 use p4kx_gfx::{AssetOrigins, SceneDefinitionOrigin, SceneDrawOrigin, SceneOrigins};
 
 use super::ui_font_sources::FontUse;
+use super::ui_render_frame_evidence::FrameContributions;
 use crate::ui_render::ComposedFrame;
-use crate::{FieldOrigin, SourceUses, UiMovieEvidence};
+use crate::{FieldOrigin, UiMovieEvidence};
 
 /// One font glyph outline admitted by a drawing operation.
 #[derive(Debug)]
@@ -48,21 +49,22 @@ struct SelectedText {
 }
 
 pub(crate) fn register(
-    uses: &SourceUses,
+    contributions: &mut FrameContributions,
     movie: &UiMovieEvidence,
     origins: &AssetOrigins,
     frame: &ComposedFrame<'_>,
     items: &[usize],
+    masks: &[usize],
 ) -> io::Result<TextSources> {
     let scene = frame.origins.as_ref().ok_or_else(inconsistent)?;
-    let selected = collect_rendered(frame, scene, items)?;
+    let selected = collect_rendered(frame, scene, items, masks)?;
     let metrics = selected.measurements(scene)?;
     let glyphs = selected
         .glyphs
         .into_iter()
         .map(|((font, glyph), by_code)| {
             let (evidence, complete) = frame.fonts.register(
-                uses,
+                contributions.registry(),
                 movie,
                 origins,
                 font,
@@ -71,7 +73,7 @@ pub(crate) fn register(
             Ok(UiRenderedGlyph {
                 font,
                 glyph,
-                origin: uses.origin(&evidence, complete),
+                origin: contributions.add(evidence, complete),
             })
         })
         .collect::<io::Result<_>>()?;
@@ -79,7 +81,7 @@ pub(crate) fn register(
         .into_iter()
         .map(|((font, glyph), used_advance)| {
             let (evidence, complete) = frame.fonts.register(
-                uses,
+                contributions.registry(),
                 movie,
                 origins,
                 font,
@@ -91,7 +93,7 @@ pub(crate) fn register(
             Ok(UiRenderedFontMetrics {
                 font,
                 glyph,
-                origin: uses.origin(&evidence, complete),
+                origin: contributions.add(evidence, complete),
             })
         })
         .collect::<io::Result<_>>()?;
@@ -106,9 +108,17 @@ fn collect_rendered(
     frame: &ComposedFrame<'_>,
     scene: &SceneOrigins,
     items: &[usize],
+    mask_inputs: &[usize],
 ) -> io::Result<SelectedText> {
     let mut selected = SelectedText::default();
     let mut masks = BTreeSet::new();
+    for &ordinal in mask_inputs {
+        let observed = scene.masks.get(ordinal).ok_or_else(inconsistent)?;
+        for draw in &observed.draws {
+            selected.collect(scene, draw);
+        }
+        masks.insert(ordinal);
+    }
     for &ordinal in items {
         let draw = scene.items.get(ordinal).ok_or_else(inconsistent)?;
         selected.collect(scene, draw);

@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use p4kx_archive::{Archive, Entry};
+use p4kx_archive::{Archive, Entry, ObservedEntry};
 use p4kx_gfx::{Assets, Export, Font, Import, MAX_MOVIE_LEN, Movie};
 use p4kx_localization::Language;
 
@@ -23,6 +23,13 @@ pub(crate) struct ImportedFonts<'archive> {
     pub(crate) fonts: Vec<Font>,
     pub(crate) report: ImportReport,
     pub(crate) sources: Vec<Option<ImportedFontSource<'archive>>>,
+    pub(crate) report_sources: ImportReportSources<'archive>,
+}
+
+#[derive(Default)]
+pub(crate) struct ImportReportSources<'archive> {
+    pub(crate) movies: Vec<Option<ObservedEntry<'archive>>>,
+    pub(crate) unresolved: Vec<(usize, usize)>,
 }
 
 struct ResolvedFont<'archive> {
@@ -64,14 +71,7 @@ pub(crate) fn resolve_fonts<'archive>(
     language: Language,
     observe: bool,
 ) -> ImportedFonts<'archive> {
-    let mut used: Vec<u16> = assets
-        .static_texts
-        .iter()
-        .flat_map(|text| text.records.iter().filter_map(|record| record.font_id))
-        .chain(assets.edit_texts.iter().filter_map(|text| text.font_id))
-        .collect();
-    used.sort_unstable();
-    used.dedup();
+    let used = used_font_ids(assets);
     let mut resolver = Resolver {
         archive,
         language,
@@ -113,15 +113,36 @@ pub(crate) fn resolve_fonts<'archive>(
                             }));
                     }
                 }
-                Err(issue) => resolver.out.report.unresolved.push(UnresolvedImport {
-                    url: import.url.clone(),
-                    name: asset.name.clone(),
-                    issue,
-                }),
+                Err(issue) => {
+                    resolver.out.report.unresolved.push(UnresolvedImport {
+                        url: import.url.clone(),
+                        name: asset.name.clone(),
+                        issue,
+                    });
+                    if observe {
+                        resolver
+                            .out
+                            .report_sources
+                            .unresolved
+                            .push((import_index, item_index));
+                    }
+                }
             }
         }
     }
     resolver.out
+}
+
+fn used_font_ids(assets: &Assets<'_>) -> Vec<u16> {
+    let mut used: Vec<u16> = assets
+        .static_texts
+        .iter()
+        .flat_map(|text| text.records.iter().filter_map(|record| record.font_id))
+        .chain(assets.edit_texts.iter().filter_map(|text| text.font_id))
+        .collect();
+    used.sort_unstable();
+    used.dedup();
+    used
 }
 
 impl<'archive> Resolver<'archive> {
@@ -309,11 +330,9 @@ impl<'archive> Resolver<'archive> {
             Movie::parse(bytes).map_err(|error| ImportIssue::Unreadable(error.to_string()))?;
         let (mut assets, sources) = if self.observe {
             let observed = movie.assets_observed();
-            let source = LoadedSources::new(
-                self.archive.observed_entry(entry),
-                *movie.read_source(),
-                observed.origins,
-            );
+            let entry = self.archive.observed_entry(entry);
+            self.out.report_sources.movies.push(entry);
+            let source = LoadedSources::new(entry, *movie.read_source(), observed.origins);
             (observed.assets, Some(Rc::new(source)))
         } else {
             (movie.assets(), None)

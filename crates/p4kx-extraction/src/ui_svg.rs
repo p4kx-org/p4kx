@@ -3,9 +3,8 @@
 
 use std::path::Path;
 
-use p4kx_gfx::{GfxError, RasterOptions, Skipped, SvgReport, TagFailure};
+use p4kx_gfx::{RasterOptions, Skipped, TagFailure};
 
-use crate::output_file::{write_error, write_replacing_protected};
 use crate::ui_imports::ImportReport;
 use crate::{ConversionError, UiBitmapFailure, UiMovie};
 
@@ -41,7 +40,7 @@ impl UiMovie<'_> {
     /// The frame is composed, its bitmaps decoded and the budgets charged exactly as for the
     /// raster, so both end at the same item. The document is streamed; bitmaps are embedded as
     /// PNG data URIs, never referenced by path, and the title, the Entry path or the file name
-    /// without its directory, is escaped. The file is written whole or not at all.
+    /// without its directory, is escaped. A sibling origin companion binds the committed SVG.
     ///
     /// # Errors
     ///
@@ -52,25 +51,7 @@ impl UiMovie<'_> {
         options: &RasterOptions,
         out: &Path,
     ) -> Result<UiSvg, ConversionError> {
-        self.check_output(out)?;
-        let frame = self.compose_frame(options)?;
-        let report: SvgReport =
-            write_replacing_protected(out, self.write_protection()?, None, |writer| {
-                frame
-                    .scene
-                    .write_svg(&frame.bitmaps.images, options, Some(&self.title()), writer)
-                    .map_err(|source| match source {
-                        GfxError::Write(source) => write_error(out, source),
-                        source => self.frame_error(source),
-                    })
-            })?;
-        Ok(UiSvg {
-            width: report.width,
-            height: report.height,
-            skipped: report.skipped,
-            bitmap_failures: frame.bitmaps.failures,
-            tag_failures: frame.tag_failures,
-            imports: frame.imports,
-        })
+        self.render_svg_to_file_with_origin(options, out)
+            .map(|written| written.render)
     }
 }

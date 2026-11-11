@@ -148,6 +148,7 @@ mod ui_extract;
 mod ui_hologram;
 mod ui_json;
 mod ui_render;
+mod ui_render_origins;
 mod ui_screen_render;
 mod ui_screens;
 mod update_status;

@@ -10,18 +10,18 @@ use p4kx_gfx::{
 };
 
 use crate::ui_render::ComposedFrame;
-use crate::{FieldOrigin, SourceUseRole, SourceUses, UiMovieEvidence, UiSourceSite as Site};
+use crate::{SourceUse, SourceUseRole, UiMovieEvidence, UiSourceSite as Site};
 
 use SourceUseRole::{Conversion, Selector};
 
 pub(crate) fn register(
-    registry: &SourceUses,
     movie: &UiMovieEvidence,
     asset_origins: &AssetOrigins,
     frame: &ComposedFrame<'_>,
     item_inputs: &[usize],
+    mask_inputs: &[usize],
     background: Background,
-) -> io::Result<FieldOrigin> {
+) -> io::Result<Vec<SourceUse>> {
     let observed = frame.origins.as_ref().ok_or_else(inconsistent)?;
     let mut geometry = Geometry {
         assets: asset_origins,
@@ -36,7 +36,7 @@ pub(crate) fn register(
     {
         geometry.record(site, "backgroundColor", Conversion);
     }
-    let mut masks = BTreeSet::new();
+    let mut masks: BTreeSet<_> = mask_inputs.iter().copied().collect();
     for &ordinal in item_inputs {
         let item = frame.scene.items.get(ordinal).ok_or_else(inconsistent)?;
         geometry.draw(*observed.items.get(ordinal).ok_or_else(inconsistent)?)?;
@@ -56,8 +56,7 @@ pub(crate) fn register(
     for ordinal in masks {
         geometry.mask(ordinal)?;
     }
-    let uses = geometry.bind(movie)?;
-    Ok(registry.origin(&uses, movie.is_bound()))
+    geometry.bind(movie)
 }
 
 struct Geometry<'a> {
@@ -179,7 +178,7 @@ impl Geometry<'_> {
         Ok(())
     }
 
-    fn bind(&self, movie: &UiMovieEvidence) -> io::Result<Vec<crate::SourceUse>> {
+    fn bind(&self, movie: &UiMovieEvidence) -> io::Result<Vec<SourceUse>> {
         let mut uses = vec![
             movie
                 .decoded(Site::Bytes(movie.stage()), "stageRectangle", Conversion)

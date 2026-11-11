@@ -6,9 +6,11 @@ use std::io;
 
 use p4kx_gfx::AssetOrigins;
 
+use super::ui_render_frame_evidence::FrameContributions;
+
 use crate::{
     FieldOrigin, InputScope, LocalizationEntry, SourceInput, SourceLocation, SourceUseRole,
-    SourceUses, UiMovieEvidence, UiSourceSite,
+    UiMovieEvidence, UiSourceSite,
 };
 
 /// A resolved localization value that supplied a rendered text field.
@@ -22,7 +24,7 @@ pub struct UiRenderedLocalization {
 }
 
 pub(crate) fn register(
-    uses: &SourceUses,
+    contributions: &mut FrameContributions,
     movie: &UiMovieEvidence,
     origins: &AssetOrigins,
     texts: Option<&LocalizationEntry>,
@@ -34,7 +36,8 @@ pub(crate) fn register(
     let texts = texts.ok_or_else(inconsistent)?;
     let original = texts.origin();
     let input = original.map_or(SourceInput::Unknown, SourceInput::Archive);
-    let scope = uses
+    let scope = contributions
+        .registry()
         .observe(input, InputScope::Payload)
         .map_err(io::Error::other)?;
     definitions
@@ -64,7 +67,7 @@ pub(crate) fn register(
             movie.append_decoding(&mut evidence);
             Ok(UiRenderedLocalization {
                 definition,
-                origin: uses.origin(&evidence, movie.is_bound() && original.is_some()),
+                origin: contributions.add(evidence, movie.is_bound() && original.is_some()),
             })
         })
         .collect()

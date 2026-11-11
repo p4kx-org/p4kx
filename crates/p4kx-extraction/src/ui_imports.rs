@@ -6,7 +6,7 @@ mod resolver;
 
 use std::path::Path;
 
-pub(crate) use self::resolver::{ImportedFonts, resolve_fonts};
+pub(crate) use self::resolver::{ImportReportSources, ImportedFonts, resolve_fonts};
 
 use crate::ui_import_match::{candidates, contained, folder_of};
 use crate::ui_movie::Origin;

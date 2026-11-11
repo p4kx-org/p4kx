@@ -1841,6 +1841,10 @@ standalone input's original Archive encryption is unknown.
 
 Also `p4kx ui render <file> --out <file.png> --json` for a GFx or SWF file on disk.
 
+The report carries `originReceipt` (the sibling companion basename),
+`artifactOrigin`, `fieldOrigins` and `provenance`. The artifact receipt
+binds the actual PNG or SVG bytes. See [source origins](source-origin.md#movie-rendering).
+
 `--lang` (only with an Archive and an Entry) resolves the localisation keys (`@key`) of text fields
 in the `global.ini` of that language; a key it does not hold is listed as `unlocalised`, and without
 `--lang` keys are drawn as they are. A `global.ini` that cannot be indexed prints no JSON and fails

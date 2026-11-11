@@ -101,3 +101,17 @@ range and a logical field such as `/changes/0/old`, `/changes/0/status` or
 `/identical`. The status describes an added or removed value. A completed
 comparison with changes exits with 1. Its receipt still ends with the same
 completion row and binds the exact stdout text.
+
+## Movie rendering
+
+`p4kx ui render` publishes a sibling `<file>.p4kx-origin.jsonl` for PNG and SVG.
+The companion binds the committed bytes as one opaque payload. It records the
+actual movie geometry, bitmap mips, font outlines, layout metrics and language
+values used by the renderer. SVG also records the input to its document title.
+Partial render reports retain known inputs and mark an unresolved contributor
+set as incomplete.
+
+`--json` adds `originReceipt`, `artifactOrigin`, `fieldOrigins` and
+`provenance`. The stage and explicit size options have independent origins.
+A diagnostic field whose contributing inputs cannot be established carries an
+unknown marker.

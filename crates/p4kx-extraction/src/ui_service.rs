@@ -23,12 +23,18 @@ pub(crate) mod ui_movie;
 pub(crate) mod ui_movie_evidence;
 #[path = "ui_render_bitmap_sources.rs"]
 mod ui_render_bitmap_sources;
+#[path = "ui_render_frame_evidence.rs"]
+mod ui_render_frame_evidence;
 #[path = "ui_render_geometry.rs"]
 mod ui_render_geometry;
 #[path = "ui_render_glyph_sources.rs"]
 mod ui_render_glyph_sources;
 #[path = "ui_render_localization.rs"]
 mod ui_render_localization;
+#[path = "ui_render_publication.rs"]
+mod ui_render_publication;
+#[path = "ui_render_summary.rs"]
+mod ui_render_summary;
 
 pub use ui_extract::{
     ObservedUiExtraction, UiAssetFailure, UiAssetKind, UiExtraction, WrittenUiAsset,
@@ -38,3 +44,5 @@ pub use ui_movie_evidence::{UiMovieEvidence, UiSourceSite};
 pub use ui_render_bitmap_sources::{UiRenderBitmapSources, UiRenderedBitmap};
 pub use ui_render_glyph_sources::{UiRenderedFontMetrics, UiRenderedGlyph};
 pub use ui_render_localization::UiRenderedLocalization;
+pub use ui_render_publication::PublishedUiRender;
+pub use ui_render_summary::{RenderSummaryOrigins, UnresolvedImportOrigins};

@@ -9,9 +9,8 @@ use p4kx_gfx::{
 };
 use p4kx_localization::decode_line_breaks;
 
-use crate::output_file::{write_error, write_replacing_protected};
 use crate::texture_parts::is_same_file;
-use crate::ui_imports::{ImportReport, ImportedFonts, resolve_fonts};
+use crate::ui_imports::{ImportReport, ImportReportSources, ImportedFonts, resolve_fonts};
 use crate::ui_movie::Origin;
 use crate::ui_render_bitmaps::FrameBitmaps;
 use crate::ui_service::ui_font_sources::FrameFonts;
@@ -50,6 +49,7 @@ pub(crate) struct ComposedFrame<'archive> {
     pub(crate) scene: Scene,
     pub(crate) origins: Option<SceneOrigins>,
     pub(crate) fonts: FrameFonts<'archive>,
+    pub(crate) import_sources: ImportReportSources<'archive>,
     pub(crate) bitmaps: FrameBitmaps<'archive>,
     pub(crate) tag_failures: Vec<TagFailure>,
     pub(crate) imports: ImportReport,
@@ -144,6 +144,7 @@ impl<'archive> UiMovie<'archive> {
             bitmaps,
             tag_failures: std::mem::take(&mut assets.failures),
             imports: imported.report,
+            import_sources: imported.report_sources,
         })
     }
 
@@ -176,7 +177,7 @@ impl<'archive> UiMovie<'archive> {
     /// Renders the first frame as [`UiMovie::render`] does and writes it to `out` as an 8-bit
     /// RGBA PNG, replacing the file.
     ///
-    /// The PNG is written whole or not at all.
+    /// The committed PNG is bound by a sibling source-origin companion.
     ///
     /// # Errors
     ///
@@ -187,25 +188,18 @@ impl<'archive> UiMovie<'archive> {
         options: &RasterOptions,
         out: &Path,
     ) -> Result<UiRender, ConversionError> {
-        self.check_output(out)?;
-        let render = self.render(options)?;
-        write_replacing_protected(out, self.write_protection()?, None, |writer| {
-            render
-                .image
-                .write_png(writer)
-                .map_err(|source| match source {
-                    GfxError::Write(source) => write_error(out, source),
-                    source => ConversionError::UiMovie {
-                        movie: self.name().to_owned(),
-                        source,
-                    },
-                })
-        })?;
-        Ok(render)
+        self.render_to_file_with_origin(options, out)
+            .map(|written| written.render)
     }
 }
 
 impl ComposedFrame<'_> {
+    pub(crate) const fn has_no_omissions(&self) -> bool {
+        self.bitmaps.failures.is_empty()
+            && self.tag_failures.is_empty()
+            && self.imports.unresolved.is_empty()
+    }
+
     pub(crate) fn into_render(self, raster: Raster) -> UiRender {
         UiRender {
             image: raster.image,

@@ -5,6 +5,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
+use crate::ui_render_origins::{self, RenderEvidence};
 use anyhow::Result;
 use p4kx_extraction::gfx::{Background, CanvasSize, RasterOptions, Skipped, TagFailure};
 use p4kx_extraction::{ImportReport, UiBitmapFailure, UiMovie};
@@ -14,25 +15,25 @@ use crate::ui::chain;
 use crate::{exit, json};
 
 #[derive(Serialize)]
-struct RenderJson<'a> {
+pub(super) struct RenderJson<'a> {
     movie: &'a str,
     target: String,
     format: &'static str,
     width: u32,
     height: u32,
-    skipped: Vec<SkippedJson>,
-    failed: Vec<FailedJson>,
-    imports: ImportsJson,
+    pub(super) skipped: Vec<SkippedJson>,
+    pub(super) failed: Vec<FailedJson>,
+    pub(super) imports: ImportsJson,
 }
 
 #[derive(Serialize)]
-struct ImportsJson {
-    movies: Vec<String>,
-    unresolved: Vec<UnresolvedJson>,
+pub(super) struct ImportsJson {
+    pub(super) movies: Vec<String>,
+    pub(super) unresolved: Vec<UnresolvedJson>,
 }
 
 #[derive(Serialize)]
-struct UnresolvedJson {
+pub(super) struct UnresolvedJson {
     url: String,
     name: String,
     reason: &'static str,
@@ -40,25 +41,25 @@ struct UnresolvedJson {
 }
 
 #[derive(Serialize)]
-struct SkippedJson {
+pub(super) struct SkippedJson {
     id: u16,
     depth: u16,
     #[serde(skip_serializing_if = "Option::is_none")]
-    sprite: Option<u16>,
+    pub(super) sprite: Option<u16>,
     reason: &'static str,
     drawn: bool,
     message: String,
 }
 
 #[derive(Serialize)]
-struct FailedJson {
+pub(super) struct FailedJson {
     kind: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
-    id: Option<u16>,
+    pub(super) id: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    code: Option<u16>,
+    pub(super) code: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    offset: Option<usize>,
+    pub(super) offset: Option<usize>,
     error: String,
 }
 
@@ -91,53 +92,36 @@ pub(crate) fn render(
         size: size.unwrap_or(CanvasSize::Stage),
         background,
     };
-    let parts = if svg {
-        let written = movie.render_svg_to_file(&options, out)?;
-        Parts {
-            width: written.width,
-            height: written.height,
-            skipped: written.skipped,
-            bitmap_failures: written.bitmap_failures,
-            tag_failures: written.tag_failures,
-            imports: written.imports,
-        }
-    } else {
-        let rendered = movie.render_to_file(&options, out)?;
-        Parts {
-            width: rendered.image.width(),
-            height: rendered.image.height(),
-            skipped: rendered.skipped,
-            bitmap_failures: rendered.bitmap_failures,
-            tag_failures: rendered.tag_failures,
-            imports: rendered.imports,
-        }
-    };
+    let (parts, evidence) = render_parts(movie, out, &options, svg)?;
     let skipped: Vec<SkippedJson> = parts.skipped.iter().map(skipped_json).collect();
     let failed = failed(&parts);
     if as_json {
-        json::print(&RenderJson {
-            movie: movie.name(),
-            target: json::path(out),
-            format: if svg { "svg" } else { "png" },
-            width: parts.width,
-            height: parts.height,
-            skipped,
-            failed,
-            imports: ImportsJson {
-                movies: parts.imports.movies.clone(),
-                unresolved: parts
-                    .imports
-                    .unresolved
-                    .iter()
-                    .map(|import| UnresolvedJson {
-                        url: import.url.clone(),
-                        name: import.name.clone(),
-                        reason: import.issue.code(),
-                        message: import.issue.to_string(),
-                    })
-                    .collect(),
+        ui_render_origins::print(
+            RenderJson {
+                movie: movie.name(),
+                target: json::path(out),
+                format: if svg { "svg" } else { "png" },
+                width: parts.width,
+                height: parts.height,
+                skipped,
+                failed,
+                imports: ImportsJson {
+                    movies: parts.imports.movies.clone(),
+                    unresolved: parts
+                        .imports
+                        .unresolved
+                        .iter()
+                        .map(|import| UnresolvedJson {
+                            url: import.url.clone(),
+                            name: import.name.clone(),
+                            reason: import.issue.code(),
+                            message: import.issue.to_string(),
+                        })
+                        .collect(),
+                },
             },
-        })?;
+            evidence,
+        )?;
     } else {
         print_report(movie, out, &parts, &skipped, &failed)?;
     }
@@ -146,6 +130,43 @@ pub(crate) fn render(
     } else {
         exit::PARTIAL_FAILURE
     }))
+}
+
+fn render_parts(
+    movie: &UiMovie<'_>,
+    out: &Path,
+    options: &RasterOptions,
+    svg: bool,
+) -> Result<(Parts, RenderEvidence)> {
+    Ok(if svg {
+        let (written, evidence) =
+            RenderEvidence::of(movie.render_svg_to_file_with_origin(options, out)?);
+        (
+            Parts {
+                width: written.width,
+                height: written.height,
+                skipped: written.skipped,
+                bitmap_failures: written.bitmap_failures,
+                tag_failures: written.tag_failures,
+                imports: written.imports,
+            },
+            evidence,
+        )
+    } else {
+        let (rendered, evidence) =
+            RenderEvidence::of(movie.render_to_file_with_origin(options, out)?);
+        (
+            Parts {
+                width: rendered.image.width(),
+                height: rendered.image.height(),
+                skipped: rendered.skipped,
+                bitmap_failures: rendered.bitmap_failures,
+                tag_failures: rendered.tag_failures,
+                imports: rendered.imports,
+            },
+            evidence,
+        )
+    })
 }
 
 fn print_report(
