@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::{
-    CompanionError, CompanionPath, CompanionResolver, LayerCache, MaterialLibrary, MaterialStatus,
+    CompanionPath, CompanionResolver, LayerCache, MaterialCompanion, MaterialCompanionUse,
+    MaterialLibrary, MaterialStatus,
 };
 
 /// How much of the material library a model names is read.
@@ -46,7 +47,8 @@ pub(crate) fn load(
     };
     let fetched = fetch(&request, companions);
     let target = request.into_target();
-    match fetched {
+    companions.observe_material(MaterialCompanionUse::Library, fetched.origin.as_ref());
+    match fetched.bytes {
         Ok(None) => MaterialStatus::Missing { path, target },
         Err(error) => MaterialStatus::Unreadable {
             path,
@@ -75,15 +77,16 @@ pub(crate) fn load(
 fn fetch(
     request: &crate::MaterialRequest,
     companions: &mut dyn CompanionResolver,
-) -> Result<Option<Vec<u8>>, CompanionError> {
+) -> MaterialCompanion {
     let path = request.path();
-    if request.searches_sibling()
-        && !path.contains('/')
-        && let Some(bytes) = companions.resolve(CompanionPath::Sibling(&format!("{path}.mtl")))?
-    {
-        return Ok(Some(bytes));
+    if request.searches_sibling() && !path.contains('/') {
+        let sibling =
+            companions.resolve_material_file(CompanionPath::Sibling(&format!("{path}.mtl")));
+        if !matches!(&sibling.bytes, Ok(None)) {
+            return sibling;
+        }
     }
-    companions.resolve(CompanionPath::Material(path))
+    companions.resolve_material_file(CompanionPath::Material(path))
 }
 
 /// Returns `name` with `/` separators and without a leading `Data/` or a `.mtl` extension, or

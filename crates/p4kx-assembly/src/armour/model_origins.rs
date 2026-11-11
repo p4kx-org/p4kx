@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{EntryOrigin, ModelArchiveSource};
+use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource};
 
 use super::{Armour, ArmourPart};
 
 impl ArmourPart {
+    /// Returns the material library and layer reads selected for this part.
+    #[must_use]
+    pub fn material_archive_origins(&self) -> &MaterialArchiveOrigins {
+        &self.material_archive_origins
+    }
+
     /// Returns the physical model and companion inputs selected for this part.
     #[must_use]
     pub fn model_archive_sources(&self) -> &[ModelArchiveSource] {

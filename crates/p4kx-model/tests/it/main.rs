@@ -21,6 +21,7 @@ mod lods;
 mod material_authored;
 mod material_authored_complete_elements;
 mod material_authored_limits;
+mod material_companion_origins;
 mod material_library_lookup;
 mod material_observer;
 mod material_observer_baseline;

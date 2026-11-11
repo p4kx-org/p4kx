@@ -5,7 +5,11 @@ use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use p4kx_model::{CompanionError, CompanionPath, CompanionResolver, MaterialRequest, ModelFile};
+use p4kx_archive::{Archive, Entry};
+use p4kx_model::{
+    CompanionError, CompanionPath, CompanionResolver, MaterialCompanion, MaterialCompanionUse,
+    MaterialReadOrigin, MaterialRequest, ModelFile,
+};
 use thiserror::Error;
 
 use crate::archive_material_reference;
@@ -15,6 +19,7 @@ use crate::entry_path::relative_path;
 use crate::path_index::PathIndex;
 use crate::sound::read_capped;
 use crate::source_provenance::ModelArchiveSource;
+use crate::source_provenance::model_material_origins::MaterialObservation;
 use crate::texture_grey::TextureVerdicts;
 
 /// The largest `.mtl` file a model's material library is read from, in bytes.
@@ -36,6 +41,7 @@ pub(crate) struct ArchiveCompanions<'i, 'a> {
     pub(crate) folder: &'i str,
     pub(crate) verdicts: &'i TextureVerdicts,
     pub(crate) model_sources: Option<&'i mut Vec<ModelArchiveSource>>,
+    pub(crate) material_observation: Option<MaterialObservation<'i>>,
 }
 
 impl CompanionResolver for ArchiveCompanions<'_, '_> {
@@ -57,17 +63,63 @@ impl CompanionResolver for ArchiveCompanions<'_, '_> {
         self.read_companion(CompanionPath::Sibling(name), Some(file))
     }
 
+    fn resolve_material_file(&mut self, path: CompanionPath<'_>) -> MaterialCompanion {
+        let (entry, limit) = match self.companion_entry(path) {
+            Ok(Some(selected)) => selected,
+            Ok(None) => return MaterialCompanion::unobserved(Ok(None)),
+            Err(error) => return MaterialCompanion::unobserved(Err(error)),
+        };
+        let archive = self.index.archive();
+        let origin = self.material_observation.as_ref().and_then(|observation| {
+            archive
+                .entry_origin(entry)
+                .map(|origin| observation.reads.register(origin))
+        });
+        MaterialCompanion {
+            bytes: read_entry(archive, entry, limit).map(Some),
+            origin,
+        }
+    }
+
+    fn observe_material(
+        &mut self,
+        usage: MaterialCompanionUse,
+        origin: Option<&MaterialReadOrigin>,
+    ) {
+        if let Some(observation) = &mut self.material_observation
+            && let Some(used) = observation.used.as_mut()
+            && let Some(entry) = origin.and_then(|token| observation.reads.origin(token))
+        {
+            used.record(usage, entry);
+        }
+    }
+
     fn texture_is_grey(&mut self, file: &str) -> Option<bool> {
         self.verdicts.is_grey(self.index, file)
     }
 }
 
-impl ArchiveCompanions<'_, '_> {
+impl<'a> ArchiveCompanions<'_, 'a> {
     fn read_companion(
         &mut self,
         path: CompanionPath<'_>,
         model_file: Option<ModelFile>,
     ) -> Result<Option<Vec<u8>>, CompanionError> {
+        let Some((entry, limit)) = self.companion_entry(path)? else {
+            return Ok(None);
+        };
+        let archive = self.index.archive();
+        let bytes = read_entry(archive, entry, limit)?;
+        if let (Some(file), Some(sources)) = (model_file, self.model_sources.as_mut()) {
+            sources.push(ModelArchiveSource::new(file, archive.entry_origin(entry)));
+        }
+        Ok(Some(bytes))
+    }
+
+    fn companion_entry(
+        &self,
+        path: CompanionPath<'_>,
+    ) -> Result<Option<(&'a Entry, u64)>, CompanionError> {
         let (entry_path, limit) = match path {
             CompanionPath::Sibling(name) => {
                 let name = plain_name(name)?;
@@ -90,18 +142,14 @@ impl ArchiveCompanions<'_, '_> {
             }
             _ => self.index.find(&entry_path),
         };
-        let Some(entry) = entry else {
-            return Ok(None);
-        };
-        let archive = self.index.archive();
-        let reader = archive.open_entry(entry)?;
-        let bytes = read_capped(reader, entry.uncompressed_size(), limit)?
-            .ok_or_else(|| too_large(entry.path(), limit))?;
-        if let (Some(file), Some(sources)) = (model_file, self.model_sources.as_mut()) {
-            sources.push(ModelArchiveSource::new(file, archive.entry_origin(entry)));
-        }
-        Ok(Some(bytes))
+        Ok(entry.map(|entry| (entry, limit)))
     }
+}
+
+fn read_entry(archive: &Archive, entry: &Entry, limit: u64) -> Result<Vec<u8>, CompanionError> {
+    let reader = archive.open_entry(entry)?;
+    read_capped(reader, entry.uncompressed_size(), limit)?
+        .ok_or_else(|| too_large(entry.path(), limit))
 }
 
 /// Fetches the companions of a model file from the files next to it.

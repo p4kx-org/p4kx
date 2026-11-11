@@ -16,7 +16,11 @@ use crate::disk_case::CaseIndex;
 use crate::model_companions::{ArchiveCompanions, DiskCompanions};
 use crate::path_index::PathIndex;
 use crate::source_protection::SourceProtection;
-use crate::source_provenance::{ArchiveModelRead, ModelArchiveSource};
+use crate::source_provenance::model_material_origins::MaterialObservation;
+use crate::source_provenance::{
+    ArchiveMaterialRead, ArchiveMaterialReads, ArchiveModelRead, MaterialArchiveOrigins,
+    ModelArchiveSource,
+};
 use crate::texture_grey::TextureVerdicts;
 
 /// A model read from a chunk file Entry of an Archive or from a file on disk, with the
@@ -114,6 +118,7 @@ impl ModelSource {
             folder,
             verdicts,
             model_sources: Some(&mut archive_sources),
+            material_observation: None,
         };
         let read = Model::read_with_materials(
             file_name,
@@ -150,12 +155,50 @@ impl ModelSource {
         cache: &LayerCache,
         verdicts: &TextureVerdicts,
     ) -> MaterialStatus {
+        Self::read_material_library(index, model_path, library, cache, verdicts, None)
+    }
+
+    /// Reads the selected library and binds the original reads of its retained layers.
+    #[must_use]
+    pub fn material_library_observed(
+        index: &PathIndex<'_>,
+        model_path: &str,
+        library: &str,
+        cache: &LayerCache,
+        verdicts: &TextureVerdicts,
+        reads: &ArchiveMaterialReads,
+    ) -> ArchiveMaterialRead {
+        let mut origins = MaterialArchiveOrigins::default();
+        let observation = MaterialObservation {
+            reads,
+            used: Some(&mut origins),
+        };
+        let status = Self::read_material_library(
+            index,
+            model_path,
+            library,
+            cache,
+            verdicts,
+            Some(observation),
+        );
+        ArchiveMaterialRead { status, origins }
+    }
+
+    fn read_material_library(
+        index: &PathIndex<'_>,
+        model_path: &str,
+        library: &str,
+        cache: &LayerCache,
+        verdicts: &TextureVerdicts,
+        material_observation: Option<MaterialObservation<'_>>,
+    ) -> MaterialStatus {
         let (folder, _) = split_entry_path(model_path);
         let mut companions = ArchiveCompanions {
             index,
             folder,
             verdicts,
             model_sources: None,
+            material_observation,
         };
         MaterialStatus::load_with(
             Some(library),
@@ -175,11 +218,26 @@ impl ModelSource {
         verdicts: &TextureVerdicts,
         budget: &mut LayerBudget,
     ) -> Arc<MaterialStatus> {
+        Self::layer_library_tracking(index, path, cache, verdicts, budget, None)
+    }
+
+    /// Reads the layer and retains its physical read identity in the shared cache.
+    #[must_use]
+    pub fn layer_library_tracking(
+        index: &PathIndex<'_>,
+        path: &str,
+        cache: &LayerCache,
+        verdicts: &TextureVerdicts,
+        budget: &mut LayerBudget,
+        reads: Option<&ArchiveMaterialReads>,
+    ) -> Arc<MaterialStatus> {
+        let material_observation = reads.map(|reads| MaterialObservation { reads, used: None });
         let mut companions = ArchiveCompanions {
             index,
             folder: "",
             verdicts,
             model_sources: None,
+            material_observation,
         };
         cache.library(path, &mut companions, budget)
     }

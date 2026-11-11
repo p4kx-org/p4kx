@@ -3,6 +3,8 @@
 
 #[path = "model_archive_source.rs"]
 mod model_archive_source;
+#[path = "model_material_origins.rs"]
+pub(crate) mod model_material_origins;
 
 pub use crate::animation_sources::ArchiveAnimationRead;
 pub use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
@@ -35,4 +37,7 @@ pub use crate::source_use::{
 pub use crate::source_uses::SourceUses;
 pub use crate::source_value::{SourceValue, SourceValueState, SourcedValue};
 pub use model_archive_source::{ArchiveModelRead, ModelArchiveSource};
+pub use model_material_origins::{
+    ArchiveMaterialRead, ArchiveMaterialReads, MaterialArchiveOrigins, MaterialLayerOrigin,
+};
 pub use p4kx_archive::EncryptionFieldEvidence;

@@ -42,6 +42,14 @@ fn the_observed_writer_keeps_the_glb_and_reports_only_emitted_geometry_and_mater
     assert_eq!(actual, baseline);
     assert_eq!(summary, expected);
     assert!(summary.hidden_primitives > 0);
+    let [_, hidden_part] = armour.parts() else {
+        return Err("expected the hidden part in the Assembly".into());
+    };
+    let material = hidden_part
+        .material_archive_origins()
+        .library()
+        .ok_or("hidden material origin")?;
+    assert_eq!(material.entry().path(), r"Data\Objects\Test\hidden.mtl");
     let [body, hidden] = emission.parts() else {
         return Err("expected body and hidden model dispositions".into());
     };

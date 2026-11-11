@@ -6,6 +6,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use p4kx_extraction::{ArchiveMaterialRead, MaterialArchiveOrigins};
 use p4kx_model::MaterialStatus;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -16,35 +17,58 @@ use crate::build::library_key_of;
 use crate::build_palettes::Palettes;
 use crate::{Issue, IssueKind, ModelProvider};
 
+#[derive(Clone)]
+pub(super) struct Library {
+    pub(super) status: Arc<MaterialStatus>,
+    pub(super) origins: Arc<MaterialArchiveOrigins>,
+}
+
+impl From<ArchiveMaterialRead> for Library {
+    fn from(read: ArchiveMaterialRead) -> Self {
+        Self {
+            status: Arc::new(read.status),
+            origins: Arc::new(read.origins),
+        }
+    }
+}
+
 /// The material libraries read for the jobs, by the key they are cached under.
-pub(super) type Libraries = HashMap<String, Arc<MaterialStatus>>;
+pub(super) type Libraries = HashMap<String, Library>;
 
 /// Returns the materials a job is drawn with: its library, with the choices of its Character
 /// applied and the tint palette of its geometry. A library that cannot be read is listed once.
 pub(super) fn drawn_with(
     job: &Job,
     found: &Loaded,
-    (libraries, unnamed): (&Libraries, &Arc<MaterialStatus>),
+    (libraries, unnamed): (&Libraries, &Library),
     (reported, tints): (&mut HashSet<String>, &mut Palettes<'_>),
     issues: &mut Vec<Issue>,
-) -> Arc<MaterialStatus> {
+) -> Library {
     let key = library_key(job, found);
-    let library = key
+    let mut library = key
         .as_ref()
         .and_then(|key| libraries.get(key))
-        .map_or_else(|| Arc::clone(unnamed), Arc::clone);
-    if let (Some(key), Some(reason)) = (key, library.problem().or_else(|| library.layer_problem()))
-        && reported.insert(key)
+        .unwrap_or(unnamed)
+        .clone();
+    if let (Some(key), Some(reason)) = (
+        key,
+        library
+            .status
+            .problem()
+            .or_else(|| library.status.layer_problem()),
+    ) && reported.insert(key)
     {
         issues.push(issue(job, IssueKind::MaterialLibrary { reason }));
     }
-    let painted = painted(tints, library, job, issues);
+    let painted = painted(tints, library.status, job, issues);
     let natural = Look::natural();
-    job.look
+    library.status = job
+        .look
         .as_ref()
         .unwrap_or(&natural)
         .apply(&painted)
-        .map_or(painted, Arc::new)
+        .map_or(painted, Arc::new);
+    library
 }
 
 /// Returns `materials` drawn with the tint palette of the job's geometry, else the default
@@ -107,6 +131,11 @@ pub(super) fn read_libraries(
         .collect();
     wanted
         .par_iter()
-        .map(|(key, entry, name)| (key.clone(), Arc::new(provider.library(entry, name))))
+        .map(|(key, entry, name)| {
+            (
+                key.clone(),
+                Library::from(provider.library_observed(entry, name)),
+            )
+        })
         .collect()
 }

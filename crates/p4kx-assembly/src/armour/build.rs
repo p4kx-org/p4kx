@@ -4,14 +4,14 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use p4kx_extraction::ModelArchiveSource;
+use p4kx_extraction::{ArchiveMaterialRead, ModelArchiveSource};
 use p4kx_gltf::MorphTarget;
 use p4kx_model::{MaterialStatus, Model, ModelFile};
 
 use super::face_build::{Face, Found, settled};
 use super::head_move::{HeadMove, Worn, check_follows, first_mesh_note, followed};
 use super::jobs::{Job, issue, planned};
-use super::materials::{drawn_with, read_libraries};
+use super::materials::{Library, drawn_with, read_libraries};
 use super::own_face::own_head;
 use super::read_models::{Loaded, choose, read_models};
 use super::shape::shaped;
@@ -88,7 +88,7 @@ impl Armour {
         let loaded = read_models(&jobs, models, options)?;
         let chosen = choose(&jobs, &loaded, options.max_vertices, &mut issues);
         let libraries = read_libraries(&jobs, &chosen, models);
-        let unnamed = Arc::new(MaterialStatus::Unnamed);
+        let unnamed = Library::from(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed));
         let covering = covering(&jobs, &chosen, variant);
         let (mut reported, mut tints) = (HashSet::new(), Palettes::new(palettes));
         let mut parts = Vec::with_capacity(chosen.len());
@@ -149,7 +149,7 @@ impl Armour {
 fn part_of(
     job: &Job,
     found: &Loaded,
-    (model, materials): (Arc<Model>, Arc<MaterialStatus>),
+    (model, materials): (Arc<Model>, Library),
     morphs: Vec<MorphTarget>,
     follows: Vec<usize>,
 ) -> ArmourPart {
@@ -160,7 +160,8 @@ fn part_of(
         model,
         archive_sources: Arc::clone(&found.archive_sources),
         definition_origin: found.definition_origin.clone(),
-        materials,
+        materials: materials.status,
+        material_archive_origins: materials.origins,
         morphs,
         follows,
         face: None,

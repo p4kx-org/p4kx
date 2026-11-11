@@ -5,7 +5,10 @@ use std::collections::HashSet;
 
 use crate::mtl_layer_cache::MAX_LAYER_FILES;
 use crate::mtl_number;
-use crate::{CompanionResolver, LayerCache, Material, MaterialLayer, MaterialLibrary, TextureSlot};
+use crate::{
+    CompanionResolver, LayerCache, Material, MaterialCompanionUse, MaterialLayer, MaterialLibrary,
+    TextureSlot,
+};
 
 const WHITE: [f32; 3] = [1.0; 3];
 
@@ -64,8 +67,8 @@ pub(crate) fn resolve(
     let mut budget = cache.budget();
     let mut unresolved: Vec<String> = Vec::new();
     let mut listed: HashSet<String> = HashSet::new();
-    for material in &mut library.materials {
-        for layer in &mut material.layers {
+    for (material_index, material) in library.materials.iter_mut().enumerate() {
+        for (layer_index, layer) in material.layers.iter_mut().enumerate() {
             let Some(path) = layer
                 .attribute("Path")
                 .map(str::trim)
@@ -75,7 +78,16 @@ pub(crate) fn resolve(
             };
             let path = path.to_owned();
             let submaterial = layer.attribute("Submtl").map(str::trim).unwrap_or_default();
-            let surface = cache.surface(&path, submaterial, companions, &mut budget);
+            let (source, origin) = cache.surface(&path, submaterial, companions, &mut budget);
+            let (surface, source_material) = source.unzip();
+            companions.observe_material(
+                MaterialCompanionUse::Layer {
+                    material: material_index,
+                    layer: layer_index,
+                    source_material,
+                },
+                origin.as_ref(),
+            );
             if surface.is_none() && unresolved.len() < MAX_LAYER_FILES {
                 let normal = format!(
                     "{}|{}",

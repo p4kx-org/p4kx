@@ -9,8 +9,9 @@ use p4kx_extraction::model::{
     PositionBox,
 };
 use p4kx_extraction::{
-    AnimationChoice, AnimationSet, Archive, ArchiveModelRead, ArchiveTextures, ConversionError,
-    ModelArchiveSource, ModelSource, PathIndex, TextureVerdicts, archive_error_in,
+    AnimationChoice, AnimationSet, Archive, ArchiveMaterialRead, ArchiveMaterialReads,
+    ArchiveModelRead, ArchiveTextures, ConversionError, ModelArchiveSource, ModelSource, PathIndex,
+    TextureVerdicts, archive_error_in,
 };
 use thiserror::Error;
 
@@ -18,11 +19,12 @@ use thiserror::Error;
 mod file;
 
 use crate::MAX_ASSEMBLY_VERTICES;
-use crate::cdf::is_character_definition;
 use crate::path_match::starts_with_path;
 use crate::skeleton::SkeletonProblem;
 
 mod character;
+#[path = "provider_dispatch.rs"]
+mod dispatch;
 
 /// A model a [`ModelProvider`] read and the Entry it was read from.
 #[derive(Debug, Clone)]
@@ -156,6 +158,11 @@ pub trait ModelProvider: Sync {
     /// the model first. A library that does not exist or cannot be read is a status.
     fn library(&self, entry: &str, name: &str) -> MaterialStatus;
 
+    /// Returns the library together with the original reads the provider can prove.
+    fn library_observed(&self, entry: &str, name: &str) -> ArchiveMaterialRead {
+        ArchiveMaterialRead::unobserved(self.library(entry, name))
+    }
+
     /// Returns the budget of layer files one caller, such as one package, may read through
     /// [`Self::layer_library`]; the default has the default limits.
     fn layer_budget(&self) -> LayerBudget {
@@ -207,6 +214,7 @@ pub struct ArchiveModels<'a> {
     index: PathIndex<'a>,
     max_attachment_vertices: usize,
     layers: LayerCache,
+    material_reads: ArchiveMaterialReads,
     verdicts: TextureVerdicts,
 }
 
@@ -219,6 +227,7 @@ impl<'a> ArchiveModels<'a> {
             index: PathIndex::new(archive),
             max_attachment_vertices: MAX_ASSEMBLY_VERTICES,
             layers: LayerCache::new(),
+            material_reads: ArchiveMaterialReads::default(),
             verdicts: TextureVerdicts::new(),
         }
     }
@@ -290,37 +299,6 @@ impl<'a> ArchiveModels<'a> {
                     .find(&candidate)
                     .map(|entry| entry.path().to_owned())
             })
-    }
-}
-
-impl ModelProvider for ArchiveModels<'_> {
-    fn model(&self, path: &str, lod: u32) -> Result<ProvidedModel, ModelFailure> {
-        let entry = self.entry_of(path).ok_or(ModelFailure::Missing)?;
-        if is_character_definition(&entry) {
-            return self.character(&entry, lod);
-        }
-        self.read_model(entry, lod, Vec::new())
-    }
-
-    fn library(&self, entry: &str, name: &str) -> MaterialStatus {
-        ModelSource::material_library(&self.index, entry, name, &self.layers, &self.verdicts)
-    }
-
-    fn layer_budget(&self) -> LayerBudget {
-        self.layers.budget()
-    }
-
-    fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
-        ModelSource::layer_library(&self.index, path, &self.layers, &self.verdicts, budget)
-    }
-
-    fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {
-        let entry = self.file_entry(path).ok_or(ModelFailure::Missing)?;
-        self.read_file_entry(entry, limit)
-    }
-
-    fn deployed(&self, path: &str, model: &Model) -> Result<Option<Model>, ModelFailure> {
-        self.pose_gear(path, model)
     }
 }
 

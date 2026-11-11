@@ -33,6 +33,7 @@ mod installation;
 mod language_texts;
 mod loaded_dataforge;
 mod localization;
+mod material_archive_origins;
 mod material_reference;
 mod material_reference_failures;
 mod material_reference_regression;
