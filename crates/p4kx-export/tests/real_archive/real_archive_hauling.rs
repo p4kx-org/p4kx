@@ -92,7 +92,7 @@ fn contracts_of_a_real_archive_list_their_hauling_orders() -> TestResult {
     )?;
     let built = p4kx_export::build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let contracts = catalog["contracts"].as_array().ok_or("contracts")?;
+    let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let subtypes = commodity_subtypes(&catalog)?;
     let mut sources: BTreeMap<&str, usize> = BTreeMap::new();
     let mut kinds: BTreeMap<&str, usize> = BTreeMap::new();

@@ -8,12 +8,14 @@ use p4kx_extraction::{
 };
 use rayon::prelude::*;
 
+use crate::build::original_input::OriginalCatalogInput;
 use crate::export_ledger::ExportLedger;
 use crate::playability::Playability;
 use crate::record_fields::{
     boolean, component, elements, locale_key, number, reference, structure, text,
 };
-use crate::{CatalogError, CatalogFailure, Kind};
+use crate::record_observation::RecordObservation;
+use crate::{CatalogError, CatalogFailure, CatalogReadFailure, Kind};
 
 const MANIFEST_TYPE: &str = "CrewManifest";
 const TAG_TYPE: &str = "Tag";
@@ -70,14 +72,31 @@ impl Evidence {
             })
             .flatten()
             .collect();
-        Self::gather(found)
+        Self::gather(found, |failure: &CatalogFailure| failure.guid)
     }
 
     /// Reads playability dependencies and retains their actual canonical field inspections.
-    pub(crate) fn read_catalog(
-        records: &[Record<'_>],
+    #[cfg(test)]
+    pub(crate) fn read_catalog<'f>(
+        records: &[Record<'f>],
         cancel: Option<&CancelToken>,
-    ) -> Result<(Self, Vec<CatalogFailure>, ExportLedger), CatalogError> {
+    ) -> Result<(Self, Vec<CatalogReadFailure<'f>>, ExportLedger), CatalogError> {
+        Self::read_observed(records, None, cancel)
+    }
+
+    pub(crate) fn read_captured<'f>(
+        records: &[Record<'f>],
+        input: &OriginalCatalogInput<'_, '_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self, Vec<CatalogReadFailure<'f>>, ExportLedger), CatalogError> {
+        Self::read_observed(records, Some(input), cancel)
+    }
+
+    fn read_observed<'f>(
+        records: &[Record<'f>],
+        input: Option<&OriginalCatalogInput<'_, '_>>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self, Vec<CatalogReadFailure<'f>>, ExportLedger), CatalogError> {
         let found = records
             .par_iter()
             .map_init(TreeBuilder::new, |trees, record| {
@@ -87,11 +106,21 @@ impl Evidence {
                 if !evidence_record(record) {
                     return Ok(None);
                 }
-                let read = crate::export_dependency_read::read(trees, record, Kind::Ships, cancel)?;
+                let admission = match input {
+                    Some(input) => RecordObservation::capture(input, record)?,
+                    None => RecordObservation::accounting(record),
+                };
+                let read = crate::export_dependency_read::read(
+                    input,
+                    trees,
+                    &admission,
+                    Kind::Ships,
+                    cancel,
+                )?;
                 let outcome = read
                     .tree
                     .map(|tree| project_evidence(&tree))
-                    .map_err(|error| CatalogFailure::of(record, &error));
+                    .map_err(|error| CatalogReadFailure::of(record, &error));
                 Ok(Some((outcome, read.ledger)))
             })
             .filter_map(Result::transpose)
@@ -104,11 +133,15 @@ impl Evidence {
                 outcome
             })
             .collect();
-        let (evidence, failures) = Self::gather(outcomes);
+        let (evidence, failures) =
+            Self::gather(outcomes, |failure: &CatalogReadFailure<'f>| failure.guid());
         Ok((evidence, failures, ledger))
     }
 
-    fn gather(found: Vec<Result<Option<Found>, CatalogFailure>>) -> (Self, Vec<CatalogFailure>) {
+    fn gather<E>(
+        found: Vec<Result<Option<Found>, E>>,
+        guid: impl Fn(&E) -> Guid,
+    ) -> (Self, Vec<E>) {
         let mut evidence = Self::default();
         let mut failures = Vec::new();
         for result in found {
@@ -121,7 +154,7 @@ impl Evidence {
                 }
                 Ok(None) => {}
                 Err(failure) => {
-                    evidence.unreadable.insert(failure.guid);
+                    evidence.unreadable.insert(guid(&failure));
                     failures.push(failure);
                 }
             }

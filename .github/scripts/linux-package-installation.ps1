@@ -45,19 +45,35 @@ function Expand-P4kxAppImage {
     return @{binaries=(Join-Path $Directory 'squashfs-root/usr/bin'); launchers=$launchers}
 }
 
-function Install-P4kxDeb {
+function Assert-P4kxDebArchive {
     param([string]$Asset, [string]$Version, $Platform)
-    Assert-P4kxDisposableLinuxRunner $Platform
     $fields = @(Invoke-P4kxLinuxTool dpkg-deb @('--field', $Asset, 'Package', 'Version', 'Architecture'))
     $metadata = @{}
     foreach ($field in $fields) { if ($field -match '^([^:]+):\s*(.+)$') { $metadata[$Matches[1]] = $Matches[2] } }
     if ($metadata.Package -cne 'p4kx' -or $metadata.Version -cne (Get-P4kxDebianVersion $Version) -or
         $metadata.Architecture -cne $Platform.deb_arch) { throw 'Debian package metadata does not match the native release.' }
+}
+
+function Get-P4kxInstalledDeb {
+    param($Platform)
     $PSNativeCommandUseErrorActionPreference = $false
-    & dpkg-query '--show' '--showformat=${db:Status-Abbrev}' 'p4kx' 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { throw 'Debian verification requires no existing P4KX package.' }
-    if ($LASTEXITCODE -ne 1) { throw 'Installed-package ownership query failed.' }
-    Invoke-P4kxLinuxTool sudo @('apt-get', 'install', '--yes', $Asset) | Out-Null
+    $installed = @(& dpkg-query '--show' '--showformat=${db:Status-Status}\t${db:Status-Eflag}\t${Package}\t${Version}\t${Architecture}\n' 'p4kx' 2>$null)
+    if ($LASTEXITCODE -eq 1 -and $installed.Count -eq 0) { return $null }
+    if ($LASTEXITCODE -ne 0 -or $installed.Count -ne 1) { throw 'Installed-package ownership query failed.' }
+    $fields = $installed[0] -split "`t"
+    if ($fields.Count -ne 5 -or $fields[1] -cne 'ok' -or $fields[2] -cne 'p4kx') {
+        throw 'Installed Debian ownership query returned an invalid package state.'
+    }
+    if ($fields[0] -ceq 'not-installed') { return $null }
+    if ($fields[4] -cne $Platform.deb_arch) { throw 'Installed Debian package has the wrong native architecture.' }
+    if ($fields[0] -ceq 'config-files') { return $null }
+    if ($fields[0] -cne 'installed' -or -not $fields[3]) {
+        throw 'Installed Debian ownership does not identify a fully installed native P4KX package.'
+    }
+    return $fields[3]
+}
+
+function Get-P4kxDebLaunchers {
     $launchers = @{}
     foreach ($binary in @('p4kx', 'p4kx-gui', 'p4kx-mcp')) {
         $public = "/usr/bin/$binary"
@@ -65,7 +81,23 @@ function Install-P4kxDeb {
         if (-not $actual -or $actual.FullName -cne "/usr/lib/p4kx/$binary") { throw 'Debian public command does not resolve to the package payload.' }
         $launchers[$binary] = @{executable=$public; prefix=@()}
     }
-    return @{binaries='/usr/lib/p4kx'; launchers=$launchers}
+    return $launchers
+}
+
+function Assert-P4kxDebPayloadAbsent {
+    foreach ($path in @('/usr/bin/p4kx', '/usr/bin/p4kx-gui', '/usr/bin/p4kx-mcp', '/usr/lib/p4kx')) {
+        if (Test-Path -LiteralPath $path) { throw "Debian native payload remains: $path" }
+    }
+}
+
+function Install-P4kxDeb {
+    param([string]$Asset, [string]$Version, $Platform)
+    Assert-P4kxDisposableLinuxRunner $Platform
+    Assert-P4kxDebArchive $Asset $Version $Platform
+    if ($null -ne (Get-P4kxInstalledDeb $Platform)) { throw 'Debian verification requires no existing P4KX package.' }
+    Assert-P4kxDebPayloadAbsent
+    Invoke-P4kxLinuxTool sudo @('apt-get', 'install', '--yes', $Asset) | Out-Null
+    return @{binaries='/usr/lib/p4kx'; launchers=(Get-P4kxDebLaunchers)}
 }
 
 <#
@@ -94,9 +126,8 @@ function Get-P4kxFlatpakLaunchers {
     return $launchers
 }
 
-function Install-P4kxFlatpak {
-    param([string]$Asset, $Producer, $Platform, [string]$FixtureDirectory, [string]$CheckDirectory)
-    Assert-P4kxDisposableLinuxRunner $Platform
+function Install-P4kxFlatpakRuntime {
+    param($Producer, $Platform)
     $settings = Get-P4kxLinuxPackaging
     $runtime = $Producer.flatpak.runtime_ref
     $expected = "runtime/$($settings.flatpak.runtime)/$($Platform.unix_arch)/$($settings.flatpak.runtime_branch)"
@@ -106,7 +137,19 @@ function Install-P4kxFlatpak {
     Invoke-P4kxLinuxTool flatpak @('remote-add', '--user', '--if-not-exists', 'flathub', $settings.flatpak.runtime_repository) | Out-Null
     Invoke-P4kxLinuxTool flatpak @('install', '--user', '--assumeyes', '--noninteractive', "--arch=$($Platform.unix_arch)", 'flathub', $runtime) | Out-Null
     Invoke-P4kxLinuxTool flatpak @('update', '--user', '--assumeyes', '--noninteractive', "--commit=$($Producer.flatpak.runtime_commit)", $runtime) | Out-Null
-    Invoke-P4kxLinuxTool flatpak @('install', '--user', '--assumeyes', '--noninteractive', $Asset) | Out-Null
+}
+
+function Install-P4kxFlatpakBundle {
+    param([string]$Asset)
+    Invoke-P4kxLinuxTool flatpak @('install', '--user', '--assumeyes', '--noninteractive', '--bundle', $Asset) | Out-Null
+}
+
+function Install-P4kxFlatpak {
+    param([string]$Asset, $Producer, $Platform, [string]$FixtureDirectory, [string]$CheckDirectory)
+    Assert-P4kxDisposableLinuxRunner $Platform
+    $settings = Get-P4kxLinuxPackaging
+    Install-P4kxFlatpakRuntime $Producer $Platform
+    Install-P4kxFlatpakBundle $Asset
     $identity = Get-P4kxLiveFlatpakIdentity $Platform $Producer
     $location = (Invoke-P4kxLinuxTool flatpak @('info', '--user', "--arch=$($Platform.unix_arch)", '--show-location', $settings.application_id) | Out-String).Trim()
     $metadata = @(Invoke-P4kxLinuxTool flatpak @('info', '--user', "--arch=$($Platform.unix_arch)", '--show-metadata', $settings.application_id))
@@ -122,9 +165,7 @@ function Remove-P4kxLinuxPackage {
     param([string]$Package, $Platform)
     if ($Package -eq 'deb') {
         Invoke-P4kxLinuxTool sudo @('apt-get', 'remove', '--yes', 'p4kx') | Out-Null
-        foreach ($path in @('/usr/bin/p4kx', '/usr/bin/p4kx-gui', '/usr/bin/p4kx-mcp', '/usr/lib/p4kx')) {
-            if (Test-Path -LiteralPath $path) { throw "Debian uninstall left package ownership: $path" }
-        }
+        Assert-P4kxDebPayloadAbsent
     }
     if ($Package -eq 'flatpak') {
         $identity = (Get-P4kxLinuxPackaging).application_id

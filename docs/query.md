@@ -235,10 +235,9 @@ of them, and the Query selects the Records that refer to any of them. A Record t
 itself is not selected for that. A weak pointer to a nested instance of another Record, not to
 that Record itself, is not a Reference and selects nothing. It combines with `from` and `at`:
 both keep only the Records that also meet them. The clauses stand in the order `from`, `at`,
-`referencing`, `select`, `where`; `at "…"` behind `referencing` is an error that says so. An
-Archive with more than 8,388,608 References is indexed up to that many, the first ones in Record
-order. The first Query with `referencing` of an Archive reads every Record once to
-index the References ([ADR-0029](adr/0029-references-are-indexed-once-per-archive-from-record-trees.md));
+`referencing`, `select`, `where`. An `at "…"` behind `referencing` is an error. The first
+Query with `referencing` of an Archive reads every Record once and indexes the readable
+References without a fixed count limit ([ADR-0029](adr/0029-references-are-indexed-once-per-archive-from-record-trees.md));
 the window keeps that index for the Archive, and `p4kx dcb refs` lists the References themselves
 with their fields.
 
@@ -459,14 +458,21 @@ otherwise text anywhere in it, ignoring case), e.g. `--path "*/fireRate"`. The p
 segment by segment ignoring ASCII case, so a path is followed by the paths below it. The result
 is the same for every number of threads.
 
-A Record whose layout or instance cannot be read, or that has more than 1,048,576 values, is not
-counted at all, not even the values found before the limit (the paths it walked still count
-towards the path limit below), and is reported on stderr with exit
-code 1. A value that cannot be read (a bad array
-range, a pointer to no instance, an instance owned twice, a struct nested deeper than 64) is not
-counted and is reported as a number on stderr and in the JSON. An Archive whose Records have more
-than 1,048,576 distinct paths is an error (exit code 5), which bounds the memory
-([ADR-0049](adr/0049-field-statistics-are-counted-per-path-in-one-parallel-pass.md)).
+A requested Record whose root layout or instance cannot be read adds to the unreadable Record
+count and contributes no field counts; stderr reports it with exit code 1. Statistics traverse
+owned values iteratively without a depth or mixed value/work cutoff.
+
+An unreadable scalar occurrence retains its declared occurrence and kind count but adds no
+distinct value or numeric extremum. Invalid array ranges, missing instances, unreadable nested
+layouts, repeated ownership and cyclic inline declarations add to the unreadable-value count.
+Only observations retained before a rejected source edge contribute field counts; unread
+descendant occurrences are not invented. The unreadable counts appear on stderr and in JSON.
+
+The existing path policy allows 1,048,576 trie nodes including the empty root. Requiring another
+node during discovery or merge is an error (exit code 5), not a successful prefix. This bounds
+trie-node cardinality, not all retained observations, path spelling, scratch or process memory.
+See [ADR-0049](adr/0049-field-statistics-are-counted-per-path-in-one-parallel-pass.md) and
+[canonical owned values](canonical-owned-values.md) for exact policies and cost boundaries.
 
 ## Errors
 

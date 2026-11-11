@@ -96,7 +96,10 @@ fn dcb_info_prints_one_line_of_json() -> TestResult {
     let (stdout, _) = run(&archive, true, 0)?;
 
     assert_eq!(stdout.lines().count(), 1, "one line: {stdout}");
-    let value: serde_json::Value = serde_json::from_str(&stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&stdout)?;
+    let fields = value.as_object_mut().ok_or("DataForge summary object")?;
+    fields.remove("fieldOrigins");
+    fields.remove("provenance");
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }
@@ -258,3 +261,6 @@ fn dcb_info_reads_the_dataforge_of_a_real_archive() -> TestResult {
     }
     Ok(())
 }
+
+#[path = "dcb_info_origins.rs"]
+mod origins;

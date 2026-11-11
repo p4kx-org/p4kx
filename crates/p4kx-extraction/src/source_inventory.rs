@@ -95,7 +95,7 @@ impl SourceEncryptionState {
 }
 
 /// The exact declaration-bearing directory record format.
-#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[non_exhaustive]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
@@ -109,7 +109,7 @@ pub enum SourceRecordFormat {
 }
 
 /// The physical field supplying an encryption declaration.
-#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[non_exhaustive]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
@@ -144,7 +144,7 @@ impl SourceDeclarationKind {
 }
 
 /// An observed encryption declaration whose values originate in directory metadata.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = projection_schema::require_properties)]
 pub struct SourceEncryptionDeclaration {
@@ -156,7 +156,7 @@ pub struct SourceEncryptionDeclaration {
 }
 
 /// Physical Archive Entry facts, retaining all stored declaration occurrences.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = projection_schema::require_properties)]
 pub struct ArchiveEntrySource {
@@ -170,7 +170,7 @@ pub struct ArchiveEntrySource {
 }
 
 /// Minimal original Entry proof when optional stored details were not retained.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = projection_schema::require_properties)]
 pub struct ArchiveEntryProof {
@@ -180,7 +180,7 @@ pub struct ArchiveEntryProof {
 }
 
 /// Measured whole-Archive file facts independently of its stored Entry declarations.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = projection_schema::require_properties)]
 pub struct ArchiveFileSource {
@@ -188,7 +188,7 @@ pub struct ArchiveFileSource {
 }
 
 /// Observed standalone-file facts without a claim of original P4K lineage.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = projection_schema::require_properties)]
 pub struct FileSource {
@@ -197,7 +197,7 @@ pub struct FileSource {
 }
 
 /// The closed physical-source inventory payload.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[non_exhaustive]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum PhysicalSourceKind {
@@ -228,6 +228,16 @@ pub struct PhysicalSource {
     pub(crate) source: PhysicalSourceKind,
 }
 
+impl PartialEq for PhysicalSource {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.ancestors == other.ancestors
+            && self.stored_encryption == other.stored_encryption
+            && self.source == other.source
+    }
+}
+
+impl Eq for PhysicalSource {}
 impl PhysicalSource {
     /// Returns this source's document-local identifier.
     #[must_use]
@@ -237,7 +247,7 @@ impl PhysicalSource {
 }
 
 /// Immutable sorted physical sources and observed use inventory for one prepared result.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = projection_schema::require_properties)]
 pub struct SourceInventory {

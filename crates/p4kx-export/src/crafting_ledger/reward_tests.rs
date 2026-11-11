@@ -4,6 +4,7 @@
 use p4kx_extraction::DataForge;
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
+use crate::HealthText;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::SourceDisposition;
 
@@ -153,7 +154,7 @@ fn two_reward_placements_are_one_actual_dependency_record() -> TestResult {
         record_path: "synthetic/pool.xml",
         entries: Vec::new(),
     }];
-    let search = super::reward_sources(&records, &pools, None, None)?;
+    let search = super::reward_sources(&records, &pools, None, None, None)?;
     assert_eq!(
         search.sources.len(),
         2,
@@ -202,7 +203,7 @@ fn an_actual_failed_reward_dependency_retains_its_guid_and_path() -> TestResult 
     );
     let forge = DataForge::open(&bytes)?;
     let records: Vec<_> = forge.records().collect();
-    let search = super::reward_sources(&records, &[], None, None)?;
+    let search = super::reward_sources(&records, &[], None, None, None)?;
     let source = search
         .ledger
         .sources
@@ -214,7 +215,7 @@ fn an_actual_failed_reward_dependency_retains_its_guid_and_path() -> TestResult 
         "the failed source GUID is retained"
     );
     assert_eq!(
-        source.record_path.as_deref(),
+        source.record_path.as_ref().map(HealthText::as_str),
         Some("synthetic/contract"),
         "the failure path is retained"
     );
@@ -244,7 +245,7 @@ fn unreadable_field_leaves_are_retained_even_without_reward_rows() -> TestResult
     let bytes = crate::crafting::ledger::fixtures::fields();
     let forge = DataForge::open(&bytes)?;
     let records: Vec<_> = forge.records().collect();
-    let search = super::reward_sources(&records, &[], None, None)?;
+    let search = super::reward_sources(&records, &[], None, None, None)?;
     assert!(
         search.sources.is_empty(),
         "a source-free canonical scan has no invented reward rows"

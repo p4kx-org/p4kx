@@ -5,27 +5,29 @@ use p4kx_extraction::{CancelToken, DataForgeError, Filter, Record, RecordTree, T
 use rayon::prelude::*;
 
 use super::{Scan, selects_group};
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_v3::resource_group_catalog::{self, ResourceGroupMembers};
 use crate::entity_selection::{Selected, select};
 use crate::export_diagnostic::ExportSourceRole;
-use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
+use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::record_observation::RecordObservation;
 use crate::resource_group::{Groups, Listing, ParentSource, listing};
-use crate::{CatalogError, CatalogFailure, Kind};
+use crate::{CatalogError, CatalogReadFailure, Kind};
 
-pub(super) struct GroupRead {
+pub(super) struct GroupRead<'f> {
     pub(super) groups: Groups,
     pub(super) members: Vec<ResourceGroupMembers>,
-    pub(super) failures: Vec<CatalogFailure>,
+    pub(super) failures: Vec<CatalogReadFailure<'f>>,
     pub(super) ledger: ExportLedger,
 }
 
-struct GroupPiece {
+struct GroupPiece<'f> {
     complete: bool,
     listing: Option<Listing>,
     members: Option<ResourceGroupMembers>,
     parent_failure: Option<ParentSource>,
-    failure: Option<CatalogFailure>,
+    failure: Option<CatalogReadFailure<'f>>,
     disposition: SourceDisposition,
     ledger: ExportLedger,
 }
@@ -35,13 +37,13 @@ impl<'f> Scan<'_, '_, 'f> {
     pub(super) fn groups(
         records: &[Record<'f>],
         filter: Option<&Filter>,
-        origins: &CatalogOrigins,
+        input: &OriginalCatalogInput<'_, '_>,
         cancel: Option<&CancelToken>,
-    ) -> Result<GroupRead, CatalogError> {
-        let listed: Vec<GroupPiece> = records
+    ) -> Result<GroupRead<'f>, CatalogError> {
+        let listed: Vec<GroupPiece<'f>> = records
             .par_iter()
             .map_init(TreeBuilder::new, |trees, record| {
-                read_group(trees, record, filter, origins, cancel)
+                read_group(trees, record, filter, input, cancel)
             })
             .filter_map(Result::transpose)
             .collect::<Result<_, _>>()?;
@@ -76,12 +78,14 @@ fn read_group<'f>(
     trees: &mut TreeBuilder<'f>,
     record: &Record<'f>,
     filter: Option<&Filter>,
-    origins: &CatalogOrigins,
+    input: &OriginalCatalogInput<'_, '_>,
     cancel: Option<&CancelToken>,
-) -> Result<Option<GroupPiece>, CatalogError> {
+) -> Result<Option<GroupPiece<'f>>, CatalogError> {
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
+    input.record_context(record)?;
+    let origins = input.origins();
     match select(record, None) {
         Ok(Some(Selected::Entity(Kind::ResourceGroups))) => {}
         Ok(_) => return Ok(None),
@@ -101,44 +105,47 @@ fn read_group<'f>(
         }
     }
     let selected = selects_group(record, filter);
+    let admission = RecordObservation::capture(input, record)?;
     let mut piece = match trees.build(record) {
-        Ok(tree) => readable(&tree, record, selected, origins, cancel)?,
+        Ok(tree) => readable(&tree, &admission, selected, input, cancel)?,
         Err(error) => failed_read(record, &error, selected, origins)?,
     };
     for kind in [Kind::ResourceGroups, Kind::Commodities, Kind::ResourceTypes] {
-        piece.ledger.observe(SourceObservation::new(
-            kind,
-            record,
+        piece.ledger.observe(admission.source(
+            Some(kind),
             ExportSourceRole::Dependency,
             piece.disposition,
-        ));
+        )?);
     }
     Ok(Some(piece))
 }
 
-fn readable(
-    tree: &RecordTree<'_>,
-    record: &Record<'_>,
+fn readable<'f>(
+    tree: &RecordTree<'f>,
+    admission: &RecordObservation<'_, 'f>,
     selected: bool,
-    origins: &CatalogOrigins,
+    input: &OriginalCatalogInput<'_, '_>,
     cancel: Option<&CancelToken>,
-) -> Result<GroupPiece, CatalogError> {
-    let mut ledger = crate::export_field_walk::inspect(
+) -> Result<GroupPiece<'f>, CatalogError> {
+    let origins = input.origins();
+    let mut ledger = crate::export_field_walk::inspect_observed(
+        Some(input),
         tree,
-        record,
+        admission,
         Some(Kind::ResourceGroups),
         ExportSourceRole::Dependency,
         cancel,
     )?;
     let (members, listing) = if selected {
-        let (members, notes) = resource_group_catalog::members(tree, origins, cancel)?;
+        let (members, notes) = resource_group_catalog::members(tree, input, admission, cancel)?;
         crate::source_projection_notes::record(
             Kind::ResourceGroups,
             ExportSourceRole::Selected,
+            admission,
             tree,
             notes,
             &mut ledger,
-        );
+        )?;
         (Some(members), Some(listing(tree, origins, cancel)?))
     } else {
         (None, None)
@@ -154,12 +161,12 @@ fn readable(
     })
 }
 
-fn failed_read(
-    record: &Record<'_>,
+fn failed_read<'f>(
+    record: &Record<'f>,
     error: &DataForgeError,
     selected: bool,
     origins: &CatalogOrigins,
-) -> Result<GroupPiece, CatalogError> {
+) -> Result<GroupPiece<'f>, CatalogError> {
     Ok(GroupPiece {
         complete: !selected,
         listing: None,
@@ -169,7 +176,7 @@ fn failed_read(
         } else {
             None
         },
-        failure: (!selected).then(|| CatalogFailure::of(record, error)),
+        failure: (!selected).then(|| CatalogReadFailure::of(record, error)),
         disposition: SourceDisposition::ReadFailed,
         ledger: ExportLedger::default(),
     })

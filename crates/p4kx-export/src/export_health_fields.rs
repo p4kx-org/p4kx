@@ -5,18 +5,20 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ExportSourceRole;
 use crate::catalog_number_health::NumberCaptures;
+use crate::catalog_read::original::ReferenceObservation;
 use crate::catalog_target_index::TargetIndex;
-use crate::export_diagnostic::{ExportDiagnostic, ExportDiagnosticSeverity, FailedExportRecord};
+use crate::export_diagnostic::ExportDiagnosticSeverity;
 use crate::export_field_inspection::FieldInspection;
 use crate::export_ledger::{ExportAccountingError, SourceObservation};
-use crate::export_reference_issue::ExportUnresolvedReference;
+use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
+use crate::health_failed_observation::FailedRecordObservation as FailedExportRecord;
 
 /// Source inspections resolved onto each actual successful production read.
 pub(crate) struct Fields {
     pub(crate) incomplete_kinds: BTreeSet<usize>,
     pub(crate) failed: Vec<FailedExportRecord>,
     pub(crate) diagnostics: Vec<ExportDiagnostic>,
-    pub(crate) references: Vec<ExportUnresolvedReference>,
+    pub(crate) references: Vec<ReferenceObservation>,
 }
 
 /// Reuses immutable canonical proofs by physical identity, without another decode or field walk.
@@ -47,17 +49,21 @@ pub(crate) fn resolve(
         if inspection.guid != source.guid
             || source
                 .record_path
-                .as_deref()
-                .is_some_and(|path| path != inspection.record_path)
+                .as_ref()
+                .map(crate::HealthText::as_str)
+                .is_some_and(|path| path != inspection.record_path.as_str())
         {
             return Err(ExportAccountingError::ConflictingFieldInspection);
         }
+        source.key()?;
+        let mut owner = inspection.subject.clone();
+        owner.merge(source.subject().clone())?;
         if !inspection.number_requirements.is_empty() {
-            let mut coverage = captured.for_record(source.record_index);
+            let mut coverage = captured.for_source(source)?;
             if let Some(diagnostic) =
-                crate::catalog_number_diagnostics::uncovered(inspection, source, &mut coverage)
+                crate::catalog_number_diagnostics::uncovered(inspection, source, &mut coverage)?
             {
-                retain_diagnostic(diagnostic, inspection, source, &mut fields);
+                retain_diagnostic(diagnostic, inspection, source, &mut fields)?;
             }
         }
         if !inspection.complete
@@ -65,7 +71,7 @@ pub(crate) fn resolve(
         {
             fields.incomplete_kinds.insert(kind.index());
         }
-        retain(inspection, source, &mut fields);
+        retain(inspection, source, &mut fields)?;
     }
     let reference_diagnostics = fields.diagnostics.len();
     crate::catalog_reference_health::resolve(
@@ -77,7 +83,7 @@ pub(crate) fn resolve(
     )?;
     fields.failed.extend(failed_diagnostics(
         fields.diagnostics.iter().skip(reference_diagnostics),
-    ));
+    )?);
     Ok(fields)
 }
 
@@ -91,31 +97,33 @@ fn canonical_inspections(
             std::collections::btree_map::Entry::Vacant(entry) => {
                 entry.insert(inspection);
             }
-            std::collections::btree_map::Entry::Occupied(entry) => {
-                if entry.get() != &inspection {
-                    return Err(ExportAccountingError::ConflictingFieldInspection);
-                }
+            std::collections::btree_map::Entry::Occupied(mut entry) => {
+                entry.get_mut().merge(inspection)?;
             }
         }
     }
     Ok(canonical)
 }
 
-fn retain(inspection: &FieldInspection, source: &SourceObservation, fields: &mut Fields) {
+fn retain(
+    inspection: &FieldInspection,
+    source: &SourceObservation,
+    fields: &mut Fields,
+) -> Result<(), ExportAccountingError> {
     for original in &inspection.diagnostics {
         let mut diagnostic = original.clone();
         diagnostic.kind = source.kind;
         diagnostic.source_role = Some(source.role);
-        retain_diagnostic(diagnostic, inspection, source, fields);
+        retain_diagnostic(diagnostic, inspection, source, fields)?;
     }
     fields
         .references
         .extend(inspection.unresolved_references.iter().map(|original| {
             let mut reference = original.clone();
-            reference.kind = source.kind;
-            reference.source_role = source.role;
+            reference.contextualize(source.kind, source.role);
             reference
         }));
+    Ok(())
 }
 
 fn retain_diagnostic(
@@ -123,44 +131,49 @@ fn retain_diagnostic(
     inspection: &FieldInspection,
     source: &SourceObservation,
     fields: &mut Fields,
-) {
+) -> Result<(), ExportAccountingError> {
     if diagnostic.severity != ExportDiagnosticSeverity::Information {
-        fields.failed.push(FailedExportRecord {
-            kind: source.kind,
-            record_index: inspection.record_index,
-            guid: inspection.guid.to_string(),
-            record_path: Some(inspection.record_path.clone()),
-            role: source.role,
-            stage: diagnostic.stage,
-            code: diagnostic.code,
-        });
+        let mut owner = inspection.subject.clone();
+        owner.merge(source.subject().clone())?;
+        fields.failed.push(FailedExportRecord::new(
+            source.kind,
+            owner,
+            source.role,
+            diagnostic.stage,
+            diagnostic.code,
+        )?);
     }
     fields.diagnostics.push(diagnostic);
+    Ok(())
 }
 
 /// Retains every available blocking owner identity before aggregate example limits are applied.
 pub(crate) fn failed_diagnostics<'diagnostic>(
     diagnostics: impl IntoIterator<Item = &'diagnostic ExportDiagnostic>,
-) -> Vec<FailedExportRecord> {
-    diagnostics
-        .into_iter()
-        .filter(|diagnostic| diagnostic.severity != ExportDiagnosticSeverity::Information)
-        .flat_map(|diagnostic| {
-            diagnostic.examples.iter().filter_map(|example| {
-                Some(FailedExportRecord {
-                    kind: diagnostic.kind,
-                    record_index: example.record_index?,
-                    guid: example.record_guid.clone()?,
-                    record_path: example.record_path.clone(),
-                    role: diagnostic.source_role?,
-                    stage: diagnostic.stage,
-                    code: diagnostic.code,
-                })
-            })
-        })
-        .collect()
+) -> Result<Vec<FailedExportRecord>, ExportAccountingError> {
+    let mut failed = Vec::new();
+    for diagnostic in diagnostics {
+        if diagnostic.severity == ExportDiagnosticSeverity::Information {
+            continue;
+        }
+        let Some(role) = diagnostic.source_role else {
+            continue;
+        };
+        for example in &diagnostic.examples {
+            if example.subject().key().is_none() {
+                continue;
+            }
+            failed.push(FailedExportRecord::new(
+                diagnostic.kind,
+                example.subject().clone(),
+                role,
+                diagnostic.stage,
+                diagnostic.code,
+            )?);
+        }
+    }
+    Ok(failed)
 }
-
 #[cfg(test)]
 #[path = "export_health_fields/numeric_capture_tests.rs"]
 mod numeric_capture_tests;

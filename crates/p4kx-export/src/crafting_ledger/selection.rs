@@ -10,6 +10,7 @@ use crate::crafting_records::{
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{SourceDisposition, SourceObservation};
 use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
+use crate::record_observation::RecordObservation;
 use crate::selection::{self, BlueprintSelection, Kind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,13 +56,10 @@ pub(super) struct Selection {
 impl Selection {
     pub(super) fn observation(
         self,
-        record: &Record<'_>,
+        admission: &RecordObservation<'_, '_>,
         disposition: SourceDisposition,
-    ) -> SourceObservation {
-        self.action.kind().map_or_else(
-            || SourceObservation::catalog_source(record, self.role, disposition),
-            |kind| SourceObservation::new(kind, record, self.role, disposition),
-        )
+    ) -> Result<SourceObservation, crate::CatalogError> {
+        admission.source(self.action.kind(), self.role, disposition)
     }
 
     pub(super) const fn successful_disposition(self) -> SourceDisposition {

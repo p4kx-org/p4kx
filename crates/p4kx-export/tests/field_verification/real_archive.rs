@@ -73,8 +73,8 @@ fn field_inventory_observes_declared_populated_and_exported_source_values() -> s
             .summary()
             .failures()
             .iter()
-            .map(|failure| failure.guid)
-            .collect(),
+            .map(|failure| failure.guid().parse())
+            .collect::<Result<_, _>>()?,
         exclusions,
         &|| false,
     )?;

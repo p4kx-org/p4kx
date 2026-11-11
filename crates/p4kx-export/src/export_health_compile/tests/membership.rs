@@ -11,14 +11,14 @@ use super::TestResult;
 #[test]
 fn unreadable_metadata_invalidates_membership_without_multiplying_sources() -> TestResult {
     let mut ledger = super::ledger();
-    let mut candidate = super::source(
-        Kind::Items,
+    let candidate = crate::export_ledger::SourceObservation::accounting(
+        None,
         1,
+        p4kx_extraction::Guid::from_stored([1; 16]),
+        None,
         crate::ExportSourceRole::SelectionCandidate,
         SourceDisposition::ReadFailed,
     );
-    candidate.kind = None;
-    candidate.record_path = None;
     ledger.observe(candidate);
     let report = export_health_compile::compile(
         ledger,

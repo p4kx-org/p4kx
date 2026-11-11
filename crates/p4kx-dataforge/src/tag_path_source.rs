@@ -4,7 +4,7 @@
 use crate::Record;
 
 /// The source field whose stored occurrence selected a tag-tree edge.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TagPathEdgeKind {
     /// A `TagDatabase.tags` root occurrence.

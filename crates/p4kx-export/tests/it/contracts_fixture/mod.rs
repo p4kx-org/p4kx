@@ -4,12 +4,17 @@
 //! A synthetic Archive with contracts, sub contracts, templates, mission types, a mission
 //! organisation with tagged string variants and reputation rewards.
 
+mod fixed_reward_origins;
 mod gaps;
 mod lookups;
 mod prerequisites;
 mod records;
 mod referenced;
+mod reputation_gain_origins;
 mod structures;
+mod title_limits;
+mod title_missing;
+mod title_origins;
 
 use std::error::Error;
 use std::path::{Path, PathBuf};

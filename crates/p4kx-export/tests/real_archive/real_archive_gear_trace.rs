@@ -14,6 +14,7 @@ use p4kx_testkit::real_archive_path;
 use serde_json::Value;
 
 use crate::catalog_v3_consumer;
+use crate::real_archive_blueprints::Blueprints;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -122,25 +123,6 @@ fn filled(value: &Value, name: &str) -> bool {
     value.get(name).is_some_and(|inner| !inner.is_null())
 }
 
-fn property_guids(value: &Value, found: &mut Vec<String>) {
-    match value {
-        Value::Object(map) => {
-            if let Some(guid) = map.get("propertyGuid").and_then(Value::as_str) {
-                found.push(guid.to_owned());
-            }
-            for inner in map.values() {
-                property_guids(inner, found);
-            }
-        }
-        Value::Array(items) => {
-            for inner in items {
-                property_guids(inner, found);
-            }
-        }
-        _ => {}
-    }
-}
-
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 #[expect(
@@ -169,17 +151,23 @@ fn every_modified_property_is_filled_on_the_item_the_blueprint_produces() -> Tes
     let mut misses: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut no_source: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut unmapped = 0_usize;
-    let blueprints = catalog["blueprints"].as_array().ok_or("the blueprints")?;
-    for blueprint in blueprints {
-        let mut guids = Vec::new();
-        property_guids(blueprint, &mut guids);
-        guids.sort();
-        guids.dedup();
-        let produced = blueprint["producedItemGuid"]
+    let blueprints = Blueprints::read(&catalog)?;
+    for blueprint in blueprints.rows() {
+        let guids: std::collections::BTreeSet<_> = blueprint
+            .costs()
+            .flat_map(|cost| {
+                cost["context"]["modifiers"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+            })
+            .filter_map(|modifier| modifier["propertyGuid"]["value"].as_str())
+            .collect();
+        let produced = blueprint.presentation["producedItem"]["value"]
             .as_str()
             .and_then(|guid| items.get(guid));
         for guid in guids {
-            let class = classes.get(guid.as_str()).ok_or("an unknown property")?;
+            let class = classes.get(guid).ok_or("an unknown property")?;
             let (_, paths) = FIELDS
                 .iter()
                 .find(|(name, _)| name == class)
@@ -216,7 +204,7 @@ fn every_modified_property_is_filled_on_the_item_the_blueprint_produces() -> Tes
             }
         }
     }
-    report(&format!("blueprints: {}", blueprints.len()));
+    report(&format!("blueprints: {}", blueprints.rows().len()));
     for (class, count) in &uses {
         report(&format!("{class}: {count} blueprints"));
     }

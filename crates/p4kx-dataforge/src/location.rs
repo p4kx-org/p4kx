@@ -21,7 +21,7 @@ pub enum Step<'f> {
 pub struct Location<'f> {
     steps: Box<[Step<'f>]>,
     text: Box<str>,
-    original_positions: Option<Box<[u32]>>,
+    original_positions: Option<Box<[u64]>>,
 }
 
 impl<'f> Location<'f> {
@@ -49,14 +49,14 @@ impl<'f> Location<'f> {
         }
     }
 
-    pub(crate) fn original_instance(steps: &[Step<'f>], positions: &[u32]) -> Self {
+    pub(crate) fn original_instance(steps: &[Step<'f>], positions: &[u64]) -> Self {
         Self {
             original_positions: Some(positions.into()),
             ..Self::new(steps)
         }
     }
 
-    pub(crate) fn original_positions(&self) -> Option<&[u32]> {
+    pub(crate) fn original_positions(&self) -> Option<&[u64]> {
         self.original_positions.as_deref()
     }
 
@@ -106,6 +106,28 @@ impl fmt::Display for Location<'_> {
 #[cfg(test)]
 mod tests {
     use super::{Location, Step};
+
+    #[test]
+    fn original_instance_storage_keeps_wide_field_positions_without_changing_public_equality() {
+        const WIDE_FIELD: u64 = 4_294_967_296;
+        let steps = [Step::Field("late"), Step::Element(7)];
+        let actual = Location::original_instance(&steps, &[WIDE_FIELD, 7]);
+        assert_eq!(
+            actual.original_positions(),
+            Some([WIDE_FIELD, 7].as_slice()),
+            "private original tuples retain the complete field ordinal"
+        );
+        let logical = Location::new(&steps);
+        assert_eq!(
+            actual, logical,
+            "public Location equality remains based on semantic steps and text"
+        );
+        assert_eq!(
+            logical.original_positions(),
+            None,
+            "a logical descriptor grants no original positions"
+        );
+    }
 
     #[test]
     fn public_location_constructor_has_no_original_instance_receipt() {

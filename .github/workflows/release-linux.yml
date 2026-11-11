@@ -85,6 +85,15 @@ jobs:
           Install-P4kxLinuxPackageTools -Target $env:P4KX_TARGET -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'tools')
       - name: Build the native static AppImage runtime and corresponding source
         run: .github/scripts/build-linux-runtime.ps1 -Target $env:P4KX_TARGET -StagingDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'runtime-build') -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'runtime')
+      - name: Build native installer upgrade fixtures
+        run: |
+          . .github/scripts/linux-package-lifecycle-evidence.ps1
+          $fixtureVersion = Get-P4kxLinuxLifecycleFixtureVersion
+          $binary = "target/$env:P4KX_TARGET/release"
+          $output = Join-Path $env:P4KX_PACKAGE_TASK 'lifecycle-fixture'
+          $env:FLATPAK_USER_DIR = Join-Path $env:P4KX_PACKAGE_TASK 'flatpak-installation'
+          .github/scripts/build-linux-deb.ps1 -Target $env:P4KX_TARGET -Version $fixtureVersion -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'lifecycle-deb')
+          .github/scripts/build-linux-flatpak.ps1 -Target $env:P4KX_TARGET -Version $fixtureVersion -BinaryDirectory $binary -OutputDirectory $output -StagingDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'lifecycle-flatpak')
       - name: Build native tar.gz, AppImage, deb and Flatpak from the release executables
         run: |
           $binary = "target/$env:P4KX_TARGET/release"
@@ -122,6 +131,7 @@ jobs:
           path: |
             ${{ env.P4KX_PACKAGE_TASK }}/package/*
             ${{ env.P4KX_PACKAGE_TASK }}/fixture/*
+            ${{ env.P4KX_PACKAGE_TASK }}/lifecycle-fixture/*
             ${{ env.P4KX_PACKAGE_TASK }}/validation/*.json
           if-no-files-found: error
 
@@ -178,7 +188,7 @@ jobs:
       - name: Execute each real package launcher, desktop frames and Documents portal grants
         run: |
           $base = "artifacts/linux-build-$env:P4KX_TARGET"
-          & xvfb-run --auto-servernum pwsh -NoProfile -File .github/scripts/check-linux-packages.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory "$base/package" -FixtureDirectory "$base/fixture" -BuildMetadata "$base/validation/build.json" -AdapterEvidence "$base/validation/adapter.json" -ServiceBuildMetadata (Join-Path $env:P4KX_PACKAGE_TASK 'services/services.json') -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'package-check')
+          & xvfb-run --auto-servernum pwsh -NoProfile -File .github/scripts/check-linux-packages.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory "$base/package" -FixtureDirectory "$base/fixture" -LifecycleFixtureDirectory "$base/lifecycle-fixture" -BuildMetadata "$base/validation/build.json" -AdapterEvidence "$base/validation/adapter.json" -ServiceBuildMetadata (Join-Path $env:P4KX_PACKAGE_TASK 'services/services.json') -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'package-check')
           if ($LASTEXITCODE -ne 0) { throw 'Native installed Linux package execution failed.' }
           Copy-Item "$base/validation/package-tools.json" "$base/package/P4KX-$env:VERSION-$env:P4KX_TARGET-package-tools.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

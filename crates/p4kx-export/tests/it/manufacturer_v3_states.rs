@@ -118,7 +118,7 @@ fn assert_normal_rejects(result: TestResult<(BuiltCatalog, Value)>) -> TestResul
     assert!(
         matches!(
             error.downcast_ref::<CatalogError>(),
-            Some(CatalogError::IncompleteExport { .. })
+            Some(CatalogError::IncompleteExport(_))
         ),
         "malformed authored fields refuse normal publication with its typed error"
     );

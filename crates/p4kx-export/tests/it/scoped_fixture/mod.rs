@@ -108,7 +108,7 @@ fn build_mode(
             .summary()
             .failures()
             .iter()
-            .map(|failure| failure.reason.clone())
+            .map(|failure| failure.reason().to_owned())
             .collect(),
     })
 }
@@ -226,24 +226,4 @@ fn generator() -> TestRecord {
                 .value("contracts", TestValue::Array(vec![object(contract)])),
         )]),
     )
-}
-
-pub(crate) fn value<'a>(
-    document: &'a Value,
-    kind: &str,
-    variable: &str,
-) -> Result<&'a Value, String> {
-    let field = if kind == "contractTemplates" {
-        "contractProperties"
-    } else {
-        "missionProperties"
-    };
-    document[kind]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .flat_map(|record| record[field].as_array().into_iter().flatten())
-        .find(|property| property["variable"] == variable)
-        .map(|property| &property["value"])
-        .ok_or_else(|| format!("{kind} property {variable}"))
 }

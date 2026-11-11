@@ -5,9 +5,11 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::Kind;
-use crate::contract::every_field_required;
-use crate::export_diagnostic::{ExportDiagnosticCode, ExportDiagnosticStage, ExportSourceRole};
-use crate::export_ledger::{SourceDiagnosis, SourceDisposition};
+pub use crate::catalog_read::original::FailedExportEntry;
+use crate::catalog_read::original::{EntryDiagnosis, EntryReceipt};
+use crate::export_diagnostic::ExportSourceRole;
+use crate::export_ledger::SourceDisposition;
+use crate::{ExportAccountingError, HealthText};
 
 /// The required operation performed on a physical Archive Entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
@@ -55,44 +57,48 @@ pub enum EntryOperation {
 }
 
 /// The exact identity and outcome of one actually consumed Archive Entry.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub(crate) struct ArchiveEntryObservation {
     pub(crate) operation: EntryOperation,
     pub(crate) kind: Kind,
     pub(crate) entry_index: Option<usize>,
     pub(crate) container_entry_index: Option<usize>,
-    pub(crate) path: String,
+    pub(crate) path: HealthText,
     pub(crate) role: ExportSourceRole,
     pub(crate) disposition: SourceDisposition,
-    pub(crate) diagnosis: SourceDiagnosis,
+    pub(crate) diagnosis: EntryDiagnosis,
+    pub(crate) receipt: Option<EntryReceipt>,
 }
 
-/// One exact failed Archive Entry identity, retained independently of bounded examples.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub struct FailedExportEntry {
-    /// The failed required operation on the physical Entry.
-    pub operation: EntryOperation,
-    /// The affected catalog kind.
-    pub kind: Kind,
-    /// The outer Archive Entry index, null when unavailable or the configured Entry is missing.
-    pub entry_index: Option<usize>,
-    /// The nested container Entry index when available.
-    pub container_entry_index: Option<usize>,
-    /// The canonical Entry path, using `outer!inner` for a nested file.
-    pub path: String,
-    /// The relationship of the source to the affected kind.
-    pub role: ExportSourceRole,
-    /// The failed source-read or projection stage.
-    pub stage: ExportDiagnosticStage,
-    /// The stable failure category.
-    pub code: ExportDiagnosticCode,
-    /// The technical source field when the failing operation identifies one.
-    pub field: Option<String>,
-    /// The technical source struct or document type when available.
-    pub source_type: Option<String>,
-    /// The configured target GUID when the failing operation identifies one.
-    #[schemars(with = "Option<crate::guid_text::CatalogGuid>")]
-    pub target_guid: Option<String>,
+impl ArchiveEntryObservation {
+    pub(crate) fn original(&self) -> Result<&EntryReceipt, ExportAccountingError> {
+        self.receipt
+            .as_ref()
+            .ok_or(ExportAccountingError::UnboundHealthSubject)
+    }
+
+    pub(crate) fn merge(&mut self, other: &Self) -> Result<(), ExportAccountingError> {
+        if self != other {
+            return Err(ExportAccountingError::ConflictingSourceDatum);
+        }
+        match (&mut self.receipt, &other.receipt) {
+            (Some(left), Some(right)) => left.merge(right),
+            (None, None) => Ok(()),
+            _ => Err(ExportAccountingError::UnboundHealthSubject),
+        }
+    }
 }
+
+impl PartialEq for ArchiveEntryObservation {
+    fn eq(&self, other: &Self) -> bool {
+        self.operation == other.operation
+            && self.kind == other.kind
+            && self.entry_index == other.entry_index
+            && self.container_entry_index == other.container_entry_index
+            && self.path == other.path
+            && self.role == other.role
+            && self.disposition == other.disposition
+            && self.diagnosis == other.diagnosis
+    }
+}
+impl Eq for ArchiveEntryObservation {}

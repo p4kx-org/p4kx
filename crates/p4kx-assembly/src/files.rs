@@ -116,7 +116,10 @@ impl LoadoutFiles for ArchiveFiles<'_> {
             .entry_index(path)
             .and_then(|index| self.archive.entries().get(index))
         else {
-            return LoadoutFileRead::unbound(path, Err(LoadoutFileError::NotFound));
+            return LoadoutFileRead::new(
+                LoadoutFileSource::missing_archive(path, self.archive.input_origin()),
+                Err(LoadoutFileError::NotFound),
+            );
         };
         let Some(original) = self.archive.entry_origin(entry) else {
             return LoadoutFileRead::unbound(

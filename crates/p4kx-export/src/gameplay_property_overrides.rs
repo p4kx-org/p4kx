@@ -6,7 +6,7 @@ use p4kx_extraction::{SourcedValue, StructValue, Value};
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::{CatalogFields, CatalogRecordContext};
-use crate::source_fields::FieldError;
+use crate::source_fields::{FieldCapture, FieldError};
 
 use super::contract::{
     PropertyNameOverrideConditionPayload, PropertyNameOverrideConditionSource,
@@ -19,6 +19,7 @@ pub(crate) fn read<'source>(
     fields: &CatalogFields<'_, 'source, '_>,
     record_index: u32,
     projection: &CatalogProjection<'_, 'source>,
+    capture: &dyn FieldCapture<'source>,
     notes: &mut Vec<FieldError>,
 ) -> Result<SourcedValue<Vec<SourcedValue<PropertyNameOverrideSource<'source>>>>, CatalogError> {
     fields.array("nameOverrides", notes)?.try_map(|values| {
@@ -28,8 +29,7 @@ pub(crate) fn read<'source>(
             .map(|(index, value)| {
                 let path = fields.location(&format!("nameOverrides[{index}]"));
                 fields
-                    .context()
-                    .structure_element(value, fields.source().type_name(), &path, notes)?
+                    .structure_element(&format!("nameOverrides[{index}]"), value, notes)?
                     .try_map(|source| {
                         entry(
                             source,
@@ -37,6 +37,7 @@ pub(crate) fn read<'source>(
                             fields.context(),
                             record_index,
                             projection,
+                            capture,
                             notes,
                         )
                     })
@@ -51,12 +52,13 @@ fn entry<'source>(
     context: &CatalogRecordContext<'_>,
     record_index: u32,
     projection: &CatalogProjection<'_, 'source>,
+    capture: &dyn FieldCapture<'source>,
     notes: &mut Vec<FieldError>,
 ) -> Result<PropertyNameOverrideSource<'source>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
+    let fields = CatalogFields::observed(source, path, context, capture)?;
     let source_type = fields.source_type()?;
     let payload = if source.type_name() == "CraftingPropertyNameOverride" {
-        fields.check(&["propertyName", "condition"], notes);
+        fields.check_observed(&["propertyName", "condition"], notes)?;
         Some(PropertyNameOverrideFields {
             property_name: source_read::name(
                 &fields,
@@ -66,14 +68,20 @@ fn entry<'source>(
                 notes,
             )?,
             condition: fields.structure("condition", notes)?.try_map(|source| {
-                condition(source, &fields.location("condition"), context, notes)
+                condition(
+                    source,
+                    &fields.location("condition"),
+                    context,
+                    capture,
+                    notes,
+                )
             })?,
         })
     } else {
-        fields.check(&[], notes);
+        fields.check_observed(&[], notes)?;
         None
     };
-    let payload = source_read::payload(&fields, path, payload, notes)?;
+    let payload = source_read::payload(&fields, payload, notes)?;
     Ok(PropertyNameOverrideSource {
         source_type,
         payload,
@@ -84,9 +92,10 @@ fn condition<'source>(
     source: &StructValue<'source>,
     path: &str,
     context: &CatalogRecordContext<'_>,
+    capture: &dyn FieldCapture<'source>,
     notes: &mut Vec<FieldError>,
 ) -> Result<PropertyNameOverrideConditionSource<'source>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
+    let fields = CatalogFields::observed(source, path, context, capture)?;
     let source_type = fields.source_type()?;
     let (payload, known): (_, &[&str]) = match source.type_name() {
         "CraftingPropertyNameOverrideCondition_Base"
@@ -102,8 +111,8 @@ fn condition<'source>(
         ),
         _ => (None, &[]),
     };
-    fields.check(known, notes);
-    let payload = source_read::payload(&fields, path, payload, notes)?;
+    fields.check_observed(known, notes)?;
+    let payload = source_read::payload(&fields, payload, notes)?;
     Ok(PropertyNameOverrideConditionSource {
         source_type,
         payload,
@@ -120,11 +129,10 @@ fn labels<'source>(
             .iter()
             .enumerate()
             .map(|(index, value)| {
-                let path = fields.location(&format!("{name}[{index}]"));
-                fields.context().read(
+                let name = format!("{name}[{index}]");
+                fields.read_value(
                     Some(value),
-                    fields.source().type_name(),
-                    &path,
+                    &name,
                     "a nullable Enum",
                     notes,
                     |value| match value {

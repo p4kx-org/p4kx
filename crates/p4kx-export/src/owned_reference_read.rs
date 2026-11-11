@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Reference, StructValue, Value, ValueError};
+use p4kx_extraction::{Guid, Reference, StructValue, Value, ValueError};
 
 use crate::guid_text::CatalogGuid;
 use crate::owned_reference::{OwnedReference, OwnedReferenceStatus};
@@ -19,39 +19,69 @@ pub(crate) fn read<'r, 'f>(
     reader: &Reader<'r, 'f>,
     value: &Value<'f>,
 ) -> Result<Option<OwnedTarget<'r, 'f>>, ()> {
-    let mut result = match value {
-        Value::Null => return Ok(None),
-        Value::Reference(target) => return Ok(Some(reference(reader, target))),
-        Value::Error(ValueError::OutsideRecord {
-            struct_index,
-            instance_index,
-        }) => unresolved(
-            OwnedReferenceStatus::OutsideOwner,
-            *struct_index,
-            *instance_index,
-        ),
-        Value::Error(ValueError::InvalidPointer {
-            struct_index,
-            instance_index,
-        }) => unresolved(
-            OwnedReferenceStatus::MissingTarget,
-            *struct_index,
-            *instance_index,
-        ),
-        Value::Error(ValueError::DanglingReference { guid }) => {
+    let Some(shape) = shape(value)? else {
+        return Ok(None);
+    };
+    let mut result = match shape {
+        WeakShape::Reference(target) => return Ok(Some(reference(reader, target))),
+        WeakShape::Outside {
+            structure,
+            instance,
+        } => unresolved(OwnedReferenceStatus::OutsideOwner, structure, instance),
+        WeakShape::Invalid {
+            structure,
+            instance,
+        } => unresolved(OwnedReferenceStatus::MissingTarget, structure, instance),
+        WeakShape::Dangling(guid) => {
             let mut reference = empty(OwnedReferenceStatus::MissingTarget);
-            reference.record_guid = Some(CatalogGuid(*guid));
+            reference.record_guid = Some(CatalogGuid(guid));
             OwnedTarget {
                 reference,
                 target: None,
             }
         }
-        _ => return Err(()),
     };
     if let Value::Error(error) = value {
         result.reference.source_error = Some(error.to_string());
     }
     Ok(Some(result))
+}
+
+/// Checks the accepted weak-link shapes without owner lookup or owned target metadata.
+pub(crate) fn check(value: &Value<'_>) -> Result<(), ()> {
+    shape(value).map(|_| ())
+}
+
+enum WeakShape<'value, 'source> {
+    Reference(&'value Reference<'source>),
+    Outside { structure: u32, instance: u32 },
+    Invalid { structure: u32, instance: u32 },
+    Dangling(Guid),
+}
+
+fn shape<'value, 'source>(
+    value: &'value Value<'source>,
+) -> Result<Option<WeakShape<'value, 'source>>, ()> {
+    Ok(match value {
+        Value::Null => None,
+        Value::Reference(target) => Some(WeakShape::Reference(target)),
+        Value::Error(ValueError::OutsideRecord {
+            struct_index,
+            instance_index,
+        }) => Some(WeakShape::Outside {
+            structure: *struct_index,
+            instance: *instance_index,
+        }),
+        Value::Error(ValueError::InvalidPointer {
+            struct_index,
+            instance_index,
+        }) => Some(WeakShape::Invalid {
+            structure: *struct_index,
+            instance: *instance_index,
+        }),
+        Value::Error(ValueError::DanglingReference { guid }) => Some(WeakShape::Dangling(*guid)),
+        _ => return Err(()),
+    })
 }
 
 fn reference<'r, 'f>(reader: &Reader<'r, 'f>, source: &Reference<'f>) -> OwnedTarget<'r, 'f> {

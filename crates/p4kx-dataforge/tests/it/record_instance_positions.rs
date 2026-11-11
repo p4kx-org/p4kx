@@ -36,7 +36,7 @@ fn weak_instance_receipts_distinguish_actual_duplicate_field_positions() -> Test
 fn assert_position(
     reference: &Reference<'_>,
     owner: &Record<'_>,
-    expected: &[u32],
+    expected: &[u64],
     logical: &str,
 ) -> TestResult {
     let receipt = reference.original_target();

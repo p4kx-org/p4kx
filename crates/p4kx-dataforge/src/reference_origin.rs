@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::{Guid, Location, Record, Reference};
+use std::sync::Arc;
+
+use crate::{DataForgeError, Guid, Location, Record, RecordText, Reference};
 
 /// A borrowed original target admission, independent from descriptive equality.
 #[derive(Debug, Clone, Copy)]
@@ -32,6 +34,22 @@ impl<'borrow, 'source> ReferenceOrigin<'borrow, 'source> {
         self.reference.guid
     }
 
+    /// Borrows the decoder-selected original Record without accepting another selection key.
+    ///
+    /// # Errors
+    /// Returns the original missing-row error if its selected Record cannot be read.
+    pub fn record(&self) -> Result<Record<'source>, DataForgeError> {
+        self.reference.owner.record(self.reference.record_index)
+    }
+
+    /// Reads the exact original selected Record's name declaration without a new target selection.
+    ///
+    /// # Errors
+    /// Returns the original selected header's invalid-string or missing-row error.
+    pub fn record_name(&self) -> Result<RecordText<'source>, DataForgeError> {
+        self.record()?.stored_name()
+    }
+
     /// Returns the original admitted Record's normalized path.
     #[must_use]
     pub const fn record_path(&self) -> &'source str {
@@ -51,10 +69,17 @@ impl<'borrow, 'source> ReferenceOrigin<'borrow, 'source> {
     /// Borrows the original field and array ordinals, absent for a Record target.
     /// Field ordinals refer to the visited struct's canonical fields, including inherited fields.
     #[must_use]
-    pub fn instance_positions(&self) -> Option<&[u32]> {
+    pub fn instance_positions(&self) -> Option<&[u64]> {
         self.reference
             .location()
             .and_then(Location::original_positions)
+    }
+
+    /// Retains the decoder's existing immutable instance location, absent for a Record target.
+    /// This shared view does not grant original-source admission.
+    #[must_use]
+    pub fn shared_instance_location(&self) -> Option<Arc<Location<'source>>> {
+        self.reference.location.as_ref().map(Arc::clone)
     }
 
     /// Borrows the actual original instance location, absent for a Record target.
@@ -63,3 +88,7 @@ impl<'borrow, 'source> ReferenceOrigin<'borrow, 'source> {
         self.reference.location()
     }
 }
+
+#[cfg(test)]
+#[path = "reference_origin_name_tests.rs"]
+mod name_tests;

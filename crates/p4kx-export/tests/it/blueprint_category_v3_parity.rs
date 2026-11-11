@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::catalog_crafting_support::blueprint;
 use p4kx_extraction::{Archive, DataForge};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestValue,
@@ -9,7 +10,6 @@ use serde_json::{Value, json};
 
 use crate::blueprint_category_v3_fixture as fixture;
 use crate::commodity_v3_fixture::{self as common, TestResult};
-use crate::commodity_v3_source_inventory::{self as origins, SourceField};
 use crate::crafting_fixture;
 
 const ORPHAN: u128 = 0x705;
@@ -63,16 +63,6 @@ fn source_index(forge: &DataForge<'_>, guid: u128) -> TestResult<u32> {
     Ok(index)
 }
 
-fn blueprint(catalog: &Value, guid: u128) -> TestResult<&Value> {
-    let expected = common::guid(guid);
-    fixture::at(catalog, "/blueprints")?
-        .as_array()
-        .ok_or("unmigrated Blueprint rows")?
-        .iter()
-        .find(|row| row.get("guid").and_then(Value::as_str) == Some(expected.as_str()))
-        .ok_or_else(|| "the unchanged selected Blueprint is absent".into())
-}
-
 fn assert_backfill(catalog: &Value, magazine_index: u32) -> TestResult {
     let iron = common::definition(catalog, crafting_fixture::RESOURCE_IRON)?;
     assert_eq!(
@@ -80,12 +70,35 @@ fn assert_backfill(catalog: &Value, magazine_index: u32) -> TestResult {
         &json!("resourceFallback"),
         "the cost-used resource still supplies a fallback Commodity"
     );
-    let uses = origins::uses(catalog, fixture::at(iron, "/selection")?)?;
-    assert!(uses.iter().any(|(index, field, role)| {
-        *index == u64::from(magazine_index)
-            && matches!(field, SourceField::Body(path) if path.starts_with("blueprint.tiers[0].recipe.costs.") && path.ends_with(".resource"))
-            && role == "selector"
-    }), "Commodity backfill keeps an actual original Blueprint resource-use selector");
+    let uses =
+        blueprint::selected_ordinals(catalog, &iron["selection"], u64::from(magazine_index))?;
+    let blueprint = blueprint::by_guid(catalog, crafting_fixture::MAGAZINE)?;
+    let mut matched = 0;
+    for tier in blueprint.tiers()? {
+        for cost in tier["costs"].as_array().ok_or("typed costs")? {
+            if cost
+                .pointer("/meaning/resourceGuid/value")
+                .and_then(Value::as_str)
+                != Some(common::guid(crafting_fixture::RESOURCE_IRON).as_str())
+            {
+                continue;
+            }
+            let source = blueprint.node(&cost["source"])?;
+            let resource = blueprint::field_ref(source, "resource")?;
+            let ordinal = resource["valueIndex"]
+                .as_str()
+                .ok_or("actual resource ordinal")?;
+            assert!(
+                uses.contains(ordinal),
+                "the genuine resource slot remains a backfill selector"
+            );
+            matched += 1;
+        }
+    }
+    assert!(
+        matched > 0,
+        "the selected original Blueprint actually uses this resource"
+    );
     Ok(())
 }
 
@@ -115,31 +128,38 @@ fn original_crafting(source: &DataForgeBuilder) -> TestResult<(u32, u32)> {
 }
 
 fn assert_blueprints(catalog: &Value) -> TestResult {
-    let magazine = blueprint(catalog, crafting_fixture::MAGAZINE)?;
+    let magazine = blueprint::by_guid(catalog, crafting_fixture::MAGAZINE)?;
+    let tier = magazine
+        .tiers()?
+        .first()
+        .copied()
+        .ok_or("original Magazine tier")?;
     assert_eq!(
-        fixture::at(magazine, "/craftTimeSeconds")?,
-        &json!(93_784),
-        "the existing whole-second interpretation is retained"
+        common::at(tier, "/craftTimeSeconds/value")?,
+        "93784",
+        "the source tier duration survives"
+    );
+    let (ingredient, slot) = magazine.ingredient(0)?;
+    assert_eq!(
+        common::at(ingredient, "/meaning/quantityScu/value")?,
+        0.5,
+        "the resource cost keeps its original quantity"
     );
     assert_eq!(
-        fixture::at(magazine, "/ingredients/0/quantityScu")?,
-        &json!(0.5),
-        "the first resource quantity is unchanged"
+        magazine.debug_name(slot.ok_or("nearest Magazine slot")?)?,
+        "MAGAZINE",
+        "the resource retains its nearest named slot"
     );
     assert_eq!(
-        fixture::at(magazine, "/ingredients/0/slot")?,
-        &json!("MAGAZINE"),
-        "nearest selection name still supplies the flattened ingredient"
+        common::at(magazine.presentation, "/category/value")?.as_str(),
+        Some(common::guid(crafting_fixture::CATEGORY).as_str()),
+        "the presentation links its original Blueprint category"
     );
+    let orphan = blueprint::by_guid(catalog, ORPHAN)?;
     assert_eq!(
-        fixture::at(magazine, "/categoryGuid")?,
-        &json!(common::guid(crafting_fixture::CATEGORY)),
-        "a retained category link keeps its GUID"
-    );
-    assert_eq!(
-        fixture::at(blueprint(catalog, ORPHAN)?, "/categoryGuid")?,
-        &Value::Null,
-        "the existing leftover-category unlink projection remains unchanged"
+        common::at(orphan.presentation, "/category/state")?,
+        "absent",
+        "the existing leftover-category unlink projection remains"
     );
     Ok(())
 }

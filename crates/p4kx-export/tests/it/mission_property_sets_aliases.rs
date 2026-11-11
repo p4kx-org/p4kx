@@ -53,18 +53,25 @@ fn conflicting_physical_generators_refuse_normal_publication() -> TestResult {
         .err()
         .ok_or("normal publication accepted ambiguous source identity")?;
     let error = *error.downcast::<CatalogError>()?;
-    let CatalogError::IncompleteExport { health } = error else {
+    let CatalogError::IncompleteExport(refusal) = error else {
         return Err(error.into());
     };
+    let health = refusal.health();
     for kind in [Kind::Contracts, Kind::MissionPropertySets] {
         let indices: BTreeSet<_> = health
-            .failed_records
+            .failed_records()
             .iter()
             .filter(|source| {
                 source.kind == Some(kind) && source.code == ExportDiagnosticCode::AmbiguousIdentity
             })
-            .map(|source| source.record_index)
-            .collect();
+            .map(|source| {
+                source
+                    .record_index()
+                    .value()
+                    .copied()
+                    .ok_or("failed physical Record position")
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
         assert_eq!(
             indices,
             BTreeSet::from([0, 1]),
@@ -76,7 +83,7 @@ fn conflicting_physical_generators_refuse_normal_publication() -> TestResult {
 
 fn verify_quarantined_health(health: &p4kx_export::ExportHealth) -> TestResult {
     let kind = health
-        .kinds
+        .kinds()
         .iter()
         .find(|kind| kind.kind == Kind::MissionPropertySets)
         .ok_or("set health")?;
@@ -94,7 +101,7 @@ fn verify_quarantined_health(health: &p4kx_export::ExportHealth) -> TestResult {
     );
     assert!(
         health
-            .diagnostics
+            .diagnostics()
             .iter()
             .any(|diagnostic| diagnostic.warning_code.as_deref()
                 == Some("ambiguous_mission_property_set")),
@@ -125,7 +132,7 @@ fn diagnostic_quarantines_only_conflicting_sets_and_all_their_joins() -> TestRes
             "the incompatible canonical identity is quarantined"
         );
     }
-    for contract in document["contracts"].as_array().ok_or("contracts")? {
+    for contract in crate::catalog_contracts::v3::rows(&document)? {
         for guid in contract["propertySetGuids"]
             .as_array()
             .ok_or("propertySetGuids")?
@@ -157,7 +164,7 @@ fn identical_alias_payloads_keep_one_canonical_set_per_authored_location() -> Te
         !built
             .summary()
             .export_health()
-            .failed_records
+            .failed_records()
             .iter()
             .any(|source| source.code == ExportDiagnosticCode::AmbiguousIdentity),
         "compatible payloads do not invent an identity failure"

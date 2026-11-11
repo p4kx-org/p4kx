@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::HashSet;
+use std::sync::Arc;
 
-use p4kx_extraction::{CancelToken, Guid, SourceValue};
+use p4kx_extraction::{CancelToken, SourceValue, SourcedValue};
 
 use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
@@ -13,96 +14,43 @@ use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use super::assembly::Quantizer;
 use super::contract::{QualityOwner, QualityQuantizationResources, QuantizationEligibility};
 use super::evidence::Evidence;
-use super::resource_links::ResourceLinks;
-use super::{QualityRows, QuantizationUse, Retention};
+use super::fallbacks::Fallbacks;
+use super::link_index::{Links, Members};
+use super::{QualityRows, Retention, check_cancel};
 
-#[derive(Default)]
-struct Member {
-    decision: Evidence,
-    values: Evidence,
-}
-
-struct Links {
-    values: Vec<Guid>,
-    members: BTreeMap<Guid, Member>,
-    evidence: Evidence,
-}
-
-pub(super) fn fill<'f>(
-    rows: &mut QualityRows<'f>,
-    quantizers: &[Quantizer<'f>],
-    resources: &[ResourceLinks],
-    inventory: &Evidence,
+pub(super) fn fill<'source>(
+    rows: &mut QualityRows<'source>,
+    quantizers: &[Quantizer<'source>],
+    mut links: Links,
     origins: &CatalogOrigins,
     cancel: Option<&CancelToken>,
 ) -> Result<(), CatalogError> {
     let mut used = HashSet::new();
-    let mut all_links = HashMap::<Guid, HashSet<Guid>>::new();
-    for resource in resources {
-        for target in &resource.targets {
-            all_links
-                .entry(*target)
-                .or_default()
-                .insert(resource.resource);
-        }
-    }
     for quantizer in quantizers {
-        check(cancel)?;
-        let eligible = matches!(
-            quantizer.eligibility.result,
-            QuantizationEligibility::Eligible
-        );
-        let first = eligible && used.insert(quantizer.guid);
-        let links = if first {
-            all_links.remove(&quantizer.guid);
-            linked(quantizer.guid, resources, inventory, cancel)?
+        check_cancel(cancel)?;
+        let first = eligible(quantizer) && used.insert(quantizer.guid);
+        let members = if first {
+            links.take(quantizer.guid)
         } else {
-            Links {
-                values: Vec::new(),
-                members: BTreeMap::new(),
-                evidence: Evidence::default(),
-            }
+            Members::new()
         };
         if matches!(quantizer.retention, Retention::Leftover) && first {
-            rows.summary.unresolved_links += links.values.len();
+            rows.summary.unresolved_links += members.len();
         }
-        if !matches!(quantizer.retention, Retention::Selected) {
-            continue;
+        if matches!(quantizer.retention, Retention::Selected) {
+            let all = first.then_some(&links.inventory);
+            emit(rows, quantizer, members, all, quantizers, origins, cancel)?;
         }
-        emit(rows, quantizer, &links, first, quantizers, origins, cancel)?;
     }
-    rows.summary.unresolved_links += all_links.values().map(HashSet::len).sum::<usize>();
+    rows.summary.unresolved_links += links.unresolved();
     Ok(())
 }
 
-fn linked(
-    guid: Guid,
-    resources: &[ResourceLinks],
-    inventory: &Evidence,
-    cancel: Option<&CancelToken>,
-) -> Result<Links, CatalogError> {
-    let mut evidence = inventory.clone();
-    let mut values = Vec::new();
-    let mut members = BTreeMap::<Guid, Member>::new();
-    for resource in resources {
-        check(cancel)?;
-        evidence.append(&resource.evidence);
-        if resource.targets.contains(&guid) {
-            values.push(resource.resource);
-            evidence.keep(resource.guid_source.clone());
-            let member = members.entry(resource.resource).or_default();
-            member.decision.append(&resource.evidence);
-            member.values.keep(resource.guid_source.clone());
-        }
-    }
-    values.sort_unstable();
-    values.dedup();
-    values.sort_by_cached_key(|guid| CatalogGuid(*guid).text());
-    Ok(Links {
-        values,
-        members,
-        evidence,
-    })
+const fn eligible(quantizer: &Quantizer<'_>) -> bool {
+    matches!(
+        quantizer.eligibility.result,
+        QuantizationEligibility::Eligible
+    )
 }
 
 fn prefix(
@@ -113,8 +61,8 @@ fn prefix(
 ) -> Result<Evidence, CatalogError> {
     let mut result = Evidence::default();
     for candidate in candidates {
-        check(cancel)?;
-        result.append(&candidate.eligibility.admission);
+        check_cancel(cancel)?;
+        result.append(&candidate.eligibility.admission)?;
         result.header(
             &origins.record(candidate.record_index),
             RecordHeaderInput::Field(RecordHeaderField::Guid),
@@ -123,11 +71,8 @@ fn prefix(
         if candidate.guid != target.guid {
             continue;
         }
-        result.append(&candidate.eligibility.evidence);
-        if matches!(
-            candidate.eligibility.result,
-            QuantizationEligibility::Eligible
-        ) {
+        result.append(&candidate.eligibility.evidence)?;
+        if eligible(candidate) {
             break;
         }
     }
@@ -141,99 +86,102 @@ fn prefix(
     Ok(result)
 }
 
-fn emit<'f>(
-    rows: &mut QualityRows<'f>,
-    quantizer: &Quantizer<'f>,
-    links: &Links,
-    first: bool,
-    candidates: &[Quantizer<'f>],
+fn emit(
+    rows: &mut QualityRows<'_>,
+    quantizer: &Quantizer<'_>,
+    members: Members,
+    all: Option<&Evidence>,
+    candidates: &[Quantizer<'_>],
     origins: &CatalogOrigins,
     cancel: Option<&CancelToken>,
 ) -> Result<(), CatalogError> {
     let Some(owner) = quantizer.owner else {
         return Ok(());
     };
-    let context = origins.record(owner.record_index);
-    let eligible = matches!(
-        quantizer.eligibility.result,
-        QuantizationEligibility::Eligible
-    );
-    let mut evidence = if eligible {
+    let own = own_eligibility(quantizer)?;
+    let eligible = eligible(quantizer);
+    let selected = Arc::new(if eligible {
         prefix(quantizer, candidates, origins, cancel)?
     } else {
-        own_eligibility(quantizer)
-    };
-    let selected = evidence.clone();
-    if first {
-        evidence.append(&links.evidence);
+        own.copy()?
+    });
+    let mut aggregate = selected.copy()?;
+    if let Some(all) = all {
+        aggregate.append(all)?;
     }
-    let members = members(links, &selected, origins, cancel)?;
+    let cells = member_cells(
+        members,
+        &selected,
+        &mut aggregate,
+        &mut rows.fallbacks,
+        origins,
+        cancel,
+    )?;
     if eligible {
-        eligible_use(rows, owner, &links.values);
+        rows.summary.unused += usize::from(cells.is_empty());
     }
-    rows.inverse.push(QualityQuantizationResources {
+    rows.inverse.push(row(
+        owner,
+        quantizer.eligibility.result,
+        &own,
+        &aggregate,
+        cells,
+        origins,
+    )?);
+    Ok(())
+}
+
+fn row(
+    owner: QualityOwner<'_>,
+    eligibility: QuantizationEligibility,
+    own: &Evidence,
+    aggregate: &Evidence,
+    members: Vec<SourcedValue<CatalogGuid>>,
+    origins: &CatalogOrigins,
+) -> Result<QualityQuantizationResources, CatalogError> {
+    let context = origins.record(owner.record_index);
+    Ok(QualityQuantizationResources {
         physical_guid: owner.guid,
         physical_index: owner.record_index,
-        inputs: evidence.sources(origins)?,
-        complete: evidence.complete,
         guid: context.header_selector(RecordHeaderField::Guid, SourceValue::Present(owner.guid))?,
         record_index: context.header_selector(
             RecordHeaderField::RecordIndex,
             SourceValue::Present(owner.record_index),
         )?,
-        eligibility: own_eligibility(quantizer).value(origins, quantizer.eligibility.result)?,
-        resource_type_guids: evidence.value(origins, members)?,
-    });
-    Ok(())
+        eligibility: own.value(origins, eligibility),
+        resource_type_guids: aggregate.value(origins, members),
+    })
 }
 
-fn own_eligibility(quantizer: &Quantizer<'_>) -> Evidence {
-    let mut evidence = quantizer.eligibility.admission.clone();
-    evidence.append(&quantizer.eligibility.evidence);
-    evidence
+fn own_eligibility(quantizer: &Quantizer<'_>) -> Result<Evidence, CatalogError> {
+    let mut evidence = quantizer.eligibility.admission.copy()?;
+    evidence.append(&quantizer.eligibility.evidence)?;
+    Ok(evidence)
 }
 
-fn eligible_use<'f>(rows: &mut QualityRows<'f>, owner: QualityOwner<'f>, values: &[Guid]) {
-    rows.summary.unused += usize::from(values.is_empty());
-    rows.uses.push(QuantizationUse {
-        guid: owner.guid,
-        record_index: owner.record_index,
-        resource_type_guids: values.iter().copied().map(CatalogGuid).collect(),
-    });
-}
-
-fn members(
-    links: &Links,
-    decision: &Evidence,
+fn member_cells(
+    members: Members,
+    selected: &Arc<Evidence>,
+    aggregate: &mut Evidence,
+    fallbacks: &mut Fallbacks,
     origins: &CatalogOrigins,
     cancel: Option<&CancelToken>,
-) -> Result<Vec<p4kx_extraction::SourcedValue<CatalogGuid>>, CatalogError> {
-    links
-        .values
-        .iter()
-        .map(|guid| {
-            check(cancel)?;
-            let mut evidence = decision.clone();
-            let member = links
-                .members
-                .get(guid)
-                .ok_or(crate::ExportAccountingError::MissingFieldInspection)?;
-            evidence.append(&member.decision);
-            let mut uses = evidence.sources(origins)?;
-            uses.extend(member.values.sources(origins)?);
-            Ok(origins.uses.value(
-                SourceValue::Present(CatalogGuid(*guid)),
-                &uses,
-                evidence.complete && member.values.complete,
-            ))
-        })
-        .collect()
-}
-
-fn check(cancel: Option<&CancelToken>) -> Result<(), CatalogError> {
-    if cancel.is_some_and(CancelToken::is_cancelled) {
-        Err(CatalogError::Cancelled)
-    } else {
-        Ok(())
+) -> Result<Vec<SourcedValue<CatalogGuid>>, CatalogError> {
+    let mut ordered = members.into_iter().collect::<Vec<_>>();
+    ordered.sort_by_cached_key(|(guid, _)| CatalogGuid(*guid).text());
+    let mut cells = Vec::new();
+    cells
+        .try_reserve(ordered.len())
+        .map_err(CatalogError::SourceUseAllocation)?;
+    for (guid, member) in ordered {
+        check_cancel(cancel)?;
+        let mut relationship = member.decision;
+        relationship.append(&member.values)?;
+        aggregate.append(&member.values)?;
+        let mut exact = selected.copy()?;
+        exact.append(&relationship)?;
+        cells.push(exact.value(origins, CatalogGuid(guid)));
+        fallbacks.retain(guid, selected, relationship)?;
     }
+    Ok(cells)
 }

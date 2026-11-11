@@ -116,7 +116,7 @@ fn assert_projection_failure(numbers: Numbers, field: &str) -> TestResult {
     assert!(
         matches!(
             error.downcast_ref::<CatalogError>(),
-            Some(CatalogError::IncompleteExport { .. })
+            Some(CatalogError::IncompleteExport(_))
         ),
         "invalid numeric data blocks normal publication"
     );
@@ -138,17 +138,18 @@ fn assert_projection_failure(numbers: Numbers, field: &str) -> TestResult {
         .pointer("/exportHealth/diagnostics")
         .and_then(Value::as_array)
         .ok_or("the diagnostics")?;
+    let mut found = false;
+    for diagnostic in diagnostics {
+        let examples = diagnostic["examples"].as_array().ok_or("source examples")?;
+        for example in examples {
+            found |= crate::health_origin_assertions::example_text(&catalog, example, "field")?
+                == Some(&serde_json::json!(field))
+                && crate::health_origin_assertions::example_text(&catalog, example, "sourceType")?
+                    == Some(&serde_json::json!("CraftingQualityDistributionNormal"));
+        }
+    }
     assert!(
-        diagnostics
-            .iter()
-            .any(
-                |diagnostic| diagnostic["examples"].as_array().is_some_and(|examples| {
-                    examples.iter().any(|example| {
-                        example["field"] == field
-                            && example["sourceType"] == "CraftingQualityDistributionNormal"
-                    })
-                })
-            ),
+        found,
         "the failure retains its source struct and exact field"
     );
     assert_quality_failure_health(&catalog)

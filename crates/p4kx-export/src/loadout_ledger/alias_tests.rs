@@ -37,7 +37,7 @@ fn wanted_uses_the_actual_physical_item_instead_of_its_guid_alias() -> TestResul
         },
         &capture,
     )
-    .map_err(|failure| failure.reason)?
+    .map_err(|failure| failure.reason().to_owned())?
     .ok_or("loadout missing")?;
     assert_eq!(
         row.ports.first().ok_or("port missing")?.name,
@@ -75,7 +75,7 @@ fn a_wanted_index_with_a_different_guid_fails_accounting_without_a_fake_read() -
         },
         &capture,
     )
-    .map_err(|failure| failure.reason)?;
+    .map_err(|failure| failure.reason().to_owned())?;
     assert!(
         row.is_none(),
         "no row is fabricated for a mismatched selected identity"

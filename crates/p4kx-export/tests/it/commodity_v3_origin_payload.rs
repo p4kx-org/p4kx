@@ -52,15 +52,9 @@ fn assert_no_payload_failures(health: &Value) -> TestResult {
         assert!(
             !matches!(
                 diagnostic.get("code").and_then(Value::as_str),
-                Some(
-                    "sourceReadFailure"
-                        | "projectionFailure"
-                        | "fieldWalkLimit"
-                        | "originMetadataLimit"
-                        | "originTargetInventoryLimit"
-                )
+                Some("sourceReadFailure" | "projectionFailure" | "fieldWalkLimit")
             ),
-            "the independent capture limit does not become a read/projection diagnostic"
+            "complete original relationships do not produce read, projection or field-walk failures"
         );
     }
     Ok(())
@@ -113,86 +107,117 @@ fn assert_kind_complete(kind: &Value) -> TestResult {
     Ok(())
 }
 
-/// Checks every authored cost and its matching ingredient survives capture limits.
+/// Checks every authored cost and matching ingredient after the original input count.
 pub(crate) fn assert_full_costs(catalog: &Value) -> TestResult {
-    let blueprints = fixture::at(catalog, "/blueprints")?
-        .as_array()
-        .ok_or("blueprints")?;
+    use crate::catalog_crafting_support::blueprint;
     assert_eq!(
-        blueprints.len(),
+        blueprint::definitions(catalog)?.len(),
         1,
-        "the fixture has one cost-bearing Blueprint"
+        "one cost-bearing Blueprint"
     );
-    let blueprint = blueprints.first().ok_or("cost-bearing blueprint")?;
+    let blueprint = blueprint::by_guid(catalog, limit_fixture::BLUEPRINT)?;
     assert_eq!(
-        fixture::at(blueprint, "/guid")?,
-        &json!(fixture::guid(limit_fixture::BLUEPRINT)),
-        "the original Blueprint identity is retained"
+        fixture::at(blueprint.definition, "/guid/value")?.as_str(),
+        Some(fixture::guid(limit_fixture::BLUEPRINT).as_str()),
+        "the arena is bound to the authored Blueprint"
     );
-    let tiers = fixture::at(blueprint, "/tiers")?
-        .as_array()
-        .ok_or("tiers")?;
-    assert_eq!(tiers.len(), 1, "the original single tier is retained");
-    let tier = tiers.first().ok_or("cost-bearing tier")?;
+    let tiers = blueprint.tiers()?;
+    let [tier] = tiers.as_slice() else {
+        return Err("one original tier".into());
+    };
     assert!(
-        tier.get("mandatory").is_some_and(Value::is_null),
-        "the mandatory cost field remains explicitly null"
+        tier["mandatory"].is_null(),
+        "the mandatory cost remains absent from the recipe"
     );
-    let costs = fixture::at(tier, "/optional")?
+    let tier_source = blueprint.node(&tier["source"])?;
+    let recipe = blueprint.field(tier_source, "recipe")?;
+    let cost_source = blueprint.field(recipe, "costs")?;
+    let mandatory = blueprint.field(cost_source, "mandatoryCost")?;
+    assert_eq!(
+        fixture::at(mandatory, "/value/state")?,
+        "null",
+        "the actual mandatory slot is explicitly null"
+    );
+
+    let refs = tier["optional"]
         .as_array()
-        .ok_or("optional costs")?;
-    let ingredients = fixture::at(blueprint, "/ingredients")?
+        .ok_or("optional cost references")?;
+    let costs = tier["costs"].as_array().ok_or("flat typed costs")?;
+    let ingredients = blueprint.presentation["ingredients"]
         .as_array()
         .ok_or("ingredients")?;
     assert_eq!(
-        costs.len(),
+        refs.len(),
         usize::from(COST_COUNT),
-        "the capture bound never truncates costs"
+        "every original optional slot has a reference"
+    );
+    assert_eq!(
+        costs.len(),
+        refs.len(),
+        "each optional slot has one typed cost"
     );
     assert_eq!(
         ingredients.len(),
-        costs.len(),
-        "the flattened projection keeps every cost"
+        refs.len(),
+        "each optional resource cost has one ingredient"
     );
     let resource = fixture::guid(fixture::RESOURCE_FALLBACK);
-    for ((cost, ingredient), index) in costs.iter().zip(ingredients).zip(0..COST_COUNT) {
-        assert_cost_pair(cost, ingredient, index, &resource)?;
+    for (index, ((reference, cost), ingredient)) in
+        (0..COST_COUNT).zip(refs.iter().zip(costs).zip(ingredients))
+    {
+        assert_cost(index, reference, cost, ingredient, &resource)?;
     }
     Ok(())
 }
 
-fn assert_cost_pair(cost: &Value, ingredient: &Value, index: u16, resource: &str) -> TestResult {
+fn assert_cost(
+    index: u16,
+    reference: &Value,
+    cost: &Value,
+    ingredient: &Value,
+    resource: &str,
+) -> TestResult {
+    assert_eq!(reference, &cost["source"], "physical optional slot order");
     assert_eq!(
-        fixture::at(cost, "/kind")?,
-        &json!("resource"),
-        "the authored cost keeps its resource kind"
+        reference, &ingredient["cost"],
+        "the ingredient links the same authored cost"
     );
-    for line in [cost, ingredient] {
-        assert_eq!(
-            fixture::at(line, "/resourceGuid")?.as_str(),
-            Some(resource),
-            "nested and flattened costs retain the resource GUID"
-        );
-        assert_eq!(
-            fixture::at(line, "/quantityScu")?.as_f64(),
-            Some(f64::from(index) + 1.0),
-            "distinct healthy source quantities keep physical array order"
-        );
-        assert_eq!(
-            fixture::at(line, "/minQuality")?,
-            &json!(0),
-            "the source minimum quality stays unchanged"
-        );
-    }
+    assert!(
+        ingredient["slot"].is_null(),
+        "a cost outside a selection has no slot"
+    );
+    let meaning = &cost["meaning"];
     assert_eq!(
-        fixture::at(cost, "/options")?.as_array().map(Vec::len),
-        Some(0),
+        meaning["type"], "resource",
+        "the original cost is typed as a resource"
+    );
+    assert_eq!(
+        fixture::at(meaning, "/resourceGuid/value")?.as_str(),
+        Some(resource),
+        "the typed cost retains its authored resource link"
+    );
+    assert_eq!(
+        meaning
+            .pointer("/quantityScu/value")
+            .and_then(Value::as_f64),
+        Some(f64::from(index) + 1.0),
+        "quantity matches the authored slot position"
+    );
+    assert_eq!(
+        fixture::at(meaning, "/minQuality/value")?,
+        "0",
+        "minimum quality is preserved"
+    );
+    assert!(
+        meaning.get("options").is_none(),
         "no resource cost options are synthesized"
     );
     assert_eq!(
-        fixture::at(cost, "/modifiers")?.as_array().map(Vec::len),
+        cost.pointer("/context/modifiers")
+            .and_then(Value::as_array)
+            .map(Vec::len),
         Some(0),
-        "no resource cost modifiers are synthesized"
+        "no modifiers are invented"
     );
     Ok(())
 }

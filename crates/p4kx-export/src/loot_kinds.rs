@@ -4,11 +4,12 @@
 use p4kx_extraction::RecordTree;
 
 use crate::Kind;
-use crate::contract_loot::{LootArchetype, LootPoolFilter, LootTable};
+use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
+use crate::contract_loot::{LootArchetype, LootTable};
 use crate::contract_loot_legacy::{LegacyLootArchetype, LegacyLootTable};
 use crate::guid_text::sort_by_guid;
 use crate::loot_legacy::{legacy_archetype, legacy_table};
-use crate::loot_records::{loot_archetype, loot_table, pool_filter};
+use crate::loot_records::{loot_archetype, loot_table};
 
 /// An entity of one of the loot kinds.
 pub(crate) enum LootPick<'f> {
@@ -17,7 +18,7 @@ pub(crate) enum LootPick<'f> {
     /// A loot archetype.
     Archetype(LootArchetype<'f>),
     /// A pool filter.
-    Filter(LootPoolFilter<'f>),
+    Filter(Box<LootFilterDefinition<'f>>),
     /// An older loot table.
     LegacyTable(LegacyLootTable<'f>),
     /// An older loot archetype.
@@ -31,7 +32,6 @@ impl<'f> LootPick<'f> {
         Some(match kind {
             Kind::LootTables => Self::Table(loot_table(tree)),
             Kind::LootArchetypes => Self::Archetype(loot_archetype(tree)),
-            Kind::LootPoolFilters => Self::Filter(pool_filter(tree)),
             Kind::LegacyLootTables => Self::LegacyTable(legacy_table(tree)),
             Kind::LegacyLootArchetypes => Self::LegacyArchetype(legacy_archetype(tree)),
             _ => return None,
@@ -44,7 +44,7 @@ impl<'f> LootPick<'f> {
 pub(crate) struct LootKinds<'f> {
     pub(crate) tables: Vec<LootTable<'f>>,
     pub(crate) archetypes: Vec<LootArchetype<'f>>,
-    pub(crate) filters: Vec<LootPoolFilter<'f>>,
+    pub(crate) filters: Vec<LootFilterDefinition<'f>>,
     pub(crate) legacy_tables: Vec<LegacyLootTable<'f>>,
     pub(crate) legacy_archetypes: Vec<LegacyLootArchetype<'f>>,
 }
@@ -55,7 +55,7 @@ impl<'f> LootKinds<'f> {
         match pick {
             LootPick::Table(entity) => self.tables.push(entity),
             LootPick::Archetype(entity) => self.archetypes.push(entity),
-            LootPick::Filter(entity) => self.filters.push(entity),
+            LootPick::Filter(entity) => self.filters.push(*entity),
             LootPick::LegacyTable(entity) => self.legacy_tables.push(entity),
             LootPick::LegacyArchetype(entity) => self.legacy_archetypes.push(entity),
         }
@@ -65,7 +65,7 @@ impl<'f> LootKinds<'f> {
     pub(crate) fn order(&mut self) {
         sort_by_guid(&mut self.tables, |entity| entity.guid);
         sort_by_guid(&mut self.archetypes, |entity| entity.guid);
-        sort_by_guid(&mut self.filters, |entity| entity.guid);
+        sort_by_guid(&mut self.filters, |entity| entity.physical_guid);
         sort_by_guid(&mut self.legacy_tables, |entity| entity.guid);
         sort_by_guid(&mut self.legacy_archetypes, |entity| entity.guid);
     }

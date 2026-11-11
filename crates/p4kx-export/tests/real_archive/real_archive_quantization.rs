@@ -51,7 +51,7 @@ fn the_quality_quantizations_of_a_real_archive_link_to_resource_types() -> TestR
             .summary()
             .failures()
             .iter()
-            .all(|failure| !failure.record_path.contains("qualityquantization")),
+            .all(|failure| !failure.record_path().contains("qualityquantization")),
         "every Record is readable"
     );
 
@@ -157,7 +157,7 @@ fn the_quality_quantizations_of_a_real_archive_link_to_resource_types() -> TestR
             .summary()
             .failures()
             .iter()
-            .all(|failure| !linked.contains(&failure.guid.to_string())),
+            .all(|failure| !linked.contains(failure.guid())),
         "no linked ResourceType is a failure"
     );
     let summary = built.summary().quantizations();

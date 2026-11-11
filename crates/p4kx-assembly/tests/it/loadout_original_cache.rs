@@ -151,13 +151,16 @@ impl Probe {
 impl LoadoutReadObserver for Probe {
     fn observe(&self, event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()> {
         let result = match event {
-            LoadoutReadEvent::FileRead {
-                source, outcome, ..
-            } => self.read(source, outcome),
-            LoadoutReadEvent::FileProjection {
-                source, outcome, ..
-            } => self.projected(source, outcome),
-            LoadoutReadEvent::FileReused { observation } => self.reused(observation),
+            LoadoutReadEvent::FileRead { observation, .. } => {
+                self.read(observation.source(), observation.read_outcome())
+            }
+            LoadoutReadEvent::FileProjection { observation, .. } => {
+                observation.projection_outcome().map_or_else(
+                    || Err("a genuine projection callback retains its actual parse outcome".into()),
+                    |outcome| self.projected(observation.source(), outcome),
+                )
+            }
+            LoadoutReadEvent::FileReused { observation, .. } => self.reused(observation),
             _ => Ok(()),
         };
         assert!(

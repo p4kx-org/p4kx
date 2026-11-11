@@ -17,6 +17,7 @@ use crate::{MediaError, MediaWriter, origin_error};
 #[derive(Clone, Copy)]
 pub(crate) struct OriginSite<'a> {
     namespace: &'a str,
+    prefix: &'a [u64],
     indices: &'a [u64],
     field: &'a str,
 }
@@ -25,8 +26,21 @@ impl<'a> OriginSite<'a> {
     pub(crate) const fn new(namespace: &'a str, indices: &'a [u64], field: &'a str) -> Self {
         Self {
             namespace,
+            prefix: &[],
             indices,
             field,
+        }
+    }
+
+    pub(crate) const fn prefixed<'prefix>(self, prefix: &'prefix [u64]) -> OriginSite<'prefix>
+    where
+        'a: 'prefix,
+    {
+        OriginSite {
+            namespace: self.namespace,
+            prefix,
+            indices: self.indices,
+            field: self.field,
         }
     }
 
@@ -38,7 +52,8 @@ impl<'a> OriginSite<'a> {
             .and_then(|size| {
                 self.indices
                     .len()
-                    .checked_mul(size_of::<u64>())
+                    .checked_add(self.prefix.len())
+                    .and_then(|length| length.checked_mul(size_of::<u64>()))
                     .and_then(|indices| size.checked_add(indices))
             });
         !self.namespace.is_empty()
@@ -108,7 +123,7 @@ impl OriginCapture {
             original.at(
                 SourceLocation::Subresource {
                     namespace: site.namespace.to_owned(),
-                    indices: site.indices.to_vec(),
+                    indices: site.prefix.iter().chain(site.indices).copied().collect(),
                     field: site.field.to_owned(),
                 },
                 role,

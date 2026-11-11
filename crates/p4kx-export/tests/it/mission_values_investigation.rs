@@ -6,17 +6,25 @@ use serde_json::{Value, json};
 
 use crate::mission_values_fixture::{self as fixture, Owner, TestResult};
 
+#[path = "mission_values_canonical_investigation.rs"]
+mod canonical;
+
 #[test]
 fn investigation_keeps_all_clue_variants_and_owner_local_non_property_weak_links() -> TestResult {
     for owner in [Owner::Generator, Owner::Template, Owner::Broker] {
-        let document = fixture::build(
-            &fixture::database(
-                vec![fixture::property("Case", fixture::investigation())],
-                owner,
-            ),
-            CatalogPublicationMode::Normal,
-        )?;
-        let case = fixture::value(&document, owner, "Case")?;
+        let builder = fixture::database(
+            vec![fixture::property("Case", fixture::investigation())],
+            owner,
+        );
+        if matches!(owner, Owner::Template) {
+            crate::mission_template_original::owner_is_first(&builder)?;
+        }
+        let document = fixture::build(&builder, CatalogPublicationMode::Normal)?;
+        if !matches!(owner, Owner::Generator) {
+            canonical::verify(&document, owner)?;
+            continue;
+        }
+        let case = fixture::generator_value(&document, "Case")?;
         verify_investigation_fields(case)?;
         verify_items(case)?;
     }

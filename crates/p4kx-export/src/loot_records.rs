@@ -3,18 +3,10 @@
 
 use p4kx_extraction::{RecordTree, StructValue};
 
-use crate::contract_loot::{
-    LootArchetype, LootConfig, LootPoolFilter, LootTable, LootTableEntry, PoolFilterInstance,
-    PoolFilterNode,
-};
+use crate::contract_loot::{LootArchetype, LootConfig, LootTable, LootTableEntry};
 use crate::guid_text::CatalogGuid;
 use crate::loot_entry::{archetype_entries, optional_integer, optional_number, quantity};
-use crate::record_fields::{
-    class_name, integer, number, reference, references, structs, structure, text,
-};
-
-/// The deepest chain of filters inside filters that is followed.
-const MAX_FILTER_DEPTH: usize = 16;
+use crate::record_fields::{class_name, integer, number, reference, structs, structure, text};
 
 /// Returns the loot table the Record tree `tree` describes.
 pub(crate) fn loot_table<'f>(tree: &RecordTree<'f>) -> LootTable<'f> {
@@ -53,40 +45,6 @@ pub(crate) fn loot_archetype<'f>(tree: &RecordTree<'f>) -> LootArchetype<'f> {
         record_path: tree.record_path(),
         entries: archetype_entries(archetype),
     }
-}
-
-/// Returns the pool filter the Record tree `tree` describes.
-pub(crate) fn pool_filter<'f>(tree: &RecordTree<'f>) -> LootPoolFilter<'f> {
-    LootPoolFilter {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        filter: filter_node(structure(Some(tree.root()), "filter"), 0),
-    }
-}
-
-fn filter_node<'f>(node: Option<&StructValue<'f>>, depth: usize) -> Option<PoolFilterNode<'f>> {
-    let node = node?;
-    let value = Some(node);
-    let term = structure(value, "tagFilter");
-    Some(PoolFilterNode {
-        node_type: node.type_name(),
-        filter_guid: reference(value, "filterRecord"),
-        positive_tag_guids: references(term, "positiveTags"),
-        negative_tag_guids: references(term, "negativeTags"),
-        filters: if depth < MAX_FILTER_DEPTH {
-            structs(value, "filters")
-                .map(|instance| PoolFilterInstance {
-                    name: text(Some(instance), "name"),
-                    mode: text(Some(instance), "mode"),
-                    filter: filter_node(structure(Some(instance), "filter"), depth + 1)
-                        .map(Box::new),
-                })
-                .collect()
-        } else {
-            Vec::new()
-        },
-    })
 }
 
 /// Returns the loot the struct `config` (a `LootConfig`) generates, `None` for no struct.

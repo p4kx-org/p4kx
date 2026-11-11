@@ -191,7 +191,7 @@ fn check_requirement(requirement: &Value, [factions, scopes, standings]: [&HashS
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn a_contract_of_a_real_archive_names_its_type_and_standing_range() -> TestResult {
     let catalog = catalog()?;
-    let contracts = list(&catalog, "contracts")?;
+    let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let types = guids(&catalog, "missionTypes")?;
     let standings = guids(&catalog, "reputationStandings")?;
     let scopes = guids(&catalog, "reputationScopes")?;

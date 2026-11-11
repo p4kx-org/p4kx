@@ -81,7 +81,10 @@ fn open(dir: &Path, entries: Vec<TestEntry>) -> Archive {
 
 fn read(dir: &Path, entries: Vec<TestEntry>, limits: Limits) -> Placements {
     let archive = open(dir, entries);
-    Placements::read_within(&archive, None, limits).expect("placements")
+    crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        Placements::read_within(&archive, None, limits, capture)
+    })
+    .expect("placements")
 }
 
 fn system(xml: &str, others: &[(&str, String)]) -> Vec<TestEntry> {
@@ -270,14 +273,18 @@ fn a_container_instanced_several_times_is_parsed_once() {
     let index = Index::new(&archive);
     let roots: Vec<usize> = index.systems().iter().map(|(_, entry)| *entry).collect();
     let limits = Limits::default();
-    let read = read_all(
-        &archive,
-        &index,
-        &roots,
-        None,
-        limits.external,
-        (limits.depth, limits.children),
-    );
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        read_all(
+            &archive,
+            &index,
+            &roots,
+            None,
+            limits.external,
+            (limits.depth, limits.children),
+            capture,
+        )
+    })
+    .expect("original Entry capture");
     assert_eq!(read.parsed, 3, "the system, the ring and the leaf");
     assert_eq!(read.bodies.len(), 3, "each held once");
 }

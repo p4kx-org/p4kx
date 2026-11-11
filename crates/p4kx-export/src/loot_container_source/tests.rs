@@ -30,7 +30,9 @@ fn malformed_xml_does_not_hide_a_later_readable_entity() -> TestResult {
             r#"<Entity objectContainer="next.socpak"/>"#,
         ));
     let (_folder, archive) = opened(&container)?;
-    let read = super::read(&archive, 0);
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        super::read(&archive, 0, capture)
+    })?;
     assert!(
         matches!(read.unreadable, Some(Unreadable::EntityXml(_))),
         "parse failure is reported"
@@ -64,16 +66,21 @@ fn a_malformed_config_keeps_other_declared_links_with_field_diagnostics() -> Tes
         r#"<Entity objectContainer="next.socpak" multiConfigRef="invalid"/>"#,
     ));
     let (_folder, archive) = opened(&container)?;
-    let read = super::read(&archive, 0);
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        super::read(&archive, 0, capture)
+    })?;
     let [(_, link)] = read.links.as_slice() else {
         return Err("one partially projected source expected".into());
     };
     assert_eq!(
-        link.container.as_deref(),
+        link.value().container.as_deref(),
         Some("next.socpak"),
         "valid link survives"
     );
-    assert!(link.malformed_config, "invalid populated GUID is explicit");
+    assert!(
+        link.value().malformed_config,
+        "invalid populated GUID is explicit"
+    );
     let [_, source] = read.ledger.entries.as_slice() else {
         return Err("outer plus source expected".into());
     };
@@ -88,7 +95,7 @@ fn a_malformed_config_keeps_other_declared_links_with_field_diagnostics() -> Tes
         "stable field code"
     );
     assert_eq!(
-        source.diagnosis.field.as_deref(),
+        source.diagnosis.accounting_field(source.path.as_str()),
         Some("multiConfigRef"),
         "actual field location"
     );
@@ -101,7 +108,9 @@ fn duplicate_paths_preserve_distinct_physical_entry_indices() -> TestResult {
         .entry(TestEntry::stored("entdata/same.entxml", "<Entity/>"))
         .entry(TestEntry::stored("entdata/same.entxml", "invalid"));
     let (_folder, archive) = opened(&container)?;
-    let read = super::read(&archive, 0);
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        super::read(&archive, 0, capture)
+    })?;
     let [_, first, second] = read.ledger.entries.as_slice() else {
         return Err("both physical source Entries expected".into());
     };

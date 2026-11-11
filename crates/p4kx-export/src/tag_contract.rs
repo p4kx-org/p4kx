@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::header::TagHeader;
+use super::path_row::TagPath;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::guid_text::CatalogGuid;
 use crate::schema_fields::every_field_required;
@@ -40,35 +41,6 @@ pub(crate) struct EntityTags<'source> {
     #[serde(flatten)]
     pub(crate) source: TagHeader<'source>,
     pub(crate) tags: SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>,
-}
-
-/// The selected parent of a first-depth-first convenience path.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(
-    tag = "type",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase"
-)]
-#[schemars(transform = every_field_required)]
-pub(crate) enum TagPathParent {
-    Root,
-    Tag {
-        guid: SourcedValue<CatalogGuid>,
-        record_index: SourcedValue<u32>,
-    },
-}
-
-/// One first-selected, cycle-cut convenience path; authored edges remain authoritative.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct TagPath {
-    pub(crate) guid: SourcedValue<CatalogGuid>,
-    pub(crate) record_index: SourcedValue<u32>,
-    pub(crate) path: SourcedValue<String>,
-    pub(crate) depth: SourcedValue<u32>,
-    pub(crate) listed: SourcedValue<bool>,
-    pub(crate) parent: SourcedValue<TagPathParent>,
 }
 
 /// Prepared rows and stable source keys used for accounting and sorting.

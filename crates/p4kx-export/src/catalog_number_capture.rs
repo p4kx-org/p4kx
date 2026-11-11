@@ -4,8 +4,10 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
-use crate::resource_raw_policy::ResourceNumberContract;
 use p4kx_extraction::Value;
+
+use crate::catalog_read::original::OriginalValueSite;
+use crate::resource_raw_policy::ResourceNumberContract;
 
 /// Exact scalar storage of one nonfinite source number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -24,20 +26,37 @@ impl FloatToken {
     }
 }
 
+/// The actual emitted named field or original value occurrence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum NumberOccurrence {
+    NamedField,
+    LootValue { ordinal: u64 },
+    BlueprintValue { ordinal: u64 },
+    TemplateValue { ordinal: u64 },
+}
+
 /// A lossless numeric token retained by the actual raw-field reader.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CapturedNumber {
     pub(crate) record_index: u32,
+    pub(crate) occurrence: NumberOccurrence,
     pub(crate) field: String,
     pub(crate) token: FloatToken,
     pub(crate) source_type: String,
     pub(crate) contract: ResourceNumberContract,
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct CapturedPosition {
+    record_index: u32,
+    occurrence: NumberOccurrence,
+    field: String,
+}
+
 /// Local evidence committed only with its successfully returned canonical definition.
 #[derive(Default)]
 pub(crate) struct NumberCapture {
-    values: RefCell<BTreeMap<(u32, String), CapturedScalar>>,
+    values: RefCell<BTreeMap<CapturedPosition, CapturedScalar>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,10 +75,68 @@ impl NumberCapture {
         contract: ResourceNumberContract,
         value: &Value<'_>,
     ) {
+        self.retain_at(
+            record_index,
+            NumberOccurrence::NamedField,
+            field,
+            source_type,
+            contract,
+            value,
+        );
+    }
+
+    /// Retains a nonfinite token only from this actual original Loot value visit.
+    pub(crate) fn retain_loot(&self, site: &OriginalValueSite<'_, '_, '_, '_>) {
+        self.retain_original(
+            site,
+            NumberOccurrence::LootValue {
+                ordinal: site.ordinal(),
+            },
+        );
+    }
+
+    /// Retains a nonfinite token from this actual original Blueprint value visit.
+    pub(crate) fn retain_blueprint(&self, site: &OriginalValueSite<'_, '_, '_, '_>) {
+        self.retain_original(
+            site,
+            NumberOccurrence::BlueprintValue {
+                ordinal: site.ordinal(),
+            },
+        );
+    }
+
+    fn retain_original(
+        &self,
+        site: &OriginalValueSite<'_, '_, '_, '_>,
+        occurrence: NumberOccurrence,
+    ) {
+        self.retain_at(
+            site.record_index(),
+            occurrence,
+            || site.logical_path().to_owned(),
+            site.owner_type(),
+            ResourceNumberContract::Number,
+            site.value(),
+        );
+    }
+
+    fn retain_at(
+        &self,
+        record_index: u32,
+        occurrence: NumberOccurrence,
+        field: impl FnOnce() -> String,
+        source_type: &str,
+        contract: ResourceNumberContract,
+        value: &Value<'_>,
+    ) {
         if let Some(token) = FloatToken::read(value) {
             self.values
                 .borrow_mut()
-                .entry((record_index, field()))
+                .entry(CapturedPosition {
+                    record_index,
+                    occurrence,
+                    field: field(),
+                })
                 .or_insert_with(|| CapturedScalar {
                     source_type: source_type.to_owned(),
                     contract,
@@ -72,9 +149,10 @@ impl NumberCapture {
         self.values
             .into_inner()
             .into_iter()
-            .map(|((record_index, field), scalar)| CapturedNumber {
-                record_index,
-                field,
+            .map(|(position, scalar)| CapturedNumber {
+                record_index: position.record_index,
+                occurrence: position.occurrence,
+                field: position.field,
                 source_type: scalar.source_type,
                 contract: scalar.contract,
                 token: scalar.token,
@@ -86,3 +164,7 @@ impl NumberCapture {
 #[cfg(test)]
 #[path = "catalog_number_capture_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "catalog_number_occurrence_tests.rs"]
+mod occurrence_tests;

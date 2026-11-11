@@ -6,6 +6,7 @@ use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestT
 
 use crate::crafting::ledger::{ReadMode, read, read_catalog};
 use crate::export_diagnostic::ExportSourceRole;
+use crate::export_field_inspection::FieldInspection;
 use crate::export_ledger::SourceDisposition;
 use crate::{CatalogError, Kind};
 
@@ -95,14 +96,20 @@ fn a_selected_resource_dangling_link_keeps_its_actual_read_and_the_existing_coun
         .field_inspections
         .first()
         .ok_or("the retained source field evidence")?;
-    let expected = format!("00000000-0000-0000-0000-{MISSING:012x}");
-    assert!(
-        proof
-            .unresolved_references
-            .iter()
-            .any(|reference| reference.target_guid.as_deref() == Some(expected.as_str()))
-    );
+    assert_dangling_reference(proof);
     Ok(())
+}
+
+fn assert_dangling_reference(proof: &FieldInspection) {
+    let expected = format!("00000000-0000-0000-0000-{MISSING:012x}");
+    assert!(proof.unresolved_references.iter().any(|reference| {
+        reference
+            .data()
+            .target_guid
+            .map(|guid| guid.to_string())
+            .as_deref()
+            == Some(expected.as_str())
+    }));
 }
 
 fn quantization(builder: DataForgeBuilder) -> DataForgeBuilder {

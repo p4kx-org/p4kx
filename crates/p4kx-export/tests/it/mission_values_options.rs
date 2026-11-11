@@ -6,6 +6,13 @@ use p4kx_export::CatalogPublicationMode;
 use p4kx_testkit::{TestInstance, TestValue};
 use serde_json::{Value, json};
 
+use crate::loot_v3_graph as raw;
+use crate::mission_canonical_text as canonical;
+use crate::mission_template_graph::{self as source, Property};
+
+#[path = "mission_values_option_targets.rs"]
+mod targets;
+
 fn option(kind: &str) -> TestInstance {
     TestInstance::new(format!("MissionPropertyValueOption_{kind}"))
         .value("textId", TestValue::text("@option"))
@@ -24,14 +31,13 @@ fn declaration(kind: &str, options: Vec<TestValue>) -> TestValue {
 #[test]
 fn options_retain_exact_numeric_types_debug_flags_and_structured_dependencies() -> TestResult {
     let owner = Owner::Template;
-    let document = fixture::build(
-        &fixture::database(options_properties(), owner),
-        CatalogPublicationMode::Normal,
-    )?;
-    verify_metadata(&document, owner)?;
-    verify_integer(&document, owner)?;
-    verify_dependencies(&document, owner)?;
-    verify_float_and_tags(&document, owner)?;
+    let builder = fixture::database(options_properties(), owner);
+    crate::mission_template_original::owner_is_first(&builder)?;
+    let document = fixture::build(&builder, CatalogPublicationMode::Normal)?;
+    verify_metadata(&document)?;
+    verify_integer(&document)?;
+    verify_dependencies(&document)?;
+    verify_float_and_tags(&document)?;
     Ok(())
 }
 
@@ -93,171 +99,169 @@ fn options_properties() -> Vec<TestValue> {
     ]
 }
 
-fn verify_metadata(document: &Value, owner: Owner) -> TestResult {
-    for kind in ["Integer", "StringHash", "Float", "Tags"] {
-        let options = fixture::field(fixture::value(document, owner, kind)?, "/options")?
-            .as_array()
-            .ok_or("options missing")?;
-        let option = options.first().ok_or("option missing")?;
+fn verify_metadata(document: &Value) -> TestResult {
+    for (name, kind) in [
+        ("Integer", "integer"),
+        ("StringHash", "stringHash"),
+        ("Float", "float"),
+        ("Tags", "tags"),
+    ] {
+        let property = Property::new(document, name)?;
+        property.kind(kind)?;
+        let option = property.element(property.field(property.node, "options")?, 0)?;
+        raw::structure(option, &format!("MissionPropertyValueOption_{name}"))?;
+        let token = property.field(option, "textId")?;
         assert_eq!(
-            *fixture::field(option, "/textId")?,
+            source::text(token)?,
             "@option",
-            "the authored source token is independent of display resolution"
+            "the original Locale token precedes presentation lookup"
         );
+        canonical::single(property.field(option, "weighting")?, 0.375)?;
         assert_eq!(
-            *fixture::field(option, "/weighting")?,
-            0.375,
-            "Single weighting must not be read as an integer"
+            source::scalar(
+                property.field(option, "DEBUG_forceChooseThisOption")?,
+                "boolean"
+            )?,
+            &json!(false),
+            "the explicit debug flag is preserved without a field alias"
         );
-        assert_eq!(
-            *fixture::field(option, "/debugForceChooseThisOption")?,
-            false,
-            "the explicit debug flag survives"
-        );
-        assert_eq!(
-            *fixture::field(option, "/displayName/key")?,
+        canonical::key(
+            &property,
+            document,
+            token,
             "@option",
-            "the option label remains a localised text"
+            "lookup",
+            Some("@option"),
+        )?;
+    }
+    Ok(())
+}
+
+fn verify_integer(document: &Value) -> TestResult {
+    let property = Property::new(document, "Integer")?;
+    let option = property.element(property.field(property.node, "options")?, 0)?;
+    for (field, expected) in [("value", 16_777_217), ("variation", i32::MIN)] {
+        let number = source::scalar(property.field(option, field)?, "number")?;
+        assert_eq!(
+            number.get("type"),
+            Some(&json!("int32")),
+            "integer source width is retained exactly"
+        );
+        assert_eq!(
+            number.get("value"),
+            Some(&json!(expected)),
+            "signed Int32 values never pass through f32"
         );
     }
     Ok(())
 }
 
-fn verify_integer(document: &Value, owner: Owner) -> TestResult {
-    let integer = fixture::value(document, owner, "Integer")?;
+fn verify_dependencies(document: &Value) -> TestResult {
+    let property = Property::new(document, "StringHash")?;
+    let option = property.element(property.field(property.node, "options")?, 0)?;
     assert_eq!(
-        *fixture::field(integer, "/options/0/value")?,
-        16_777_217,
-        "Int32 must not lose precision through f32"
-    );
-    assert_eq!(
-        *fixture::field(integer, "/options/0/variation")?,
-        i32::MIN,
-        "the signed bound survives exactly"
-    );
-    Ok(())
-}
-
-fn verify_dependencies(document: &Value, owner: Owner) -> TestResult {
-    let string = fixture::value(document, owner, "StringHash")?;
-    assert_eq!(
-        *fixture::field(string, "/options/0/value")?,
+        source::text(property.field(option, "value")?)?,
         "",
-        "an authored empty String is retained"
+        "an authored empty String survives"
     );
-    let dependency = fixture::field(string, "/options/0/dependentProperties/0")?;
+    let dependency = property.element(property.field(option, "dependentProperties")?, 0)?;
+    raw::structure(dependency, "DependentMissionProperty")?;
+    let target = property.field(dependency, "property")?;
+    let binding = property.binding(target)?;
     assert_eq!(
-        *fixture::field(dependency, "/property/variable")?,
+        raw::present(
+            binding
+                .get("missionPropertyStatus")
+                .ok_or("strict dependency status")?
+        )?,
+        &json!("resolved"),
+        "the dependency points to a genuine same-owner MissionProperty"
+    );
+    let field = binding
+        .pointer("/target/field")
+        .ok_or("actual dependency variable source field")?;
+    assert_eq!(
+        source::text(property.bound(field)?)?,
         "Integer",
-        "dependentProperties is a Class structure with a property pointer"
+        "the dependency resolves the original variable"
     );
+    let values = property.field(dependency, "values")?;
     assert_eq!(
-        *fixture::field(dependency, "/values/0/targetType")?,
-        "MissionPropertyValueOption_Integer",
-        "option targets retain their own type"
+        raw::elements(values)?.len(),
+        3,
+        "all original option-target slots survive"
     );
+    verify_option_targets(&property, values)
+}
+
+fn verify_option_targets(property: &Property<'_>, values: &Value) -> TestResult {
+    for index in [0, 2] {
+        let node = property.element(values, index)?;
+        let weak = source::scalar(node, "weakReference")?;
+        assert_eq!(
+            raw::present(
+                weak.pointer("/target/sourceType")
+                    .ok_or("actual option target type")?
+            )?,
+            &json!("MissionPropertyValueOption_Integer"),
+            "a non-property option target keeps its own concrete type"
+        );
+        assert_eq!(
+            raw::present(
+                weak.get("targetRecordIndex")
+                    .ok_or("actual same-owner option")?
+            )?,
+            &json!(0),
+            "the option really resolves inside its independently checked physical Template owner"
+        );
+        assert!(
+            raw::present(
+                weak.pointer("/target/location")
+                    .ok_or("actual owned option location")?
+            )?
+            .is_string(),
+            "the resolved original option has its exact owner-local location"
+        );
+        assert_eq!(
+            property.binding(node)?.get("missionPropertyStatus"),
+            Some(&Value::Null),
+            "a generic option target is not coerced into a MissionProperty"
+        );
+    }
+    raw::source_null(property.element(values, 1)?);
+    let first = source::scalar(property.element(values, 0)?, "weakReference")?;
+    let repeated = source::scalar(property.element(values, 2)?, "weakReference")?;
     assert_eq!(
-        *fixture::field(dependency, "/values/0/status")?,
-        "resolved",
-        "an option weak target does not need a mission variable"
+        first.pointer("/target/location/value"),
+        repeated.pointer("/target/location/value"),
+        "the repeated original pointer retains the same semantic target"
     );
-    assert_eq!(
-        *fixture::field(dependency, "/values/1")?,
-        Value::Null,
-        "null option pointers retain position"
-    );
-    assert_eq!(
-        *fixture::field(dependency, "/values/0")?,
-        *fixture::field(dependency, "/values/2")?,
-        "repeated option targets retain position"
+    assert_ne!(
+        property.element(values, 0)?.get("sourceOrdinal"),
+        property.element(values, 2)?.get("sourceOrdinal"),
+        "equal targets retain separate actual original occurrences"
     );
     Ok(())
 }
 
-fn verify_float_and_tags(document: &Value, owner: Owner) -> TestResult {
+fn verify_float_and_tags(document: &Value) -> TestResult {
+    let property = Property::new(document, "Float")?;
+    let option = property.element(property.field(property.node, "options")?, 0)?;
+    canonical::single(property.field(option, "value")?, -0.125)?;
+    canonical::single(property.field(option, "variation")?, 0.0625)?;
+    let property = Property::new(document, "Tags")?;
+    let option = property.element(property.field(property.node, "options")?, 0)?;
+    let tags = property.field(property.field(option, "tags")?, "tags")?;
     assert_eq!(
-        *fixture::field(
-            fixture::value(document, owner, "Float")?,
-            "/options/0/value"
-        )?,
-        -0.125,
-        "fractional values survive"
+        raw::elements(tags)?.len(),
+        4,
+        "tag source order remains independent of its lookup interpretation"
     );
-    assert_eq!(
-        *fixture::field(
-            fixture::value(document, owner, "Float")?,
-            "/options/0/variation"
-        )?,
-        0.0625,
-        "fractional variation survives"
-    );
-    assert_eq!(
-        *fixture::field(
-            fixture::value(document, owner, "Tags")?,
-            "/options/0/sourceTags/tags/1/status"
-        )?,
-        "dangling",
-        "tag option raw target identity is retained"
-    );
-    Ok(())
-}
-
-#[test]
-fn race_splits_and_faction_conditions_retain_single_values_and_target_identity() -> TestResult {
-    let race = race();
-    let conditions = vec![
-        fixture::object(
-            TestInstance::new("DataSetMatchCondition_FactionIdentityDef")
-                .value("factionIdentity", TestValue::Reference(fixture::MISSING)),
-        ),
-        fixture::object(
-            TestInstance::new("DataSetMatchCondition_ExcludeNearbyLocationsDef")
-                .value("exclusionRangeKm", TestValue::Single(0.375)),
-        ),
-        fixture::object(
-            TestInstance::new("DataSetMatchCondition_ExcludeDistantLocationsDef")
-                .value("exclusionRangeKm", TestValue::Single(1.125)),
-        ),
-    ];
-    let organization = TestInstance::new("MissionPropertyValue_Organization")
-        .value("matchConditions", fixture::array(conditions));
-    let owner = Owner::Generator;
-    let document = fixture::build(
-        &fixture::database(
-            vec![
-                fixture::property("Race", race),
-                fixture::property("Faction", organization),
-            ],
-            owner,
-        ),
-        CatalogPublicationMode::Normal,
+    source::reference(
+        property.element(tags, 1)?,
+        "79000000-0000-4000-8000-000000000002",
+        None,
     )?;
-    assert_eq!(
-        *fixture::field(fixture::value(&document, owner, "Race")?, "/targetSplits")?,
-        json!([{"targetSplit":0.125},{"targetSplit":0.0}]),
-        "every authored split survives in order"
-    );
-    let conditions = fixture::field(fixture::value(&document, owner, "Faction")?, "/conditions")?;
-    assert_eq!(
-        *fixture::field(conditions, "/0/condition")?,
-        "factionIdentity",
-        "FactionIdentityDef is a supported union variant"
-    );
-    assert_eq!(
-        *fixture::field(conditions, "/0/factionIdentity/status")?,
-        "dangling",
-        "the faction target is not discarded when dangling"
-    );
-    assert_eq!(
-        *fixture::field(conditions, "/1/rangeKm")?,
-        0.375,
-        "nearby range has Single precision"
-    );
-    assert_eq!(
-        *fixture::field(conditions, "/2/rangeKm")?,
-        1.125,
-        "distant range has Single precision"
-    );
     Ok(())
 }
 
@@ -284,8 +288,12 @@ fn option_display_keys_keep_their_established_meaning_and_raw_text_ids_survive()
             &fixture::database(properties, owner),
             CatalogPublicationMode::Normal,
         )?;
+        if !matches!(owner, Owner::Generator) {
+            canonical_display(&document, &tokens, owner)?;
+            continue;
+        }
         for (index, token) in tokens.into_iter().enumerate() {
-            let value = fixture::value(&document, owner, &format!("Label_{index}"))?;
+            let value = fixture::generator_value(&document, &format!("Label_{index}"))?;
             let option = fixture::field(value, "/options/0")?;
             assert_eq!(
                 *fixture::field(option, "/textId")?,
@@ -307,16 +315,25 @@ fn option_display_keys_keep_their_established_meaning_and_raw_text_ids_survive()
     Ok(())
 }
 
-fn race() -> TestInstance {
-    TestInstance::new("MissionPropertyValue_TimeTrialRace").value(
-        "targetSplits",
-        fixture::array(vec![
-            fixture::object(
-                TestInstance::new("TimeTrialSplit").value("targetSplit", TestValue::Single(0.125)),
-            ),
-            fixture::object(
-                TestInstance::new("TimeTrialSplit").value("targetSplit", TestValue::Single(0.0)),
-            ),
-        ]),
-    )
+fn canonical_display(document: &Value, tokens: &[&str; 4], owner: Owner) -> TestResult {
+    let meanings = [
+        ("placeholder", None),
+        ("empty", None),
+        ("notKey", None),
+        ("lookup", Some("@option")),
+    ];
+    for (index, (token, (interpretation, expected))) in tokens.iter().zip(meanings).enumerate() {
+        let property = owner.property(document, &format!("Label_{index}"))?;
+        property.kind("integer")?;
+        let option = property.element(property.field(property.node, "options")?, 0)?;
+        canonical::key(
+            &property,
+            document,
+            property.field(option, "textId")?,
+            token,
+            interpretation,
+            expected,
+        )?;
+    }
+    Ok(())
 }

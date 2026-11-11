@@ -3,21 +3,54 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::catalog_number_capture::{CapturedNumber, FloatToken};
+use crate::ExportAccountingError;
+use crate::catalog_number_capture::{CapturedNumber, FloatToken, NumberOccurrence};
+use crate::catalog_read::original::ExampleBodyReceipt;
 use crate::catalog_row::CatalogRows;
 use crate::catalog_target_index::TargetIndex;
+use crate::export_ledger::SourceObservation;
 use crate::resource_raw_policy::ResourceNumberContract;
 use crate::selection::Kind;
+use crate::template_number_capture::TemplateNumbers;
 
-/// One thin original nonfinite token awaiting actual emitted raw coverage.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One original nonfinite token awaiting exact actual emitted raw coverage.
+#[derive(Debug, Clone)]
 pub(crate) struct NumberRequirement {
     pub(crate) record_index: u32,
+    pub(crate) original_ordinal: u64,
     pub(crate) field: String,
     pub(crate) source_type: String,
-    pub(crate) contract: ResourceNumberContract,
+    pub(crate) contract: Option<ResourceNumberContract>,
     pub(crate) token: FloatToken,
+    pub(crate) body: Option<ExampleBodyReceipt>,
 }
+
+impl NumberRequirement {
+    pub(crate) fn merge(&mut self, other: Self) -> Result<(), ExportAccountingError> {
+        if *self != other {
+            return Err(ExportAccountingError::ConflictingSourceDatum);
+        }
+        match (&mut self.body, other.body) {
+            (Some(body), Some(other)) => body.merge(other),
+            (None, None) => Ok(()),
+            _ => Err(ExportAccountingError::UnboundHealthSubject),
+        }
+    }
+}
+
+// Value equality is separate from the original body-receipt merge.
+impl PartialEq for NumberRequirement {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_index == other.record_index
+            && self.original_ordinal == other.original_ordinal
+            && self.field == other.field
+            && self.source_type == other.source_type
+            && self.contract == other.contract
+            && self.token == other.token
+    }
+}
+
+impl Eq for NumberRequirement {}
 
 /// Actual numeric receipts attached to one emitted canonical family.
 #[derive(Debug, Clone)]
@@ -26,46 +59,120 @@ pub(crate) struct EmittedNumber {
     pub(crate) value: CapturedNumber,
 }
 
-/// Actual retained named-slot receipts indexed once by their original physical Record.
+#[derive(Default)]
+struct RecordNumbers<'source> {
+    named: BTreeMap<&'source str, &'source CapturedNumber>,
+    original: BTreeMap<u64, &'source CapturedNumber>,
+}
+
+/// Original numeric receipts indexed once by their admitted emitted physical Record.
 pub(crate) struct NumberCaptures<'source> {
-    records: BTreeMap<u32, BTreeMap<&'source str, &'source CapturedNumber>>,
+    records: BTreeMap<u32, RecordNumbers<'source>>,
+    templates: BTreeMap<u32, Vec<&'source TemplateNumbers>>,
 }
 
 impl<'source> NumberCaptures<'source> {
     pub(crate) fn new(rows: Option<&'source CatalogRows>, targets: Option<&TargetIndex>) -> Self {
-        let mut records: BTreeMap<u32, BTreeMap<&str, &CapturedNumber>> = BTreeMap::new();
+        let mut records = BTreeMap::<u32, RecordNumbers<'source>>::new();
+        let mut templates = BTreeMap::<u32, Vec<&TemplateNumbers>>::new();
         if let (Some(rows), Some(targets)) = (rows, targets) {
             for number in &rows.numbers {
                 let actual = &number.value;
-                if targets
+                if !targets
                     .emitted
                     .contains(&(number.kind, actual.record_index))
                 {
-                    records
-                        .entry(actual.record_index)
-                        .or_default()
-                        .entry(actual.field.as_str())
-                        .or_insert(actual);
+                    continue;
+                }
+                if matches!(actual.occurrence, NumberOccurrence::TemplateValue { .. }) {
+                    continue;
+                }
+                if matches!(actual.occurrence, NumberOccurrence::LootValue { .. })
+                    && number.kind != Kind::LootPoolFilters
+                {
+                    continue;
+                }
+                match actual.occurrence {
+                    NumberOccurrence::NamedField => {
+                        records
+                            .entry(actual.record_index)
+                            .or_default()
+                            .named
+                            .entry(actual.field.as_str())
+                            .or_insert(actual);
+                    }
+                    NumberOccurrence::TemplateValue { .. } => {}
+                    NumberOccurrence::LootValue { ordinal }
+                    | NumberOccurrence::BlueprintValue { ordinal } => {
+                        if matches!(actual.occurrence, NumberOccurrence::BlueprintValue { .. })
+                            && number.kind != Kind::Blueprints
+                        {
+                            continue;
+                        }
+                        records
+                            .entry(actual.record_index)
+                            .or_default()
+                            .original
+                            .entry(ordinal)
+                            .or_insert(actual);
+                    }
+                }
+            }
+            for template in &rows.template_numbers {
+                if let (Some(index), Some(kind)) =
+                    (template.record_index(), template.emitted_kind())
+                    && targets.emitted.contains(&(kind, index))
+                {
+                    templates.entry(index).or_default().push(template);
                 }
             }
         }
-        Self { records }
+        Self { records, templates }
     }
 
-    pub(crate) fn for_record(&self, record_index: u32) -> Coverage<'_, 'source> {
+    pub(crate) fn for_source(
+        &self,
+        source: &SourceObservation,
+    ) -> Result<Coverage<'_, 'source>, ExportAccountingError> {
+        let mut coverage = self.for_record(source.record_index, source.kind);
+        for template in self
+            .templates
+            .get(&source.record_index)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(values) = template.for_source(source)?
+                && coverage.template.replace(values).is_some()
+            {
+                return Err(ExportAccountingError::ConflictingSourceDatum);
+            }
+        }
+        Ok(coverage)
+    }
+    pub(crate) fn for_record(
+        &self,
+        record_index: u32,
+        kind: Option<Kind>,
+    ) -> Coverage<'_, 'source> {
         Coverage {
             record_index,
+            kind,
             available: self.records.get(&record_index),
-            consumed: BTreeSet::new(),
+            template: None,
+            consumed_named: BTreeSet::new(),
+            consumed_owned: BTreeSet::new(),
         }
     }
 }
 
-/// Fresh consumption state for one original selected or dependency inspection.
+/// Fresh consumption state for one actual source role and physical Record.
 pub(crate) struct Coverage<'index, 'source> {
     record_index: u32,
-    available: Option<&'index BTreeMap<&'source str, &'source CapturedNumber>>,
-    consumed: BTreeSet<&'source str>,
+    kind: Option<Kind>,
+    available: Option<&'index RecordNumbers<'source>>,
+    template: Option<&'source BTreeMap<u64, CapturedNumber>>,
+    consumed_named: BTreeSet<&'source str>,
+    consumed_owned: BTreeSet<u64>,
 }
 
 impl Coverage<'_, '_> {
@@ -73,15 +180,61 @@ impl Coverage<'_, '_> {
         if required.record_index != self.record_index {
             return false;
         }
+        if let Some(values) = self.template {
+            let actual = values.get(&required.original_ordinal);
+            return actual.is_some_and(|actual| {
+                scalar_matches(required, actual)
+                    && actual.occurrence
+                        == NumberOccurrence::TemplateValue {
+                            ordinal: required.original_ordinal,
+                        }
+                    && actual.contract == ResourceNumberContract::Number
+                    && self.consumed_owned.insert(required.original_ordinal)
+            });
+        }
+        if matches!(self.kind, Some(Kind::LootPoolFilters | Kind::Blueprints)) {
+            return self.owned(required);
+        }
+        let Some(contract) = required.contract else {
+            return false;
+        };
         let Some((field, actual)) = self
             .available
-            .and_then(|values| values.get_key_value(required.field.as_str()))
+            .and_then(|values| values.named.get_key_value(required.field.as_str()))
         else {
             return false;
         };
-        actual.token == required.token
-            && actual.source_type == required.source_type
-            && actual.contract == required.contract
-            && self.consumed.insert(*field)
+        scalar_matches(required, actual)
+            && actual.contract == contract
+            && self.consumed_named.insert(*field)
     }
+
+    fn owned(&mut self, required: &NumberRequirement) -> bool {
+        let Some(actual) = self
+            .available
+            .and_then(|values| values.original.get(&required.original_ordinal))
+        else {
+            return false;
+        };
+        let occurrence = match self.kind {
+            Some(Kind::LootPoolFilters) => NumberOccurrence::LootValue {
+                ordinal: required.original_ordinal,
+            },
+            Some(Kind::Blueprints) => NumberOccurrence::BlueprintValue {
+                ordinal: required.original_ordinal,
+            },
+            _ => return false,
+        };
+        scalar_matches(required, actual)
+            && actual.occurrence == occurrence
+            && actual.contract == ResourceNumberContract::Number
+            && self.consumed_owned.insert(required.original_ordinal)
+    }
+}
+
+fn scalar_matches(required: &NumberRequirement, actual: &CapturedNumber) -> bool {
+    actual.record_index == required.record_index
+        && actual.token == required.token
+        && actual.source_type == required.source_type
+        && actual.field == required.field
 }

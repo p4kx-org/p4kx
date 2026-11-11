@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::DecimalU64;
 
 /// Exact half-open extent in immediately owning source coordinates.
-#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[non_exhaustive]
 pub struct ArchiveByteRange {

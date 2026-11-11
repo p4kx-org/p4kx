@@ -1,52 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Guid, Record};
-
 use crate::catalog_row::{CatalogRows, ExcludedCatalogRow};
-use crate::commodity_backfill_input::{CommodityBackfillInput, CommodityInputLimit};
-use crate::export_diagnostic::{ExportDiagnostic, ExportDiagnosticCode, ExportSourceRole};
+use crate::export_diagnostic::ExportSourceRole;
 use crate::export_field_inspection::FieldInspection;
+use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
+pub(crate) use crate::record_derived_observation::DerivedFailure;
+pub(crate) use crate::record_observation::SourceObservation;
+pub(crate) use crate::record_source_status::{SourceDiagnosis, SourceDisposition};
 use crate::selection::Kind;
-
-/// The exact source disposition recorded where a reader or projection finishes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SourceDisposition {
-    /// A canonical read and typed projection completed, including zero-row projections.
-    Projected,
-    /// A documented policy excluded the Record before a canonical read.
-    SkippedBeforeRead,
-    /// A documented policy excluded the Record after a successful canonical read.
-    SkippedAfterRead,
-    /// The canonical source could not be read.
-    ReadFailed,
-    /// The canonical source was read but its typed projection failed.
-    ProjectionFailed,
-}
-
-impl SourceDisposition {
-    #[must_use]
-    pub(crate) const fn read_succeeded(self) -> bool {
-        matches!(
-            self,
-            Self::Projected | Self::SkippedAfterRead | Self::ProjectionFailed
-        )
-    }
-
-    #[must_use]
-    pub(crate) const fn failed(self) -> bool {
-        matches!(self, Self::ReadFailed | Self::ProjectionFailed)
-    }
-}
-
-/// Available technical field metadata of a source failure.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct SourceDiagnosis {
-    pub(crate) code: Option<ExportDiagnosticCode>,
-    pub(crate) field: Option<String>,
-    pub(crate) source_type: Option<String>,
-    pub(crate) target_guid: Option<Guid>,
-}
 
 /// Root directory evidence that cannot establish a complete Archive inventory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -67,74 +29,6 @@ impl ArchiveInventoryProblem {
     }
 }
 
-/// An immutable source observation captured before rows are aggregated or failures deduplicated.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[must_use]
-pub(crate) struct SourceObservation {
-    pub(crate) kind: Option<Kind>,
-    pub(crate) record_index: u32,
-    pub(crate) guid: Guid,
-    pub(crate) record_path: Option<String>,
-    pub(crate) role: ExportSourceRole,
-    pub(crate) disposition: SourceDisposition,
-    pub(crate) diagnosis: SourceDiagnosis,
-}
-
-impl SourceObservation {
-    /// Captures an actual source disposition without consulting emitted-row counts.
-    pub(crate) fn new(
-        kind: Kind,
-        record: &Record<'_>,
-        role: ExportSourceRole,
-        disposition: SourceDisposition,
-    ) -> Self {
-        Self {
-            kind: Some(kind),
-            record_index: record.index(),
-            guid: record.guid(),
-            record_path: record.record_path().ok().map(str::to_owned),
-            role,
-            disposition,
-            diagnosis: SourceDiagnosis::default(),
-        }
-    }
-
-    /// Captures a non-kind source such as the global crafting or item-recovery configuration.
-    pub(crate) fn catalog_source(
-        record: &Record<'_>,
-        role: ExportSourceRole,
-        disposition: SourceDisposition,
-    ) -> Self {
-        Self {
-            kind: None,
-            record_index: record.index(),
-            guid: record.guid(),
-            record_path: record.record_path().ok().map(str::to_owned),
-            role,
-            disposition,
-            diagnosis: SourceDiagnosis::default(),
-        }
-    }
-
-    /// Associates available field diagnostics with this actual observation.
-    pub(crate) fn diagnosed(mut self, diagnosis: SourceDiagnosis) -> Self {
-        self.diagnosis = diagnosis;
-        self
-    }
-}
-
-/// One failed derived operation whose original selected source row may remain present.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DerivedFailure {
-    pub(crate) affected_kind: Kind,
-    pub(crate) output_kind: Kind,
-    pub(crate) record_index: u32,
-    pub(crate) role: ExportSourceRole,
-    pub(crate) guid: Guid,
-    pub(crate) record_path: Option<String>,
-    pub(crate) diagnosis: SourceDiagnosis,
-}
-
 /// Production observations collected independently of output rows and compatibility summaries.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ExportLedger {
@@ -146,8 +40,6 @@ pub(crate) struct ExportLedger {
     pub(crate) derived_failures: Vec<DerivedFailure>,
     pub(crate) field_diagnostics: Vec<ExportDiagnostic>,
     pub(crate) field_inspections: Vec<FieldInspection>,
-    pub(crate) commodity_backfill_inputs: Vec<CommodityBackfillInput>,
-    pub(crate) commodity_input_limits: Vec<CommodityInputLimit>,
     pub(crate) skipped_rows: Vec<(Kind, usize)>,
     pub(crate) catalog_rows: Option<CatalogRows>,
     pub(crate) conflicting_catalog_rows: bool,
@@ -230,10 +122,6 @@ impl ExportLedger {
         self.derived_failures.extend(other.derived_failures);
         self.field_diagnostics.extend(other.field_diagnostics);
         self.field_inspections.extend(other.field_inspections);
-        self.commodity_backfill_inputs
-            .extend(other.commodity_backfill_inputs);
-        self.commodity_input_limits
-            .extend(other.commodity_input_limits);
         self.skipped_rows.extend(other.skipped_rows);
         self.excluded_catalog_rows
             .extend(other.excluded_catalog_rows);
@@ -242,6 +130,7 @@ impl ExportLedger {
 
 /// A contradiction in production accounting prevents publication.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum ExportAccountingError {
     /// Reference resolution has no final catalog-row evidence.
     #[error("no final catalog-row evidence for source Reference resolution")]
@@ -279,6 +168,24 @@ pub enum ExportAccountingError {
     /// Repeated inspection of the same immutable source produced different results.
     #[error("conflicting field-inspection results for one source Record")]
     ConflictingFieldInspection,
+    /// Retained original source facts contradict their actual occurrence or value.
+    #[error("conflicting original source datum")]
+    ConflictingSourceDatum,
+    /// A retained catalog subject has no matching original input binding.
+    #[error("catalog health subject is not bound to its original input")]
+    UnboundHealthSubject,
+    /// Health capture was used after its immutable result was sealed.
+    #[error("health capture is already sealed")]
+    HealthCaptureClosed,
+    /// A reserved original Loot occurrence was not completed.
+    #[error("original Loot value {ordinal} was not completed")]
+    UnfilledLootValue {
+        /// The original owned-value preorder position.
+        ordinal: u64,
+    },
+    /// A canonical Loot value or error variant cannot be retained by this reader.
+    #[error("unsupported original Loot source value")]
+    UnsupportedLootSourceValue,
     /// A source path cannot be formatted.
     #[error("cannot format a source field path")]
     FieldPath(#[source] std::fmt::Error),

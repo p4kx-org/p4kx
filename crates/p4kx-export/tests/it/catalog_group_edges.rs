@@ -192,7 +192,7 @@ fn an_unreadable_group_is_reported_once() -> TestResult {
         .summary()
         .failures()
         .iter()
-        .map(|failure| failure.guid.to_string())
+        .map(|failure| failure.guid().to_string())
         .collect();
     assert_eq!(failures, ["10000000-0000-4000-8000-000000000001"]);
     Ok(())
@@ -252,7 +252,10 @@ fn a_blueprint_whose_category_is_unreadable_has_no_category_guid() -> TestResult
             ),
         );
     let (built, catalog) = diagnostic_from(&forge, None)?;
-    assert_eq!(catalog["blueprints"][0]["categoryGuid"], Value::Null);
+    assert_eq!(
+        catalog["projections"]["blueprintPresentation"]["rows"][0]["category"]["value"],
+        Value::Null
+    );
     assert_eq!(
         built.summary().failures().len(),
         1,
@@ -344,21 +347,22 @@ fn a_blueprint_whose_category_is_a_leftover_has_no_category_guid() -> TestResult
     );
     let (_, catalog) = build_from(&crafting_fixture::database().record(orphan), None)?;
     let categories = blueprint_categories::guids(&catalog)?;
-    let blueprints = catalog["blueprints"].as_array().ok_or("blueprints")?;
-    let orphan = blueprints
+    let orphan = crate::catalog_crafting_support::blueprint::definitions(&catalog)?
         .iter()
-        .find(|blueprint| blueprint["className"] == "BP_CRAFT_orphan")
+        .position(|definition| definition["className"]["value"] == "BP_CRAFT_orphan")
         .ok_or("the orphan blueprint")?;
-    assert_eq!(orphan["categoryGuid"], Value::Null);
-    for blueprint in blueprints {
-        if let Some(guid) = blueprint["categoryGuid"].as_str() {
+    let orphan = crate::catalog_crafting_support::blueprint::by_index(&catalog, orphan)?;
+    assert_eq!(orphan.presentation["category"]["state"], "absent");
+    let rows = catalog["projections"]["blueprintPresentation"]["rows"]
+        .as_array()
+        .ok_or("Blueprint presentations")?;
+    for blueprint in rows {
+        if let Some(guid) = blueprint["category"]["value"].as_str() {
             assert!(categories.contains(guid), "category {guid}");
         }
     }
     assert!(
-        blueprints
-            .iter()
-            .any(|blueprint| blueprint["categoryGuid"].is_string()),
+        rows.iter().any(|row| row["category"]["value"].is_string()),
         "the others keep theirs"
     );
     Ok(())

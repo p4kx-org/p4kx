@@ -7,9 +7,10 @@ use crate::Kind;
 use crate::export_diagnostic::ExportDiagnosticCode;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
-use crate::shop_inventories::{Inventories, ItemList};
+use crate::shop_inventories::ItemList;
 use crate::shop_prefabs::Prefabs;
 
+use super::inventory_source::{items, request};
 use super::{ENTITY, TestResult, opened};
 
 #[test]
@@ -23,10 +24,10 @@ fn partial_inventory_json_retains_valid_ids_and_reports_one_failed_entry() -> Te
             "Data/Scripts/ShopInventories/unused.json",
             "bad unused JSON",
         ),
+        request("selected"),
     ])?;
-    let inventories = Inventories::new(&archive);
     let mut ledger = ExportLedger::default();
-    let items = inventories.items("selected", &mut ledger);
+    let items = items(&archive, "selected", &mut ledger)?;
     assert_eq!(
         ledger.incomplete_inventories,
         Vec::new(),
@@ -59,7 +60,7 @@ fn partial_inventory_json_retains_valid_ids_and_reports_one_failed_entry() -> Te
         "retained partial rows do not certify a complete projection"
     );
     assert_eq!(
-        source.diagnosis.field.as_deref(),
+        source.diagnosis.accounting_field(source.path.as_str()),
         Some("Inventory[].ID.ID[]"),
         "the technical field survives"
     );
@@ -68,10 +69,10 @@ fn partial_inventory_json_retains_valid_ids_and_reports_one_failed_entry() -> Te
 
 #[test]
 fn a_configured_missing_inventory_has_a_logical_identity_and_no_fake_index() -> TestResult {
-    let (_folder, archive) = opened(Vec::new())?;
+    let (_folder, archive) = opened(vec![request("missing")])?;
     let mut ledger = ExportLedger::default();
     assert_eq!(
-        Inventories::new(&archive).items("missing", &mut ledger),
+        items(&archive, "missing", &mut ledger)?,
         ItemList::Missing,
         "configured missing file remains distinguishable"
     );
@@ -98,13 +99,16 @@ fn a_configured_missing_inventory_has_a_logical_identity_and_no_fake_index() -> 
 
 #[test]
 fn an_authored_empty_inventory_is_a_successful_zero_row_projection() -> TestResult {
-    let (_folder, archive) = opened(vec![TestEntry::stored(
-        "Data/Scripts/ShopInventories/empty.json",
-        r#"{"Inventory":[]}"#,
-    )])?;
+    let (_folder, archive) = opened(vec![
+        TestEntry::stored(
+            "Data/Scripts/ShopInventories/empty.json",
+            r#"{"Inventory":[]}"#,
+        ),
+        request("empty"),
+    ])?;
     let mut ledger = ExportLedger::default();
     assert_eq!(
-        Inventories::new(&archive).items("empty", &mut ledger),
+        items(&archive, "empty", &mut ledger)?,
         ItemList::Items {
             guids: Vec::new(),
             dropped: 0
@@ -129,15 +133,20 @@ fn malformed_prefab_values_retain_valid_entity_inventory_pairs() -> TestResult {
         offlineInventoryXMLName="Scripts/ShopInventories/unsupported.csv"/></PropertiesDataCore>
         </Object></PrefabLibrary>"#;
     let (_folder, archive) = opened(vec![TestEntry::stored("Data/Prefabs/Shops/mixed.xml", xml)])?;
-    let prefabs = Prefabs::read(&archive, None);
+    let prefabs = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        Prefabs::read(&archive, None, capture)
+    })?;
     assert_eq!(
         prefabs.ledger.incomplete_inventories,
         Vec::new(),
         "all prefab input attributes were enumerated"
     );
     assert_eq!(
-        prefabs.by_entity.get(ENTITY),
-        Some(&vec!["good".to_owned()]),
+        prefabs.by_entity.get(ENTITY).map(|stems| stems
+            .iter()
+            .map(crate::shop_inventory_path::InventoryStem::as_str)
+            .collect::<Vec<_>>()),
+        Some(vec!["good"]),
         "valid inventory pair survives"
     );
     let [source] = prefabs.ledger.entries.as_slice() else {
@@ -167,7 +176,9 @@ fn unreadable_prefab_xml_marks_its_inventory_dependency_walk_incomplete() -> Tes
         "Data/Prefabs/Shops/bad.xml",
         "broken XML",
     )])?;
-    let prefabs = Prefabs::read(&archive, None);
+    let prefabs = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        Prefabs::read(&archive, None, capture)
+    })?;
     assert_eq!(
         prefabs.ledger.incomplete_inventories,
         [Kind::Shops],
@@ -183,3 +194,6 @@ fn unreadable_prefab_xml_marks_its_inventory_dependency_walk_incomplete() -> Tes
     );
     Ok(())
 }
+
+#[path = "shop_inventory_positional_tests.rs"]
+mod positional;

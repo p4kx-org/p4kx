@@ -9,7 +9,8 @@ use p4kx_extraction::{RecordTree, StructValue, TagTree};
 use crate::blueprint::as_struct;
 use crate::mission_layers::{items, one};
 use crate::record_fields::text;
-use crate::spawn_error::SpawnError;
+use crate::record_read::ReadError;
+use crate::source_fields::FieldCapture;
 use crate::spawn_model::{LocationPrerequisite, LocationQueryLink, SpawnLevel, SpawnPoolLink};
 use crate::spawn_pools::{Registered, SpawnPools, Target};
 use crate::spawn_read::Reader;
@@ -32,11 +33,6 @@ pub(crate) struct Level {
 }
 
 impl Level {
-    /// Returns what this level alone states.
-    pub(crate) fn resolved(&self) -> Resolved {
-        resolve(&[self])
-    }
-
     /// Reads the properties in the array `properties` of `params` and the location prerequisites
     /// in the array `prerequisites` of `owner`, registering what they state in `pools`.
     ///
@@ -50,7 +46,7 @@ impl Level {
         (params, properties): (Option<&StructValue<'f>>, &str),
         (owner, prerequisites): (Option<&StructValue<'_>>, &str),
         pools: &mut SpawnPools<'f>,
-    ) -> Result<Self, SpawnError> {
+    ) -> Result<Self, ReadError> {
         let mut found = Vec::new();
         for property in items(params, properties).iter().filter_map(as_struct) {
             found.extend(stated(reader, property, pools)?);
@@ -67,7 +63,7 @@ fn stated<'f>(
     reader: &Reader<'_, 'f>,
     property: &StructValue<'f>,
     pools: &mut SpawnPools<'f>,
-) -> Result<Option<Stated>, SpawnError> {
+) -> Result<Option<Stated>, ReadError> {
     let Some(variable) = text(Some(property), "missionVariableName") else {
         return Ok(None);
     };
@@ -112,11 +108,15 @@ pub(crate) struct RecordSpawns<'x, 'f> {
 
 impl<'x, 'f> RecordSpawns<'x, 'f> {
     /// Creates the reader of one canonical owning Record.
-    pub(crate) fn new(tags: &'x TagTree, tree: &'x RecordTree<'f>) -> Self {
-        Self {
-            reader: Reader::for_record(tags, tree),
+    pub(crate) fn new(
+        tags: &'x TagTree,
+        tree: &'x RecordTree<'f>,
+        capture: &'x dyn FieldCapture<'f>,
+    ) -> Result<Self, ReadError> {
+        Ok(Self {
+            reader: Reader::for_observed(tags, tree, capture)?,
             pools: RefCell::new(SpawnPools::default()),
-        }
+        })
     }
 
     /// Returns the distinct descriptions and queries the levels stated.
@@ -129,7 +129,7 @@ impl<'x, 'f> RecordSpawns<'x, 'f> {
         level: SpawnLevel,
         params: (Option<&StructValue<'f>>, &str),
         owner: (Option<&StructValue<'f>>, &str),
-    ) -> Result<Level, SpawnError> {
+    ) -> Result<Level, ReadError> {
         Level::read(
             level,
             &self.reader,
@@ -147,7 +147,7 @@ impl<'x, 'f> RecordSpawns<'x, 'f> {
     pub(crate) fn handler(
         &self,
         handler: &StructValue<'f>,
-    ) -> Result<HandlerSpawns<'_, 'x, 'f>, SpawnError> {
+    ) -> Result<HandlerSpawns<'_, 'x, 'f>, ReadError> {
         let level = self.level(
             SpawnLevel::Handler,
             (one(Some(handler), "contractParams"), "propertyOverrides"),
@@ -176,7 +176,7 @@ impl<'r, 'x, 'f> HandlerSpawns<'r, 'x, 'f> {
         &'h self,
         contract: &StructValue<'f>,
         template: Option<&'h Level>,
-    ) -> Result<ContractSpawns<'h, 'r, 'x, 'f>, SpawnError> {
+    ) -> Result<ContractSpawns<'h, 'r, 'x, 'f>, ReadError> {
         let level = self.record.level(
             SpawnLevel::Contract,
             (one(Some(contract), "paramOverrides"), "propertyOverrides"),
@@ -203,7 +203,7 @@ impl<'f> ContractSpawns<'_, '_, '_, 'f> {
     /// # Errors
     ///
     /// See [`Level::read`].
-    pub(crate) fn resolve(&self, sub: Option<&StructValue<'f>>) -> Result<Resolved, SpawnError> {
+    pub(crate) fn resolve(&self, sub: Option<&StructValue<'f>>) -> Result<Resolved, ReadError> {
         let sub_level = sub
             .map(|sub| {
                 self.handler.record.level(

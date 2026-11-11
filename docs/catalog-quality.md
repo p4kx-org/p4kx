@@ -72,13 +72,12 @@ Actual positive and negative list/wrapper/reference selectors are retained. Unre
 property names and unused target payloads are not contributors. A nested resource GUID retains
 its own actual resource-header payload contribution independently of the shared inventory proof.
 
-Optional decision proof capture shares Commodity's existing limits: 4096 retained input uses
-and 1 MiB of variable metadata per proof group. Actual enumeration and inverse calculation
-continue after a capture cut. A cut retains an opaque original-source witness and explicitly
-sets `sourceSetComplete: false`; it never fabricates an inventory coordinate or a missing value.
-Positive GUID payload proofs have independent retention, so a shared inventory cut cannot starve
-a late child. Known encrypted witnesses remain `containsEncryptedSource: true` even after a cut.
-Incomplete optional coordinate retention is independent of complete source-read health.
+The aggregate inverse retains all actual inputs needed to evaluate its complete resource
+inventory, including negative probes. Each nested resource GUID retains the winning quantizer
+selection and its own matching original authored relationship slots and GUID payload. Those
+member receipts also drive Commodity fallback. Evidence registration stays specific to the
+physical source Record even when nominal GUIDs deduplicate in the inverse. Unreadable consulted
+inputs keep explicit incompleteness.
 
 ## Health, counts and publication
 
@@ -123,5 +122,5 @@ frozen test inputs; the catalog output contract is v3 only.
 Synthetic source oracles cover raw widths/IEEE bits, nullable/empty/reference forms, retained
 malformed ranges, duplicate physical identity, first-eligible prefix, Filter/dependency scope,
 exact numeric capture negatives, immediate plain/encrypted/unknown origins and a genuine
-optional-capture cut with a late positive value. Installed-Archive acceptance is deferred by
+complete wide capture with a physically independent late positive value. Installed-Archive acceptance is deferred by
 the user. No source proposal or synthetic fixture establishes an installed Build result.

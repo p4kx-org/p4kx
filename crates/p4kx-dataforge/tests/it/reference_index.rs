@@ -3,8 +3,7 @@
 
 //! The index of incoming and outgoing References over a synthetic DataForge in both layouts.
 
-use p4kx_dataforge::query::{Query, QueryErrorKind};
-use p4kx_dataforge::{DataForge, Guid, ReferenceIndex};
+use p4kx_dataforge::{DataForge, Guid, ObservedReferenceIndex, ReferenceIndex, Value};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -306,6 +305,14 @@ fn the_index_stops_at_its_limit_and_says_so() -> TestResult {
         let capped = ReferenceIndex::build_with(forge, 3, &|| false).ok_or("an index")?;
         assert!(capped.is_truncated(), "more References than the limit");
         assert_eq!(capped.len(), 3, "the first three in Record order");
+        let alpha = index_of(forge, ALPHA)?;
+        let last = capped
+            .outgoing(alpha)
+            .last()
+            .ok_or("the retained array occurrence")?;
+        assert_eq!(last.location(), "escorts[1]");
+        assert_eq!(last.indices(), &[1]);
+        assert_eq!(last.target(), Some(index_of(forge, BETA)?));
         assert!(!all.is_truncated(), "the full index is complete");
         Ok(())
     })
@@ -328,72 +335,69 @@ fn a_limited_index_can_be_cancelled() -> TestResult {
     })
 }
 
-fn selected(forge: &DataForge<'_>, text: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let compiled = Query::parse(text)?.compile(forge)?;
-    let run = compiled.run()?;
-    Ok(run
-        .indexes()
-        .iter()
-        .filter_map(|index| forge.record(*index)?.name().ok().map(str::to_owned))
-        .collect())
-}
-
 #[test]
-fn referencing_selects_the_records_that_refer_to_a_record() -> TestResult {
-    in_both_versions(|forge| {
-        let by_path = selected(forge, r#"referencing "libs/makers/aegis""#)?;
+fn original_occurrence_rejects_an_identical_reference_from_a_different_index() -> TestResult {
+    for version in [6, 8] {
+        let bytes = builder().version(version).build();
+        let same_bytes = bytes.clone();
+        let left = DataForge::open(&bytes)?;
+        let right = DataForge::open(&same_bytes)?;
+        let beta = index_of(&left, BETA)?;
+        let record = left
+            .record(index_of(&left, ALPHA)?)
+            .ok_or("original holder")?;
+        let tree = record.tree()?;
+        let [maker, escorts, ..] = tree.fields() else {
+            return Err("original maker and escorts fields".into());
+        };
         assert_eq!(
-            by_path,
-            ["Ship.Alpha", "Ship.Beta"],
-            "the referrers of Aegis by record path"
+            (maker.name(), escorts.name()),
+            ("maker", "escorts"),
+            "original field order"
         );
-        let guid = guid_text(AEGIS);
-        let by_guid = selected(forge, &format!("referencing \"{guid}\""))?;
-        assert_eq!(by_guid, by_path, "by GUID");
-        let typed = selected(
-            forge,
-            r#"from Manufacturer referencing "libs/planets/terra""#,
-        )?;
-        assert_eq!(typed, ["Manufacturer.Aegis"], "combined with from");
-        let located = selected(forge, r#"at "ships" referencing "LIBS\PLANETS\Terra""#)?;
+        let Value::Array(items) = escorts.value() else {
+            return Err("original escorts array".into());
+        };
+        let [Value::Null, Value::Reference(target), ..] = items.as_ref() else {
+            return Err("original null followed by resolved Reference".into());
+        };
+        assert_eq!(target.record_index(), beta, "decoder-selected target");
+
+        let first = ObservedReferenceIndex::build(&left)?;
+        let second = ObservedReferenceIndex::build(&right)?;
+        let own = first
+            .index()
+            .incoming(beta)
+            .next()
+            .ok_or("first original Reference")?;
+        let other = second
+            .index()
+            .incoming(beta)
+            .next()
+            .ok_or("second original Reference")?;
         assert_eq!(
-            located,
-            ["Ship.Alpha"],
-            "combined with at, ignoring case and separators"
+            (own.source(), own.target(), own.location()),
+            (other.source(), other.target(), other.location()),
+            "equal Reference coordinates in separately opened sources"
+        );
+        let origin = first.origin(own).ok_or("first original occurrence")?;
+        let other_origin = second.origin(other).ok_or("second original occurrence")?;
+        assert_eq!(
+            (origin.value_ordinal(), other_origin.value_ordinal()),
+            (3, 3),
+            "preorder includes maker, the array and its preceding null element"
         );
         assert!(
-            selected(forge, r#"referencing "libs/ships/loose""#)?.is_empty(),
-            "nobody refers to Loose"
+            first.origin(other).is_none(),
+            "the first index refuses the second occurrence"
         );
-        Ok(())
-    })
+        assert!(
+            second.origin(own).is_none(),
+            "the second index refuses the first occurrence"
+        );
+    }
+    Ok(())
 }
 
-#[test]
-fn referencing_an_unknown_record_is_marked() -> TestResult {
-    in_both_versions(|forge| {
-        let text = r#"from Ship referencing "libs/nowhere""#;
-        let error = Query::parse(text)?.compile(forge).err().ok_or("compiled")?;
-        assert_eq!(
-            error.kind(),
-            &QueryErrorKind::UnknownReferencedRecord {
-                text: "libs/nowhere".to_owned()
-            },
-            "kind"
-        );
-        assert_eq!(&text[error.span().range()], r#""libs/nowhere""#, "span");
-        let canonical = Query::parse(r#"REFERENCING  "a""b" select x"#)?.to_string();
-        assert_eq!(
-            canonical, r#"referencing "a""b" select x"#,
-            "canonical form"
-        );
-        let out_of_order = Query::parse(r#"at "x" select a referencing "y""#)
-            .err()
-            .ok_or("parsed")?;
-        assert!(
-            out_of_order.to_string().contains("has to come before"),
-            "{out_of_order}"
-        );
-        Ok(())
-    })
-}
+#[path = "reference_index_query.rs"]
+mod query;

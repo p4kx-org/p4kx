@@ -7,7 +7,8 @@
 use std::error::Error;
 
 use p4kx_assembly::{
-    Attachment, EntityNode, LoadoutError, LoadoutResolver, PortDefinition, PortSource, Target,
+    Attachment, EntityNode, LoadoutError, LoadoutResolver, LoadoutTargetGuid, PortDefinition,
+    PortSource, Target,
 };
 use p4kx_dataforge::{DataForge, Guid};
 use p4kx_testkit::sample_ship;
@@ -91,7 +92,9 @@ fn unresolvable_ports_keep_their_target_and_reason() -> TestResult {
     assert_eq!(cargo.target(), &Target::Reference(missing), "target");
     assert_eq!(
         cargo.error(),
-        &LoadoutError::DanglingReference { guid: missing },
+        &LoadoutError::DanglingReference {
+            guid: LoadoutTargetGuid::unbound(missing)
+        },
         "reason"
     );
     let (path, door) = unresolved.get(1).ok_or("no second")?;

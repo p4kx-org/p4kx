@@ -1,0 +1,76 @@
+# Soundbank metadata in the media export
+
+`p4kx media export ARCHIVE --out DIR --kind audio --filter '*.bnk'` retains each selected
+BNK Entry and streams its original physical directory into `audio.jsonl`. The physical source
+identity includes the Archive fingerprint, containing Entry chain and leaf Entry index.
+Short IDs and display paths may repeat. The source's exact verified bytes are in `source.raw`.
+
+| Namespace | `data.record_type` | Original subresource indices |
+| --- | --- | --- |
+| `audio-bank` | `bank` | BKHD section ordinal |
+| `audio-bank-section` | `bank-section` | Section ordinal |
+| `audio-bank-media` | `bank-media` | DIDX section and triplet ordinals |
+| `audio-bank-object` | `bank-object` | HIRC section and object ordinals |
+| `audio-bank-hirc-action` | `bank-hirc-action` | HIRC section and object ordinals |
+| `audio-bank-hirc-event` | `bank-hirc-event` | HIRC section and Event object ordinals |
+| `audio-bank-hirc-event-action` | `bank-hirc-event-action` | HIRC section, Event object and action ordinals |
+| `audio-bank-hirc-event-tail` | `bank-hirc-event-tail` | HIRC section and Event object ordinals |
+| `audio-bank-hirc` | `bank-hirc` | HIRC section ordinal |
+| `audio-bank-stid` | `bank-stid` | STID section ordinal |
+| `audio-bank-name` | `bank-name` | STID section and name ordinals |
+| `audio-bank-stid-tail` | `bank-stid-tail` | STID section ordinal |
+| `audio-bank-failure` | `bank-failure` | Failure phase and section ordinal when known |
+
+Each section row retains the original four tag bytes, including unknown and non-UTF-8 tags,
+and its exact header and body ranges. A BKHD row retains its original version, bank ID,
+language ID and reader version support. Ranges are half-open in decoded Entry coordinates.
+Their starts, exclusive ends and payload ordinals use unsigned decimal strings.
+
+Each original DIDX triplet retains its ID, authored DATA offset and length, and the
+range of its declaration. Repeated media IDs are separate rows in original order. DATA
+resolution reports `resolved`, `missing`, `ambiguous`, `unavailable` or `outside-data`.
+A resolved row links the exact DATA section and retained byte range. A bounded prefix
+read supplies the observed media class, optional RIFF length and prefetch decision.
+The class can be `wem`, `midi`, `impulse` or `unknown`.
+
+HIRC object rows retain original order, raw type bytes, IDs and raw object ranges.
+The version-specific kind is derived when a unique supported BKHD version is available.
+The HIRC section summary retains its declared object count and exact trailing range,
+including an explicitly empty range. The current Audio capability lists coverage for
+decoded object fields and [embedded WEM metadata](media-audio-metadata.md#wems-embedded-in-soundbanks)
+separately from these physical envelopes.
+
+Action rows from that same physical object and observed bank header carry the original
+action type and target ID. Version 154 Play actions also carry the original bank ID
+(including zero) and bank type. Other versions and non-Play actions have a null PlayBank
+value, with receipts for the decision that applied. Each word has its own original
+byte range. Both skipped-property counts are selectors for the PlayBank fields.
+An unsupported Action layout retains the original body and reports its layout explicitly.
+A malformed Action contributes the fields read before the failure to diagnostic output.
+
+Event rows preserve the original action count and its byte range. Versions through 122 use a
+little-endian unsigned 32-bit count. Versions 123 through 154 use a Wwise variable-length count.
+Each action ID is emitted in original order with its exact word range, including repeated IDs.
+A complete Event emits the exact residual body range. Diagnostic Event rows preserve readable
+count fields and the actual count-prefix range. An unsupported layout retains its original body
+and reports the version-dependent status explicitly.
+
+STID header rows retain the authored string type and name count. Each name row carries its
+original ID and byte count, exact header and name ranges, original bytes and UTF-8 result.
+Repeated IDs and empty names retain their ordinals. Valid UTF-8 preserves whitespace and NUL
+characters. Invalid UTF-8 retains the validated prefix length and the invalid sequence length
+when known. A successful name scan emits an exact residual range, which can be empty.
+Diagnostic output for a truncated name retains the authored count and readable prefix.
+
+The provider streams physical sections before reading the selected DIDX, HIRC and STID bodies.
+The second checked pass uses the complete directory evidence to select a unique DATA
+section. Repeated recognized sections produce diagnosed projection loss, and all original
+occurrences are available in diagnostic output. An incomplete directory leaves unresolved
+DATA selection unavailable. An out-of-range media declaration keeps its original triplet
+and its diagnosis.
+
+The field-origin companion binds exact uses to the actual physical Entry. A resolved media
+class identifies the admitted signature and form used to classify it. A declared RIFF
+length identifies its own consulted size word. The raw media range and its originating
+DIDX declaration remain separate fields. Record status, directory metadata and payload
+encryption retain their distinct meanings.

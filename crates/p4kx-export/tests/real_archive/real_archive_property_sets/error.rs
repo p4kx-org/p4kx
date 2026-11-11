@@ -90,6 +90,8 @@ pub(super) enum CatalogFault {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum AccountingFault {
+    HealthCaptureClosed,
+    Unknown,
     MissingCatalogRows,
     ConflictingCatalogRows,
     MissingCatalogRowSource,
@@ -101,6 +103,9 @@ pub(super) enum AccountingFault {
     ConflictingFieldInspection,
     ConflictingTagTrace,
     UnfilledTransformationNode,
+    ConflictingSourceDatum,
+    UnfilledLootValue,
+    UnsupportedLootSourceValue,
     FieldPath,
     ConflictingDisposition,
     Unreconciled,
@@ -109,6 +114,7 @@ pub(super) enum AccountingFault {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum OutputFault {
+    HealthShape,
     JsonDecode,
     MissingSets,
     MissingContracts,
@@ -167,7 +173,6 @@ pub(super) enum SourceFault {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum JoinFault {
     ContractIdentity,
-    MissingRawContract,
     ArrayShape,
     Count,
     Target,

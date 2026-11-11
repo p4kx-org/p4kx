@@ -47,10 +47,12 @@ impl LoadoutReadObserver for Probe {
                     return ControlFlow::Break(());
                 }
             }
-            LoadoutReadEvent::FileRead {
-                outcome: Err(LoadoutFileError::SourceEvidenceUnavailable),
-                ..
-            } => {
+            LoadoutReadEvent::FileRead { observation, .. }
+                if matches!(
+                    observation.read_outcome(),
+                    Err(LoadoutFileError::SourceEvidenceUnavailable)
+                ) =>
+            {
                 self.source_failures.fetch_add(1, Ordering::Relaxed);
             }
             _ => {}

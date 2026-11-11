@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use p4kx_extraction::{Archive, CancelToken, Entry};
 use rayon::prelude::*;
 
 use crate::CatalogError;
+use crate::catalog_read::original::EntryCapture;
 use crate::export_ledger::ExportLedger;
 use crate::shop_container_scan::{Scanned, shop_entities};
+use crate::shop_inventory_observations::InventoryObservations;
+use crate::shop_inventory_path::InventoryStem;
 use crate::shop_prefabs::Prefabs;
 use crate::starmap_index::key;
 
@@ -61,7 +64,7 @@ pub(crate) enum Component {
     /// The component is there and names no inventory file.
     NoFile,
     /// The component names this file (lower-case stem).
-    File(String),
+    File(InventoryStem),
     /// The container's components for the Entity disagree.
     Conflict,
 }
@@ -70,6 +73,7 @@ pub(crate) enum Component {
 struct Named {
     classes: Vec<Class>,
     inventories: Vec<Component>,
+    observations: InventoryObservations,
     placed: bool,
     prefab: bool,
 }
@@ -81,8 +85,8 @@ pub(crate) fn verdict(states: &[Component]) -> Inventory<'_> {
     for state in states {
         match state {
             Component::File(stem) => match file {
-                Some(held) if held != stem => conflict = true,
-                _ => file = Some(stem),
+                Some(held) if held != stem.as_str() => conflict = true,
+                _ => file = Some(stem.as_str()),
             },
             Component::Conflict => conflict = true,
             Component::NotFound => not_found = true,
@@ -104,6 +108,7 @@ pub(crate) fn verdict(states: &[Component]) -> Inventory<'_> {
 #[derive(Debug, Default)]
 pub(crate) struct Containers {
     pub(crate) ledger: ExportLedger,
+    pub(crate) unattributed_declarations: bool,
     by_entity: HashMap<String, Named>,
     pub(crate) listed: usize,
     pub(crate) unreadable: usize,
@@ -122,17 +127,18 @@ impl Containers {
     pub(crate) fn read(
         archive: &Archive,
         cancel: Option<&CancelToken>,
+        capture: &EntryCapture<'_>,
     ) -> Result<Self, CatalogError> {
         let listed = listed(archive);
-        let read: Vec<Scanned> = listed
+        let read = listed
             .par_iter()
             .map(|(entry, _)| {
                 if cancel.is_some_and(CancelToken::is_cancelled) {
-                    return Scanned::default();
+                    return Ok(Scanned::default());
                 }
-                shop_entities(archive, entry)
+                shop_entities(archive, entry, capture)
             })
-            .collect();
+            .collect::<Result<Vec<_>, CatalogError>>()?;
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
@@ -144,6 +150,8 @@ impl Containers {
                 containers.other_scanned += 1;
             }
             containers.ledger.merge(entities.ledger);
+            containers.unattributed_declarations |= entities.unattributed_declarations;
+            let mut observations = entities.observations;
             let Some((entities, rejected)) = entities.entities else {
                 if class.is_some() {
                     containers.unreadable += 1;
@@ -162,33 +170,34 @@ impl Containers {
             }
             for (entity, inventory) in entities {
                 containers.components += usize::from(inventory != Component::NotFound);
+                let original = observations.remove(&entity);
                 let named = containers.by_entity.entry(entity).or_default();
+                if let Some(original) = original {
+                    named.observations.merge(original)?;
+                }
                 named.placed = true;
                 if let Some(class) = &class
                     && !named.classes.contains(class)
                 {
                     named.classes.push(class.clone());
                 }
-                if !named.inventories.contains(&inventory) {
-                    named.inventories.push(inventory);
-                }
+                append_inventory(&mut named.inventories, inventory)?;
             }
         }
         Ok(containers)
     }
 
     /// Adds the inventory files the shop prefabs name as one more place per Entity.
-    pub(crate) fn add_prefabs(&mut self, prefabs: &Prefabs) {
+    pub(crate) fn add_prefabs(&mut self, prefabs: &Prefabs) -> Result<(), CatalogError> {
         for (entity, stems) in &prefabs.by_entity {
             let named = self.by_entity.entry(entity.clone()).or_default();
             named.prefab = true;
             for stem in stems {
                 let state = Component::File(stem.clone());
-                if !named.inventories.contains(&state) {
-                    named.inventories.push(state);
-                }
+                append_inventory(&mut named.inventories, state)?;
             }
         }
+        Ok(())
     }
 
     /// Returns whether a prefab names the Entity and no container holds it.
@@ -219,6 +228,31 @@ impl Containers {
             .map_or(Inventory::None, |named| verdict(&named.inventories))
     }
 
+    pub(crate) fn inventory_observations(
+        &self,
+        entity: &str,
+    ) -> Option<(&[Component], &InventoryObservations)> {
+        self.by_entity
+            .get(entity)
+            .map(|named| (named.inventories.as_slice(), &named.observations))
+    }
+
+    pub(crate) fn inventory_selections(
+        &self,
+    ) -> Result<BTreeMap<&str, InventoryStem>, CatalogError> {
+        let mut paths: BTreeMap<&str, InventoryStem> = BTreeMap::new();
+        for state in self.by_entity.values().flat_map(|named| &named.inventories) {
+            if let Component::File(stem) = state {
+                if let Some(held) = paths.get_mut(stem.as_str()) {
+                    held.merge(stem)?;
+                } else {
+                    paths.insert(stem.as_str(), stem.clone());
+                }
+            }
+        }
+        Ok(paths)
+    }
+
     /// Returns the inventory file stems any container names, ordered.
     pub(crate) fn inventory_stems(&self) -> BTreeSet<&str> {
         self.by_entity
@@ -230,6 +264,17 @@ impl Containers {
             })
             .collect()
     }
+}
+
+fn append_inventory(states: &mut Vec<Component>, state: Component) -> Result<(), CatalogError> {
+    if let Some(held) = states.iter_mut().find(|held| **held == state) {
+        if let (Component::File(held), Component::File(incoming)) = (held, &state) {
+            held.merge(incoming)?;
+        }
+    } else {
+        states.push(state);
+    }
+    Ok(())
 }
 
 fn listed(archive: &Archive) -> Vec<(&Entry, Option<Class>)> {
@@ -281,7 +326,7 @@ mod tests {
     use super::{Component, Inventory, classify, verdict};
 
     fn file(stem: &str) -> Component {
-        Component::File(stem.to_owned())
+        Component::File(crate::shop_inventory_path::InventoryStem::accounting(stem))
     }
 
     #[test]

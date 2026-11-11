@@ -37,9 +37,11 @@ pub(crate) fn scope(profile: OriginProfile, pointer: &str) -> ScopeMapping {
         | OriginProfile::MaterialConfigurationFailure => {
             crate::origin_material_profile::scope(profile, data)
         }
-        OriginProfile::Unmigrated | OriginProfile::ArchiveBuild | OriginProfile::IndexBuild => {
-            ScopeMapping::Unmapped
-        }
+        OriginProfile::Unmigrated
+        | OriginProfile::ArchiveBuild
+        | OriginProfile::IndexBuild
+        | OriginProfile::AudioWem
+        | OriginProfile::AudioBank => ScopeMapping::Unmapped,
     }
 }
 
@@ -117,11 +119,40 @@ pub(crate) fn independent(profile: OriginProfile, pointer: &str) -> bool {
         | OriginProfile::MaterialConfigurationFailure => {
             crate::origin_material_profile::independent(profile, pointer)
         }
+        OriginProfile::AudioWem | OriginProfile::AudioBank => audio_independent(pointer),
         OriginProfile::ArchiveEntry
         | OriginProfile::Unmigrated
         | OriginProfile::ArchiveBuild
         | OriginProfile::IndexBuild => false,
     }
+}
+
+fn audio_independent(pointer: &str) -> bool {
+    matches!(
+        pointer,
+        "/data/record_type" | "/data/payload/phase" | "/issues"
+    ) || [
+        "header_range",
+        "body_range",
+        "padding_range",
+        "index_range",
+        "count_range",
+        "id_range",
+        "name_range",
+        "point_range",
+        "content/payload/raw_range",
+        "content/payload/text_range",
+        "content/payload/utf8_input_range",
+        "data/range",
+        "trailing_range",
+    ]
+    .into_iter()
+    .any(|range| {
+        pointer
+            .strip_prefix("/data/payload/")
+            .and_then(|path| path.strip_prefix(range))
+            .is_some_and(|rest| origin_resolver::within(rest, "/basis"))
+    })
 }
 
 fn failure_control(profile: OriginProfile, pointer: &str) -> bool {

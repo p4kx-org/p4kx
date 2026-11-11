@@ -42,7 +42,8 @@ annotations. Their schemas remain strings with documented `x-values` and
 target or successful operation. Kind identifiers, Entry-operation identifiers, diagnostic codes,
 negative-only unresolved-reference reasons and explanatory Archive-key states remain open.
 
-Schema 3 distinguishes eleven fixed control types: `CatalogPublicationMode`, `ExportHealthStatus`,
+Schema 3 uses closed controls for dataset availability and interpretation, including the
+shop inventory's "offlineDesignTime" meaning. Publication and evidence controls include `CatalogPublicationMode`, `ExportHealthStatus`,
 `ExportStageStatus`, `ExportSourceMode`, `ExportDiagnosticSeverity`, `ExportDiagnosticStage`,
 `ExportDiagnosticUnit`, `ExportSourceRole`, `DefinitionStatus`, `OwnedReferenceStatus` and
 `PropertyReferenceStatus`. They govern publication, health accounting or a positive source-link

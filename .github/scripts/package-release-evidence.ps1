@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'native-evidence.ps1')
 . (Join-Path $PSScriptRoot 'linux-package-evidence.ps1')
+. (Join-Path $PSScriptRoot 'linux-package-lifecycle-evidence.ps1')
 . (Join-Path $PSScriptRoot 'documents-portal-evidence.ps1')
 . (Join-Path $PSScriptRoot 'msi-path-verification.ps1')
 
@@ -17,10 +18,14 @@ function Assert-P4kxPackageRuntime {
     if ((($packages.package | Sort-Object) -join ',') -cne (($Platform.packages | Sort-Object) -join ',')) {
         throw 'Release evidence does not cover every target package exactly once.'
     }
+    $sourcePackage = if ($Platform.os -ceq 'windows') { 'portable-zip' } else { 'tar-gz' }
     foreach ($package in $packages) {
         $name = Get-P4kxAssetName -Target $Platform.target -Version $Version -Package $package.package
         $hash = (Get-FileHash -LiteralPath (Join-Path $AssetDirectory $name) -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($package.target -cne $Platform.target -or $package.archive_sha256 -cne $hash) { throw 'Executed package source/target/digest differs.' }
+        if ($package.package -ceq $sourcePackage -and $Runtime.archive_sha256 -cne $hash) {
+            throw "Native release archive digest differs from the executed $sourcePackage."
+        }
         Assert-P4kxBinaryEvidence -Metadata $package -Platform $Platform
         if ($Platform.os -eq 'linux') {
             Assert-P4kxLinuxPackageProducer $package.producer $Platform $Runtime $AssetDirectory $Version
@@ -38,5 +43,8 @@ function Assert-P4kxPackageRuntime {
         foreach ($check in @('cli_list', 'cli_extract', 'cli_convert', 'mcp_tools', 'mcp_read', 'gui_frames')) {
             if ($package.runtime.$check -cne 'success') { throw "Packaged runtime check '$check' did not succeed." }
         }
+    }
+    if ($Platform.os -ceq 'linux') {
+        Assert-P4kxLinuxLifecycleEvidence $Runtime.linux_lifecycle $packages $Platform $Version $Runtime.revision
     }
 }

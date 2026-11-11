@@ -13,6 +13,7 @@ mod origin;
 mod patch;
 mod paths;
 mod read;
+mod request;
 mod structure;
 mod totals;
 

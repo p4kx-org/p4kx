@@ -8,6 +8,11 @@ use p4kx_export::CatalogPublicationMode;
 use p4kx_testkit::{TestInstance, TestValue};
 use serde_json::{Value, json};
 
+use crate::mission_canonical_health as canonical_health;
+
+#[path = "mission_name_canonical.rs"]
+mod canonical;
+
 #[derive(Clone, Copy)]
 enum Position {
     Suspect,
@@ -92,7 +97,11 @@ fn original_name_tokens_and_dangling_targets_survive_both_investigation_position
                 owner,
                 CatalogPublicationMode::Normal,
             )?;
-            let value = fixture::value(&document, owner, "Case")?
+            if !matches!(owner, Owner::Generator) {
+                canonical::original(&document, position, owner)?;
+                continue;
+            }
+            let value = fixture::generator_value(&document, "Case")?
                 .pointer(position.path())
                 .ok_or("the investigation name")?;
             assert_eq!(value["source"]["characterGivenName"], "plain");
@@ -128,7 +137,7 @@ fn resolved_name_data_keeps_its_full_reference_and_the_legacy_guid() -> TestResu
             Owner::Generator,
             CatalogPublicationMode::Normal,
         )?;
-        let value = fixture::value(&document, Owner::Generator, "Case")?
+        let value = fixture::generator_value(&document, "Case")?
             .pointer(position.path())
             .ok_or("the investigation name")?;
         let reference = &value["source"]["characterNameData"];
@@ -170,20 +179,14 @@ fn malformed_present_name_tokens_and_nonfinite_chances_fail_their_original_owner
             )?;
             assert_eq!(document["exportHealth"]["status"], "incomplete");
             assert_eq!(document["missionPropertySets"], json!([]));
-            let failures = document["exportHealth"]["diagnostics"]
-                .as_array()
-                .ok_or("the diagnostics")?;
             assert!(
-                failures
-                    .iter()
-                    .any(|failure| failure["examples"]
-                        .as_array()
-                        .is_some_and(|examples| examples.iter().any(
-                            |example| example["sourceType"] == "MissionPropertyValue_AIName"
-                                && example["field"]
-                                    .as_str()
-                                    .is_some_and(|path| path.ends_with(&format!(".name.{field}")))
-                        )))
+                canonical_health::example(
+                    &document,
+                    None,
+                    "MissionPropertyValue_AIName",
+                    |path| path.ends_with(&format!(".name.{field}"))
+                )?,
+                "the same report retains the original failing name field and source type"
             );
         }
     }
@@ -202,7 +205,7 @@ fn investigation_source_additions_leave_legacy_ai_name_properties_unchanged() ->
         ),
         CatalogPublicationMode::Normal,
     )?;
-    let value = fixture::value(&document, Owner::Generator, "Legacy")?;
+    let value = fixture::generator_value(&document, "Legacy")?;
     assert_eq!(value["type"], "aiName");
     assert_eq!(value["givenName"]["key"], Value::Null);
     assert_eq!(value["nameDataGuid"], Value::Null);
@@ -218,7 +221,7 @@ fn the_name_schema_requires_original_source_fields_even_when_null() -> TestResul
         Owner::Generator,
         CatalogPublicationMode::Normal,
     )?;
-    let mut value = fixture::value(&document, Owner::Generator, "Case")?
+    let mut value = fixture::generator_value(&document, "Case")?
         .pointer(Position::Suspect.path())
         .ok_or("the investigation name")?
         .clone();

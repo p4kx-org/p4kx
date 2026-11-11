@@ -5,21 +5,31 @@ use p4kx_extraction::{CancelToken, RecordTree, SourceValue, SourcedValue};
 
 use super::contract::{ResourceGroupKey, ResourceGroupMembers};
 use crate::CatalogError;
-use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_read::{self, CatalogFields};
+use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_read::CatalogFields;
+use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::guid_text::CatalogGuid;
 use crate::record_header_field::RecordHeaderField;
+use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
+use crate::template_field_capture::TemplateFieldCapture;
 
 /// Freezes both original membership arrays before the selected group map is constructed.
-pub(crate) fn read(
-    tree: &RecordTree<'_>,
-    origins: &CatalogOrigins,
+pub(crate) fn read<'source>(
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, '_>,
+    admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<(ResourceGroupMembers, Vec<FieldError>), CatalogError> {
-    let context = origins.record(tree.record_index());
-    let fields = CatalogFields::new(tree.root(), "", &context);
+    let scope = input.record_scope(admission.record(), tree)?;
+    let original = OriginalFlowFields::read(&scope, cancel)?;
+    let capture = TemplateFieldCapture::new(&original, input, admission)?;
+    let context = input
+        .origins()
+        .record(tree.record_index())
+        .with_cancel(cancel);
+    let fields = CatalogFields::observed(tree.root(), "", &context, &capture)?;
     let mut notes = Vec::new();
     let groups = references(&fields, "groups", &mut notes, cancel)?;
     let resources = references(&fields, "resources", &mut notes, cancel)?;
@@ -58,13 +68,7 @@ fn references(
                 if cancel.is_some_and(CancelToken::is_cancelled) {
                     return Err(CatalogError::Cancelled);
                 }
-                catalog_read::reference_value(
-                    fields.context(),
-                    Some(value),
-                    fields.source().type_name(),
-                    &format!("{name}[{ordinal}]"),
-                    notes,
-                )
+                fields.reference_value(&format!("{name}[{ordinal}]"), Some(value), notes)
             })
             .collect::<Result<_, CatalogError>>()
     })

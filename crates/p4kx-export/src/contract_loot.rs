@@ -126,54 +126,6 @@ pub(crate) struct SpawnWith<'a> {
     pub(crate) selector: LootSelector<'a>,
 }
 
-/// A pool filter: a `PoolFilterRecord` Record under `lootgeneration/filters`, which items a
-/// container may draw.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct LootPoolFilter<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `V3PoolFilter_ASDDelving`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The filter of the Record; `null` when it has none.
-    pub(crate) filter: Option<PoolFilterNode<'a>>,
-}
-
-/// One node of a pool filter: a sequence of filters, a link to another filter Record, or a tag
-/// term.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct PoolFilterNode<'a> {
-    /// The struct of the node as stored, e.g. `PoolFilter_Sequence`; informational, not a
-    /// selector: the other fields tell what the node holds.
-    pub(crate) node_type: &'a str,
-    /// The `PoolFilterRecord` a `PoolFilter_RecordRef` links to.
-    pub(crate) filter_guid: Option<CatalogGuid>,
-    /// The GUIDs of the `Tag` Records in `positiveTags` of a `PoolFilter_Tags`.
-    pub(crate) positive_tag_guids: Vec<CatalogGuid>,
-    /// The GUIDs of the `Tag` Records in `negativeTags` of a `PoolFilter_Tags`.
-    pub(crate) negative_tag_guids: Vec<CatalogGuid>,
-    /// The filters of a `PoolFilter_Sequence`, in stored order.
-    pub(crate) filters: Vec<PoolFilterInstance<'a>>,
-}
-
-/// One filter of a sequence and how it combines with the ones before it.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct PoolFilterInstance<'a> {
-    /// The designer's label.
-    pub(crate) name: Option<&'a str>,
-    /// `mode`, e.g. `Cumulative` or `Additive`.
-    pub(crate) mode: Option<&'a str>,
-    /// The filter; `null` when the instance has none.
-    pub(crate) filter: Option<Box<PoolFilterNode<'a>>>,
-}
-
 /// A container placed with a multi config: an entity that places an object container and carries
 /// a `SubHarvestableMultiConfigRecord`, whose tag points the config fills with harvestables and
 /// their loot. One entry per container, system and starmap object it hangs below.
@@ -220,7 +172,7 @@ pub(crate) struct LootConfig {
     pub(crate) loot_table_guid: Option<CatalogGuid>,
     /// The `LootTableV3Record` the config links to, an entry of `lootTables`.
     pub(crate) loot_table_v3_guid: Option<CatalogGuid>,
-    /// The `PoolFilterRecord` of the constraints, an entry of `lootPoolFilters`.
+    /// The `PoolFilterRecord` of the constraints, an entry of `definitions.lootPoolFilters.rows`.
     pub(crate) pool_filter_guid: Option<CatalogGuid>,
     /// `totalResultsLimit`.
     pub(crate) total_results_limit: Option<i64>,

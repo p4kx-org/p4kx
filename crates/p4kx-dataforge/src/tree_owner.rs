@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use crate::{DataForge, Record};
+use crate::{DataForge, DataForgeError, Record};
 
 /// Borrowed identity of the DataForge that supplied a canonical tree.
 #[derive(Clone, Copy)]
@@ -15,6 +15,21 @@ impl<'source> TreeOwner<'source> {
     /// Retains the actual canonical reader's borrowed owner.
     pub(crate) const fn new(forge: &'source DataForge<'source>) -> Self {
         Self { forge }
+    }
+
+    pub(crate) fn record(self, index: u32) -> Result<Record<'source>, DataForgeError> {
+        let row = self
+            .forge
+            .record(index)
+            .ok_or(DataForgeError::IndexOutOfRange {
+                part: "Reference",
+                index: usize::try_from(index).map_err(|_| DataForgeError::TooLarge {
+                    part: "Record index",
+                })?,
+                target: "Record",
+                target_index: u64::from(index),
+            })?;
+        Ok(row)
     }
 
     /// Compares the original borrowed owner without using descriptive identities.

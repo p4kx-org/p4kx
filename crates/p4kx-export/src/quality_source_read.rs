@@ -13,7 +13,7 @@ use crate::quality_source::{
     QualityRecordReference, QualitySource,
 };
 use crate::resource_value_read;
-use crate::source_fields::FieldError;
+use crate::source_fields::{FieldCapture, FieldError};
 
 /// Projects an authored distribution without following its Record Reference.
 pub(crate) fn distribution<'f>(
@@ -21,15 +21,16 @@ pub(crate) fn distribution<'f>(
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<QualitySource<'f, QualityCurveSource>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
+    let fields = CatalogFields::observed(source, path, context, capture)?;
     let payload = match source.type_name() {
         "CraftingQualityDistributionNormal" | "CraftingQualityDistributionUniform" => {
             Some(QualityPayload::Inline(InlineQuality {
                 value: context.value(
                     path,
                     SourceValue::Present(quality_curve_source_read::read(
-                        source, path, context, notes,
+                        source, path, context, notes, capture,
                     )?),
                 )?,
             }))
@@ -38,12 +39,12 @@ pub(crate) fn distribution<'f>(
             Some(record_ref(&fields, "qualityDistributionRecord", notes)?)
         }
         "CraftingQualityDistribution_Base" | "CraftingQualityDistribution_Base_NonRef" => {
-            fields.check(&[], notes);
+            fields.check_observed(&[], notes)?;
             Some(QualityPayload::EmptyBase)
         }
         _ => None,
     };
-    wrap(source, path, context, notes, payload)
+    wrap(source, path, context, notes, payload, capture)
 }
 
 /// Projects the ordered authored location-override source.
@@ -52,15 +53,16 @@ pub(crate) fn overrides<'f>(
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<QualitySource<'f, QualityOverridesSource<'f>>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
+    let fields = CatalogFields::observed(source, path, context, capture)?;
     let payload = match source.type_name() {
         "CraftingQualityLocationOverride" => {
-            fields.check(&["locationOverrideList"], notes);
+            fields.check_observed(&["locationOverrideList"], notes)?;
             Some(QualityPayload::Inline(InlineQuality {
                 value: context.value(
                     path,
-                    SourceValue::Present(override_list(source, path, context, notes)?),
+                    SourceValue::Present(override_list(source, path, context, notes, capture)?),
                 )?,
             }))
         }
@@ -68,12 +70,12 @@ pub(crate) fn overrides<'f>(
             Some(record_ref(&fields, "locationOverrideRecord", notes)?)
         }
         "CraftingQualityLocationOverride_Base" | "CraftingQualityLocationOverride_Base_NonRef" => {
-            fields.check(&[], notes);
+            fields.check_observed(&[], notes)?;
             Some(QualityPayload::EmptyBase)
         }
         _ => None,
     };
-    wrap(source, path, context, notes, payload)
+    wrap(source, path, context, notes, payload, capture)
 }
 
 fn override_list<'f>(
@@ -81,8 +83,9 @@ fn override_list<'f>(
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<QualityOverridesSource<'f>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
+    let fields = CatalogFields::observed(source, path, context, capture)?;
     let location_override_list =
         fields
             .array("locationOverrideList", notes)?
@@ -92,9 +95,15 @@ fn override_list<'f>(
                     .enumerate()
                     .map(|(index, value)| {
                         let location = format!("{path}.locationOverrideList[{index}]");
-                        context
-                            .structure_element(value, source.type_name(), &location, notes)?
-                            .try_map(|entry| override_entry(entry, &location, context, notes))
+                        fields
+                            .structure_element(
+                                &format!("locationOverrideList[{index}]"),
+                                value,
+                                notes,
+                            )?
+                            .try_map(|entry| {
+                                override_entry(entry, &location, context, notes, capture)
+                            })
                     })
                     .collect::<Result<_, CatalogError>>()
             })?;
@@ -108,11 +117,12 @@ fn override_entry<'f>(
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<QualityOverrideSource<'f>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
+    let fields = CatalogFields::observed(source, path, context, capture)?;
     let payload = match source.type_name() {
         "CraftingQualityLocationOverrideEntry" => {
-            fields.check(&["location", "qualityDistribution"], notes);
+            fields.check_observed(&["location", "qualityDistribution"], notes)?;
             let quality_distribution =
                 fields
                     .structure("qualityDistribution", notes)?
@@ -122,6 +132,7 @@ fn override_entry<'f>(
                             &format!("{path}.qualityDistribution"),
                             context,
                             notes,
+                            capture,
                         )
                     })?;
             Some(QualityOverridePayload::Entry(Box::new(
@@ -133,7 +144,7 @@ fn override_entry<'f>(
         }
         "CraftingQualityLocationOverrideEntry_Base"
         | "CraftingQualityLocationOverrideEntry_Base_NonRef" => {
-            fields.check(&[], notes);
+            fields.check_observed(&[], notes)?;
             Some(QualityOverridePayload::EmptyBase)
         }
         _ => None,
@@ -153,25 +164,28 @@ pub(crate) fn quantization<'f>(
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<QualitySource<'f, QualityQuantizationSource<'f>>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
+    let fields = CatalogFields::observed(source, path, context, capture)?;
     let payload = match source.type_name() {
         "CraftingQualityQuantization" => Some(QualityPayload::Inline(InlineQuality {
             value: context.value(
                 path,
-                SourceValue::Present(quality_bands_read::read(source, path, context, notes)?),
+                SourceValue::Present(quality_bands_read::read(
+                    source, path, context, notes, capture,
+                )?),
             )?,
         })),
         "CraftingQualityQuantization_RecordRef" => {
             Some(record_ref(&fields, "qualityQuantizationRecord", notes)?)
         }
         "CraftingQualityQuantization_Base" | "CraftingQualityQuantization_Base_NonRef" => {
-            fields.check(&[], notes);
+            fields.check_observed(&[], notes)?;
             Some(QualityPayload::EmptyBase)
         }
         _ => None,
     };
-    wrap(source, path, context, notes, payload)
+    wrap(source, path, context, notes, payload, capture)
 }
 
 fn record_ref<T>(
@@ -179,7 +193,7 @@ fn record_ref<T>(
     field: &str,
     notes: &mut Vec<FieldError>,
 ) -> Result<QualityPayload<T>, CatalogError> {
-    fields.check(&[field], notes);
+    fields.check_observed(&[field], notes)?;
     Ok(QualityPayload::RecordRef(QualityRecordReference {
         reference: resource_value_read::reference(fields, field, notes)?,
     }))
@@ -191,8 +205,9 @@ fn wrap<'f, T>(
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
     payload: Option<QualityPayload<T>>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<QualitySource<'f, T>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
+    let fields = CatalogFields::observed(source, path, context, capture)?;
     Ok(QualitySource {
         source_type: fields.source_type()?,
         payload: payload.map_or_else(

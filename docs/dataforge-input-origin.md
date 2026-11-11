@@ -114,11 +114,62 @@ second read, parse or read/parse counter increment. A context budget refusal can
 the intrinsic parse outcome absent while reporting incomplete inventory. A cache event
 alone does not supply the current caller's authored selection contributions.
 
+The Export adapter retains genuine file-read and projection proofs for the resolver cache's
+lifetime while draining each caller's ledger delta. Reuse validates the original admission,
+intrinsic document kind and exact read/optional parse outcomes; it emits no new file operation
+or duplicate diagnostic text. Archive admission follows the original input/container/Entry
+binding; a generic or missing source retains its existing opaque handle. Equal path/index
+descriptions and separately created unbound sources do not establish the same admission.
+
+Read, projection and reuse events retain the same readonly original document-operation handle.
+Cloning it is not another IO operation; two genuine cold reads of the same Entry remain distinct.
+The adapter records observed read/projection phases separately from the receipt's intrinsic
+outcomes. A later-filled parse result alone supplies no missing callback proof. Projection must
+use its own observed successful read and may complete after another operation; delivery order
+and matching file metadata cannot replace the actual operation handle. Repeating a read or
+projection callback for that same handle is an explicit accounting error, with no extra row.
+
 Observer cancellation and unavailable original admission remain fatal across later reads,
 cache accesses and resolver roots. The Export adapter preserves the first cause;
 `CatalogError::LoadoutSourceEvidence` retains actual admission unavailability rather than
 turning it into an ordinary unreadable source row. Normal no-observer reads retain their
 existing route and do not create original-source observation storage.
+
+### Authored requests and direct XML Includes
+
+`LoadoutPath` retains path text and its optional authentic selection as one private pair.
+Cloning that pair preserves the selection; copying its text cannot bind a new path to the
+original getter. Record-path callbacks run within the actual Record/tree projection, and XML
+callbacks borrow the original document operation and the actual node of the same parse. The
+XML site includes the real attribute name, decoded value and decoding outcome. A selection
+handle alone does not replace these source-read proofs.
+
+FileRead and FileProjection carry the original candidate together with the current caller.
+FileDependency reports one selected direct Include, with both genuine parent and child
+operation handles, the child's unchanged first-population candidate, and the actual Include
+request. It follows the child's actual read and optional projection. Missing or malformed
+children retain their real failed outcomes. FileDependencyRefused instead carries the genuine
+parent, selected Include and actual error when a cycle or input policy refuses the request
+before a child operation exists. It never invents a read or Entry for the refused target.
+
+Local XML cache hits reference the original child operation through that one direct edge.
+Global XML cache reuse emits only one FileReused root link with today's caller; consumers retain
+the original dependency graph and follow its existing edges. Vehicle-cache reuse keeps its
+separate flat set of original candidate operations. Neither route repeats source reads or
+parses. An observer stop prevents later operations and successful edge/reuse callbacks.
+
+The direct graph avoids repeatedly expanding a shared dependency closure for every Include.
+A seven-document complete DAG has seven reads, seven projections and twenty-one direct edges;
+its later root-cache hit adds one reuse link and no new edge. Operation storage and callback
+count follow the actual documents and selected edges, rather than the number of transitive
+paths. Existing XML parse-depth and file-count policies remain separate and unchanged.
+
+An output adapter must validate both edge endpoints against their actual observed phases and
+expected original input, retain the genuine Include recipe, and connect the current caller
+through the root link before publishing derived field origins. An independently observed
+unbound provider remains explicitly unknown/incomplete; a known Archive input must still
+supply its actual ArchiveInputOrigin. Missing implementation capture cannot use the unbound
+case as a fallback. These SDK receipts do not by themselves complete every output adapter.
 
 ## Export contract and verification
 

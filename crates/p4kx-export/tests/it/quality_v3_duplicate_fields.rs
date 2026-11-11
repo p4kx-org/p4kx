@@ -55,7 +55,7 @@ fn quality_v3_one_retained_cell_cannot_excuse_two_identical_original_named_float
     assert!(
         matches!(
             build_catalog_from(&archive, &input, &options),
-            Err(CatalogError::IncompleteExport { .. })
+            Err(CatalogError::IncompleteExport(_))
         ),
         "unrepresented duplicate authored slots require diagnostic publication"
     );

@@ -94,7 +94,7 @@ fn a_failed_radar_read_is_distinct_from_a_missing_entry() -> TestResult {
         failures
             .first()
             .ok_or("compatibility failure missing")?
-            .guid,
+            .guid(),
         "both representations identify the same failed source"
     );
     assert!(

@@ -52,7 +52,7 @@ impl CapturedFixture {
         assert!(
             matches!(
                 build_catalog_from(&self.archive, &self.input, &options),
-                Err(CatalogError::IncompleteExport { .. })
+                Err(CatalogError::IncompleteExport(_))
             ),
             "the required original token diagnosis blocks actual normal publication"
         );
@@ -99,25 +99,32 @@ pub(crate) fn assert_uncovered(
     let diagnostics = support::at(catalog, "/exportHealth/diagnostics")?
         .as_array()
         .ok_or("source diagnostics")?;
+    let mut found = false;
+    for diagnostic in diagnostics {
+        if diagnostic.get("kind").and_then(Value::as_str) != Some(kind)
+            || diagnostic.get("sourceRole").and_then(Value::as_str) != Some(role)
+            || diagnostic.get("stage").and_then(Value::as_str) != Some("projection")
+            || diagnostic.get("code").and_then(Value::as_str) != Some("unsupportedValue")
+            || diagnostic.get("severity").and_then(Value::as_str) != Some("error")
+        {
+            continue;
+        }
+        let examples = support::at(diagnostic, "/examples")?
+            .as_array()
+            .ok_or("source examples")?;
+        for example in examples {
+            found |= example
+                .pointer("/recordIndex/value")
+                .and_then(Value::as_u64)
+                == Some(record)
+                && crate::health_origin_assertions::example_text(catalog, example, "field")?
+                    == Some(&json!(field))
+                && crate::health_origin_assertions::example_text(catalog, example, "sourceType")?
+                    == Some(&json!("CraftingQualityDistributionNormal"));
+        }
+    }
     assert!(
-        diagnostics.iter().any(|diagnostic| {
-            diagnostic.get("kind").and_then(Value::as_str) == Some(kind)
-                && diagnostic.get("sourceRole").and_then(Value::as_str) == Some(role)
-                && diagnostic.get("stage").and_then(Value::as_str) == Some("projection")
-                && diagnostic.get("code").and_then(Value::as_str) == Some("unsupportedValue")
-                && diagnostic.get("severity").and_then(Value::as_str) == Some("error")
-                && diagnostic
-                    .get("examples")
-                    .and_then(Value::as_array)
-                    .is_some_and(|examples| {
-                        examples.iter().any(|example| {
-                            example.get("recordIndex").and_then(Value::as_u64) == Some(record)
-                                && example.get("field").and_then(Value::as_str) == Some(field)
-                                && example.get("sourceType").and_then(Value::as_str)
-                                    == Some("CraftingQualityDistributionNormal")
-                        })
-                    })
-        }),
+        found,
         "the original physical token keeps its exact blocking diagnostic; a Kind, GUID alias, other field or unrelated refusal is not capture proof"
     );
     Ok(())

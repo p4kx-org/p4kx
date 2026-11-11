@@ -48,11 +48,22 @@ impl LoadoutResolver<'_> {
         issues: &mut Vec<LoadoutError>,
     ) -> Option<Arc<VehicleImplementation>> {
         match self.vehicle_of(spec) {
-            Some(Ok(vehicle)) => {
-                issues.extend(vehicle.issues.iter().cloned());
+            Some((Ok(vehicle), caller)) => {
+                if vehicle.issues.iter().any(LoadoutError::is_missing_file) {
+                    let caller = Arc::new(caller);
+                    issues.extend(vehicle.issues.iter().cloned().map(|mut issue| {
+                        issue.used_by(&caller);
+                        issue
+                    }));
+                } else {
+                    issues.extend(vehicle.issues.iter().cloned());
+                }
                 Some(vehicle)
             }
-            Some(Err(error)) => {
+            Some((Err(mut error), caller)) => {
+                if error.is_missing_file() {
+                    error.used_by(&Arc::new(caller));
+                }
                 issues.push(error);
                 None
             }
@@ -73,9 +84,8 @@ impl LoadoutResolver<'_> {
             Ok(own) => {
                 issues.extend(own.issues.iter().cloned());
                 entries.extend(
-                    own.list
-                        .iter()
-                        .map(|entry| (entry.clone(), PortSource::Loadout)),
+                    own.specs()
+                        .map(|entry| (entry.into_owned(), PortSource::Loadout)),
                 );
             }
             Err(error) => issues.push(error),
@@ -87,7 +97,9 @@ impl LoadoutResolver<'_> {
             match self.entries(overrides) {
                 Ok(given) => {
                     issues.extend(given.issues.iter().cloned());
-                    let given = given.list.iter().map(|e| (e.clone(), PortSource::Override));
+                    let given = given
+                        .specs()
+                        .map(|entry| (entry.into_owned(), PortSource::Override));
                     merge_by_port(&mut entries, given, |(entry, _)| &entry.port);
                 }
                 Err(error) => issues.push(error),

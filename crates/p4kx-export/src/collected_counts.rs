@@ -31,7 +31,7 @@ impl Collected<'_> {
             Kind::ContractShipSpawns => self.contract_ship_spawns.len(),
             Kind::ContractLocationQueries => self.contract_location_queries.len(),
             Kind::ContractTemplates => self.contract_templates.len(),
-            Kind::MissionBrokerEntries => self.mission_broker_entries.len(),
+            Kind::MissionBrokerEntries => self.broker_definitions.len(),
             Kind::ContractNpcSpawns => self.contract_npc_spawns.len(),
             Kind::ContractEntitySpawns => self.contract_entity_spawns.len(),
             Kind::MissionPropertySets => self.mission_property_sets.len(),
@@ -45,6 +45,7 @@ impl Collected<'_> {
             Kind::HarvestableLocations => self.harvestable_locations.len(),
             Kind::LootContainers => self.loot_containers.len(),
             Kind::Shops => self.shops.len(),
+            Kind::ShopInventories => self.shop_inventories.rows.len(),
             Kind::Crafters => self.crafters.len(),
             Kind::FactionReputations
             | Kind::ReputationScopes

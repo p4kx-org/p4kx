@@ -1,9 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[cfg(test)]
+use std::convert::Infallible;
+
 use p4kx_extraction::Guid;
 
-use crate::starmap_xml::{Document, Node, XmlError, attribute};
+use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
+use crate::{CatalogError, ExportAccountingError};
+
+#[cfg(test)]
+use crate::starmap_xml::Document;
+use crate::starmap_xml::{Node, XmlError, attribute};
 
 /// The attribute of an entity component that names the container the entity places.
 const CONTAINER_ATTRIBUTE: &str = "objectContainer";
@@ -25,32 +33,110 @@ pub(crate) struct EntityLink {
     pub(crate) malformed_config: bool,
 }
 
-/// Reads the configured container links, distinguishing valid empty XML from malformed XML.
-pub(crate) fn read(bytes: &[u8]) -> Result<EntityLink, XmlError> {
-    Ok(link_below(Document::parse(bytes)?.root()))
+/// An entity link paired privately to its actual selected authored container token.
+pub(crate) struct CapturedEntityLink {
+    value: EntityLink,
+    selected: Option<AuthoredEntryPath>,
 }
 
-/// Returns the first container and the first config named by an element at or below `root`, in
-/// document order, and whether another one differs.
-fn link_below<'d, N: Node<'d>>(root: N) -> EntityLink {
-    let mut link = EntityLink::default();
+impl CapturedEntityLink {
+    pub(crate) const fn value(&self) -> &EntityLink {
+        &self.value
+    }
+
+    pub(crate) fn into_parts(self) -> (EntityLink, Option<AuthoredEntryPath>) {
+        (self.value, self.selected)
+    }
+}
+
+enum AttributeValue<'source> {
+    Plain(&'source str),
+    Captured(AuthoredEntryPath),
+}
+
+impl AttributeValue<'_> {
+    fn text(&self) -> &str {
+        match self {
+            Self::Plain(value) => value,
+            Self::Captured(value) => value.as_str(),
+        }
+    }
+    fn receipt(self) -> Option<AuthoredEntryPath> {
+        match self {
+            Self::Plain(_) => None,
+            Self::Captured(value) => Some(value),
+        }
+    }
+}
+
+/// Reads configured entity links from an independent plain XML projection.
+#[cfg(test)]
+pub(crate) fn read(bytes: &[u8]) -> Result<EntityLink, XmlError> {
+    let document = Document::parse(bytes)?;
+    let result = link_below(document.root(), |node, name| {
+        Ok::<_, Infallible>(attribute(node, name).map(AttributeValue::Plain))
+    });
+    Ok(match result {
+        Ok(link) => link.value,
+        Err(never) => match never {},
+    })
+}
+
+/// Reads entity links in the same parse as their actual admitted source token.
+pub(crate) fn read_original(
+    read: &EntryRead,
+    capture: &EntryCapture<'_>,
+) -> Result<Result<CapturedEntityLink, XmlError>, CatalogError> {
+    let document = match EntryXml::parse(read, capture)? {
+        Ok(document) => document,
+        Err(error) => return Ok(Err(error)),
+    };
+    let link = link_below(document.root(), |node, name| {
+        if name == CONTAINER_ATTRIBUTE {
+            document
+                .attribute(node, name)
+                .map(|value| value.map(AttributeValue::Captured))
+        } else {
+            Ok(attribute(node, name).map(AttributeValue::Plain))
+        }
+    })?;
+    if link.value.container.is_some() && link.selected.is_none() {
+        return Err(ExportAccountingError::UnboundHealthSubject.into());
+    }
+    Ok(Ok(link))
+}
+
+fn link_below<'document, N: Node<'document>, E>(
+    root: N,
+    mut attribute: impl FnMut(N, &'static str) -> Result<Option<AttributeValue<'document>>, E>,
+) -> Result<CapturedEntityLink, E> {
+    let mut link = CapturedEntityLink {
+        value: EntityLink::default(),
+        selected: None,
+    };
     let mut pending = vec![root];
     while let Some(node) = pending.pop() {
-        if let Some(path) = attribute(node, CONTAINER_ATTRIBUTE).filter(|path| !path.is_empty()) {
-            match link.container.as_deref() {
-                None => link.container = Some(path.to_owned()),
-                Some(first) => link.several |= first != path,
+        if let Some(path) =
+            attribute(node, CONTAINER_ATTRIBUTE)?.filter(|path| !path.text().is_empty())
+        {
+            match link.value.container.as_deref() {
+                None => {
+                    link.value.container = Some(path.text().to_owned());
+                    link.selected = path.receipt();
+                }
+                Some(first) => link.value.several |= first != path.text(),
             }
         }
-        if let Some(text) = attribute(node, CONFIG_ATTRIBUTE).filter(|text| !text.trim().is_empty())
+        if let Some(text) =
+            attribute(node, CONFIG_ATTRIBUTE)?.filter(|text| !text.text().trim().is_empty())
         {
-            if let Ok(guid) = text.trim().parse() {
-                match link.config {
-                    None => link.config = Some(guid),
-                    Some(first) => link.several |= first != guid,
+            if let Ok(guid) = text.text().trim().parse() {
+                match link.value.config {
+                    None => link.value.config = Some(guid),
+                    Some(first) => link.value.several |= first != guid,
                 }
             } else {
-                link.malformed_config = true;
+                link.value.malformed_config = true;
             }
         }
         let mark = pending.len();
@@ -59,7 +145,7 @@ fn link_below<'d, N: Node<'d>>(root: N) -> EntityLink {
             added.reverse();
         }
     }
-    link
+    Ok(link)
 }
 
 #[cfg(test)]

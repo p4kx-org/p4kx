@@ -62,7 +62,7 @@ fn health(global_failure: bool) -> super::Result<ExportHealth> {
     assert!(
         matches!(
             p4kx_export::build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH)),
-            Err(CatalogError::IncompleteExport { .. })
+            Err(CatalogError::IncompleteExport(_))
         ),
         "the real production Normal gate refuses the actual source defect"
     );
@@ -89,9 +89,10 @@ fn an_unrelated_kind_failure_does_not_prevent_an_independent_mapped_audit() -> s
     );
     assert!(
         health
-            .failed_records
+            .failed_records()
             .iter()
-            .any(|source| source.kind == Some(Kind::Ships) && source.record_index == 1),
+            .any(|source| source.kind == Some(Kind::Ships)
+                && source.record_index().value() == Some(&1)),
         "the exact failed physical source remains available"
     );
     Ok(())
@@ -102,9 +103,9 @@ fn an_unscoped_failure_cannot_be_assumed_unrelated_to_the_mapping() -> super::Re
     let health = health(true)?;
     assert!(
         health
-            .failed_records
+            .failed_records()
             .iter()
-            .any(|source| source.kind.is_none() && source.record_index == 2),
+            .any(|source| source.kind.is_none() && source.record_index().value() == Some(&2)),
         "the actual unreadable global source remains an exact physical identity"
     );
     assert!(

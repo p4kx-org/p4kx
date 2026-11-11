@@ -8,6 +8,7 @@ use p4kx_export::Kind;
 use serde_json::Value;
 
 use crate::catalog_v3_consumer;
+use crate::real_archive_blueprints::Blueprints;
 use crate::real_archive_broker_entries::check_broker_links;
 use crate::real_archive_contract_templates::check_template_links;
 use crate::real_archive_npc_spawns::check_npc_links;
@@ -64,23 +65,31 @@ fn check_blueprint_links(catalog: &Value) -> TestResult {
     let producible: HashSet<_> = items.union(&ships).copied().collect();
     let categories = real_archive_verification::guids(catalog, Kind::BlueprintCategories.name())?;
     let resources = real_archive_verification::guids(catalog, Kind::ResourceTypes.name())?;
-    for blueprint in real_archive_verification::list(catalog, Kind::Blueprints)? {
-        if let Some(guid) = blueprint.get("categoryGuid").and_then(Value::as_str) {
+    let blueprints = Blueprints::read(catalog)?;
+    for blueprint in blueprints.rows() {
+        if let Some(guid) = blueprint
+            .presentation
+            .pointer("/category/value")
+            .and_then(Value::as_str)
+        {
             assert!(categories.contains(guid), "blueprint category {guid}");
         }
-        if let Some(guid) = blueprint.get("producedItemGuid").and_then(Value::as_str) {
+        if let Some(guid) = blueprint
+            .presentation
+            .pointer("/producedItem/value")
+            .and_then(Value::as_str)
+        {
             assert!(producible.contains(guid), "produced entity {guid}");
         }
-        for ingredient in blueprint
-            .get("ingredients")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            if let Some(guid) = ingredient.get("resourceGuid").and_then(Value::as_str) {
+        for ingredient in blueprint.ingredients()? {
+            let meaning = &ingredient["meaning"];
+            if let Some(guid) = meaning
+                .pointer("/resourceGuid/value")
+                .and_then(Value::as_str)
+            {
                 assert!(resources.contains(guid), "resource {guid}");
             }
-            if let Some(guid) = ingredient.get("itemGuid").and_then(Value::as_str) {
+            if let Some(guid) = meaning.pointer("/itemGuid/value").and_then(Value::as_str) {
                 assert!(items.contains(guid), "ingredient item {guid}");
             }
         }

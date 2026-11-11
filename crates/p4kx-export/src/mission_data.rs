@@ -89,15 +89,19 @@ fn tier<'f>(tier: &StructValue<'f>) -> ScenarioTier<'f> {
 /// Sets the `faction_reputation_guid` of every faction in `scenarios` from the
 /// `factionReputationRef` of its `Faction` Record; a Record that is missing, unreadable or names
 /// none leaves `None`.
-pub(crate) fn link_scenario_factions(
-    forge: &DataForge<'_>,
-    scenarios: &mut [ContractScenario<'_>],
+pub(crate) fn link_scenario_factions<'f>(
+    forge: &'f DataForge<'f>,
+    scenarios: &mut [ContractScenario<'f>],
+    input: &'f crate::build::original_input::OriginalCatalogInput<'f, 'f>,
     cancel: Option<&p4kx_extraction::CancelToken>,
 ) -> Result<crate::export_ledger::ExportLedger, crate::CatalogError> {
-    let capture = std::sync::Arc::new(crate::export_builder_capture::BuilderCapture::for_kind(
-        crate::Kind::ContractScenarios,
-        cancel,
-    ));
+    let capture = std::sync::Arc::new(
+        crate::export_builder_capture::BuilderCapture::for_input_kind(
+            input,
+            crate::Kind::ContractScenarios,
+            cancel,
+        ),
+    );
     let mut trees = TreeBuilder::with_read_observer(capture.clone());
     for tiers in scenarios
         .iter_mut()

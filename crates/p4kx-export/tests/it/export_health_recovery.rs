@@ -94,7 +94,7 @@ fn an_actual_recovered_directory_refuses_normal_in_memory_publication() -> TestR
     let (_directory, archive) = archive(true)?;
     let result = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH));
     assert!(
-        matches!(result, Err(CatalogError::IncompleteExport { .. })),
+        matches!(result, Err(CatalogError::IncompleteExport(_))),
         "a recovered subset cannot establish successful absence for any catalog kind"
     );
     Ok(())
@@ -118,11 +118,11 @@ fn recovered_diagnostic_output_has_one_global_marker_and_only_observed_counts() 
         "the one readable manufacturer source is observed once"
     );
     assert!(
-        health.failed_records.is_empty() && health.failed_entries.is_empty(),
+        health.failed_records().is_empty() && health.failed_entries().is_empty(),
         "archive-wide uncertainty is not assigned to a fabricated Record or Entry zero"
     );
     let global: Vec<_> = health
-        .diagnostics
+        .diagnostics()
         .iter()
         .filter(|diagnostic| {
             diagnostic.kind.is_none()
@@ -142,7 +142,7 @@ fn recovered_diagnostic_output_has_one_global_marker_and_only_observed_counts() 
     );
     assert_eq!(marker.count, 1, "unknown lost Entry counts are not guessed");
     assert!(
-        marker.examples.is_empty(),
+        marker.examples().is_empty(),
         "the archive-wide diagnostic fabricates no physical source identity"
     );
     assert_unknown_inventories(health)?;
@@ -156,7 +156,7 @@ fn recovered_diagnostic_output_has_one_global_marker_and_only_observed_counts() 
 }
 
 fn assert_unknown_inventories(health: &p4kx_export::ExportHealth) -> TestResult {
-    for kind in &health.kinds {
+    for kind in health.kinds() {
         assert!(
             !kind.source_inventory_complete,
             "the root directory may hide inputs of any kind"
@@ -209,7 +209,7 @@ fn recovered_normal_writes_preserve_fresh_and_existing_destinations() -> TestRes
                 },
             );
             assert!(
-                matches!(result, Err(CatalogError::IncompleteExport { .. })),
+                matches!(result, Err(CatalogError::IncompleteExport(_))),
                 "root recovery blocks both plain and compressed normal writes"
             );
             assert!(!created.get(), "the destination factory is not called");
@@ -238,7 +238,7 @@ fn allowing_recovery_with_a_healthy_directory_keeps_normal_publication_healthy()
     );
     assert!(
         health
-            .kinds
+            .kinds()
             .iter()
             .all(|kind| kind.source_inventory_complete),
         "a regular intact directory has no root inventory uncertainty"

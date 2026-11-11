@@ -3,9 +3,10 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Result, ensure};
 use p4kx_extraction::{
-    Archive, DataForgeEntry, DataForgeLoadError, DataForgeSource, is_dataforge_file,
+    Archive, DataForgeEntry, DataForgeLoadError, DataForgeOrigin, DataForgeSource, SourceInput,
+    is_dataforge_file,
 };
 
 /// The DataForge a `p4kx dcb` command reads, from an Archive or from a DataForge file on disk,
@@ -54,5 +55,22 @@ impl ForgeInput {
     /// Returns the DataForge that was read.
     pub(crate) const fn entry(&self) -> &DataForgeEntry {
         &self.entry
+    }
+
+    /// Returns the physical input that supplied the admitted DataForge bytes.
+    pub(crate) fn source_input(&self) -> Result<SourceInput<'_>> {
+        let original = self.entry.origin();
+        match original {
+            DataForgeOrigin::Archive(origin) => {
+                ensure!(
+                    self.archive()
+                        .is_some_and(|archive| original.matches_archive(archive)),
+                    "foreign DataForge Archive Entry"
+                );
+                Ok(SourceInput::Archive(origin))
+            }
+            DataForgeOrigin::File(origin) => Ok(SourceInput::File(origin)),
+            _ => Ok(SourceInput::Unknown),
+        }
     }
 }

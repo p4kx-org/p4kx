@@ -27,15 +27,6 @@ fn build() -> Result<Value, Box<dyn Error>> {
     )?)
 }
 
-fn entry(catalog: &Value, sub: bool) -> Result<&Value, String> {
-    catalog["contracts"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|entry| entry["subContractGuid"].is_null() != sub)
-        .ok_or_else(|| "the contract entry".to_owned())
-}
-
 fn pool<'c>(catalog: &'c Value, kind: &str, guid: &Value) -> Result<&'c Value, String> {
     catalog[kind]
         .as_array()
@@ -71,12 +62,18 @@ fn the_nearest_level_that_states_a_variable_wins_and_an_empty_description_is_lef
 {
     let catalog = build()?;
     assert_eq!(
-        weights(&catalog, entry(&catalog, false)?)?,
+        weights(
+            &catalog,
+            crate::catalog_contracts::entry_by_level(&catalog, false)?
+        )?,
         [("Wave_BP@contract".to_owned(), 2.0)],
         "the empty Empty_BP of the contract hides the handler's and is itself left out"
     );
     assert_eq!(
-        weights(&catalog, entry(&catalog, true)?)?,
+        weights(
+            &catalog,
+            crate::catalog_contracts::entry_by_level(&catalog, true)?
+        )?,
         [("Wave_BP@subContract".to_owned(), 3.0)]
     );
     Ok(())
@@ -122,7 +119,7 @@ fn ship_options_keep_the_crew_faction_flag_for_each_authored_alternative() -> Te
 #[test]
 fn location_queries_are_exported_as_stored_with_tag_paths() -> TestResult {
     let catalog = build()?;
-    let contract = entry(&catalog, false)?;
+    let contract = crate::catalog_contracts::entry_by_level(&catalog, false)?;
     let links = contract["locationQueries"].as_array().ok_or("links")?;
     let names: Vec<(&str, &str)> = links
         .iter()
@@ -160,17 +157,18 @@ fn location_queries_are_exported_as_stored_with_tag_paths() -> TestResult {
 #[test]
 fn location_prerequisites_are_listed_per_level_as_stored() -> TestResult {
     let catalog = build()?;
-    let levels: Vec<(&str, &str)> = entry(&catalog, true)?["locationPrerequisites"]
-        .as_array()
-        .ok_or("prerequisites")?
-        .iter()
-        .map(|item| {
-            (
-                item["level"].as_str().unwrap_or_default(),
-                item["locationLevelType"].as_str().unwrap_or_default(),
-            )
-        })
-        .collect();
+    let levels: Vec<(&str, &str)> =
+        crate::catalog_contracts::entry_by_level(&catalog, true)?["locationPrerequisites"]
+            .as_array()
+            .ok_or("prerequisites")?
+            .iter()
+            .map(|item| {
+                (
+                    item["level"].as_str().unwrap_or_default(),
+                    item["locationLevelType"].as_str().unwrap_or_default(),
+                )
+            })
+            .collect();
     assert_eq!(levels, [("handler", "System"), ("subContract", "Planet")]);
     Ok(())
 }

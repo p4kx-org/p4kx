@@ -74,7 +74,7 @@ impl SourceRegistry {
                 }
             }
 
-            SourceInput::File(origin) => self.file(FileInputRef::DataForge(origin)),
+            SourceInput::File(origin) => self.file(FileInputRef::Observed(origin)),
             SourceInput::BuildManifest(origin) => self.file(FileInputRef::BuildManifest(origin)),
             SourceInput::Unknown => {
                 let id = PhysicalSourceRef(format!("u{}", self.sources.len()));

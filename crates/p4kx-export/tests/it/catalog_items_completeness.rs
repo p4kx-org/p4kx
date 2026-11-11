@@ -32,8 +32,8 @@ fn every_kind_states_its_completeness() -> TestResult {
             .summary()
             .kinds()
             .iter()
-            .all(|entry| entry.complete == (entry.kind == Kind::Tags)),
-        "every scoped kind is partial; only the global Tag taxonomy stays complete"
+            .all(|entry| entry.complete == matches!(entry.kind, Kind::Tags | Kind::ShopInventories)),
+        "the Tag taxonomy and physical shop inventory selection are global"
     );
     Ok(())
 }
@@ -67,6 +67,7 @@ fn expected_completeness() -> Value {
         "subHarvestableMultiConfigs": {"status": "complete"},
         "harvestableLocations": {"status": "complete"},
         "shops": {"status": "complete"},
+        "shopInventories": {"status": "complete"},
         "factionReputations": {"status": "complete"},
         "reputationScopes": {"status": "complete"},
         "reputationStandings": {"status": "complete"},

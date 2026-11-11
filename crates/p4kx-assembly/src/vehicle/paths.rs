@@ -3,19 +3,6 @@
 
 pub(super) const DIRECTORY: &str = "Scripts/Entities/Vehicles/Implementations/Xml";
 
-/// Adds `path` to the candidates when it lies below the implementation folder.
-pub(super) fn add_candidate(list: &mut Vec<String>, path: &str) {
-    if let Some(path) = confine(path) {
-        push_unique(list, &path);
-    }
-}
-
-pub(super) fn push_unique(list: &mut Vec<String>, path: &str) {
-    if !list.iter().any(|seen| seen.eq_ignore_ascii_case(path)) {
-        list.push(path.to_owned());
-    }
-}
-
 /// Returns `path` with `/` as separator and without a leading `Data`, or `None` when it has a
 /// `.` or `..` segment or does not lie below the implementation folder.
 pub(super) fn confine(path: &str) -> Option<String> {

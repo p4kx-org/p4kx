@@ -16,9 +16,9 @@ pub trait CanonicalReadObserver: Send + Sync {
     ) -> ControlFlow<()>;
 }
 
-pub(crate) struct ReadObserver(pub(crate) Arc<dyn CanonicalReadObserver>);
+pub(crate) struct ReadObserver<'f>(pub(crate) Arc<dyn CanonicalReadObserver + 'f>);
 
-impl std::fmt::Debug for ReadObserver {
+impl std::fmt::Debug for ReadObserver<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("ReadObserver")

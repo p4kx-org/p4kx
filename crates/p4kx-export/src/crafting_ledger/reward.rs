@@ -7,9 +7,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use p4kx_extraction::{CancelToken, Guid, Record, TreeBuilder};
 use rayon::prelude::*;
 
+use crate::build::original_input::OriginalCatalogInput;
 use crate::crafting_sources;
 use crate::crafting_types::{BlueprintPool, RewardSource};
 use crate::export_ledger::ExportLedger;
+use crate::record_observation::RecordObservation;
 use crate::{CatalogError, CatalogPhase, CatalogProgress, Kind};
 
 const PROGRESS_STEP: usize = 1024;
@@ -37,9 +39,20 @@ fn scan<'f>(
     trees: &mut TreeBuilder<'f>,
     record: &Record<'f>,
     wanted: &HashSet<Guid>,
+    input: Option<&OriginalCatalogInput<'_, '_>>,
     cancel: Option<&CancelToken>,
 ) -> Result<Scanned<'f>, CatalogError> {
-    let read = crate::export_dependency_read::read(trees, record, Kind::BlueprintPools, cancel)?;
+    let admission = match input {
+        Some(input) => RecordObservation::capture(input, record)?,
+        None => RecordObservation::accounting(record),
+    };
+    let read = crate::export_dependency_read::read(
+        input,
+        trees,
+        &admission,
+        Kind::BlueprintPools,
+        cancel,
+    )?;
     let Ok(tree) = read.tree else {
         return Ok(Scanned::Failed {
             type_name: record.type_name().ok(),
@@ -114,6 +127,7 @@ fn tick(done: &AtomicUsize, total: usize, progress: Option<&(dyn Fn(CatalogProgr
 pub(crate) fn reward_sources<'f>(
     records: &[Record<'f>],
     pools: &[BlueprintPool<'f>],
+    input: Option<&OriginalCatalogInput<'_, '_>>,
     cancel: Option<&CancelToken>,
     progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
 ) -> Result<RewardSearch<'f>, CatalogError> {
@@ -125,7 +139,7 @@ pub(crate) fn reward_sources<'f>(
             if cancel.is_some_and(CancelToken::is_cancelled) {
                 return Err(CatalogError::Cancelled);
             }
-            let scanned = scan(trees, record, &wanted, cancel)?;
+            let scanned = scan(trees, record, &wanted, input, cancel)?;
             tick(&done, records.len(), progress);
             Ok(scanned)
         })

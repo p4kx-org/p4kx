@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::bank_object_fields;
 use crate::bank_reader::SectionReader;
 use crate::{BankError, HircKind, SectionId};
 
@@ -225,9 +226,7 @@ pub(crate) fn skip_items(
     count: u32,
     len: usize,
 ) -> Result<(), BankError> {
-    let total = usize::try_from(count)
-        .ok()
-        .and_then(|count| count.checked_mul(len))
-        .ok_or_else(|| BankError::invalid(SectionId::HIRC, "a list is longer than its body"))?;
-    fields.skip(total).map(|_| ())
+    fields
+        .skip(bank_object_fields::item_bytes(count, len)?)
+        .map(|_| ())
 }

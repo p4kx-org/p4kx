@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use serde_json::Value;
 
+use crate::real_archive_contract_templates::mission_graph::{self as graph, Family, Mission};
 use crate::real_archive_verification::{TestResult, guids, print_line};
 
 /// The values of the enum `EExcludeSpawnGender`.
@@ -89,6 +90,87 @@ fn check_links_of(
     Ok(())
 }
 
+fn check_context(
+    mission: &Mission<'_>,
+    kinds: &[(&'static str, HashSet<&str>)],
+    counts: &mut Counts,
+) -> TestResult {
+    for pool in mission.pools()? {
+        let Some(field) = pool_field(pool.family) else {
+            continue;
+        };
+        let listed = &kinds
+            .iter()
+            .find(|(name, _)| *name == field)
+            .ok_or("actual spawn kind")?
+            .1;
+        assert!(listed.contains(pool.guid), "{field} {} resolves", pool.guid);
+        *counts.links.entry(field).or_default() += 1;
+    }
+    check_properties(mission, kinds, counts)
+}
+
+fn check_properties(
+    mission: &Mission<'_>,
+    kinds: &[(&'static str, HashSet<&str>)],
+    counts: &mut Counts,
+) -> TestResult {
+    for property in graph::array(mission.projection, "properties")?
+        .iter()
+        .filter(|property| {
+            property
+                .get("objective")
+                .is_some_and(|reference| !reference.is_null())
+        })
+    {
+        let Some(source) = property.get("value").filter(|value| !value.is_null()) else {
+            continue;
+        };
+        mission.follow(source)?;
+        let kind = graph::text(property, "/valueKind")?;
+        if kind == "organization" {
+            counts.organizations += 1;
+            continue;
+        }
+        assert!(VALUE_TYPES.contains(&kind), "known value type {kind}");
+        let expected = match kind {
+            "shipSpawnDescriptions" => "ships",
+            "npcSpawnDescriptions" => "npcs",
+            "entitySpawnDescriptions" => "entities",
+            _ => continue,
+        };
+        if let Some((family, guid)) = mission
+            .registration(source)?
+            .map(|registration| registration.identifier())
+            .transpose()?
+            .flatten()
+        {
+            assert_eq!(
+                family, expected,
+                "the actual property registration has the same family"
+            );
+            let field = pool_field(family).ok_or("actual spawn family")?;
+            let listed = &kinds
+                .iter()
+                .find(|(name, _)| *name == field)
+                .ok_or("actual spawn kind")?
+                .1;
+            assert!(listed.contains(guid), "{kind} {guid} resolves");
+        }
+        counts.property_values += 1;
+    }
+    Ok(())
+}
+
+fn pool_field(family: &str) -> Option<&'static str> {
+    match family {
+        "ships" => Some("shipSpawns"),
+        "npcs" => Some("npcSpawns"),
+        "entities" => Some("entitySpawns"),
+        _ => None,
+    }
+}
+
 /// Asserts that every NPC and entity spawn link of a contract, a template and a broker entry, and
 /// every spawn value of an objective property, names an entry of its kind, and that the stored
 /// enum names are known.
@@ -98,9 +180,12 @@ pub(crate) fn check_npc_links(catalog: &Value) -> TestResult {
         .map(|(field, kind)| Ok((field, guids(catalog, kind)?)))
         .collect::<Result<_, String>>()?;
     let mut counts = Counts::default();
-    for kind in ["contracts", "contractTemplates", "missionBrokerEntries"] {
-        for entry in catalog[kind].as_array().ok_or(kind)? {
-            check_links_of(entry, &kinds, &mut counts)?;
+    for entry in crate::real_archive_contracts::v3::rows(catalog)? {
+        check_links_of(entry, &kinds, &mut counts)?;
+    }
+    for family in [Family::Template, Family::Broker] {
+        for mission in graph::contexts(catalog, family)? {
+            check_context(&mission, &kinds, &mut counts)?;
         }
     }
     let mut unknown_genders = 0_usize;

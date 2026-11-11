@@ -3,6 +3,8 @@
 
 use std::fmt;
 
+use crate::WemCodecSource;
+
 const DSP_HEADER_LEN: u32 = 0x0C;
 const DSP_CHANNEL_LEN: u32 = 0x2E;
 const PTADPCM_FRAME_LEN: u32 = 0x104;
@@ -28,7 +30,7 @@ pub enum Codec {
     Xma2,
     /// AAC, tag `0xAAC0`.
     Aac,
-    /// Nintendo DSP ADPCM, tag `0xFFF0`, or tag `0x0002` with `12 + 46 × channels` bytes after
+    /// Nintendo DSP ADPCM, tag `0xFFF0`, or tag `0x0002` with `12 + 46 � channels` bytes after
     /// the `fmt` fields.
     Dsp,
     /// Sony HEVAG, tag `0xFFFB`.
@@ -67,7 +69,7 @@ impl Codec {
     /// states them.
     ///
     /// Tag `0x0002` is IMA ADPCM unless the chunk holds DSP coefficients (`extra_len` is
-    /// `12 + 46 × channels`) or its block alignment is 260 bytes per channel (PTADPCM).
+    /// `12 + 46 � channels`) or its block alignment is 260 bytes per channel (PTADPCM).
     #[must_use]
     pub const fn of_format(
         tag: u16,
@@ -75,14 +77,28 @@ impl Codec {
         block_align: u16,
         extra_len: Option<u16>,
     ) -> Self {
+        Self::classify_format(tag, channels, block_align, extra_len).0
+    }
+
+    pub(crate) const fn classify_format(
+        tag: u16,
+        channels: u16,
+        block_align: u16,
+        extra_len: Option<u16>,
+    ) -> (Self, WemCodecSource) {
         if tag != 0x0002 {
-            return Self::from_tag(tag);
+            return (Self::from_tag(tag), WemCodecSource::Tag);
         }
         let channels = channels as u32;
+        let adpcm = WemCodecSource::AdpcmBlock {
+            extra_length_present: extra_len.is_some(),
+        };
         match extra_len {
-            Some(extra) if extra as u32 == DSP_HEADER_LEN + channels * DSP_CHANNEL_LEN => Self::Dsp,
-            _ if block_align as u32 == PTADPCM_FRAME_LEN * channels => Self::PtAdpcm,
-            _ => Self::ImaAdpcm,
+            Some(extra) if extra as u32 == DSP_HEADER_LEN + channels * DSP_CHANNEL_LEN => {
+                (Self::Dsp, WemCodecSource::DspCoefficients)
+            }
+            _ if block_align as u32 == PTADPCM_FRAME_LEN * channels => (Self::PtAdpcm, adpcm),
+            _ => (Self::ImaAdpcm, adpcm),
         }
     }
 

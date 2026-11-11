@@ -7,12 +7,15 @@ use crate::loadout_file_trace::FileTrace;
 use crate::markup::{Budget, Element};
 use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
 use crate::vehicle::ElemOverride;
-use crate::vehicle::elem::{self, Modification};
+use crate::vehicle::elem::{Modification, ModificationPatch};
 use crate::vehicle::file_read;
 use crate::vehicle::patch::{self, ModificationReport};
 use crate::vehicle::paths;
 use crate::vehicle::paths::DIRECTORY;
-use crate::{LoadoutDocumentKind, LoadoutError, LoadoutFiles};
+use crate::{
+    LoadoutDocumentKind, LoadoutError, LoadoutFailurePath, LoadoutFiles, LoadoutPath,
+    LoadoutPathOperation,
+};
 
 const LISTED: usize = 8;
 
@@ -31,42 +34,49 @@ pub(super) fn apply(
     selection: &Selection<'_>,
     budget: &mut Budget,
     issues: &mut Vec<LoadoutError>,
-    observation: Option<&Observation>,
+    observation: Option<&Observation<'_>>,
     trace: &mut FileTrace,
 ) -> Result<AppliedModification, LoadoutError> {
     let mut modified = AppliedModification::default();
-    let found = elem::find_modification(root, selection.modification);
-    let patch_file = found.as_ref().and_then(|found| found.patch_file.as_deref());
-    let (candidates, explicit) = patch_candidates(selection, patch_file, issues);
+    let authored = selection
+        .selected
+        .and_then(|selected| selected.patch.as_ref());
+    let (candidates, explicit) = patch_candidates(selection, authored, issues, observation)?;
 
-    match file_read::first(
+    let first = trace.position();
+    let read = file_read::first(
         files,
         &candidates,
+        selection.caller,
         LoadoutDocumentKind::VehiclePatch,
         observation,
         trace,
-    ) {
+    );
+    if let Some(wanted) = explicit.filter(|wanted| match &read {
+        Ok(Some((path, _))) => !wanted.eq_ignore_ascii_case(path),
+        Ok(None) => true,
+        Err(_) => false,
+    }) {
+        issues.push(super::missing(LoadoutFailurePath::from_attempts(
+            wanted,
+            trace.attempts(first, 1),
+        )));
+    }
+    match read {
         Ok(Some((path, bytes))) => {
-            if let Some(wanted) = explicit.as_ref().filter(|w| !w.eq_ignore_ascii_case(&path)) {
-                issues.push(super::missing(wanted));
-            }
             budget.grow(bytes.len());
             if let Some(done) = apply_patch(root, bytes, &path, budget, issues, observation)? {
                 modified.patch_path = Some(path);
                 modified.report = Some(done);
             }
         }
-        Ok(None) => {
-            if let Some(wanted) = &explicit {
-                issues.push(super::missing(wanted));
-            }
-        }
+        Ok(None) => {}
         Err(LoadoutError::ObservationStopped) => return Err(LoadoutError::ObservationStopped),
         Err(error) => issues.push(error),
     }
     apply_elements(
         root,
-        found.as_ref(),
+        selection.selected,
         selection,
         budget,
         issues,
@@ -79,38 +89,51 @@ pub(super) fn apply(
 /// Returns the candidates for the patch file, and the one the Modification names itself.
 fn patch_candidates(
     selection: &Selection<'_>,
-    patch_file: Option<&str>,
+    authored: Option<&ModificationPatch>,
     issues: &mut Vec<LoadoutError>,
-) -> (Vec<String>, Option<String>) {
+    observation: Option<&Observation<'_>>,
+) -> Result<(Vec<LoadoutPath>, Option<LoadoutPath>), LoadoutError> {
     let mut candidates = Vec::new();
     let mut explicit = None;
-    if let Some(file) = patch_file {
-        if let Some(path) = paths::confine(&paths::patch_path(file)) {
-            paths::push_unique(&mut candidates, &path);
+    if let Some(authored) = authored {
+        if let Some(path) = paths::confine(&paths::patch_path(&authored.path)) {
+            let path = LoadoutPath::derived(
+                path,
+                LoadoutPathOperation::VehiclePatch,
+                &[&authored.path, selection.modification, &authored.name],
+                observation,
+            )?;
+            candidates.push(path.clone());
             explicit = Some(path);
         } else {
             issues.push(super::issue(
-                file,
+                &authored.path,
                 format!("the patch file is not below {DIRECTORY}"),
             ));
         }
     }
     if paths::usable_name(selection.stem) && paths::usable_name(selection.modification) {
-        paths::add_candidate(
+        crate::vehicle::request::add(
             &mut candidates,
             &format!(
                 "{DIRECTORY}/Modifications/{}_{}.xml",
                 selection.stem, selection.modification
             ),
-        );
+            LoadoutPathOperation::VehiclePatchStem,
+            &[selection.definition, selection.modification],
+            observation,
+        )?;
     }
     if paths::usable_name(selection.class_name) {
-        paths::add_candidate(
+        crate::vehicle::request::add(
             &mut candidates,
             &format!("{DIRECTORY}/Modifications/{}.xml", selection.class_name),
-        );
+            LoadoutPathOperation::VehiclePatchClass,
+            &[selection.class_request],
+            observation,
+        )?;
     }
-    (candidates, explicit)
+    Ok((candidates, explicit))
 }
 
 /// Runs `run` on `root` and restores `root` as it was when `run` fails; the copy that makes this
@@ -118,7 +141,7 @@ fn patch_candidates(
 fn guarded<T>(
     root: &mut Element,
     budget: &mut Budget,
-    observation: Option<&Observation>,
+    observation: Option<&Observation<'_>>,
     run: impl FnOnce(&mut Element, &mut Budget) -> Result<T, String>,
 ) -> Result<T, String> {
     if let Err(error) = budget.check_copy(root) {
@@ -173,7 +196,7 @@ fn apply_patch(
     path: &str,
     budget: &mut Budget,
     issues: &mut Vec<LoadoutError>,
-    observation: Option<&Observation>,
+    observation: Option<&Observation<'_>>,
 ) -> Result<Option<ModificationReport>, LoadoutError> {
     match guarded(root, budget, observation, |root, budget| {
         file_read::patch(root, bytes, budget, observation)
@@ -197,7 +220,7 @@ fn apply_elements(
     selection: &Selection<'_>,
     budget: &mut Budget,
     issues: &mut Vec<LoadoutError>,
-    observation: Option<&Observation>,
+    observation: Option<&Observation<'_>>,
     modified: &mut AppliedModification,
 ) -> Result<(), LoadoutError> {
     match found {

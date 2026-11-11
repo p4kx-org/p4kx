@@ -1,52 +1,90 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::markup::Element;
+use crate::LoadoutPath;
+use crate::loadout_xml::{Node, Scope};
 
-/// A Modification of the base implementation: the patch file it names and its `Elem` overrides.
+/// A Modification of the base implementation: its selected patch and Elem overrides.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Modification {
-    pub(super) patch_file: Option<String>,
+    pub(super) patch: Option<ModificationPatch>,
     pub(super) elems: Vec<ElemOverride>,
 }
 
-/// Finds the Modification `name` below the `Modifications` element of `vehicle`, preferring an
-/// exact name over one that differs in ASCII case.
-pub(super) fn find_modification(vehicle: &Element, name: &str) -> Option<Modification> {
-    let all: Vec<&Element> = vehicle
-        .children_named("Modifications")
-        .flat_map(|modifications| modifications.children_named("Modification"))
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct ModificationPatch {
+    pub(super) path: LoadoutPath,
+    pub(super) name: LoadoutPath,
+}
+
+/// Selects the original Modification, preferring an exact name over an ASCII case match.
+pub(super) fn find_modification(
+    vehicle: Node<'_, '_>,
+    scope: &Scope<'_, '_>,
+    requested: &str,
+) -> Result<Option<Modification>, String> {
+    let Some((node, authored_name)) = select_modification(vehicle, requested) else {
+        return Ok(None);
+    };
+    let patch = match node.attribute_ascii("patchFile") {
+        Some((name, value)) if !value.trim().is_empty() => Some(ModificationPatch {
+            path: scope
+                .path(node, name)?
+                .ok_or("the selected patchFile attribute is absent")?,
+            name: scope
+                .modification_name(node, authored_name)?
+                .ok_or("the selected Modification name is absent")?,
+        }),
+        _ => None,
+    };
+    let elems = named_children(node, "Elems")
+        .flat_map(|node| named_children(node, "Elem"))
+        .filter_map(|node| {
+            Some(ElemOverride {
+                id_ref: node
+                    .attribute_ascii("idRef")
+                    .map(|(_, value)| value)
+                    .filter(|value| !value.is_empty())?
+                    .to_owned(),
+                name: node.attribute_ascii("name")?.1.to_owned(),
+                value: node
+                    .attribute_ascii("value")
+                    .map_or("", |(_, value)| value)
+                    .to_owned(),
+            })
+        })
         .collect();
-    let element = all
-        .iter()
-        .find(|element| element.attribute("name") == Some(name))
-        .or_else(|| {
-            all.iter().find(|element| {
-                element
-                    .attribute("name")
-                    .is_some_and(|found| found.eq_ignore_ascii_case(name))
-            })
-        })?;
-    Some(Modification {
-        patch_file: element
-            .attribute("patchFile")
-            .filter(|path| !path.trim().is_empty())
-            .map(str::to_owned),
-        elems: element
-            .children_named("Elems")
-            .flat_map(|elems| elems.children_named("Elem"))
-            .filter_map(|elem| {
-                Some(ElemOverride {
-                    id_ref: elem
-                        .attribute("idRef")
-                        .filter(|id| !id.is_empty())?
-                        .to_owned(),
-                    name: elem.attribute("name")?.to_owned(),
-                    value: elem.attribute("value").unwrap_or_default().to_owned(),
-                })
-            })
-            .collect(),
-    })
+    Ok(Some(Modification { patch, elems }))
+}
+
+fn select_modification<'document, 'input>(
+    vehicle: Node<'document, 'input>,
+    requested: &str,
+) -> Option<(Node<'document, 'input>, &'document str)> {
+    let mut fallback = None;
+    for candidate in named_children(vehicle, "Modifications")
+        .flat_map(|group| named_children(group, "Modification"))
+    {
+        let Some((name, value)) = candidate.attribute_ascii("name") else {
+            continue;
+        };
+        if value == requested {
+            return Some((candidate, name));
+        }
+        if fallback.is_none() && value.eq_ignore_ascii_case(requested) {
+            fallback = Some((candidate, name));
+        }
+    }
+    fallback
+}
+
+fn named_children<'document, 'input>(
+    node: Node<'document, 'input>,
+    name: &str,
+) -> impl Iterator<Item = Node<'document, 'input>> {
+    node.children()
+        .into_iter()
+        .filter(move |child| child.name().eq_ignore_ascii_case(name))
 }
 
 /// One `Elem` of a Modification: the attribute `name` of every element with the `id` `id_ref`

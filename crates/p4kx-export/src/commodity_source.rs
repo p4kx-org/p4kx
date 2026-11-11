@@ -9,9 +9,7 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::CatalogFields;
 use crate::commodity_authoring_contract::CommodityAuthoring;
-use crate::commodity_contract::{
-    CommodityDefinition, CommoditySelection, CommoditySelectionDiagnostic,
-};
+use crate::commodity_contract::{CommodityDefinition, CommoditySelection};
 use crate::commodity_inputs::CommodityInputs;
 use crate::commodity_resource::CommodityResourceSelection;
 use crate::commodity_text_input::{CommodityTextInput, CommodityTextSelector};
@@ -22,7 +20,7 @@ use crate::source_fields::FieldError;
 /// Captures only the original first-resource selectors for one Commodity choice.
 pub(crate) fn link_inputs(
     tree: &RecordTree<'_>,
-    selected: &CommodityResourceSelection,
+    selected: &CommodityResourceSelection<'_, '_>,
     origins: &CatalogOrigins,
 ) -> Result<Vec<SourceUse>, CatalogError> {
     let mut inputs = CommodityInputs::new(origins);
@@ -34,7 +32,7 @@ pub(crate) fn link_inputs(
 
 /// Retains the target header actually consulted before reading a resource dependency body.
 pub(crate) fn resource_inputs(
-    selected: &CommodityResourceSelection,
+    selected: &CommodityResourceSelection<'_, '_>,
     origins: &CatalogOrigins,
     links: &[SourceUse],
 ) -> Result<Vec<SourceUse>, CatalogError> {
@@ -74,13 +72,11 @@ pub(crate) fn definition<'source>(
     tree: &RecordTree<'source>,
     entity: SourcedValue<CommodityAuthoring<'source>>,
     selection: SourcedValue<CommoditySelection>,
-    selection_diagnostics: Vec<CommoditySelectionDiagnostic>,
     origins: &CatalogOrigins,
 ) -> Result<CommodityDefinition<'source>, CatalogError> {
     Ok(CommodityDefinition {
         source: CanonicalRecordHeader::read(tree, origins)?,
         selection,
-        selection_diagnostics,
         entity,
     })
 }
@@ -88,7 +84,7 @@ pub(crate) fn definition<'source>(
 /// Binds the existing first-resource GUID independently of its target's body availability.
 pub(crate) fn subtype(
     tree: &RecordTree<'_>,
-    selected: &CommodityResourceSelection,
+    selected: &CommodityResourceSelection<'_, '_>,
     origins: &CatalogOrigins,
     links: &[SourceUse],
 ) -> Result<SourcedValue<Option<CatalogGuid>>, CatalogError> {

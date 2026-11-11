@@ -34,7 +34,7 @@ fn every_physical_tag_and_every_authored_edge_survives_the_convenience_tree() ->
     let health = built
         .summary()
         .export_health()
-        .kinds
+        .kinds()
         .iter()
         .find(|kind| kind.kind.name() == "tags")
         .ok_or("tag health")?;

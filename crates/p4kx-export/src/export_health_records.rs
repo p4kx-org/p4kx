@@ -4,11 +4,13 @@
 use std::collections::BTreeMap;
 
 use crate::export_diagnostic::{
-    ExportDiagnostic, ExportDiagnosticCode, ExportDiagnosticExample, ExportDiagnosticSeverity,
-    ExportDiagnosticStage, ExportDiagnosticUnit, ExportSourceRole, FailedExportRecord,
+    ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
+    ExportSourceRole,
 };
 use crate::export_health::{ExportSourceCounts, ExportSourceMode};
 use crate::export_ledger::{ExportAccountingError, SourceDisposition, SourceObservation};
+use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
+use crate::health_failed_observation::FailedRecordObservation as FailedExportRecord;
 use crate::selection::Kind;
 
 type SourceKey = (Option<usize>, u32, ExportSourceRole);
@@ -19,15 +21,14 @@ pub(crate) fn sources(
 ) -> Result<Vec<SourceObservation>, ExportAccountingError> {
     let mut sources = BTreeMap::<SourceKey, SourceObservation>::new();
     for source in observations {
+        source.key()?;
         let key = (
             source.kind.map(Kind::index),
             source.record_index,
             source.role,
         );
-        if let Some(previous) = sources.get(&key) {
-            if previous != &source {
-                return Err(ExportAccountingError::ConflictingDisposition { kind: source.kind });
-            }
+        if let Some(previous) = sources.get_mut(&key) {
+            previous.merge(source)?;
         } else {
             sources.insert(key, source);
         }
@@ -99,7 +100,7 @@ fn count_selected(counts: &mut ExportSourceCounts, disposition: SourceDispositio
 /// Returns the source unit declared by the actual reader of a kind.
 pub(crate) const fn source_mode(kind: Kind) -> ExportSourceMode {
     match kind {
-        Kind::HarvestableLocations | Kind::LootContainers | Kind::Shops => {
+        Kind::HarvestableLocations | Kind::LootContainers | Kind::Shops | Kind::ShopInventories => {
             ExportSourceMode::ArchiveEntries
         }
         Kind::Paints
@@ -116,24 +117,23 @@ pub(crate) const fn source_mode(kind: Kind) -> ExportSourceMode {
 /// Returns the exact failed source identities and aggregate-ready source diagnostics.
 pub(crate) fn failures(
     sources: &[SourceObservation],
-) -> (Vec<FailedExportRecord>, Vec<ExportDiagnostic>) {
+) -> Result<(Vec<FailedExportRecord>, Vec<ExportDiagnostic>), ExportAccountingError> {
     let mut failed = Vec::new();
     let mut diagnostics = Vec::new();
     let failed_sources = sources.iter().filter(|source| source.disposition.failed());
     for source in failed_sources {
         let (stage, code) = stage(source);
-        failed.push(FailedExportRecord {
-            kind: source.kind,
-            record_index: source.record_index,
-            guid: source.guid.to_string(),
-            record_path: source.record_path.clone(),
-            role: source.role,
+        source.key()?;
+        failed.push(FailedExportRecord::new(
+            source.kind,
+            source.subject().clone(),
+            source.role,
             stage,
             code,
-        });
-        diagnostics.push(diagnostic(source, stage, code));
+        )?);
+        diagnostics.push(diagnostic(source, stage, code)?);
     }
-    (failed, diagnostics)
+    Ok((failed, diagnostics))
 }
 
 fn stage(source: &SourceObservation) -> (ExportDiagnosticStage, ExportDiagnosticCode) {
@@ -165,8 +165,8 @@ fn diagnostic(
     source: &SourceObservation,
     stage: ExportDiagnosticStage,
     code: ExportDiagnosticCode,
-) -> ExportDiagnostic {
-    ExportDiagnostic {
+) -> Result<ExportDiagnostic, ExportAccountingError> {
+    Ok(ExportDiagnostic {
         kind: source.kind,
         stage,
         code,
@@ -175,13 +175,6 @@ fn diagnostic(
         warning_code: None,
         count: 1,
         count_unit: ExportDiagnosticUnit::Records,
-        examples: vec![ExportDiagnosticExample {
-            record_index: Some(source.record_index),
-            record_guid: Some(source.guid.to_string()),
-            record_path: source.record_path.clone(),
-            field: source.diagnosis.field.clone(),
-            source_type: source.diagnosis.source_type.clone(),
-            target_guid: source.diagnosis.target_guid.map(|guid| guid.to_string()),
-        }],
-    }
+        examples: vec![source.diagnosis.example(source.subject().clone())?],
+    })
 }

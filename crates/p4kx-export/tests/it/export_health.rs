@@ -10,7 +10,7 @@ use std::fs;
 
 use p4kx_export::{
     CatalogError, CatalogFile, CatalogOptions, CatalogPublicationMode, Compression,
-    ExportDiagnosticCode, ExportDiagnosticStage, ExportHealth, ExportSourceRole, Kind,
+    ExportDiagnosticCode, ExportDiagnosticStage, ExportHealth, ExportSourceRole, HealthText, Kind,
     build_catalog, write_catalog_from,
 };
 use p4kx_extraction::{Archive, DataForgeEntry, Filter};
@@ -64,13 +64,13 @@ fn retained_rows_keep_actual_field_failures_in_the_artifact() -> TestResult {
 
 fn assert_failed_identity(health: &ExportHealth) {
     let identities: BTreeSet<_> = health
-        .failed_records
+        .failed_records()
         .iter()
         .map(|failed| {
             (
-                failed.record_index,
-                failed.guid.as_str(),
-                failed.record_path.as_deref(),
+                failed.record_index().value().copied(),
+                failed.guid().value().map(HealthText::as_str),
+                failed.record_path_text().value(),
                 failed.kind.map(Kind::name),
                 failed.role,
             )
@@ -82,8 +82,8 @@ fn assert_failed_identity(health: &ExportHealth) {
         "exactly one physical identity failed; stage entries are not extra Records"
     );
     let expected = (
-        1,
-        "00000000-0000-0000-0000-000000000002",
+        Some(1),
+        Some("00000000-0000-0000-0000-000000000002"),
         Some("libs/foundry/records/scitemmanufacturer/inspected"),
         Some(Kind::Manufacturers.name()),
         ExportSourceRole::Selected,
@@ -98,7 +98,7 @@ fn assert_failed_identity(health: &ExportHealth) {
     ] {
         assert!(
             health
-                .failed_records
+                .failed_records()
                 .iter()
                 .any(|failed| failed.stage == stage
                     && failed.code == ExportDiagnosticCode::UnreadableSource),
@@ -106,12 +106,12 @@ fn assert_failed_identity(health: &ExportHealth) {
         );
     }
     assert!(
-        health.diagnostics.iter().any(|diagnostic| diagnostic.code
+        health.diagnostics().iter().any(|diagnostic| diagnostic.code
             == ExportDiagnosticCode::UnreadableSource
             && diagnostic
-                .examples
+                .examples()
                 .iter()
-                .any(|example| example.field.as_deref() == Some("Code"))),
+                .any(|example| example.field_text().value() == Some("Code"))),
         "the failed field path is available from the artifact alone"
     );
 }
@@ -132,7 +132,7 @@ fn represented_optional_empty_and_dangling_states_do_not_invent_a_read_failure()
     ] {
         assert!(
             health
-                .diagnostics
+                .diagnostics()
                 .iter()
                 .any(|diagnostic| diagnostic.code == code),
             "{code:?} remains a distinct represented state"
@@ -140,10 +140,12 @@ fn represented_optional_empty_and_dangling_states_do_not_invent_a_read_failure()
     }
     assert!(
         health
-            .unresolved_references
+            .unresolved_references()
             .iter()
-            .any(|reference| reference.target_guid.as_deref()
-                == Some("99000000-0000-4000-8000-000000000001")),
+            .any(
+                |reference| reference.target_guid().value().map(HealthText::as_str)
+                    == Some("99000000-0000-4000-8000-000000000001")
+            ),
         "the configured dangling identity is not sampled away"
     );
     Ok(())
@@ -196,7 +198,7 @@ fn normal_mode_refuses_memory_and_fresh_or_existing_files_before_creation() -> T
     assert!(
         matches!(
             build_catalog(&archive, &fixture::options()),
-            Err(CatalogError::IncompleteExport { .. })
+            Err(CatalogError::IncompleteExport(_))
         ),
         "normal in-memory publication also refuses incomplete bytes"
     );
@@ -216,7 +218,7 @@ fn normal_mode_refuses_memory_and_fresh_or_existing_files_before_creation() -> T
                     CatalogFile::create(&output)
                 });
             assert!(
-                matches!(result, Err(CatalogError::IncompleteExport { .. })),
+                matches!(result, Err(CatalogError::IncompleteExport(_))),
                 "normal output refuses the same measured source fault"
             );
             assert!(!called.get(), "the destination callback is never invoked");

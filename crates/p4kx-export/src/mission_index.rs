@@ -1,29 +1,40 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
-use p4kx_extraction::{CancelToken, DataForge, Filter, Guid, Record, TagTree, TreeBuilder};
+use p4kx_extraction::{
+    CancelToken, DataForge, Filter, Guid, Record, SourceEvidenceError, TagTree, TreeBuilder,
+};
 use rayon::prelude::*;
 
+use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_read::original::RewardRead;
 use crate::contract_hauling::HaulingRequirement;
 use crate::export_ledger::ExportLedger;
 use crate::mission_hauling::HaulingProperty;
-use crate::mission_layers::Property;
+use crate::mission_text_inputs::{BrokerTexts, OrganizationTexts, TemplateTexts};
 use crate::spawn_layers::Level;
 use crate::spawn_pools::SpawnPools;
-use crate::{CatalogError, CatalogFailure};
+use crate::{CatalogError, CatalogReadFailure};
 
+#[path = "mission_index_read/nominal_reward.rs"]
+mod nominal_reward;
 #[path = "mission_index_read/mod.rs"]
 mod read;
+#[path = "mission_index_read/template_facts.rs"]
+mod template_facts;
+#[path = "mission_index_read/template_read.rs"]
+mod template_read;
 
-pub(crate) use read::title_key;
+pub(crate) use self::template_facts::TemplateFacts;
+use self::template_read::{FailedTemplate, TemplateReadSource};
 
 /// A `MissionBrokerEntry` Record: what a contract without a template states about itself.
 #[derive(Debug, Default)]
 pub(crate) struct Broker<'f> {
-    pub(crate) title: Option<&'f str>,
-    pub(crate) description: Option<&'f str>,
+    pub(crate) texts: Option<BrokerTexts<'f>>,
     pub(crate) mission_type: Option<Guid>,
     pub(crate) location: Option<Guid>,
     pub(crate) objective_orders: Vec<HaulingRequirement>,
@@ -34,13 +45,11 @@ pub(crate) struct Broker<'f> {
 /// class.
 #[derive(Debug, Default)]
 pub(crate) struct Template<'f> {
-    pub(crate) title: Option<&'f str>,
+    pub(crate) texts: Option<TemplateTexts<'f>>,
     pub(crate) mission_type: Option<Guid>,
-    pub(crate) properties: Vec<Property<'f>>,
     pub(crate) hauling: Vec<HaulingProperty<'f>>,
     pub(crate) objective_orders: Vec<HaulingRequirement>,
-    pub(crate) illegal: Option<bool>,
-    pub(crate) can_be_shared: Option<bool>,
+    pub(crate) facts: Option<Box<TemplateFacts>>,
     /// The ship spawns and location queries of the template.
     pub(crate) spawns: Option<Level>,
 }
@@ -51,15 +60,33 @@ pub(crate) struct MissionTypeName<'f> {
     pub(crate) name_key: Option<&'f str>,
 }
 
-/// The string variants of a mission organisation: the Tag Record and the localisation key of each.
-pub(crate) type Variants<'f> = Vec<(Guid, &'f str)>;
+enum RewardDependency {
+    Original(RewardRead),
+    UnreadablePath(RewardRead),
+    #[cfg(test)]
+    Accounting(Option<i64>),
+}
+
+#[cfg(test)]
+impl RewardDependency {
+    const fn amount(&self) -> Option<i64> {
+        match self {
+            Self::Original(reward) => reward.amount(),
+            Self::UnreadablePath(_) => None,
+            #[cfg(test)]
+            Self::Accounting(value) => *value,
+        }
+    }
+}
 
 enum Piece<'f> {
     Template(Guid, Template<'f>, SpawnPools<'f>),
-    Failed(CatalogFailure),
+    Failed(CatalogReadFailure<'f>),
+    FailedTemplate(CatalogReadFailure<'f>, FailedTemplate),
     Type(Guid, MissionTypeName<'f>),
-    Organization(Guid, Variants<'f>),
-    Reward(Guid, i64),
+    Organization(Guid, Option<OrganizationTexts<'f>>),
+    Reward(Guid, u32, RewardDependency),
+    UnusableRewardCandidate(CatalogReadFailure<'f>, RewardDependency),
     Locality(Guid, Vec<Guid>),
     Broker(Guid, Broker<'f>),
     Faction(Guid, Option<&'f str>),
@@ -71,20 +98,43 @@ enum Piece<'f> {
 #[derive(Default)]
 pub(crate) struct MissionIndex<'f> {
     templates: HashMap<Guid, Template<'f>>,
+    failed_templates: HashMap<Guid, Vec<FailedTemplate>>,
+    template_source: Option<TemplateReadSource>,
     types: HashMap<Guid, MissionTypeName<'f>>,
-    organizations: HashMap<Guid, Variants<'f>>,
-    rewards: HashMap<Guid, i64>,
+    organizations: HashMap<Guid, OrganizationTexts<'f>>,
+    rewards: BTreeMap<(Guid, u32), RewardDependency>,
     localities: HashMap<Guid, Vec<Guid>>,
     brokers: HashMap<Guid, Broker<'f>>,
     factions: HashMap<Guid, Option<&'f str>>,
-    tags: TagTree,
+    tags: Tags,
     pools: SpawnPools<'f>,
-    failures: Vec<CatalogFailure>,
+    failures: Vec<CatalogReadFailure<'f>>,
     ledger: ExportLedger,
+}
+
+enum Tags {
+    Owned(TagTree),
+    Captured(crate::catalog_v3::tag_catalog::CapturedTagTree),
+}
+
+impl Default for Tags {
+    fn default() -> Self {
+        Self::Owned(TagTree::default())
+    }
+}
+
+impl Tags {
+    fn tree(&self) -> &TagTree {
+        match self {
+            Self::Owned(tree) => tree,
+            Self::Captured(tree) => tree.tree(),
+        }
+    }
 }
 
 impl<'f> MissionIndex<'f> {
     /// Reads the complete dependency index only when selected catalog mission inputs need it.
+    #[cfg(test)]
     pub(crate) fn read_catalog(
         forge: &'f DataForge<'f>,
         filter: Option<&Filter>,
@@ -98,22 +148,93 @@ impl<'f> MissionIndex<'f> {
         }
     }
 
+    pub(crate) fn read_captured(
+        forge: &'f DataForge<'f>,
+        input: &OriginalCatalogInput<'_, 'f>,
+        filter: Option<&Filter>,
+        cancel: Option<&CancelToken>,
+        dependencies: Option<crate::catalog_v3::tag_catalog::TagDependencies<'f>>,
+        captured: &crate::catalog_v3::tag_catalog::CapturedTags<'_, 'f>,
+    ) -> Result<Self, CatalogError> {
+        input.check_forge(forge)?;
+        if !Self::needs_index(forge, filter, cancel)? {
+            if dependencies.is_some() {
+                return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
+            }
+            return Ok(Self::default());
+        }
+        let dependencies =
+            dependencies.ok_or(crate::ExportAccountingError::ConflictingSourceDatum)?;
+        if !std::ptr::eq(dependencies.tree.tree(), captured.tree()) {
+            return Err(crate::ExportAccountingError::ConflictingTagTrace.into());
+        }
+        let tags = Tags::Captured(dependencies.tree);
+        Self::from_tags(
+            forge,
+            Some(input),
+            cancel,
+            tags,
+            dependencies.failures,
+            dependencies.ledger,
+            Some(captured),
+        )
+    }
+    pub(crate) fn needs_index(
+        forge: &DataForge<'_>,
+        filter: Option<&Filter>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<bool, CatalogError> {
+        filter.map_or(Ok(true), |filter| {
+            read::catalog_needs_index(forge, filter, cancel)
+        })
+    }
+
     /// Reads the Records of `forge` a contract refers to; a Record that cannot be read is left
     /// out, so what refers to it resolves to nothing.
     ///
     /// # Errors
     ///
     /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
+    #[cfg(test)]
     pub(crate) fn read(
         forge: &'f DataForge<'f>,
         cancel: Option<&CancelToken>,
     ) -> Result<Self, CatalogError> {
+        Self::read_observed(forge, None, cancel)
+    }
+
+    #[cfg(test)]
+    fn read_observed(
+        forge: &'f DataForge<'f>,
+        input: Option<&OriginalCatalogInput<'_, 'f>>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Self, CatalogError> {
+        let (tags, failures, ledger) = read::read_tags(forge, input, cancel)?;
+        Self::from_tags(
+            forge,
+            input,
+            cancel,
+            Tags::Owned(tags),
+            failures,
+            ledger,
+            None,
+        )
+    }
+
+    fn from_tags(
+        forge: &'f DataForge<'f>,
+        input: Option<&OriginalCatalogInput<'_, 'f>>,
+        cancel: Option<&CancelToken>,
+        tags: Tags,
+        failures: Vec<CatalogReadFailure<'f>>,
+        ledger: ExportLedger,
+        captured: Option<&crate::catalog_v3::tag_catalog::CapturedTags<'_, 'f>>,
+    ) -> Result<Self, CatalogError> {
         let records: Vec<Record<'f>> = forge.records().collect();
-        let (tags, failures, ledger) = read::read_tags(forge, cancel)?;
         let pieces = records
             .par_iter()
             .map_init(TreeBuilder::new, |trees, record| {
-                read::read(trees, record, &tags, cancel)
+                read::read(trees, record, tags.tree(), input, captured, cancel)
             })
             .filter_map(Result::transpose)
             .collect::<Result<Vec<_>, _>>()?;
@@ -121,6 +242,7 @@ impl<'f> MissionIndex<'f> {
             tags,
             failures,
             ledger,
+            template_source: input.map(|input| TemplateReadSource::new(input.origins())),
             ..Self::default()
         };
         for read in pieces {
@@ -135,18 +257,33 @@ impl<'f> MissionIndex<'f> {
     fn insert(&mut self, piece: Piece<'f>) {
         match piece {
             Piece::Template(guid, template, found) => {
+                self.failed_templates.remove(&guid);
                 self.templates.insert(guid, template);
                 self.pools.merge(found);
             }
             Piece::Failed(failure) => self.failures.push(failure),
+            Piece::FailedTemplate(failure, attempt) => {
+                let guid = failure.guid();
+                if !self.templates.contains_key(&guid) {
+                    self.failed_templates.entry(guid).or_default().push(attempt);
+                }
+                self.failures.push(failure);
+            }
             Piece::Type(guid, kind) => {
                 self.types.insert(guid, kind);
             }
             Piece::Organization(guid, variants) => {
-                self.organizations.insert(guid, variants);
+                if let Some(variants) = variants {
+                    self.organizations.insert(guid, variants);
+                }
             }
-            Piece::Reward(guid, amount) => {
-                self.rewards.insert(guid, amount);
+            Piece::Reward(guid, position, amount) => {
+                self.rewards.insert((guid, position), amount);
+            }
+            Piece::UnusableRewardCandidate(failure, reward) => {
+                self.rewards
+                    .insert((failure.guid(), failure.record().index()), reward);
+                self.failures.push(failure);
             }
             Piece::Locality(guid, locations) => {
                 self.localities.insert(guid, locations);
@@ -164,7 +301,7 @@ impl<'f> MissionIndex<'f> {
     /// could not be read.
     pub(crate) fn take_template_results(
         &mut self,
-    ) -> (SpawnPools<'f>, Vec<CatalogFailure>, ExportLedger) {
+    ) -> (SpawnPools<'f>, Vec<CatalogReadFailure<'f>>, ExportLedger) {
         (
             std::mem::take(&mut self.pools),
             std::mem::take(&mut self.failures),
@@ -173,20 +310,30 @@ impl<'f> MissionIndex<'f> {
     }
 
     /// Returns the tag tree of the DataForge.
-    pub(crate) const fn tags(&self) -> &TagTree {
-        &self.tags
+    pub(crate) fn tags(&self) -> &TagTree {
+        self.tags.tree()
     }
 
     pub(crate) fn template(&self, guid: Guid) -> Option<&Template<'f>> {
         self.templates.get(&guid)
     }
 
-    pub(crate) fn mission_type(&self, guid: Guid) -> Option<&MissionTypeName<'f>> {
-        self.types.get(&guid)
+    pub(crate) fn failed_templates(&self, guid: Guid) -> &[FailedTemplate] {
+        self.failed_templates.get(&guid).map_or(&[], Vec::as_slice)
     }
 
-    pub(crate) fn reward(&self, guid: Guid) -> Option<i64> {
-        self.rewards.get(&guid).copied()
+    pub(crate) fn check_template_source(
+        &self,
+        origins: &CatalogOrigins,
+    ) -> Result<(), CatalogError> {
+        self.template_source
+            .as_ref()
+            .ok_or(SourceEvidenceError::ForeignEvidence)?
+            .check(origins)
+    }
+
+    pub(crate) fn mission_type(&self, guid: Guid) -> Option<&MissionTypeName<'f>> {
+        self.types.get(&guid)
     }
 
     pub(crate) fn broker(&self, guid: Guid) -> Option<&Broker<'f>> {
@@ -204,20 +351,8 @@ impl<'f> MissionIndex<'f> {
         self.localities.get(&guid).map_or(&[], Vec::as_slice)
     }
 
-    /// Returns the localisation key of the string variant of organisation `organization` whose
-    /// tag is named `variant`, or, without a variant, of its only string variant; an organisation
-    /// with several states no choice then.
-    pub(crate) fn variant(&self, organization: Guid, variant: Option<&str>) -> Option<&'f str> {
-        let variants = self.organizations.get(&organization)?;
-        let Some(name) = variant else {
-            return match variants.as_slice() {
-                [(_, key)] => Some(*key),
-                _ => None,
-            };
-        };
-        variants
-            .iter()
-            .find(|(tag, _)| self.tags.get(*tag).is_some_and(|tag| tag.name() == name))
-            .map(|(_, key)| *key)
+    /// Returns the actual ordered authored text variants of the chosen dependency.
+    pub(crate) fn organization(&self, guid: Guid) -> Option<&OrganizationTexts<'f>> {
+        self.organizations.get(&guid)
     }
 }

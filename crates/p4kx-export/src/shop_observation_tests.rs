@@ -6,15 +6,20 @@ use p4kx_extraction::{Archive, Filter};
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry};
 
 use crate::catalog_crafting::CraftingKinds;
+use crate::catalog_read::original::{EntryCapture, FailedEntryObservation};
 use crate::collected::Collected;
 use crate::contract::CraftingGlobal;
 use crate::export_diagnostic::ExportDiagnosticCode;
-use crate::export_entry_ledger::{EntryOperation, FailedExportEntry};
+use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::shop_containers::Component;
+use crate::shop_inventories::Inventories;
 use crate::shop_registry::RegistryNeed;
 use crate::shops::{self, REGISTRY};
-use crate::{CatalogOptions, Kind, ShopSummary};
+use crate::{CatalogError, CatalogOptions, Kind, ShopSummary};
+
+#[path = "shop_inventory_test_source.rs"]
+mod inventory_source;
 
 #[path = "shop_inventory_observation_tests.rs"]
 mod inventories;
@@ -23,6 +28,18 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 const ENTITY: &str = "4dce4077-9730-ac77-5074-916b3b2700b7";
 const ROOT: &str = "4a269932-183e-362d-aacc-188e7debbea9";
 const CONTAINER: &str = "Data/ObjectContainers/PU/Shops/admin/test.socpak";
+
+fn read_shops(archive: &Archive, capture: &EntryCapture<'_>) -> Result<shops::Built, CatalogError> {
+    let mut inventories = Inventories::prepare(archive, capture, None)?.inventories;
+    shops::shops(
+        archive,
+        &ArchiveFiles::new(archive),
+        &[],
+        None,
+        capture,
+        &mut inventories,
+    )
+}
 
 fn opened(
     entries: Vec<TestEntry>,
@@ -78,7 +95,9 @@ fn empty_collected() -> Collected<'static> {
 #[test]
 fn an_absent_registry_without_starmap_is_explicitly_optional() -> TestResult {
     let (_folder, archive) = opened(Vec::new())?;
-    let read = shops::shops(&archive, &ArchiveFiles::new(&archive), &[], None)?;
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        read_shops(&archive, capture)
+    })?;
     assert_eq!(
         read.ledger.inventories,
         [Kind::Shops],
@@ -111,13 +130,16 @@ fn an_absent_registry_required_by_starmap_is_a_failed_configured_source() -> Tes
     let (_folder, archive) = opened(Vec::new())?;
     let mut summary = ShopSummary::default();
     let mut ledger = ExportLedger::default();
-    let read = crate::shop_registry::read_source(
-        &archive,
-        &ArchiveFiles::new(&archive),
-        RegistryNeed::Required,
-        &mut summary,
-        &mut ledger,
-    );
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        crate::shop_registry::read_source(
+            &archive,
+            &ArchiveFiles::new(&archive),
+            RegistryNeed::Required,
+            &mut summary,
+            &mut ledger,
+            capture,
+        )
+    })?;
     assert!(read.is_none(), "the configured registry is absent");
     let [source] = ledger.entries.as_slice() else {
         return Err("one required missing registry observation".into());
@@ -151,7 +173,9 @@ fn a_registry_projection_failure_does_not_claim_unconsumed_container_reads() -> 
         TestEntry::stored(REGISTRY, "malformed XML"),
         TestEntry::stored(CONTAINER, "bad unused container"),
     ])?;
-    let read = shops::shops(&archive, &ArchiveFiles::new(&archive), &[], None)?;
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        read_shops(&archive, capture)
+    })?;
     assert_eq!(
         read.ledger.incomplete_inventories,
         [Kind::Shops],
@@ -182,7 +206,9 @@ fn a_registry_projection_failure_does_not_claim_unconsumed_container_reads() -> 
 fn malformed_registry_rows_retain_valid_shops_and_one_failed_source() -> TestResult {
     let malformed = r#"<ShopBackup ID="not-a-guid" SuperName="Root,Lost"/>"#;
     let (_folder, archive) = opened(vec![TestEntry::stored(REGISTRY, registry(malformed))])?;
-    let read = shops::shops(&archive, &ArchiveFiles::new(&archive), &[], None)?;
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        read_shops(&archive, capture)
+    })?;
     assert_eq!(
         read.shops.len(),
         1,
@@ -232,7 +258,9 @@ fn editor_and_soc_failures_keep_exact_nested_identities_and_valid_components() -
         TestEntry::stored(CONTAINER, container.build()),
     ])?;
     let source = archive.entries().get(1).ok_or("outer source")?;
-    let read = crate::shop_container_scan::shop_entities(&archive, source);
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        crate::shop_container_scan::shop_entities(&archive, source, capture)
+    })?;
     assert!(
         read.ledger.incomplete_inventories.contains(&Kind::Shops),
         "failed editor/SOC reads can hide inventory dependencies"
@@ -240,7 +268,12 @@ fn editor_and_soc_failures_keep_exact_nested_identities_and_valid_components() -
     let (entities, _) = read.entities.ok_or("retained components")?;
     assert_eq!(
         entities,
-        [(ENTITY.to_owned(), Component::File("good".to_owned()))],
+        [(
+            ENTITY.to_owned(),
+            Component::File(crate::shop_inventory_path::InventoryStem::accounting(
+                "good"
+            ))
+        )],
         "the valid SOC is retained despite separate failures"
     );
     let entries = crate::export_health_entries::compile(read.ledger.entries)?;
@@ -264,14 +297,14 @@ fn editor_and_soc_failures_keep_exact_nested_identities_and_valid_components() -
     Ok(())
 }
 
-fn assert_failed_identities(failed: &[FailedExportEntry]) {
+fn assert_failed_identities(failed: &[FailedEntryObservation]) {
     let identities: Vec<_> = failed
         .iter()
         .map(|source| {
             (
-                source.operation,
-                source.entry_index,
-                source.container_entry_index,
+                source.source.operation,
+                source.source.entry_index,
+                source.source.container_entry_index,
             )
         })
         .collect();
@@ -295,10 +328,10 @@ fn unreadable_metadata_does_not_invent_a_soc_or_editor_read() -> TestResult {
         .entry(TestEntry::stored("test_editor.xml", "unused malformed XML"))
         .entry(TestEntry::stored("unused.soc", "unused bytes"));
     let (_folder, archive) = opened(vec![TestEntry::stored(CONTAINER, container.build())])?;
-    let read = crate::shop_container_scan::shop_entities(
-        &archive,
-        archive.entries().first().ok_or("container")?,
-    );
+    let container = archive.entries().first().ok_or("container")?;
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        crate::shop_container_scan::shop_entities(&archive, container, capture)
+    })?;
     assert!(
         read.entities.is_none(),
         "the selected metadata projection failed"
@@ -331,12 +364,15 @@ fn a_filter_finishes_an_empty_shop_inventory_without_reading_shop_sources() -> T
         filter: Some(&filter),
         ..CatalogOptions::new(std::time::UNIX_EPOCH)
     };
-    let summary = shops::add_shops(
-        &archive,
-        &ArchiveFiles::new(&archive),
-        &mut collected,
-        &options,
-    )?;
+    let summary = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        shops::add_shops(
+            &archive,
+            &ArchiveFiles::new(&archive),
+            &mut collected,
+            &options,
+            capture,
+        )
+    })?;
     assert_eq!(
         summary,
         ShopSummary::default(),
@@ -344,8 +380,8 @@ fn a_filter_finishes_an_empty_shop_inventory_without_reading_shop_sources() -> T
     );
     assert_eq!(
         collected.ledger.inventories,
-        [Kind::Shops],
-        "selection enumeration completed"
+        [Kind::ShopInventories, Kind::Shops],
+        "the global files and filtered shop registry each finish their selection"
     );
     assert_eq!(
         collected.ledger.entries,

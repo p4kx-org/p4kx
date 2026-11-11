@@ -10,7 +10,7 @@ use crate::resource_property_contract::{
     ResourceCraftingData, ResourceProperty, ResourcePropertyPayload, ResourceVolatility,
 };
 use crate::resource_value_read;
-use crate::source_fields::FieldError;
+use crate::source_fields::{FieldCapture, FieldError};
 
 /// Projects a concrete property without collapsing nulls or reordering members.
 pub(crate) fn read<'f>(
@@ -18,16 +18,17 @@ pub(crate) fn read<'f>(
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<ResourceProperty<'f>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
+    let fields = CatalogFields::observed(source, path, context, capture)?;
     let name = fields.text("name", notes)?;
     let payload = match source.type_name() {
         "ResourceTypeProperties" => {
-            fields.check(&["name"], notes);
+            fields.check_observed(&["name"], notes)?;
             Some(ResourcePropertyPayload::Base)
         }
         "ResourceTypeVolatility" => {
-            fields.check(&["name", "volatility", "healthDecayPerSecond"], notes);
+            fields.check_observed(&["name", "volatility", "healthDecayPerSecond"], notes)?;
             Some(ResourcePropertyPayload::Volatility(ResourceVolatility {
                 volatility: resource_value_read::single(&fields, "volatility", notes)?,
                 health_decay_per_second: resource_value_read::single(
@@ -38,7 +39,7 @@ pub(crate) fn read<'f>(
             }))
         }
         "ResourceTypeCraftingData" => Some(ResourcePropertyPayload::CraftingData(Box::new(
-            crafting(source, path, context, notes)?,
+            crafting(source, path, context, notes, capture)?,
         ))),
         _ => None,
     };
@@ -57,9 +58,10 @@ fn crafting<'f>(
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<ResourceCraftingData<'f>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
-    fields.check(
+    let fields = CatalogFields::observed(source, path, context, capture)?;
+    fields.check_observed(
         &[
             "name",
             "qualityDistribution",
@@ -67,7 +69,7 @@ fn crafting<'f>(
             "qualityQuantization",
         ],
         notes,
-    );
+    )?;
     let distribution = fields
         .structure("qualityDistribution", notes)?
         .try_map(|value| {
@@ -76,6 +78,7 @@ fn crafting<'f>(
                 &format!("{path}.qualityDistribution"),
                 context,
                 notes,
+                capture,
             )
         })?;
     let location_override = fields
@@ -86,6 +89,7 @@ fn crafting<'f>(
                 &format!("{path}.qualityLocationOverride"),
                 context,
                 notes,
+                capture,
             )
         })?;
     let quantization = fields
@@ -96,6 +100,7 @@ fn crafting<'f>(
                 &format!("{path}.qualityQuantization"),
                 context,
                 notes,
+                capture,
             )
         })?;
     Ok(ResourceCraftingData {

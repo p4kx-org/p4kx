@@ -160,7 +160,7 @@ pub(crate) fn refused(source: &DataForgeBuilder, filter: Option<&Filter>) -> Tes
     assert!(
         matches!(
             p4kx_export::build_catalog(&archive, &options),
-            Err(CatalogError::IncompleteExport { .. })
+            Err(CatalogError::IncompleteExport(_))
         ),
         "incomplete original source evidence must refuse normal publication"
     );

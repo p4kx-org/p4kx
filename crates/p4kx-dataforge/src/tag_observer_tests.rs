@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cell::Cell;
 use std::convert::Infallible;
 
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
-use crate::{DataForge, TagBuildEvent, TagProjectionFailure, TagRelationIssue, TagTree};
+use crate::{DataForge, TagBuildEvent, TagRelationIssue, TagTree};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 const FIRST: u128 = 0x6900_0000_0000_4000_8000_0000_0000_0001;
@@ -16,7 +17,6 @@ enum Seen {
     Read(u32, bool),
     Duplicate(u32),
     Projected(u32),
-    Failed(u32, TagProjectionFailure),
     Relation {
         record_index: u32,
         target: Option<crate::Guid>,
@@ -33,14 +33,12 @@ fn capture(seen: &mut Vec<Seen>, event: &TagBuildEvent<'_, '_>) {
         }
         TagBuildEvent::DuplicateSkipped { record } => Seen::Duplicate(record.index()),
         TagBuildEvent::Projected { record } => Seen::Projected(record.index()),
-        TagBuildEvent::ProjectionFailed { record, reason } => Seen::Failed(record.index(), *reason),
         TagBuildEvent::RelationSkipped {
-            record,
+            incoming,
             target,
             reason,
-            ..
         } => Seen::Relation {
-            record_index: record.index(),
+            record_index: incoming.record().index(),
             target: *target,
             reason: *reason,
         },
@@ -137,33 +135,28 @@ fn duplicate_guids_keep_distinct_physical_read_and_skip_events() -> TestResult {
 }
 
 #[test]
-fn rejected_names_and_their_descendants_have_typed_limit_events() -> TestResult {
+fn long_names_and_their_descendants_have_physical_projection_events() -> TestResult {
     let bytes = builder()
-        .record(tag(
-            FIRST,
-            &"x".repeat(crate::MAX_TAG_NAME_BYTES + 1),
-            &[FIRST + 1],
-        ))
+        .record(tag(FIRST, &"x".repeat(257), &[FIRST + 1]))
         .record(tag(FIRST + 1, "child", &[]))
         .build();
     let (seen, tree) = observed(&bytes)?;
-    assert!(
-        tree.is_empty(),
-        "a rejected ancestor and its descendants stay outside the tag tree"
+    assert_eq!(tree.len(), 2, "both original Tags are retained");
+    for record in [0, 1] {
+        assert!(seen.contains(&Seen::Read(record, true)));
+        assert!(seen.contains(&Seen::Projected(record)));
+    }
+    let child = tree.at(1).ok_or("actual child")?;
+    assert_eq!(
+        child.path_view().to_string(),
+        format!("{}.child", "x".repeat(257))
     );
-    assert!(
-        seen.contains(&Seen::Failed(0, TagProjectionFailure::NameBytes)),
-        "the actual name limit is identified"
-    );
-    assert!(
-        seen.contains(&Seen::Failed(1, TagProjectionFailure::AncestorDiscarded)),
-        "descendant omission has a separate actual source outcome"
-    );
+    assert_eq!(child.parent().map(|tag| tag.position()), Some(0));
     Ok(())
 }
 
 #[test]
-fn path_and_depth_limits_report_the_exact_rejected_source() -> TestResult {
+fn long_paths_and_deep_tags_report_their_exact_physical_sources() -> TestResult {
     let mut spec = builder();
     for index in 0_u32..7 {
         let children = if index < 6 {
@@ -173,11 +166,12 @@ fn path_and_depth_limits_report_the_exact_rejected_source() -> TestResult {
         };
         spec = spec.record(tag(FIRST + u128::from(index), &"x".repeat(200), &children));
     }
-    let (seen, _) = observed(&spec.build())?;
-    assert!(
-        seen.contains(&Seen::Failed(5, TagProjectionFailure::PathBytes)),
-        "the sixth path exceeds the existing byte limit"
-    );
+    let (seen, tree) = observed(&spec.build())?;
+    let path = tree.at(5).ok_or("the sixth physical Tag")?;
+    assert_eq!(path.path_view().byte_len(), 1205);
+    assert!(seen.contains(&Seen::Read(5, true)));
+    assert!(seen.contains(&Seen::Projected(5)));
+    assert!(seen.contains(&Seen::Projected(6)));
     let mut spec = builder();
     for index in 0_u32..66 {
         let children = if index < 65 {
@@ -187,15 +181,12 @@ fn path_and_depth_limits_report_the_exact_rejected_source() -> TestResult {
         };
         spec = spec.record(tag(FIRST + u128::from(index), "x", &children));
     }
-    let (seen, _) = observed(&spec.build())?;
-    assert!(
-        seen.contains(&Seen::Failed(64, TagProjectionFailure::Depth)),
-        "the first out-of-depth source is retained"
-    );
-    assert!(
-        seen.contains(&Seen::Failed(65, TagProjectionFailure::AncestorDiscarded)),
-        "the descendant of an overdeep source is retained"
-    );
+    let (seen, tree) = observed(&spec.build())?;
+    assert_eq!(tree.at(65).ok_or("the final physical Tag")?.depth(), 65);
+    for record in [64, 65] {
+        assert!(seen.contains(&Seen::Read(record, true)));
+        assert!(seen.contains(&Seen::Projected(record)));
+    }
     Ok(())
 }
 
@@ -335,3 +326,30 @@ fn cancellation_is_reported_explicitly_without_a_completed_tree() -> TestResult 
     );
     Ok(())
 }
+
+#[test]
+fn cancellation_after_the_last_path_reports_one_terminal_event() -> TestResult {
+    let bytes = builder().record(tag(FIRST, "root", &[])).build();
+    let forge = DataForge::open(&bytes)?;
+    let stop = Cell::new(false);
+    let mut events = Vec::new();
+    let tree = TagTree::build_observed(&forge, &|| stop.get(), &mut |event| {
+        if matches!(event, TagBuildEvent::PathChosen { .. }) {
+            stop.set(true);
+        }
+        capture(&mut events, &event);
+        Ok::<_, Infallible>(())
+    })?;
+    assert!(
+        tree.is_none(),
+        "the final callback may still request cancellation"
+    );
+    assert_eq!(
+        events,
+        [Seen::Read(0, true), Seen::Projected(0), Seen::Cancelled]
+    );
+    Ok(())
+}
+
+#[path = "tag_relation_event_tests.rs"]
+mod relation_tests;

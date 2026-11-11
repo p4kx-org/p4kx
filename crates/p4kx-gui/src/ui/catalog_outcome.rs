@@ -10,10 +10,10 @@ use p4kx_export::{
     CatalogPublicationMode, CatalogSummary, DECOMPRESSED_LIMIT, SizeWarning, UPLOAD_LIMIT,
 };
 
-use super::catalog_lines::{Notice, failure_lines, kinds, languages, notices, playability, sizes};
+use super::catalog_lines::{Notice, failure_line, kinds, languages, notices, playability, sizes};
 use super::extraction::{group_label, number};
-use super::extraction_outcome::{decorate, ratio};
-use super::record_export_outcome::{list, outcome_window};
+use super::extraction_outcome::{decorate, list_row, ratio};
+use super::record_export_outcome::{list_rows, outcome_window};
 use crate::theme::desktop::{MODAL_GROUP_GAP, MODAL_WIDTH, SPINNER_INLINE};
 use crate::theme::palette;
 use crate::theme::tokens::SPACE_3;
@@ -107,7 +107,7 @@ fn finished_window(
             ui.colored_label(palette::WARNING, texts.get(T::HealthIncomplete));
         }
         ui.add_space(SPACE_3);
-        finished(ui, &laid);
+        finished(ui, &laid, texts, summary.summary());
     })
 }
 
@@ -264,8 +264,6 @@ struct Laid {
     skipped: String,
     playability: Vec<String>,
     failed_heading: String,
-    failures: Vec<String>,
-    reasons: Vec<usize>,
     texts: Vec<String>,
     missing: String,
     size: String,
@@ -290,7 +288,6 @@ impl Laid {
         let summary = outcome.summary();
         let limit = format::decimal_size(UPLOAD_LIMIT, texts.language());
         let warnings = size_warnings(texts, summary, &limit);
-        let (failures, reasons) = failure_lines(texts, summary);
         Self {
             key,
             kinds_heading: texts.get(T::KindsHeading),
@@ -307,8 +304,6 @@ impl Laid {
                 T::SummaryFailed,
                 &[("number", number(texts, summary.failures().len()))],
             ),
-            failures,
-            reasons,
             playability: playability(texts, summary),
             texts: languages(texts, summary),
             missing: texts.format(
@@ -324,7 +319,7 @@ impl Laid {
     }
 }
 
-fn finished(ui: &mut Ui, laid: &Laid) {
+fn finished(ui: &mut Ui, laid: &Laid, texts: &Texts, summary: &CatalogSummary) {
     for (warning, level) in &laid.warnings {
         let body = |ui: &mut Ui| {
             ui.colored_label(palette::GRAY_1, warning);
@@ -350,12 +345,18 @@ fn finished(ui: &mut Ui, laid: &Laid) {
     ui.add_space(MODAL_GROUP_GAP);
     group_label(ui, &laid.playability_heading);
     lines(ui, &laid.playability);
-    list(
+    let failures = summary.failures();
+    list_rows(
         ui,
         (&laid.failed_heading, "catalog-failed"),
-        &laid.failures,
-        Some(&laid.reasons),
+        failures.len(),
         true,
+        |ui, index| {
+            if let Some(failure) = failures.get(index) {
+                let (line, reason) = failure_line(texts, failure);
+                list_row(ui, &line, Some(reason));
+            }
+        },
     );
     ui.add_space(MODAL_GROUP_GAP);
     group_label(ui, &laid.texts_heading);

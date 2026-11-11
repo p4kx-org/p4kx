@@ -115,7 +115,7 @@ impl<'f> LoadoutResolver<'f> {
                 continue;
             };
             match self.specs.get(&record.index()) {
-                None => deferred.push((record.guid(), Arc::clone(nested))),
+                None => deferred.push((record.guid(), Arc::clone(nested.shared()))),
                 Some(spec) if spec.as_ref().as_ref().is_ok_and(|s| s.docked_vehicle) => {}
                 Some(_) => self.entry_records(nested, out, deferred),
             }

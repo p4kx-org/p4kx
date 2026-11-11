@@ -5,7 +5,6 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::broker_terms::MissionReward;
-use crate::contract::every_field_required;
 use crate::contract_hauling::HaulingRequirement;
 use crate::guid_text::CatalogGuid;
 use crate::mission_property_auto::AutoSpawns;
@@ -44,38 +43,6 @@ impl PropertyKind {
             _ => return None,
         })
     }
-}
-
-/// A property of an objective token.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct ObjectiveProperty<'a> {
-    /// How the objective holds the property.
-    pub(crate) kind: Option<PropertyKind>,
-    /// The `missionVariableName` of the property, `null` when empty.
-    pub(crate) variable: Option<String>,
-    /// The `extendedTextToken` of the property, `null` when empty.
-    pub(crate) token: Option<String>,
-    /// The `missionVariableName` of the property of the template the `property` of a referenced
-    /// property points to; `null` for any other kind or a pointer to nothing.
-    pub(crate) contract_property: Option<String>,
-    /// The value of an output, embedded or input property, `null` for a referenced one.
-    pub(crate) value: Option<PropertyValue<'a>>,
-    /// The output an input property takes, `null` for any other kind.
-    pub(crate) linked_output: Option<LinkedOutput>,
-}
-
-/// The output property an input property takes the value of.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct LinkedOutput {
-    /// The `id` of the objective that holds the output, an entry of `objectives`; `null` when the
-    /// pointer does not name one.
-    pub(crate) objective_id: Option<CatalogGuid>,
-    /// The `missionVariableName` of the output.
-    pub(crate) variable: Option<String>,
 }
 
 /// The value of a mission property (`MissionPropertyValue_*`), tagged by `type`.

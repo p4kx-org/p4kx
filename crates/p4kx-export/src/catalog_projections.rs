@@ -6,6 +6,8 @@ use serde::Serialize;
 
 use crate::catalog_table::CatalogTable;
 use crate::commodity_contract::CommodityPresentation;
+use crate::contract_missions::ContractEntry;
+use crate::mission_titles::MissionTitles;
 use crate::quality_catalog::contract::QualityQuantizationResources;
 use crate::schema_fields::every_field_required;
 
@@ -13,7 +15,14 @@ use crate::schema_fields::every_field_required;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct CatalogProjections {
+pub(crate) struct CatalogProjections<'source> {
+    pub(crate) contracts: CatalogTable<ContractEntry<'source>>,
+    pub(crate) mission_titles: CatalogTable<MissionTitles<'source>>,
+    pub(crate) blueprint_presentation: CatalogTable<
+        crate::blueprint_presentation::BlueprintPresentation<
+            p4kx_extraction::SourcedValue<crate::guid_text::CatalogGuid>,
+        >,
+    >,
     pub(crate) quality_quantization_resources: CatalogTable<QualityQuantizationResources>,
     pub(crate) tag_paths: CatalogTable<super::tag_catalog::TagPath>,
     pub(crate) commodity_presentation: CatalogTable<CommodityPresentation>,

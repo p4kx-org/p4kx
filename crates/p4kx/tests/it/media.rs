@@ -3,7 +3,7 @@
 
 use std::fs;
 
-use p4kx_testkit::{ArchiveBuilder, TestEntry};
+use p4kx_testkit::{ArchiveBuilder, TestCodec, TestEntry, TestWem};
 use predicates::prelude::predicate;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -160,5 +160,54 @@ fn zero_or_excessive_media_limits_are_invalid_input() -> TestResult {
         ])
         .assert()
         .code(2);
+    Ok(())
+}
+
+#[test]
+fn media_cli_audio_emits_typed_wem_summary_and_directory() -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let source = folder.path().join("Data.p4k");
+    let wem = TestWem::pcm(TestCodec::Pcm, 1, 22_050, &[0, 1]).bytes();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Audio/fixture.wem", wem))
+        .write_to(&source)?;
+    let output = folder.path().join("media");
+    p4kx_testkit::p4kx()?
+        .args(["media", "export"])
+        .arg(&source)
+        .arg("--out")
+        .arg(&output)
+        .args(["--kind", "audio"])
+        .assert()
+        .code(0);
+    let index: p4kx_media::Index =
+        serde_json::from_slice(&fs::read(output.join("media-index.json"))?)?;
+    let schema = p4kx_testkit::p4kx()?
+        .args(["media", "schema", "--record"])
+        .assert()
+        .code(0)
+        .get_output()
+        .stdout
+        .clone();
+    let validator =
+        jsonschema::validator_for(&serde_json::from_slice::<serde_json::Value>(&schema)?)?;
+    let stream = fs::read_to_string(output.join(&index.artifact_base).join("audio.jsonl"))?;
+    let mut types = Vec::new();
+    for line in stream.lines() {
+        let row: serde_json::Value = serde_json::from_str(line)?;
+        validator
+            .validate(&row)
+            .map_err(|error| error.to_string())?;
+        let record_type = row
+            .pointer("/data/record_type")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("built-in Audio record discriminator")?;
+        types.push(record_type.to_owned());
+    }
+    assert_eq!(
+        types,
+        ["wem", "wem-chunk", "wem-chunk"],
+        "format and sample-data chunks follow the WEM header"
+    );
     Ok(())
 }

@@ -1,5 +1,7 @@
 # Resources preserve authored facts and physical reference provenance
 
+The reference-inspection quotas below are superseded by [ADR-0363](0363-catalog-inspection-visits-every-materialized-occurrence.md). The original identity and field contracts remain in force.
+
 ## Decision
 
 Export selected ResourceType Records as an independent `resourceTypes` catalog kind. Keep commodity

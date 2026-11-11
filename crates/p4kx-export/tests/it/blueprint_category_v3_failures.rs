@@ -69,12 +69,12 @@ fn category_v3_keeps_strict_source_failures_and_does_not_read_filtered_broken_ca
         .first()
         .ok_or("original category read failure")?;
     assert_eq!(
-        failure.guid.to_string(),
+        failure.guid().to_string(),
         common::guid(fixture::CATEGORY),
         "the failure retains the original GUID"
     );
     assert_eq!(
-        failure.record_path,
+        failure.record_path(),
         fixture::PATH,
         "the failure retains the normalized source path"
     );
@@ -107,8 +107,9 @@ fn assert_physical_failure(catalog: &Value) -> TestResult {
         .ok_or("failed physical Records")?;
     assert!(
         failed.iter().any(|entry| {
-            entry.get("recordIndex").and_then(Value::as_u64) == Some(0)
-                && entry.get("guid").and_then(Value::as_str) == Some(expected_guid.as_str())
+            entry.pointer("/recordIndex/value").and_then(Value::as_u64) == Some(0)
+                && entry.pointer("/guid/value").and_then(Value::as_str)
+                    == Some(expected_guid.as_str())
                 && entry.get("kind").and_then(Value::as_str) == Some("blueprintCategories")
                 && entry.get("role").and_then(Value::as_str) == Some("selected")
                 && entry.get("code").and_then(Value::as_str) == Some("sourceReadFailure")
@@ -135,22 +136,27 @@ fn assert_unhandled_field_health(catalog: &Value) -> TestResult {
     let diagnostics = fixture::at(catalog, "/exportHealth/diagnostics")?
         .as_array()
         .ok_or("field diagnostics")?;
+    let mut found = false;
+    for diagnostic in diagnostics {
+        if diagnostic.get("code").and_then(Value::as_str) != Some("unsupportedValue")
+            || diagnostic.get("kind").and_then(Value::as_str) != Some("blueprintCategories")
+        {
+            continue;
+        }
+        let examples = diagnostic["examples"].as_array().ok_or("field examples")?;
+        for example in examples {
+            found |= example
+                .pointer("/recordIndex/value")
+                .and_then(Value::as_u64)
+                == Some(0)
+                && crate::health_origin_assertions::example_text(catalog, example, "field")?
+                    == Some(&json!("$name"))
+                && crate::health_origin_assertions::example_text(catalog, example, "sourceType")?
+                    == Some(&json!(fixture::SOURCE_TYPE));
+        }
+    }
     assert!(
-        diagnostics.iter().any(|diagnostic| {
-            diagnostic.get("code").and_then(Value::as_str) == Some("unsupportedValue")
-                && diagnostic.get("kind").and_then(Value::as_str) == Some("blueprintCategories")
-                && diagnostic
-                    .get("examples")
-                    .and_then(Value::as_array)
-                    .is_some_and(|examples| {
-                        examples.iter().any(|example| {
-                            example.get("recordIndex").and_then(Value::as_u64) == Some(0)
-                                && example.get("field").and_then(Value::as_str) == Some("$name")
-                                && example.get("sourceType").and_then(Value::as_str)
-                                    == Some(fixture::SOURCE_TYPE)
-                        })
-                    })
-        }),
+        found,
         "unsupported coverage keeps the actual physical owner, body field and source type"
     );
     Ok(())

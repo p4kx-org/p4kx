@@ -3,18 +3,22 @@
 
 use std::collections::BTreeMap;
 
+use crate::catalog_read::original::ExampleBodyReceipt;
 use crate::catalog_reference;
-use crate::catalog_reference::CatalogReference;
+use crate::catalog_reference::{CatalogReference, CatalogReferenceTarget};
 use crate::catalog_row::{CatalogRowExclusion, CatalogRows};
 use crate::catalog_target_index::TargetIndex;
 use crate::export_diagnostic::{
-    ExportDiagnostic, ExportDiagnosticCode, ExportDiagnosticExample, ExportDiagnosticSeverity,
-    ExportDiagnosticStage, ExportDiagnosticUnit, ExportSourceRole,
+    ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
+    ExportSourceRole,
 };
 use crate::export_field_inspection::FieldInspection;
 use crate::export_health_fields::Fields;
 use crate::export_ledger::{ExportAccountingError, SourceDisposition, SourceObservation};
-use crate::export_reference_issue::{ExportReferenceStatus, ExportUnresolvedReference};
+use crate::export_reference_issue::ExportReferenceStatus;
+use crate::health_diagnostic_observation::{
+    DiagnosticObservation as ExportDiagnostic, ExampleObservation,
+};
 
 /// Resolves captured source links using final emitted rows and exact physical source outcomes.
 pub(crate) fn resolve(
@@ -49,11 +53,10 @@ pub(crate) fn resolve(
             .get(&source.record_index)
             .ok_or(ExportAccountingError::MissingFieldInspection)?;
         for reference in &proof.catalog_references {
-            let target_sources = by_target
-                .get(&reference.target_record_index)
-                .map_or(&[][..], Vec::as_slice);
-            if let Some(status) = status(reference, rows, targets, target_sources) {
-                record(source, proof, reference, status, fields);
+            let target = reference.target()?;
+            let target_sources = by_target.get(&target.index).map_or(&[][..], Vec::as_slice);
+            if let Some(status) = status(&target, rows, targets, target_sources) {
+                record(source, reference, status, fields)?;
             }
         }
     }
@@ -61,22 +64,19 @@ pub(crate) fn resolve(
 }
 
 fn status(
-    reference: &CatalogReference,
+    target: &CatalogReferenceTarget<'_>,
     rows: &CatalogRows,
     targets: &TargetIndex,
     sources: &[&SourceObservation],
 ) -> Option<ExportReferenceStatus> {
-    if catalog_reference::actual_kind(&reference.target_type) != Some(reference.target_kind) {
+    if catalog_reference::actual_kind(target.source_type) != Some(target.kind) {
         return Some(ExportReferenceStatus::UnexpectedTargetType);
     }
-    let identity = (reference.target_kind, reference.target_guid);
+    let identity = (target.kind, target.guid);
     if targets.ambiguous.contains(&identity) {
         return Some(ExportReferenceStatus::AmbiguousIdentity);
     }
-    if targets
-        .emitted
-        .contains(&(reference.target_kind, reference.target_record_index))
-    {
+    if targets.emitted.contains(&(target.kind, target.index)) {
         return None;
     }
     if targets
@@ -86,31 +86,24 @@ fn status(
     {
         return Some(ExportReferenceStatus::AmbiguousIdentity);
     }
-    if !reference
-        .target_kind
-        .records()
-        .matches_path(&reference.target_record_path)
-    {
+    if !target.kind.records().matches_path(target.path) {
         return Some(ExportReferenceStatus::OutsideCatalogSelection);
     }
-    if reference.target_kind != crate::Kind::Tags
+    if target.kind != crate::Kind::Tags
         && rows
             .filter
             .as_ref()
-            .is_some_and(|filter| !filter.matches(&reference.target_record_path))
+            .is_some_and(|filter| !filter.matches(target.path))
     {
         return Some(ExportReferenceStatus::ExcludedByFilter);
     }
-    if let Some(reason) = targets
-        .excluded
-        .get(&(reference.target_kind, reference.target_record_index))
-    {
+    if let Some(reason) = targets.excluded.get(&(target.kind, target.index)) {
         return Some(match reason {
             CatalogRowExclusion::Filter => ExportReferenceStatus::ExcludedByFilter,
             CatalogRowExclusion::DevelopmentLeftover => ExportReferenceStatus::ExcludedByPolicy,
         });
     }
-    Some(source_status(reference.target_kind, sources))
+    Some(source_status(target.kind, sources))
 }
 
 fn source_status(kind: crate::Kind, sources: &[&SourceObservation]) -> ExportReferenceStatus {
@@ -143,27 +136,14 @@ fn source_status(kind: crate::Kind, sources: &[&SourceObservation]) -> ExportRef
 
 fn record(
     source: &SourceObservation,
-    proof: &FieldInspection,
     reference: &CatalogReference,
     status: ExportReferenceStatus,
     fields: &mut Fields,
-) {
-    fields.references.push(ExportUnresolvedReference {
-        record_index: source.record_index,
-        kind: source.kind,
-        source_role: source.role,
-        record_guid: proof.guid.to_string(),
-        record_path: proof.record_path.clone(),
-        field: reference.field.clone(),
-        source_type: reference.source_type.clone(),
-        target_guid: Some(reference.target_guid.to_string()),
-        target_record_index: Some(reference.target_record_index),
-        target_record_path: Some(reference.target_record_path.clone()),
-        target_type: Some(reference.target_type.clone()),
-        target_location: None,
-        status,
-        source_pointer: None,
-    });
+) -> Result<(), ExportAccountingError> {
+    let mut original = reference.original.clone().resolved(status);
+    original.merge_owner(source.subject())?;
+    original.contextualize(source.kind, source.role);
+    let data = original.data();
     let blocking = matches!(
         status,
         ExportReferenceStatus::AmbiguousIdentity
@@ -187,15 +167,16 @@ fn record(
         warning_code: None,
         count: 1,
         count_unit: ExportDiagnosticUnit::Values,
-        examples: vec![ExportDiagnosticExample {
-            record_index: Some(source.record_index),
-            record_guid: Some(proof.guid.to_string()),
-            record_path: Some(proof.record_path.clone()),
-            field: Some(reference.field.clone()),
-            source_type: Some(reference.source_type.clone()),
-            target_guid: Some(reference.target_guid.to_string()),
-        }],
+        examples: vec![ExampleObservation::captured(
+            source.subject().clone(),
+            Some(data.field.as_str()),
+            Some(data.source_type.as_str()),
+            data.target_guid,
+            ExampleBodyReceipt::reference(&original)?,
+        )?],
     });
+    fields.references.push(original);
+    Ok(())
 }
 
 fn ambiguous_rows(
@@ -216,14 +197,13 @@ fn ambiguous_rows(
             warning_code: None,
             count: 1,
             count_unit: ExportDiagnosticUnit::Records,
-            examples: vec![ExportDiagnosticExample {
-                record_index: Some(*physical),
-                record_guid: Some(proof.guid.to_string()),
-                record_path: Some(proof.record_path.clone()),
-                field: None,
-                source_type: None,
-                target_guid: Some(proof.guid.to_string()),
-            }],
+            examples: vec![ExampleObservation::captured(
+                proof.subject.clone(),
+                None,
+                None,
+                Some(proof.guid),
+                ExampleBodyReceipt::guid_header(proof.subject.clone()),
+            )?],
         });
     }
     Ok(())

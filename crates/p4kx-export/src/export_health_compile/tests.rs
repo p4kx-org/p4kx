@@ -1,18 +1,24 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "tests/counters.rs"]
 mod counters;
+#[path = "tests/diagnostics.rs"]
 mod diagnostics;
+#[path = "tests/entries.rs"]
 mod entries;
+#[path = "tests/membership.rs"]
 mod membership;
 
 use p4kx_extraction::Guid;
 
 use crate::export_diagnostic::ExportSourceRole;
-use crate::export_ledger::{ExportLedger, SourceDiagnosis, SourceDisposition, SourceObservation};
+use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
 use crate::{Kind, KindSummary};
 
-type TestResult = Result<(), Box<dyn std::error::Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+#[path = "tests/original.rs"]
+mod original;
 
 fn source(
     kind: Kind,
@@ -20,15 +26,14 @@ fn source(
     role: ExportSourceRole,
     disposition: SourceDisposition,
 ) -> SourceObservation {
-    SourceObservation {
-        kind: Some(kind),
-        record_index: u32::from(id),
-        guid: Guid::from_stored([id; 16]),
-        record_path: Some(format!("synthetic/{id}")),
+    SourceObservation::accounting(
+        Some(kind),
+        u32::from(id),
+        Guid::from_stored([id; 16]),
+        Some(crate::HealthText::new(&format!("synthetic/{id}"))),
         role,
         disposition,
-        diagnosis: SourceDiagnosis::default(),
-    }
+    )
 }
 
 fn observe(ledger: &mut ExportLedger, source: SourceObservation) {
@@ -39,7 +44,11 @@ fn observe(ledger: &mut ExportLedger, source: SourceObservation) {
                 kind: source.kind,
                 record_index: source.record_index,
                 guid: source.guid,
-                record_path: source.record_path.clone().unwrap_or_default(),
+                record_path: source
+                    .record_path
+                    .clone()
+                    .expect("readable accounting source path"),
+                subject: source.subject().clone(),
                 role: source.role,
                 complete: true,
                 diagnostics: Vec::new(),

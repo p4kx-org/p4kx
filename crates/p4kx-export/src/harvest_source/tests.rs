@@ -22,7 +22,9 @@ fn opened(payload: Vec<u8>) -> Result<(tempfile::TempDir, Archive), Box<dyn std:
 #[test]
 fn an_empty_container_is_a_successful_source_without_an_invented_soc() -> TestResult {
     let (_folder, archive) = opened(TestContainer::new().build())?;
-    let (soc, ledger) = super::read(&archive, 1);
+    let (soc, ledger) = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        super::read(&archive, 1, capture)
+    })?;
     assert_eq!(soc, Soc::Plain, "empty is a valid source result");
     let [outer] = ledger.entries.as_slice() else {
         return Err("one actual source Entry expected".into());
@@ -43,12 +45,18 @@ fn an_empty_container_is_a_successful_source_without_an_invented_soc() -> TestRe
 #[test]
 fn a_failed_outer_open_does_not_claim_an_inner_read() -> TestResult {
     let (_folder, archive) = opened(b"invalid container".to_vec())?;
-    let (soc, ledger) = super::read(&archive, 1);
+    let (soc, ledger) = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        super::read(&archive, 1, capture)
+    })?;
     assert!(matches!(soc, Soc::Unreadable(_)), "the container failed");
     let [outer] = ledger.entries.as_slice() else {
         return Err("one failed source Entry expected".into());
     };
-    assert_eq!(outer.path, "harvest.socpak", "exact failed identity");
+    assert_eq!(
+        outer.path.as_str(),
+        "harvest.socpak",
+        "exact failed identity"
+    );
     assert_eq!(
         outer.disposition,
         SourceDisposition::ReadFailed,
@@ -64,7 +72,9 @@ fn only_the_selected_first_soc_is_observed() -> TestResult {
         .entry(TestEntry::stored("first.soc", "plain source"))
         .entry(TestEntry::zstd("second.soc", "unread source").with_payload(b"bad".to_vec()));
     let (_folder, archive) = opened(container.build())?;
-    let (soc, ledger) = super::read(&archive, 1);
+    let (soc, ledger) = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        super::read(&archive, 1, capture)
+    })?;
     assert_eq!(soc, Soc::Plain, "a successful scan can find no preset");
     let [outer, inner] = ledger.entries.as_slice() else {
         return Err("outer plus selected SOC expected".into());
@@ -80,7 +90,8 @@ fn only_the_selected_first_soc_is_observed() -> TestResult {
         "actual inner index, not filtered position"
     );
     assert_eq!(
-        inner.path, "harvest.socpak!first.soc",
+        inner.path.as_str(),
+        "harvest.socpak!first.soc",
         "nested identity survives"
     );
     assert_eq!(
@@ -96,7 +107,9 @@ fn a_corrupt_selected_soc_retains_its_nested_identity() -> TestResult {
     let container = TestContainer::new()
         .entry(TestEntry::zstd("bad.soc", "expected source").with_payload(b"bad".to_vec()));
     let (_folder, archive) = opened(container.build())?;
-    let (soc, ledger) = super::read(&archive, 1);
+    let (soc, ledger) = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        super::read(&archive, 1, capture)
+    })?;
     assert!(matches!(soc, Soc::Unreadable(_)), "selected source failed");
     let [outer, inner] = ledger.entries.as_slice() else {
         return Err("actual outer and inner operations expected".into());
@@ -107,7 +120,8 @@ fn a_corrupt_selected_soc_retains_its_nested_identity() -> TestResult {
         "directory read succeeded"
     );
     assert_eq!(
-        inner.path, "harvest.socpak!bad.soc",
+        inner.path.as_str(),
+        "harvest.socpak!bad.soc",
         "failed inner identity"
     );
     assert_eq!(

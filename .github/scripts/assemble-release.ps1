@@ -32,6 +32,9 @@ The release version, defaulting to the workspace version.
 .PARAMETER Revision
 The full source commit digest, defaulting to GITHUB_SHA or the current commit.
 
+.PARAMETER TagAttestations
+Selects attestation instructions after the tagged workflow has verified completion of both attestation jobs.
+
 .EXAMPLE
 ./assemble-release.ps1 -AssetDirectory assets -NotesPath release-notes.md -OutputNotesPath notes.md -Repository p4kx-org/p4kx
 #>
@@ -43,7 +46,8 @@ param(
     [string]$VirusTotalNotePath,
     [Parameter(Mandatory)][string]$Repository,
     [string]$Version,
-    [string]$Revision
+    [string]$Revision,
+    [switch]$TagAttestations
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,7 +82,8 @@ $sha3Lines = $files | ForEach-Object { Get-HashLine $_ { param($s) [System.Secur
 Set-Content -LiteralPath (Join-Path $AssetDirectory $sha256Name) -Value $sha256Lines -Encoding utf8NoBOM
 Set-Content -LiteralPath (Join-Path $AssetDirectory $sha3Name) -Value $sha3Lines -Encoding utf8NoBOM
 
-$provenance = @"
+$provenance = if ($TagAttestations) {
+@"
 ## Build provenance
 
 Every asset except the hash files and the attestation bundles is attested (SLSA build
@@ -99,6 +104,13 @@ gh attestation verify <file> --bundle <bundle> --repo $Repository
 gh attestation verify <file> --bundle <sbom>.cdx.json.sigstore.json --repo $Repository --predicate-type https://cyclonedx.org/bom
 ``````
 "@
+} else {
+@'
+## Build provenance
+
+This validation run did not generate Sigstore attestations.
+'@
+}
 
 $checksums = @"
 ## Checksums

@@ -215,7 +215,7 @@ fn assert_header(catalog: &Value) -> TestResult {
     Ok(())
 }
 
-const EXPECTED_KINDS: [&str; 51] = [
+const EXPECTED_KINDS: [&str; 52] = [
     "manufacturers",
     "items",
     "ships",
@@ -267,12 +267,13 @@ const EXPECTED_KINDS: [&str; 51] = [
     "resourceTypes",
     "tags",
     "blueprintCategoryLists",
+    "shopInventories",
 ];
 
 fn assert_kind_order() {
     assert_eq!(
         Kind::ALL.iter().map(|kind| kind.name()).collect::<Vec<_>>(),
         EXPECTED_KINDS,
-        "the new Kind appends at index 50 without changing any existing index"
+        "the catalog Kind order preserves the category-list index before shop inventories"
     );
 }

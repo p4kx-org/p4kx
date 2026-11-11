@@ -143,7 +143,7 @@ impl<'f> LoadoutResolver<'f> {
     ///
     /// Returns the reason when no files were given to read it from or it cannot be read.
     pub fn resolve_file(&mut self, path: &str) -> Result<EntityNode, LoadoutError> {
-        let loadout = LoadoutSpec::Xml(path.into());
+        let loadout = LoadoutSpec::Xml(crate::LoadoutPath::unbound(path));
         self.entries(Some(&loadout))?;
         let spec = EntitySpec {
             record_index: None,

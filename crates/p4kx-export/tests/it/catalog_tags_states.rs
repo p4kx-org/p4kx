@@ -3,10 +3,11 @@
 
 use p4kx_export::{CancelToken, CatalogError, CatalogPublicationMode, build_catalog};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::catalog_tags_fixture::{self as fixture, TestResult, at};
 use crate::commodity_v3_fixture::{self as archive_fixture, DcbOrigin};
+use crate::health_origin_assertions;
 
 #[test]
 fn absent_null_empty_invalid_and_unreadable_entity_arrays_remain_distinct() -> TestResult {
@@ -128,14 +129,10 @@ fn canonical_tag_read_failure_is_health_evidence_without_a_fabricated_definition
 }
 
 #[test]
-fn depth_and_text_cuts_retain_every_raw_record_and_report_the_actual_limit() -> TestResult {
-    for (count, name, label) in [
+fn full_depth_name_and_path_preserve_raw_and_selected_records() -> TestResult {
+    for (count, name, former_warning) in [
         (66_u32, "x".to_owned(), "tag_path_depth_limit"),
-        (
-            2,
-            "x".repeat(p4kx_extraction::MAX_TAG_NAME_BYTES + 1),
-            "tag_path_name_bytes_limit",
-        ),
+        (2, "x".repeat(257), "tag_path_name_bytes_limit"),
         (7, "x".repeat(200), "tag_path_bytes_limit"),
     ] {
         let mut database = fixture::schema();
@@ -152,7 +149,12 @@ fn depth_and_text_cuts_retain_every_raw_record_and_report_the_actual_limit() -> 
             ));
         }
         database = database.record(fixture::roots(fixture::references(&[0x1000])));
-        let (_, catalog) = fixture::diagnostic(&database)?;
+        let (_, catalog) = fixture::build(
+            &database,
+            DcbOrigin::Plain,
+            CatalogPublicationMode::Normal,
+            None,
+        )?;
         assert_eq!(
             fixture::rows(&catalog, "definitions/tags")?.len(),
             usize::try_from(count)?
@@ -161,13 +163,19 @@ fn depth_and_text_cuts_retain_every_raw_record_and_report_the_actual_limit() -> 
             .as_array()
             .ok_or("diagnostics")?;
         assert!(
-            diagnostics.iter().any(|row| row["warningCode"] == label),
-            "explicit actual budget reason"
+            diagnostics
+                .iter()
+                .all(|row| row["warningCode"] != former_warning),
+            "valid original data has no projection cutoff diagnostic"
         );
-        assert!(
-            fixture::rows(&catalog, "projections/tagPaths")?.len() < usize::try_from(count)?,
-            "only convenience rows are cut by the path budget"
-        );
+        let paths = fixture::rows(&catalog, "projections/tagPaths")?;
+        assert_eq!(paths.len(), usize::try_from(count)?);
+        let last = paths.last().ok_or("the actual last tag path")?;
+        assert_eq!(at(last, "/recordIndex/value")?, &json!(count - 1));
+        assert_eq!(at(last, "/depth/value")?, &json!(count - 1));
+        let text = vec![name.as_str(); usize::try_from(count)?].join(".");
+        assert_eq!(at(last, "/path/value")?, &json!(text));
+        assert_eq!(at(last, "/path/containsEncryptedSource")?, &json!(false));
     }
     Ok(())
 }
@@ -278,17 +286,30 @@ fn a_new_zero_valued_declared_tag_field_cannot_silently_pass_full_coverage() -> 
         .as_array()
         .ok_or("diagnostics")?;
     assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic["code"] == "unsupportedValue"
-                && diagnostic["examples"]
-                    .as_array()
-                    .is_some_and(|examples| examples
-                        .iter()
-                        .any(|example| example["field"] == "futureTaxonomyFlag"
-                            && example["sourceType"] == "Tag"))),
+        future_field_diagnostic(&catalog, diagnostics)?,
         "zero-valued future declarations cannot silently disappear behind complete health"
     );
     assert_eq!(at(&catalog, "/exportHealth/status")?, &json!("incomplete"));
     Ok(())
+}
+
+fn future_field_diagnostic(catalog: &Value, diagnostics: &[Value]) -> TestResult<bool> {
+    for diagnostic in diagnostics
+        .iter()
+        .filter(|row| row["code"] == "unsupportedValue")
+    {
+        let Some(examples) = diagnostic["examples"].as_array() else {
+            continue;
+        };
+        for example in examples {
+            if health_origin_assertions::example_text(catalog, example, "field")?
+                == Some(&json!("futureTaxonomyFlag"))
+                && health_origin_assertions::example_text(catalog, example, "sourceType")?
+                    == Some(&json!("Tag"))
+            {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }

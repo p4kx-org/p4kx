@@ -3,9 +3,12 @@
 
 use p4kx_extraction::Record;
 
+use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_read_failure::CatalogReadFailure;
 use crate::export_diagnostic::ExportSourceRole;
-use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
+use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::picked::Picked;
+use crate::record_observation::RecordObservation;
 use crate::selection::Kind;
 
 /// Source observations and rows produced by one Record check.
@@ -37,24 +40,25 @@ pub(crate) enum ScanError {
 
 /// Completes the production evidence captured by a Record worker.
 pub(crate) fn finish<'f>(
-    record: &Record<'_>,
+    input: &OriginalCatalogInput<'_, '_>,
+    record: &Record<'f>,
     trace: &SourceTrace,
     result: Result<Option<Picked<'f>>, ScanError>,
     mut ledger: ExportLedger,
 ) -> Result<Option<RecordScan<'f>>, crate::CatalogError> {
     let picked = match result {
         Ok(picked) => {
-            trace.completed(record, picked.as_ref(), &mut ledger);
+            trace.completed(input, record, picked.as_ref(), &mut ledger)?;
             picked
         }
         Err(ScanError::Source(error)) => {
-            trace.failed(record, &error, &mut ledger);
-            Some(Picked::Failed(crate::CatalogFailure::of(record, &error)))
+            trace.failed(input, record, &error, &mut ledger)?;
+            Some(Picked::Failed(CatalogReadFailure::of(record, &error)))
         }
         Err(ScanError::Fatal(error)) => return Err(error),
         Err(ScanError::Projection(error)) => {
-            trace.failed(record, &error, &mut ledger);
-            Some(Picked::Failed(crate::CatalogFailure::of(record, &error)))
+            trace.failed(input, record, &error, &mut ledger)?;
+            Some(Picked::Failed(CatalogReadFailure::of(record, &error)))
         }
     };
     Ok(
@@ -118,29 +122,33 @@ impl SourceTrace {
     /// Captures the actual completed source disposition and any secondary crafter selection.
     pub(crate) fn completed(
         &self,
+        input: &OriginalCatalogInput<'_, '_>,
         record: &Record<'_>,
         picked: Option<&Picked<'_>>,
         ledger: &mut ExportLedger,
-    ) {
+    ) -> Result<(), crate::CatalogError> {
         if !self.selected {
-            return;
+            return Ok(());
         }
         let disposition = picked.map_or(SourceDisposition::Projected, |picked| {
             disposition(picked, self.stage)
         });
-        ledger.observe(self.observation(record, ExportSourceRole::Selected, disposition));
+        let admission = RecordObservation::capture(input, record)?;
+        ledger.observe(admission.source(self.kind, ExportSourceRole::Selected, disposition)?);
         if let Some(picked) = picked {
-            additional(record, picked, ledger);
+            additional(&admission, picked, ledger)?;
         }
+        Ok(())
     }
 
     /// Captures the stage of an actual failure without interpreting its display text.
     pub(crate) fn failed(
         &self,
+        input: &OriginalCatalogInput<'_, '_>,
         record: &Record<'_>,
         error: &(dyn std::error::Error + 'static),
         ledger: &mut ExportLedger,
-    ) {
+    ) -> Result<(), crate::CatalogError> {
         let role = if self.selected {
             ExportSourceRole::Selected
         } else {
@@ -151,22 +159,13 @@ impl SourceTrace {
         } else {
             SourceDisposition::ReadFailed
         };
+        let admission = RecordObservation::capture(input, record)?;
         ledger.observe(
-            self.observation(record, role, disposition)
+            admission
+                .source(self.kind, role, disposition)?
                 .diagnosed(crate::export_source_failure::diagnosis(error)),
         );
-    }
-
-    fn observation(
-        &self,
-        record: &Record<'_>,
-        role: ExportSourceRole,
-        disposition: SourceDisposition,
-    ) -> SourceObservation {
-        self.kind.map_or_else(
-            || SourceObservation::catalog_source(record, role, disposition),
-            |kind| SourceObservation::new(kind, record, role, disposition),
-        )
+        Ok(())
     }
 }
 
@@ -182,23 +181,26 @@ fn disposition(picked: &Picked<'_>, stage: Stage) -> SourceDisposition {
     }
 }
 
-fn additional(record: &Record<'_>, picked: &Picked<'_>, ledger: &mut ExportLedger) {
+fn additional(
+    admission: &RecordObservation<'_, '_>,
+    picked: &Picked<'_>,
+    ledger: &mut ExportLedger,
+) -> Result<(), crate::CatalogError> {
     match picked {
         Picked::Crafted(picked, _) => {
-            ledger.observe(SourceObservation::new(
-                Kind::Crafters,
-                record,
+            ledger.observe(admission.source(
+                Some(Kind::Crafters),
                 ExportSourceRole::Selected,
                 SourceDisposition::Projected,
-            ));
-            additional(record, picked, ledger);
+            )?);
+            additional(admission, picked, ledger)?;
         }
-        Picked::SkippedPaint => ledger.observe(SourceObservation::new(
-            Kind::Paints,
-            record,
+        Picked::SkippedPaint => ledger.observe(admission.source(
+            Some(Kind::Paints),
             ExportSourceRole::DerivedInput,
             SourceDisposition::SkippedAfterRead,
-        )),
+        )?),
         _ => {}
     }
+    Ok(())
 }

@@ -4,131 +4,136 @@
 use std::io::{self, Write};
 use std::path::Path;
 
-use p4kx_extraction::{Tag, TagTreeIssues};
-use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
+use p4kx_extraction::{Tag, TagPath, TagTreeIssues};
+use serde::ser::{Serialize, SerializeMap, Serializer};
 
 use crate::dcb_tags::Listing;
+use crate::dcb_tags::origins::TagOrigins;
 use crate::json;
 
-/// One tag of the flat list, with its parent and children by GUID.
-struct Flat<'t>(Tag<'t>);
+struct PathText<'tree>(TagPath<'tree>);
 
-/// One tag of the tree, with its children nested.
-struct Nested<'t>(Tag<'t>);
+impl Serialize for PathText<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(&self.0)
+    }
+}
 
 struct Issues(TagTreeIssues);
 
-struct Tags<'a, 't> {
-    listing: &'a Listing<'t>,
-    tree: bool,
-}
-
-fn head<S: SerializeMap>(map: &mut S, tag: &Tag<'_>) -> Result<(), S::Error> {
-    map.serialize_entry("guid", &tag.guid().to_string())?;
-    map.serialize_entry("name", tag.name())?;
-    map.serialize_entry("path", tag.path())?;
-    map.serialize_entry("legacy_id", &tag.legacy_id())
-}
-
-impl Serialize for Flat<'_> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let tag = &self.0;
-        let mut map = serializer.serialize_map(Some(7))?;
-        head(&mut map, tag)?;
-        map.serialize_entry(
-            "parent",
-            &tag.parent().map(|parent| parent.guid().to_string()),
-        )?;
-        map.serialize_entry("depth", &tag.depth())?;
-        let children: Vec<String> = tag
-            .children()
-            .map(|child| child.guid().to_string())
-            .collect();
-        map.serialize_entry("children", &children)?;
-        map.end()
-    }
-}
-
-impl Serialize for Nested<'_> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let tag = &self.0;
-        let mut map = serializer.serialize_map(Some(5))?;
-        head(&mut map, tag)?;
-        let children: Vec<Nested<'_>> = tag.children().map(Nested).collect();
-        map.serialize_entry("children", &children)?;
-        map.end()
-    }
-}
-
 impl Serialize for Issues {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(Some(7))?;
+        let mut map = serializer.serialize_map(Some(8))?;
+        map.serialize_entry("unclassified", &self.0.unclassified())?;
         map.serialize_entry("unreadable", &self.0.unreadable())?;
         map.serialize_entry("dangling", &self.0.dangling())?;
         map.serialize_entry("repeated", &self.0.repeated())?;
-        map.serialize_entry("too_deep", &self.0.too_deep())?;
-        map.serialize_entry("too_long", &self.0.too_long())?;
+        map.serialize_entry("too_deep", &0)?;
+        map.serialize_entry("too_long", &0)?;
         map.serialize_entry("duplicate", &self.0.duplicate())?;
         map.serialize_entry("unlisted", &self.0.unlisted())?;
         map.end()
     }
 }
 
-impl Serialize for Tags<'_, '_> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if self.tree {
-            let mut seq = serializer.serialize_seq(Some(self.listing.tops.len()))?;
-            for top in &self.listing.tops {
-                seq.serialize_element(&Nested(*top))?;
-            }
-            seq.end()
-        } else {
-            let mut seq = serializer.serialize_seq(Some(self.listing.rows.len()))?;
-            for row in &self.listing.rows {
-                seq.serialize_element(&Flat(row.tag))?;
-            }
-            seq.end()
-        }
-    }
-}
-
-struct Document<'a, 't> {
-    archive: String,
-    listing: &'a Listing<'t>,
-    tree: bool,
-}
-
-impl Serialize for Document<'_, '_> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(Some(6))?;
-        map.serialize_entry("archive", &self.archive)?;
-        map.serialize_entry("tag_count", &self.listing.total)?;
-        map.serialize_entry("shown_count", &self.listing.rows.len())?;
-        map.serialize_entry("issues", &Issues(self.listing.issues))?;
-        map.serialize_entry("tree", &self.tree)?;
-        map.serialize_entry(
-            "tags",
-            &Tags {
-                listing: self.listing,
-                tree: self.tree,
-            },
-        )?;
-        map.end()
-    }
-}
-
-/// Writes the listing as one line of JSON: the tags flat in tree order, or with `tree` nested.
+/// Writes the listing as one line of JSON.
 pub(crate) fn write(
     out: &mut impl Write,
     archive: &Path,
     listing: &Listing<'_>,
     tree: bool,
+    origins: &TagOrigins,
 ) -> io::Result<()> {
-    let document = Document {
-        archive: json::path(archive),
-        listing,
-        tree,
-    };
-    serde_json::to_writer(&mut *out, &document)?;
-    writeln!(out)
+    let summary = origins.summary(listing).map_err(io::Error::other)?;
+    out.write_all(b"{\"archive\":")?;
+    serde_json::to_writer(&mut *out, &json::path(archive))?;
+    field(out, "tag_count", &listing.total)?;
+    field(out, "shown_count", &listing.rows.len())?;
+    field(out, "issues", &Issues(listing.issues))?;
+    field(out, "tree", &tree)?;
+    field(out, "fieldOrigins", &summary)?;
+    field(out, "provenance", origins.inventory())?;
+    out.write_all(b",\"tags\":[")?;
+    if tree {
+        for (index, top) in listing.tops.iter().enumerate() {
+            comma(out, index)?;
+            nested(out, *top, origins)?;
+        }
+    } else {
+        for (index, row) in listing.rows.iter().enumerate() {
+            comma(out, index)?;
+            flat(out, row.tag, origins)?;
+        }
+    }
+    out.write_all(b"]}\n")
+}
+
+fn head(out: &mut impl Write, tag: Tag<'_>) -> io::Result<()> {
+    out.write_all(b"{\"guid\":")?;
+    serde_json::to_writer(&mut *out, &tag.guid().to_string())?;
+    field(out, "name", &tag.name())?;
+    field(out, "path", &PathText(tag.path_view()))?;
+    field(out, "legacy_id", &tag.legacy_id())
+}
+
+fn field<T: Serialize>(out: &mut impl Write, name: &str, value: &T) -> io::Result<()> {
+    out.write_all(b",")?;
+    serde_json::to_writer(&mut *out, name)?;
+    out.write_all(b":")?;
+    serde_json::to_writer(out, value)?;
+    Ok(())
+}
+
+fn comma(out: &mut impl Write, index: usize) -> io::Result<()> {
+    if index != 0 {
+        out.write_all(b",")?;
+    }
+    Ok(())
+}
+
+fn flat(out: &mut impl Write, tag: Tag<'_>, origins: &TagOrigins) -> io::Result<()> {
+    let fields = origins
+        .row(tag.position(), true)
+        .map_err(io::Error::other)?;
+    head(out, tag)?;
+    field(
+        out,
+        "parent",
+        &tag.parent().map(|parent| parent.guid().to_string()),
+    )?;
+    field(out, "depth", &tag.depth())?;
+    field(out, "fieldOrigins", &fields)?;
+    out.write_all(b",\"children\":[")?;
+    for (index, child) in tag.children().enumerate() {
+        comma(out, index)?;
+        serde_json::to_writer(&mut *out, &child.guid().to_string())?;
+    }
+    out.write_all(b"]}")
+}
+
+fn nested(out: &mut impl Write, top: Tag<'_>, origins: &TagOrigins) -> io::Result<()> {
+    let base_depth = top.depth();
+    let mut open = 0;
+    for tag in std::iter::once(top).chain(top.descendants()) {
+        let depth = tag.depth() - base_depth;
+        if open > depth {
+            close(out, open - depth)?;
+            out.write_all(b",")?;
+        }
+        let fields = origins
+            .row(tag.position(), false)
+            .map_err(io::Error::other)?;
+        head(out, tag)?;
+        field(out, "fieldOrigins", &fields)?;
+        out.write_all(b",\"children\":[")?;
+        open = depth + 1;
+    }
+    close(out, open)
+}
+
+fn close(out: &mut impl Write, count: usize) -> io::Result<()> {
+    for _ in 0..count {
+        out.write_all(b"]}")?;
+    }
+    Ok(())
 }

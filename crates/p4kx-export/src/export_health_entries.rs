@@ -4,18 +4,19 @@
 use std::collections::BTreeMap;
 
 use crate::Kind;
+use crate::catalog_read::original::FailedEntryObservation;
 use crate::export_diagnostic::{
-    ExportDiagnostic, ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage,
-    ExportDiagnosticUnit,
+    ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
 };
-use crate::export_entry_ledger::{ArchiveEntryObservation, FailedExportEntry};
+use crate::export_entry_ledger::ArchiveEntryObservation;
 use crate::export_health::ExportSourceCounts;
 use crate::export_ledger::{ExportAccountingError, SourceDisposition};
+use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
 
 /// Actual Archive Entry outcomes after physical and logical identity deduplication.
 pub(crate) struct Entries {
     pub(crate) sources: Vec<ArchiveEntryObservation>,
-    pub(crate) failed: Vec<FailedExportEntry>,
+    pub(crate) failed: Vec<FailedEntryObservation>,
     pub(crate) diagnostics: Vec<ExportDiagnostic>,
 }
 
@@ -37,12 +38,13 @@ pub(crate) fn compile(
             std::collections::btree_map::Entry::Vacant(entry) => {
                 entry.insert(source);
             }
-            std::collections::btree_map::Entry::Occupied(entry) => {
+            std::collections::btree_map::Entry::Occupied(mut entry) => {
                 if entry.get() != &source {
                     return Err(ExportAccountingError::ConflictingDisposition {
                         kind: Some(source.kind),
                     });
                 }
+                entry.get_mut().merge(&source)?;
             }
         }
     }
@@ -55,11 +57,11 @@ pub(crate) fn compile(
     let diagnostics = failed
         .iter()
         .map(|failure| ExportDiagnostic {
-            kind: Some(failure.kind),
+            kind: Some(failure.source.kind),
             stage: failure.stage,
             code: failure.code,
             severity: ExportDiagnosticSeverity::Error,
-            source_role: Some(failure.role),
+            source_role: Some(failure.source.role),
             warning_code: None,
             count: 1,
             count_unit: ExportDiagnosticUnit::EntryOperations,
@@ -73,7 +75,7 @@ pub(crate) fn compile(
     })
 }
 
-fn failure(source: &ArchiveEntryObservation) -> FailedExportEntry {
+fn failure(source: &ArchiveEntryObservation) -> FailedEntryObservation {
     let (stage, code) = if source.disposition == SourceDisposition::ReadFailed {
         (
             ExportDiagnosticStage::SourceRead,
@@ -85,18 +87,10 @@ fn failure(source: &ArchiveEntryObservation) -> FailedExportEntry {
             ExportDiagnosticCode::ProjectionFailure,
         )
     };
-    FailedExportEntry {
-        operation: source.operation,
-        kind: source.kind,
-        entry_index: source.entry_index,
-        container_entry_index: source.container_entry_index,
-        path: source.path.clone(),
-        role: source.role,
+    FailedEntryObservation {
+        source: source.clone(),
         stage,
         code: source.diagnosis.code.unwrap_or(code),
-        field: source.diagnosis.field.clone(),
-        source_type: source.diagnosis.source_type.clone(),
-        target_guid: source.diagnosis.target_guid.map(|guid| guid.to_string()),
     }
 }
 

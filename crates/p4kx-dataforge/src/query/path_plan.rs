@@ -3,11 +3,12 @@
 
 use crate::DataType;
 use crate::query::reader::Reader;
-use crate::query::resolve::{Resolved, resolve};
+use crate::query::resolve::{self, Resolved};
 use crate::query::schema::{FieldDef, StructFields};
-use crate::query::suggest::closest;
+use crate::query::suggest;
 use crate::query::syntax::{Name, Path};
 use crate::query::{QueryError, QueryErrorKind};
+use crate::source_layout_index;
 
 /// The kind of a field that decides how the rest of a path resolves behind it.
 type SlotKey = (DataType, u16, bool);
@@ -19,7 +20,7 @@ pub(crate) enum PathPlan {
     /// of the path stands at `position` as it does there.
     Fixed {
         head: String,
-        position: u32,
+        position: u64,
         resolved: Resolved,
     },
     /// Without `from`: resolved once per kind of field the path starts with, relative to it.
@@ -42,26 +43,20 @@ impl PathPlan {
         from: Option<&Name>,
     ) -> Result<Self, QueryError> {
         let head = &path.head;
+        let source_error = |error| QueryError::new(QueryErrorKind::DataForge(error), head.span());
         if let (Some(index), Some(from)) = (nominal, from) {
-            let Some(field) = structs.field(index, head.as_str()) else {
-                return Err(unknown_field(
-                    head,
-                    Some(from.as_str()),
-                    closest(head.as_str(), structs.field_names(index)),
-                ));
-            };
-            return Ok(Self::Fixed {
-                head: head.as_str().to_owned(),
-                position: field.position,
-                resolved: resolve(structs, &field, path, Some(from.as_str()))?,
-            });
+            return Self::fixed(structs, index, path, from);
         }
         let mut seen: Vec<SlotKey> = Vec::new();
         let mut resolved = Vec::new();
         let mut first_error = None;
         for index in 0..structs.len() {
-            let Some(field) = structs.field(index, head.as_str()) else {
-                continue;
+            let field = match structs.field(index, head.as_str()) {
+                Ok(Some(field)) => field,
+                Err(error) if source_layout_index::is_operational(&error) => {
+                    return Err(source_error(error));
+                }
+                Ok(None) | Err(_) => continue,
             };
             let key = key_of(&field);
             if seen.contains(&key) {
@@ -73,7 +68,7 @@ impl PathPlan {
                 end: field.end.saturating_sub(field.start),
                 ..field
             };
-            match resolve(structs, &relative, path, None) {
+            match resolve::resolve(structs, &relative, path, None) {
                 Ok(done) => resolved.push((key, done)),
                 Err(error) => {
                     first_error.get_or_insert(error);
@@ -81,17 +76,43 @@ impl PathPlan {
             }
         }
         if resolved.is_empty() {
-            return Err(first_error.unwrap_or_else(|| {
-                unknown_field(
-                    head,
-                    None,
-                    closest(head.as_str(), structs.all_field_names()),
-                )
-            }));
+            if let Some(error) = first_error {
+                return Err(error);
+            }
+            let suggestion = suggest::closest_fallible(head.as_str(), structs.all_field_names())
+                .map_err(source_error)?;
+            return Err(unknown_field(head, None, suggestion));
         }
         Ok(Self::ByHead {
             head: head.as_str().to_owned(),
             resolved,
+        })
+    }
+
+    /// Resolves one path against its nominal struct.
+    fn fixed(
+        structs: &StructFields<'_>,
+        index: usize,
+        path: &Path,
+        from: &Name,
+    ) -> Result<Self, QueryError> {
+        let head = &path.head;
+        let source_error = |error| QueryError::new(QueryErrorKind::DataForge(error), head.span());
+        let Some(field) = structs.field(index, head.as_str()).map_err(source_error)? else {
+            return Err(unknown_field(
+                head,
+                Some(from.as_str()),
+                suggest::closest_fallible(
+                    head.as_str(),
+                    structs.field_names(index).map_err(source_error)?,
+                )
+                .map_err(source_error)?,
+            ));
+        };
+        Ok(Self::Fixed {
+            head: head.as_str().to_owned(),
+            position: field.position,
+            resolved: resolve::resolve(structs, &field, path, Some(from.as_str()))?,
         })
     }
 
@@ -106,20 +127,26 @@ impl PathPlan {
             .chain(by_head.iter().map(|(_, resolved)| resolved.leaf))
     }
 
-    /// Returns how the path is read from the Records of the struct whose fields are `fields`,
-    /// with the type of its scalars, or `None` when it does not resolve there.
-    pub(crate) fn reader(&self, fields: &[FieldDef<'_>]) -> Option<(Reader, DataType)> {
+    pub(crate) fn head(&self) -> &str {
+        match self {
+            Self::Fixed { head, .. } | Self::ByHead { head, .. } => head,
+        }
+    }
+
+    /// Returns the reader for the actual first matching head occurrence.
+    pub(crate) fn reader(&self, field: Option<&FieldDef<'_>>) -> Option<(Reader, DataType)> {
+        let field = field?;
         match self {
             Self::Fixed {
                 head,
                 position,
                 resolved,
-            } => fields
-                .iter()
-                .find(|field| field.name == head && field.position == *position)
-                .map(|_| (resolved.reader.clone(), resolved.leaf)),
+            } => (field.name == head && field.position == *position)
+                .then(|| (resolved.reader.clone(), resolved.leaf)),
             Self::ByHead { head, resolved } => {
-                let field = fields.iter().find(|field| field.name == head)?;
+                if field.name != head {
+                    return None;
+                }
                 let key = key_of(field);
                 resolved
                     .iter()

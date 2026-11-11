@@ -5,7 +5,6 @@ use p4kx_extraction::{Guid, RecordTree};
 use thiserror::Error;
 
 use crate::blueprint::as_struct;
-use crate::commodity_backfill_input::CommodityInputCapture;
 use crate::crafting_types::{QualityQuantization, QuantizationBand};
 use crate::record_fields::{class_name, elements, integer, reference, structure};
 use crate::selection::{Kind, KindRule};
@@ -72,30 +71,16 @@ pub(crate) fn quantization<'f>(
 
 /// Returns the GUIDs of the quality quantization Records that the crafting data of the
 /// `ResourceType` Record tree `tree` link to.
-pub(crate) fn linked_quantizations(
-    tree: &RecordTree<'_>,
-    capture: &mut CommodityInputCapture,
-) -> Vec<Guid> {
-    let mut linked = Vec::new();
-    for (index, value) in elements(Some(tree.root()), "properties").iter().enumerate() {
-        let Some(data) = as_struct(value) else {
-            continue;
-        };
-        let Some(target) = reference(
-            structure(Some(data), "qualityQuantization"),
-            "qualityQuantizationRecord",
-        ) else {
-            continue;
-        };
-        let path = format!("properties[{index}].qualityQuantization.qualityQuantizationRecord");
-        let selectors = [
-            "properties".to_owned(),
-            format!("properties[{index}].$type"),
-            format!("properties[{index}].qualityQuantization"),
-            format!("properties[{index}].qualityQuantization.$type"),
-        ];
-        capture.observe(tree.guid(), Some(target.0), &path, &selectors);
-        linked.push(target.0);
-    }
-    linked
+pub(crate) fn linked_quantizations(tree: &RecordTree<'_>) -> Vec<Guid> {
+    elements(Some(tree.root()), "properties")
+        .iter()
+        .filter_map(|value| {
+            let data = as_struct(value)?;
+            reference(
+                structure(Some(data), "qualityQuantization"),
+                "qualityQuantizationRecord",
+            )
+            .map(|target| target.0)
+        })
+        .collect()
 }

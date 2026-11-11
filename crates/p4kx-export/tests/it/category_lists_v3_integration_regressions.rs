@@ -148,16 +148,10 @@ fn category_lists_v3_read_failure_cannot_unlink_a_valid_same_guid_category() -> 
         }),
         "the valid original category definition remains present"
     );
-    let blueprint_guid = common::guid(crafting_fixture::MAGAZINE);
-    let blueprint = fixture::at(&catalog, "/blueprints")?
-        .as_array()
-        .ok_or("blueprints")?
-        .iter()
-        .find(|row| row.get("guid").and_then(Value::as_str) == Some(blueprint_guid.as_str()))
-        .ok_or("original linked blueprint")?;
+    let blueprint =
+        crate::catalog_crafting_support::blueprint::by_guid(&catalog, crafting_fixture::MAGAZINE)?;
     assert_eq!(
-        fixture::at(blueprint, "/categoryGuid")?,
-        &json!(guid),
+        blueprint.presentation["category"]["value"], guid,
         "an unrelated list read failure cannot clear the actual category link"
     );
     Ok(())
@@ -241,8 +235,8 @@ fn assert_alias_failure(catalog: &Value, index: u32) -> TestResult {
         .ok_or("actual source failures")?;
     assert!(
         failed.iter().any(|row| {
-            row.get("recordIndex").and_then(Value::as_u64) == Some(u64::from(index))
-                && row.get("guid").and_then(Value::as_str) == Some(guid.as_str())
+            row.pointer("/recordIndex/value").and_then(Value::as_u64) == Some(u64::from(index))
+                && row.pointer("/guid/value").and_then(Value::as_str) == Some(guid.as_str())
                 && row.get("kind").and_then(Value::as_str) == Some(fixture::KIND)
                 && row.get("role").and_then(Value::as_str) == Some("selected")
                 && row.get("code").and_then(Value::as_str) == Some("sourceReadFailure")
@@ -251,7 +245,7 @@ fn assert_alias_failure(catalog: &Value, index: u32) -> TestResult {
     );
     assert!(
         !failed.iter().any(|row| {
-            row.get("guid").and_then(Value::as_str) == Some(guid.as_str())
+            row.pointer("/guid/value").and_then(Value::as_str) == Some(guid.as_str())
                 && row.get("kind").and_then(Value::as_str) == Some("blueprintCategories")
         }),
         "a database failure cannot fabricate a category-definition failure"

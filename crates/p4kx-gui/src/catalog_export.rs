@@ -4,6 +4,7 @@
 mod job;
 mod name;
 mod output;
+mod refusal;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};

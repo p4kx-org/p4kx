@@ -291,14 +291,17 @@ everything; nobody uploads assets by hand.
    <version>`) and merge that pull request. The version of `p4kx-gui` is the Release version.
 2. Push the tag `vMAJOR.MINOR.PATCH[-suffix]` on the merge commit. The workflow refuses any other
    tag name.
-3. The workflow reads the native platform contract. Windows producers build native AMD64/ARM64
-   MSI and portable ZIP files; separate native consumers execute their release EXEs and test
+3. The workflow builds and tests the packages on AMD64 and ARM64 for each operating system.
+   Windows ships MSI and portable ZIP packages. Native consumers exercise the release EXEs,
    upgrades, blocked downgrades, rollback, explicit CPU replacement and profile preservation.
-   CycloneDX SBOMs identify each target and shipped binary (`p4kx-gui`, `p4kx`, `p4kx-mcp`),
-   including any bundled Microsoft runtime files. The add-on is Python without bundled third-party packages
-   and has no SBOM of its own.
-4. Every architecture-specific package is included in VirusTotal scan coverage. A failed or missing scan never blocks the
-   Release; the notes then say the scan did not run.
+   Linux ships tar.gz, AppImage, deb and Flatpak packages. Native consumers exercise all four
+   launchers, deb and Flatpak upgrades, profile preservation and Flatpak Documents portal grants.
+   CycloneDX SBOMs identify each target and shipped binary (`p4kx-gui`, `p4kx`, `p4kx-mcp`).
+   The architecture-neutral Python add-on has its own provenance bundle.
+4. Tag publication requires a completed VirusTotal report for each of the twelve native
+   package digests. The release gate verifies the package bytes, source revision, version
+   and workflow run against the report receipt. Pending, missing or failed reports stop
+   publication. The release notes link the completed reports.
 5. The build provenance of every asset and each target's package SBOMs are attested
    (Sigstore, via GitHub Artifact Attestations). The bundles become Release assets.
 6. `SHA256SUMS.txt` and `SHA3-512SUMS.txt` list every other asset, as plain text files that open
@@ -306,16 +309,17 @@ everything; nobody uploads assets by hand.
    `CHANGELOG.md` section, the VirusTotal result, the verification commands, and GitHub's generated
    "What's Changed" list.
 
-A pull request that changes the workflow, its scripts, the installer or the add-on runs the same
-jobs as a dry run: everything is built, but nothing is scanned, attested or published.
-The `workflow_dispatch` trigger adds the VirusTotal scan to such a run.
-The complete twelve-package/twelve-SBOM/four-native-proof preflight runs before hashes or
-publication. Windows evidence binds executed package/binary digests to the source SHA.
-[Windows package verification](docs/windows-packages.md) describes the modular workflow interface
-and safe, non-installing MSI contract test.
+Pull requests matching the release paths build the complete matrix in a dry run. Scans,
+attestations and publication run at their respective release gates. A full manual branch
+run can record VirusTotal availability. Operating-system-specific dry runs skip scanning
+and combined release assembly.
 
-Secret: the owner sets the repository secret `VIRUSTOTAL_API_KEY` (Settings, Secrets and
-variables, Actions). Without it the scan is skipped.
+The preflight requires twelve packages, twelve target-and-binary SBOMs and four native
+runtime proofs. Each proof binds the executed packages and binaries to the source revision.
+See [Windows package verification](docs/windows-packages.md) and
+[Linux package verification](docs/linux-packages.md).
+
+Set the repository secret `VIRUSTOTAL_API_KEY` in the GitHub Actions settings before tagging.
 
 ### Verifying a download
 
@@ -329,12 +333,12 @@ Replace `<file>` with the name of the downloaded asset.
   path>")))`, which prints upper-case hex. Compare the output with the line of the file in
   `SHA256SUMS.txt` or `SHA3-512SUMS.txt`, ignoring case.
 - Attestation: `gh attestation verify <file> --repo p4kx-org/p4kx`.
-- Attestation offline, with the bundle from the Release:
-  `gh attestation verify <file> --bundle P4KX-<version>-provenance.sigstore.json --repo
-  p4kx-org/p4kx`. The bundle of an SBOM is named after it (`<sbom>.cdx.json.sigstore.json`) and
-  needs `--predicate-type https://cyclonedx.org/bom`.
-- SBOM: the `P4KX-<version>-<binary>.cdx.json` assets are CycloneDX 1.5 JSON. Their attestation
-  ties them to the ZIP and the MSI, and the provenance bundle covers the SBOM files themselves.
+- Offline attestation uses `gh attestation verify <file> --bundle <bundle> --repo p4kx-org/p4kx`.
+  Select `P4KX-<version>-<target>-provenance.sigstore.json` for a native package, or
+  `P4KX-<version>-addon-provenance.sigstore.json` for the Blender add-on.
+- For an SBOM, use `P4KX-<version>-<target>-<binary>.cdx.json.sigstore.json` with
+  `--predicate-type https://cyclonedx.org/bom`. The matching `.cdx.json` describes the
+  shipped binary for that target. The target provenance bundle also covers the SBOM file.
 
 ## Licence
 

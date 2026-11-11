@@ -227,3 +227,63 @@ fn a_cancelled_build_gives_no_index() -> TestResult {
     assert_eq!(built.map(|index| index.len()), Some(2_599), "not stopped");
     Ok(())
 }
+
+#[test]
+fn aliases_keep_the_actual_physical_weak_pointer_target() -> TestResult {
+    let aliases = DataForgeBuilder::new()
+        .structure(
+            TestStruct::new("Alias").field("link", TestType::WeakPointer("Alias".to_owned())),
+        )
+        .record(
+            TestRecord::new(ONE, "Alias", "Alias.First", "aliases/first.xml")
+                .value("link", TestValue::pointer("Alias.Second")),
+        )
+        .record(TestRecord::new(
+            ONE,
+            "Alias",
+            "Alias.Second",
+            "aliases/second.xml",
+        ))
+        .record(
+            TestRecord::new(TWO, "Alias", "Alias.Caller", "aliases/caller.xml")
+                .value("link", TestValue::pointer("Alias.Second")),
+        );
+    in_both_versions(&aliases, |forge| {
+        let first = record(forge, "Alias.First")?;
+        let second = record(forge, "Alias.Second")?;
+        let caller = record(forge, "Alias.Caller")?;
+        let target = forge.record(second).ok_or("the second physical alias")?;
+        assert_eq!(
+            forge
+                .record_by_guid(target.guid())
+                .map(|record| record.index()),
+            Some(first)
+        );
+        for source in [first, caller] {
+            let original = forge.record(source).ok_or("the physical caller")?.tree()?;
+            let Some(p4kx_dataforge::Value::Reference(reference)) = original.field("link") else {
+                return Err("the original decoder admits the other physical instance".into());
+            };
+            assert_eq!(
+                reference.record_index(),
+                second,
+                "the source selects the second alias"
+            );
+            assert!(
+                reference.location().is_none(),
+                "the target is a Record root"
+            );
+        }
+        let index = ReferenceIndex::build(forge);
+        assert_eq!(index.referrers(second), [first, caller]);
+        assert!(index.incoming(first).next().is_none());
+        for source in [first, caller] {
+            let links: Vec<_> = index
+                .outgoing(source)
+                .map(|link| (link.location(), link.target()))
+                .collect();
+            assert_eq!(links, [("link".to_owned(), Some(second))]);
+        }
+        Ok(())
+    })
+}

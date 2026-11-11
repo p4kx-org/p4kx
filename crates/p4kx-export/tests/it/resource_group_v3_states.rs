@@ -90,7 +90,7 @@ fn check_array_state(
     );
     if matches!(state, "invalid" | "unreadable") {
         assert!(
-            matches!(fixture::build(&database, DcbOrigin::Plain, CatalogPublicationMode::Normal, None), Err(error) if matches!(error.downcast_ref::<CatalogError>(), Some(CatalogError::IncompleteExport { .. }))),
+            matches!(fixture::build(&database, DcbOrigin::Plain, CatalogPublicationMode::Normal, None), Err(error) if matches!(error.downcast_ref::<CatalogError>(), Some(CatalogError::IncompleteExport(_)))),
             "normal publication retains its typed refusal"
         );
     }
@@ -125,7 +125,7 @@ fn unknown_group_fields_block_full_coverage_even_with_a_zero_value() -> TestResu
         "the canonical ResourceGroup source contract is preserved"
     );
     assert!(
-        matches!(fixture::build(&database, DcbOrigin::Plain, CatalogPublicationMode::Normal, None), Err(error) if matches!(error.downcast_ref::<CatalogError>(), Some(CatalogError::IncompleteExport { .. }))),
+        matches!(fixture::build(&database, DcbOrigin::Plain, CatalogPublicationMode::Normal, None), Err(error) if matches!(error.downcast_ref::<CatalogError>(), Some(CatalogError::IncompleteExport(_)))),
         "unhandled declarations cannot publish normally"
     );
     let diagnostics = at(&catalog, "/exportHealth/diagnostics")?

@@ -72,20 +72,21 @@ fn a_blueprint_keeps_every_tier_with_its_craft_time() -> TestResult {
 fn a_selection_keeps_its_count_and_options() -> TestResult {
     read(None, |crafting| {
         let first = &crafting.blueprints[0].tiers[0];
-        let outer = select(first.mandatory.as_ref())?;
+        let outer = select(first.mandatory_cost())?;
         assert_eq!(outer.count, Some(2), "choose 2");
         assert_eq!(outer.slot, Some("ASPECTS"));
         assert_eq!(outer.slot_key, Some("@crafting_slot"));
         assert_eq!(outer.options.len(), 2);
         assert!(!outer.chooses_fewer(), "choose all offered");
-        let pick = select(crafting.blueprints[1].tiers[0].mandatory.as_ref())?;
+        let pick = select(crafting.blueprints[1].tiers[0].mandatory_cost())?;
         assert_eq!(
             (pick.count, pick.options.len()),
             (Some(1), 3),
             "choose 1 of 3"
         );
         assert!(pick.chooses_fewer());
-        let Some(Cost::Item(line)) = first.optional.first() else {
+        let Some(Cost::Item(line)) = first.optional.first().and_then(|index| first.cost(*index))
+        else {
             return Err("an optional item line".into());
         };
         assert_eq!(
@@ -99,17 +100,20 @@ fn a_selection_keeps_its_count_and_options() -> TestResult {
 #[test]
 fn a_cost_line_keeps_its_quantity_multiplier_and_inclusion() -> TestResult {
     read(None, |crafting| {
-        let outer = select(crafting.blueprints[0].tiers[0].mandatory.as_ref())?;
-        let frame = select(outer.options.first())?;
-        let Some(Cost::Resource(line)) = frame.options.first() else {
+        let tier = &crafting.blueprints[0].tiers[0];
+        let outer = select(tier.mandatory_cost())?;
+        let frame = select(outer.options.first().and_then(|index| tier.cost(*index)))?;
+        let Some(Cost::Resource(line)) = frame.options.first().and_then(|index| tier.cost(*index))
+        else {
             return Err("a resource line".into());
         };
         assert_eq!(line.context.quantity_multiplier, Some(1.15));
         assert_eq!(line.quantity_scu, Some(0.5), "the stored quantity");
         assert_eq!(line.min_quality, Some(300));
         assert_eq!(line.resource, Some(guid(fixture::IRON)));
-        let core = select(outer.options.get(1))?;
-        let Some(Cost::Resource(line)) = core.options.first() else {
+        let core = select(outer.options.get(1).and_then(|index| tier.cost(*index)))?;
+        let Some(Cost::Resource(line)) = core.options.first().and_then(|index| tier.cost(*index))
+        else {
             return Err("a resource line".into());
         };
         assert_eq!(line.context.quantity_multiplier, None);
@@ -122,8 +126,9 @@ fn a_cost_line_keeps_its_quantity_multiplier_and_inclusion() -> TestResult {
 fn property_modifiers_keep_their_quality_ranges() -> TestResult {
     read(None, |crafting| {
         let second = &crafting.blueprints[0].tiers[1];
-        let slot = select(second.mandatory.as_ref())?;
-        let Some(Cost::Resource(line)) = slot.options.first() else {
+        let slot = select(second.mandatory_cost())?;
+        let Some(Cost::Resource(line)) = slot.options.first().and_then(|index| second.cost(*index))
+        else {
             return Err("a resource line".into());
         };
         let [modifier] = line.context.modifiers.as_slice() else {

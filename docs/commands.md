@@ -396,12 +396,15 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   [--exclude <filter>] [--conflict skip|overwrite|if-changed] [--diagnostic]` writes the
   versioned `p4kx-media` inventory as JSONL streams, exact decoded raw payloads and an atomic
   `media-index.json`. Repeat `--kind` and `--exclude` for explicit selections. Omission selects
-  all registered providers: `archive`, `shader` and `material`. The shader stream preserves nested `.ext`
-  declarations and inventories `.cfib`/`.cfxb`/`.shcb` caches without semantic decoding.
+  all registered providers (`archive`, `shader`, `material` and `audio`). The shader stream preserves
+  nested `.ext` declarations and inventories `.cfib`/`.cfxb`/`.shcb` caches with explicit coverage.
   The material stream includes standalone/unused .mtl libraries without geometry conversion;
   [material source metadata](media-material-metadata.md) describes its exact retained fields.
   Selecting both `--kind material --kind shader` adds original MTL shader/flag references with
   explicit physical-target resolution and actual read receipts; filtered targets stay unselected.
+  The Audio stream preserves [standalone and embedded WEM metadata](media-audio-metadata.md),
+  original RIFF chunk ranges, cue and LIST annotations, and [soundbank metadata](media-bank-metadata.md)
+  including typed Action and Event fields. Raw bytes and immediate field origins stay available.
   A known kind without a provider
   fails explicitly. Incomplete diagnostic generations remain separate from the complete root
   index. Byte, count, nesting and reference limits are exposed as `--max-*` options; their defaults,

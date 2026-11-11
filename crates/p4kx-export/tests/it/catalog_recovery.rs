@@ -27,7 +27,7 @@ fn failure_guids(built: &p4kx_export::BuiltCatalog) -> Vec<String> {
         .summary()
         .failures()
         .iter()
-        .map(|failure| failure.guid.to_string())
+        .map(|failure| failure.guid().to_string())
         .collect()
 }
 

@@ -39,24 +39,28 @@ pub(crate) fn layout_observed<'f, E>(
         observe(TagBuildEvent::Cancelled)?;
         return Ok(None);
     };
-    let positions: HashMap<_, _> = raws
-        .iter()
-        .enumerate()
-        .map(|(index, raw)| (raw.guid, index))
-        .collect();
+    let mut positions = HashMap::with_capacity(raws.len());
+    for (index, raw) in raws.iter().enumerate() {
+        if ticker.stopped() {
+            observe(TagBuildEvent::Cancelled)?;
+            return Ok(None);
+        }
+        positions.insert(raw.guid, index);
+    }
     let mut walk = Walk {
         raws: &raws,
         positions: &positions,
         visited: vec![false; raws.len()],
         nodes: Vec::with_capacity(raws.len()),
+        next_node: 0,
         roots: Vec::new(),
-        text_bytes: 0,
+        names: HashMap::new(),
         issues,
         ticker,
     };
     walk.listed_roots(roots, observe)?;
     walk.unlisted(observe)?;
-    if walk.ticker.stopped() {
+    if walk.ticker.poll() {
         observe(TagBuildEvent::Cancelled)?;
         return Ok(None);
     }
@@ -94,9 +98,14 @@ impl<'s> Ticker<'s> {
     fn stopped(&mut self) -> bool {
         self.steps += 1;
         if !self.stopped && self.steps >= POLL_EVERY {
-            self.steps = 0;
-            self.stopped = (self.stop)();
+            return self.poll();
         }
+        self.stopped
+    }
+
+    fn poll(&mut self) -> bool {
+        self.steps = 0;
+        self.stopped = self.stopped || (self.stop)();
         self.stopped
     }
 }

@@ -6,9 +6,11 @@ use p4kx_extraction::{CancelToken, RecordTree, StructValue, Value};
 use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::CatalogRecordContext;
+use crate::catalog_read::original::OriginalFlowFields;
 use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 
 use super::contract::{QuantizationEligibility, QuantizationIneligibility};
+use super::declaration_survey;
 use super::evidence::Evidence;
 
 pub(crate) struct Eligibility {
@@ -17,31 +19,46 @@ pub(crate) struct Eligibility {
     pub(crate) admission: Evidence,
 }
 
-pub(crate) fn read(
-    tree: &RecordTree<'_>,
+pub(crate) fn read<'source>(
+    tree: &RecordTree<'source>,
     origins: &CatalogOrigins,
+    original: &OriginalFlowFields<'_, '_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<Eligibility, CatalogError> {
+    original.check_tree(tree)?;
     let context = origins.record(tree.record_index());
+    original.check_context(context.sources(), context.dataforge(), tree.record_index())?;
     let mut evidence = Evidence::default();
-    let value = tree.field("qualityQuantization");
-    evidence.field(&context, "qualityQuantization", value)?;
+    let root = tree.root();
+    let value = evidence.lookup(
+        &context,
+        root,
+        "qualityQuantization",
+        "qualityQuantization",
+        || declaration_survey::survey(original, root),
+    )?;
     let Some(Value::Struct(source)) = value else {
         return Ok(excluded(evidence, QuantizationIneligibility::NoInlineBands));
     };
-    evidence.field(&context, "qualityQuantization.$type", None)?;
-    if source.type_name() != "CraftingQualityQuantization" {
+    if evidence.concrete_type(&context, "qualityQuantization", source)?
+        != "CraftingQualityQuantization"
+    {
         return Ok(excluded(evidence, QuantizationIneligibility::NoInlineBands));
     }
-    let value = source.field("bands");
-    evidence.field(&context, "qualityQuantization.bands", value)?;
+    let value = evidence.lookup(
+        &context,
+        source,
+        "bands",
+        "qualityQuantization.bands",
+        || declaration_survey::survey(original, source),
+    )?;
     let Some(Value::Array(bands)) = value else {
         return Ok(excluded(evidence, QuantizationIneligibility::InvalidBands));
     };
     if bands.is_empty() {
         return Ok(excluded(evidence, QuantizationIneligibility::EmptyBands));
     }
-    if !valid_bands(bands, &context, &mut evidence, cancel)? {
+    if !valid_bands(bands, &context, &mut evidence, original, cancel)? {
         return Ok(excluded(evidence, QuantizationIneligibility::InvalidBands));
     }
     evidence.header(
@@ -56,10 +73,11 @@ pub(crate) fn read(
     })
 }
 
-fn valid_bands(
-    bands: &[Value<'_>],
+fn valid_bands<'source>(
+    bands: &[Value<'source>],
     context: &CatalogRecordContext<'_>,
     evidence: &mut Evidence,
+    original: &OriginalFlowFields<'_, '_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<bool, CatalogError> {
     for (ordinal, value) in bands.iter().enumerate() {
@@ -67,35 +85,35 @@ fn valid_bands(
             return Err(CatalogError::Cancelled);
         }
         let path = format!("qualityQuantization.bands[{ordinal}]");
-        evidence.field(context, &path, Some(value))?;
+        evidence.field(context, &path, value)?;
         let Some(source) = band(value) else {
             return Ok(false);
         };
-        if !valid_band(source, &path, context, evidence)? {
+        if !valid_band(source, &path, context, evidence, original)? {
             return Ok(false);
         }
     }
     Ok(true)
 }
 
-fn valid_band(
-    source: &StructValue<'_>,
+fn valid_band<'source>(
+    source: &StructValue<'source>,
     path: &str,
     context: &CatalogRecordContext<'_>,
     evidence: &mut Evidence,
+    original: &OriginalFlowFields<'_, '_, 'source>,
 ) -> Result<bool, CatalogError> {
-    evidence.field(context, &format!("{path}.$type"), None)?;
-    if source.type_name() != "CraftingQualityQuantizationBand" {
+    if evidence.concrete_type(context, path, source)? != "CraftingQualityQuantizationBand" {
         return Ok(false);
     }
-    for field in ["start", "end", "mappedValue"] {
-        evidence.field(context, &format!("{path}.{field}"), source.field(field))?;
-    }
-    let (Some(Value::Int32(start)), Some(Value::Int32(end)), Some(Value::Int32(_))) = (
-        source.field("start"),
-        source.field("end"),
-        source.field("mappedValue"),
-    ) else {
+    let mut field = |name| {
+        evidence.lookup(context, source, name, &format!("{path}.{name}"), || {
+            declaration_survey::survey(original, source)
+        })
+    };
+    let (Some(Value::Int32(start)), Some(Value::Int32(end)), Some(Value::Int32(_))) =
+        (field("start")?, field("end")?, field("mappedValue")?)
+    else {
         return Ok(false);
     };
     Ok(end >= start)

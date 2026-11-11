@@ -8,9 +8,10 @@ use p4kx_export::{
     KindSummary, LoadoutSummary, PaintSummary, Playability, PlayabilityCounts, SCHEMA_VERSION,
     SizeWarning, StarmapSummary, UPLOAD_LIMIT, VariantCounts,
 };
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, SourceInventory};
 use serde::Serialize;
 
+use crate::catalog_failure_json::FailureJson;
 use crate::catalog_json_shops::ShopsJson;
 use crate::catalog_json_slugs::StoreSlugsJson;
 use crate::json;
@@ -23,6 +24,7 @@ pub(super) struct SummaryJson<'a> {
     archive_key: ArchiveKeyState,
     encrypted_entries_unread: u64,
     export_health: &'a ExportHealth,
+    provenance: &'a SourceInventory,
     size: u64,
     compressed_size: Option<u64>,
     upload_limit: u64,
@@ -185,13 +187,6 @@ impl From<&CraftingWarning> for WarningJson {
 }
 
 #[derive(Serialize)]
-struct FailureJson<'a> {
-    guid: String,
-    path: &'a str,
-    error: &'a str,
-}
-
-#[derive(Serialize)]
 struct ItemClassJson {
     classified: usize,
     other: usize,
@@ -299,6 +294,7 @@ pub(super) fn summary_json<'a>(
         archive_key: summary.archive_key().state(),
         encrypted_entries_unread: summary.archive_key().entries_unread(),
         export_health: summary.export_health(),
+        provenance: summary.source_inventory(),
         size: summary.size(),
         compressed_size: summary.compressed_size(),
         upload_limit: UPLOAD_LIMIT,
@@ -307,15 +303,7 @@ pub(super) fn summary_json<'a>(
         decompressed_warning: summary.decompressed_warning().map(warning_name),
         kinds: summary.kinds().iter().map(KindJson::from).collect(),
         skipped: summary.skipped(),
-        failed: summary
-            .failures()
-            .iter()
-            .map(|failure| FailureJson {
-                guid: failure.guid.to_string(),
-                path: &failure.record_path,
-                error: &failure.reason,
-            })
-            .collect(),
+        failed: summary.failures().iter().map(FailureJson::from).collect(),
         warnings: summary.warnings().iter().map(WarningJson::from).collect(),
         item_classes: ItemClassJson {
             classified: summary.item_classes().classified,

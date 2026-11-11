@@ -243,7 +243,12 @@ fn overlay_children(
         let partner = partners
             .get_mut(&pair_key(source))
             .and_then(VecDeque::pop_front);
-        let mut element = Element::read(source.name.clone(), source.attributes.clone(), Vec::new());
+        let mut element = Element {
+            name: source.name.clone(),
+            attributes: source.attributes.clone(),
+            children: Vec::new(),
+            origins: Vec::new(),
+        };
         for (name, _) in &source.attributes {
             element.mark(name, ValueOrigin::Patch);
         }

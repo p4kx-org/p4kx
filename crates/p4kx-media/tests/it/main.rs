@@ -5,6 +5,13 @@
 
 mod archive;
 mod archive_layout;
+mod audio_bank_hirc_action_provider;
+mod audio_bank_hirc_event_provider;
+mod audio_bank_provider;
+mod audio_bank_stid_provider;
+mod audio_provider_sources;
+mod audio_wem_annotations_provider;
+mod audio_wem_failure_schema;
 mod budgets;
 mod build_origin_fixture;
 mod build_origin_index;

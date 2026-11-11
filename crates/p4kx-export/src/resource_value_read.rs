@@ -71,11 +71,11 @@ pub(crate) fn single_number(
         && value.value().is_some()
         && !matches!(original, Value::Single(_))
     {
-        notes.push(FieldError::Malformed {
-            source_type: fields.source().type_name().to_owned(),
-            field: fields.location(name),
-            expected: "a Single under the declared numeric field contract",
-        });
+        notes.push(fields.invalid(
+            name,
+            original,
+            "a Single under the declared numeric field contract",
+        )?);
     }
     Ok(value)
 }
@@ -107,7 +107,7 @@ pub(crate) fn number(
 /// Retains numeric storage while enforcing its independent Int32 field contract.
 pub(crate) fn int32_number(
     fields: &CatalogFields<'_, '_, '_>,
-    name: &str,
+    name: &'static str,
     presence: NumericPresence,
     notes: &mut Vec<FieldError>,
 ) -> Result<SourcedValue<ResourceNumber>, CatalogError> {
@@ -117,10 +117,10 @@ pub(crate) fn int32_number(
         || (matches!(presence, NumericPresence::Optional)
             && matches!(original, None | Some(Value::Null)));
     if !valid && !matches!(original, Some(Value::Error(_))) {
-        notes.push(FieldError::Malformed {
-            source_type: fields.source().type_name().to_owned(),
-            field: fields.location(name),
-            expected: "an Int32 under the declared numeric field contract",
+        const EXPECTED: &str = "an Int32 under the declared numeric field contract";
+        notes.push(match original {
+            Some(original) => fields.invalid(name, original, EXPECTED)?,
+            None => fields.missing(name, EXPECTED)?,
         });
     }
     Ok(value)
@@ -132,11 +132,5 @@ pub(crate) fn reference(
     name: &str,
     notes: &mut Vec<FieldError>,
 ) -> Result<SourcedValue<CatalogRecordReference>, CatalogError> {
-    crate::catalog_read::reference_value(
-        fields.context(),
-        fields.source().field(name),
-        fields.source().type_name(),
-        &fields.location(name),
-        notes,
-    )
+    fields.reference(name, notes)
 }

@@ -142,7 +142,7 @@ fn build_database(
             .summary()
             .failures()
             .iter()
-            .map(|failure| failure.reason.clone())
+            .map(|failure| failure.reason().to_owned())
             .collect(),
     })
 }

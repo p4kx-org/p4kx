@@ -70,19 +70,11 @@ pub enum ValueError {
         /// The instance.
         instance_index: u32,
     },
-    /// An array has more elements than one Record tree may hold.
-    #[error("the array of {count} values is larger than the {limit} values a Record may hold")]
-    TooManyValues {
-        /// The number of elements.
-        count: u32,
-        /// The most values one Record tree may hold.
-        limit: usize,
-    },
-    /// Owned structs are nested deeper than [`MAX_NESTING_DEPTH`](crate::MAX_NESTING_DEPTH).
-    #[error("the value is nested deeper than {limit} structs")]
-    TooDeep {
-        /// The deepest nesting that is read.
-        limit: usize,
+    /// A non-array inline class contains the same inline type on its active path.
+    #[error("inline class {struct_index} contains itself")]
+    InlineClassCycle {
+        /// The original target index selected by the cyclic class declaration.
+        struct_index: u32,
     },
     /// A Reference names a Record that does not exist.
     #[error("the Reference refers to the Record {guid}, which does not exist")]

@@ -31,6 +31,9 @@ files referenced by `index`; the JSONL streams and binary artifacts stay in the 
 The library's [generic record envelope](../schemas/media-record.schema.json) stays available without
 built-in payload restrictions. Custom provider namespaces remain generic in the CLI schema as well.
 
+[WEM source metadata](media-audio-metadata.md) and [Soundbank metadata](media-bank-metadata.md)
+document the typed `audio.jsonl` records, their half-open raw ranges and the field-origin companion.
+
 ## Entry
 
 The shape of one Entry in `list` and `search`:
@@ -112,7 +115,13 @@ returns the same object; [Archive source layout](media-archive-layout.md) define
  "struct_count": 6696, "enum_count": 774}
 ```
 
-`entry` is the path of the DataForge Entry as the Archive stores it.
+`entry` is the path of the DataForge Entry as the Archive stores it or the standalone file name.
+The `fieldOrigins` map addresses `/version`, `/record_count`, `/struct_count` and
+`/enum_count` with their distinct original DataForge header fields. `/entry` uses the Archive
+directory or standalone file metadata. Its Archive marker follows the directory scope.
+`/archive` records the caller's input path with an empty, complete contributor set. Source
+references resolve in `provenance`, which preserves unknown original Archive lineage for
+standalone files.
 
 ## `p4kx dcb export <archive> --json`
 
@@ -1013,7 +1022,7 @@ invalid input (exit code 2), as is a `<record>` no Record matches.
 ```
 
 `records` has one entry per Record `<record>` names. `reference_count` is the number of
-References listed in `references` and `record_count` the number of distinct Records among their
+References listed in `references` and `record_count` the number of distinct GUIDs among their
 other ends. In an entry, `record` is the Record the
 listing is about; in each of its `references`, `record` is the other end: the Record that holds
 the Reference for `incoming`, the Record it links to for `outgoing`. `location` is the place of
@@ -1026,19 +1035,51 @@ GUIDs no Record has, with `"record": null` and the `guid` they name.
 [{"from": "libs/ships/alpha", "to": "libs/makers/aegis"}]}`, the files by record path, and
 `--unresolved --json` writes `{"archive": "…", "count": 880, "unresolved": [{"record": {…},
 "guid": "…", "location": "…", "field": "…", "indices": […]}]}` where `record` is the Record that
-holds the Reference. A DataForge that holds more than 8,388,608 References, or Records that
-cannot be read, give a warning on stderr; the index is then incomplete. It keeps the first
-8,388,608 References in the order of the Records.
+holds the Reference. `file_count` covers all files with a readable record path and `edge_count`
+counts the distinct returned pairs after any filter.
+
+The index attempts every Record without a fixed reference quota. Unreadable Records are
+reported on stderr. An allocation refusal reported by the canonical read or origin preparation
+fails the JSON command.
+
+All four JSON modes include the shared `provenance.sources` and `provenance.uses` inventory.
+A `fieldOrigins` map addresses values relative to its immediate listing, link, edge or
+count envelope. Each origin contains `sourceUsesRefs`, `sourceSetComplete` and
+`containsEncryptedSource`. A known encrypted contribution makes the last value true.
+False requires a complete set of known unencrypted contributors. Null preserves unknown
+origin, including the original Archive lineage of a standalone DCB.
+
+- A listing addresses `/record/guid`, `/record/record_path`, `/record/name`, `/record/type`,
+  `/reference_count`, `/record_count` and `/unresolved_count`. Incoming counts use the whole
+  reference scan and the physical Record selected for the listing. Outgoing counts use the
+  selected Record's body. An incoming `unresolved_count` is a fixed zero.
+- A link addresses `/record`, its present metadata fields, `/location`, `/field`,
+  `/indices`, each `/indices/<index>` and a present unresolved `/guid`. The
+  `dataforgeReferenceRoute` coordinates are the physical source Record index and zero-based
+  canonical preorder position, excluding the root Struct. An individual array index adds the
+  zero-based position among array steps, outermost first. The declaration and array-position
+  observations support the route. The Reference occurrence selects its related Record.
+  An unresolved GUID payload comes from the original `$error.guid`.
+- A file edge addresses `/from` and `/to`. Both retain the actual supporting Reference
+  occurrences, including distinct occurrences that give the same pair. Each displayed
+  endpoint retains its source path and any other member names and paths used to choose the
+  spelling. The envelope addresses `/file_count` and `/edge_count`.
+- The unresolved envelope addresses `/count` over the whole reference scan.
+
+Coverage for a count is incomplete when a read failure can conceal a contributor in its
+scan scope. An error in a field declared as a scalar string cannot conceal a Reference. A
+record body failure can make incoming counts incomplete while an outgoing count for a
+different, readable Record stays complete.
 
 ## `p4kx dcb tags <archive> [<tag>] [--tree] [--format table|json] --json`
 
 Lists the tag tree: the Tags of the `TagDatabase` with their tag paths. `<tag>` is a GUID or a tag
-path (ignoring case; sibling Tags may share one, so it can name several); with it only that Tag and
+path (ignoring ASCII case; sibling Tags may share one, so it can name several); with it only that Tag and
 everything below it is listed, without it every Tag. `--json` is `--format json`; with
 `--format table` it is invalid input (exit code 2), as is a `<tag>` no Tag has.
 
 ```json
-{"archive": "…", "tag_count": 18891, "shown_count": 3, "issues": {"unreadable": 0, "dangling": 0,
+{"archive": "…", "tag_count": 18891, "shown_count": 3, "issues": {"unclassified": 0, "unreadable": 0, "dangling": 0,
  "repeated": 0, "too_deep": 0, "too_long": 0, "duplicate": 0, "unlisted": 0}, "tree": false, "tags": [{"guid": "…", "name": "Gun",
  "path": "Weapon.Gun", "legacy_id": null, "parent": "…", "depth": 1, "children": ["…"]}]}
 ```
@@ -1050,11 +1091,10 @@ in the order the `TagDatabase` lists them, then the Tags it does not list. `name
 of Tags above it and `children` their GUIDs in the order the Tag lists them. `tag_count` is every Tag
 of the DataForge and `shown_count` the Tags listed, which differs with `<tag>`. `issues` counts what
 the tree could not take as the DataForge lists it, and each non-zero count is also a warning on
-stderr: `unreadable` Tag Records left out, `dangling` listed Tags that are no Tag Record,
+stderr: `unclassified` Records whose unreadable type prevents deciding Tag/TagDatabase membership; they are not counted as read Tags, `unreadable` Tag Records left out, `dangling` listed Tags that are no Tag Record,
 `repeated` Tags listed more than once (the first listing counts, which also cuts a cycle),
-`too_deep` Tags left out, with everything below each, below 64 levels, `too_long` Tags left out, with
-everything below each, whose name is over 256 bytes, whose path is over 1,024 bytes or that would
-take the paths of the tree over 64 MiB, `duplicate` Tag Records left out because an earlier one has
+`too_deep` and `too_long` are retained JSON keys and always zero,
+`duplicate` Tag Records left out because an earlier one has
 their GUID, and `unlisted` Tags no `TagDatabase` reaches, which stand as roots of their own.
 
 With `--tree` the document holds `"tree": true` and `tags` holds only the top of the listing, the
@@ -1066,6 +1106,37 @@ have no `parent` and `depth`, and `children` is no list of GUIDs:
  "children": [{"guid": "…", "name": "Gun", "path": "Weapon.Gun", "legacy_id": null,
  "children": []}]}]}
 ```
+
+Both JSON forms carry `provenance.sources` and `provenance.uses`, plus immediate
+`fieldOrigins` maps. Each origin entry contains `containsEncryptedSource`,
+`sourceUsesRefs` and `sourceSetComplete`. Its references resolve in the document's shared
+inventory. `true` proves an encrypted contributor or ancestor, `false` requires a complete
+set of unencrypted contributors, and null preserves unknown origin. A standalone DCB has
+unknown original Archive lineage.
+
+The envelope map addresses `/tag_count`, `/shown_count` and each `/issues/<key>`.
+Each Tag has its own relative map addressing `/guid`, `/name`, `/path`, `/legacy_id`,
+`/children` and each `/children/<index>`. Flat rows also address `/parent` and `/depth`.
+Nested child objects carry their own maps. Their parent's indexed child entry records
+the relationship that selected them. A GUID entry has this shape.
+
+```json
+{"/guid":{"containsEncryptedSource":true,"sourceUsesRefs":["u-guid"],"sourceSetComplete":true}}
+```
+
+Header identities, original array positions, name conversions and legacy-ID sentinel
+conversions retain their own use sets. A selected path includes the names and selected
+relationships of its ancestors, including ancestors hidden by a query. Depth uses the
+selected topology. Repeated original operands keep their own occurrence identity.
+
+Membership and diagnostic counts retain the actual classification survey and relevant
+read or relationship observations. Successful source-type intervals use
+`dataforgeRecordHeaderRange` with decimal inclusive-start/exclusive-end indices and
+`sourceType`. The original `dataforgeHeader.recordCount` bounds the survey. Failed
+reads remain attempted observations. The historical zero-valued limit counters have a
+complete empty set of contributors. Unlisted-root topology can have an incomplete
+contributor set when the observed walk supplies no selected incoming relationship.
+`archive` and `tree` are command inputs.
 
 ## `p4kx dcb fields <archive> [<type or Query>] [--path <glob>] [--format table|csv|json] --json`
 
@@ -1496,15 +1567,25 @@ Also `p4kx audio info <file> --json` for a WEM file on disk.
 ```json
 {"sound": "Data\\Sounds\\wwise\\Media\\100.wem", "codec": "pcm", "codec_name": "PCM",
  "format_tag": 65534, "channels": 2, "sample_rate": 48000, "sample_count": 1200,
- "duration_seconds": 0.025}
+ "duration_seconds": 0.025, "loop": null}
 ```
 
 `sound` is the Entry path, or the path of the file on disk. `codec` is one of `pcm`,
 `ima_adpcm`, `vorbis`, `opus`, `ptadpcm`, `xwma`, `xma2`, `aac`, `dsp`, `hevag`, `atrac9` or
 `unknown`; `codec_name` is its readable name and `format_tag` the raw tag of the `fmt` chunk.
 `sample_count` is the number of frames (samples per channel) and `duration_seconds` the playing
-time; both are `null` when the header does not state them and the codec does not allow computing
-them.
+time. Both can be `null` when the selected header and codec leave the count unknown. A selected
+`loop` has `start`, `end` and `frames` in samples per channel. The `end` is exclusive. The example
+omits the additional `fieldOrigins` and `provenance` metadata.
+
+`fieldOrigins` maps each output path to the evidence used by that value. The sound name comes
+from input metadata. Format and derived values retain their original WEM inputs, including the
+last applicable format chunk before the first data chunk. For an encrypted top-level P4K Entry,
+the name can be unencrypted while the format payload is encrypted. A standalone file has unknown
+original Archive encryption. The source and use identifiers resolve in `provenance`.
+
+A Vorbis count is read within the selected `vorb` chunk. A chunk too short to supply a count uses
+the existing embedded-format fallback when available.
 
 ## `p4kx audio wav <archive> <entry> --out <file> --json`
 

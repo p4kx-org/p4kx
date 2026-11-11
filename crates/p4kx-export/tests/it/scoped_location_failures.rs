@@ -7,6 +7,8 @@ use p4kx_testkit::{TestInstance, TestValue};
 
 use crate::scoped_fixture::{self, TestResult, object, property, scoped};
 
+use crate::scoped_canonical_failures as canonical;
+
 #[test]
 fn an_unknown_concrete_variant_in_each_family_fails_both_owning_records() -> TestResult {
     for (field, source_type) in [
@@ -34,22 +36,7 @@ fn an_unknown_concrete_variant_in_each_family_fails_both_owning_records() -> Tes
                 .iter()
                 .all(|error| error.contains("unknown struct") && error.contains(source_type))
         );
-        assert_eq!(
-            report.document["contractTemplates"]
-                .as_array()
-                .ok_or("templates")?
-                .len(),
-            0,
-            "an unreadable source Record is not emitted"
-        );
-        assert_eq!(
-            report.document["missionBrokerEntries"]
-                .as_array()
-                .ok_or("brokers")?
-                .len(),
-            0,
-            "an unreadable source Record is not emitted"
-        );
+        canonical::unknown(&report.document, field, source_type)?;
     }
     Ok(())
 }
@@ -72,14 +59,8 @@ fn an_unreadable_populated_filter_is_not_exported_as_an_absent_pointer() -> Test
             .iter()
             .all(|error| error.contains("locationClassFilter") && error.contains("unreadable"))
     );
-    assert_eq!(
-        report.document["contractTemplates"]
-            .as_array()
-            .ok_or("templates")?
-            .len(),
-        0,
-        "an unreadable source Record is not emitted"
-    );
+    canonical::pointer(&report.document, "Scoped_BP", "locationClassFilter")?;
+
     Ok(())
 }
 
@@ -102,5 +83,6 @@ fn an_unreadable_enum_is_distinct_from_a_preserved_unknown_enum_name() -> TestRe
             .iter()
             .all(|error| error.contains("hostility") && error.contains("unreadable"))
     );
+    canonical::unreadable_enum(&report.document)?;
     Ok(())
 }

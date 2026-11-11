@@ -152,6 +152,12 @@ fn verify_profile(stream: OriginStream, profile: OriginProfile) -> Result<(), Me
         ) | (OriginStream::IndexBuild, OriginProfile::IndexBuild)
             | (
                 OriginStream::Records {
+                    kind: MediaKind::Audio
+                },
+                OriginProfile::AudioWem | OriginProfile::AudioBank
+            )
+            | (
+                OriginStream::Records {
                     kind: MediaKind::Material
                 },
                 OriginProfile::MaterialLibrary

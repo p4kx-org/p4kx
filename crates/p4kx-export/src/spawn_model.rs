@@ -31,7 +31,7 @@ pub(crate) enum SpawnLevel {
 
 /// A set of tags written as their full tag paths, e.g. `AI.Ship.SpawnFlags.PoweredOff`, in
 /// stored order.
-pub(crate) type TagPaths = Vec<String>;
+pub(crate) type TagPaths = Vec<crate::spawn_tag_text::SpawnTagText>;
 
 /// An [`io::Write`] that feeds what it is given to a SHA-256 hasher.
 struct HashWriter(Sha256);

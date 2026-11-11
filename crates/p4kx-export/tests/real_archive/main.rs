@@ -6,7 +6,10 @@
 
 mod catalog_v3_blueprint_category_tests;
 mod catalog_v3_consumer;
+mod catalog_v3_loot_consumer_tests;
+mod catalog_v3_mission_definition_tests;
 mod real_archive;
+mod real_archive_blueprints;
 mod real_archive_broker_entries;
 mod real_archive_canonical_texts;
 mod real_archive_catalog_links;
@@ -47,6 +50,7 @@ mod real_archive_reputation;
 mod real_archive_resource_oracles;
 mod real_archive_ship_base;
 mod real_archive_ship_matrix;
+mod real_archive_shop_inventory_v3;
 mod real_archive_shop_items;
 mod real_archive_shops;
 mod real_archive_spawns;

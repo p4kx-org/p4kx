@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::borrow::Borrow;
+use std::collections::{HashMap, HashSet};
 
 use p4kx_foundation::PathPattern;
 
@@ -170,21 +171,18 @@ impl Query {
         forge: &'f DataForge<'f>,
         references: impl FnOnce() -> Option<R>,
     ) -> Result<CompiledQuery<'f>, QueryError> {
-        let structs = StructFields::read_all(forge);
+        let structs = StructFields::read_all(forge).map_err(|error| {
+            let span = self
+                .from
+                .as_ref()
+                .map_or(crate::query::Span::new(0, 0), Name::span);
+            QueryError::new(QueryErrorKind::DataForge(error), span)
+        })?;
         let selected = match &self.from {
             Some(name) => select_type(&structs, name)?,
             None => vec![true; structs.len()],
         };
-        let nominal = self
-            .from
-            .as_ref()
-            .and_then(|name| {
-                let index = structs.position_of(name.as_str())?;
-                Some(structs.fields(index).map(|_| index).map_err(|error| {
-                    QueryError::new(QueryErrorKind::DataForge(error.clone()), name.span())
-                }))
-            })
-            .transpose()?;
+        let nominal = nominal(&structs, self.from.as_ref())?;
         let from = self.from.as_ref();
         let columns = self
             .select
@@ -269,6 +267,20 @@ impl Query {
     }
 }
 
+/// Returns the first named layout position after validating its source.
+fn nominal(structs: &StructFields<'_>, from: Option<&Name>) -> Result<Option<usize>, QueryError> {
+    from.and_then(|name| {
+        let index = structs.position_of(name.as_str())?;
+        Some(
+            structs
+                .fields(index)
+                .map(|_| index)
+                .map_err(|error| QueryError::new(QueryErrorKind::DataForge(error), name.span())),
+        )
+    })
+    .transpose()
+}
+
 /// Resolves the path a comparison reads and checks that a value it reaches can compare with
 /// the literal.
 fn compared<'c>(
@@ -292,18 +304,37 @@ fn plan(
 ) -> Plan {
     let fields = match structs.fields(index) {
         Ok(fields) => fields,
-        Err(error) => return Plan::Broken(error.clone()),
+        Err(error) => return Plan::Broken(error),
     };
+    let wanted: HashSet<&str> = columns
+        .iter()
+        .map(PathPlan::head)
+        .chain(compared.iter().map(|(_, path)| path.head()))
+        .collect();
+    let mut heads = HashMap::new();
+    for field in fields {
+        let field = match field {
+            Ok(field) => field,
+            Err(error) => return Plan::Broken(error),
+        };
+        if wanted.contains(field.name) {
+            heads.entry(field.name).or_insert(field);
+        }
+    }
     let columns: Box<[Option<Reader>]> = columns
         .iter()
-        .map(|column| column.reader(fields).map(|(reader, _)| reader))
+        .map(|column| {
+            column
+                .reader(heads.get(column.head()))
+                .map(|(reader, _)| reader)
+        })
         .collect();
     Plan::Read {
         shared: Groups::of(&columns),
         columns,
         tests: compared
             .iter()
-            .map(|(comparison, path)| Test::of(comparison, path.reader(fields)?))
+            .map(|(comparison, path)| Test::of(comparison, path.reader(heads.get(path.head()))?))
             .collect(),
     }
 }

@@ -18,3 +18,14 @@ pub use crate::export_ledger::ExportAccountingError;
 pub use crate::export_reference_issue::{
     ExportReferenceStatus, ExportSourcePointer, ExportUnresolvedReference,
 };
+
+pub use crate::catalog_v3::export_health_capture::CatalogProvenance;
+
+pub use crate::build::refusal::CatalogRefusal;
+
+pub use crate::catalog_failures::{CatalogFailureIter, CatalogFailureView, CatalogFailures};
+pub use crate::catalog_read::original::CatalogFailureDetails;
+pub use crate::health_metadata::{HealthMetadata, HealthTextRef};
+pub use crate::health_text_view::HealthTextView;
+
+pub use super::health_text::HealthText;

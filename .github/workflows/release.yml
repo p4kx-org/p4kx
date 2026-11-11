@@ -149,30 +149,28 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: release-*
+          pattern: "{release-*-pc-windows-msvc,release-*-unknown-linux-gnu}"
           path: assets
           merge-multiple: true
-      - name: Scan every present architecture-specific package
-        continue-on-error: true
+      - name: Scan every required architecture-specific package
+        continue-on-error: ${{ github.ref_type != 'tag' }}
         timeout-minutes: 140
         env:
           VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          . .github/scripts/platform-contract.ps1
-          $contract = Get-P4kxPlatformContract
-          $files = @(foreach ($row in $contract.targets) {
-            foreach ($package in $row.packages) {
-              $name = Get-P4kxAssetName -Target $row.target -Version $env:VERSION -Package $package
-              (Get-Item -LiteralPath "assets/$name").FullName
-            }
-          })
-          .github/scripts/virustotal-scan.ps1 -Path $files -NotePath virustotal.md
+          . .github/scripts/release-scan-evidence.ps1
+          $files = @(Get-P4kxReleaseScanAssets -AssetDirectory assets -Version $env:VERSION | Select-Object -ExpandProperty FullName)
+          $required = $env:GITHUB_REF_TYPE -ceq 'tag'
+          .github/scripts/virustotal-scan.ps1 -Path $files -NotePath virustotal.md -RequireComplete:$required -EvidencePath virustotal-evidence.json -Version $env:VERSION -Revision $env:GITHUB_SHA -RunId $env:GITHUB_RUN_ID
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
         with:
           name: virustotal-note
-          path: virustotal.md
-          if-no-files-found: ignore
+          path: |
+            virustotal.md
+            virustotal-evidence.json
+          if-no-files-found: ${{ github.ref_type == 'tag' && 'error' || 'ignore' }}
 
   attest:
     name: Attest (${{ matrix.target }})
@@ -226,7 +224,7 @@ jobs:
   assemble:
     name: Complete matrix, hashes and release notes
     needs: [prepare, windows, linux, scan, attest, attest-addon]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && ((needs.attest.result == 'success' && needs.attest-addon.result == 'success') || github.ref_type != 'tag') }}
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && (github.ref_type != 'tag' || (needs.scan.result == 'success' && needs.attest.result == 'success' && needs.attest-addon.result == 'success')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -240,7 +238,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: "{release-*,attestations-*}"
+          pattern: "{release-addon,release-*-pc-windows-msvc,release-*-unknown-linux-gnu,attestations-*}"
           path: assets
           merge-multiple: true
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -254,11 +252,17 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
           SCAN_RESULT: ${{ needs.scan.result }}
         run: |
+          if ($env:GITHUB_REF_TYPE -ceq 'tag') {
+            . .github/scripts/release-scan-evidence.ps1
+            Assert-P4kxReleaseScanEvidence -EvidencePath notes/virustotal-evidence.json -AssetDirectory assets -Version $env:VERSION -Revision $env:GITHUB_SHA -RunId $env:GITHUB_RUN_ID
+            if (-not (Test-Path -LiteralPath notes/virustotal.md -PathType Leaf)) { throw 'The required VirusTotal report note is missing.' }
+          }
           if ($env:SCAN_RESULT -ne 'skipped' -and -not (Test-Path notes/virustotal.md)) {
             "## Security check`n`nThe VirusTotal scan did not finish for this release." | Set-Content notes/virustotal.md -Encoding utf8NoBOM
           }
           $scan = if (Test-Path notes/virustotal.md) { 'notes/virustotal.md' }
-          .github/scripts/assemble-release.ps1 -AssetDirectory assets -NotesPath notes/release-notes.md -OutputNotesPath notes/final-notes.md -VirusTotalNotePath $scan -Repository $env:REPOSITORY -Version $env:VERSION -Revision $env:GITHUB_SHA
+          $tagAttestations = $env:GITHUB_REF_TYPE -ceq 'tag'
+          .github/scripts/assemble-release.ps1 -AssetDirectory assets -NotesPath notes/release-notes.md -OutputNotesPath notes/final-notes.md -VirusTotalNotePath $scan -Repository $env:REPOSITORY -Version $env:VERSION -Revision $env:GITHUB_SHA -TagAttestations:$tagAttestations
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-assets

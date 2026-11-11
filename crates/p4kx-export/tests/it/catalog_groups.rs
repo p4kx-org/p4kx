@@ -162,8 +162,13 @@ fn every_type_guid_and_category_guid_resolves_to_an_entry() -> TestResult {
     for guid in types {
         assert!(groups.contains(guid), "type {guid}");
     }
-    for blueprint in catalog["blueprints"].as_array().into_iter().flatten() {
-        let guid = blueprint["categoryGuid"].as_str().ok_or("a category")?;
+    for blueprint in catalog["projections"]["blueprintPresentation"]["rows"]
+        .as_array()
+        .ok_or("Blueprint presentations")?
+    {
+        let guid = blueprint["category"]["value"]
+            .as_str()
+            .ok_or("a category")?;
         assert!(categories.contains(guid), "category {guid}");
     }
     Ok(())
@@ -199,8 +204,8 @@ fn a_filter_marks_both_kinds_partial_and_selects_by_record_path() -> TestResult 
             .summary()
             .kinds()
             .iter()
-            .all(|entry| entry.complete == (entry.kind == Kind::Tags)),
-        "every scoped kind is partial; only the global Tag taxonomy stays complete"
+            .all(|entry| entry.complete == matches!(entry.kind, Kind::Tags | Kind::ShopInventories)),
+        "the Tag taxonomy and physical shop inventories are globally selected"
     );
     Ok(())
 }
@@ -262,6 +267,7 @@ fn the_kinds_follow_the_existing_ones_in_the_catalog_order() {
             "resourceTypes",
             "tags",
             "blueprintCategoryLists",
+            "shopInventories",
         ],
         "order of the catalog"
     );

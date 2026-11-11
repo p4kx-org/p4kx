@@ -9,6 +9,7 @@ use p4kx_export::{CatalogError, CatalogPublicationMode, Filter};
 use serde_json::{Value, json};
 
 use crate::catalog_crafting_support;
+use crate::health_origin_assertions as check;
 use crate::resource_edges_fixture;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -42,7 +43,7 @@ fn unreadable_type_metadata_cannot_be_guessed_as_the_first_kind_of_a_shared_pref
     };
     assert!(matches!(
         error.downcast_ref::<CatalogError>(),
-        Some(CatalogError::IncompleteExport { .. })
+        Some(CatalogError::IncompleteExport(_))
     ));
     let (_, catalog) = catalog_crafting_support::build_from_data(
         database,
@@ -58,9 +59,13 @@ fn unreadable_type_metadata_cannot_be_guessed_as_the_first_kind_of_a_shared_pref
     let failures = at(&catalog, "/exportHealth/failedRecords")?
         .as_array()
         .ok_or("the failed Record identities")?;
-    assert!(failures.iter().any(|failure| failure["recordIndex"] == 1
-        && failure["kind"].is_null()
-        && failure["role"] == "selectionCandidate"));
+    assert!(
+        failures.iter().any(
+            |failure| failure.pointer("/recordIndex/value") == Some(&json!(1))
+                && failure["kind"].is_null()
+                && failure["role"] == "selectionCandidate"
+        )
+    );
     Ok(())
 }
 
@@ -78,15 +83,16 @@ fn an_explicit_filter_excludes_unknown_generic_metadata_before_type_classificati
     assert!(
         matches!(
             error.downcast_ref::<CatalogError>(),
-            Some(CatalogError::IncompleteExport { .. })
+            Some(CatalogError::IncompleteExport(_))
         ),
         "unknown global Tag membership blocks normal publication"
     );
-    let (_, catalog) = catalog_crafting_support::build_from_data(
+    let (built, _) = catalog_crafting_support::build_from_data(
         database,
         Some(&filter),
         CatalogPublicationMode::DiagnosticPartial,
     )?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
     assert_filtered_resource_health(&catalog)?;
     assert_global_tag_uncertainty(&catalog)?;
     assert_only_global_tag_candidate_failed(&catalog)?;
@@ -213,17 +219,6 @@ fn assert_only_global_tag_candidate_failed(catalog: &Value) -> TestResult {
     let candidate = failures.first().ok_or("the unknown Tag candidate")?;
     for (field, expected) in [
         ("kind", json!("tags")),
-        ("recordIndex", json!(1)),
-        (
-            "guid",
-            json!(catalog_crafting_support::text(
-                resource_edges_fixture::MISSING
-            )),
-        ),
-        (
-            "recordPath",
-            json!("libs/foundry/records/resourcetypedatabase/excluded/metadata"),
-        ),
         ("role", json!("selectionCandidate")),
         ("stage", json!("selection")),
         ("code", json!("selectionFailure")),
@@ -233,6 +228,37 @@ fn assert_only_global_tag_candidate_failed(catalog: &Value) -> TestResult {
             "the global failure retains its exact {field} without an unscoped substitute"
         );
     }
+    assert_encrypted_candidate_identity(catalog, candidate)
+}
+
+fn assert_encrypted_candidate_identity(catalog: &Value, candidate: &Value) -> TestResult {
+    let index = check::present(candidate, "recordIndex", &json!(1), Some(true))?;
+    check::header(catalog, index, 1, "recordIndex", "selector", "archiveEntry")?;
+    let guid = check::present(
+        candidate,
+        "guid",
+        &json!(catalog_crafting_support::text(
+            resource_edges_fixture::MISSING
+        )),
+        Some(true),
+    )?;
+    check::header(catalog, guid, 1, "guid", "payload", "archiveEntry")?;
+    let path = check::present_text(
+        catalog,
+        candidate,
+        "recordPath",
+        &json!("libs/foundry/records/resourcetypedatabase/excluded/metadata"),
+        Some(true),
+    )?;
+    check::header(catalog, path, 1, "fileName", "conversion", "archiveEntry")?;
+    let uses = check::uses(catalog, index)?;
+    let contribution = uses.first().ok_or("the actual original header use")?;
+    let source = check::source(catalog, contribution)?;
+    assert_eq!(
+        source.pointer("/path/value"),
+        Some(&json!("Data\\Game2.dcb")),
+        "these headers belong to the fixture's actual encrypted DCB Entry"
+    );
     Ok(())
 }
 

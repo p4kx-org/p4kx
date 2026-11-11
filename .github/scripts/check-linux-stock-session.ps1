@@ -3,11 +3,12 @@ param(
     [Parameter(Mandatory)][string]$Version,
     [Parameter(Mandatory)][string]$AssetDirectory,
     [Parameter(Mandatory)][string]$FixtureDirectory,
+    [Parameter(Mandatory)][string]$LifecycleFixtureDirectory,
     [Parameter(Mandatory)][string]$BuildMetadata,
     [Parameter(Mandatory)][string]$OutputDirectory
 )
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'linux-package-consumer.ps1')
+. (Join-Path $PSScriptRoot 'linux-package-lifecycle.ps1')
 . (Join-Path $PSScriptRoot 'flatpak-prerequisites.ps1')
 . (Join-Path $PSScriptRoot 'documents-portal-interface.ps1')
 . (Join-Path $PSScriptRoot 'documents-portal-session.ps1')
@@ -21,6 +22,8 @@ try {
     Invoke-P4kxLinuxTool dbus-update-activation-environment @('DISPLAY', 'XAUTHORITY', 'XDG_CURRENT_DESKTOP') | Out-Null
     $interface = Get-P4kxDocumentsInterfaceEvidence $OutputDirectory 4
     Save-P4kxDocumentsSessionIdentity $OutputDirectory $null 'initial'
+    try { Save-P4kxLinuxLifecycleEvidence $LifecycleFixtureDirectory $AssetDirectory $Version $OutputDirectory $platform $base }
+    catch { $failures.Add($_.Exception) }
     foreach ($package in @('tar-gz', 'app-image', 'deb')) {
         try { $results += Invoke-P4kxLinuxHostPackage $package $AssetDirectory $FixtureDirectory (Join-Path $OutputDirectory $package) $Version $platform $base }
         catch { $failures.Add($_.Exception) }

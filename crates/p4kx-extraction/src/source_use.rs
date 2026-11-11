@@ -12,7 +12,7 @@ use crate::source_inventory::{PhysicalSourceRef, SourceEncryptionState};
 use crate::{DecimalU64, Language};
 
 /// A document-local source-use identifier, independent of addresses or pointer values.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(transparent)]
 pub struct SourceUseRef(pub(crate) String);
 
@@ -83,7 +83,7 @@ impl InputScope {
 }
 
 /// A retained source coordinate or an explicit omission inside an observed physical input.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[non_exhaustive]
 #[serde(
     tag = "type",
@@ -205,7 +205,7 @@ impl SourceUse {
 }
 
 /// One source-use inventory row, kept separately from the field's actual contribution set.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = projection_schema::require_properties)]
 pub struct SourceUseDescription {

@@ -8,7 +8,7 @@ use crate::field_origin::FieldOrigin;
 use crate::source_value_schema;
 
 /// A source value before its physical contributions are bound.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SourceValue<T> {
     /// A present value, including zero, false, empty collections and nonfinite IEEE values.
@@ -26,7 +26,7 @@ pub enum SourceValue<T> {
 }
 
 /// The interpretation state of one typed source value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[non_exhaustive]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
@@ -46,7 +46,7 @@ pub enum SourceValueState {
 }
 
 /// A typed data value with its immediate, materialized source origin.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(rename = "SourcedValueOf{T}", transform = source_value_schema::correlate)]
 pub struct SourcedValue<T> {

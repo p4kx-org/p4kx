@@ -19,7 +19,6 @@ pub(crate) struct CommodityDefinition<'source> {
     #[serde(flatten)]
     pub(crate) source: CanonicalRecordHeader<'source>,
     pub(crate) selection: SourcedValue<CommoditySelection>,
-    pub(crate) selection_diagnostics: Vec<CommoditySelectionDiagnostic>,
     pub(crate) entity: SourcedValue<CommodityAuthoring<'source>>,
 }
 
@@ -32,14 +31,6 @@ pub(crate) enum CommoditySelection {
     ResourceFallback,
 }
 
-/// An origin-capture observation independent of payload and publication health.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct CommoditySelectionDiagnostic {
-    pub(crate) code: &'static str,
-    pub(crate) record_index: SourcedValue<u32>,
-}
 /// The established Commodity choices independently of their authored input facts.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

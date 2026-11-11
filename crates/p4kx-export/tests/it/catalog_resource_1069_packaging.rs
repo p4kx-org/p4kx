@@ -6,6 +6,8 @@
 use p4kx_export::CatalogPublicationMode;
 use serde_json::{Value, json};
 
+use crate::health_reference_json as health;
+
 use crate::catalog_crafting_support;
 use crate::resource_1069_fixture::{self as fixture, Packaging, Validation};
 use crate::resource_origin_fixture::TestResult;
@@ -150,31 +152,29 @@ fn assert_unresolved_boxes(catalog: &Value) -> TestResult {
         "defaultCargoContainers.twoSCU",
         "defaultCargoContainers.oneSCU",
     ] {
-        let reference = unresolved
-            .iter()
-            .find(|reference| reference.get("field").and_then(Value::as_str) == Some(field))
-            .ok_or("the exact dangling slot is not reported")?;
+        let reference = health::by_field(catalog, unresolved, field)?;
         assert_eq!(
             reference["status"], "dangling",
             "the exact slot has an unresolved target"
         );
         assert_eq!(
-            reference["recordIndex"], 0,
+            health::present_value(reference, "recordIndex")?,
+            &json!(0),
             "the physical source owner survives"
         );
         assert_eq!(
-            reference["recordGuid"],
-            catalog_crafting_support::text(fixture::RESOURCE),
+            health::present_value(reference, "recordGuid")?,
+            &json!(catalog_crafting_support::text(fixture::RESOURCE)),
             "the owning resource identity survives"
         );
         assert_eq!(
-            reference["targetGuid"],
-            catalog_crafting_support::text(fixture::MISSING_BOX),
+            health::present_value(reference, "targetGuid")?,
+            &json!(catalog_crafting_support::text(fixture::MISSING_BOX)),
             "the unresolved target GUID survives independently"
         );
         assert_eq!(
-            reference.get("targetRecordIndex"),
-            Some(&Value::Null),
+            health::absent_value(reference, "targetRecordIndex")?,
+            &Value::Null,
             "an unresolved target has no invented physical index"
         );
     }

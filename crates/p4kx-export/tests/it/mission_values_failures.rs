@@ -6,6 +6,8 @@ use p4kx_export::CatalogPublicationMode;
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestStruct, TestType, TestValue};
 use serde_json::Value;
 
+use crate::mission_canonical_health as canonical_health;
+
 #[test]
 fn unsupported_search_clue_and_item_variants_fail_the_owner_and_block_normal_publication()
 -> TestResult {
@@ -95,14 +97,7 @@ fn an_unreadable_present_search_pointer_is_never_an_absent_configuration() -> Te
         "a present unreadable pointer blocks Normal"
     );
     let document = fixture::build(&builder, CatalogPublicationMode::DiagnosticPartial)?;
-    assert_eq!(
-        fixture::field(&document, "/contractTemplates")?
-            .as_array()
-            .ok_or("templates missing")?
-            .len(),
-        0,
-        "failed fields must not become a null search configuration in a retained template"
-    );
+    crate::scoped_canonical_failures::pointer(&document, "Broken", "searchOptions")?;
     assert_ne!(
         *fixture::field(&document, "/exportHealth/status")?,
         Value::String("complete".to_owned()),
@@ -209,24 +204,14 @@ fn additional_declared_search_fields_are_not_silently_discarded() -> TestResult 
         "unrepresented declared data blocks normal publication"
     );
     let document = fixture::build(&builder, CatalogPublicationMode::DiagnosticPartial)?;
-    let diagnostics = fixture::field(&document, "/exportHealth/diagnostics")?
-        .as_array()
-        .ok_or("diagnostics missing")?;
     assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.get("code").and_then(Value::as_str)
-                == Some("unsupportedValue")
-                && diagnostic
-                    .get("examples")
-                    .and_then(Value::as_array)
-                    .is_some_and(|examples| examples.iter().any(|example| example
-                        .get("sourceType")
-                        .and_then(Value::as_str)
-                        == Some("SpawnClosetSearchOptionsBase")
-                        && example.get("field").and_then(Value::as_str)
-                            == Some("searchOptions.futureField")))),
-        "the unknown source declaration has exact typed field evidence"
+        canonical_health::example(
+            &document,
+            Some("unsupportedValue"),
+            "SpawnClosetSearchOptionsBase",
+            |field| field == "searchOptions.futureField"
+        )?,
+        "the same report's typed text cells retain the exact unsupported field and source type"
     );
     Ok(())
 }

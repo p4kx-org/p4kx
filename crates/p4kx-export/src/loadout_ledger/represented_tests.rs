@@ -36,7 +36,7 @@ fn a_dangling_attachment_retains_its_target_without_becoming_unreadable_source()
         },
         &capture,
     )
-    .map_err(|failure| failure.reason)?
+    .map_err(|failure| failure.reason().to_owned())?
     .ok_or("represented port row missing")?;
     let target = row
         .ports
@@ -44,8 +44,7 @@ fn a_dangling_attachment_retains_its_target_without_becoming_unreadable_source()
         .ok_or("port missing")?
         .item_guid
         .ok_or("target identity missing")?
-        .0
-        .to_string();
+        .0;
     let ledger = capture.finish()?;
     let note = ledger
         .field_diagnostics
@@ -58,12 +57,8 @@ fn a_dangling_attachment_retains_its_target_without_becoming_unreadable_source()
         "a represented missing target is not a decoder failure"
     );
     assert_eq!(
-        note.examples
-            .first()
-            .ok_or("example missing")?
-            .target_guid
-            .as_deref(),
-        Some(target.as_str()),
+        note.examples.first().ok_or("example missing")?.target_guid,
+        Some(target),
         "the exact configured target identity remains exportable"
     );
     Ok(())
@@ -95,7 +90,7 @@ fn an_actual_unavailable_xml_dependency_is_a_warning_without_omitting_the_ship()
         },
         &capture,
     )
-    .map_err(|failure| failure.reason)?;
+    .map_err(|failure| failure.reason().to_owned())?;
     assert!(
         row.is_some(),
         "the existing retained Ship/loadout representation remains available for diagnostic export"
@@ -153,7 +148,7 @@ fn many_represented_targets_keep_complete_identity_and_bounded_examples() -> Tes
         },
         &capture,
     )
-    .map_err(|failure| failure.reason)?;
+    .map_err(|failure| failure.reason().to_owned())?;
     let ledger = capture.finish()?;
     let note = ledger
         .field_diagnostics

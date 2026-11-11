@@ -25,6 +25,7 @@ function Assert-P4kxArchiveEvidence {
         [string]$ArchiveHash
     )
     if ($Metadata.schema -ne 1 -or $Metadata.target -cne $Platform.target -or
+        $Metadata.os -cne $Platform.os -or $Metadata.arch -cne $Platform.arch -or
         $Metadata.revision -cne $Revision -or $Metadata.compiler -cne $Compiler -or
         $Metadata.nextest -cne $Nextest -or $Metadata.compiler_host -cne $Platform.target -or
         $Metadata.nextest_host -cne $Platform.target -or

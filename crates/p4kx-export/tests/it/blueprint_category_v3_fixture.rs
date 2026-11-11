@@ -143,7 +143,7 @@ pub(crate) fn refused(source: &DataForgeBuilder) -> TestResult {
     assert!(
         matches!(
             p4kx_export::build_catalog(&archive, &common::options()),
-            Err(CatalogError::IncompleteExport { .. })
+            Err(CatalogError::IncompleteExport(_))
         ),
         "a genuine category source/coverage failure must refuse normal publication"
     );

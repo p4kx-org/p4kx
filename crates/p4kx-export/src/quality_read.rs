@@ -10,7 +10,7 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::CatalogFields;
 use crate::guid_text::CatalogGuid;
 use crate::quality_source_read;
-use crate::source_fields::FieldError;
+use crate::source_fields::{FieldCapture, FieldError};
 
 use super::contract::{QualityDistributionDefinition, QualityOwner, QualityQuantizationDefinition};
 
@@ -23,32 +23,45 @@ pub(crate) fn distribution<'f>(
     tree: &RecordTree<'f>,
     origins: &CatalogOrigins,
     cancel: Option<&CancelToken>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<Read<QualityDistributionDefinition<'f>>, CatalogError> {
     let numbers = NumberCapture::default();
     let context = origins
         .record(tree.record_index())
         .with_numbers(&numbers)
         .with_cancel(cancel);
-    let fields = CatalogFields::new(tree.root(), "", &context);
+    let fields = CatalogFields::observed(tree.root(), "", &context, capture)?;
     let mut notes = Vec::new();
-    fields.check(
+    fields.check_observed(
         if tree.type_name() == "CraftingQualityDistributionRecord" {
             &["qualityDistribution"]
         } else {
             &["locationOverride"]
         },
         &mut notes,
-    );
+    )?;
     let quality_distribution = fields
         .structure("qualityDistribution", &mut notes)?
         .try_map(|source| {
-            quality_source_read::distribution(source, "qualityDistribution", &context, &mut notes)
+            quality_source_read::distribution(
+                source,
+                "qualityDistribution",
+                &context,
+                &mut notes,
+                capture,
+            )
         })?;
     let location_override =
         fields
             .structure("locationOverride", &mut notes)?
             .try_map(|source| {
-                quality_source_read::overrides(source, "locationOverride", &context, &mut notes)
+                quality_source_read::overrides(
+                    source,
+                    "locationOverride",
+                    &context,
+                    &mut notes,
+                    capture,
+                )
             })?;
     Ok(Read {
         value: QualityDistributionDefinition {
@@ -66,19 +79,26 @@ pub(crate) fn quantization<'f>(
     tree: &RecordTree<'f>,
     origins: &CatalogOrigins,
     cancel: Option<&CancelToken>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<Read<QualityQuantizationDefinition<'f>>, CatalogError> {
     let numbers = NumberCapture::default();
     let context = origins
         .record(tree.record_index())
         .with_numbers(&numbers)
         .with_cancel(cancel);
-    let fields = CatalogFields::new(tree.root(), "", &context);
+    let fields = CatalogFields::observed(tree.root(), "", &context, capture)?;
     let mut notes = Vec::new();
-    fields.check(&["qualityQuantization"], &mut notes);
+    fields.check_observed(&["qualityQuantization"], &mut notes)?;
     let quality_quantization = fields
         .structure("qualityQuantization", &mut notes)?
         .try_map(|source| {
-            quality_source_read::quantization(source, "qualityQuantization", &context, &mut notes)
+            quality_source_read::quantization(
+                source,
+                "qualityQuantization",
+                &context,
+                &mut notes,
+                capture,
+            )
         })?;
     Ok(Read {
         value: QualityQuantizationDefinition {

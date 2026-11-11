@@ -29,7 +29,6 @@ is independent of game-text protection, selection completeness and publication h
 | `recordName`, `fileName`, `metadataTag` | Exact stored name, filename and separate Record-table metadata tag, with the shared sentinel/layout states. |
 | `recordPath`, `recordIndex`, `sourceType` | The original normalized Record path, physical DataForge Record position and concrete source struct name. Physical position and nominal GUID remain different identities. |
 | `selection` | Closed `entity` or `resourceFallback` choice, with the actual selection inputs. Resource fallback retains its eligibility and representation-check inputs here. |
-| `selectionDiagnostics` | Separate origin-capture bookkeeping. `originMetadataLimit` names a bounded field/selector-metadata capture limit; `originTargetInventoryLimit` names the separate bounded affected-target inventory. Each carries its actual source Record index and applies only to the affected resource/kept-quantization decision. It does not claim a payload read failure. |
 | `entity` | Commodity-owned authored bindings for an Entity. It is absent for a ResourceType-backed row; no Entity source is invented. |
 
 `entity.value` contains ordered `purchasableParameters`, `displayParameters` and
@@ -84,11 +83,12 @@ only the language Entries actually used. Failed reads stay attempts, not retaine
 Known encrypted contributors keep a true marker even when the set is incomplete; without such
 proof, an incomplete set is null, never false.
 
-Origin capture is bounded independently of payload reading: at most 4096 retained decision inputs and 1 MiB of field/selector metadata per Record, plus at most 4096 compact affected-target pairs. Targets are the actual observed resource and optional quantization GUID; a target-inventory overflow is reported separately without guessing missing field paths. A metadata limit leaves the existing
-crafting DTO and selection intact, records the real origin-capture reason and makes only the
-affected selection contributor set incomplete. It does not become `sourceReadFailure`, omit a
-DTO or redefine normal/diagnostic publication health. The existing canonical reader, cancellation,
-source-watch and publication rules still apply.
+Resource fallback uses the original Blueprint selectors and the actual matching Quality inverse
+members. A Quality-backed choice retains the effective quantizer decision, the matching authored
+Resource relationship slots, and the existing packaging and representation checks. Unrelated
+members of the same inverse do not contribute to that Commodity. Every original applicable
+selector is retained. Unreadable inputs remain attempted evidence with explicit incompleteness.
+Source-use buffer allocation failures abort catalog preparation before publication.
 
 ## Consumer migration and evidence
 

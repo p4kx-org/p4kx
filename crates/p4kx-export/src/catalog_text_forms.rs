@@ -18,6 +18,22 @@ pub(crate) struct TextFormProjection<'source> {
     pub(crate) uses: Vec<SourceUse>,
 }
 
+/// Records the language Entry consulted for this actual authored key selector.
+pub(crate) fn lookup_use(
+    input: &CatalogLocaleInput,
+    language: Language,
+    selector: &SourceUse,
+    role: SourceUseRole,
+) -> Result<SourceUse, CatalogError> {
+    Ok(input.scope().at(
+        SourceLocation::LocalizationLookup {
+            language,
+            selector: selector.reference().clone(),
+        },
+        role,
+    )?)
+}
+
 /// Binds one prepared lookup to its exact key, locale and conversion inputs.
 pub(crate) fn project<'source>(
     registry: &SourceUses,
@@ -30,27 +46,26 @@ pub(crate) fn project<'source>(
     let mut source_uses = selectors.to_vec();
     if looked_up {
         for selector in selectors {
-            let location = SourceLocation::LocalizationLookup {
+            source_uses.push(lookup_use(
+                input,
                 language,
-                selector: selector.reference().clone(),
-            };
-            let payload_location = text.as_ref().map(|_| location.clone());
-            source_uses.push(input.scope().at(location, SourceUseRole::Selector)?);
-            if let Some(location) = payload_location {
-                source_uses.push(input.scope().at(location, SourceUseRole::Payload)?);
+                selector,
+                SourceUseRole::Selector,
+            )?);
+            if text.is_some() {
+                source_uses.push(lookup_use(
+                    input,
+                    language,
+                    selector,
+                    SourceUseRole::Payload,
+                )?);
             }
         }
     }
     let mut display_uses = source_uses.clone();
     if looked_up && text.is_some() {
         for selector in selectors {
-            let conversion = input.scope().at(
-                SourceLocation::LocalizationLookup {
-                    language,
-                    selector: selector.reference().clone(),
-                },
-                SourceUseRole::Conversion,
-            )?;
+            let conversion = lookup_use(input, language, selector, SourceUseRole::Conversion)?;
             if input.decoded() {
                 source_uses.push(conversion.clone());
             }

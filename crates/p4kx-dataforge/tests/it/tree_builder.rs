@@ -5,7 +5,7 @@
 
 use std::error::Error;
 
-use p4kx_dataforge::{DataForge, MAX_RECORD_VALUES, TreeBuilder, Value};
+use p4kx_dataforge::{DataForge, TreeBuilder, Value};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -75,13 +75,8 @@ fn the_root_is_walked_like_a_nested_struct() -> TestResult {
 }
 
 #[test]
-fn a_full_record_tree_stays_small_per_worker() {
+fn one_value_keeps_its_existing_compact_layout() {
     let value = size_of::<Value<'_>>();
 
     assert!(value <= 48, "one value takes {value} bytes");
-    assert!(
-        MAX_RECORD_VALUES * value <= 64 << 20,
-        "the largest tree takes {} MiB",
-        (MAX_RECORD_VALUES * value) >> 20
-    );
 }

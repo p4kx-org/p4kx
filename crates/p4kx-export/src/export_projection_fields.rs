@@ -3,60 +3,48 @@
 
 use std::error::Error;
 
+use crate::catalog_read::original::ExampleBodyReceipt;
 use crate::export_diagnostic::ExportDiagnosticCode;
 use crate::export_ledger::SourceDiagnosis;
 use crate::mission_property_fields::PropertyFieldError;
+use crate::record_source_status::DiagnosisBody;
 use crate::scoped_location_fields::FieldError;
+use crate::source_fields::{self, FieldDescription, FieldIssue};
 
-/// Extracts malformed and unreadable field categories from strict typed source mappers.
+/// Borrows closed source-error metadata without parsing display text or recreating its receipt.
 pub(crate) fn diagnosis(error: &(dyn Error + 'static)) -> Option<SourceDiagnosis> {
-    if let Some(error) = error.downcast_ref::<crate::source_fields::FieldError>() {
-        let (source_type, field, code) = match error {
-            crate::source_fields::FieldError::Malformed {
-                source_type, field, ..
-            } => (source_type, field, ExportDiagnosticCode::MalformedSource),
-            crate::source_fields::FieldError::Unreadable {
-                source_type, field, ..
-            } => (source_type, field, ExportDiagnosticCode::UnreadableSource),
-            crate::source_fields::FieldError::Unsupported { source_type, field } => {
-                (source_type, field, ExportDiagnosticCode::UnsupportedValue)
-            }
-        };
-        return Some(SourceDiagnosis {
-            code: Some(code),
-            field: Some(field.clone()),
-            source_type: Some(source_type.clone()),
-            target_guid: None,
-        });
+    if let Some(error) = error.downcast_ref::<source_fields::FieldError>() {
+        return Some(field(&error.description(), error.body()));
     }
-    let (field, source_type, code) = if let Some(error) = error.downcast_ref::<FieldError>() {
-        match error {
-            FieldError::Malformed { owner, field, .. } => (
-                *field,
-                Some(owner.clone()),
-                ExportDiagnosticCode::MalformedSource,
-            ),
-            FieldError::Unreadable { owner, field, .. } => (
-                *field,
-                Some(owner.clone()),
-                ExportDiagnosticCode::UnreadableSource,
-            ),
-        }
-    } else {
-        let error = error.downcast_ref::<PropertyFieldError>()?;
-        match error {
-            PropertyFieldError::Malformed { field, .. } => {
-                (*field, None, ExportDiagnosticCode::MalformedSource)
-            }
-            PropertyFieldError::Unreadable { field, .. } => {
-                (*field, None, ExportDiagnosticCode::UnreadableSource)
-            }
-        }
-    };
-    Some(SourceDiagnosis {
-        code: Some(code),
-        field: Some(field.to_owned()),
-        source_type,
+    if let Some(error) = error.downcast_ref::<FieldError>() {
+        return Some(field(&error.description(), error.body()));
+    }
+    let error = error.downcast_ref::<PropertyFieldError>()?;
+    Some(field(&error.description(), error.body()))
+}
+
+pub(crate) fn field(
+    description: &FieldDescription<'_>,
+    body: Option<&ExampleBodyReceipt>,
+) -> SourceDiagnosis {
+    let body = body.map_or(DiagnosisBody::Pending, |body| {
+        body.clone()
+            .select_description(Some(description.field), description.source_type, None)
+            .map_or(DiagnosisBody::Conflicting, DiagnosisBody::Captured)
+    });
+    SourceDiagnosis {
+        code: Some(code(description.issue)),
+        field: Some(description.field.to_owned()),
+        source_type: description.source_type.map(str::to_owned),
         target_guid: None,
-    })
+        body,
+    }
+}
+
+pub(crate) const fn code(issue: FieldIssue) -> ExportDiagnosticCode {
+    match issue {
+        FieldIssue::Malformed => ExportDiagnosticCode::MalformedSource,
+        FieldIssue::Unreadable => ExportDiagnosticCode::UnreadableSource,
+        FieldIssue::Unsupported => ExportDiagnosticCode::UnsupportedValue,
+    }
 }

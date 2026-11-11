@@ -239,6 +239,11 @@ fn catalog_with_a_filter_marks_the_kind_partial_and_prints_json() -> TestResult 
             "the manufacturer filter excludes commodity rows at {pointer}"
         );
     }
+    assert_eq!(
+        catalog.pointer("/declarations/shopInventoryResolution"),
+        Some(&serde_json::json!({"availability": "unavailable", "rows": []})),
+        "the Record filter omits the shop registry scan",
+    );
     insta::assert_snapshot!("catalog_filter_json", summary);
     Ok(())
 }

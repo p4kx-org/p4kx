@@ -67,3 +67,62 @@ fn finite_values_do_not_materialize_optional_nonfinite_receipt_coordinates() {
         "no nonfinite proof token was required"
     );
 }
+
+#[test]
+fn equal_named_loot_values_keep_distinct_original_occurrence_receipts() {
+    let capture = NumberCapture::default();
+    let value = Value::Single(f32::from_bits(0x7fc0_0017));
+    for ordinal in [3, 4, 3] {
+        capture.retain_at(
+            7,
+            super::NumberOccurrence::LootValue { ordinal },
+            || "filter.same".to_owned(),
+            "PoolFilter_Custom",
+            ResourceNumberContract::Number,
+            &value,
+        );
+    }
+    let receipts = capture.finish();
+    assert_eq!(
+        receipts.len(),
+        2,
+        "equal names/tokens at different original positions remain independent"
+    );
+    for (receipt, ordinal) in receipts.iter().zip([3, 4]) {
+        assert_eq!(
+            receipt.occurrence,
+            super::NumberOccurrence::LootValue { ordinal },
+            "actual source occurrence, not a named-path alias"
+        );
+        assert_eq!(
+            receipt.token,
+            FloatToken::Single(0x7fc0_0017),
+            "source width and payload bits remain exact"
+        );
+    }
+}
+
+#[test]
+fn finite_loot_values_do_not_allocate_conditional_receipt_paths() {
+    let capture = NumberCapture::default();
+    let materialized = std::cell::Cell::new(false);
+    capture.retain_at(
+        7,
+        super::NumberOccurrence::LootValue { ordinal: 3 },
+        || {
+            materialized.set(true);
+            "filter.same".to_owned()
+        },
+        "PoolFilter_Custom",
+        ResourceNumberContract::Number,
+        &Value::Double(1.0),
+    );
+    assert!(
+        !materialized.get(),
+        "finite source facts do not require nonfinite-loss receipt paths"
+    );
+    assert!(
+        capture.finish().is_empty(),
+        "the complete scalar DTO carries finite data without a conditional receipt"
+    );
+}

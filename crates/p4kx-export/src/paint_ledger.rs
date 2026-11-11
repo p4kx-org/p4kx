@@ -61,15 +61,13 @@ pub(crate) fn inputs(
         ledger.observe(input);
         if role == ExportSourceRole::Dependency && unreadable.contains(&observation.record_index) {
             ledger.incomplete_inventory(Kind::Paints);
-            ledger.derived_failure(DerivedFailure {
-                affected_kind: Kind::Paints,
-                output_kind: Kind::Paints,
-                record_index: observation.record_index,
+            ledger.derived_failure(DerivedFailure::of_source(
+                observation,
+                Kind::Paints,
+                Kind::Paints,
                 role,
-                guid: observation.guid,
-                record_path: observation.record_path.clone(),
-                diagnosis: SourceDiagnosis::default(),
-            });
+                SourceDiagnosis::default(),
+            )?);
         }
     }
     Ok(ledger)

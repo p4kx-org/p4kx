@@ -66,17 +66,20 @@ fn convenience_path_uses_only_the_actual_chosen_occurrences_and_ancestor_names()
     let (_, catalog) = fixture::diagnostic(&fixture::graph())?;
     let row = fixture::row(&catalog, "projections/tagPaths", 1)?;
     let actual = uses(&catalog, at(row, "/path")?)?;
-    let mut expected = BTreeSet::from([
-        (0, body("tagName"), "conversion".to_owned()),
-        (1, body("tagName"), "conversion".to_owned()),
+    let mut topology = BTreeSet::from([
         (4, body("tags[2]"), "selector".to_owned()),
         (0, body("children[3]"), "selector".to_owned()),
     ]);
     for record in [0, 1, 4] {
         for field in ["guid", "sourceType", "recordIndex"] {
-            expected.insert((record, header(field), "selector".to_owned()));
+            topology.insert((record, header(field), "selector".to_owned()));
         }
     }
+    let mut expected = topology.clone();
+    expected.extend([
+        (0, body("tagName"), "conversion".to_owned()),
+        (1, body("tagName"), "conversion".to_owned()),
+    ]);
     assert_eq!(
         actual, expected,
         "no compressed ordinal or counterfactual later edge contributes"
@@ -88,14 +91,18 @@ fn convenience_path_uses_only_the_actual_chosen_occurrences_and_ancestor_names()
             .any(|(index, _, _)| *index == 1),
         "descendant names do not contribute to the root path"
     );
-    let depth = uses(&catalog, at(row, "/depth")?)?;
-    assert!(
-        depth.contains(&(0, body("tagName"), "selector".to_owned())),
-        "ancestor name participates in the path-budget selection"
-    );
-    assert!(
-        depth.contains(&(1, body("tagName"), "selector".to_owned())),
-        "selected child name participates in its path-budget selection"
+    for field in ["/depth", "/listed"] {
+        assert_eq!(
+            uses(&catalog, at(row, field)?)?,
+            topology,
+            "{field} depends on the actual qualifying headers and selected edges"
+        );
+    }
+    topology.insert((0, header("guid"), "payload".to_owned()));
+    assert_eq!(
+        uses(&catalog, at(row, "/parent")?)?,
+        topology,
+        "the parent adds its actual GUID payload to the selected topology"
     );
     let unlisted = uses(
         &catalog,
@@ -226,3 +233,12 @@ fn equal_database_guids_keep_both_physical_root_declarations_and_the_selected_ow
     );
     Ok(())
 }
+
+#[path = "catalog_tag_name_origin.rs"]
+mod name_origin;
+
+#[path = "catalog_tag_topology_origin.rs"]
+mod topology_origin;
+
+#[path = "catalog_tag_dependent_receipts.rs"]
+mod dependent_receipts;

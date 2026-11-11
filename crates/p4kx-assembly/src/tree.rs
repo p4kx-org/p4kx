@@ -15,6 +15,11 @@ use crate::{
     PortConstraints, PortDefinition, PortVisibility, VehicleImplementation, ZoneChunk,
 };
 
+#[path = "loadout_target.rs"]
+mod loadout_target;
+
+pub use self::loadout_target::{Target, Unresolved};
+
 /// One Entity in a Loadout tree: its Record and its ports with what they hold.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntityNode {
@@ -356,36 +361,4 @@ pub enum Attachment {
     Entity(Box<EntityNode>),
     /// An Entity that cannot be resolved, with the reason.
     Unresolved(Unresolved),
-}
-
-/// An attachment that cannot be resolved: what was named and why it fails.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Unresolved {
-    pub(crate) target: Target,
-    pub(crate) error: LoadoutError,
-}
-
-impl Unresolved {
-    /// Returns what the Loadout names.
-    #[must_use]
-    pub const fn target(&self) -> &Target {
-        &self.target
-    }
-
-    /// Returns why it cannot be resolved.
-    #[must_use]
-    pub const fn error(&self) -> &LoadoutError {
-        &self.error
-    }
-}
-
-/// What a Loadout names to attach to a port.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Target {
-    /// A Record by Reference.
-    Reference(Guid),
-    /// An Entity by class name.
-    ClassName(String),
-    /// A Reference that cannot be read.
-    Unreadable,
 }

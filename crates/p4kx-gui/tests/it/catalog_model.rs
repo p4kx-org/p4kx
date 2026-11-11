@@ -25,10 +25,10 @@ fn an_unreadable_record_refuses_a_normal_catalog_without_writing() -> TestResult
     };
     assert!(!health.is_complete(), "a selected source failed");
     assert!(
-        health
-            .failed_records
-            .iter()
-            .any(|record| record.guid == "90000000-0000-4000-8000-000000000009"),
+        health.failed_records().iter().any(|record| record
+            .guid()
+            .value()
+            .is_some_and(|guid| guid.as_str() == "90000000-0000-4000-8000-000000000009")),
         "the failed source identity is retained"
     );
     assert!(!file.exists(), "normal publication creates no snapshot");

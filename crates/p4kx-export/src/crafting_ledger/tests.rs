@@ -12,7 +12,7 @@ use super::fixtures;
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
-fn a_readable_overdeep_blueprint_is_a_projection_failure() -> TestResult {
+fn a_readable_deep_blueprint_is_a_complete_projection() -> TestResult {
     let bytes = fixtures::blueprint(33, false);
     let forge = DataForge::open(&bytes)?;
     let read = super::read(&forge, None, None, None)?;
@@ -28,13 +28,13 @@ fn a_readable_overdeep_blueprint_is_a_projection_failure() -> TestResult {
     );
     assert_eq!(
         source.disposition,
-        SourceDisposition::ProjectionFailed,
-        "canonical reading succeeded before typed depth rejection"
+        SourceDisposition::Projected,
+        "canonical reading retains the full deep recipe"
     );
     assert_eq!(
         read.data.failures.len(),
-        1,
-        "the public compatibility failure is retained"
+        0,
+        "a valid depth cannot create a read failure"
     );
     assert_eq!(
         read.ledger.field_inspections.len(),
@@ -78,7 +78,7 @@ fn excluded_blueprints_are_not_read_or_reported_as_omitted() -> TestResult {
     let read = super::read(&forge, Some(&filter), None, None)?;
     assert!(
         read.data.failures.is_empty(),
-        "an excluded overdeep source is not a selected failure"
+        "an excluded deep source is not a selected failure"
     );
     assert!(
         read.ledger.sources.is_empty(),

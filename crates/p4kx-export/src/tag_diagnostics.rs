@@ -1,96 +1,77 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Guid, Record, TagProjectionFailure, TagRelationIssue};
+use p4kx_extraction::TagRelationIssue;
 
-use crate::Kind;
+use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_read::original::ExampleBodyReceipt;
 use crate::export_diagnostic::{
-    ExportDiagnostic, ExportDiagnosticCode, ExportDiagnosticExample, ExportDiagnosticSeverity,
-    ExportDiagnosticStage, ExportDiagnosticUnit, ExportSourceRole,
+    ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
+    ExportSourceRole,
 };
-use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDiagnosis};
-
-pub(super) fn cut(ledger: &mut ExportLedger, record: &Record<'_>, reason: TagProjectionFailure) {
-    ledger.derived_failure(DerivedFailure {
-        affected_kind: Kind::Tags,
-        output_kind: Kind::Tags,
-        record_index: record.index(),
-        role: ExportSourceRole::Selected,
-        guid: record.guid(),
-        record_path: record.record_path().ok().map(str::to_owned),
-        diagnosis: SourceDiagnosis {
-            code: Some(ExportDiagnosticCode::DerivedProjectionFailure),
-            field: Some("tagPath".to_owned()),
-            source_type: Some("Tag".to_owned()),
-            target_guid: None,
-        },
-    });
-    let label = match reason {
-        TagProjectionFailure::Depth => "tag_path_depth_limit",
-        TagProjectionFailure::NameBytes => "tag_path_name_bytes_limit",
-        TagProjectionFailure::PathBytes => "tag_path_bytes_limit",
-        TagProjectionFailure::TextBytes => "tag_path_text_bytes_limit",
-        TagProjectionFailure::NodeCount => "tag_path_node_count_limit",
-        TagProjectionFailure::AncestorDiscarded => "tag_path_ancestor_discarded",
-    };
-    issue(
-        ledger,
-        record,
-        "tagPath",
-        None,
-        label,
-        ExportDiagnosticSeverity::Warning,
-    );
-}
+use crate::export_ledger::ExportLedger;
+use crate::health_diagnostic_observation::{DiagnosticObservation, ExampleObservation};
+use crate::record_observation::RecordObservation;
+use crate::{CatalogError, Kind};
 
 pub(super) fn relation(
     ledger: &mut ExportLedger,
-    record: &Record<'_>,
-    field: &str,
-    target: Option<Guid>,
+    admission: &RecordObservation<'_, '_>,
     reason: TagRelationIssue,
-) {
+    body: ExampleBodyReceipt,
+) -> Result<(), CatalogError> {
     let label = match reason {
         TagRelationIssue::Dangling => "tag_relation_dangling",
         TagRelationIssue::Repeated => "tag_relation_repeated",
         TagRelationIssue::MalformedValue => "tag_relation_malformed",
     };
-    issue(
-        ledger,
-        record,
-        field,
+    let (field, source_type, target) = body.description()?;
+    let example = ExampleObservation::captured(
+        admission.subject().clone(),
+        field.as_deref(),
+        source_type.as_deref(),
         target,
-        label,
-        ExportDiagnosticSeverity::Information,
-    );
+        body,
+    )?;
+    issue(ledger, admission, label, example);
+    Ok(())
 }
-
-pub(super) fn duplicate(ledger: &mut ExportLedger, record: &Record<'_>) {
-    issue(
-        ledger,
-        record,
-        "$guid",
-        Some(record.guid()),
-        "tag_duplicate_guid",
-        ExportDiagnosticSeverity::Information,
-    );
+pub(super) fn duplicate(
+    input: &OriginalCatalogInput<'_, '_>,
+    ledger: &mut ExportLedger,
+    admission: &RecordObservation<'_, '_>,
+) -> Result<(), CatalogError> {
+    let subject = admission.subject().clone();
+    let body = ExampleBodyReceipt::duplicate_guid_header(input, subject.clone())?;
+    let (field, source_type, target_guid) = body.description()?;
+    let example = ExampleObservation::captured(
+        subject,
+        field.as_deref(),
+        source_type.as_deref(),
+        target_guid,
+        body,
+    )?;
+    issue(ledger, admission, "tag_duplicate_guid", example);
+    Ok(())
 }
 
 fn issue(
     ledger: &mut ExportLedger,
-    record: &Record<'_>,
-    field: &str,
-    target: Option<Guid>,
+    admission: &RecordObservation<'_, '_>,
     label: &str,
-    severity: ExportDiagnosticSeverity,
+    retained: ExampleObservation,
 ) {
-    ledger.field_diagnostic(ExportDiagnostic {
+    ledger.field_diagnostic(DiagnosticObservation {
         kind: Some(Kind::Tags),
         stage: ExportDiagnosticStage::DerivedProjection,
         code: ExportDiagnosticCode::SourceWarning,
-        severity,
+        severity: ExportDiagnosticSeverity::Information,
         source_role: Some(
-            if record.type_name().is_ok_and(|name| name == "TagDatabase") {
+            if admission
+                .record()
+                .type_name()
+                .is_ok_and(|name| name == "TagDatabase")
+            {
                 ExportSourceRole::Dependency
             } else {
                 ExportSourceRole::Selected
@@ -99,13 +80,6 @@ fn issue(
         warning_code: Some(label.to_owned()),
         count: 1,
         count_unit: ExportDiagnosticUnit::Occurrences,
-        examples: vec![ExportDiagnosticExample {
-            record_index: Some(record.index()),
-            record_guid: Some(record.guid().to_string()),
-            record_path: record.record_path().ok().map(str::to_owned),
-            field: Some(field.to_owned()),
-            source_type: record.type_name().ok().map(str::to_owned),
-            target_guid: target.map(|guid| guid.to_string()),
-        }],
+        examples: vec![retained],
     });
 }

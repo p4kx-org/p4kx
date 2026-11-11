@@ -13,7 +13,7 @@ use std::sync::Mutex;
 use p4kx_export::{CatalogPhase, CatalogProgress, CraftingWarning, Filter, read_crafting};
 use p4kx_extraction::{DataForge, ReferenceIndex};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
-use serde_json::{Value, json};
+use serde_json::json;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -172,7 +172,8 @@ fn the_reward_sources_are_complete_and_ordered_by_record() -> TestResult {
 #[test]
 fn a_blueprint_links_no_dismantle_process_a_filter_left_out() -> TestResult {
     let (_, whole) = build_from(&fixture::database(), None)?;
-    let linked = &blueprint(&whole, fixture::TWO_TIERS)?["dismantle"];
+    let linked =
+        &blueprint::by_guid(&whole, fixture::TWO_TIERS)?.presentation["dismantle"]["value"];
     assert_eq!(linked["processGuid"], json!(text(fixture::DISMANTLE)));
     let filter = Filter::new("*/bp_craft_two_tiers");
     let (_, filtered) = build_from(&fixture::database(), Some(&filter))?;
@@ -182,8 +183,8 @@ fn a_blueprint_links_no_dismantle_process_a_filter_left_out() -> TestResult {
         "the process is out"
     );
     assert_eq!(
-        blueprint(&filtered, fixture::TWO_TIERS)?["dismantle"],
-        Value::Null,
+        blueprint::by_guid(&filtered, fixture::TWO_TIERS)?.presentation["dismantle"]["state"],
+        "absent",
         "so no blueprint points at it"
     );
     Ok(())

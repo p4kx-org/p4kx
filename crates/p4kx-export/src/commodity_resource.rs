@@ -1,26 +1,55 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{RecordTree, StructValue};
+use p4kx_extraction::{CancelToken, RecordTree, StructValue, Value};
+
+use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_read::original::{ExampleBodyReceipt, OriginalFlowFields};
 
 use crate::definition_reference::DefinitionReference;
+use crate::record_observation::RecordObservation;
 use crate::source_fields::{self, FieldError, Fields};
 
 /// The first authored resource link and its original indexed field identity.
-pub(crate) struct CommodityResource {
+pub(crate) struct CommodityResource<'tree, 'source> {
     pub(crate) reference: DefinitionReference,
     pub(crate) field: String,
-    pub(crate) source_type: String,
+    entry: &'tree StructValue<'source>,
+    value: &'tree Value<'source>,
+}
+
+impl<'source> CommodityResource<'_, 'source> {
+    pub(crate) fn failure_body(
+        &self,
+        input: &OriginalCatalogInput<'_, '_>,
+        admission: &RecordObservation<'_, 'source>,
+        tree: &RecordTree<'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ExampleBodyReceipt, CatalogError> {
+        let scope = input.record_scope(admission.record(), tree)?;
+        let fields = OriginalFlowFields::read(&scope, cancel)?;
+        let fact = fields.fact(self.value)?;
+        let ancestors = fields.ancestors(fact)?;
+        fields.body_capture(input, admission)?.reference_fact(
+            self.entry,
+            fact,
+            &ancestors,
+            &self.field,
+        )
+    }
 }
 
 /// The established first-container choice and every selector actually used to reach it.
-pub(crate) struct CommodityResourceSelection {
-    pub(crate) link: Option<CommodityResource>,
+pub(crate) struct CommodityResourceSelection<'tree, 'source> {
+    pub(crate) link: Option<CommodityResource<'tree, 'source>>,
     pub(crate) selectors: Vec<String>,
 }
 
 /// Returns the first non-null resource link without replacing an unresolved first target.
-pub(crate) fn first(tree: &RecordTree<'_>) -> Result<CommodityResourceSelection, FieldError> {
+pub(crate) fn first<'tree, 'source>(
+    tree: &'tree RecordTree<'source>,
+) -> Result<CommodityResourceSelection<'tree, 'source>, FieldError> {
     let mut selected = CommodityResourceSelection {
         link: None,
         selectors: vec!["Components".to_owned()],
@@ -45,11 +74,11 @@ pub(crate) fn first(tree: &RecordTree<'_>) -> Result<CommodityResourceSelection,
     Ok(selected)
 }
 
-fn composition(
-    source: &StructValue<'_>,
+fn composition<'tree, 'source>(
+    source: &'tree StructValue<'source>,
     path: &str,
     selectors: &mut Vec<String>,
-) -> Result<Option<CommodityResource>, FieldError> {
+) -> Result<Option<CommodityResource<'tree, 'source>>, FieldError> {
     let fields = Fields::new(source, path);
     selectors.push(format!("{path}.defaultComposition"));
     let Some(values) = fields.array("defaultComposition")? else {
@@ -67,11 +96,12 @@ fn composition(
             continue;
         };
         selectors.push(format!("{entry_path}.entry"));
-        if let Some(reference) = Fields::new(entry, &entry_path).reference("entry")? {
+        if let Some(slot) = Fields::new(entry, &entry_path).reference_slot("entry")? {
             return Ok(Some(CommodityResource {
-                reference,
+                reference: slot.reference.into_owned(),
                 field: format!("{entry_path}.entry"),
-                source_type: entry.type_name().to_owned(),
+                entry,
+                value: slot.value,
             }));
         }
     }

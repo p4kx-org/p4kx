@@ -8,7 +8,8 @@ use crate::fields::number::Extremes;
 use crate::fields::seen::Seen;
 use crate::fields::trie::{ROOT, Trie};
 use crate::fields::{FieldKind, FieldStatisticsError};
-use crate::{DataForge, MAX_RECORD_VALUES};
+use crate::source_layout_index;
+use crate::{DataForge, DataForgeError};
 
 pub(super) const NONE: u32 = u32::MAX;
 
@@ -16,13 +17,19 @@ const KEPT_PENDING: usize = 1 << 16;
 
 /// Why the walk of one Record stops.
 pub(super) enum Stop {
-    TooLarge,
     Paths(FieldStatisticsError),
+    Read(DataForgeError),
 }
 
 impl From<FieldStatisticsError> for Stop {
     fn from(error: FieldStatisticsError) -> Self {
         Self::Paths(error)
+    }
+}
+
+impl From<DataForgeError> for Stop {
+    fn from(error: DataForgeError) -> Self {
+        Self::Read(error)
     }
 }
 
@@ -42,13 +49,10 @@ struct Pending {
 pub(crate) struct Part<'s, 'f> {
     pub(crate) trie: Trie<'f>,
     pub(super) layouts: &'s SharedLayouts<'f>,
-    pub(super) slots: HashMap<(u32, u32), usize>,
-    pub(super) children: Vec<Box<[u32]>>,
     pub(super) types: HashMap<(u32, u32), u32>,
     pub(super) visited: HashSet<(u32, u32)>,
     pending: Vec<Pending>,
     pub(super) skipped: u64,
-    values: usize,
     record: u32,
     pub(crate) examined: u64,
     pub(crate) unreadable_records: u64,
@@ -60,13 +64,10 @@ impl<'s, 'f> Part<'s, 'f> {
         Self {
             trie: Trie::new(),
             layouts,
-            slots: HashMap::new(),
-            children: Vec::new(),
             types: HashMap::new(),
             visited: HashSet::new(),
             pending: Vec::new(),
             skipped: 0,
-            values: 0,
             record: NONE,
             examined: 0,
             unreadable_records: 0,
@@ -84,8 +85,7 @@ impl<'s, 'f> Part<'s, 'f> {
         Ok(merged)
     }
 
-    /// Walks the Record at `index` and counts its values; a Record with more values than a
-    /// Record tree may hold adds nothing but one unreadable Record.
+    /// Walks the actual Record and atomically commits its readable field statistics.
     ///
     /// # Errors
     ///
@@ -103,76 +103,38 @@ impl<'s, 'f> Part<'s, 'f> {
         };
         let instance = u32::from(def.instance_index);
         let layouts = self.layouts;
-        let (Some(bytes), Ok(layout)) = (
-            forge.instance(def.struct_index, instance),
-            layouts.get(forge, def.struct_index),
-        ) else {
+        let Some(bytes) = forge.instance(def.struct_index, instance) else {
             self.unreadable_records += 1;
             return Ok(());
         };
+        let layout = match layouts.get(forge, def.struct_index) {
+            Ok(layout) => layout,
+            Err(error) if source_layout_index::is_operational(&error) => {
+                return Err(FieldStatisticsError::Read { source: error });
+            }
+            Err(_) => {
+                self.unreadable_records += 1;
+                return Ok(());
+            }
+        };
         self.record = index;
-        self.values = 0;
         self.skipped = 0;
         self.pending.clear();
         self.visited.clear();
         self.visited.insert((def.struct_index, instance));
-        match self.structure(forge, def.struct_index, &layout, bytes, ROOT, 0) {
+        match self.structure(forge, def.struct_index, &layout, bytes, ROOT, instance) {
             Ok(()) => {
                 self.commit();
                 Ok(())
             }
-            Err(Stop::TooLarge) => {
-                self.unreadable_records += 1;
-                self.pending.clear();
-                self.release();
-                Ok(())
-            }
             Err(Stop::Paths(error)) => Err(error),
+            Err(Stop::Read(source)) => Err(FieldStatisticsError::Read { source }),
         }
     }
 
-    pub(super) const fn spend(&mut self, values: usize) -> Walk {
-        self.values = self.values.saturating_add(values);
-        if self.values > MAX_RECORD_VALUES {
-            return Err(Stop::TooLarge);
-        }
-        Ok(())
+    pub(super) fn field_node(&mut self, parent: u32, name: &'f str) -> Result<u32, Stop> {
+        Ok(self.trie.child(parent, name)?)
     }
-
-    pub(super) fn pool_of(&mut self, node: u32, struct_index: u32, len: usize) -> usize {
-        *self.slots.entry((node, struct_index)).or_insert_with(|| {
-            self.children.push(vec![NONE; len].into_boxed_slice());
-            self.children.len() - 1
-        })
-    }
-
-    pub(super) fn field_node(
-        &mut self,
-        pool: usize,
-        position: usize,
-        parent: u32,
-        name: &'f str,
-    ) -> Result<u32, Stop> {
-        let known = self
-            .children
-            .get(pool)
-            .and_then(|nodes| nodes.get(position))
-            .copied()
-            .unwrap_or(NONE);
-        if known != NONE {
-            return Ok(known);
-        }
-        let id = self.trie.child(parent, name)?;
-        if let Some(slot) = self
-            .children
-            .get_mut(pool)
-            .and_then(|nodes| nodes.get_mut(position))
-        {
-            *slot = id;
-        }
-        Ok(id)
-    }
-
     pub(super) fn type_node(
         &mut self,
         parent: u32,

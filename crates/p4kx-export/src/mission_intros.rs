@@ -1,67 +1,76 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
+use p4kx_extraction::SourcedValue;
 
-use p4kx_extraction::{Guid, StructValue, Value};
-
-use crate::blueprint::as_struct;
+use crate::CatalogError;
 use crate::contract_facts::RequiredIntro;
-use crate::contract_missions::{ContractEntry, StandingLevel};
+use crate::contract_missions::{ContractBase, ContractEntry, ContractWithTitles, StandingLevel};
 use crate::guid_text::CatalogGuid;
-use crate::mission_layers::{items, one};
+use crate::mission_titles::MissionTitles;
 
-const COMPLETED_TAGS: &str = "ContractPrerequisite_CompletedContractTags";
+#[path = "mission_intro_grant_read.rs"]
+mod grant_read;
+#[path = "mission_intro_grants.rs"]
+mod grants;
+#[path = "mission_intro_read.rs"]
+mod read;
+#[path = "mission_intro_requirements.rs"]
+mod requirements;
 
-/// The intro contracts that grant each completion tag.
-pub(crate) type Grants = HashMap<Guid, Vec<CatalogGuid>>;
+pub(crate) use self::grants::{Candidates, Grants, INTRO_CONTRACTS};
+pub(crate) use self::requirements::Requirements;
 
-/// Reads the completed-contract tags the prerequisites in the array field `field` of `parent`
-/// require, stated at `level`; their intro contracts are not resolved yet.
-pub(crate) fn required(
-    level: StandingLevel,
-    parent: Option<&StructValue<'_>>,
-    field: &str,
-) -> Vec<RequiredIntro> {
-    items(parent, field)
-        .iter()
-        .filter_map(as_struct)
-        .filter(|prerequisite| prerequisite.type_name() == COMPLETED_TAGS)
-        .flat_map(|prerequisite| {
-            let list = one(Some(prerequisite), "requiredCompletedContractTags");
-            items(list, "tags")
-        })
-        .filter_map(|tag| match tag {
-            Value::Reference(target) if target.location().is_none() => Some(target.guid()),
-            _ => None,
-        })
-        .map(|tag| RequiredIntro {
-            level,
-            tag_guid: CatalogGuid(tag),
-            intro_contracts: Vec::new(),
+use self::read::Lookup;
+
+#[derive(Clone, Debug)]
+pub(crate) struct AuthoredIntro {
+    level: SourcedValue<StandingLevel>,
+    tag_guid: SourcedValue<CatalogGuid>,
+    lookup: Lookup,
+}
+
+/// A contract row whose authored prerequisites still need the admitted grant join.
+pub(crate) struct PendingContract<'source> {
+    pub(crate) base: ContractBase<'source>,
+    pub(crate) titles: MissionTitles<'source>,
+    pub(crate) requirements: SourcedValue<Vec<AuthoredIntro>>,
+}
+
+/// Joins authored requirements to successful physical intro grant witnesses.
+pub(crate) fn resolve(
+    entries: Vec<PendingContract<'_>>,
+    grants: Grants,
+) -> Result<Vec<ContractWithTitles<'_>>, CatalogError> {
+    let mut resolver = grants.resolver();
+    entries
+        .into_iter()
+        .map(|entry| {
+            let required_intros = entry.requirements.try_map(|requirements| {
+                requirements
+                    .into_iter()
+                    .map(
+                        |AuthoredIntro {
+                             level,
+                             tag_guid,
+                             lookup,
+                         }| {
+                            Ok::<_, CatalogError>(RequiredIntro {
+                                level,
+                                tag_guid,
+                                intro_contracts: resolver.grants(&lookup)?,
+                            })
+                        },
+                    )
+                    .collect::<Result<Vec<_>, CatalogError>>()
+            })?;
+            Ok(ContractWithTitles {
+                row: ContractEntry {
+                    base: entry.base,
+                    required_intros,
+                },
+                titles: entry.titles,
+            })
         })
         .collect()
-}
-
-/// Names `intro` as a granter of every tag in `tags`.
-pub(crate) fn record_grants(grants: &mut Grants, intro: CatalogGuid, tags: &[Guid]) {
-    for tag in tags {
-        grants.entry(*tag).or_default().push(intro);
-    }
-}
-
-/// Fills the `introContracts` of every required tag of `entries` from `grants`.
-pub(crate) fn resolve(entries: &mut [ContractEntry<'_>], grants: &mut Grants) {
-    for granters in grants.values_mut() {
-        granters.sort_by_key(|id| id.text());
-        granters.dedup();
-    }
-    for requirement in entries
-        .iter_mut()
-        .flat_map(|entry| entry.facts.required_intros.iter_mut())
-    {
-        if let Some(granters) = grants.get(&requirement.tag_guid.0) {
-            requirement.intro_contracts.clone_from(granters);
-        }
-    }
 }

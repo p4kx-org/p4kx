@@ -58,6 +58,7 @@ impl Kind {
             Self::ResourceTypes => 48,
             Self::Tags => 49,
             Self::BlueprintCategoryLists => 50,
+            Self::ShopInventories => 51,
         }
     }
 }

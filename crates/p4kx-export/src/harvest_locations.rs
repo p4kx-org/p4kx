@@ -6,12 +6,13 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use p4kx_extraction::{Archive, CancelToken, Guid};
 use rayon::prelude::*;
 
-use crate::Kind;
+use crate::catalog_read::original::EntryCapture;
 use crate::contract::StarmapObject;
 use crate::contract_harvest::HarvestableLocation;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::starmap_walk::Opened;
+use crate::{CatalogError, Kind};
 
 /// What the first `.soc` of a container says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,11 +128,12 @@ pub(crate) fn locate(
     presets: &HashSet<Guid>,
     objects: &Objects,
     cancel: Option<&CancelToken>,
-) -> Located {
+    capture: &EntryCapture<'_>,
+) -> Result<Located, CatalogError> {
     let mut entries: Vec<usize> = opened.iter().map(|container| container.entry).collect();
     entries.sort_unstable();
     entries.dedup();
-    let (read, mut ledger) = read_sources(archive, &entries, cancel);
+    let (read, mut ledger) = read_sources(archive, &entries, cancel, capture)?;
     let mut unreadable: Vec<String> = read
         .iter()
         .filter_map(|(&entry, soc)| match soc {
@@ -166,31 +168,34 @@ pub(crate) fn locate(
     if !cancel.is_some_and(CancelToken::is_cancelled) {
         ledger.inventory(Kind::HarvestableLocations);
     }
-    Located {
+    Ok(Located {
         ledger,
         without_object: losses(&rows),
         locations: rows.into_iter().map(|(location, _)| location).collect(),
         unreadable,
-    }
+    })
 }
 
 fn read_sources(
     archive: &Archive,
     entries: &[usize],
     cancel: Option<&CancelToken>,
-) -> (HashMap<usize, Soc>, ExportLedger) {
+    capture: &EntryCapture<'_>,
+) -> Result<(HashMap<usize, Soc>, ExportLedger), CatalogError> {
     let reads: Vec<_> = entries
         .par_iter()
         .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
-        .map(|&entry| (entry, crate::harvest_source::read(archive, entry)))
-        .collect();
+        .map(|&entry| {
+            crate::harvest_source::read(archive, entry, capture).map(|read| (entry, read))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let mut ledger = ExportLedger::default();
     let mut sources = HashMap::with_capacity(reads.len());
     for (entry, (soc, observed)) in reads {
         ledger.merge(observed);
         sources.insert(entry, soc);
     }
-    (sources, ledger)
+    Ok((sources, ledger))
 }
 
 /// A location and why it has no object, `None` when it has one.

@@ -33,10 +33,7 @@ fn unsupported_value_variants_fail_the_generator_without_leaving_partial_sets() 
         "a failed Generator emits no partial source sets"
     );
     assert_eq!(
-        report.document["contracts"]
-            .as_array()
-            .ok_or("contracts")?
-            .len(),
+        crate::catalog_contracts::v3::rows(&report.document)?.len(),
         0
     );
     Ok(())

@@ -3,6 +3,8 @@
 
 use serde_json::{Value, json};
 
+use crate::health_reference_json as health;
+
 use crate::commodity_v3_fixture::{self as fixture, TestResult};
 use crate::commodity_v3_group_choice_fixture::{self as group_fixture, FaultPosition};
 use crate::commodity_v3_source;
@@ -102,12 +104,17 @@ fn assert_fault(catalog: &Value, record_index: u64) -> TestResult {
         .as_array()
         .ok_or("exact unresolved source inventory")?;
     assert!(
-        unresolved.iter().any(
-            |reference| reference.get("recordIndex").and_then(Value::as_u64) == Some(record_index)
-                && reference.get("field").and_then(Value::as_str) == Some("resources[0]")
-                && reference.get("status").and_then(Value::as_str) == Some("dangling")
-                && reference.get("targetGuid").and_then(Value::as_str) == Some(target.as_str())
-        ),
+        health::any(unresolved, |reference| Ok(reference
+            .pointer("/recordIndex/value")
+            .and_then(Value::as_u64)
+            == Some(record_index)
+            && health::text(catalog, reference, "field")? == "resources[0]"
+            && reference.get("status").and_then(Value::as_str)
+                == Some("dangling")
+            && reference
+                .pointer("/targetGuid/value")
+                .and_then(Value::as_str)
+                == Some(target.as_str())))?,
         "the fixture exercises a real unavailable source link"
     );
     Ok(())

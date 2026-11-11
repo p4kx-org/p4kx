@@ -210,7 +210,9 @@ The table keeps the width of its columns and scrolls sideways in a narrow window
 a number and stands right-aligned. The tab reads the tags in the background when it is first opened for an Archive and shares the
 DataForge with the other views. A note above the tree says when it differs from what the
 `TagDatabase` lists, for example Tags that no `TagDatabase` reaches, which stand as roots of their
-own. `p4kx dcb tags` prints the same tree; `p4kx dcb export --tags` writes the tag path next to every
+own. Unreadable type metadata leaves family selection unresolved: an empty result then keeps the
+warning instead of confirming that the Archive has no Tags. `p4kx dcb tags` prints the same tree;
+`p4kx dcb export --tags` writes the tag path next to every
 Reference to a Tag in the Records.
 
 ### Searching Records

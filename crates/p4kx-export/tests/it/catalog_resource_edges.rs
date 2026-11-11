@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 use crate::catalog_crafting_support;
 use crate::catalog_crafting_support::commodity::{self, TextDomain};
 use crate::catalog_crafting_support::groups;
+use crate::health_origin_assertions as health;
 use crate::resource_edges_fixture as fixture;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -90,7 +91,7 @@ fn another_emitted_guid_alias_cannot_stand_in_for_the_actual_filtered_target() -
     };
     assert!(matches!(
         error.downcast_ref::<CatalogError>(),
-        Some(CatalogError::IncompleteExport { .. })
+        Some(CatalogError::IncompleteExport(_))
     ));
     let (_, catalog) = catalog_crafting_support::diagnostic_from(&database, Some(&filter))?;
     let references = catalog["exportHealth"]["unresolvedReferences"]
@@ -100,7 +101,7 @@ fn another_emitted_guid_alias_cannot_stand_in_for_the_actual_filtered_target() -
         references
             .iter()
             .any(|reference| reference["status"] == "ambiguousIdentity"
-                && reference["targetRecordIndex"] == 0)
+                && reference["targetRecordIndex"]["value"] == 0)
     );
     commodity::assert_text(
         &catalog,
@@ -145,8 +146,8 @@ fn unselected_earlier_groups_cannot_own_selected_legacy_or_all_membership_links(
 
 #[test]
 fn a_failed_resource_dependency_retains_the_readable_commodity_and_exact_failure() -> TestResult {
-    let (_, catalog) =
-        catalog_crafting_support::diagnostic_from(&fixture::unreadable_resource(), None)?;
+    let built = catalog_crafting_support::build_diagnostic(&fixture::unreadable_resource(), None)?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(
         commodity::presentation(
             &catalog,
@@ -154,7 +155,10 @@ fn a_failed_resource_dependency_retains_the_readable_commodity_and_exact_failure
         )?["subtypeGuid"]["value"],
         catalog_crafting_support::text(fixture::RESOURCE)
     );
-    assert_eq!(catalog["resourceTypes"], json!([]));
+    assert!(
+        health::rows(&catalog, "/definitions/resourceTypes/rows")?.is_empty(),
+        "the unreadable definition is not emitted as a resource row"
+    );
     let references = catalog["exportHealth"]["unresolvedReferences"]
         .as_array()
         .ok_or("the unresolved references")?;
@@ -162,16 +166,75 @@ fn a_failed_resource_dependency_retains_the_readable_commodity_and_exact_failure
         references
             .iter()
             .any(|reference| reference["status"] == "targetReadFailed"
-                && reference["targetRecordIndex"] == 0)
+                && reference["targetRecordIndex"]["value"] == 0)
     );
     assert_eq!(catalog["exportHealth"]["status"], "incomplete");
+    assert_failed_dependency_origin(&catalog)?;
+    Ok(())
+}
+
+fn assert_failed_dependency_origin(catalog: &Value) -> TestResult {
+    let diagnostic = health::rows(catalog, "/exportHealth/diagnostics")?
+        .iter()
+        .find(|row| {
+            row["kind"] == "commodities"
+                && row["stage"] == "derivedProjection"
+                && row["code"] == "sourceReadFailure"
+        })
+        .ok_or("the failed resource read in the readable commodity projection")?;
+    let [example] = health::rows(diagnostic, "/examples")? else {
+        return Err("exactly one commodity caller caused this failure".into());
+    };
+    health::present(example, "recordIndex", &json!(1), Some(true))?;
+    health::present_text(
+        catalog,
+        example,
+        "field",
+        &json!("Components[0].defaultComposition[0].entry"),
+        Some(true),
+    )?;
+    health::present_text(
+        catalog,
+        example,
+        "sourceType",
+        &json!("FixtureCompositionEntry"),
+        Some(true),
+    )?;
+    let target = health::present(
+        example,
+        "targetGuid",
+        &json!(catalog_crafting_support::text(fixture::RESOURCE)),
+        Some(true),
+    )?;
+    let uses = health::uses(catalog, target)?;
+    let [origin] = uses.as_slice() else {
+        return Err("one authored typed Reference supplies the target GUID".into());
+    };
+    assert_eq!(
+        origin["role"], "payload",
+        "the typed Reference supplies the payload"
+    );
+    assert_eq!(
+        origin.pointer("/location/namespace"),
+        Some(&json!("dataforgeValue")),
+        "the payload comes from a DataForge value"
+    );
+    assert_eq!(
+        origin.pointer("/location/indices/0"),
+        Some(&json!("1")),
+        "the payload belongs to the exact original Record"
+    );
+    assert_eq!(
+        origin.pointer("/location/field"),
+        Some(&json!("$value")),
+        "the payload comes from the authored reference slot"
+    );
     Ok(())
 }
 
 #[test]
-fn the_reference_metadata_budget_never_claims_a_complete_empty_inventory() -> TestResult {
-    let (_, catalog) =
-        catalog_crafting_support::diagnostic_from(&fixture::reference_budget(), None)?;
+fn all_six_thousand_original_references_allow_complete_normal_publication() -> TestResult {
+    let (_, catalog) = catalog_crafting_support::build_from(&fixture::reference_budget(), None)?;
     let group = groups::members(
         &catalog,
         &catalog_crafting_support::text(fixture::FIRST_GROUP),
@@ -187,15 +250,15 @@ fn the_reference_metadata_budget_never_claims_a_complete_empty_inventory() -> Te
         .iter()
         .find(|kind| kind["kind"] == "resourceGroups")
         .ok_or("the group health")?;
-    assert_eq!(group_health["fieldInventoryComplete"], false);
+    assert_eq!(group_health["fieldInventoryComplete"], true);
     let diagnostics = catalog["exportHealth"]["diagnostics"]
         .as_array()
         .ok_or("the diagnostics")?;
     assert!(
         diagnostics
             .iter()
-            .any(|diagnostic| diagnostic["code"] == "fieldWalkLimit")
+            .all(|diagnostic| diagnostic["code"] != "fieldWalkLimit")
     );
-    assert_eq!(catalog["exportHealth"]["status"], "incomplete");
+    assert_eq!(catalog["exportHealth"]["status"], "complete");
     Ok(())
 }

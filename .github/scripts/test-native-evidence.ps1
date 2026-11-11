@@ -36,6 +36,10 @@ foreach ($row in $contract.targets) {
     Assert-P4kxRuntimeEvidence -Metadata $baseline -Platform $row -Version '0.5.0' -Revision $revision
     foreach ($mutation in @(
         { param($m) $m.target = 'wrong-architecture' },
+        { param($m) $m.os = if ($m.os -ceq 'windows') { 'linux' } else { 'windows' } },
+        { param($m) $m.arch = if ($m.arch -ceq 'amd64') { 'arm64' } else { 'amd64' } },
+        { param($m) $m.PSObject.Properties.Remove('os') },
+        { param($m) $m.PSObject.Properties.Remove('arch') },
         { param($m) $m.compiler_host = 'wrong-host' },
         { param($m) $m.archive_sha256 = 'd' * 64 },
         { param($m) $m.revision = 'd' * 40 },

@@ -61,32 +61,35 @@ fn verify_kind(health: &ExportHealth, kind: Kind) -> super::Result<()> {
         || actual.projection != ExportStageStatus::Complete
         || !actual.source_inventory_complete
         || !actual.field_inventory_complete
-        || !actual.failed_records.is_empty()
-        || !actual.failed_entries.is_empty()
+        || !actual.failed_records().is_empty()
+        || !actual.failed_entries().is_empty()
         || health
-            .failed_records
+            .failed_records()
             .iter()
             .any(|source| source.kind == Some(kind))
-        || health.failed_entries.iter().any(|entry| entry.kind == kind)
-        || health.diagnostics.iter().any(|diagnostic| {
+        || health
+            .failed_entries()
+            .iter()
+            .any(|entry| entry.kind() == kind)
+        || health.diagnostics().iter().any(|diagnostic| {
             diagnostic.kind == Some(kind)
                 && diagnostic.severity != ExportDiagnosticSeverity::Information
         })
     {
         return Err(Error::new(ErrorKind::Mapping,
             format!("mapped kind {kind} has incomplete source/projection health; failed physical Records={:?}; failed Entries={:?}",
-                actual.failed_records.iter().map(|source| source.record_index).collect::<Vec<_>>(),
-                actual.failed_entries.iter().map(|entry| (entry.entry_index, entry.operation)).collect::<Vec<_>>(),
+                actual.failed_records().iter().map(|source| source.record_index().value()).collect::<Vec<_>>(),
+                actual.failed_entries().iter().map(|entry| (entry.entry_index().value(), entry.operation())).collect::<Vec<_>>(),
             )).into());
     }
     Ok(())
 }
 
 pub(crate) fn verify(health: &ExportHealth, kinds: &[Kind]) -> super::Result<()> {
-    if health.diagnostics.iter().any(|diagnostic| {
+    if health.diagnostics().iter().any(|diagnostic| {
         diagnostic.kind.is_none() && diagnostic.severity != ExportDiagnosticSeverity::Information
     }) || health
-        .failed_records
+        .failed_records()
         .iter()
         .any(|source| source.kind.is_none())
     {
@@ -97,7 +100,7 @@ pub(crate) fn verify(health: &ExportHealth, kinds: &[Kind]) -> super::Result<()>
         .into());
     }
     if !health.is_complete()
-        && !health.diagnostics.iter().any(|diagnostic| {
+        && !health.diagnostics().iter().any(|diagnostic| {
             diagnostic.kind.is_some()
                 && diagnostic.severity != ExportDiagnosticSeverity::Information
         })

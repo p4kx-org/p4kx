@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use p4kx_archive::{ArchiveInputOrigin, BuildManifestOrigin, EntryOrigin, ObservedEntry};
 
-use crate::DataForgeFileOrigin;
+use crate::ObservedFileOrigin;
 use crate::source_details::SourceCoordinateOmission;
 use crate::source_evidence_error::{self, SourceEvidenceError};
 use crate::source_inventory::{PhysicalSourceRef, SourceEncryptionState};
@@ -29,7 +29,7 @@ pub enum SourceInput<'a> {
         byte_length: u64,
     },
     /// An observed standalone file with unknown original P4K lineage.
-    File(&'a DataForgeFileOrigin),
+    File(&'a ObservedFileOrigin),
     /// One completed original build-manifest read with unknown P4K lineage.
     BuildManifest(&'a BuildManifestOrigin),
     /// An input without trusted physical binding.

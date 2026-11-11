@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Guid, RecordTree, StructValue, Value};
+use p4kx_extraction::{CancelToken, Guid, RecordTree, StructValue, Value};
 
+use crate::CatalogError;
 use crate::blueprint::{as_struct, craft_time};
-use crate::commodity_backfill_input::CommodityInputCapture;
-use crate::crafting_tier::{TooDeep, tiers};
+use crate::crafting_tier;
 use crate::crafting_types::{
     BlueprintPool, BlueprintTiers, DismantleProcess, GameplayProperty, GlobalParams,
-    LocationOverride, PoolEntry, QualityDistribution,
+    LocationOverride, PoolEntry, QualityDistribution, Tier,
 };
 use crate::quality_curve_read;
 use crate::record_fields::{class_name, elements, locale_key, number, reference, structure};
@@ -36,19 +36,33 @@ pub(crate) fn is_crafting_path(record_path: &str) -> bool {
     starts_with_folder(record_path, ROOT)
 }
 
-/// Returns the blueprint the Record describes.
-///
-/// # Errors
-///
-/// Returns [`TooDeep`] when a selection of a tier is nested deeper than the reader follows.
-pub(crate) fn blueprint<'f>(
-    tree: &RecordTree<'f>,
-    capture: &mut CommodityInputCapture,
-) -> Result<BlueprintTiers<'f>, TooDeep> {
-    let blueprint = structure(Some(tree.root()), "blueprint");
-    let mut unknown_range_types = Vec::new();
-    let tiers = tiers(blueprint, &mut unknown_range_types, capture)?;
-    Ok(BlueprintTiers {
+/// Reads the interpreted public Blueprint from its canonical Record.
+pub(crate) fn blueprint<'source>(
+    tree: &RecordTree<'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<BlueprintTiers<'source>, CatalogError> {
+    let source = blueprint_source(tree);
+    let mut unknown = Vec::new();
+    let tiers = crafting_tier::tiers(source, &mut unknown, cancel)?
+        .into_iter()
+        .map(|tier| tier.tier)
+        .collect();
+    Ok(blueprint_metadata(tree, source, tiers, unknown))
+}
+
+pub(crate) fn blueprint_source<'read, 'source>(
+    tree: &'read RecordTree<'source>,
+) -> Option<&'read StructValue<'source>> {
+    structure(Some(tree.root()), "blueprint")
+}
+
+fn blueprint_metadata<'source>(
+    tree: &RecordTree<'source>,
+    blueprint: Option<&StructValue<'source>>,
+    tiers: Vec<Tier<'source>>,
+    unknown_range_types: Vec<&'source str>,
+) -> BlueprintTiers<'source> {
+    BlueprintTiers {
         guid: tree.guid(),
         class_name: class_name(tree),
         record_path: tree.record_path(),
@@ -58,7 +72,7 @@ pub(crate) fn blueprint<'f>(
             .map(|guid| guid.0),
         tiers,
         unknown_range_types,
-    })
+    }
 }
 
 /// Returns the dismantle process the Record describes, `None` for another process.

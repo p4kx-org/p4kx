@@ -33,7 +33,7 @@ fn a_policy_excluded_quality_target_is_retained_without_claiming_a_row() -> Test
         references(&catalog)?
             .iter()
             .any(|reference| reference["status"] == "excludedByPolicy"
-                && reference["targetRecordIndex"] == 1)
+                && reference["targetRecordIndex"]["value"] == 1)
     );
     assert_eq!(catalog["exportHealth"]["status"], "complete");
     Ok(())
@@ -49,7 +49,7 @@ fn a_filtered_quality_target_is_distinct_from_a_missing_source() -> TestResult {
         references(&catalog)?
             .iter()
             .any(|reference| reference["status"] == "excludedByFilter"
-                && reference["targetRecordIndex"] == 1)
+                && reference["targetRecordIndex"]["value"] == 1)
     );
     assert_eq!(catalog["exportHealth"]["status"], "complete");
     Ok(())
@@ -78,7 +78,7 @@ fn a_retained_quality_field_violation_does_not_become_an_omitted_reference_targe
     assert!(
         !references(&catalog)?
             .iter()
-            .any(|reference| reference["targetRecordIndex"] == 1),
+            .any(|reference| reference["targetRecordIndex"]["value"] == 1),
         "the readable canonical raw target is materialized despite its separate field violation"
     );
     assert_eq!(catalog["exportHealth"]["status"], "incomplete");
@@ -93,14 +93,14 @@ fn a_wrong_quality_target_family_is_not_accepted_as_a_present_catalog_definition
     };
     assert!(matches!(
         error.downcast_ref::<CatalogError>(),
-        Some(CatalogError::IncompleteExport { .. })
+        Some(CatalogError::IncompleteExport(_))
     ));
     let (_, catalog) = catalog_crafting_support::diagnostic_from(&database, None)?;
     assert!(
         references(&catalog)?
             .iter()
             .any(|reference| reference["status"] == "unexpectedTargetType"
-                && reference["targetRecordIndex"] == 0)
+                && reference["targetRecordIndex"]["value"] == 0)
     );
     Ok(())
 }
@@ -116,16 +116,31 @@ fn an_unknown_property_keeps_its_source_shape_and_explicit_unsupported_health() 
     let diagnostics = catalog["exportHealth"]["diagnostics"]
         .as_array()
         .ok_or("the diagnostics")?;
+    let mut found = false;
+    for diagnostic in diagnostics {
+        if diagnostic["code"] != "unsupportedValue" {
+            continue;
+        }
+        let examples = diagnostic["examples"]
+            .as_array()
+            .ok_or("actual unsupported examples")?;
+        for example in examples {
+            if example["field"]["state"] == "present" && example["sourceType"]["state"] == "present"
+            {
+                found |= crate::health_origin_assertions::text_value(
+                    &catalog["exportHealth"],
+                    &example["field"],
+                )? == &json!("properties[0]")
+                    && crate::health_origin_assertions::text_value(
+                        &catalog["exportHealth"],
+                        &example["sourceType"],
+                    )? == &json!("FixtureFutureProperty");
+            }
+        }
+    }
     assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic["code"] == "unsupportedValue"
-                && diagnostic["examples"]
-                    .as_array()
-                    .is_some_and(|examples| examples
-                        .iter()
-                        .any(|example| example["field"] == "properties[0]"
-                            && example["sourceType"] == "FixtureFutureProperty")))
+        found,
+        "the exact unsupported original source type and field path survive canonical pooling"
     );
     assert_eq!(catalog["exportHealth"]["status"], "incomplete");
     Ok(())

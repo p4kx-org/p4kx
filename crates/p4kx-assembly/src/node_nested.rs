@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::loadout_reference::LoadoutReference;
 use crate::plan::Action;
 use crate::resolver::LoadoutResolver;
 use crate::spec::{LoadoutSpec, TargetSpec};
@@ -31,7 +32,12 @@ impl LoadoutResolver<'_> {
                 {
                     plan.mismatch(&facts, reason);
                 }
-                node.attachment = self.attach(&TargetSpec::Reference(guid), None, walk);
+                node.attachment = self.attach(
+                    &TargetSpec::Reference(LoadoutReference::unbound(guid)),
+                    None,
+                    None,
+                    walk,
+                );
                 node.source = PortSource::Replaced;
                 node.origin = None;
                 true
@@ -67,7 +73,7 @@ impl LoadoutResolver<'_> {
         issues.extend(entries.issues.iter().cloned());
         let mut ports = Vec::new();
         walk.nesting = walk.nesting.saturating_add(1);
-        for entry in entries.list.iter() {
+        for entry in entries.specs() {
             if self.observation_stopped() {
                 break;
             }
@@ -87,7 +93,12 @@ impl LoadoutResolver<'_> {
                 origin: Some(entry.origin.clone()),
             };
             if !self.change(&mut node, walk) {
-                node.attachment = self.attach(&entry.target, entry.loadout.as_ref(), walk);
+                node.attachment = self.attach(
+                    &entry.target,
+                    entry.loadout.as_ref(),
+                    entry.xml_use.as_ref(),
+                    walk,
+                );
                 if matches!(node.attachment, Attachment::Empty) {
                     node.nested = self.nested_ports(entry.loadout.as_ref(), walk, issues);
                 }

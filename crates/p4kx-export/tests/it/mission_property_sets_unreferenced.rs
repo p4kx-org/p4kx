@@ -3,11 +3,10 @@
 
 //! Authored source sets survive missing, excluded and deduplicated contract rows.
 
-use p4kx_testkit::{TestInstance, TestValue};
-use serde_json::Value;
-
+use crate::catalog_contracts::v3::rows as contracts;
 use crate::mission_property_sets_fixture::{self as fixture, parameters, rows};
 use crate::scoped_fixture::{TestResult, object, property, scoped};
+use p4kx_testkit::{TestInstance, TestValue};
 
 fn owner(handler: TestInstance) -> p4kx_testkit::TestRecord {
     fixture::owner().value("generators", TestValue::Array(vec![object(handler)]))
@@ -15,10 +14,6 @@ fn owner(handler: TestInstance) -> p4kx_testkit::TestRecord {
 
 fn declarations(variable: &str) -> TestValue {
     parameters(vec![property(variable, scoped([]))])
-}
-
-fn contracts(document: &Value) -> Result<&Vec<Value>, &'static str> {
-    document["contracts"].as_array().ok_or("contracts")
 }
 
 #[test]

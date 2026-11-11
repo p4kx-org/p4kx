@@ -47,6 +47,21 @@ impl<'a> CatalogRecordContext<'a> {
         }
     }
 
+    pub(crate) const fn sources(&self) -> &'a SourceUses {
+        self.sources
+    }
+
+    pub(crate) const fn dataforge(&self) -> &'a SourceScope {
+        self.dataforge
+    }
+
+    pub(crate) const fn record_position(&self) -> Option<u32> {
+        match self.body_coordinate {
+            BodyCoordinate::Record => Some(self.record_index),
+            BodyCoordinate::CargoSlot { .. } => None,
+        }
+    }
+
     /// Selects one original field ordinal in this Record's defaultCargoContainers structure.
     pub(crate) const fn cargo_slot(&self, ordinal: u64) -> Self {
         Self {
@@ -258,28 +273,45 @@ impl<'a> CatalogRecordContext<'a> {
         notes: &mut Vec<FieldError>,
         project: impl FnOnce(&'s Value<'f>) -> Option<T>,
     ) -> Result<SourcedValue<T>, CatalogError> {
-        let state = match value {
-            None => SourceValue::Absent,
-            Some(Value::Null) => SourceValue::Null,
-            Some(Value::Error(source)) => {
-                notes.push(FieldError::Unreadable {
+        self.read_with(value, path, notes, project, |value| {
+            Ok(match value {
+                Value::Error(source) => FieldError::Unreadable {
                     source_type: owner.to_owned(),
                     field: path.to_owned(),
                     source: *source,
-                });
+                },
+                _ => FieldError::Malformed {
+                    source_type: owner.to_owned(),
+                    field: path.to_owned(),
+                    expected,
+                },
+            })
+        })
+    }
+
+    pub(super) fn read_with<'s, 'f, T>(
+        &self,
+        value: Option<&'s Value<'f>>,
+        path: &str,
+        notes: &mut Vec<FieldError>,
+        project: impl FnOnce(&'s Value<'f>) -> Option<T>,
+        failure: impl FnOnce(&'s Value<'f>) -> Result<FieldError, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let state = match value {
+            None => SourceValue::Absent,
+            Some(Value::Null) => SourceValue::Null,
+            Some(value @ Value::Error(_)) => {
+                notes.push(failure(value)?);
                 SourceValue::Unreadable
             }
-            Some(value) => project(value).map_or_else(
-                || {
-                    notes.push(FieldError::Malformed {
-                        source_type: owner.to_owned(),
-                        field: path.to_owned(),
-                        expected,
-                    });
+            Some(value) => {
+                if let Some(projected) = project(value) {
+                    SourceValue::Present(projected)
+                } else {
+                    notes.push(failure(value)?);
                     SourceValue::Invalid
-                },
-                SourceValue::Present,
-            ),
+                }
+            }
         };
         self.value(path, state)
     }

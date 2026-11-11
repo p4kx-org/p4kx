@@ -83,7 +83,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | commodities | D.commodities; V.commodityPresentation | Entity vs resource fallback, GUID identity, existing first Resource/group/name/density meaning |
 | resourceTypes | D.resourceTypes | complete resource source fact owner |
 | resourceGroups | D.resourceGroups; A.resourceGroupMembers; V.resourceGroupParents | all direct ordered memberships, repeats/nulls/cycles; first-selected parent retains actual physical/slot provenance ([contract](catalog-resource-groups.md)) |
-| blueprints | D.blueprints; C.blueprintTiers | tiers, first-tier ingredients, costs/quality/outputs, research separate |
+| blueprints | D.blueprints; C.blueprintTiers; P.blueprintPresentation | complete physical source arena, flat typed tiers/costs and Research, first-tier ingredients and sourced convenience choices |
 | blueprintCategories | D.blueprintCategories | implemented fieldless physical category definitions with the shared eight sourced header fields; no fabricated name, rule or hierarchy |
 | blueprintCategoryLists | A.blueprintCategoryLists | implemented type-wide physical category database declarations, independently filtered; shared eight-field header and ordered stateful references without a category catalog join ([contract](catalog-blueprint-category-lists.md)) |
 | gameplayProperties | D.gameplayProperties | all four authored fields, owner-local flat transformation occurrences, ordered overrides, exact numbers and public inert TextForms; no guessed stat link ([contract](catalog-gameplay-properties.md)) |
@@ -95,7 +95,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | paints | D.paints; A.paintShipCompatibility | item identity plus fit relationship |
 | loadouts | C.itemPorts; P.loadoutItems | source definitions/restrictions vs resolved default attachments/full path/parent and merge evidence |
 | starmapObjects | D.starmapObjects; P.starmapPlacements | identity/navigation definition vs physical placement/world projection |
-| contracts | V.contracts; A.contractPropertySetLinks; V.missionTitles | fanout identity/subcontract order, resolved title/standing/reward/fact precedence; original declarations not duplicated per row |
+| contracts | D.contractGenerators; V.contracts; V.missionTitles; A.contractPropertySetLinks | complete physical Generator arena, actual contract/subcontract occurrences, derived title and description with immediate per-language origin, and standing/reward/fact precedence ([contract](catalog-contract-generators.md)) |
 | mineableElements | D.mineableElements | element-local instability/resistance; many per ResourceType |
 | refiningProcesses | D.refiningProcesses | stored refining relationships/parameters |
 | mineableCompositions | D.mineableCompositions | ordered elements/ranges and source links |
@@ -114,7 +114,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | contractScenarios | D.contractScenarios | faction reward tiers/progression, source flags, no active state |
 | lootTables | D.lootTables | weighted archetype links/order |
 | lootArchetypes | D.lootArchetypes | weighted typed selectors/constraints/order |
-| lootPoolFilters | D.lootPoolFilters | complete typed filter trees |
+| lootPoolFilters | D.lootPoolFilters | complete ordered original fields/values in an owner-local flat graph; exact declarations, every slot/error parameter, per-datum origins |
 | legacyLootTables | D.legacyLootTables | actual distinct source generation, not compatibility duplicate of LootV3 |
 | legacyLootArchetypes | D.legacyLootArchetypes | source generation/secondary/spawn-with relationships |
 | mineableEntities | D.mineableEntities | scan signature and entity identity |
@@ -123,8 +123,8 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | missionLocationTemplates | D.missionLocationTemplates; C.locationData | completed #816 remains; actual configuration distinct from placed location |
 | contractShipSpawns | V.shipSpawnPools; A.spawnOccurrences | existing content identity/projection and authored occurrences separated |
 | contractLocationQueries | V.locationQueries; A.locationQueryOccurrences | strict typed source condition tree (completed #1011), content identity, no query execution |
-| contractTemplates | D.contractTemplates; C.missionProperties/missionFlows | parts/objectives/property values, typed structure and source order |
-| missionBrokerEntries | D.missionBrokerEntries | source strict union/parts/identity/text/provenance |
+| contractTemplates | D.contractTemplates; C.contractTemplates/missionProperties/missionFlows | one physical owner source arena, original cut-root parent/field positions, typed links and meanings; permanent contextual outputs without duplicate raw values |
+| missionBrokerEntries | D.missionBrokerEntries; C.missionBrokerEntries/missionProperties/missionFlows | one physical Broker header and full original source arena; typed owner links, shared meanings, and separately bound reputation requirement and reward context |
 | contractNpcSpawns | V.npcSpawnPools; A.spawnOccurrences | legacy content description remains distinct from new independent NPC graph |
 | contractEntitySpawns | V.entitySpawnPools; A.spawnOccurrences | source/content identities, no active spawned Entity claim |
 | missionPropertySets | A.missionPropertySets; A.contractPropertySetLinks | exact owner/location hash, all source declarations and selected Generator scope |

@@ -4,6 +4,7 @@
 use p4kx_extraction::{CancelToken, DataForgeError, Filter, Record, RecordTree, SourceUseRole};
 
 use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::gameplay_property_catalog::{self as gameplay, GameplayPropertyInput};
@@ -12,6 +13,7 @@ use crate::export_ledger::ExportLedger;
 use crate::quality_catalog::evidence::Evidence;
 use crate::quality_catalog::{Input, Retention, Step, scan};
 use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
+use crate::record_observation::RecordObservation;
 
 use super::selection::{self, Action, ReadPolicy, Selection};
 
@@ -23,6 +25,22 @@ pub(crate) enum ReadMode<'context, 'source> {
 }
 
 impl<'context, 'source> ReadMode<'context, 'source> {
+    pub(super) const fn input(self) -> Option<&'context OriginalCatalogInput<'context, 'source>> {
+        match self {
+            Self::Interpreted => None,
+            Self::Catalog(projection) => Some(projection.original()),
+        }
+    }
+
+    pub(super) fn admission<'read, 'record>(
+        self,
+        record: &'read Record<'record>,
+    ) -> Result<RecordObservation<'read, 'record>, CatalogError> {
+        match self {
+            Self::Interpreted => Ok(RecordObservation::accounting(record)),
+            Self::Catalog(projection) => RecordObservation::capture(projection.original(), record),
+        }
+    }
     pub(super) const fn origins(self) -> Option<&'context CatalogOrigins> {
         match self {
             Self::Interpreted => None,
@@ -35,10 +53,10 @@ impl<'context, 'source> ReadMode<'context, 'source> {
         record: &Record<'_>,
         filter: Option<&Filter>,
     ) -> Result<(Result<Option<Selection>, DataForgeError>, Evidence), CatalogError> {
-        let Some(origins) = self.origins() else {
+        let Some(input) = self.input() else {
             return Ok((selection::choose(record, filter), Evidence::default()));
         };
-        let context = origins.record(record.index());
+        let context = input.record_context(record)?;
         let mut inventory = Evidence::default();
         inventory.header(
             &context,
@@ -60,11 +78,12 @@ impl<'context, 'source> ReadMode<'context, 'source> {
     pub(super) fn project<'f>(
         self,
         selected: Selection,
+        admission: &RecordObservation<'_, 'f>,
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
         cancel: Option<&CancelToken>,
     ) -> Result<Option<Input<'f>>, CatalogError> {
-        let Some(origins) = self.origins() else {
+        let Some(input) = self.input() else {
             return Ok(None);
         };
         let retention = match (selected.role, selected.policy) {
@@ -73,15 +92,27 @@ impl<'context, 'source> ReadMode<'context, 'source> {
             _ => Retention::Selected,
         };
         match selected.action {
-            Action::Distribution => {
-                scan::distribution(tree, origins, retention, selected.role, ledger, cancel)
-                    .map(Some)
-            }
-            Action::Quantization => {
-                scan::quantization(tree, origins, retention, selected.role, ledger, cancel)
-                    .map(Some)
-            }
-            Action::ResourceLinks => scan::resources(tree, origins, ledger, cancel).map(Some),
+            Action::Distribution => scan::distribution(
+                tree,
+                admission,
+                input,
+                retention,
+                selected.role,
+                ledger,
+                cancel,
+            )
+            .map(Some),
+            Action::Quantization => scan::quantization(
+                tree,
+                admission,
+                input,
+                retention,
+                selected.role,
+                ledger,
+                cancel,
+            )
+            .map(Some),
+            Action::ResourceLinks => scan::resources(tree, input, admission, cancel).map(Some),
             _ => Ok(None),
         }
     }
@@ -89,6 +120,7 @@ impl<'context, 'source> ReadMode<'context, 'source> {
     pub(super) fn property(
         self,
         selected: Selection,
+        admission: &RecordObservation<'_, 'source>,
         tree: &RecordTree<'source>,
         ledger: &mut ExportLedger,
         cancel: Option<&CancelToken>,
@@ -106,15 +138,35 @@ impl<'context, 'source> ReadMode<'context, 'source> {
         if selected.role == ExportSourceRole::Dependency {
             return Ok(Some(GameplayPropertyInput::Dependency));
         }
-        let found = gameplay::read(tree, projection, cancel)?;
+        let found = gameplay::read(tree, projection, admission, cancel)?;
         crate::source_projection_notes::record(
             crate::Kind::GameplayProperties,
             selected.role,
+            admission,
             tree,
             found.notes,
             ledger,
-        );
+        )?;
         Ok(Some(GameplayPropertyInput::Selected(Box::new(found.value))))
+    }
+
+    pub(super) fn blueprint_rules(
+        self,
+        action: Action,
+        admission: &RecordObservation<'_, 'source>,
+        tree: &RecordTree<'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<crate::blueprint_rule_inputs::BlueprintRules, CatalogError> {
+        use crate::blueprint_rule_inputs::BlueprintRules;
+        match (self.input(), action) {
+            (Some(input), Action::Globals) => {
+                BlueprintRules::read_globals(tree, admission, input, cancel)
+            }
+            (Some(input), Action::Dismantle) => {
+                BlueprintRules::read_dismantle(tree, admission, input, cancel)
+            }
+            _ => Ok(BlueprintRules::default()),
+        }
     }
 
     pub(super) fn failed<'f>(
@@ -123,20 +175,20 @@ impl<'context, 'source> ReadMode<'context, 'source> {
         action: Option<Action>,
     ) -> Result<Step<'f>, CatalogError> {
         let mut step = Step::default();
-        let Some(origins) = self.origins() else {
+        let Some(input) = self.input() else {
             return Ok(step);
         };
         if !matches!(action, Some(Action::Quantization | Action::ResourceLinks)) {
             return Ok(step);
         }
-        let context = origins.record(record.index());
+        let context = input.record_context(record)?;
         let mut evidence = Evidence::default();
         evidence.header(
             &context,
             RecordHeaderInput::Field(RecordHeaderField::RecordIndex),
             true,
         )?;
-        evidence.keep(context.observe("", SourceUseRole::Attempted)?);
+        evidence.keep(context.observe("", SourceUseRole::Attempted)?)?;
         evidence.complete = false;
         if matches!(action, Some(Action::Quantization)) {
             step.input = Some(Input::UnavailableQuantization {

@@ -85,3 +85,11 @@ that the accepted categories and process types are not exported.
 - Ports for crafters: a crafter that is not an item (a fabricator below `basebuilding`) is not in
   `items`, so its `AttachDef` type and size are part of its `crafters` entry. A reader matches the
   `types` and the size range of a `loadouts` port with them.
+
+## Schema v3 amendment (#1076)
+
+Schema v3 records the actual Research envelope, declared strong-pointer bases and original
+value occurrences. The interpretation distinguishes absent, null, present-empty, present-known,
+unsupported and unreadable source shapes. A known populated shape requires the exact fieldless
+declared base. Other populated shapes keep their original payload and an explicit source diagnosis.
+See the [Blueprint v3 contract](../catalog-blueprints.md).

@@ -24,12 +24,17 @@ struct Observer(Mutex<Vec<Seen>>);
 impl LoadoutReadObserver for Observer {
     fn observe(&self, event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()> {
         let event = match event {
-            LoadoutReadEvent::FileRead {
-                source, outcome, ..
-            } => Seen::Read(source.identity().entry_index, outcome.is_ok()),
-            LoadoutReadEvent::FileProjection {
-                source, outcome, ..
-            } => Seen::Parsed(source.identity().entry_index, outcome.is_ok()),
+            LoadoutReadEvent::FileRead { observation, .. } => Seen::Read(
+                observation.source().identity().entry_index,
+                observation.read_outcome().is_ok(),
+            ),
+            LoadoutReadEvent::FileProjection { observation, .. } => Seen::Parsed(
+                observation.source().identity().entry_index,
+                observation
+                    .projection_outcome()
+                    .expect("the real parse event has its original outcome")
+                    .is_ok(),
+            ),
             LoadoutReadEvent::InventoryIncomplete => Seen::Incomplete,
             _ => return ControlFlow::Continue(()),
         };
@@ -59,6 +64,12 @@ fn archive() -> Result<(tempfile::TempDir, p4kx_archive::Archive), Box<dyn std::
 #[test]
 fn one_patch_under_two_context_budgets_does_not_claim_conflicting_intrinsic_results()
 -> Result<(), Box<dyn std::error::Error>> {
+    let request = crate::LoadoutPath::unbound(CONFIGURED);
+    let caller = crate::LoadoutRequest::Vehicle {
+        definition: request.clone(),
+        modification: crate::LoadoutPath::unbound(""),
+        class_name: None,
+    };
     let (_directory, archive) = archive()?;
     let files = ArchiveFiles::new(&archive);
     let database = p4kx_testkit::entity_schema(DataForgeBuilder::new()).build();
@@ -70,7 +81,8 @@ fn one_patch_under_two_context_budgets_does_not_claim_conflicting_intrinsic_resu
         let mut trace = FileTrace::default();
         let bytes = crate::loadout_file_events::read(
             &files,
-            CONFIGURED,
+            &request,
+            &caller,
             LoadoutDocumentKind::VehiclePatch,
             resolver.observation.as_deref(),
             &mut trace,

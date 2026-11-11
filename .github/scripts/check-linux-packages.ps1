@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory)][string]$Version,
     [Parameter(Mandatory)][string]$AssetDirectory,
     [Parameter(Mandatory)][string]$FixtureDirectory,
+    [Parameter(Mandatory)][string]$LifecycleFixtureDirectory,
     [Parameter(Mandatory)][string]$BuildMetadata,
     [Parameter(Mandatory)][string]$AdapterEvidence,
     [Parameter(Mandatory)][string]$ServiceBuildMetadata,
@@ -18,6 +19,7 @@ $platform = Get-P4kxLinuxPlatform $Target
 Assert-P4kxDisposableLinuxRunner $platform
 $assets = (Resolve-Path -LiteralPath $AssetDirectory).Path
 $fixture = (Resolve-Path -LiteralPath $FixtureDirectory).Path
+$lifecycleFixtures = (Resolve-Path -LiteralPath $LifecycleFixtureDirectory).Path
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $output) { throw 'Linux verification requires a fresh output directory.' }
 if ($env:XDG_RUNTIME_DIR -cne "/run/user/$(Get-P4kxPortalUserId)" -or -not (Test-Path -LiteralPath $env:XDG_RUNTIME_DIR -PathType Container)) { throw 'Native sessions require the normal existing per-user runtime directory.' }
@@ -32,7 +34,7 @@ $libc = (Invoke-P4kxLinuxTool getconf @('GNU_LIBC_VERSION') | Out-String).Trim()
 if ($libc -cne "glibc $((Get-P4kxLinuxPackaging).maximum_glibc_requirement)") { throw 'Native verification does not use the declared minimum glibc baseline.' }
 $services = Get-Content -LiteralPath $ServiceBuildMetadata -Raw | ConvertFrom-Json
 Assert-P4kxDocumentsServiceBuild $services $Target $env:GITHUB_SHA
-$context = @{target=$Target; version=$Version; assets=$assets; fixture=$fixture; output=$output;
+$context = @{target=$Target; version=$Version; assets=$assets; fixture=$fixture; lifecycle_fixtures=$lifecycleFixtures; output=$output;
     metadata=(Resolve-Path -LiteralPath $BuildMetadata).Path; services=(Resolve-Path -LiteralPath $ServiceBuildMetadata).Path}
 $phases = Invoke-P4kxLinuxDocumentsPhases $context $services
 $smokes = @(Get-Content -LiteralPath (Join-Path $phases.stock 'packages.json') -Raw | ConvertFrom-Json)
@@ -40,6 +42,8 @@ $state = Get-Content -LiteralPath (Join-Path $phases.stock 'flatpak-state.json')
 $flatpak = Get-P4kxDocumentsCombinedEvidence $phases $services $state.producer.archive_sha256
 Assert-P4kxFlatpakDocumentsEvidence $flatpak.documents $platform $base.revision $state.producer.archive_sha256
 $smokes += $flatpak
+$lifecycle = @(Get-Content -LiteralPath (Join-Path $phases.stock 'linux-lifecycle.json') -Raw | ConvertFrom-Json)
+$base | Add-Member -NotePropertyName linux_lifecycle -NotePropertyValue $lifecycle
 $base | Add-Member -NotePropertyName package_smokes -NotePropertyValue $smokes
 $base | Add-Member -NotePropertyName minimum_distribution -NotePropertyValue (Get-P4kxLinuxPackaging).minimum_distribution
 $base | Add-Member -NotePropertyName observed_glibc -NotePropertyValue $libc

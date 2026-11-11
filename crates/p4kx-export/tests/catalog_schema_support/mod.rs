@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! A minimal catalog that holds one entity of every kind and every field the schema lists.
+//! A synthetic catalog for structural schema checks.
 
 use p4kx_extraction::SourceValue;
 use serde_json::{Value, json};
@@ -9,7 +9,6 @@ use serde_json::{Value, json};
 mod blueprint_categories;
 mod blueprint_category_lists;
 mod blueprints;
-mod brokers;
 mod commodities;
 mod contract_properties;
 mod contracts;
@@ -21,7 +20,6 @@ mod loadouts;
 mod loot;
 mod mission_sets;
 mod npc_spawns;
-mod objective_properties;
 mod quality;
 mod recovery;
 mod reputation;
@@ -75,6 +73,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "subHarvestableMultiConfigs": {"status": "complete"},
             "harvestableLocations": {"status": "complete"},
             "shops": {"status": "complete"},
+            "shopInventories": {"status": "complete"},
             "factionReputations": {"status": "complete"},
             "reputationScopes": {"status": "complete"},
             "reputationStandings": {"status": "complete"},
@@ -148,53 +147,26 @@ pub(crate) fn minimal_catalog() -> Value {
                 "expediteFee": 3200
             }
         }],
-        "blueprints": [{
-            "guid": "11000000-0000-4000-8000-000000000001",
-            "className": "BP_CRAFT_core",
-            "recordPath": "libs/foundry/records/crafting/blueprints/crafting/bp_craft_core",
-            "key": "BP_CRAFT_core",
-            "name": {"key": null, "en": null, "de": null},
-            "categoryGuid": "d1000000-0000-4000-8000-000000000001",
-            "producedItemGuid": null,
-            "craftTimeSeconds": 93784,
-            "ingredients": [
-                {
-                    "resourceGuid": "b1000000-0000-4000-8000-000000000001",
-                    "itemGuid": null,
-                    "quantityScu": 0.5,
-                    "quantityUnits": null,
-                    "minQuality": 0,
-                    "slot": "CORE",
-                    "slotKey": null
-                },
-                {
-                    "resourceGuid": null,
-                    "itemGuid": "30000000-0000-4000-8000-000000000001",
-                    "quantityScu": null,
-                    "quantityUnits": 5,
-                    "minQuality": 500,
-                    "slot": null,
-                    "slotKey": "@crafting_ui_slotname_core"
-                }
-            ],
-            "tiers": blueprints::tiers(),
-            "defaultAvailable": false,
-            "dismantle": {
-                "processGuid": "f1000000-0000-4000-8000-000000000001",
-                "tierIndex": 0
-            }
-        }],
-        "definitions": {"blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
+        "definitions": {"contractGenerators": absent_table(), "blueprints": blueprints::definitions(), "contractTemplates": absent_table(), "missionBrokerEntries": absent_table(), "lootPoolFilters": loot::filters(), "blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
-            "tags": tags::definitions()},
+            "tags": tags::definitions(),
+            "shopInventories": {"availability": "absent", "meaning": "offlineDesignTime", "rows": []}},
+        "configurations": {
+            "blueprintTiers": blueprints::tiers(),
+            "contractTemplates": absent_table(),
+            "missionBrokerEntries": absent_table(),
+            "missionFlows": absent_table(),
+            "missionProperties": absent_table()
+        },
         "declarations": {
             "blueprintCategoryLists": blueprint_category_lists::declarations(),
             "tagRoots": tags::roots(),
+            "shopInventoryResolution": absent_table(),
             "entityTags": tags::entities(),
             "resourceGroupMembers": resource_groups::members()
         },
         "texts": {"publicNames": public_names(), "gameTexts": []},
-        "projections": {"qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents()},
+        "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents()},
         "provenance": {"sources": [], "uses": []},
 
         "blueprintPools": blueprints::pools(),
@@ -228,7 +200,6 @@ pub(crate) fn minimal_catalog() -> Value {
             "placedUnderGuid": "a2000000-0000-4000-8000-000000000003",
             "position": [12_850_000_000.0, 1250.5, -3.0]
         }],
-        "contracts": contracts::contracts(),
         "mineableElements": [{
             "guid": "a3000000-0000-4000-8000-000000000001",
             "className": "agricium_ore",
@@ -270,14 +241,11 @@ pub(crate) fn minimal_catalog() -> Value {
         "missionLocationTemplates": spawns::location_templates(),
         "contractShipSpawns": spawns::ship_spawns(),
         "contractLocationQueries": spawns::location_queries(),
-        "contractTemplates": spawns::contract_templates(),
-        "missionBrokerEntries": brokers::broker_entries(),
         "missionPropertySets": mission_sets::sets(),
         "contractNpcSpawns": npc_spawns::npc_spawns(),
         "contractEntitySpawns": npc_spawns::entity_spawns(),
         "lootTables": loot::tables(),
         "lootArchetypes": loot::archetypes(),
-        "lootPoolFilters": loot::filters(),
         "legacyLootTables": loot::legacy_tables(),
         "legacyLootArchetypes": loot::legacy_archetypes(),
         "lootContainers": loot::containers(),
@@ -293,6 +261,10 @@ pub(crate) fn minimal_catalog() -> Value {
     };
     fields.insert("exportHealth".to_owned(), export_health);
     catalog
+}
+
+fn absent_table() -> Value {
+    json!({"availability": "absent", "rows": []})
 }
 
 fn manufacturer() -> Value {

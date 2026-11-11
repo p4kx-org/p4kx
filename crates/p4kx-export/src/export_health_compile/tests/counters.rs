@@ -116,15 +116,13 @@ fn a_retained_ship_and_its_failed_loadout_are_not_an_omitted_ship() -> TestResul
             SourceDisposition::ProjectionFailed,
         ),
     );
-    ledger.derived_failure(DerivedFailure {
-        affected_kind: Kind::Ships,
-        output_kind: Kind::Loadouts,
-        record_index: ship.record_index,
-        role: Selected,
-        guid: ship.guid,
-        record_path: ship.record_path,
-        diagnosis: SourceDiagnosis::default(),
-    });
+    ledger.derived_failure(DerivedFailure::of_source(
+        &ship,
+        Kind::Ships,
+        Kind::Loadouts,
+        Selected,
+        SourceDiagnosis::default(),
+    )?);
     let report = export_health_compile::compile(
         ledger,
         &super::rows(Kind::Ships, 1),
@@ -245,9 +243,14 @@ fn incompatible_source_dispositions_cannot_be_published() {
 fn equal_guids_at_different_physical_indices_remain_distinct_sources() -> TestResult {
     let mut ledger = super::ledger();
     let good = super::source(Kind::Items, 1, Selected, SourceDisposition::Projected);
-    let mut bad = good.clone();
-    bad.record_index = 2;
-    bad.disposition = SourceDisposition::ReadFailed;
+    let bad = crate::export_ledger::SourceObservation::accounting(
+        good.kind,
+        2,
+        good.guid,
+        good.record_path.clone(),
+        good.role,
+        SourceDisposition::ReadFailed,
+    );
     super::observe(&mut ledger, good.clone());
     super::observe(&mut ledger, good);
     super::observe(&mut ledger, bad);
@@ -280,7 +283,8 @@ fn equal_guids_at_different_physical_indices_remain_distinct_sources() -> TestRe
             .failed_records
             .first()
             .ok_or("failed identity")?
-            .record_index,
+            .key()
+            .index(),
         2,
         "the exact failed physical identity is retained"
     );

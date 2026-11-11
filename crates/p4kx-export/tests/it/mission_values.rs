@@ -5,6 +5,8 @@ use p4kx_export::CatalogPublicationMode;
 use p4kx_testkit::{TestInstance, TestValue};
 use serde_json::{Value, json};
 
+#[path = "mission_values_canonical_auto.rs"]
+mod canonical_auto;
 #[path = "mission_values_investigation.rs"]
 mod investigation;
 
@@ -53,7 +55,10 @@ fn auto_properties() -> Vec<TestValue> {
 }
 
 fn verify_auto(document: &Value, owner: Owner) -> TestResult {
-    let base = fixture::value(document, owner, "Base")?;
+    if !matches!(owner, Owner::Generator) {
+        return canonical_auto::variants(document, owner);
+    }
+    let base = fixture::generator_value(document, "Base")?;
     assert_eq!(
         *fixture::field(base, "/type")?,
         "autoSpawns",
@@ -69,13 +74,13 @@ fn verify_auto(document: &Value, owner: Owner) -> TestResult {
         "present",
         "normal References retain resolution"
     );
-    let entity = fixture::value(document, owner, "Entity")?;
+    let entity = fixture::generator_value(document, "Entity")?;
     assert_eq!(
         *fixture::field(entity, "/searchOptions/entityDeclaration/status")?,
         "dangling",
         "dangling target identity remains represented"
     );
-    let tags = fixture::value(document, owner, "Tags")?;
+    let tags = fixture::generator_value(document, "Tags")?;
     let positive = tags
         .pointer("/searchOptions/closetPositiveTags/tags")
         .and_then(Value::as_array)
@@ -121,27 +126,7 @@ fn absent_pointer_and_empty_investigation_arrays_are_distinct_source_shapes() ->
         &fixture::database(properties, owner),
         CatalogPublicationMode::Normal,
     )?;
-    let auto = fixture::value(&document, owner, "Auto")?;
-    assert_eq!(
-        *fixture::field(auto, "/autoSpawns")?,
-        Value::Null,
-        "absent normal Reference is null"
-    );
-    assert_eq!(
-        *fixture::field(auto, "/searchOptions")?,
-        Value::Null,
-        "absent optional pointer is null"
-    );
-    assert_eq!(
-        *fixture::field(fixture::value(&document, owner, "Case")?, "/suspects")?,
-        json!([]),
-        "declared empty Class arrays remain empty"
-    );
-    assert_eq!(
-        *fixture::field(fixture::value(&document, owner, "Race")?, "/targetSplits")?,
-        json!([]),
-        "declared empty split arrays remain empty"
-    );
+    canonical_auto::absent(&document)?;
     Ok(())
 }
 
@@ -165,11 +150,12 @@ fn auto_spawns_preserves_exact_reference_identities_and_populated_negative_tags(
             &fixture::database(vec![fixture::property("Raw", source)], owner),
             CatalogPublicationMode::Normal,
         )?;
-        let source = fixture::value(&document, owner, "Raw")?;
-        let index = match owner {
-            Owner::Generator => 1,
-            Owner::Template | Owner::Broker => 2,
-        };
+        if !matches!(owner, Owner::Generator) {
+            canonical_auto::identities(&document, owner)?;
+            continue;
+        }
+        let source = fixture::generator_value(&document, "Raw")?;
+        let index = 1;
         verify_definition_identity(fixture::field(source, "/autoSpawns")?, true, index)?;
         let options = fixture::field(source, "/searchOptions")?;
         verify_definition_identity(

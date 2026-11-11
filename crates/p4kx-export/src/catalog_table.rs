@@ -28,6 +28,13 @@ pub(crate) struct CatalogTable<T> {
 }
 
 impl<T> CatalogTable<T> {
+    pub(crate) const fn empty(availability: DatasetAvailability) -> Self {
+        Self {
+            availability,
+            rows: Vec::new(),
+        }
+    }
+
     pub(crate) fn new(forge: &DataForge<'_>, source_types: &[&str], rows: Vec<T>) -> Self {
         let mut unavailable = false;
         let mut declared = !rows.is_empty();

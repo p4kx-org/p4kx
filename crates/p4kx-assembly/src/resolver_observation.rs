@@ -7,9 +7,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use p4kx_dataforge::{DataForgeError, Guid, Record, RecordTree, TreeBuilder};
 
+pub(crate) use crate::resolver_path_read::parse_spec;
+
 use crate::{
-    Entities, LoadoutDocumentKind, LoadoutError, LoadoutFileError, LoadoutFileObservation,
-    LoadoutFileSource, LoadoutResolver,
+    Entities, LoadoutClassSelection, LoadoutError, LoadoutFileObservation, LoadoutPath,
+    LoadoutPathObserver, LoadoutRequest, LoadoutResolver, LoadoutSelection, LoadoutTargetGuid,
+    XmlLoadoutClassSite, XmlLoadoutPathSite,
 };
 
 /// An actual source operation performed by a loadout resolver.
@@ -19,26 +22,51 @@ pub enum LoadoutReadEvent<'r, 'f> {
     InventoryIncomplete,
     /// An actual required XML file read completed.
     FileRead {
-        /// The actual Entry identity or configured missing target.
-        source: &'r LoadoutFileSource,
-        /// The intrinsic document projection requested by the reader.
-        kind: LoadoutDocumentKind,
-        /// The actual byte-read outcome.
-        outcome: Result<(), &'r LoadoutFileError>,
+        /// The original document operation whose read completed.
+        observation: &'r LoadoutFileObservation,
+        /// The actual retained document candidate that supplied this operation.
+        request: &'r LoadoutPath,
+        /// The current caller supplied before document-cache lookup.
+        caller: &'r LoadoutRequest,
     },
     /// The actual intrinsic source document projection completed.
     FileProjection {
-        /// The same source identity as the preceding successful file read.
-        source: &'r LoadoutFileSource,
-        /// The intrinsic document projection performed.
-        kind: LoadoutDocumentKind,
-        /// The actual parse or document-shape outcome.
-        outcome: Result<(), &'r str>,
+        /// The same original operation whose successful read was observed.
+        observation: &'r LoadoutFileObservation,
+        /// The actual retained document candidate that supplied this operation.
+        request: &'r LoadoutPath,
+        /// The current caller supplied before document-cache lookup.
+        caller: &'r LoadoutRequest,
     },
     /// Original file and projection outcomes supplied a cached document result.
     FileReused {
         /// Immutable first-population evidence, without another source operation.
         observation: &'r LoadoutFileObservation,
+        /// The actual retained document candidate that supplied this operation.
+        request: &'r LoadoutPath,
+
+        /// The current caller supplied before document-cache lookup.
+        caller: &'r LoadoutRequest,
+    },
+    /// One original direct Include links two genuine file operations.
+    FileDependency {
+        /// The original including document's operation.
+        parent: &'r LoadoutFileObservation,
+        /// The original child operation, including an actual read or parse failure.
+        observation: &'r LoadoutFileObservation,
+        /// The child's original first-population candidate.
+        request: &'r LoadoutPath,
+        /// The genuine direct Include request selected by the parent parse.
+        dependency: &'r LoadoutRequest,
+    },
+    /// A genuine Include is refused before a child operation is read.
+    FileDependencyRefused {
+        /// The original including document's operation.
+        parent: &'r LoadoutFileObservation,
+        /// The genuine Include request that reached this refusal.
+        dependency: &'r LoadoutRequest,
+        /// The actual cycle or input-limit failure.
+        error: &'r LoadoutError,
     },
     /// A canonical dependency read completed before optional projection helpers run.
     CanonicalRead {
@@ -72,15 +100,62 @@ pub enum LoadoutReadEvent<'r, 'f> {
 pub trait LoadoutReadObserver: Send + Sync {
     /// Returns `Break` to stop the observed resolution.
     fn observe(&self, event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()>;
+
+    /// Runs the actual Record projection exactly once within a borrowed path scope.
+    fn with_record_paths(
+        &self,
+        _record: &Record<'_>,
+        _tree: &RecordTree<'_>,
+        parse: &mut dyn FnMut(Option<&dyn LoadoutPathObserver>) -> ControlFlow<()>,
+    ) -> ControlFlow<()> {
+        parse(None)
+    }
+
+    /// Captures an actual same-parse XML attribute before its path text is copied.
+    fn xml_path(
+        &self,
+        _selection: &LoadoutSelection,
+        _site: &XmlLoadoutPathSite<'_>,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    /// Captures the actual XML class-name attribute before its text is copied.
+    fn xml_class(
+        &self,
+        _selection: &LoadoutClassSelection,
+        _site: &XmlLoadoutClassSite<'_>,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    /// Captures the actual Record chosen for this class getter before copying its GUID.
+    fn class_record(
+        &self,
+        _selection: &LoadoutClassSelection,
+        _record: &Record<'_>,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    /// Captures one concrete candidate builder from its actual private input pairs.
+    fn derived_path(
+        &self,
+        _selection: &LoadoutSelection,
+        _inputs: &[&LoadoutPath],
+        _value: &str,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
 }
 
-pub(crate) struct Observation {
-    observer: Arc<dyn LoadoutReadObserver>,
+pub(crate) struct Observation<'f> {
+    observer: Arc<dyn LoadoutReadObserver + 'f>,
     stopped: AtomicBool,
 }
 
-impl Observation {
-    fn new(observer: Arc<dyn LoadoutReadObserver>) -> Self {
+impl<'f> Observation<'f> {
+    fn new(observer: Arc<dyn LoadoutReadObserver + 'f>) -> Self {
         Self {
             observer,
             stopped: AtomicBool::new(false),
@@ -95,6 +170,85 @@ impl Observation {
         self.stopped.store(true, Ordering::Release);
     }
 
+    pub(crate) fn record_paths(
+        &self,
+        record: &Record<'_>,
+        tree: &RecordTree<'_>,
+        parse: &mut dyn FnMut(Option<&dyn LoadoutPathObserver>) -> ControlFlow<()>,
+    ) -> ControlFlow<()> {
+        if self.stopped() {
+            return ControlFlow::Break(());
+        }
+        self.observer.with_record_paths(record, tree, parse)
+    }
+
+    pub(crate) fn xml_path(
+        &self,
+        selection: &LoadoutSelection,
+        site: &XmlLoadoutPathSite<'_>,
+    ) -> ControlFlow<()> {
+        if self.stopped() {
+            return ControlFlow::Break(());
+        }
+        let outcome = self.observer.xml_path(selection, site);
+        if outcome.is_break() {
+            self.stop();
+        }
+        outcome
+    }
+
+    pub(crate) fn xml_class(
+        &self,
+        selection: &LoadoutClassSelection,
+        site: &XmlLoadoutClassSite<'_>,
+    ) -> ControlFlow<()> {
+        if self.stopped() {
+            return ControlFlow::Break(());
+        }
+        let outcome = self.observer.xml_class(selection, site);
+        if outcome.is_break() {
+            self.stop();
+        }
+        outcome
+    }
+
+    pub(crate) fn class_record(
+        &self,
+        selection: &LoadoutClassSelection,
+        record: &Record<'_>,
+    ) -> Result<(), LoadoutError> {
+        if self.stopped() {
+            return Err(LoadoutError::ObservationStopped);
+        }
+        if self.observer.class_record(selection, record).is_break() {
+            self.stop();
+        }
+        if self.stopped() {
+            Err(LoadoutError::ObservationStopped)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub(crate) fn derived_path(
+        &self,
+        selection: &LoadoutSelection,
+        inputs: &[&LoadoutPath],
+        value: &str,
+    ) -> Result<(), LoadoutError> {
+        if self.stopped() {
+            return Err(LoadoutError::ObservationStopped);
+        }
+        if self
+            .observer
+            .derived_path(selection, inputs, value)
+            .is_break()
+        {
+            self.stop();
+            return Err(LoadoutError::ObservationStopped);
+        }
+        Ok(())
+    }
     fn notify(&self, event: LoadoutReadEvent<'_, '_>) -> Result<(), LoadoutError> {
         if self.stopped() {
             return Err(LoadoutError::ObservationStopped);
@@ -117,7 +271,7 @@ pub(crate) enum Cache {
 }
 
 pub(crate) fn notify(
-    observation: Option<&Observation>,
+    observation: Option<&Observation<'_>>,
     event: LoadoutReadEvent<'_, '_>,
 ) -> Result<(), LoadoutError> {
     observation.map_or(Ok(()), |observation| observation.notify(event))
@@ -126,7 +280,7 @@ pub(crate) fn notify(
 pub(crate) fn canonical<'f>(
     builder: &mut TreeBuilder<'f>,
     record: &Record<'f>,
-    observation: Option<&Observation>,
+    observation: Option<&Observation<'_>>,
 ) -> Result<RecordTree<'f>, LoadoutError> {
     if observation.is_some_and(Observation::stopped) {
         return Err(LoadoutError::ObservationStopped);
@@ -140,7 +294,7 @@ pub(crate) fn canonical<'f>(
         },
     )?;
     outcome.map_err(|error| LoadoutError::UnreadableRecord {
-        guid: record.guid(),
+        guid: LoadoutTargetGuid::unbound(record.guid()),
         reason: error.to_string(),
     })
 }
@@ -150,7 +304,7 @@ impl<'f> LoadoutResolver<'f> {
     #[must_use]
     pub fn with_observed_entities(
         entities: Arc<Entities<'f>>,
-        observer: Arc<dyn LoadoutReadObserver>,
+        observer: Arc<dyn LoadoutReadObserver + 'f>,
     ) -> Self {
         let mut resolver = Self::with_entities(entities);
         resolver.observation = Some(Arc::new(Observation::new(observer)));
@@ -183,14 +337,14 @@ impl<'f> LoadoutResolver<'f> {
 pub(crate) fn read_spec<'f>(
     builder: &mut TreeBuilder<'f>,
     record: &Record<'f>,
-    observation: Option<&Observation>,
+    observation: Option<&Observation<'_>>,
 ) -> Result<crate::spec::EntitySpec, LoadoutError> {
     if observation.is_some_and(Observation::stopped) {
         return Err(LoadoutError::ObservationStopped);
     }
     if !crate::entities::is_entity(record) {
         let error = LoadoutError::NotAnEntity {
-            guid: record.guid(),
+            guid: LoadoutTargetGuid::unbound(record.guid()),
             type_name: record
                 .type_name()
                 .unwrap_or("Record of an unreadable type")
@@ -205,7 +359,8 @@ pub(crate) fn read_spec<'f>(
         )?;
         return Err(error);
     }
-    canonical(builder, record, observation).map(|tree| crate::spec::EntitySpec::read(&tree))
+    let tree = canonical(builder, record, observation)?;
+    parse_spec(record, &tree, observation)
 }
 
 impl LoadoutResolver<'_> {

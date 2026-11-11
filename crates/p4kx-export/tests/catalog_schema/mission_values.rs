@@ -9,7 +9,7 @@ use crate::catalog_schema_support;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-const CONTRACT_PROPERTY: &str = "/contractTemplates/0/contractProperties/0";
+const CONTRACT_PROPERTY: &str = "/missionPropertySets/0/properties/1";
 const QUALITY_DISTRIBUTION: &str =
     "/definitions/qualityDistributions/rows/0/qualityDistribution/value/payload/value/value/value";
 

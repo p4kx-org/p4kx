@@ -3,7 +3,7 @@
 
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, ExportHealth, build_catalog_from};
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestStruct, TestType,
@@ -38,7 +38,7 @@ impl Fixture {
         })
     }
 
-    pub(super) fn catalog(&self) -> TestResult<(Value, ExportHealth)> {
+    pub(super) fn catalog(&self) -> TestResult<Value> {
         let options = CatalogOptions {
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..CatalogOptions::new(UNIX_EPOCH)
@@ -48,10 +48,7 @@ impl Fixture {
             built.summary().export_health().is_complete(),
             "the source fixture has no actual read or projection failures"
         );
-        Ok((
-            serde_json::from_slice(built.json())?,
-            built.summary().export_health().clone(),
-        ))
+        Ok(serde_json::from_slice(built.json())?)
     }
 }
 

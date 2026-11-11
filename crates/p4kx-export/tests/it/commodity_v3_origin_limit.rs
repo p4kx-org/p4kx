@@ -4,14 +4,13 @@
 use p4kx_export::{CatalogPublicationMode, Kind};
 use serde_json::{Value, json};
 
+use crate::catalog_crafting_support::blueprint;
 use crate::commodity_v3_fixture::{self as fixture, DcbOrigin, TestResult};
 use crate::commodity_v3_origin_limit_fixture::{self as limit_fixture, COST_COUNT};
 use crate::commodity_v3_origin_payload as payload;
-use crate::commodity_v3_source;
-use crate::commodity_v3_source_inventory::SourceField;
 
 #[test]
-fn capture_limit_keeps_payload_and_publication_complete() -> TestResult {
+fn wide_blueprint_backfill_keeps_every_original_selection_use() -> TestResult {
     let database = limit_fixture::database();
     let mut plain = None;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
@@ -36,10 +35,10 @@ fn capture_limit_keeps_payload_and_publication_complete() -> TestResult {
                     .kind(Kind::Commodities)
                     .map(|kind| (kind.count, kind.complete)),
                 Some((5, true)),
-                "origin metadata loss cannot omit a logical Commodity"
+                "the same logical Commodities are complete"
             );
             payload::assert_full_costs(&catalog)?;
-            assert_selection_only_limit(&catalog, encrypted)?;
+            assert_complete_selection(&catalog, encrypted)?;
             if let Some(first) = &normal {
                 payload::same_payload(first, &catalog, "")?;
             } else {
@@ -56,91 +55,78 @@ fn capture_limit_keeps_payload_and_publication_complete() -> TestResult {
     Ok(())
 }
 
-fn assert_selection_only_limit(catalog: &Value, encrypted: bool) -> TestResult {
-    let expected = if encrypted {
-        Value::Bool(true)
-    } else {
-        Value::Null
-    };
+fn assert_complete_selection(catalog: &Value, encrypted: bool) -> TestResult {
     let row = fixture::definition(catalog, fixture::RESOURCE_FALLBACK)?;
+    let selection = fixture::at(row, "/selection")?;
     assert_eq!(
-        fixture::at(row, "/selection/state")?,
-        &json!("present"),
-        "the source selection remains a present choice"
+        selection["state"], "present",
+        "the fallback selection is present"
     );
     assert_eq!(
-        fixture::at(row, "/selection/value")?,
-        &json!("resourceFallback"),
-        "the source selection keeps its fallback kind"
+        selection["value"], "resourceFallback",
+        "the Commodity records its resource fallback"
     );
     assert_eq!(
-        fixture::at(row, "/selection/sourceSetComplete")?,
-        &json!(false),
-        "the capture limit marks only selection contributors incomplete"
+        selection["sourceSetComplete"], true,
+        "every actual fallback selector is retained"
     );
     assert_eq!(
-        fixture::at(row, "/selection/containsEncryptedSource")?,
-        &expected,
-        "known encryption stays true while incomplete plain lineage stays unknown"
+        selection["containsEncryptedSource"], encrypted,
+        "fallback selection retains the actual encryption state"
     );
     assert_eq!(
         fixture::at(row, "/guid/containsEncryptedSource")?,
-        &json!(encrypted),
-        "the raw GUID has its own complete physical source evidence"
+        encrypted,
+        "the GUID retains the original encryption state"
     );
     assert_eq!(
         fixture::at(row, "/guid/sourceSetComplete")?,
-        &json!(true),
-        "the independent raw GUID contributor set remains complete"
+        true,
+        "the GUID has complete provenance"
     );
-    assert_limit_diagnostic(row)?;
-    assert_retained_inputs(catalog, row)?;
+    assert!(
+        row.get("selectionDiagnostics").is_none(),
+        "the retired quota field is absent from the definition"
+    );
+    assert_retained_inputs(catalog, selection)?;
     assert_independent_selection(catalog, encrypted)?;
     assert_exact_commodity_rows(catalog)
 }
 
-fn assert_limit_diagnostic(row: &Value) -> TestResult {
-    let diagnostics = fixture::at(row, "/selectionDiagnostics")?
-        .as_array()
-        .ok_or("selection diagnostics")?;
+fn assert_retained_inputs(catalog: &Value, selection: &Value) -> TestResult {
+    let recipe = blueprint::by_guid(catalog, limit_fixture::BLUEPRINT)?;
+    let record_index = recipe
+        .definition
+        .pointer("/recordIndex/value")
+        .and_then(Value::as_u64)
+        .ok_or("physical Blueprint index")?;
     assert_eq!(
-        diagnostics.len(),
-        1,
-        "one bounded origin metadata limit is reported"
+        record_index,
+        limit_fixture::BLUEPRINT_INDEX,
+        "the selector belongs to the actual Blueprint Record"
     );
-    let diagnostic = diagnostics.first().ok_or("origin metadata observation")?;
+    let retained = blueprint::selected_ordinals(catalog, selection, record_index)?;
+    let tiers = recipe.tiers()?;
+    let [tier] = tiers.as_slice() else {
+        return Err("one cost-bearing tier".into());
+    };
+    let costs = tier["costs"].as_array().ok_or("cost nodes")?;
     assert_eq!(
-        fixture::at(diagnostic, "/code")?,
-        &json!("originMetadataLimit"),
-        "the report names the actual metadata capture limit"
+        costs.len(),
+        usize::from(COST_COUNT),
+        "every authored optional cost is retained"
     );
-    assert_eq!(
-        fixture::at(diagnostic, "/recordIndex/value")?,
-        &json!(limit_fixture::BLUEPRINT_INDEX),
-        "the report retains the actual limiting Blueprint owner"
-    );
-    assert_eq!(
-        fixture::at(diagnostic, "/recordIndex/sourceSetComplete")?,
-        &json!(true),
-        "the diagnostic owner has complete physical evidence"
-    );
-    Ok(())
-}
-
-fn assert_retained_inputs(catalog: &Value, row: &Value) -> TestResult {
-    let uses = commodity_v3_source::uses(catalog, fixture::at(row, "/selection")?)?;
-    let retained = uses
-        .iter()
-        .filter(|(index, path, role)| {
-            *index == limit_fixture::BLUEPRINT_INDEX
-                && matches!(path, SourceField::Body(path) if path.starts_with("blueprint.tiers[0].recipe.costs.optionalCosts[") && path.ends_with(".resource"))
-                && role == "selector"
-        })
-        .count();
-    assert!(
-        (1..usize::from(COST_COUNT)).contains(&retained),
-        "the production capture retains real distinct inputs and reports the remaining gap"
-    );
+    for cost in costs {
+        let original = recipe.node(&cost["source"])?;
+        let leaf = blueprint::field_ref(original, "resource")?;
+        let ordinal = leaf["valueIndex"]
+            .as_str()
+            .ok_or("actual resource leaf ordinal")?;
+        assert!(
+            retained.contains(ordinal),
+            "every authored resource slot contributes exactly"
+        );
+    }
     Ok(())
 }
 
@@ -154,19 +140,16 @@ fn assert_independent_selection(catalog: &Value, encrypted: bool) -> TestResult 
     assert_eq!(
         fixture::at(row, "/selection/sourceSetComplete")?,
         &json!(true),
-        "an unrelated Blueprint capture limit cannot taint another resource"
+        "another Blueprint does not taint an independent resource"
     );
     assert_eq!(
         fixture::at(row, "/selection/containsEncryptedSource")?,
         &json!(encrypted),
         "the unrelated resource keeps only its actual encryption evidence"
     );
-    assert_eq!(
-        fixture::at(row, "/selectionDiagnostics")?
-            .as_array()
-            .map(Vec::len),
-        Some(0),
-        "the unrelated resource gains no metadata-limit diagnostic"
+    assert!(
+        row.get("selectionDiagnostics").is_none(),
+        "the unrelated resource uses the same complete selection contract"
     );
     Ok(())
 }
@@ -198,37 +181,25 @@ fn assert_exact_commodity_rows(catalog: &Value) -> TestResult {
                 Some(guid.as_str()),
                 "row identities and GUID order survive"
             );
-            let limited = path == "/definitions/commodities/rows"
-                && fixture::at(row, "/guid/value")?.as_str()
-                    == Some(fixture::guid(fixture::RESOURCE_FALLBACK).as_str());
-            assert_row_completeness(row, limited, path == "/definitions/commodities/rows")?;
+            assert_row_completeness(row, path == "/definitions/commodities/rows");
         }
     }
     Ok(())
 }
 
-fn assert_row_completeness(row: &Value, limited: bool, definition: bool) -> TestResult {
+fn assert_row_completeness(row: &Value, definition: bool) {
     let mut incomplete = Vec::new();
     incomplete_paths(row, "", &mut incomplete);
-    let expected_incomplete = if limited {
-        vec!["/selection"]
-    } else {
-        Vec::new()
-    };
-    assert_eq!(
-        incomplete, expected_incomplete,
-        "only the selection's contributor completeness changes"
+    assert!(
+        incomplete.is_empty(),
+        "all original contributor sets remain complete"
     );
-    if !limited && definition {
-        assert_eq!(
-            fixture::at(row, "/selectionDiagnostics")?
-                .as_array()
-                .map(Vec::len),
-            Some(0),
-            "other definitions gain no capture-limit diagnosis"
+    if definition {
+        assert!(
+            row.get("selectionDiagnostics").is_none(),
+            "the canonical definition excludes the retired quota field"
         );
     }
-    Ok(())
 }
 fn incomplete_paths(value: &Value, path: &str, result: &mut Vec<String>) {
     if value.get("sourceSetComplete") == Some(&Value::Bool(false)) {

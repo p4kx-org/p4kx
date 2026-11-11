@@ -20,7 +20,7 @@ mod archive_material_reference;
 mod archive_metadata_version;
 mod archive_region_info;
 mod archive_table_declaration;
-mod bank;
+pub mod bank;
 mod budget;
 mod buffers;
 mod chunk_source;
@@ -115,7 +115,7 @@ mod record_report;
 mod report;
 mod resolved_texts;
 mod selection;
-mod sound;
+pub mod sound;
 mod sound_convert;
 mod sound_job;
 mod sound_output;
@@ -205,7 +205,7 @@ pub use coverage::{
 };
 pub use dataforge::{DATAFORGE_ENTRIES, DataForgeEntry, DataForgeLoadError, MAX_DATAFORGE_SIZE};
 pub use dataforge_file::is_dataforge_file;
-pub use dataforge_file_origin::DataForgeFileOrigin;
+pub use dataforge_file_origin::{DataForgeFileOrigin, ObservedFileOrigin};
 pub use dataforge_origin::DataForgeOrigin;
 pub use dataforge_source::DataForgeSource;
 pub use dds_raw_info::{DdsDx10Info, DdsLegacyInfo, DdsPixelFormatInfo};
@@ -264,8 +264,8 @@ pub use p4kx_archive::{
     DosTimestamp, EffectiveEncoding, Entry, EntryIssue, EntryMetadata, EntryOrigin,
     EntryOriginStep, EntryReader, EntryRecordFormat, InstallationStatus, KeyCheck, KeyDemand,
     KeyDemandSnapshot, MAX_COMPRESSION_RATIO, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES,
-    MAX_CONTAINER_LEN, MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN, OpenOptions, SourceEncryption,
-    UnreadEntries, ZipHeaderMetadata,
+    MAX_CONTAINER_LEN, MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN, ObservedEntry,
+    ObservedEntryBinding, OpenOptions, SourceEncryption, UnreadEntries, ZipHeaderMetadata,
 };
 pub use p4kx_archive::{
     ArchiveLayoutKind, ArchiveMetadata, ArchiveMetadataStatus, AvailableMetadataSpan,
@@ -295,15 +295,22 @@ pub use p4kx_dataforge::{
     Annotations, CSV_BYTE_ORDER_MARK, CanonicalReadObserver, DataForge, DataForgeError,
     DataForgeIssue, DataType, Enum, FLAT_COLUMNS, FLAT_TAG_COLUMN, FLAT_TEXT_COLUMN, Field,
     FieldKind, FieldStat, FieldStatistics, FieldStatisticsError, FieldStorage, FileGraph,
-    FlatFormat, FlatValues, FormatSurvey, Guid, IndexedReference, InvalidGuid, JsonLayout,
-    MAX_DATAFORGE_ISSUES, MAX_DISTINCT_VALUES, MAX_FIELD_PATHS, MAX_INDEXED_REFERENCES,
-    MAX_NESTING_DEPTH, MAX_RECORD_VALUES, MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES,
-    MAX_TAG_TEXT_BYTES, Number, PointerProbe, PointerSurvey, Property, RECORD_XML_NAMESPACE,
-    Record, RecordJson, RecordMetadata, RecordText, RecordTree, RecordXml, Reference,
-    ReferenceIndex, ReferenceOrigin, Resolution, Struct, StructValue, TAG_DATABASE_TYPE,
-    TAG_PATH_SEPARATOR, TAG_TYPE, Tag, TagBuildEvent, TagPathEdgeKind, TagPathIncoming,
-    TagProjectionFailure, TagRelationIssue, TagResolver, TagTree, TagTreeIssues, TextResolver,
+    FlatFormat, FlatValues, FormatSurvey, Guid, IndexedReference, IndexedReferenceOrigin,
+    InvalidGuid, JsonLayout, Location, MAX_DATAFORGE_ISSUES, MAX_DISTINCT_VALUES, MAX_FIELD_PATHS,
+    MAX_INDEXED_REFERENCES, Number, ObservedFileEdge, ObservedFileGraph, ObservedReferenceIndex,
+    PointerProbe, PointerSurvey, Property, RECORD_XML_NAMESPACE, Record, RecordJson,
+    RecordMetadata, RecordText, RecordTree, RecordXml, Reference, ReferenceIndex,
+    ReferenceIndexError, ReferenceOrigin, ReferenceScanGap, Resolution, Step, Struct, StructValue,
+    TAG_DATABASE_TYPE, TAG_PATH_SEPARATOR, TAG_TYPE, Tag, TagBuildEvent, TagPath, TagPathEdgeKind,
+    TagPathIncoming, TagRelationIssue, TagResolver, TagTree, TagTreeIssues, TextResolver,
     TrailingSurvey, TreeBuilder, Value, ValueError, ValueKind, write_csv_cell,
+};
+#[expect(
+    deprecated,
+    reason = "Public compatibility for the released Tag constants"
+)]
+pub use p4kx_dataforge::{
+    MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES, MAX_TAG_TEXT_BYTES,
 };
 pub use p4kx_foundation::{ArchiveKey, ArchiveKeyError};
 pub use p4kx_gfx as gfx;
@@ -359,11 +366,11 @@ pub use source_provenance::{
     ArchiveEntryProof, ArchiveEntrySource, ArchiveFileSource, EncryptionFieldEvidence, FieldOrigin,
     FieldOriginSeed, FieldOrigins, FieldOriginsError, FieldOriginsSeed, FieldPath, FieldPathError,
     FieldPathSeed, FileSource, InputScope, OriginReaderLimits, PhysicalSource, PhysicalSourceKind,
-    PhysicalSourceRef, SourceCoordinateOmission, SourceDeclarationEvidence, SourceDeclarationKind,
-    SourceDetails, SourceEncryptionDeclaration, SourceEncryptionState, SourceEvidenceError,
-    SourceInput, SourceInventory, SourceLocation, SourceRecordFormat, SourceScope, SourceUse,
-    SourceUseDescription, SourceUseRef, SourceUseRole, SourceUses, SourceValue, SourceValueState,
-    SourcedValue,
+    PhysicalSourceRef, SharedFieldOrigin, SourceCoordinateOmission, SourceDeclarationEvidence,
+    SourceDeclarationKind, SourceDetails, SourceEncryptionDeclaration, SourceEncryptionState,
+    SourceEvidenceError, SourceInput, SourceInventory, SourceLocation, SourceRecordFormat,
+    SourceScope, SourceUse, SourceUseDescription, SourceUseRef, SourceUseRole, SourceUses,
+    SourceValue, SourceValueState, SourcedValue,
 };
 pub use target::{
     create_default_target, create_default_target_protected, default_target_name, utc_rfc3339,

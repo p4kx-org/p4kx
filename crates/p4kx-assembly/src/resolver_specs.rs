@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::LoadoutTargetGuid;
 use std::sync::Arc;
 
 use p4kx_dataforge::{Guid, Record};
@@ -12,7 +13,11 @@ use crate::{EntityNode, LoadoutError, LoadoutResolver};
 impl<'f> LoadoutResolver<'f> {
     pub(crate) fn spec(&mut self, guid: Guid) -> SpecResult {
         self.entities.forge().record_by_guid(guid).map_or_else(
-            || Arc::new(Err(LoadoutError::DanglingReference { guid })),
+            || {
+                Arc::new(Err(LoadoutError::DanglingReference {
+                    guid: LoadoutTargetGuid::unbound(guid),
+                }))
+            },
             |record| self.spec_record(&record),
         )
     }
@@ -45,7 +50,7 @@ impl<'f> LoadoutResolver<'f> {
         Some(self.entities.forge().record(record_index).filter(|record| record.guid() == node.guid)
             .map_or_else(
                 || Arc::new(Err(LoadoutError::UnreadableRecord {
-                    guid: node.guid,
+                    guid: LoadoutTargetGuid::unbound(node.guid),
                     reason: format!("the physical source Record {record_index} is absent from this DataForge"),
                 })),
                 |record| self.spec_record(&record),

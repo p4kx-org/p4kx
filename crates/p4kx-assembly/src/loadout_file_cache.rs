@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::LoadoutError;
 use crate::loadout_file_trace::FileTrace;
 use crate::resolver_observation::Observation;
+use crate::{LoadoutError, LoadoutFileObservation, LoadoutRequest};
 
 pub(crate) struct CachedDocument<T> {
     value: T,
@@ -23,9 +23,17 @@ impl<T> CachedDocument<T> {
         &self.value
     }
 
+    pub(crate) fn xml_root(&self) -> Option<&LoadoutFileObservation> {
+        self.trace.xml_root()
+    }
+
     /// Replays original observations before lending the cached result.
-    pub(crate) fn reused(&self, observation: Option<&Observation>) -> Result<&T, LoadoutError> {
-        self.trace.reused(observation)?;
+    pub(crate) fn reused(
+        &self,
+        observation: Option<&Observation<'_>>,
+        caller: &LoadoutRequest,
+    ) -> Result<&T, LoadoutError> {
+        self.trace.reused(observation, caller)?;
         Ok(&self.value)
     }
 }

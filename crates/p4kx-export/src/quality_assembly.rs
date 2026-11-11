@@ -12,6 +12,7 @@ use super::contract::{
 use super::eligibility::Eligibility;
 use super::evidence::Evidence;
 use super::inverse;
+use super::link_index::Links;
 use super::resource_links::ResourceLinks;
 use super::rows::QualityRows;
 
@@ -63,8 +64,8 @@ pub(crate) struct Assembly<'source> {
 }
 
 impl<'source> Assembly<'source> {
-    pub(crate) fn add(&mut self, step: Step<'source>) {
-        self.inventory.append(&step.inventory);
+    pub(crate) fn add(&mut self, step: Step<'source>) -> Result<(), CatalogError> {
+        self.inventory.append(&step.inventory)?;
         match step.input {
             Some(Input::Distribution {
                 definition: row,
@@ -99,6 +100,7 @@ impl<'source> Assembly<'source> {
             }),
             None => {}
         }
+        Ok(())
     }
 
     fn quantization(
@@ -126,14 +128,8 @@ impl<'source> Assembly<'source> {
         origins: &CatalogOrigins,
         cancel: Option<&CancelToken>,
     ) -> Result<QualityRows<'source>, CatalogError> {
-        inverse::fill(
-            &mut self.rows,
-            &self.quantizers,
-            &self.resources,
-            &self.inventory,
-            origins,
-            cancel,
-        )?;
+        let links = Links::read(self.resources, self.inventory, cancel)?;
+        inverse::fill(&mut self.rows, &self.quantizers, links, origins, cancel)?;
         self.rows
             .distributions
             .sort_by_cached_key(|row| (row.owner.guid.text(), row.owner.record_index));

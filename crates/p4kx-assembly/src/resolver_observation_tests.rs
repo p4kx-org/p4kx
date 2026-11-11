@@ -43,6 +43,8 @@ impl LoadoutReadObserver for Observer {
         let event = match event {
             LoadoutReadEvent::FileRead { .. }
             | LoadoutReadEvent::FileProjection { .. }
+            | LoadoutReadEvent::FileDependency { .. }
+            | LoadoutReadEvent::FileDependencyRefused { .. }
             | LoadoutReadEvent::FileReused { .. }
             | LoadoutReadEvent::InventoryIncomplete => {
                 return ControlFlow::Continue(());

@@ -56,12 +56,19 @@ fn check_contract_order(catalog: &Value) -> TestResult {
     let identities: Vec<(&str, &str)> = list(catalog, Kind::Contracts)?
         .iter()
         .map(|entry| {
-            (
-                entry["guid"].as_str().unwrap_or_default(),
-                entry["subContractGuid"].as_str().unwrap_or_default(),
-            )
+            let guid = catalog_v3_consumer::identity(entry, Kind::Contracts)?;
+            let cell = entry
+                .get("subContractGuid")
+                .ok_or("contract sub-identity carrier")?;
+            let value = catalog_v3_consumer::source_value(cell)?;
+            let sub = match (cell.get("state").and_then(Value::as_str), value) {
+                (Some("present"), Some(Value::String(sub))) => sub.as_str(),
+                (Some("absent"), None) => "",
+                _ => return Err("contract sub-identity must be present or absent".into()),
+            };
+            Ok((guid, sub))
         })
-        .collect();
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
     assert!(
         identities.is_sorted_by(|a, b| a < b),
         "contracts strictly ordered by guid and subContractGuid, none twice"

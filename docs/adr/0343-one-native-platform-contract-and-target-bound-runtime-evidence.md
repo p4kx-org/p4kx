@@ -8,10 +8,11 @@ contract. OS, binary architecture and package kind have distinct typed represent
 update library; installer and distribution-specific architecture spellings remain source data.
 
 The compiler is selected with its full native host suffix while retaining the exact compiler
-release pin. Build/test artifacts, cache identities and native archive evidence include the Rust
-target. Consumers refuse a source, architecture, compiler, nextest or digest mismatch before
-running tests. PE/ELF machine inspection establishes binary identity; native CLI/MCP/GUI smoke
-steps establish executed behavior.
+release pin. Build/test artifacts and cache identities include the Rust target. Consumers compare
+the native archive's recorded target, operating system and architecture with the selected platform
+row. They refuse missing or conflicting platform fields and source, compiler, nextest or digest
+mismatches before running tests. PE/ELF machine inspection establishes binary identity. Native
+CLI/MCP/GUI smoke steps establish executed behavior.
 
 Runtime evidence records actual successful GitHub step outcomes. Missing or skipped required
 smoke cases cannot produce a successful artifact. Its scope is native synthetic verification;

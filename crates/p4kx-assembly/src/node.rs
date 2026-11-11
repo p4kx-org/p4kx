@@ -4,6 +4,8 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use p4kx_dataforge::Record;
+
 use crate::entities::describe;
 use crate::geometry_choice::GeometryChoice;
 use crate::merge::port_key;
@@ -17,8 +19,9 @@ use crate::spec::{EntitySpec, EntrySpec, LoadoutOrigin, LoadoutSpec, TargetSpec}
 use crate::vehicle::flags_contain;
 use crate::walk::Walk;
 use crate::{
-    Attachment, EntityNode, LoadoutError, PortConstraints, PortNode, PortSource, PortVisibility,
-    Target, Unresolved, VehicleImplementation,
+    Attachment, EntityNode, LoadoutError, LoadoutReferenceSelection, LoadoutTargetGuid,
+    LoadoutXmlClassUse, PortConstraints, PortNode, PortSource, PortVisibility, Target, Unresolved,
+    VehicleImplementation,
 };
 
 /// Returns the flags `spec`'s port container gives all its ports when they choose a sub-geometry:
@@ -39,6 +42,7 @@ struct Pending<'s> {
     target: &'s TargetSpec,
     loadout: Option<&'s LoadoutSpec>,
     origin: Option<&'s LoadoutOrigin>,
+    xml_use: Option<&'s LoadoutXmlClassUse>,
 }
 
 impl LoadoutResolver<'_> {
@@ -131,7 +135,7 @@ impl LoadoutResolver<'_> {
             origin: pending.origin.cloned(),
         };
         if !self.change(&mut node, walk) {
-            node.attachment = self.attach(pending.target, pending.loadout, walk);
+            node.attachment = self.attach(pending.target, pending.loadout, pending.xml_use, walk);
             if matches!(node.attachment, Attachment::Empty) {
                 node.nested = self.nested_ports(pending.loadout, walk, issues);
             }
@@ -147,32 +151,40 @@ impl LoadoutResolver<'_> {
         &mut self,
         target: &TargetSpec,
         loadout: Option<&LoadoutSpec>,
+        xml_use: Option<&LoadoutXmlClassUse>,
         walk: &mut Walk,
     ) -> Attachment {
+        let failure = |named, error| unresolved(named, error, target);
         if self.observation_stopped() {
-            return unresolved(Target::Unreadable, LoadoutError::ObservationStopped);
+            return failure(Target::Unreadable, LoadoutError::ObservationStopped);
         }
         let named = match target {
             TargetSpec::None => return Attachment::Empty,
             TargetSpec::Invalid(reason) => {
-                return unresolved(
+                return failure(
                     Target::Unreadable,
                     LoadoutError::InvalidReference { reason: *reason },
                 );
             }
-            TargetSpec::Reference(guid) => Target::Reference(*guid),
-            TargetSpec::ClassName(name) => Target::ClassName(name.clone()),
+            TargetSpec::Reference(reference) => Target::Reference(reference.guid()),
+            TargetSpec::ClassName(name) => Target::ClassName(name.value().to_owned()),
         };
         let Some(record) = self.record_of(target) else {
             let error = match target {
-                TargetSpec::Reference(guid) => LoadoutError::DanglingReference { guid: *guid },
+                TargetSpec::Reference(reference) => LoadoutError::DanglingReference {
+                    guid: LoadoutTargetGuid::from_reference(reference),
+                },
                 _ => LoadoutError::UnknownClass {
                     name: class_text(target),
                 },
             };
-            return unresolved(named, error);
+            return failure(named, error);
         };
-        let guid = record.guid();
+        let selected = match self.selected_target(target, &record) {
+            Ok(selected) => selected,
+            Err(error) => return failure(named, error),
+        };
+        let guid = selected.guid();
         if let Some(error) = walk.limit(guid) {
             if matches!(error, LoadoutError::TooDeep)
                 && resolver_observation::notify(
@@ -181,14 +193,14 @@ impl LoadoutResolver<'_> {
                 )
                 .is_err()
             {
-                return unresolved(named, LoadoutError::ObservationStopped);
+                return failure(named, LoadoutError::ObservationStopped);
             }
-            return unresolved(named, error);
+            return failure(named, error.with_target(&selected, xml_use));
         }
         let spec = self.spec_record(&record);
         let spec = match spec.as_ref() {
             Ok(spec) => spec,
-            Err(error) => return unresolved(named, error.clone()),
+            Err(error) => return failure(named, error.clone().with_target(&selected, xml_use)),
         };
         walk.ancestors.push(guid);
         let mut child = self.node(spec, loadout, walk);
@@ -201,14 +213,33 @@ impl LoadoutResolver<'_> {
         Attachment::Entity(Box::new(child))
     }
 
+    fn selected_target(
+        &self,
+        target: &TargetSpec,
+        record: &Record<'_>,
+    ) -> Result<LoadoutTargetGuid, LoadoutError> {
+        match target {
+            TargetSpec::ClassName(class) => {
+                if let (Some(observation), Some(selection)) =
+                    (self.observation.as_deref(), class.selection())
+                {
+                    observation.class_record(selection, record)?;
+                }
+                Ok(LoadoutTargetGuid::from_class(record.guid(), class))
+            }
+            TargetSpec::Reference(reference) => Ok(LoadoutTargetGuid::from_reference(reference)),
+            _ => Ok(LoadoutTargetGuid::unbound(record.guid())),
+        }
+    }
+
     /// Returns the ambiguity of a class name that several Entities have, if it is one.
     fn ambiguity(&self, target: &TargetSpec) -> Option<LoadoutError> {
         let TargetSpec::ClassName(name) = target else {
             return None;
         };
-        let candidates = self.entities.class_candidates(name);
+        let candidates = self.entities.class_candidates(name.value());
         (candidates.len() > 1).then(|| LoadoutError::AmbiguousClass {
-            name: name.clone(),
+            name: name.value().to_owned(),
             candidates: candidates.iter().map(describe).collect(),
         })
     }
@@ -239,6 +270,7 @@ fn pending_ports<'s>(
             target: &TargetSpec::None,
             loadout: None,
             origin: None,
+            xml_use: None,
         });
     let from_entries = entries.iter().map(|(entry, source)| Pending {
         name: &entry.port,
@@ -249,6 +281,7 @@ fn pending_ports<'s>(
         target: &entry.target,
         loadout: entry.loadout.as_ref(),
         origin: Some(&entry.origin),
+        xml_use: entry.xml_use.as_ref(),
     });
     let defined = spec
         .ports
@@ -265,6 +298,7 @@ fn pending_ports<'s>(
             target: &port.default_item,
             loadout: None,
             origin: (port.default_item != TargetSpec::None).then_some(&spec.origin),
+            xml_use: None,
         });
     from_entries.chain(defined).chain(declared)
 }
@@ -308,7 +342,7 @@ fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode 
         landing_gear: Arc::from([]),
         docked_vehicle,
         loadout_file: match &spec.loadout {
-            Some(LoadoutSpec::Xml(path)) => Some(Arc::clone(path)),
+            Some(LoadoutSpec::Xml(path)) => Some(Arc::clone(path.text())),
             _ => None,
         },
         expanded,
@@ -325,11 +359,20 @@ fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode 
 
 fn class_text(target: &TargetSpec) -> String {
     match target {
-        TargetSpec::ClassName(name) => name.clone(),
+        TargetSpec::ClassName(name) => name.value().to_owned(),
         _ => String::new(),
     }
 }
 
-const fn unresolved(target: Target, error: LoadoutError) -> Attachment {
-    Attachment::Unresolved(Unresolved { target, error })
+fn unresolved(target: Target, error: LoadoutError, source: &TargetSpec) -> Attachment {
+    let error = match source {
+        TargetSpec::Reference(reference) => error.with_reference(reference),
+        _ => error,
+    };
+    let reference: Option<LoadoutReferenceSelection> = source.reference_selection().cloned();
+    Attachment::Unresolved(Unresolved {
+        target,
+        error,
+        reference,
+    })
 }

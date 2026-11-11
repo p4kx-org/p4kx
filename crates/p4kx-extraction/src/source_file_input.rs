@@ -3,24 +3,24 @@
 
 use p4kx_archive::BuildManifestOrigin;
 
-use crate::DataForgeFileOrigin;
+use crate::ObservedFileOrigin;
 use crate::source_value::SourceValue;
 
 pub(crate) enum FileInput {
-    DataForge(DataForgeFileOrigin),
+    Observed(ObservedFileOrigin),
     BuildManifest(BuildManifestOrigin),
 }
 
 #[derive(Clone, Copy)]
 pub(crate) enum FileInputRef<'a> {
-    DataForge(&'a DataForgeFileOrigin),
+    Observed(&'a ObservedFileOrigin),
     BuildManifest(&'a BuildManifestOrigin),
 }
 
 impl FileInputRef<'_> {
     pub(crate) fn is_same_input(self, other: &FileInput) -> bool {
         match (self, other) {
-            (Self::DataForge(left), FileInput::DataForge(right)) => left.is_same_input(right),
+            (Self::Observed(left), FileInput::Observed(right)) => left.is_same_input(right),
             (Self::BuildManifest(left), FileInput::BuildManifest(right)) => {
                 left.is_same_input(right)
             }
@@ -30,14 +30,14 @@ impl FileInputRef<'_> {
 
     pub(crate) fn into_owned(self) -> FileInput {
         match self {
-            Self::DataForge(origin) => FileInput::DataForge(origin.clone()),
+            Self::Observed(origin) => FileInput::Observed(origin.clone()),
             Self::BuildManifest(origin) => FileInput::BuildManifest(origin.clone()),
         }
     }
 
     pub(crate) fn name(self) -> SourceValue<String> {
         match self {
-            Self::DataForge(origin) => origin
+            Self::Observed(origin) => origin
                 .path()
                 .file_name()
                 .map_or(SourceValue::Absent, |name| {
@@ -49,7 +49,7 @@ impl FileInputRef<'_> {
 
     pub(crate) fn byte_length(self) -> u64 {
         match self {
-            Self::DataForge(origin) => origin.stamp().size(),
+            Self::Observed(origin) => origin.stamp().size(),
             Self::BuildManifest(origin) => origin.byte_length(),
         }
     }

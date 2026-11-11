@@ -45,8 +45,10 @@ a neighboring field's origins. Unknown fields do not create guessed edges. Origi
 InvalidPointer, OwnedTwice and depth errors remain unreadable at the original slot.
 An actual repeated pointer is not converted into a successful shared node or cycle.
 
-The flat form preserves the existing legal source depth without expanding each source
-edge into recursive JSON envelopes. Consumers use ordinary bounded JSON parsing.
+The reader uses an explicit stack to traverse every materialized Sequence slot in order.
+It keeps one mutable field path for the current traversal. The flat output does not add a
+Sequence nesting limit or expand each edge into recursive JSON envelopes. Consumers use
+ordinary bounded JSON parsing.
 Schema checks required cells, closed payload tags and u32 link storage. A canonical
 graph consumer additionally checks root zero, range, exactly one owner per node,
 cycles, reachability and preorder. It accepts equal independently original nodes.

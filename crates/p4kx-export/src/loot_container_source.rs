@@ -5,34 +5,39 @@ use std::path::Path;
 
 use p4kx_extraction::{Archive, Entry};
 
-use crate::Kind;
-use crate::container_read;
+use crate::catalog_read::original::{EntryCapture, EntryDiagnosis, EntryRead};
 use crate::entry_source::EntrySource;
 use crate::export_diagnostic::ExportDiagnosticCode;
 use crate::export_entry_ledger::EntryOperation;
-use crate::export_ledger::{ExportLedger, SourceDiagnosis, SourceDisposition};
-use crate::loot_entxml::{self, EntityLink};
+use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::loot_entxml::{self, CapturedEntityLink};
 use crate::loot_unreadable::Unreadable;
 use crate::starmap_index;
+use crate::{CatalogError, Kind};
 
 const MAX_ENTXML_LEN: u64 = 1 << 20;
 
 /// The actual source operations and readable entity links of one container.
 #[derive(Default)]
 pub(crate) struct Read {
-    pub(crate) links: Vec<(String, EntityLink)>,
+    pub(crate) links: Vec<(String, CapturedEntityLink)>,
     pub(crate) unreadable: Option<Unreadable>,
     pub(crate) ledger: ExportLedger,
 }
 
 /// Reads each selected entity file once and retains read and XML projection failures.
-pub(crate) fn read(archive: &Archive, entry: usize) -> Read {
+pub(crate) fn read(
+    archive: &Archive,
+    entry: usize,
+    capture: &EntryCapture<'_>,
+) -> Result<Read, CatalogError> {
     let mut read = Read::default();
     let Some(socpak) = archive.entries().get(entry) else {
         read.unreadable = Some(Unreadable::NoSuchEntry);
-        return read;
+        return Ok(read);
     };
-    let source = EntrySource::outer(socpak);
+    let source = EntrySource::outer(capture, archive, socpak)?;
+    source.receipt().attempted_payload()?;
     let Ok(container) = archive.open_container(socpak) else {
         source.record(
             &mut read.ledger,
@@ -40,7 +45,7 @@ pub(crate) fn read(archive: &Archive, entry: usize) -> Read {
             SourceDisposition::ReadFailed,
         );
         read.unreadable = Some(Unreadable::NotAContainer);
-        return read;
+        return Ok(read);
     };
     source.record(
         &mut read.ledger,
@@ -52,34 +57,39 @@ pub(crate) fn read(archive: &Archive, entry: usize) -> Read {
         .iter()
         .filter(|inner| is_entity_file(inner.path()));
     for inner in entity_files {
-        read_entity(&container, socpak, inner, &mut read);
+        read_entity(archive, &container, socpak, inner, &mut read, capture)?;
     }
-    read
+    Ok(read)
 }
 
-fn read_entity(container: &Archive, socpak: &Entry, inner: &Entry, read: &mut Read) {
-    let source = EntrySource::inner(socpak, inner).operation(EntryOperation::EntityLinks);
-    let Some(bytes) = container_read::read_limited(container, inner, MAX_ENTXML_LEN) else {
+fn read_entity(
+    archive: &Archive,
+    container: &Archive,
+    socpak: &Entry,
+    inner: &Entry,
+    read: &mut Read,
+    capture: &EntryCapture<'_>,
+) -> Result<(), CatalogError> {
+    let source = EntrySource::inner(capture, archive, socpak, container, inner)?
+        .operation(EntryOperation::EntityLinks);
+    let Ok(bytes) = EntryRead::read(source.receipt().clone(), container, inner, MAX_ENTXML_LEN)?
+    else {
         source.record(
             &mut read.ledger,
             Kind::LootContainers,
             SourceDisposition::ReadFailed,
         );
         read.unreadable = Some(Unreadable::EntityFile);
-        return;
+        return Ok(());
     };
-    match loot_entxml::read(&bytes) {
+    match loot_entxml::read_original(&bytes, capture)? {
         Ok(link) => {
-            if link.malformed_config {
+            if link.value().malformed_config {
                 source.diagnosed(
                     &mut read.ledger,
                     Kind::LootContainers,
                     SourceDisposition::ProjectionFailed,
-                    SourceDiagnosis {
-                        code: Some(ExportDiagnosticCode::MalformedSource),
-                        field: Some("multiConfigRef".to_owned()),
-                        ..SourceDiagnosis::default()
-                    },
+                    EntryDiagnosis::field(ExportDiagnosticCode::MalformedSource, "multiConfigRef"),
                 );
             } else {
                 source.record(
@@ -99,6 +109,7 @@ fn read_entity(container: &Archive, socpak: &Entry, inner: &Entry, read: &mut Re
             read.unreadable = Some(Unreadable::EntityXml(error));
         }
     }
+    Ok(())
 }
 
 fn is_entity_file(path: &str) -> bool {

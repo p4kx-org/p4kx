@@ -66,7 +66,7 @@ fn run(
             },
             &capture,
         )
-        .map_err(|failure| failure.reason)?;
+        .map_err(|failure| failure.reason().to_owned())?;
     }
     Ok(capture.finish()?)
 }
@@ -95,7 +95,8 @@ fn actual_xml_read_and_projection_keep_one_entry_identity_and_cache_reuse() -> T
             "the actual Archive table position is retained"
         );
         assert_eq!(
-            entry.path, ACTUAL,
+            entry.path.as_str(),
+            ACTUAL,
             "canonical Entry spelling comes from the actual Archive"
         );
         assert_eq!(
@@ -204,7 +205,8 @@ fn configured_missing_xml_is_known_absent_and_does_not_invent_an_incomplete_inve
         "no Archive index is fabricated"
     );
     assert_eq!(
-        ledger.entries[0].path, CONFIGURED,
+        ledger.entries[0].path.as_str(),
+        CONFIGURED,
         "the configured target remains available"
     );
     assert_eq!(

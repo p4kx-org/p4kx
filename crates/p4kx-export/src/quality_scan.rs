@@ -4,31 +4,40 @@
 use p4kx_extraction::{CancelToken, RecordTree};
 
 use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
-use crate::commodity_backfill_input::CommodityInputCapture;
+use crate::catalog_read::original::OriginalFlowFields;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
+use crate::record_observation::RecordObservation;
 use crate::selection::Kind;
+use crate::template_field_capture::TemplateFieldCapture;
 
 use super::{Input, Retention, eligibility, read, resource_links};
 
 pub(crate) fn distribution<'f>(
     tree: &RecordTree<'f>,
-    origins: &CatalogOrigins,
+    admission: &RecordObservation<'_, 'f>,
+    input: &OriginalCatalogInput<'_, '_>,
     retention: Retention,
     role: ExportSourceRole,
     ledger: &mut ExportLedger,
     cancel: Option<&CancelToken>,
 ) -> Result<Input<'f>, CatalogError> {
-    let found = read::distribution(tree, origins, cancel)?;
+    let origins = input.origins();
+    let scope = input.record_scope(admission.record(), tree)?;
+    let original = OriginalFlowFields::read(&scope, cancel)?;
+    let capture = TemplateFieldCapture::new(&original, input, admission)?;
+    let found = read::distribution(tree, origins, cancel, &capture)?;
     crate::source_projection_notes::record(
         Kind::QualityDistributions,
         role,
+        admission,
         tree,
         found.notes,
         ledger,
-    );
+    )?;
     exclude(tree, Kind::QualityDistributions, retention, ledger);
     Ok(Input::Distribution {
         definition: found.value,
@@ -38,21 +47,43 @@ pub(crate) fn distribution<'f>(
 
 pub(crate) fn quantization<'f>(
     tree: &RecordTree<'f>,
-    origins: &CatalogOrigins,
+    admission: &RecordObservation<'_, 'f>,
+    input: &OriginalCatalogInput<'_, '_>,
     retention: Retention,
     role: ExportSourceRole,
     ledger: &mut ExportLedger,
     cancel: Option<&CancelToken>,
 ) -> Result<Input<'f>, CatalogError> {
-    let found = read::quantization(tree, origins, cancel)?;
+    let origins = input.origins();
+    let scope = input.record_scope(admission.record(), tree)?;
+    let original = OriginalFlowFields::read(&scope, cancel)?;
+    let capture = TemplateFieldCapture::new(&original, input, admission)?;
+    let found = read::quantization(tree, origins, cancel, &capture)?;
     crate::source_projection_notes::record(
         Kind::QualityQuantizations,
         role,
+        admission,
         tree,
         found.notes,
         ledger,
-    );
-    let mut eligible = eligibility::read(tree, origins, cancel)?;
+    )?;
+    let eligible = quantization_eligibility(tree, origins, &original, role, cancel)?;
+    exclude(tree, Kind::QualityQuantizations, retention, ledger);
+    Ok(Input::Quantization {
+        definition: found.value,
+        eligibility: eligible,
+        retention,
+    })
+}
+
+fn quantization_eligibility<'source>(
+    tree: &RecordTree<'source>,
+    origins: &CatalogOrigins,
+    original: &OriginalFlowFields<'_, '_, 'source>,
+    role: ExportSourceRole,
+    cancel: Option<&CancelToken>,
+) -> Result<eligibility::Eligibility, CatalogError> {
+    let mut eligible = eligibility::read(tree, origins, original, cancel)?;
     let context = origins.record(tree.record_index());
     for field in [
         RecordHeaderInput::NormalizedPath,
@@ -67,26 +98,16 @@ pub(crate) fn quantization<'f>(
             true,
         )?;
     }
-    exclude(tree, Kind::QualityQuantizations, retention, ledger);
-    Ok(Input::Quantization {
-        definition: found.value,
-        eligibility: eligible,
-        retention,
-    })
+    Ok(eligible)
 }
 
 pub(crate) fn resources<'f>(
     tree: &RecordTree<'f>,
-    origins: &CatalogOrigins,
-    ledger: &mut ExportLedger,
+    input: &OriginalCatalogInput<'_, '_>,
+    admission: &RecordObservation<'_, 'f>,
     cancel: Option<&CancelToken>,
 ) -> Result<Input<'f>, CatalogError> {
-    let mut capture = CommodityInputCapture::new(tree.record_index());
-    let found = resource_links::read(tree, origins, &mut capture, cancel)?;
-    let captured = capture.finish();
-    ledger.commodity_backfill_inputs.extend(captured.inputs);
-    ledger.commodity_input_limits.extend(captured.limits);
-    Ok(Input::Resource(found))
+    resource_links::read(tree, input, admission, cancel).map(Input::Resource)
 }
 
 fn exclude(tree: &RecordTree<'_>, kind: Kind, retention: Retention, ledger: &mut ExportLedger) {

@@ -3,35 +3,32 @@
 
 use p4kx_extraction::RecordTree;
 
+use crate::CatalogError;
 use crate::export_diagnostic::{
-    ExportDiagnostic, ExportDiagnosticCode, ExportDiagnosticExample, ExportDiagnosticSeverity,
-    ExportDiagnosticStage, ExportDiagnosticUnit, ExportSourceRole,
+    ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit, ExportSourceRole,
 };
 use crate::export_ledger::ExportLedger;
+use crate::health_diagnostic_observation::DiagnosticObservation;
+use crate::record_observation::RecordObservation;
 use crate::selection::Kind;
 use crate::source_fields::FieldError;
 
-/// Retains exact source identities for unsupported or malformed projected source fields.
+/// Retains projected-field diagnostics with the actual owning Record admission.
 pub(crate) fn record(
     kind: Kind,
     role: ExportSourceRole,
+    admission: &RecordObservation<'_, '_>,
     tree: &RecordTree<'_>,
     notes: Vec<FieldError>,
     ledger: &mut ExportLedger,
-) {
+) -> Result<(), CatalogError> {
+    admission.check_tree(tree)?;
     for note in notes {
-        let (source_type, field, code) = match note {
-            FieldError::Malformed {
-                source_type, field, ..
-            } => (source_type, field, ExportDiagnosticCode::MalformedSource),
-            FieldError::Unreadable {
-                source_type, field, ..
-            } => (source_type, field, ExportDiagnosticCode::UnreadableSource),
-            FieldError::Unsupported { source_type, field } => {
-                (source_type, field, ExportDiagnosticCode::UnsupportedValue)
-            }
-        };
-        ledger.field_diagnostic(ExportDiagnostic {
+        let description = note.description();
+        let code = crate::export_projection_fields::code(description.issue);
+        let diagnosis = crate::export_projection_fields::field(&description, note.body());
+        let example = diagnosis.example(admission.subject().clone())?;
+        ledger.field_diagnostic(DiagnosticObservation {
             kind: Some(kind),
             stage: ExportDiagnosticStage::Projection,
             code,
@@ -40,14 +37,8 @@ pub(crate) fn record(
             warning_code: None,
             count: 1,
             count_unit: ExportDiagnosticUnit::Values,
-            examples: vec![ExportDiagnosticExample {
-                record_index: Some(tree.record_index()),
-                record_guid: Some(tree.guid().to_string()),
-                record_path: Some(tree.record_path().to_owned()),
-                field: Some(field),
-                source_type: Some(source_type),
-                target_guid: None,
-            }],
+            examples: vec![example],
         });
     }
+    Ok(())
 }

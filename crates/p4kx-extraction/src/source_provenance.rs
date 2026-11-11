@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-pub use crate::field_origin::FieldOrigin;
+pub use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
 pub use crate::field_origin_seed::FieldOriginSeed;
 pub use crate::field_origins::{FieldOrigins, FieldOriginsError};
 pub use crate::field_origins_seed::FieldOriginsSeed;

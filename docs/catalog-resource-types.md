@@ -190,7 +190,7 @@ A reference's `present` status means it resolves to a physical Record, not that 
 emitted. Source-only Entity links for packaging and thumbnails do not require an Entity catalog
 row. Target-header values keep their own sources; an untouched target payload is not a contributor.
 
-Bounded, cancellable inspection captures required resolved target metadata. Final rows and source
+Cancellable inspection captures every materialized resolved-reference occurrence. Final rows and source
 observations determine materialization using the physical target Record index. A different emitted
 Record with the same GUID does not satisfy the link. Health distinguishes `outsideCatalogSelection`,
 `excludedByFilter`, `excludedByPolicy`, `targetReadFailed`, `targetProjectionFailed`,
@@ -199,10 +199,12 @@ are informational; read/projection failures, unexplained missing output, wrong t
 ambiguous emitted identities block normal publication. Diagnostic mode retains readable data and
 the failure evidence.
 
-Resolved-reference metadata is limited to 4096 references and 1 MiB of logical metadata per physical
-source Record. Exhaustion produces `fieldWalkLimit` and incomplete field inventory. An unreadable
-Record type remains an unknown selection candidate; a readable path excluded by a Filter is
-excluded before generic type classification.
+Resolved-reference inspection has no separate count, metadata-byte, value-count or nesting cutoff.
+Repeated source-type and target-header spellings share immutable storage within each inspection;
+each ordered reference occurrence and its physical target identity remain distinct. Existing
+canonical decoder limit errors still produce `fieldWalkLimit` and incomplete field inventory.
+An unreadable Record type remains an unknown selection candidate; a readable path excluded by a
+Filter is excluded before generic type classification. See [ADR-0363](adr/0363-catalog-inspection-visits-every-materialized-occurrence.md).
 
 The internal crafting scope reads unfiltered ResourceType reverse links when a selected
 non-leftover quantization target needs them; uncertain target metadata is conservative. Otherwise

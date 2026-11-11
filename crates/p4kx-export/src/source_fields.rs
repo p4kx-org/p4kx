@@ -3,9 +3,25 @@
 
 use p4kx_extraction::{StructValue, Value, ValueError};
 
-use crate::definition_reference::{DefinitionReference, DefinitionStatus};
-use crate::guid_text::CatalogGuid;
-use crate::record_fields;
+use crate::definition_reference::DefinitionReference;
+
+use crate::catalog_read::original::ExampleBodyReceipt;
+
+#[path = "source_checked_fields.rs"]
+mod checked;
+#[path = "source_field_description.rs"]
+mod description;
+#[path = "source_field_reads.rs"]
+mod reads;
+#[path = "source_reference_shape.rs"]
+mod reference_shape;
+#[path = "source_field_violation.rs"]
+mod violation;
+pub(crate) use checked::{FieldCapture, FieldChecks, unknown_struct};
+pub(crate) use description::{FieldDescription, FieldIssue};
+pub(crate) use violation::FieldViolation;
+
+pub(crate) use reference_shape::{ReferenceShape, ReferenceSlot};
 
 /// A typed projection failure with its complete owning source field location.
 #[derive(Debug, thiserror::Error)]
@@ -24,17 +40,46 @@ pub(crate) enum FieldError {
     },
     #[error("{source_type}.{field} has an unsupported source declaration")]
     Unsupported { source_type: String, field: String },
+    #[error(transparent)]
+    Captured(Box<CapturedFieldError>),
 }
 
+/// One allocation owning a field failure and its deferred original receipt.
+#[derive(Debug, thiserror::Error)]
+#[error("{error}")]
+pub(crate) struct CapturedFieldError {
+    #[source]
+    error: FieldError,
+    body: ExampleBodyReceipt,
+}
+
+impl CapturedFieldError {
+    pub(crate) const fn error(&self) -> &FieldError {
+        &self.error
+    }
+}
+
+impl FieldError {
+    pub(crate) fn with_body(self, body: ExampleBodyReceipt) -> Self {
+        Self::Captured(Box::new(CapturedFieldError { error: self, body }))
+    }
+
+    pub(crate) fn body(&self) -> Option<&ExampleBodyReceipt> {
+        match self {
+            Self::Captured(captured) => Some(&captured.body),
+            _ => None,
+        }
+    }
+}
 /// Strict reads of fields owned by one source struct, without graph following.
-pub(crate) struct Fields<'scope, 'source> {
+pub(crate) struct Fields<'scope, 'source, 'path> {
     source: &'scope StructValue<'source>,
-    path: &'scope str,
+    path: &'path str,
 }
 
-impl<'scope, 'source> Fields<'scope, 'source> {
+impl<'scope, 'source, 'path> Fields<'scope, 'source, 'path> {
     /// Creates field reads at a canonical source location.
-    pub(crate) const fn new(source: &'scope StructValue<'source>, path: &'scope str) -> Self {
+    pub(crate) const fn new(source: &'scope StructValue<'source>, path: &'path str) -> Self {
         Self { source, path }
     }
 
@@ -55,53 +100,18 @@ impl<'scope, 'source> Fields<'scope, 'source> {
         }
     }
 
-    /// Reads a raw source string, retaining an empty value.
-    pub(crate) fn text(&self, name: &str) -> Result<Option<&'source str>, FieldError> {
-        self.optional(name, "a nullable String", |value| match value {
-            Value::String(value) => Some(*value),
-            _ => None,
-        })
-    }
-
-    /// Reads a localisation key, retaining an empty value.
-    pub(crate) fn locale(&self, name: &str) -> Result<Option<&'source str>, FieldError> {
-        self.optional(name, "a nullable Locale", |value| match value {
-            Value::Locale(value) => Some(*value),
-            _ => None,
-        })
-    }
-
-    /// Reads a nullable source boolean without replacing false.
-    pub(crate) fn boolean(&self, name: &str) -> Result<Option<bool>, FieldError> {
-        self.optional(name, "a nullable Bool", |value| match value {
-            Value::Bool(value) => Some(*value),
-            _ => None,
-        })
-    }
-
     /// Reads an exact source `Int32`, without conversion from another numeric kind.
     pub(crate) fn int32(&self, name: &str) -> Result<Option<i32>, FieldError> {
-        self.optional(name, "a nullable Int32", |value| match value {
-            Value::Int32(value) => Some(*value),
-            _ => None,
-        })
-    }
-
-    /// Reads a finite source `Single`, without clamping or changing its unit.
-    pub(crate) fn single(&self, name: &str) -> Result<Option<f32>, FieldError> {
-        self.optional(name, "a nullable finite Single", |value| match value {
-            Value::Single(value) if value.is_finite() => Some(*value),
-            _ => None,
-        })
+        reads::FieldReads::new(self.source, self.path)
+            .int32(name)
+            .map_err(FieldViolation::into_error)
     }
 
     /// Reads a finite number representable by the catalog's 32-bit float payload.
     pub(crate) fn number(&self, name: &str) -> Result<Option<f32>, FieldError> {
-        self.optional(
-            name,
-            "a finite number representable as a 32-bit float",
-            |_| record_fields::number(Some(self.source), name),
-        )
+        reads::FieldReads::new(self.source, self.path)
+            .number(name)
+            .map_err(FieldViolation::into_error)
     }
 
     /// Reads an owned struct without turning an unreadable pointer into null.
@@ -109,49 +119,42 @@ impl<'scope, 'source> Fields<'scope, 'source> {
         &self,
         name: &str,
     ) -> Result<Option<&'scope StructValue<'source>>, FieldError> {
-        self.optional(name, "a nullable owned struct", |value| match value {
-            Value::Struct(value) => Some(value),
-            _ => None,
-        })
+        reads::FieldReads::new(self.source, self.path)
+            .structure(name)
+            .map_err(FieldViolation::into_error)
     }
 
     /// Reads an array while retaining the difference between null and empty.
     pub(crate) fn array(&self, name: &str) -> Result<Option<&'scope [Value<'source>]>, FieldError> {
-        self.optional(name, "a nullable array", |value| match value {
-            Value::Array(value) => Some(value.as_ref()),
-            _ => None,
-        })
+        reads::FieldReads::new(self.source, self.path)
+            .array(name)
+            .map_err(FieldViolation::into_error)
+    }
+
+    /// Borrows the checked Record Reference shape without owning target text.
+    pub(crate) fn reference_view(
+        &self,
+        name: &str,
+    ) -> Result<Option<ReferenceShape<'scope, 'source>>, FieldError> {
+        reads::FieldReads::new(self.source, self.path)
+            .reference(name)
+            .map_err(FieldViolation::into_error)
+    }
+
+    /// Borrows the original value selected by the checked Record Reference read.
+    pub(crate) fn reference_slot(
+        &self,
+        name: &str,
+    ) -> Result<Option<ReferenceSlot<'scope, 'source>>, FieldError> {
+        reads::FieldReads::new(self.source, self.path)
+            .reference_slot(name)
+            .map_err(FieldViolation::into_error)
     }
 
     /// Reads a Record Reference with its physical target and unresolved identity.
     pub(crate) fn reference(&self, name: &str) -> Result<Option<DefinitionReference>, FieldError> {
-        self.source
-            .field(name)
-            .map(|value| reference(value).map_err(|expected| self.invalid(name, value, expected)))
-            .transpose()
-            .map(Option::flatten)
+        Ok(self.reference_view(name)?.map(ReferenceShape::into_owned))
     }
-
-    /// Reads an authored Reference list, retaining null entries and repetitions.
-    pub(crate) fn references(
-        &self,
-        name: &str,
-    ) -> Result<Option<Vec<Option<DefinitionReference>>>, FieldError> {
-        self.array(name)?
-            .map(|values| {
-                values
-                    .iter()
-                    .enumerate()
-                    .map(|(index, value)| {
-                        reference(value).map_err(|expected| {
-                            self.invalid(&format!("{name}[{index}]"), value, expected)
-                        })
-                    })
-                    .collect()
-            })
-            .transpose()
-    }
-
     /// Describes an invalid stored value without retaining its arbitrary contents.
     pub(crate) fn invalid(
         &self,
@@ -173,20 +176,6 @@ impl<'scope, 'source> Fields<'scope, 'source> {
         }
     }
 
-    fn optional<T>(
-        &self,
-        name: &str,
-        expected: &'static str,
-        read: impl FnOnce(&'scope Value<'source>) -> Option<T>,
-    ) -> Result<Option<T>, FieldError> {
-        match self.source.field(name) {
-            None | Some(Value::Null) => Ok(None),
-            Some(value) => read(value)
-                .map(Some)
-                .ok_or_else(|| self.invalid(name, value, expected)),
-        }
-    }
-
     fn location(&self, name: &str) -> String {
         match (self.path.is_empty(), name.is_empty()) {
             (true, _) => name.to_owned(),
@@ -197,32 +186,8 @@ impl<'scope, 'source> Fields<'scope, 'source> {
 }
 
 fn reference(value: &Value<'_>) -> Result<Option<DefinitionReference>, &'static str> {
-    let (guid, status) = match value {
-        Value::Null => return Ok(None),
-        Value::Reference(target) if target.location().is_none() => {
-            return Ok(Some(DefinitionReference {
-                target_record_index: Some(target.record_index()),
-                guid: CatalogGuid(target.guid()),
-                record_path: Some(target.record_path().to_owned()),
-                target_type: Some(target.type_name().to_owned()),
-                status: DefinitionStatus::Present,
-            }));
-        }
-        Value::Error(ValueError::DanglingReference { guid }) => (*guid, DefinitionStatus::Dangling),
-        Value::Error(ValueError::UnexpectedReferenceType { guid, .. }) => {
-            (*guid, DefinitionStatus::UnexpectedTargetType)
-        }
-        _ => return Err("a nullable Record Reference"),
-    };
-    Ok(Some(DefinitionReference {
-        target_record_index: None,
-        guid: CatalogGuid(guid),
-        record_path: None,
-        target_type: None,
-        status,
-    }))
+    reference_shape::read(value).map(|target| target.map(ReferenceShape::into_owned))
 }
-
 /// Reads a nullable array entry as an owned struct at its indexed source position.
 pub(crate) fn entry<'scope, 'source>(
     value: &'scope Value<'source>,

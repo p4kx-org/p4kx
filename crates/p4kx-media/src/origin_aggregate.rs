@@ -23,7 +23,7 @@ pub(crate) fn resolve(
             artifact(resolver, pointer).map(Some)
         }
         _ if pointer == "/data"
-            || (pointer == "/data/payload" && (shader(resolver) || material(resolver))) =>
+            || (pointer == "/data/payload" && (shader(resolver) || prepared_data(resolver))) =>
         {
             data(resolver, prepared).map(Some)
         }
@@ -43,7 +43,7 @@ fn record(
     let mut capture = OriginCapture::with_limit(resolver.owner, resolver.detail_bytes);
     capture.include_original(&origin_source::whole(resolver)?)?;
     capture.include_original(&data(resolver, prepared)?)?;
-    if resolver.builtin.is_some() {
+    if resolver.builtin.is_some() && !audio(resolver) {
         capture.include_original(&resolver.resolve("/subresource", None)?)?;
     }
     if let Some(prepared) = prepared {
@@ -51,6 +51,8 @@ fn record(
     }
     if material(resolver) {
         capture.include_original(&resolver.resolve("/issues", None)?)?;
+    } else if audio(resolver) {
+        capture.include_original(&resolver.resolve("/issues", prepared)?)?;
     } else {
         capture.include_original(&OriginContributions::unknown(resolver.owner))?;
     }
@@ -97,7 +99,7 @@ fn data(
             }
         }
     }
-    if !material(resolver) {
+    if !prepared_data(resolver) {
         capture.include_original(&OriginContributions::unknown(resolver.owner))?;
     }
     Ok(capture.finish())
@@ -149,6 +151,8 @@ const fn known_members(profile: OriginProfile) -> &'static [&'static str] {
         OriginProfile::MaterialConfigurationFailure => &["/data/record_type"],
         OriginProfile::ArchiveLayout
         | OriginProfile::Unmigrated
+        | OriginProfile::AudioWem
+        | OriginProfile::AudioBank
         | OriginProfile::ArchiveBuild
         | OriginProfile::IndexBuild => &[],
     }
@@ -172,19 +176,31 @@ fn material(resolver: &OriginResolver<'_>) -> bool {
         .builtin
         .is_some_and(|builtin| crate::origin_material_profile::owns(builtin.profile))
 }
+fn audio(resolver: &OriginResolver<'_>) -> bool {
+    resolver.builtin.is_some_and(|builtin| {
+        matches!(
+            builtin.profile,
+            OriginProfile::AudioWem | OriginProfile::AudioBank
+        )
+    })
+}
+fn prepared_data(resolver: &OriginResolver<'_>) -> bool {
+    material(resolver) || audio(resolver)
+}
 fn known_data(
     resolver: &OriginResolver<'_>,
     pointer: &str,
     prepared: Option<&PreparedRecordOrigins>,
 ) -> Result<OriginContributions, MediaError> {
     let mut capture = OriginCapture::with_limit(resolver.owner, resolver.detail_bytes);
-    capture.include_original(
-        &resolver.direct(pointer, material(resolver).then_some(prepared).flatten())?,
-    )?;
+    capture.include_original(&resolver.direct(
+        pointer,
+        prepared_data(resolver).then_some(prepared).flatten(),
+    )?)?;
     if let Some(prepared) = prepared {
         prepared.include_known(pointer, &mut capture)?;
     }
-    if !material(resolver) {
+    if !prepared_data(resolver) {
         capture.include_original(&OriginContributions::unknown(resolver.owner))?;
     }
     Ok(capture.finish())

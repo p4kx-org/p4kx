@@ -3,9 +3,9 @@
 
 use crate::crafting_warning::CraftingWarning;
 use crate::export_diagnostic::{
-    ExportDiagnostic, ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage,
-    ExportDiagnosticUnit,
+    ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
 };
+use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
 use crate::selection::Kind;
 
 /// Maps the established source-warning vocabulary to its affected typed projections and units.

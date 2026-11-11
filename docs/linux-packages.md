@@ -55,6 +55,18 @@ Native synthetic-package checks require that this rule is active and unrelated e
 The Linux window, desktop file, icons and Flatpak use the same reverse-DNS identity
 `io.github.p4kx_org.p4kx`. The existing theme, typefaces and rendering behavior are retained.
 
+## Upgrade and remove installed packages
+
+For a new deb, run `sudo apt install ./P4KX-<version>-<target>.deb` over the existing
+`p4kx` package for the same CPU. Remove it with `sudo apt remove p4kx`.
+
+For a newer Flatpak bundle, run `flatpak install --user --bundle ./P4KX-<version>-<target>.flatpak`.
+The bundle replaces the deployed commit of the existing stable app ref for that CPU. Remove
+the app with `flatpak uninstall --user io.github.p4kx_org.p4kx`. These removal commands
+preserve profile data.
+
+For tar.gz and AppImage, launch the newly extracted directory or new image directly.
+
 ## Profiles, audio and sandbox access
 
 Native packages use the usual XDG profile folders; Flatpak uses its per-application profile.
@@ -171,7 +183,12 @@ SHA, pinned compiler/nextest, baseline, CPU and package hashes before execution.
 - Three actual GUI frames under Xvfb with software graphics, followed by normal exit.
 - Flatpak application and runtime OSTree identity, effective permission metadata, actual FUSE
   Documents-portal read-only input/write-output grants and installation-alias write refusal.
-- deb/Flatpak uninstall and profile-sentinel preservation.
+- In-place upgrades from an older native deb package version and a distinct Flatpak commit
+  under the same application ref, with exact replacement metadata and executable bytes,
+  candidate launch, uninstall and profile-sentinel preservation. Clean install and launch
+  checks run separately. The predecessor packages are workflow-only fixtures built with
+  the same native executables as the release candidate and an earlier package version.
+  v0.5.0 introduces these Linux release formats.
 
 The synthetic Archive comes from `p4kx-testkit`'s `native_fixture` example. No game data or real
 Archive key enters the jobs. An unavailable required capability fails the package job; no skipped

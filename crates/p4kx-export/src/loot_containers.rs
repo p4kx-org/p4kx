@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use p4kx_extraction::{Archive, CancelToken};
 use rayon::prelude::*;
 
-use crate::Kind;
+use crate::catalog_read::original::EntryCapture;
 use crate::contract_loot::{LootContainer, TagCount};
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
@@ -16,6 +16,7 @@ use crate::loot_unreadable::{Unreadable, UnreadableContainer};
 use crate::loot_walk::{Explored, Placed, Summary, below, explore, path_of};
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
+use crate::{CatalogError, Kind};
 
 /// The tag counts of a placed container, or why they cannot be counted.
 type Tags = Result<EntityTags, Unreadable>;
@@ -43,26 +44,27 @@ pub(crate) fn locate(
     opened: &[Opened],
     objects: &Objects,
     cancel: Option<&CancelToken>,
-) -> Located {
+    capture: &EntryCapture<'_>,
+) -> Result<Located, CatalogError> {
     let index = Index::new(archive);
     let Explored {
         summaries,
         beyond_limit,
         mut ledger,
-    } = explore(archive, &index, opened, cancel);
-    let (tags, observed) = read_tags(archive, &summaries, cancel);
+    } = explore(archive, &index, opened, cancel, capture)?;
+    let (tags, observed) = read_tags(archive, &summaries, cancel, capture)?;
     ledger.merge(observed);
     let containers = rows(opened, objects, &summaries, &tags);
     if !cancel.is_some_and(CancelToken::is_cancelled) {
         ledger.inventory(Kind::LootContainers);
     }
-    Located {
+    Ok(Located {
         ledger,
         containers,
         unreadable: unreadable(archive, &summaries, &tags),
         beyond_limit,
         several: several(archive, &summaries),
-    }
+    })
 }
 
 fn rows(
@@ -187,7 +189,8 @@ fn read_tags(
     archive: &Archive,
     summaries: &HashMap<usize, Summary>,
     cancel: Option<&CancelToken>,
-) -> (HashMap<usize, Tags>, ExportLedger) {
+    capture: &EntryCapture<'_>,
+) -> Result<(HashMap<usize, Tags>, ExportLedger), CatalogError> {
     let mut entries: Vec<usize> = summaries
         .values()
         .flat_map(|summary| summary.placed.iter().filter_map(|placed| placed.entry))
@@ -197,15 +200,17 @@ fn read_tags(
     let reads: Vec<_> = entries
         .par_iter()
         .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
-        .map(|&entry| (entry, crate::loot_soc_source::read(archive, entry, cancel)))
-        .collect();
+        .map(|&entry| {
+            crate::loot_soc_source::read(archive, entry, cancel, capture).map(|read| (entry, read))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let mut ledger = ExportLedger::default();
     let mut tags = HashMap::with_capacity(reads.len());
     for (entry, (counted, observed)) in reads {
         tags.insert(entry, counted);
         ledger.merge(observed);
     }
-    (tags, ledger)
+    Ok((tags, ledger))
 }
 
 #[cfg(test)]

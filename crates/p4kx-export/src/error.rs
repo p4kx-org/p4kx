@@ -7,6 +7,8 @@ use p4kx_extraction::{
 };
 use thiserror::Error;
 
+use crate::CatalogRefusal;
+
 /// A Basetool catalog cannot be built.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -14,6 +16,21 @@ pub enum CatalogError {
     /// Shared field-origin evidence was interrupted during mutation.
     #[error(transparent)]
     SourceEvidence(#[from] p4kx_extraction::SourceEvidenceError),
+    /// Retaining the actual source-use set exceeded available storage.
+    #[error("cannot allocate catalog source-use evidence")]
+    SourceUseAllocation(#[source] std::collections::TryReserveError),
+    /// Storage for the original JSON traversal or source arena could not be reserved.
+    #[error("cannot reserve catalog JSON source storage")]
+    JsonSourceAllocation(#[source] std::collections::TryReserveError),
+    /// Storage for a decoded Archive Entry could not be reserved.
+    #[error("cannot reserve catalog storage for an Archive Entry of {size} decoded bytes")]
+    EntryPayloadAllocation {
+        /// Decoded byte length stated by the Entry.
+        size: u64,
+        /// Why storage for the next decoded bytes could not be reserved.
+        #[source]
+        source: std::collections::TryReserveError,
+    },
     /// The original loadout file admission could not be retained.
     #[error(transparent)]
     LoadoutSourceEvidence(LoadoutFileError),
@@ -34,10 +51,7 @@ pub enum CatalogError {
     Accounting(#[from] crate::ExportAccountingError),
     /// Normal publication was refused before any output was created.
     #[error("catalog export is incomplete; explicit diagnostic partial export is required")]
-    IncompleteExport {
-        /// The machine-readable source and projection health that prevented publication.
-        health: Box<crate::ExportHealth>,
-    },
+    IncompleteExport(CatalogRefusal),
     /// The DataForge Entry cannot be found or read.
     #[error(transparent)]
     Load(DataForgeLoadError),
@@ -59,6 +73,15 @@ pub enum CatalogError {
     /// The ship store slug data compiled into the tool is invalid.
     #[error("the ship store slug data is invalid: {0}")]
     StoreSlugs(String),
+    /// A rendered mission text exceeds the platform string length.
+    #[error("rendered mission text exceeds the platform string length")]
+    MissionTextLength,
+    /// Memory for a mission text or its render plan could not be reserved.
+    #[error("cannot reserve memory for mission text")]
+    MissionTextAllocation(#[source] std::collections::TryReserveError),
+    /// An internal mission text plan cannot be resolved.
+    #[error("cannot resolve the mission text render plan")]
+    MissionTextPlan,
     /// The catalog cannot be written as JSON.
     #[error("cannot write the catalog as JSON")]
     Json(#[source] serde_json::Error),

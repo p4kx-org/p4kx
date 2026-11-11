@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::{Attachment, EntityNode, LoadoutError, PortNode, Target};
-use p4kx_extraction::{Guid, Record, ValueError};
+use p4kx_assembly::{
+    Attachment, EntityNode, LoadoutClassSelection, LoadoutError, LoadoutReferenceSelection,
+    LoadoutXmlClassUse, PortNode, Target,
+};
+use p4kx_extraction::{Guid, ValueError};
 
 use crate::export_diagnostic::{
-    ExportDiagnostic, ExportDiagnosticCode as Code, ExportDiagnosticSeverity as Severity,
-    ExportDiagnosticStage, ExportSourceRole,
+    ExportDiagnosticCode as Code, ExportDiagnosticSeverity as Severity, ExportDiagnosticStage,
+    ExportSourceRole,
 };
-use crate::export_ledger::ExportAccountingError;
+use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
+use crate::record_observation::RecordObservation;
+use crate::{CatalogError, ExportAccountingError};
 
 type Errors<'n> =
     std::iter::Chain<std::slice::Iter<'n, LoadoutError>, std::slice::Iter<'n, LoadoutError>>;
@@ -22,6 +27,8 @@ enum Frame<'n> {
 struct Issue<'n> {
     error: &'n LoadoutError,
     target: Option<Guid>,
+    reference: Option<&'n LoadoutReferenceSelection>,
+    class: Option<(&'n LoadoutClassSelection, Option<&'n LoadoutXmlClassUse>)>,
 }
 
 struct Issues<'n> {
@@ -46,6 +53,8 @@ impl<'n> Iterator for Issues<'n> {
                         return Some(Issue {
                             error,
                             target: target(error),
+                            reference: reference(error),
+                            class: class(error),
                         });
                     }
                 }
@@ -68,6 +77,10 @@ impl<'n> Iterator for Issues<'n> {
                             return Some(Issue {
                                 error: unresolved.error(),
                                 target,
+                                reference: unresolved
+                                    .reference_selection()
+                                    .or_else(|| reference(unresolved.error())),
+                                class: class(unresolved.error()),
                             });
                         }
                     }
@@ -84,8 +97,32 @@ const fn target(error: &LoadoutError) -> Option<Guid> {
         | LoadoutError::Cycle { guid }
         | LoadoutError::UnreadableRecord { guid, .. }
         | LoadoutError::NotAnEntity { guid, .. }
-        | LoadoutError::Assortment { guid, .. } => Some(*guid),
+        | LoadoutError::Assortment { guid, .. } => Some(guid.guid()),
         LoadoutError::InvalidReference { reason } => reason.dangling_guid(),
+        _ => None,
+    }
+}
+
+const fn reference(error: &LoadoutError) -> Option<&LoadoutReferenceSelection> {
+    match error {
+        LoadoutError::DanglingReference { guid }
+        | LoadoutError::Cycle { guid }
+        | LoadoutError::UnreadableRecord { guid, .. }
+        | LoadoutError::NotAnEntity { guid, .. }
+        | LoadoutError::Assortment { guid, .. } => guid.selection(),
+        _ => None,
+    }
+}
+
+fn class(error: &LoadoutError) -> Option<(&LoadoutClassSelection, Option<&LoadoutXmlClassUse>)> {
+    match error {
+        LoadoutError::DanglingReference { guid }
+        | LoadoutError::Cycle { guid }
+        | LoadoutError::UnreadableRecord { guid, .. }
+        | LoadoutError::NotAnEntity { guid, .. }
+        | LoadoutError::Assortment { guid, .. } => guid
+            .class_selection()
+            .map(|selection| (selection, guid.class_xml_use())),
         _ => None,
     }
 }
@@ -122,30 +159,45 @@ const fn category(error: &LoadoutError) -> (Code, Severity) {
 }
 
 pub(super) fn diagnostics(
-    record: &Record<'_>,
+    capture: &super::Capture<'_>,
+    admission: &RecordObservation<'_, '_>,
     node: &EntityNode,
-) -> Result<Vec<ExportDiagnostic>, ExportAccountingError> {
+) -> Result<Vec<ExportDiagnostic>, CatalogError> {
     let issues = Issues {
         stack: vec![Frame::Node(node)],
     };
-    crate::export_health_compile::aggregate(issues.map(|issue| {
+    crate::export_health_aggregate::aggregate_fallible(issues.map(|issue| {
         let (code, severity) = category(issue.error);
-        let mut diagnostic = super::operation::diagnostic(
-            record,
+        let example = if let (Some(_), Some(guid)) = (capture.input, issue.target) {
+            match (issue.reference, issue.class) {
+                (Some(reference), None) => capture.reference_example(admission, reference, guid)?,
+                (None, Some((class, xml_use))) => {
+                    capture.class_example(admission, class, guid, xml_use)?
+                }
+                (None, None) => return Err(ExportAccountingError::UnboundHealthSubject.into()),
+                (Some(_), Some(_)) => {
+                    return Err(ExportAccountingError::ConflictingSourceDatum.into());
+                }
+            }
+        } else {
+            let mut example = match issue.error {
+                LoadoutError::MissingXmlLoadout { path }
+                | LoadoutError::MissingVehicleImplementation { path } => {
+                    capture.request_example(admission, path)?
+                }
+                _ => super::operation::example(capture.input, admission)?,
+            };
+            example.target_guid = issue.target;
+            example
+        };
+        let mut diagnostic = super::operation::from_example(
             ExportDiagnosticStage::DerivedProjection,
             code,
             severity,
             issue.error.kind(),
+            example,
         );
         diagnostic.source_role = Some(ExportSourceRole::DerivedInput);
-        if let Some(example) = diagnostic.examples.first_mut() {
-            example.target_guid = issue.target.map(|guid| guid.to_string());
-            if let LoadoutError::MissingXmlLoadout { path }
-            | LoadoutError::MissingVehicleImplementation { path } = issue.error
-            {
-                example.field = Some(path.clone());
-            }
-        }
-        diagnostic
+        Ok::<_, CatalogError>(diagnostic)
     }))
 }

@@ -1,32 +1,27 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
+use crate::catalog_read::original::FailedEntryObservation;
 use crate::export_diagnostic::{
-    EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT, ExportDiagnostic, ExportDiagnosticSeverity,
-    ExportDiagnosticStage, ExportDiagnosticUnit, ExportSourceRole, FailedExportRecord,
+    ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit, ExportSourceRole,
 };
-use crate::export_health::{
-    CatalogPublicationMode, ExportHealth, ExportHealthStatus, ExportStageStatus, KindExportHealth,
-};
+use crate::export_health::{CatalogPublicationMode, ExportHealthStatus, ExportStageStatus};
+pub(crate) use crate::export_health_aggregate::aggregate;
+use crate::export_health_prepared::{KindFacts, PreparedHealth};
 use crate::export_ledger::{
     ArchiveInventoryProblem, ExportAccountingError, ExportLedger, SourceObservation,
 };
-use crate::{CatalogFailure, CraftingWarning, Kind, KindSummary};
+use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
+use crate::health_failed_observation::FailedRecordObservation as FailedExportRecord;
+use crate::{CraftingWarning, Kind, KindSummary};
 
 #[cfg(test)]
+#[path = "export_health_compile/tests.rs"]
 mod tests;
-
-type DiagnosticKey = (
-    Option<usize>,
-    ExportDiagnosticStage,
-    crate::ExportDiagnosticCode,
-    ExportDiagnosticSeverity,
-    Option<ExportSourceRole>,
-    Option<String>,
-    ExportDiagnosticUnit,
-);
+#[cfg(test)]
+pub(crate) use crate::export_health_prepare::compile;
 
 struct Evidence {
     archive_inventory_problem: Option<ArchiveInventoryProblem>,
@@ -34,9 +29,9 @@ struct Evidence {
     incomplete_inventories: BTreeSet<usize>,
     sources: Vec<SourceObservation>,
     incomplete_fields: BTreeSet<usize>,
-    references: Vec<crate::ExportUnresolvedReference>,
+    references: Vec<crate::catalog_read::original::ReferenceObservation>,
     entries: Vec<crate::export_entry_ledger::ArchiveEntryObservation>,
-    failed_entries: Vec<crate::FailedExportEntry>,
+    failed_entries: Vec<FailedEntryObservation>,
     failed: Vec<FailedExportRecord>,
     diagnostics: Vec<ExportDiagnostic>,
     skipped_rows: Vec<(Kind, usize)>,
@@ -45,7 +40,7 @@ struct Evidence {
 impl Evidence {
     fn read(
         ledger: ExportLedger,
-        failures: &[CatalogFailure],
+        failures: impl IntoIterator<Item = p4kx_extraction::Guid>,
         warnings: &[CraftingWarning],
     ) -> Result<Self, ExportAccountingError> {
         if ledger.conflicting_catalog_rows {
@@ -65,13 +60,13 @@ impl Evidence {
             &ledger.excluded_catalog_rows,
         )?;
         let entries = crate::export_health_entries::compile(ledger.entries)?;
-        let (mut failed, mut diagnostics) = crate::export_health_records::failures(&sources);
-        let derived = crate::export_health_derived::failures(ledger.derived_failures);
+        let (mut failed, mut diagnostics) = crate::export_health_records::failures(&sources)?;
+        let derived = crate::export_health_derived::failures(ledger.derived_failures)?;
         failed.extend(derived.0);
         failed.extend(fields.failed);
         failed.extend(crate::export_health_fields::failed_diagnostics(
             &ledger.field_diagnostics,
-        ));
+        )?);
         diagnostics.extend(derived.1);
         diagnostics.extend(entries.diagnostics);
         diagnostics.extend(fields.diagnostics);
@@ -91,7 +86,7 @@ impl Evidence {
                 .flat_map(crate::export_health_warning::diagnostics),
         );
         validate_failures(failures, &failed)?;
-        order_failures(&mut failed);
+        order_failures(&mut failed)?;
         Ok(Self {
             archive_inventory_problem: ledger.archive_inventory_problem,
             inventories,
@@ -107,18 +102,14 @@ impl Evidence {
         })
     }
 
-    fn kind(
-        &self,
-        kind: Kind,
-        rows: &[KindSummary],
-    ) -> Result<KindExportHealth, ExportAccountingError> {
+    fn kind(&self, kind: Kind, rows: &[KindSummary]) -> Result<KindFacts, ExportAccountingError> {
         if !self.inventories.contains(&kind.index()) {
             return Err(ExportAccountingError::MissingInventory { kind });
         }
         let uncertain = self.archive_inventory_problem.is_some() || self.uncertain_selection(kind);
         let (read, projection) = self.kind_stages(kind, uncertain);
-        let (counts, failed) = self.record_counts(kind)?;
-        Ok(KindExportHealth {
+        let counts = self.record_counts(kind)?;
+        Ok(KindFacts {
             kind,
             source_mode: crate::export_health_records::source_mode(kind),
             source_inventory_complete: !uncertain
@@ -138,13 +129,7 @@ impl Evidence {
                 .filter(|(source, _)| *source == kind)
                 .map(|(_, count)| *count))?,
             failed_derived_projections: self.derived_failures(kind)?,
-            failed_records: failed,
-            failed_entries: self
-                .failed_entries
-                .iter()
-                .filter(|entry| entry.kind == kind)
-                .cloned()
-                .collect(),
+
             unresolved_reference_count: self
                 .references
                 .iter()
@@ -175,21 +160,18 @@ impl Evidence {
     fn record_counts(
         &self,
         kind: Kind,
-    ) -> Result<(crate::ExportSourceCounts, Vec<FailedExportRecord>), ExportAccountingError> {
+    ) -> Result<crate::ExportSourceCounts, ExportAccountingError> {
         let mut counts = crate::export_health_records::counts(kind, &self.sources)?;
-        let failed: Vec<_> = self
+        counts.failed_dependencies = self
             .failed
             .iter()
-            .filter(|source| source.kind == Some(kind))
-            .cloned()
-            .collect();
-        counts.failed_dependencies = failed
-            .iter()
-            .filter(|source| source.role == ExportSourceRole::Dependency)
-            .map(|source| source.record_index)
+            .filter(|source| {
+                source.kind == Some(kind) && source.role == ExportSourceRole::Dependency
+            })
+            .map(|source| source.key().index())
             .collect::<BTreeSet<_>>()
             .len();
-        Ok((counts, failed))
+        Ok(counts)
     }
 
     fn derived_failures(&self, kind: Kind) -> Result<usize, ExportAccountingError> {
@@ -247,30 +229,39 @@ fn incomplete_archive(problem: ArchiveInventoryProblem) -> ExportDiagnostic {
     }
 }
 
-/// Compiles production observations after the exact final row counts are known.
-pub(crate) fn compile(
+/// Resolves accounting and retained occurrences before their one original report seal.
+pub(crate) fn prepare_report(
     ledger: ExportLedger,
     rows: &[KindSummary],
-    failures: &[CatalogFailure],
+    failures: impl IntoIterator<Item = p4kx_extraction::Guid>,
     warnings: &[CraftingWarning],
     mode: CatalogPublicationMode,
-) -> Result<ExportHealth, ExportAccountingError> {
+) -> Result<PreparedHealth, ExportAccountingError> {
     let evidence = Evidence::read(ledger, failures, warnings)?;
-    let kinds: Vec<_> = Kind::ALL
+    let kinds = Kind::ALL
         .into_iter()
         .map(|kind| evidence.kind(kind, rows))
-        .collect::<Result<_, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?;
     let (read, projection) = stages(evidence.diagnostics.iter());
-    Ok(ExportHealth {
-        status: if evidence.diagnostics.iter().any(blocks) {
-            ExportHealthStatus::Incomplete
-        } else {
-            ExportHealthStatus::Complete
-        },
+    let status = if evidence.diagnostics.iter().any(blocks) {
+        ExportHealthStatus::Incomplete
+    } else {
+        ExportHealthStatus::Complete
+    };
+    let selected = evidence.selected();
+    let owners = evidence
+        .sources
+        .into_iter()
+        .map(SourceObservation::into_subject)
+        .collect();
+    Ok(PreparedHealth {
+        owners,
+        entry_owners: evidence.entries,
+        status,
         read,
         projection,
         publication_mode: mode,
-        unique_selected_source_records: evidence.selected(),
+        unique_selected_source_records: selected,
         selected_kind_records: sum(kinds.iter().map(|kind| kind.source_records.selected))?,
         written_rows: sum(kinds.iter().map(|kind| kind.written_rows))?,
         kinds,
@@ -280,56 +271,15 @@ pub(crate) fn compile(
         diagnostics: evidence.diagnostics,
     })
 }
-
 fn validate_failures(
-    legacy: &[CatalogFailure],
+    legacy: impl IntoIterator<Item = p4kx_extraction::Guid>,
     failed: &[FailedExportRecord],
 ) -> Result<(), ExportAccountingError> {
-    let known: BTreeSet<_> = failed.iter().map(|source| source.guid.as_str()).collect();
-    if legacy
-        .iter()
-        .any(|failure| !known.contains(failure.guid.to_string().as_str()))
-    {
+    let known: BTreeSet<_> = failed.iter().map(|source| source.key().guid()).collect();
+    if legacy.into_iter().any(|guid| !known.contains(&guid)) {
         return Err(ExportAccountingError::UnobservedFailure);
     }
     Ok(())
-}
-
-pub(crate) fn aggregate(
-    diagnostics: impl IntoIterator<Item = ExportDiagnostic>,
-) -> Result<Vec<ExportDiagnostic>, ExportAccountingError> {
-    let mut grouped = BTreeMap::<DiagnosticKey, ExportDiagnostic>::new();
-    for mut diagnostic in diagnostics {
-        let key = (
-            diagnostic.kind.map(Kind::index),
-            diagnostic.stage,
-            diagnostic.code,
-            diagnostic.severity,
-            diagnostic.source_role,
-            diagnostic.warning_code.clone(),
-            diagnostic.count_unit,
-        );
-        if let Some(existing) = grouped.get_mut(&key) {
-            existing.count = existing
-                .count
-                .checked_add(diagnostic.count)
-                .ok_or(ExportAccountingError::CounterOverflow)?;
-            existing.examples.append(&mut diagnostic.examples);
-            examples(existing);
-        } else {
-            examples(&mut diagnostic);
-            grouped.insert(key, diagnostic);
-        }
-    }
-    Ok(grouped.into_values().collect())
-}
-
-fn examples(diagnostic: &mut ExportDiagnostic) {
-    diagnostic.examples.sort();
-    diagnostic.examples.dedup();
-    diagnostic
-        .examples
-        .truncate(EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT);
 }
 
 fn stages<'a>(
@@ -355,18 +305,27 @@ fn blocks(diagnostic: &ExportDiagnostic) -> bool {
     diagnostic.severity != ExportDiagnosticSeverity::Information
 }
 
-fn order_failures(records: &mut Vec<FailedExportRecord>) {
+fn order_failures(records: &mut Vec<FailedExportRecord>) -> Result<(), ExportAccountingError> {
     records.sort_by(|left, right| {
-        left.record_index
-            .cmp(&right.record_index)
+        left.key()
+            .index()
+            .cmp(&right.key().index())
             .then_with(|| left.kind.map(Kind::index).cmp(&right.kind.map(Kind::index)))
             .then_with(|| left.role.cmp(&right.role))
             .then_with(|| left.stage.cmp(&right.stage))
             .then_with(|| left.code.cmp(&right.code))
     });
-    records.dedup();
+    let mut retained: Vec<FailedExportRecord> = Vec::with_capacity(records.len());
+    for record in records.drain(..) {
+        if let Some(previous) = retained.last_mut().filter(|previous| *previous == &record) {
+            previous.merge(record)?;
+        } else {
+            retained.push(record);
+        }
+    }
+    *records = retained;
+    Ok(())
 }
-
 fn sum(mut counts: impl Iterator<Item = usize>) -> Result<usize, ExportAccountingError> {
     counts.try_fold(0_usize, |total, count| {
         total

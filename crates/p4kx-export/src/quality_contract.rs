@@ -80,10 +80,6 @@ pub(crate) struct QualityQuantizationResources {
     pub(crate) physical_guid: CatalogGuid,
     #[serde(skip)]
     pub(crate) physical_index: u32,
-    #[serde(skip)]
-    pub(crate) inputs: Vec<p4kx_extraction::SourceUse>,
-    #[serde(skip)]
-    pub(crate) complete: bool,
     pub(crate) guid: SourcedValue<CatalogGuid>,
     pub(crate) record_index: SourcedValue<u32>,
     pub(crate) eligibility: SourcedValue<QuantizationEligibility>,

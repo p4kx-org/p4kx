@@ -7,15 +7,15 @@ use std::sync::Mutex;
 use p4kx_extraction::StructValue;
 use thiserror::Error;
 
+use crate::catalog_read::original::ExampleBodyReceipt;
+
+#[path = "template_error_description.rs"]
+mod description;
+pub(crate) use description::TemplateDescription;
+
 /// A contract template whose structure the catalog does not follow to its end.
 #[derive(Debug, Error)]
 pub(crate) enum TemplateError {
-    /// Child mission phases nest deeper than the limit.
-    #[error("objective phases nest deeper than {0} levels")]
-    PhasesTooDeep(usize),
-    /// Mission flow conditions nest deeper than the limit.
-    #[error("mission flow conditions nest deeper than {0} levels")]
-    ConditionsTooDeep(usize),
     /// A field that holds one of several structs holds one the catalog does not know.
     #[error("{field} holds the unknown struct {name}")]
     UnknownStruct {
@@ -24,9 +24,29 @@ pub(crate) enum TemplateError {
         /// The struct name.
         name: String,
     },
+    #[error("{error}")]
+    Captured {
+        #[source]
+        error: Box<Self>,
+        body: ExampleBodyReceipt,
+    },
 }
 
 impl TemplateError {
+    pub(crate) fn with_body(self, body: ExampleBodyReceipt) -> Self {
+        Self::Captured {
+            error: Box::new(self),
+            body,
+        }
+    }
+
+    pub(crate) const fn body(&self) -> Option<&ExampleBodyReceipt> {
+        match self {
+            Self::Captured { body, .. } => Some(body),
+            Self::UnknownStruct { .. } => None,
+        }
+    }
+
     /// Returns the error for the struct `value` in the field `field`.
     pub(crate) fn unknown(field: &'static str, value: &StructValue<'_>) -> Self {
         Self::UnknownStruct {

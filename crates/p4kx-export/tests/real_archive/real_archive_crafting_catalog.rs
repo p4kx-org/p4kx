@@ -22,6 +22,7 @@ use p4kx_testkit::{real_archive_b_path, real_archive_path};
 use serde_json::Value;
 
 use crate::catalog_v3_consumer;
+use crate::real_archive_blueprints::Blueprints;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -50,43 +51,18 @@ fn list<'c>(catalog: &'c Value, kind: &str) -> Result<&'c Vec<Value>, String> {
     catalog_v3_consumer::named_rows(catalog, kind).map_err(|error| error.to_string())
 }
 
-fn named<'c>(catalog: &'c Value, class_name: &str) -> Result<&'c Value, String> {
-    list(catalog, "blueprints")?
-        .iter()
-        .find(|blueprint| blueprint["className"] == class_name)
-        .ok_or_else(|| format!("the blueprint {class_name}"))
-}
-
 fn at<'v>(value: &'v Value, pointer: &str) -> &'v Value {
     value.pointer(pointer).unwrap_or(&Value::Null)
 }
 
-fn lines(blueprint: &Value) -> Vec<&Value> {
-    fn walk<'c>(line: &'c Value, out: &mut Vec<&'c Value>) {
-        out.push(line);
-        for option in line["options"].as_array().into_iter().flatten() {
-            walk(option, out);
-        }
-    }
-    let mut out = Vec::new();
-    for tier in blueprint["tiers"].as_array().into_iter().flatten() {
-        for line in std::iter::once(&tier["mandatory"])
-            .chain(tier["optional"].as_array().into_iter().flatten())
-        {
-            if line.is_object() {
-                walk(line, &mut out);
-            }
-        }
-    }
-    out
-}
-
 fn choose_fewer(line: &Value) -> bool {
-    line["kind"] == "select"
-        && line["count"].as_u64().is_some_and(|count| {
-            usize::try_from(count)
-                .is_ok_and(|count| count < line["options"].as_array().map_or(0, Vec::len))
-        })
+    let meaning = &line["meaning"];
+    meaning["type"] == "select"
+        && meaning
+            .pointer("/count/value")
+            .and_then(Value::as_str)
+            .and_then(|count| count.parse::<usize>().ok())
+            .is_some_and(|count| count < meaning["options"].as_array().map_or(0, Vec::len))
 }
 
 #[expect(
@@ -127,87 +103,56 @@ fn verify(path: &Path) -> TestResult {
         built.summary().failures().first(),
         built.summary().warnings()
     );
-    check_tiers(&catalog)?;
-    check_quality(&catalog)?;
+    let blueprints = Blueprints::read(&catalog)?;
+    check_tiers(&blueprints)?;
+    check_quality(&catalog, &blueprints)?;
     check_pools(&catalog)?;
-    check_dismantle(&catalog)
+    check_dismantle(&catalog, &blueprints)
 }
 
-fn flatten(line: &Value, slot: (&Value, &Value), out: &mut Vec<Value>) {
-    match line["kind"].as_str() {
-        Some("select") => {
-            let own = (&line["slot"], &line["slotKey"]);
-            let slot = if own.0.is_null() && own.1.is_null() {
-                slot
-            } else {
-                own
-            };
-            for option in line["options"].as_array().into_iter().flatten() {
-                flatten(option, slot, out);
-            }
-        }
-        Some("resource" | "item") => out.push(serde_json::json!({
-            "resourceGuid": line["resourceGuid"],
-            "itemGuid": line["itemGuid"],
-            "quantityScu": line["quantityScu"],
-            "quantityUnits": line["quantityUnits"],
-            "minQuality": line["minQuality"],
-            "slot": slot.0,
-            "slotKey": slot.1,
-        })),
-        _ => {}
-    }
-}
-
-fn first_tier_ingredients(blueprint: &Value) -> Vec<Value> {
-    let mut out = Vec::new();
-    let tier = at(blueprint, "/tiers/0");
-    let costs = std::iter::once(&tier["mandatory"])
-        .chain(tier["optional"].as_array().into_iter().flatten());
-    for cost in costs.filter(|cost| cost.is_object()) {
-        flatten(cost, (&Value::Null, &Value::Null), &mut out);
-    }
-    out
-}
-
-fn check_tiers(catalog: &Value) -> TestResult {
-    let blueprints = list(catalog, "blueprints")?;
+fn check_tiers(blueprints: &Blueprints<'_>) -> TestResult {
     let mut several = 0_usize;
     let mut fewer = 0_usize;
-    for blueprint in blueprints {
-        let tiers = blueprint["tiers"].as_array().ok_or("tiers")?;
-        assert!(!tiers.is_empty(), "{} has a tier", blueprint["className"]);
-        assert_eq!(
-            at(blueprint, "/tiers/0/craftTimeSeconds"),
-            &blueprint["craftTimeSeconds"],
-            "{}: the first tier is the one craftTimeSeconds describes",
-            blueprint["className"]
+    for blueprint in blueprints.rows() {
+        assert!(
+            !blueprint.tiers.is_empty(),
+            "{} has a tier",
+            blueprint.definition["className"]
         );
-        assert_eq!(
-            blueprint["ingredients"].as_array(),
-            Some(&first_tier_ingredients(blueprint)),
-            "{}: the ingredients are the first tier flattened",
-            blueprint["className"]
-        );
-        several += usize::from(tiers.len() > 1);
-        fewer += usize::from(lines(blueprint).into_iter().any(choose_fewer));
+        blueprint.check_ingredients()?;
+        several += usize::from(blueprint.tiers.len() > 1);
+        fewer += usize::from(blueprint.costs().any(choose_fewer));
     }
-    assert!(fewer >= 1, "a blueprint that lets the player choose fewer");
-    let magazine = named(catalog, LMG_MAGAZINE)?;
-    let outer = at(magazine, "/tiers/0/mandatory");
+    assert!(fewer >= 1, "a Blueprint lets the player choose fewer");
+    let magazine = blueprints.named(LMG_MAGAZINE)?;
+    let outer = &magazine.first_cost()?["meaning"];
+    assert_eq!(outer["type"], "select", "the magazine has a selection cost");
     assert_eq!(
-        (
-            outer["kind"].as_str(),
-            outer["count"].as_u64(),
-            outer["options"].as_array().map(Vec::len)
-        ),
-        (Some("select"), Some(2), Some(2)),
-        "choose 2 of 2"
+        outer.pointer("/count/value").and_then(Value::as_str),
+        Some("2"),
+        "the magazine selection requires two options"
     );
-    assert_eq!(at(magazine, "/tiers/0/craftTimeSeconds"), 10, "craft time");
-    let multiplied = lines(named(catalog, MULTIPLIER_BLUEPRINT)?)
-        .into_iter()
-        .filter_map(|line| line["quantityMultiplier"].as_f64())
+    assert_eq!(
+        outer["options"].as_array().map(Vec::len),
+        Some(2),
+        "both magazine options are present"
+    );
+    assert_eq!(
+        magazine
+            .tiers
+            .first()
+            .and_then(|tier| tier.pointer("/craftTimeSeconds/value"))
+            .and_then(Value::as_str),
+        Some("10"),
+        "the magazine takes ten seconds"
+    );
+    let multiplied = blueprints
+        .named(MULTIPLIER_BLUEPRINT)?
+        .costs()
+        .filter_map(|line| {
+            line.pointer("/context/quantityMultiplier/value")
+                .and_then(Value::as_f64)
+        })
         .any(|factor| (factor - EXPECTED_MULTIPLIER).abs() < 1.0e-6);
     assert!(multiplied, "the slaver arms carry the factor 1.15");
     print_line(&format!(
@@ -216,16 +161,24 @@ fn check_tiers(catalog: &Value) -> TestResult {
     Ok(())
 }
 
-fn check_quality(catalog: &Value) -> TestResult {
+fn check_quality(catalog: &Value, blueprints: &Blueprints<'_>) -> TestResult {
     let properties: HashSet<&str> = list(catalog, "gameplayProperties")?
         .iter()
         .map(|property| catalog_v3_consumer::identity(property, Kind::GameplayProperties))
         .collect::<Result<_, _>>()?;
     let mut kinds = HashSet::new();
-    for blueprint in list(catalog, "blueprints")? {
-        for line in lines(blueprint) {
-            for modifier in line["modifiers"].as_array().into_iter().flatten() {
-                if let Some(guid) = modifier["propertyGuid"].as_str() {
+    for blueprint in blueprints.rows() {
+        for line in blueprint.costs() {
+            for modifier in line
+                .pointer("/context/modifiers")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                if let Some(guid) = modifier
+                    .pointer("/propertyGuid/value")
+                    .and_then(Value::as_str)
+                {
                     assert!(properties.contains(guid), "property {guid}");
                 }
                 for range in modifier["ranges"].as_array().into_iter().flatten() {
@@ -265,7 +218,7 @@ fn check_pools(catalog: &Value) -> TestResult {
     );
     let blueprints: HashSet<&str> = list(catalog, "blueprints")?
         .iter()
-        .filter_map(|blueprint| blueprint["guid"].as_str())
+        .filter_map(|blueprint| blueprint.pointer("/guid/value").and_then(Value::as_str))
         .collect();
     let (mut entries_total, mut unresolved) = (0_usize, 0_usize);
     for entry in pools
@@ -290,7 +243,7 @@ fn check_pools(catalog: &Value) -> TestResult {
     Ok(())
 }
 
-fn check_dismantle(catalog: &Value) -> TestResult {
+fn check_dismantle(catalog: &Value, blueprints: &Blueprints<'_>) -> TestResult {
     let processes = list(catalog, "dismantleProcesses")?;
     let [process] = processes.as_slice() else {
         return Err(format!("one dismantle process, found {}", processes.len()).into());
@@ -300,27 +253,47 @@ fn check_dismantle(catalog: &Value) -> TestResult {
         (&Value::from(0.5), &Value::from(15)),
         "efficiency and time"
     );
-    let magazine = named(catalog, LMG_MAGAZINE)?;
+    let magazine = blueprints.named(LMG_MAGAZINE)?;
     assert_eq!(
-        at(magazine, "/dismantle/processGuid"),
+        magazine
+            .presentation
+            .pointer("/dismantle/value/processGuid")
+            .ok_or("magazine dismantle process GUID")?,
         &process["guid"],
         "the process"
     );
-    assert_eq!(at(magazine, "/dismantle/tierIndex"), 0, "the first tier");
+    assert_eq!(
+        magazine.presentation.pointer("/dismantle/value/tier"),
+        magazine.presentation.get("firstTier"),
+        "the dismantle return uses the first tier"
+    );
     let excluded = at(catalog, "/craftingGlobal/dismantleExcludedResourceGuids")
         .as_array()
         .ok_or("excluded resources")?;
     assert!(!excluded.is_empty(), "excluded resources");
-    let unlinked = list(catalog, "blueprints")?
+    let unlinked = blueprints
+        .rows()
         .iter()
-        .filter(|blueprint| blueprint["dismantle"].is_null())
+        .filter(|blueprint| {
+            blueprint
+                .presentation
+                .pointer("/dismantle/value")
+                .is_some_and(Value::is_null)
+        })
         .count();
     print_line(&format!(
         "blueprints without a dismantle return: {unlinked}"
     ));
-    let defaults = list(catalog, "blueprints")?
+    let defaults = blueprints
+        .rows()
         .iter()
-        .filter(|blueprint| blueprint["defaultAvailable"] == true)
+        .filter(|blueprint| {
+            blueprint
+                .presentation
+                .pointer("/defaultAvailable/value")
+                .and_then(Value::as_bool)
+                == Some(true)
+        })
         .count();
     print_line(&format!("default blueprints in the catalog: {defaults}"));
     Ok(())

@@ -9,6 +9,7 @@ use p4kx_testkit::DataForgeBuilder;
 use serde_json::{Value, json};
 
 use crate::catalog_crafting_support;
+use crate::health_origin_assertions;
 use crate::resource_1069_fixture as fixture;
 use crate::resource_origin_fixture::{self as origin, TestResult};
 
@@ -21,7 +22,7 @@ fn an_unreadable_owned_cell_keeps_its_resource_and_readable_neighbors() -> TestR
     };
     assert!(matches!(
         error.downcast_ref::<CatalogError>(),
-        Some(CatalogError::IncompleteExport { .. })
+        Some(CatalogError::IncompleteExport(_))
     ));
     let (_, catalog) = fixture::build(&database, CatalogPublicationMode::DiagnosticPartial)?;
     let resource = fixture::row(&catalog)?;
@@ -120,22 +121,7 @@ fn assert_unreadable_evidence(catalog: &Value) -> TestResult {
         .ok_or("field diagnostics")?;
     for stage in ["sourceField", "projection"] {
         assert!(
-            diagnostics.iter().any(|diagnostic| {
-                diagnostic.get("code").and_then(Value::as_str) == Some("unreadableSource")
-                    && diagnostic.get("stage").and_then(Value::as_str) == Some(stage)
-                    && diagnostic
-                        .get("examples")
-                        .and_then(Value::as_array)
-                        .is_some_and(|examples| {
-                            examples.iter().any(|example| {
-                                example.get("recordIndex").and_then(Value::as_u64) == Some(0)
-                                    && example.get("field").and_then(Value::as_str)
-                                        == Some("properties[0].volatility")
-                                    && example.get("sourceType").and_then(Value::as_str)
-                                        == Some("ResourceTypeVolatility")
-                            })
-                        })
-            }),
+            exact_unreadable_example(catalog, diagnostics, stage)?,
             "the exact owner and field are retained at {stage}"
         );
     }
@@ -146,6 +132,36 @@ fn assert_unreadable_evidence(catalog: &Value) -> TestResult {
         "a local cell failure is not a wholly failed Record"
     );
     Ok(())
+}
+
+fn exact_unreadable_example(
+    catalog: &Value,
+    diagnostics: &[Value],
+    stage: &str,
+) -> TestResult<bool> {
+    for diagnostic in diagnostics.iter().filter(|row| {
+        row["code"].as_str() == Some("unreadableSource") && row["stage"].as_str() == Some(stage)
+    }) {
+        let Some(examples) = diagnostic["examples"].as_array() else {
+            continue;
+        };
+        for example in examples {
+            if example
+                .pointer("/recordIndex/value")
+                .and_then(Value::as_u64)
+                == Some(0)
+                && health_origin_assertions::example_text(catalog, example, "field")?
+                    .and_then(Value::as_str)
+                    == Some("properties[0].volatility")
+                && health_origin_assertions::example_text(catalog, example, "sourceType")?
+                    .and_then(Value::as_str)
+                    == Some("ResourceTypeVolatility")
+            {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 
 #[test]

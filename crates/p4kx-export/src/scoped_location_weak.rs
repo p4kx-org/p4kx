@@ -9,9 +9,9 @@ use crate::scoped_location_link::{PropertyReference, PropertyReferenceStatus};
 use crate::spawn_read::Reader;
 
 /// Interprets a source weak link as a mission-property variable in its original owner.
-pub(crate) fn read(
-    reader: &Reader<'_, '_>,
-    value: &Value<'_>,
+pub(crate) fn read<'source>(
+    reader: &Reader<'_, 'source>,
+    value: &Value<'source>,
 ) -> Result<Option<PropertyReference>, ()> {
     let Some(target) = owned_reference_read::read(reader, value)? else {
         return Ok(None);

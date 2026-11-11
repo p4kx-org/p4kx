@@ -162,11 +162,13 @@ pub enum Kind {
     Tags,
     /// Authored lists: every `BlueprintCategoryDatabaseRecord` under the ordinary Filter.
     BlueprintCategoryLists,
+    /// Original offline shop inventory JSON files in the Archive.
+    ShopInventories,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 51] = [
+    pub const ALL: [Self; 52] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -218,6 +220,7 @@ impl Kind {
         Self::ResourceTypes,
         Self::Tags,
         Self::BlueprintCategoryLists,
+        Self::ShopInventories,
     ];
 
     /// Returns the stable kind identifier, independently of its canonical dataset path.
@@ -275,6 +278,7 @@ impl Kind {
             Self::ResourceTypes => "resourceTypes",
             Self::Tags => "tags",
             Self::BlueprintCategoryLists => "blueprintCategoryLists",
+            Self::ShopInventories => "shopInventories",
         }
     }
 }

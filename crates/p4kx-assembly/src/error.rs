@@ -4,7 +4,12 @@
 use p4kx_dataforge::{Guid, ValueError};
 use thiserror::Error;
 
-use crate::{MAX_LOADOUT_DEPTH, MAX_LOADOUT_PORTS};
+use std::sync::Arc;
+
+use crate::{
+    LoadoutFailurePath, LoadoutReference, LoadoutRequest, LoadoutTargetGuid, LoadoutXmlClassUse,
+    MAX_LOADOUT_DEPTH, MAX_LOADOUT_PORTS,
+};
 
 /// Why a port of a Loadout, or the Loadout of an Entity, cannot be resolved.
 ///
@@ -19,7 +24,7 @@ pub enum LoadoutError {
     #[error("the Reference refers to the Record {guid}, which does not exist")]
     DanglingReference {
         /// The GUID of the missing Record.
-        guid: Guid,
+        guid: LoadoutTargetGuid,
     },
     /// A Reference cannot be read.
     #[error("the Reference cannot be read: {reason}")]
@@ -49,7 +54,7 @@ pub enum LoadoutError {
     #[error("the Record {guid} is a {type_name}, not an Entity")]
     NotAnEntity {
         /// The GUID of the Record.
-        guid: Guid,
+        guid: LoadoutTargetGuid,
         /// The Record's type.
         type_name: String,
     },
@@ -57,7 +62,7 @@ pub enum LoadoutError {
     #[error("the Record {guid} cannot be read: {reason}")]
     UnreadableRecord {
         /// The GUID of the Record.
-        guid: Guid,
+        guid: LoadoutTargetGuid,
         /// Why it cannot be read.
         reason: String,
     },
@@ -67,7 +72,7 @@ pub enum LoadoutError {
     )]
     Cycle {
         /// The GUID of the Entity.
-        guid: Guid,
+        guid: LoadoutTargetGuid,
     },
     /// The branch is deeper than [`MAX_LOADOUT_DEPTH`].
     #[error("the Loadout is nested deeper than {MAX_LOADOUT_DEPTH} Entities")]
@@ -85,13 +90,13 @@ pub enum LoadoutError {
     #[error("the XML Loadout {path} cannot be read: there is no such file")]
     MissingXmlLoadout {
         /// The configured file path.
-        path: String,
+        path: LoadoutFailurePath,
     },
     /// A configured vehicle implementation or explicit patch has no matching Archive Entry.
     #[error("the vehicle implementation {path}: there is no such file")]
     MissingVehicleImplementation {
         /// The configured implementation or patch path.
-        path: String,
+        path: LoadoutFailurePath,
     },
     /// An XML Loadout cannot be read.
     #[error("the XML Loadout {path} cannot be read: {reason}")]
@@ -107,7 +112,7 @@ pub enum LoadoutError {
     #[error("the loadout assortment {guid} cannot be used: {reason}")]
     Assortment {
         /// The GUID of the assortment Record.
-        guid: Guid,
+        guid: LoadoutTargetGuid,
         /// Why it cannot be used.
         reason: String,
     },
@@ -145,6 +150,59 @@ pub enum LoadoutError {
 }
 
 impl LoadoutError {
+    pub(crate) const fn is_missing_file(&self) -> bool {
+        matches!(
+            self,
+            Self::MissingXmlLoadout { .. } | Self::MissingVehicleImplementation { .. }
+        )
+    }
+
+    pub(crate) fn used_by(&mut self, caller: &Arc<LoadoutRequest>) {
+        if let Self::MissingXmlLoadout { path } | Self::MissingVehicleImplementation { path } = self
+        {
+            path.used_by(caller);
+        }
+    }
+    /// Binds only the equal incoming Reference that selected this immediate failure.
+    pub(crate) fn with_reference(self, reference: &LoadoutReference) -> Self {
+        self.with_target(&LoadoutTargetGuid::from_reference(reference), None)
+    }
+
+    /// Binds the matching immediate selected target without relabeling nested failures.
+    pub(crate) fn with_target(
+        self,
+        target: &LoadoutTargetGuid,
+        xml_use: Option<&LoadoutXmlClassUse>,
+    ) -> Self {
+        match self {
+            Self::DanglingReference { guid } if guid.guid() == target.guid() => {
+                Self::DanglingReference {
+                    guid: target.for_failure(xml_use),
+                }
+            }
+            Self::Cycle { guid } if guid.guid() == target.guid() => Self::Cycle {
+                guid: target.for_failure(xml_use),
+            },
+            Self::UnreadableRecord { guid, reason } if guid.guid() == target.guid() => {
+                Self::UnreadableRecord {
+                    guid: target.for_failure(xml_use),
+                    reason,
+                }
+            }
+            Self::NotAnEntity { guid, type_name } if guid.guid() == target.guid() => {
+                Self::NotAnEntity {
+                    guid: target.for_failure(xml_use),
+                    type_name,
+                }
+            }
+            Self::Assortment { guid, reason } if guid.guid() == target.guid() => Self::Assortment {
+                guid: target.for_failure(xml_use),
+                reason,
+            },
+            other => other,
+        }
+    }
+
     /// Returns a stable code for the kind of error, e.g. `dangling_reference`, for scripts; the
     /// message is text for people.
     #[must_use]

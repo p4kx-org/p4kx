@@ -8,6 +8,7 @@ use p4kx_export::Kind;
 use serde_json::{Map, Value};
 
 use crate::catalog_v3_consumer;
+use crate::real_archive_contract_templates::mission_graph::{self as graph, Family};
 use crate::real_archive_text_oracle::Oracle;
 use crate::real_archive_texts::{Coverage, keyed_texts};
 
@@ -253,9 +254,17 @@ pub(crate) fn kind_coverage(
     english_oracle: &Oracle,
     german_oracle: &Oracle,
 ) -> TestResult<(Coverage, Coverage)> {
+    let mission_family = match kind {
+        Kind::ContractTemplates => Some(Family::Template),
+        Kind::MissionBrokerEntries => Some(Family::Broker),
+        _ => None,
+    };
+    if let Some(family) = mission_family {
+        return mission_coverage(catalog, family, english_oracle, german_oracle);
+    }
     if matches!(
         kind,
-        Kind::Manufacturers | Kind::Commodities | Kind::ResourceTypes
+        Kind::Manufacturers | Kind::Commodities | Kind::ResourceTypes | Kind::Blueprints
     ) {
         return canonical_coverage(catalog, kind, english_oracle, german_oracle);
     }
@@ -271,6 +280,55 @@ pub(crate) fn kind_coverage(
     Ok((english, german))
 }
 
+fn mission_coverage(
+    catalog: &Value,
+    family: Family,
+    english_oracle: &Oracle,
+    german_oracle: &Oracle,
+) -> TestResult<(Coverage, Coverage)> {
+    let mut counters = CoverageCounters::new(english_oracle, german_oracle);
+    let index = TextIndex::new(catalog)?;
+    for mission in graph::contexts(catalog, family)? {
+        for lookup in graph::array(mission.projection, "localizations")? {
+            let source = lookup.get("source").ok_or("mission localization source")?;
+            let key = mission_text_key(mission.follow(source)?)?;
+            let target = index.reference(
+                lookup
+                    .get("text")
+                    .ok_or("mission localization text carrier")?,
+                TextDomain::GameText,
+                TextReferenceShape::Required,
+            )?;
+            match (graph::text(lookup, "/interpretation")?, key, target) {
+                ("lookup", Some(key), Some(target)) if key == target.key => {
+                    counters.count(Some(target))?;
+                }
+                (
+                    "empty" | "placeholder" | "notKey" | "null" | "wrongShape" | "unreadable",
+                    None,
+                    None,
+                ) => {}
+                _ => {
+                    return Err("mission localization disagrees with original key or text".into());
+                }
+            }
+        }
+    }
+    Ok(counters.finish())
+}
+
+fn mission_text_key(node: &Value) -> TestResult<Option<&str>> {
+    let carrier = node.get("value").ok_or("original mission text carrier")?;
+    let Some(payload) = catalog_v3_consumer::source_value(carrier)? else {
+        return Ok(None);
+    };
+    if !matches!(graph::text(payload, "/type")?, "string" | "locale") {
+        return Ok(None);
+    }
+    let key = graph::text(payload, "/value/sourceText")?;
+    Ok((key.starts_with('@') && !p4kx_extraction::is_placeholder_key(key)).then_some(key))
+}
+
 fn canonical_coverage(
     catalog: &Value,
     kind: Kind,
@@ -279,6 +337,17 @@ fn canonical_coverage(
 ) -> TestResult<(Coverage, Coverage)> {
     let mut counters = CoverageCounters::new(english_oracle, german_oracle);
     let index = TextIndex::new(catalog)?;
+    if kind == Kind::Blueprints {
+        let blueprints = crate::real_archive_blueprints::Blueprints::read(catalog)?;
+        for blueprint in blueprints.rows() {
+            counters.count(index.reference(
+                blueprint.presentation.get("name").ok_or("Blueprint name")?,
+                TextDomain::GameText,
+                TextReferenceShape::Nullable,
+            )?)?;
+        }
+        return Ok(counters.finish());
+    }
     let rows = if kind == Kind::Commodities {
         catalog_v3_consumer::presentations(catalog)?
     } else {

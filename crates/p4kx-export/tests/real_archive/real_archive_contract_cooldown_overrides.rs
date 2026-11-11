@@ -14,7 +14,9 @@ use p4kx_extraction::{Archive, DataForgeEntry, StructValue, TreeBuilder, Value};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value as Json;
 
-type TestResult = Result<(), Box<dyn Error>>;
+use crate::real_archive_contracts::v3;
+
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 /// `(record GUID, contract GUID, sub contract GUID or empty)`.
 type EntryKey = (String, String, String);
@@ -178,35 +180,40 @@ fn same(actual: &Json, expected: &Json) -> bool {
 
 /// Asserts that `entry` carries the value and level of each of `fields` and the nearest level as
 /// `cooldownLayer`.
-#[expect(
-    clippy::indexing_slicing,
-    reason = "indexing a JSON value by key gives null for a missing key"
-)]
-fn check_entry(entry: &Json, key: &EntryKey, fields: &[Stated; 5]) {
+fn check_entry(entry: &Json, key: &EntryKey, fields: &[Stated; 5]) -> TestResult {
+    let layers = entry
+        .get("cooldownLayers")
+        .ok_or("actual cooldown layers")?;
     for ((name, _), stated) in FIELDS.iter().zip(fields) {
         let (level, value) = stated
             .as_ref()
             .map_or((Json::Null, Json::Null), |(level, value)| {
                 (Json::from(*level), value.clone())
             });
-        assert_eq!(
-            entry["cooldownLayers"][name], level,
-            "level of {name} of {key:?}"
-        );
+        let actual_layer = v3::cell(layers, name)?.unwrap_or(&Json::Null);
+        let actual_value = v3::cell(entry, name)?.unwrap_or(&Json::Null);
+        assert_eq!(actual_layer, &level, "level of {name} of {key:?}");
         assert!(
-            same(&entry[name], &value),
-            "{name} of {key:?}: {} against {value}",
-            entry[name]
+            same(actual_value, &value),
+            "{name} of {key:?}: {actual_value} against {value}"
         );
     }
     let nearest = LEVELS
         .iter()
         .find(|level| fields.iter().flatten().any(|(own, _)| own == *level));
     assert_eq!(
-        entry["cooldownLayer"].as_str().unwrap_or("none"),
+        cooldown_layer(entry)?,
         nearest.copied().unwrap_or("none"),
         "cooldownLayer of {key:?}"
     );
+    Ok(())
+}
+
+fn cooldown_layer(entry: &Json) -> TestResult<&str> {
+    Ok(v3::cell(entry, "cooldownLayer")?
+        .map(|layer| layer.as_str().ok_or("cooldownLayer is a string"))
+        .transpose()?
+        .unwrap_or("none"))
 }
 
 #[test]
@@ -216,24 +223,23 @@ fn every_cooldown_field_reports_the_stored_value_and_the_level_that_states_it() 
     let (expected, from_handler_params) = expected_fields(&archive)?;
     let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Json = serde_json::from_slice(built.json())?;
-    let contracts = catalog["contracts"].as_array().ok_or("contracts")?;
+    let contracts = v3::rows(&catalog)?;
+    let projections = v3::Projections::read(&catalog)?;
     let mut census: BTreeMap<&str, usize> = BTreeMap::new();
     let mut checked = 0_usize;
     for entry in contracts {
-        let layer = entry["cooldownLayer"].as_str().unwrap_or("none");
+        let layer = cooldown_layer(entry)?;
         *census.entry(layer).or_default() += 1;
+        let (guid, sub) = v3::identity(entry)?;
         let key = (
-            entry["recordGuid"].as_str().ok_or("recordGuid")?.to_owned(),
-            entry["guid"].as_str().ok_or("guid")?.to_owned(),
-            entry["subContractGuid"]
-                .as_str()
-                .unwrap_or_default()
-                .to_owned(),
+            projections.header(entry, "guid")?.to_owned(),
+            guid.to_owned(),
+            sub.unwrap_or_default().to_owned(),
         );
         let fields = expected
             .get(&key)
             .ok_or("an entry without a stored contract")?;
-        check_entry(entry, &key, fields);
+        check_entry(entry, &key, fields)?;
         checked += 1;
     }
     print_line(&format!(

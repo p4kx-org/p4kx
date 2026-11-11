@@ -5,10 +5,13 @@ use std::collections::{HashMap, HashSet};
 
 use p4kx_extraction::{Filter, Guid};
 
-use crate::blueprint::{Links, blueprint};
+use crate::CatalogError;
+use crate::Kind;
+use crate::blueprint_catalog_rows::{self, BlueprintRow};
+use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
-use crate::contract::{Blueprint, BlueprintPool, CraftingGlobal, DismantleProcess};
-use crate::contract_recipe::BlueprintDismantle;
+use crate::contract::{BlueprintPool, CraftingGlobal, DismantleProcess};
 use crate::contract_rewards::{PoolEntry, RewardSource};
 use crate::crafting::{Crafting, ReadCrafting};
 use crate::crafting_types as library;
@@ -16,22 +19,20 @@ use crate::crafting_warning::CraftingWarning;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::quality_catalog::QualityRows;
-use crate::texts::Texts;
-use crate::{CatalogFailure, Kind};
 
 #[path = "crafting_ledger/catalog_rows.rs"]
 mod rows;
 
 /// Selected crafting and canonical source datasets in their documented GUID order.
 pub(crate) struct CraftingKinds<'f> {
-    pub(crate) blueprints: Vec<Blueprint<'f>>,
+    pub(crate) blueprints: Vec<BlueprintRow<'f>>,
     pub(crate) properties: Vec<GameplayPropertyDefinition<'f>>,
     pub(crate) quality: QualityRows<'f>,
     pub(crate) pools: Vec<BlueprintPool<'f>>,
     pub(crate) dismantle: Vec<DismantleProcess<'f>>,
     pub(crate) global: CraftingGlobal,
     pub(crate) skipped: Vec<(Kind, usize)>,
-    pub(crate) failures: Vec<CatalogFailure>,
+    pub(crate) failures: Vec<CatalogReadFailure<'f>>,
     pub(crate) warnings: Vec<CraftingWarning>,
     pub(crate) ledger: ExportLedger,
 }
@@ -40,11 +41,14 @@ pub(crate) struct CraftingKinds<'f> {
 /// Other crafting rows apply their own catalog Filter and development-leftover rules.
 pub(crate) fn kinds<'f>(
     read: ReadCrafting<'f>,
-    texts: &Texts<'f>,
+    origins: &CatalogOrigins,
     filter: Option<&Filter>,
-) -> CraftingKinds<'f> {
+) -> Result<CraftingKinds<'f>, CatalogError> {
     let ReadCrafting {
         data: crafting,
+        blueprints,
+        blueprint_rules,
+        catalog_failures,
         mut ledger,
         gameplay,
         quality,
@@ -64,8 +68,22 @@ pub(crate) fn kinds<'f>(
     );
     let (dismantle, dismantle_skipped) = dismantle(&crafting, &mut selected);
     let kept: HashSet<Guid> = dismantle.iter().map(|process| process.guid.0).collect();
-    CraftingKinds {
-        blueprints: blueprints(&crafting, texts, &kept),
+    let process = crafting
+        .dismantle_process()
+        .map(|item| item.guid)
+        .filter(|guid| kept.contains(guid));
+    let mut blueprints = blueprints
+        .into_iter()
+        .map(|row| blueprint_catalog_rows::row(row, &blueprint_rules, process, origins))
+        .collect::<Result<Vec<_>, _>>()?;
+    blueprints.sort_by_cached_key(|row| {
+        (
+            row.definition.physical_guid.text(),
+            row.definition.physical_index,
+        )
+    });
+    Ok(CraftingKinds {
+        blueprints,
         properties,
         quality,
         pools,
@@ -79,10 +97,10 @@ pub(crate) fn kinds<'f>(
             (Kind::BlueprintPools, pools_skipped),
             (Kind::DismantleProcesses, dismantle_skipped),
         ],
-        failures: crafting.failures,
+        failures: catalog_failures,
         warnings: crafting.warnings,
         ledger,
-    }
+    })
 }
 
 fn dismantle<'f>(
@@ -102,35 +120,6 @@ fn dismantle<'f>(
         },
         |entity| entity.guid,
     )
-}
-
-/// Returns the blueprints of `crafting`; one links a dismantle process only when that process is
-/// among the `kept` ones, so the link never points at a process the catalog leaves out.
-fn blueprints<'f>(
-    crafting: &Crafting<'f>,
-    texts: &Texts<'f>,
-    kept: &HashSet<Guid>,
-) -> Vec<Blueprint<'f>> {
-    let defaults: HashSet<Guid> = crafting.global.default_blueprints.iter().copied().collect();
-    let mut blueprints: Vec<Blueprint<'f>> = crafting
-        .blueprints
-        .iter()
-        .map(|source| {
-            let links = Links {
-                default_available: defaults.contains(&source.guid),
-                dismantle: crafting
-                    .dismantle_return(source)
-                    .filter(|link| kept.contains(&link.process.guid))
-                    .map(|link| BlueprintDismantle {
-                        process_guid: CatalogGuid(link.process.guid),
-                        tier_index: link.tier.and_then(|tier| u32::try_from(tier).ok()),
-                    }),
-            };
-            blueprint(source, texts, links)
-        })
-        .collect();
-    blueprints.sort_by_cached_key(|entity| entity.guid.text());
-    blueprints
 }
 
 fn global(source: &library::GlobalParams) -> CraftingGlobal {

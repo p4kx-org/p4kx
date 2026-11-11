@@ -17,7 +17,7 @@ impl<'f> ShipReader<'f> {
         observer: Arc<O>,
     ) -> Self
     where
-        O: LoadoutReadObserver + CanonicalReadObserver + 'static,
+        O: LoadoutReadObserver + CanonicalReadObserver + 'f,
     {
         let forge = entities.forge();
         Self {

@@ -9,7 +9,7 @@ use std::error::Error;
 use std::time::SystemTime;
 
 use p4kx_export::{CatalogOptions, build_catalog};
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, Guid};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
@@ -51,6 +51,49 @@ fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, Box<dyn
         .iter()
         .filter_map(|entry| entry["guid"].as_str())
         .collect())
+}
+
+fn filter_guids(catalog: &Value) -> Result<HashSet<&str>, Box<dyn Error>> {
+    let table = catalog
+        .pointer("/definitions/lootPoolFilters")
+        .ok_or("canonical Loot definitions table")?;
+    assert_eq!(
+        table.get("availability").and_then(Value::as_str),
+        Some("available"),
+        "the real Archive declares its Loot family"
+    );
+    let rows = table
+        .get("rows")
+        .and_then(Value::as_array)
+        .ok_or("canonical physical Loot rows")?;
+    let mut guids = HashSet::new();
+    for row in rows {
+        let cell = row
+            .get("guid")
+            .ok_or("independently sourced original header GUID")?;
+        assert_eq!(
+            cell.get("state").and_then(Value::as_str),
+            Some("present"),
+            "an emitted original GUID is readable"
+        );
+        for member in [
+            "containsEncryptedSource",
+            "sourceUsesRefs",
+            "sourceSetComplete",
+        ] {
+            assert!(
+                cell.get(member).is_some(),
+                "required immediate origin member {member}"
+            );
+        }
+        let guid = cell
+            .get("value")
+            .and_then(Value::as_str)
+            .ok_or("exact original GUID text")?;
+        let _: Guid = guid.parse()?;
+        guids.insert(guid);
+    }
+    Ok(guids)
 }
 
 fn named<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, Box<dyn Error>> {
@@ -121,7 +164,7 @@ fn the_loot_kinds_and_the_containers_of_a_real_archive_are_linked() -> TestResul
     let catalog = catalog()?;
     let tables = guids(&catalog, "lootTables")?;
     let archetypes = guids(&catalog, "lootArchetypes")?;
-    let filters = guids(&catalog, "lootPoolFilters")?;
+    let filters = filter_guids(&catalog)?;
     let configs = guids(&catalog, "subHarvestableMultiConfigs")?;
     let containers = list(&catalog, "lootContainers")?;
     print_line(&format!(

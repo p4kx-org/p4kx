@@ -1,103 +1,160 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::Entry;
+use p4kx_assembly::LoadoutFileRead;
+use p4kx_extraction::{Archive, Entry};
 
-use crate::Kind;
+use crate::catalog_read::original::{
+    AuthoredEntryPath, EntryCapture, EntryDiagnosis, EntryRead, EntryReceipt, LoadoutBodyReceipt,
+};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_entry_ledger::{ArchiveEntryObservation, EntryOperation};
-use crate::export_ledger::{ExportLedger, SourceDiagnosis, SourceDisposition};
+use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::{CatalogError, Kind};
 
-/// The physical identity of one Archive source operation.
+/// One operation retaining the exact Entry admitted before its original read.
 #[derive(Debug, Clone)]
 pub(crate) struct EntrySource {
-    outer: Option<usize>,
-    inner: Option<usize>,
-    path: String,
+    receipt: EntryReceipt,
     operation: EntryOperation,
     role: ExportSourceRole,
 }
 
 impl EntrySource {
-    /// Identifies an Entry in the source Archive.
-    pub(crate) fn outer(entry: &Entry) -> Self {
+    pub(crate) fn outer(
+        capture: &EntryCapture<'_>,
+        archive: &Archive,
+        entry: &Entry,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self::new(
+            EntryReceipt::outer(capture, archive, entry)?,
+            EntryOperation::ContainerDirectory,
+        ))
+    }
+
+    pub(crate) fn loadout(
+        capture: &EntryCapture<'_>,
+        read: &LoadoutFileRead,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self::new(
+            EntryReceipt::loadout(capture, read)?,
+            EntryOperation::SourceXml,
+        ))
+    }
+
+    pub(crate) fn from_read(read: &EntryRead, operation: EntryOperation) -> Self {
+        Self::new(read.receipt().clone(), operation)
+    }
+
+    pub(crate) fn of_operation(
+        capture: &EntryCapture<'_>,
+        body: LoadoutBodyReceipt,
+        operation: EntryOperation,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self::new(
+            EntryReceipt::of_operation(capture, body)?,
+            operation,
+        ))
+    }
+
+    pub(crate) fn inner(
+        capture: &EntryCapture<'_>,
+        archive: &Archive,
+        outer: &Entry,
+        container: &Archive,
+        inner: &Entry,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self::new(
+            EntryReceipt::inner(capture, archive, outer, container, inner)?,
+            EntryOperation::SourceXml,
+        ))
+    }
+
+    pub(crate) fn fixed_missing(
+        capture: &EntryCapture<'_>,
+        path: &'static str,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self::new(
+            EntryReceipt::fixed(capture, path)?,
+            EntryOperation::Enumeration,
+        ))
+    }
+
+    pub(crate) fn authored_missing(path: AuthoredEntryPath) -> Self {
+        Self::new(EntryReceipt::selected(path), EntryOperation::Enumeration)
+    }
+
+    const fn new(receipt: EntryReceipt, operation: EntryOperation) -> Self {
         Self {
-            outer: Some(entry.index()),
-            inner: None,
-            path: entry.path().to_owned(),
-            operation: EntryOperation::ContainerDirectory,
+            receipt,
+            operation,
             role: ExportSourceRole::DerivedInput,
         }
     }
 
-    /// Identifies an Entry inside an actual source container.
-    pub(crate) fn inner(outer: &Entry, inner: &Entry) -> Self {
-        Self {
-            outer: Some(outer.index()),
-            inner: Some(inner.index()),
-            path: format!("{}!{}", outer.path(), inner.path()),
-            operation: EntryOperation::SourceXml,
-            role: ExportSourceRole::DerivedInput,
-        }
+    pub(crate) const fn receipt(&self) -> &EntryReceipt {
+        &self.receipt
     }
 
-    /// Retains an authored path whose configured Entry is absent.
-    pub(crate) fn missing(path: &str) -> Self {
-        Self {
-            outer: None,
-            inner: None,
-            path: path.to_owned(),
-            operation: EntryOperation::Enumeration,
-            role: ExportSourceRole::DerivedInput,
+    pub(crate) fn merge(&mut self, other: &Self) -> Result<(), crate::ExportAccountingError> {
+        if self.operation != other.operation || self.role != other.role {
+            return Err(crate::ExportAccountingError::ConflictingSourceDatum);
         }
+        self.receipt.merge(&other.receipt)
     }
 
-    /// Identifies the required operation without changing the physical source identity.
     #[must_use]
     pub(crate) const fn operation(mut self, operation: EntryOperation) -> Self {
         self.operation = operation;
         self
     }
 
-    /// Marks an Entry as a required dependency rather than a directly selected input.
     #[must_use]
     pub(crate) const fn dependency(mut self) -> Self {
         self.role = ExportSourceRole::Dependency;
         self
     }
 
-    /// Records the actual result of the required read or projection.
     pub(crate) fn record(
         self,
         ledger: &mut ExportLedger,
         kind: Kind,
         disposition: SourceDisposition,
     ) {
-        self.diagnosed(ledger, kind, disposition, SourceDiagnosis::default());
+        self.diagnosed(ledger, kind, disposition, EntryDiagnosis::default());
     }
 
-    /// Records a source result with the available field metadata.
     pub(crate) fn diagnosed(
         self,
         ledger: &mut ExportLedger,
         kind: Kind,
         disposition: SourceDisposition,
-        diagnosis: SourceDiagnosis,
+        diagnosis: EntryDiagnosis,
     ) {
-        ledger.entry(ArchiveEntryObservation {
+        ledger.entry(self.observation(kind, disposition, diagnosis));
+    }
+
+    pub(crate) fn observation(
+        self,
+        kind: Kind,
+        disposition: SourceDisposition,
+        diagnosis: EntryDiagnosis,
+    ) -> ArchiveEntryObservation {
+        ArchiveEntryObservation {
             kind,
-            entry_index: self.outer,
-            container_entry_index: self.inner,
-            path: self.path,
+            entry_index: self.receipt.entry_index(),
+            container_entry_index: self.receipt.container_entry_index(),
+            path: self.receipt.path_storage(),
             role: self.role,
             disposition,
             diagnosis,
             operation: self.operation,
-        });
+            receipt: Some(self.receipt),
+        }
     }
 }
 
-/// Copies actual Entry operations as dependencies of another consuming kind.
+/// Copies actual operation receipts to another consuming kind without another source read.
 pub(crate) fn dependencies(source: &ExportLedger, ledger: &mut ExportLedger, kind: Kind) {
     if !source.incomplete_inventories.is_empty() {
         ledger.incomplete_inventory(kind);

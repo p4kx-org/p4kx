@@ -10,13 +10,13 @@ use crate::definition_reference::DefinitionStatus;
 use crate::guid_text::CatalogGuid;
 use crate::source_fields::FieldError;
 
-/// Reads an original Record link with independent source resolution and target headers.
-pub(crate) fn reference_value(
+/// Shares target resolution while binding a failure to its actual field guard.
+pub(crate) fn reference_with_failure<'source, 'field>(
     context: &CatalogRecordContext<'_>,
-    value: Option<&Value<'_>>,
-    owner: &str,
+    value: Option<&'field Value<'source>>,
     path: &str,
     notes: &mut Vec<FieldError>,
+    failure: impl FnOnce(&'field Value<'source>) -> Result<FieldError, CatalogError>,
 ) -> Result<SourcedValue<CatalogRecordReference>, CatalogError> {
     let reference = match value {
         Some(Value::Reference(target)) if target.location().is_none() => {
@@ -48,16 +48,7 @@ pub(crate) fn reference_value(
         _ => None,
     };
     reference.map_or_else(
-        || {
-            context.read(
-                value,
-                owner,
-                path,
-                "a nullable Record Reference",
-                notes,
-                |_| None,
-            )
-        },
+        || context.read_with(value, path, notes, |_| None, failure),
         |reference| context.value(path, SourceValue::Present(reference)),
     )
 }

@@ -77,10 +77,10 @@ fn unrelated_loadout_failure_does_not_invalidate_healthy_paint_vehicle_facts() -
     let health = built.summary().export_health();
     assert!(
         health
-            .failed_entries
+            .failed_entries()
             .iter()
-            .any(|failure| failure.kind == Kind::Ships
-                && failure.operation == EntryOperation::XmlLoadout),
+            .any(|failure| failure.kind() == Kind::Ships
+                && failure.operation() == EntryOperation::XmlLoadout),
         "the unrelated XML failure actually occurred"
     );
     let paints = health.kind(Kind::Paints).ok_or("paint health")?;
@@ -111,7 +111,7 @@ fn required_vehicle_parse_failure_still_blocks_paints_and_normal_publication() -
     assert!(
         matches!(
             build_catalog(&archive, &normal),
-            Err(CatalogError::IncompleteExport { .. })
+            Err(CatalogError::IncompleteExport(_))
         ),
         "normal publication refuses the actual vehicle failure"
     );
@@ -135,9 +135,9 @@ fn required_vehicle_parse_failure_still_blocks_paints_and_normal_publication() -
     );
     assert!(
         paints
-            .failed_entries
+            .failed_entries()
             .iter()
-            .any(|failure| failure.operation == EntryOperation::VehicleImplementation),
+            .any(|failure| failure.operation() == EntryOperation::VehicleImplementation),
         "the required parse operation and exact Entry identity are retained"
     );
     Ok(())

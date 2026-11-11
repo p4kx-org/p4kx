@@ -16,7 +16,7 @@ type TestResult = Result<(), Box<dyn Error>>;
 fn schema() -> Result<QuerySchema, Box<dyn Error>> {
     let bytes = database();
     let forge = DataForge::open(&bytes)?;
-    Ok(QuerySchema::of(&forge))
+    Ok(QuerySchema::of(&forge)?)
 }
 
 /// Returns the names offered at the end of `text`.
@@ -204,7 +204,7 @@ fn the_cursor_decides_not_the_text_behind_it() -> TestResult {
 fn an_accepted_candidate_makes_a_query_that_runs() -> TestResult {
     let bytes = database();
     let forge = DataForge::open(&bytes)?;
-    let schema = QuerySchema::of(&forge);
+    let schema = QuerySchema::of(&forge)?;
     let typed = "from Ship select Components[Wea";
     let completion = schema.complete(typed, typed.len()).ok_or("no completion")?;
     let candidate = completion.candidates().first().ok_or("no candidate")?;
@@ -232,7 +232,7 @@ fn names_that_are_no_bare_names_are_inserted_in_backticks() -> TestResult {
         )
         .build();
     let forge = DataForge::open(&bytes)?;
-    let schema = QuerySchema::of(&forge);
+    let schema = QuerySchema::of(&forge)?;
 
     let completion = schema
         .complete("from Tag select ", 16)
@@ -258,7 +258,7 @@ fn a_long_list_is_cut_and_counts_the_rest() -> TestResult {
     });
     let bytes = builder.build();
     let forge = DataForge::open(&bytes)?;
-    let schema = QuerySchema::of(&forge);
+    let schema = QuerySchema::of(&forge)?;
 
     let completion = schema.complete("from T", 6).ok_or("no completion")?;
 
@@ -287,7 +287,7 @@ fn brackets_also_offer_the_bases_and_a_path_needs_a_related_type() -> TestResult
         )
         .build();
     let forge = DataForge::open(&bytes)?;
-    let schema = QuerySchema::of(&forge);
+    let schema = QuerySchema::of(&forge)?;
 
     assert_eq!(
         names(&schema, "from Holder select parts["),

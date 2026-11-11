@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-#[path = "catalog_input_limits.rs"]
-pub(crate) mod catalog_input_limits;
 #[path = "catalog_number_capture.rs"]
 pub(crate) mod catalog_number_capture;
 #[path = "catalog_number_diagnostics.rs"]
@@ -38,6 +36,8 @@ pub(crate) mod catalog_text_contract;
 pub(crate) mod catalog_text_forms;
 #[path = "gameplay_property_catalog.rs"]
 pub(crate) mod gameplay_property_catalog;
+#[path = "loot_filter_catalog.rs"]
+pub(crate) mod loot_filter_catalog;
 #[path = "quality_bands_read.rs"]
 pub(crate) mod quality_bands_read;
 #[path = "quality_curve_source_read.rs"]
@@ -76,6 +76,8 @@ pub(crate) mod resource_read;
 pub(crate) mod resource_type_contract;
 #[path = "resource_value_read.rs"]
 pub(crate) mod resource_value_read;
+#[path = "source_value_catalog.rs"]
+pub(crate) mod source_value_catalog;
 
 #[path = "catalog_projections.rs"]
 pub(crate) mod catalog_projections;
@@ -97,9 +99,6 @@ pub(crate) mod commodity_authoring_read;
 
 #[path = "commodity_backfill.rs"]
 pub(crate) mod commodity_backfill;
-
-#[path = "commodity_backfill_input.rs"]
-pub(crate) mod commodity_backfill_input;
 
 #[path = "commodity_binding_read.rs"]
 pub(crate) mod commodity_binding_read;
@@ -137,3 +136,6 @@ pub(crate) mod canonical_record_header;
 pub(crate) mod record_header_field;
 #[path = "source_header.rs"]
 pub(crate) mod source_header;
+
+#[path = "export_health_capture.rs"]
+pub(crate) mod export_health_capture;

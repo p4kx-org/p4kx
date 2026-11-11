@@ -48,6 +48,13 @@ it does not replace that marker or restore runtime authority. Absence means unkn
 only where the governing older output format permits omission; current descriptions
 require the field. Catalog v3 does not accept a missing current field as a legacy default.
 
+`SourceUses::shared_origin` captures the original contributors common to several values.
+`value_with_shared_origin` adds each value's own contributors from the same inventory.
+Each value still serializes its complete sorted, deduplicated `sourceUsesRefs` array
+and the marker derived from that union. The normal writer streams the shared and local
+references together. Calling `FieldOrigin::source_uses_refs` materializes a contiguous
+slice for that value.
+
 `SourceUses::freeze` preserves the original sorted wire descriptions. Runtime owner
 tokens and handles are not serialized or restored by a metadata reader.
 

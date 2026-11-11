@@ -73,7 +73,10 @@ pub(super) fn definitions(
             ensure(
                 rows(catalog, "/exportHealth/failedRecords")?
                     .iter()
-                    .any(|row| row["recordIndex"].as_u64() == Some(u64::from(record.index()))),
+                    .any(|row| {
+                        row.pointer("/recordIndex/value").and_then(Value::as_u64)
+                            == Some(u64::from(record.index()))
+                    }),
                 "failed-source-health",
             )?;
             continue;

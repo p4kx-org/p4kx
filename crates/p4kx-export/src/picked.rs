@@ -3,7 +3,9 @@
 
 use p4kx_extraction::{Guid, RecordTree};
 
+use crate::Kind;
 use crate::blueprint_category::BlueprintCategory;
+use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::contract::{
     Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
@@ -23,7 +25,6 @@ use crate::mission_kinds::MissionPick;
 use crate::paint_port::VehicleFacts;
 use crate::ship_base::ShipRead;
 use crate::texts::Texts;
-use crate::{CatalogFailure, Kind};
 
 /// A Record a kind selected: its entity, or a development leftover of the kind.
 ///
@@ -74,7 +75,7 @@ pub(crate) enum Picked<'f> {
     /// A development leftover that is an item and a paint.
     SkippedPaint,
     /// A Record that could not be read.
-    Failed(CatalogFailure),
+    Failed(CatalogReadFailure<'f>),
     /// A warning the check of the Records found.
     Warned(CraftingWarning),
 }
@@ -84,10 +85,7 @@ impl<'f> Picked<'f> {
     /// `texts`. `None` for a kind whose dedicated reader supplies its rows.
     pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>, texts: &Texts<'f>) -> Option<Self> {
         Some(match kind {
-            Kind::Items => {
-                let (item, line) = item(tree, texts);
-                Self::Item(item, line, carries_ports(tree))
-            }
+            Kind::Items => Self::item_entity(tree, texts),
             Kind::Crafters => return crafter(tree).map(Self::Crafter),
             Kind::MineableElements => Self::Mineable(mineable_element(tree)),
             Kind::RefiningProcesses => Self::Refining(refining_process(tree, texts)),
@@ -105,12 +103,12 @@ impl<'f> Picked<'f> {
             }
             Kind::LootTables
             | Kind::LootArchetypes
-            | Kind::LootPoolFilters
             | Kind::LegacyLootTables
             | Kind::LegacyLootArchetypes => {
                 return LootPick::entity(kind, tree).map(Self::Loot);
             }
-            Kind::Tags
+            Kind::LootPoolFilters
+            | Kind::Tags
             | Kind::Manufacturers
             | Kind::Ships
             | Kind::Commodities
@@ -141,8 +139,14 @@ impl<'f> Picked<'f> {
             | Kind::HarvestableLocations
             | Kind::LootContainers
             | Kind::MineableEntities
-            | Kind::Shops => return None,
+            | Kind::Shops
+            | Kind::ShopInventories => return None,
         })
+    }
+
+    fn item_entity(tree: &RecordTree<'f>, texts: &Texts<'f>) -> Self {
+        let (item, line) = item(tree, texts);
+        Self::Item(item, line, carries_ports(tree))
     }
 
     /// Returns `self` joined with the crafting station `tree` describes when `self` is an item,
@@ -163,7 +167,7 @@ impl<'f> Picked<'f> {
     /// Returns the ship `build` makes of the base data `read`, or the failure when the base data
     /// could not be read: a ship is never left out without a trace.
     pub(crate) fn of_ship(
-        read: Result<ShipRead, CatalogFailure>,
+        read: Result<ShipRead, CatalogReadFailure<'f>>,
         build: impl FnOnce(&ShipRead) -> (Ship<'f>, VehicleFacts),
     ) -> Self {
         match read {

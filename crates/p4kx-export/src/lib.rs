@@ -36,9 +36,8 @@
 //! rule of the catalog's `variantOf` and without building a catalog, for a front-end that folds
 //! variants under their base.
 //!
-//! [`TagTree::build`] reads the tag tree of a [`DataForge`]: tag GUID to tag path, parent and
-//! children, at most [`MAX_TAG_DEPTH`] levels deep. [`TagTree::find_path`] finds the tags with a
-//! tag path. The catalog kinds that match tags (paints, loadouts) use the tree, and
+//! [`TagTree::build`] reads the selected tag paths and their hierarchy from a [`DataForge`].
+//! [`TagTree::find_path`] finds Tags by path. Catalog kinds such as paints and loadouts use this tree.
 //! `RecordExportOptions::tags` adds the tag path to every tag Reference of an exported Record.
 //!
 //! [`read_crafting`] reads the complete crafting data of a DataForge as [`Crafting`]: every tier
@@ -62,13 +61,28 @@ mod action_map_tests;
 mod action_map_write;
 mod archive_key_use;
 mod blueprint;
+mod blueprint_backfill_source;
+mod blueprint_catalog_read;
+mod blueprint_catalog_rows;
 mod blueprint_category;
+mod blueprint_choice_inputs;
+mod blueprint_context_contract;
+mod blueprint_context_read;
+mod blueprint_definition;
+mod blueprint_field_source;
+mod blueprint_ingredient_read;
+mod blueprint_presentation;
+mod blueprint_research_contract;
+mod blueprint_research_read;
+mod blueprint_rule_inputs;
+mod blueprint_tier_contract;
+mod blueprint_tier_read;
+mod broker_canonical_read;
 mod broker_entry;
 mod broker_entry_read;
-mod broker_identity;
-mod broker_links;
-mod broker_requirements;
-mod broker_schedule;
+mod broker_projection_read;
+mod broker_reputation_read;
+mod broker_standing_read;
 mod broker_terms;
 mod broker_values;
 mod build;
@@ -76,17 +90,19 @@ mod build_derived;
 mod build_harvest;
 mod build_loot;
 mod build_starmap;
+mod built_catalog;
 mod cargo_manifest;
 mod catalog_crafting;
 mod catalog_file;
 mod catalog_file_write;
 mod catalog_output;
-mod catalog_recipe;
 mod catalog_reference;
 mod catalog_reference_health;
+mod catalog_reference_texts;
 mod catalog_row;
 mod catalog_rows;
 mod catalog_target_index;
+mod catalog_template_modules;
 mod catalog_v3;
 mod collected;
 #[cfg(test)]
@@ -97,7 +113,6 @@ mod contract;
 mod contract_cargo;
 mod contract_completeness;
 mod contract_crafter;
-mod contract_crafting;
 mod contract_entities;
 mod contract_facts;
 mod contract_harvest;
@@ -112,7 +127,6 @@ mod contract_mining_params;
 mod contract_mission_data;
 mod contract_missions;
 mod contract_offer;
-mod contract_recipe;
 mod contract_recovery;
 mod contract_reputation;
 mod contract_reward;
@@ -124,9 +138,7 @@ mod contract_stats;
 mod contract_stats_gear;
 mod contract_stats_mining;
 mod contract_store_slugs;
-mod contract_template;
 mod contract_template_read;
-mod cost_resources;
 mod crafter;
 mod crafter_attach;
 mod crafter_fields;
@@ -134,8 +146,11 @@ mod crafter_hosts;
 mod crafter_queue;
 mod crafter_rules;
 mod crafting;
+mod crafting_cost_read;
 mod crafting_quantization;
+mod crafting_recipe_costs;
 mod crafting_records;
+mod crafting_research;
 mod crafting_scan;
 mod crafting_sources;
 mod crafting_tier;
@@ -150,25 +165,12 @@ mod error;
 mod export_archive_health;
 mod export_builder_capture;
 mod export_dependency_read;
-mod export_diagnostic;
-mod export_entry_counts;
-mod export_entry_ledger;
 mod export_evidence_lock;
 mod export_field_collect;
 mod export_field_error;
 mod export_field_inspection;
 mod export_field_walk;
-mod export_health;
-mod export_health_api;
-mod export_health_compile;
-mod export_health_derived;
-mod export_health_entries;
-mod export_health_fields;
-mod export_health_records;
-mod export_health_warning;
-mod export_ledger;
 mod export_projection_fields;
-mod export_reference_issue;
 mod export_source_failure;
 mod export_tag_read;
 mod failure;
@@ -208,6 +210,7 @@ mod mission_cooldown;
 mod mission_data;
 mod mission_entry_source;
 mod mission_facts;
+mod mission_generator;
 mod mission_giver;
 mod mission_hauling;
 mod mission_hauling_levels;
@@ -240,7 +243,9 @@ mod mission_results;
 mod mission_shared;
 mod mission_siblings;
 mod mission_standing;
+mod mission_text_inputs;
 mod mission_title;
+mod mission_title_origin;
 mod mission_titles;
 mod missions;
 mod ndjson;
@@ -256,13 +261,17 @@ mod paint_port;
 mod picked;
 mod playability;
 mod playability_rules;
+mod public_api;
 mod quality_catalog;
 mod quality_curve;
 mod quality_curve_read;
 mod quantization_summary;
+mod record_derived_observation;
 mod record_export;
 mod record_fields;
+mod record_observation;
 mod record_read;
+mod record_source_status;
 mod record_summary;
 mod recovery;
 mod reputation;
@@ -290,6 +299,13 @@ mod shop_container_scan;
 mod shop_containers;
 mod shop_entry_read;
 mod shop_inventories;
+mod shop_inventory_compatibility;
+mod shop_inventory_fields;
+mod shop_inventory_file;
+mod shop_inventory_observations;
+mod shop_inventory_resolution;
+mod shop_inventory_source;
+mod shop_inventory_source_read;
 mod shop_links;
 #[cfg(test)]
 mod shop_observation_tests;
@@ -321,23 +337,54 @@ mod starmap_xml;
 mod store_slug_summary;
 mod summary;
 mod template_extras;
-mod template_flow;
+pub(crate) use catalog_template_modules::{
+    broker_definition, broker_flow_failure, catalog_configurations, location_condition_kind,
+    mission_flow_owner, scoped_location_kind, scoped_location_shape, spawn_tag_text,
+    template_action_meaning, template_action_read, template_binding_read, template_canonical_read,
+    template_condition_read, template_configuration, template_context_error,
+    template_context_owner_read, template_context_read, template_context_source_read,
+    template_context_tag_read, template_context_value, template_context_weak_read,
+    template_declaration_binding, template_definition, template_dependency_spawns,
+    template_derived_failures, template_field_binding, template_field_capture,
+    template_flow_configuration_read, template_flow_plan, template_hauling_projection,
+    template_hauling_read, template_input, template_input_read, template_localization_plan,
+    template_localization_read, template_meaning_fields, template_meaning_plan, template_meanings,
+    template_modifier_kind, template_modifier_projection, template_number_capture,
+    template_objective_plan, template_output_plan, template_output_read, template_plan,
+    template_pool_binding_read, template_projection, template_property_configuration_read,
+    template_property_kind, template_property_plan, template_property_projection,
+    template_property_projection_read, template_property_value_check, template_reference_index,
+    template_rows, template_source, template_source_meaning, template_source_members,
+    template_source_read, template_source_refs, template_spawn_context, template_spawn_plan,
+    template_spawn_projection, template_spawn_read, template_strict_property_plan,
+    template_strict_property_read, template_tag_cache, template_trigger_read,
+    template_value_meaning, template_value_meaning_read, template_vocabulary_read,
+    template_weak_plan,
+};
 mod template_issues;
 mod template_modifier;
 mod template_objective;
-mod template_objective_read;
 mod template_property;
 mod template_property_read;
 mod texts;
 mod variant_groups;
 mod variants;
 
+pub(crate) use catalog_v3::export_health_capture::{
+    CatalogReadFailure, catalog_failures, catalog_read_failure, export_diagnostic,
+    export_entry_counts, export_entry_ledger, export_health, export_health_aggregate,
+    export_health_api, export_health_compile, export_health_derived, export_health_entries,
+    export_health_fields, export_health_prepare, export_health_prepared, export_health_records,
+    export_health_warning, export_ledger, export_reference_issue, failure_text,
+    health_diagnostic_observation, health_example_samples, health_failed_observation,
+    health_metadata, health_text_view,
+};
 pub(crate) use catalog_v3::{
-    canonical_record_header, catalog_definitions, catalog_input_limits, catalog_number_capture,
+    canonical_record_header, catalog_definitions, catalog_number_capture,
     catalog_number_diagnostics, catalog_number_health, catalog_origins, catalog_projection,
     catalog_projections, catalog_read, catalog_record_reference, catalog_table,
     catalog_text_contract, commodity, commodity_authoring_contract, commodity_authoring_inputs,
-    commodity_authoring_read, commodity_backfill, commodity_backfill_input, commodity_binding_read,
+    commodity_authoring_read, commodity_backfill, commodity_binding_read,
     commodity_composition_read, commodity_contract, commodity_inputs, commodity_presentation,
     commodity_resource, commodity_resource_presentation, commodity_source, commodity_text_choice,
     commodity_text_input, number_position, quality_bands_read, quality_curve_source_read,
@@ -345,56 +392,12 @@ pub(crate) use catalog_v3::{
     resource_density_source, resource_float, resource_group, resource_group_read, resource_integer,
     resource_memberships, resource_number, resource_property_contract, resource_property_read,
     resource_raw_policy, resource_read, resource_type_contract, resource_value_read, source_header,
+    source_value_catalog,
 };
 
-pub use action_map::{
-    ACTION_MAP_PROFILE_PATH, Action, ActionMap, ActionMapError, ActionMaps, Binding, Device,
-    parse_action_maps, read_action_maps,
-};
-pub use action_map_write::{ActionMapCounts, ActionMapFormat, write_action_maps};
-pub use archive_key_use::{ArchiveKeyState, ArchiveKeyUse};
-pub use build::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
-pub use catalog_file::CatalogFile;
-pub use catalog_file_write::{write_catalog_file, write_catalog_file_from};
-pub use catalog_output::{Compression, ZSTD_LEVEL, ZSTD_WINDOW_LOG};
-pub use contract::{SCHEMA_VERSION, catalog_schema};
-pub use crafting::{Crafting, read_crafting};
-pub use crafting_types::{
-    BlueprintPool, BlueprintTiers, Cost, CostContext, DismantleProcess, DismantleReturn,
-    GameplayProperty, GlobalParams, ItemCost, LocationOverride, ModifierKind, PoolEntry,
-    PropertyModifier, QualityCurve, QualityDistribution, QualityQuantization, QuantizationBand,
-    ResourceCost, RewardChance, RewardSource, Selection, Tier, ValueRange,
-};
-pub use crafting_warning::CraftingWarning;
-pub use error::CatalogError;
 pub use export_health_api::*;
-pub use failure::CatalogFailure;
-pub use form::{FLAT_CSV_FILE, FLAT_NDJSON_FILE, NDJSON_FILE, RecordForm};
-pub use item_class::{ItemClass, ItemClassSummary};
-pub use localization_table::{TableFormat, write_localization_table};
-pub use options::{CatalogOptions, CatalogPhase, CatalogProgress};
-pub use p4kx_extraction::{
-    CancelToken, ConflictPolicy, DataForge, ExtractionError, Filter, Guid, Language,
-    LocalizationNote, MAX_TAG_DEPTH, PLACEHOLDER_KEYS, RecordExportError, RecordExportOptions,
-    RecordFailure, TAG_PATH_SEPARATOR, Tag, TagResolver, TagTree, TagTreeIssues, TextSet,
-};
-pub use playability::{Playability, PlayabilityCounts, PlayabilitySummary};
-pub use quantization_summary::QuantizationSummary;
-pub use record_export::{RecordFilePlans, write_planned_record_export, write_record_export};
-pub use record_summary::RecordExportSummary;
-pub use selection::{EXCLUDED_TOKENS, Kind, KindRule, SHIP_EXCLUDED_TOKENS, is_kind_leftover};
-pub use ship_base::{
-    BuiltShipBase, Cargo, CargoGrid, Hull, HullThreshold, Implementation, LoadoutPort, Mass,
-    MassBasis, PartialPartValue, SHIP_BASE_VERSION, ShipBase, ShipBaseError, ShipBaseOptions,
-    ShipReader, Source, SourceKind, SourceShare, Sourced, UnreadablePartValue, VehicleKind,
-    build_ship_base, build_ship_base_from,
-};
-pub use shop_summary::ShopSummary;
-pub use starmap_report::StarmapReport;
-pub use store_slug_summary::StoreSlugSummary;
-pub use summary::{
-    BuiltCatalog, CatalogSummary, DECOMPRESSED_LIMIT, DECOMPRESSED_WARNING_SIZE, KindSummary,
-    LoadoutSummary, PaintSummary, SizeWarning, StarmapSummary, TextSummary, UPLOAD_LIMIT,
-    UPLOAD_WARNING_SIZE, VariantCounts, VariantSummary,
-};
-pub use variant_groups::{VariantGroups, read_variant_groups};
+pub use public_api::*;
+
+mod shop_container_xml;
+mod shop_inventory_name;
+mod shop_inventory_path;

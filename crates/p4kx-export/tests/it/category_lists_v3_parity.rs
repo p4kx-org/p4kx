@@ -96,27 +96,33 @@ fn build(database: &DataForgeBuilder) -> TestResult<(BuiltCatalog, Value)> {
 }
 
 fn assert_recipe(catalog: &Value) -> TestResult {
-    let guid = common::guid(crafting_fixture::MAGAZINE);
-    let blueprint = fixture::at(catalog, "/blueprints")?
-        .as_array()
-        .ok_or("existing Blueprints")?
-        .iter()
-        .find(|row| row.get("guid").and_then(Value::as_str) == Some(guid.as_str()))
-        .ok_or("original selected Magazine blueprint")?;
-    for (path, expected) in [
-        (
-            "/categoryGuid",
-            json!(common::guid(crafting_fixture::CATEGORY)),
-        ),
-        ("/craftTimeSeconds", json!(93_784)),
-        ("/ingredients/0/quantityScu", json!(0.5)),
-        ("/ingredients/0/slot", json!("MAGAZINE")),
-    ] {
-        assert_eq!(
-            fixture::at(blueprint, path)?,
-            &expected,
-            "reading category lists leaves established Blueprint convenience values unchanged"
-        );
-    }
+    let blueprint =
+        crate::catalog_crafting_support::blueprint::by_guid(catalog, crafting_fixture::MAGAZINE)?;
+    let tier = blueprint
+        .tiers()?
+        .first()
+        .copied()
+        .ok_or("original Magazine tier")?;
+    let (cost, slot) = blueprint.ingredient(0)?;
+    assert_eq!(
+        common::at(blueprint.presentation, "/category/value")?.as_str(),
+        Some(common::guid(crafting_fixture::CATEGORY).as_str()),
+        "the Blueprint keeps its category"
+    );
+    assert_eq!(
+        common::at(tier, "/craftTimeSeconds/value")?,
+        "93784",
+        "the source tier duration survives"
+    );
+    assert_eq!(
+        common::at(cost, "/meaning/quantityScu/value")?,
+        0.5,
+        "the authored resource quantity survives"
+    );
+    assert_eq!(
+        blueprint.debug_name(slot.ok_or("nearest Magazine slot")?)?,
+        "MAGAZINE",
+        "the ingredient retains the nearest authored slot name"
+    );
     Ok(())
 }

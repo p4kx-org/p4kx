@@ -9,8 +9,8 @@ use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
 use item_stats_fixture::{
-    COOLER, DANGLING_GUN, DRIVE, GUN, MISSILE, PERSONAL_GUN, PLAIN, PLANT, SHIELD, UNBOUNDED_DRIVE,
-    UNBUILDABLE_AMMO_GUN, WRONG_TYPE_GUN,
+    COOLER, CYCLIC_AMMO_GUN, DANGLING_GUN, DRIVE, GUN, MISSILE, PERSONAL_GUN, PLAIN, PLANT, SHIELD,
+    UNBOUNDED_DRIVE, WRONG_TYPE_GUN,
 };
 use p4kx_export::{CatalogOptions, build_catalog};
 use p4kx_extraction::Archive;
@@ -18,17 +18,24 @@ use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "catalog_item_ammo_source.rs"]
+mod ammo_source;
+
 fn catalog() -> Result<Value, Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let archive = Archive::open_with_key(
-        item_stats_fixture::write_archive(dir.path())?,
-        Some(p4kx_testkit::test_key()),
-    )?;
+    let (_directory, archive) = ammo_source::archive(ammo_source::AmmoSource::CyclicMembers)?;
+    catalog_from(&archive)
+}
+
+fn catalog_from(archive: &Archive) -> Result<Value, Box<dyn Error>> {
     let options = CatalogOptions {
         publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(archive, &options)?;
+    assert!(
+        !built.summary().export_health().is_complete(),
+        "the exact source errors remain visible independently of readable stats"
+    );
     Ok(serde_json::from_slice(built.json())?)
 }
 
@@ -129,9 +136,28 @@ fn a_weapon_with_an_ammunition_record_of_another_struct_keeps_the_item_and_has_n
 }
 
 #[test]
-fn a_weapon_whose_ammunition_record_cannot_be_built_keeps_the_item_and_has_null_ammo() -> TestResult
+fn a_weapon_keeps_readable_ammo_fields_beside_exact_inline_cycle_errors() -> TestResult {
+    let gun = item(&catalog()?, CYCLIC_AMMO_GUN)?;
+    assert_eq!(
+        gun["stats"]["weapon"]["ammo"],
+        json!({
+            "speed": 0.0,
+            "lifetime": 0.0,
+            "damage": null,
+            "detonationDamage": null,
+            "detonationMinRadius": null,
+            "detonationMaxRadius": null
+        })
+    );
+    assert_eq!(gun["stats"]["weapon"]["ammoCapacity"], 200);
+    Ok(())
+}
+
+#[test]
+fn a_weapon_whose_ammo_layout_genuinely_cannot_be_built_keeps_the_item_and_null_ammo() -> TestResult
 {
-    let gun = item(&catalog()?, UNBUILDABLE_AMMO_GUN)?;
+    let (_directory, archive) = ammo_source::archive(ammo_source::AmmoSource::InvalidLayout)?;
+    let gun = item(&catalog_from(&archive)?, CYCLIC_AMMO_GUN)?;
     assert!(gun["stats"]["weapon"]["ammo"].is_null());
     assert_eq!(gun["stats"]["weapon"]["ammoCapacity"], 200);
     Ok(())

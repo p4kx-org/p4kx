@@ -4,72 +4,67 @@
 use p4kx_extraction::{CancelToken, DataForge, Filter, Record, RecordTree, TreeBuilder};
 use rayon::prelude::*;
 
+use crate::blueprint_rule_inputs::BlueprintRules;
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read_failure::CatalogReadFailure;
 use crate::crafting_scan;
 use crate::crafting_warning::CraftingWarning;
 use crate::export_diagnostic::ExportSourceRole;
-use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
-use crate::{CatalogError, CatalogFailure, CatalogProgress, Kind};
+use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::record_observation::RecordObservation;
+use crate::{CatalogError, CatalogProgress, Kind};
 
 use super::fault::Fault;
-use super::projection::{self, Piece};
+use super::projection::{self, Piece, ProjectError};
 use super::resource_scope::ResourceLinkScope;
-use super::selection::{self, ReadPolicy, Selection};
+use super::selection::{self, Action, ReadPolicy, Selection};
 use super::{ReadCrafting, ReadMode};
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyInput;
 use crate::quality_catalog::Step;
 
 pub(super) struct Tracked<'f> {
     pub(super) piece: Option<Piece<'f>>,
+    pub(super) blueprint_rules: BlueprintRules,
     pub(super) ledger: ExportLedger,
     pub(super) quality: Step<'f>,
     pub(super) gameplay: Option<GameplayPropertyInput<'f>>,
 }
 
 fn candidate<'f>(
-    record: &Record<'f>,
+    admission: &RecordObservation<'_, 'f>,
     error: &p4kx_extraction::DataForgeError,
     filter: Option<&Filter>,
-) -> Tracked<'f> {
-    let source = selection::candidate_kind(record).map_or_else(
-        || {
-            SourceObservation::catalog_source(
-                record,
-                ExportSourceRole::SelectionCandidate,
-                SourceDisposition::ReadFailed,
-            )
-        },
-        |kind| {
-            SourceObservation::new(
-                kind,
-                record,
-                ExportSourceRole::SelectionCandidate,
-                SourceDisposition::ReadFailed,
-            )
-        },
-    );
+) -> Result<Tracked<'f>, CatalogError> {
+    let record = admission.record();
+    let source = admission.source(
+        selection::candidate_kind(record),
+        ExportSourceRole::SelectionCandidate,
+        SourceDisposition::ReadFailed,
+    )?;
     let mut ledger = ExportLedger::default();
     ledger.observe(source);
-    Tracked {
+    Ok(Tracked {
         piece: (!selection::outside(record, filter))
-            .then(|| Piece::Failed(CatalogFailure::of(record, error))),
+            .then(|| Piece::Failed(CatalogReadFailure::of(record, error))),
         ledger,
         quality: Step::default(),
         gameplay: None,
-    }
+        blueprint_rules: BlueprintRules::default(),
+    })
 }
-
 fn failure<'f>(
     selected: Selection,
-    record: &Record<'f>,
+    admission: &RecordObservation<'_, 'f>,
     fault: Fault<'_>,
     mut ledger: ExportLedger,
     filter: Option<&Filter>,
-) -> Tracked<'f> {
+) -> Result<Tracked<'f>, CatalogError> {
+    let record = admission.record();
     let mut source = selected
-        .observation(record, fault.disposition())
+        .observation(admission, fault.disposition())?
         .diagnosed(fault.diagnosis());
     if selected.policy == ReadPolicy::SkipAfter {
-        ledger.observe(selected.observation(record, SourceDisposition::SkippedBeforeRead));
+        ledger.observe(selected.observation(admission, SourceDisposition::SkippedBeforeRead)?);
         source.role = ExportSourceRole::Dependency;
         ledger.reassign_inspection_role(
             selected.action.kind(),
@@ -79,14 +74,15 @@ fn failure<'f>(
         );
     }
     ledger.observe(source);
-    Tracked {
+    Ok(Tracked {
         piece: fault
             .compatibility_failure(record, filter)
-            .then(|| Piece::Failed(CatalogFailure::of(record, fault.error()))),
+            .then(|| Piece::Failed(CatalogReadFailure::of(record, fault.error()))),
         ledger,
         quality: Step::default(),
         gameplay: None,
-    }
+        blueprint_rules: BlueprintRules::default(),
+    })
 }
 
 fn one<'f>(
@@ -108,15 +104,17 @@ fn one<'f>(
             ledger: ExportLedger::default(),
             quality: Step::default(),
             gameplay: None,
+            blueprint_rules: BlueprintRules::default(),
         },
         Ok(None) => return Ok(None),
         Err(error) => {
-            let mut tracked = candidate(record, &error, filter);
+            let admission = mode.admission(record)?;
+            let mut tracked = candidate(&admission, &error, filter)?;
             tracked.quality = mode.failed(record, None)?;
             tracked
         }
     };
-    tracked.quality.inventory.append(&inventory);
+    tracked.quality.inventory.append(&inventory)?;
     Ok(Some(tracked))
 }
 
@@ -128,14 +126,16 @@ fn selected_record<'f>(
     mode: ReadMode<'_, 'f>,
     selected: Selection,
 ) -> Result<Tracked<'f>, CatalogError> {
+    let admission = mode.admission(record)?;
     if selected.policy == ReadPolicy::SkipBefore {
         let mut ledger = ExportLedger::default();
-        ledger.observe(selected.observation(record, SourceDisposition::SkippedBeforeRead));
+        ledger.observe(selected.observation(&admission, SourceDisposition::SkippedBeforeRead)?);
         return Ok(Tracked {
             piece: Some(Piece::Skipped),
             ledger,
             quality: Step::default(),
             gameplay: None,
+            blueprint_rules: BlueprintRules::default(),
         });
     }
     let tree = match trees.build(record) {
@@ -143,56 +143,123 @@ fn selected_record<'f>(
         Err(error) => {
             let mut tracked = failure(
                 selected,
-                record,
+                &admission,
                 Fault::Read(&error),
                 ExportLedger::default(),
                 filter,
-            );
+            )?;
             tracked.quality = mode.failed(record, Some(selected.action))?;
+            if mode.input().is_some() {
+                match selected.action {
+                    Action::Globals => {
+                        tracked.blueprint_rules.defaults.unavailable = true;
+                        tracked.blueprint_rules.item_exclusions.unavailable = true;
+                    }
+                    Action::Dismantle => tracked.blueprint_rules.process_unavailable = true,
+                    _ => {}
+                }
+            }
             return Ok(tracked);
         }
     };
-    project_tree(record, &tree, selected, mode, cancel, filter)
+    project_tree(&admission, &tree, selected, mode, cancel, filter)
+}
+
+fn read_blueprint<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    role: ExportSourceRole,
+    ledger: &mut ExportLedger,
+    cancel: Option<&CancelToken>,
+) -> Result<Piece<'source>, CatalogError> {
+    let found = crate::blueprint_catalog_read::read(tree, projection, admission, cancel)?;
+    crate::source_projection_notes::record(
+        Kind::Blueprints,
+        role,
+        admission,
+        tree,
+        found.notes,
+        ledger,
+    )?;
+    Ok(Piece::CanonicalBlueprint(Box::new(found.value)))
+}
+
+fn read_selected_projection<'source>(
+    selected: Selection,
+    admission: &RecordObservation<'_, 'source>,
+    tree: &RecordTree<'source>,
+    ledger: &mut ExportLedger,
+    cancel: Option<&CancelToken>,
+) -> Result<Option<Piece<'source>>, ProjectError> {
+    let projected = projection::project(selected.action, tree, cancel)?;
+    if let Some(kind) = selected.action.kind() {
+        crate::source_projection_notes::record(
+            kind,
+            selected.role,
+            admission,
+            tree,
+            projected.notes,
+            ledger,
+        )
+        .map_err(ProjectError::Catalog)?;
+    }
+    Ok(projected.piece)
 }
 
 fn project_tree<'f>(
-    record: &Record<'f>,
+    admission: &RecordObservation<'_, 'f>,
     tree: &RecordTree<'f>,
     selected: Selection,
     mode: ReadMode<'_, 'f>,
     cancel: Option<&CancelToken>,
     filter: Option<&Filter>,
 ) -> Result<Tracked<'f>, CatalogError> {
-    let mut ledger = crate::export_field_walk::inspect(
+    let mut ledger = crate::export_field_walk::inspect_observed(
+        mode.input(),
         tree,
-        record,
+        admission,
         selected.action.kind(),
         selected.role,
         cancel,
     )?;
-    let input = mode.project(selected, tree, &mut ledger, cancel)?;
-    let gameplay = mode.property(selected, tree, &mut ledger, cancel)?;
+    let input = mode.project(selected, admission, tree, &mut ledger, cancel)?;
+    let gameplay = mode.property(selected, admission, tree, &mut ledger, cancel)?;
     let piece = if input.is_some() || gameplay.is_some() {
         None
+    } else if let ReadMode::Catalog(projection) = mode
+        && selected.action == Action::Blueprint
+    {
+        Some(read_blueprint(
+            tree,
+            projection,
+            admission,
+            selected.role,
+            &mut ledger,
+            cancel,
+        )?)
     } else {
-        match projection::project(selected.action, tree, selected.role, &mut ledger) {
+        match read_selected_projection(selected, admission, tree, &mut ledger, cancel) {
             Ok(piece) => piece,
-            Err(error) => {
-                return Ok(failure(
+            Err(ProjectError::Catalog(error)) => return Err(error),
+            Err(ProjectError::Source(error)) => {
+                return failure(
                     selected,
-                    record,
+                    admission,
                     Fault::Projection(&error),
                     ledger,
                     filter,
-                ));
+                );
             }
         }
     };
-    ledger.observe(selected.observation(record, selected.successful_disposition()));
+    let blueprint_rules = mode.blueprint_rules(selected.action, admission, tree, cancel)?;
+    ledger.observe(selected.observation(admission, selected.successful_disposition())?);
     Ok(Tracked {
         piece,
         ledger,
         gameplay,
+        blueprint_rules,
         quality: Step {
             input,
             ..Step::default()
@@ -263,7 +330,13 @@ fn read_scoped<'f>(
     let mut result = super::assemble::assemble(tracked, mode.origins(), cancel)?;
     inventories(&mut result.ledger);
     if !result.data.pools.is_empty() {
-        let found = crafting_scan::reward_sources(records, &result.data.pools, cancel, progress)?;
+        let found = crafting_scan::reward_sources(
+            records,
+            &result.data.pools,
+            mode.input(),
+            cancel,
+            progress,
+        )?;
         result.data.reward_sources = found.sources;
         result.ledger.merge(found.ledger);
         if found.unreadable > 0 {
@@ -273,7 +346,16 @@ fn read_scoped<'f>(
                 .push(CraftingWarning::UnreadableRewardRecords(found.unreadable));
         }
     }
-    if let Some(warning) = result.data.unknown_ranges_warning() {
+    let selected = result
+        .blueprints
+        .iter()
+        .map(|row| row.unknown_range_types.as_slice());
+    let interpreted = result
+        .data
+        .blueprints
+        .iter()
+        .map(|row| row.unknown_range_types.as_slice());
+    if let Some(warning) = crate::crafting::unknown_ranges_warning(interpreted.chain(selected)) {
         result.data.warnings.push(warning);
     }
     let processes = result.data.live_dismantle().count();

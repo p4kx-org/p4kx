@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
 
@@ -9,6 +10,7 @@ use p4kx_dataforge::{DataForge, Guid, Record, RecordTree, TagTree, TreeBuilder};
 use crate::assortment::Assorted;
 use crate::entities::is_entity;
 use crate::loadout_file_cache::CachedDocument;
+use crate::manual_loadout;
 use crate::pick::LoadoutPicks;
 use crate::plan::Plan;
 use crate::resolver_observation::{self, Cache, LoadoutReadEvent, Observation};
@@ -16,7 +18,7 @@ use crate::spec::{EntitySpec, EntrySpec, LoadoutSpec, TargetSpec};
 use crate::walk::Walk;
 use crate::{
     ChangeError, ChangedLoadout, Entities, EntityNode, ItemFacts, LandingGear, LoadoutChanges,
-    LoadoutError, LoadoutFiles, VehicleImplementation, Wearable,
+    LoadoutError, LoadoutFiles, LoadoutXmlClassUse, VehicleImplementation, Wearable,
 };
 
 #[path = "resolver_specs.rs"]
@@ -31,13 +33,18 @@ pub(crate) type VehicleResult = Result<Arc<VehicleImplementation>, LoadoutError>
 pub(crate) struct Entries {
     pub(crate) list: Arc<[EntrySpec]>,
     pub(crate) issues: Arc<[LoadoutError]>,
+    pub(crate) xml_use: Option<LoadoutXmlClassUse>,
 }
 
 impl Entries {
+    pub(crate) fn specs(&self) -> impl Iterator<Item = Cow<'_, EntrySpec>> {
+        manual_loadout::entries(&self.list, self.xml_use.as_ref())
+    }
     fn complete(list: Arc<[EntrySpec]>) -> Self {
         Self {
             list,
             issues: Arc::from([]),
+            xml_use: None,
         }
     }
 }
@@ -57,7 +64,7 @@ pub struct LoadoutResolver<'f> {
     pub(crate) vehicles: HashMap<String, CachedDocument<VehicleResult>>,
     pub(crate) landing: HashMap<Guid, Result<Arc<[LandingGear]>, LoadoutError>>,
     pub(crate) builder: TreeBuilder<'f>,
-    pub(crate) observation: Option<Arc<Observation>>,
+    pub(crate) observation: Option<Arc<Observation<'f>>>,
     pub(crate) read_sources: HashMap<(Cache, Guid), Record<'f>>,
     pub(crate) assortments: HashMap<Guid, Assorted>,
     pub(crate) assorting: Vec<Guid>,
@@ -200,8 +207,14 @@ impl<'f> LoadoutResolver<'f> {
                     tree,
                 },
             )?;
-            self.specs
-                .insert(entity.index(), Arc::new(Ok(EntitySpec::read(tree))));
+            self.specs.insert(
+                entity.index(),
+                Arc::new(resolver_observation::parse_spec(
+                    entity,
+                    tree,
+                    self.observation.as_deref(),
+                )),
+            );
         }
         self.resolve(entity)
     }
@@ -337,7 +350,10 @@ impl<'f> LoadoutResolver<'f> {
     pub(crate) fn entries(&mut self, loadout: Option<&LoadoutSpec>) -> EntriesResult {
         match loadout {
             None => Ok(Entries::complete(Arc::from([]))),
-            Some(LoadoutSpec::Manual(entries)) => Ok(Entries::complete(Arc::clone(entries))),
+            Some(LoadoutSpec::Manual(entries)) => Ok(Entries {
+                xml_use: entries.usage().cloned(),
+                ..Entries::complete(Arc::clone(entries.shared()))
+            }),
             Some(LoadoutSpec::Layered(layers)) => self.layered_entries(layers),
             Some(LoadoutSpec::Assortments(guids)) => Ok(self.assortment_entries(guids)),
             Some(LoadoutSpec::Xml(path)) => self.xml_entries(path),
@@ -347,8 +363,10 @@ impl<'f> LoadoutResolver<'f> {
     /// Returns the Record a target names, or `None` when there is none.
     pub(crate) fn record_of(&self, target: &TargetSpec) -> Option<Record<'f>> {
         match target {
-            TargetSpec::Reference(guid) => self.entities.forge().record_by_guid(*guid),
-            TargetSpec::ClassName(name) => self.entities.by_class_name(name),
+            TargetSpec::Reference(reference) => {
+                self.entities.forge().record_by_guid(reference.guid())
+            }
+            TargetSpec::ClassName(name) => self.entities.by_class_name(name.value()),
             TargetSpec::None | TargetSpec::Invalid(_) => None,
         }
     }

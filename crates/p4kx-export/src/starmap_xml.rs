@@ -7,12 +7,17 @@ use crate::starmap_transform::Rotation;
 
 /// An element of text XML or `CryXml`, read alike.
 pub(crate) trait Node<'d>: Copy {
+    fn original(self) -> Root<'d>;
     fn name(self) -> &'d str;
     fn attributes(self) -> impl Iterator<Item = (&'d str, &'d str)>;
     fn children(self) -> impl Iterator<Item = Self>;
 }
 
 impl<'d> Node<'d> for cryxml::Element<'d> {
+    fn original(self) -> Root<'d> {
+        Root::Cry(self)
+    }
+
     fn name(self) -> &'d str {
         cryxml::Element::name(self)
     }
@@ -27,6 +32,10 @@ impl<'d> Node<'d> for cryxml::Element<'d> {
 }
 
 impl<'d> Node<'d> for roxmltree::Node<'d, '_> {
+    fn original(self) -> Root<'d> {
+        Root::Text(self)
+    }
+
     fn name(self) -> &'d str {
         self.tag_name().name()
     }
@@ -83,6 +92,19 @@ impl<'b> Document<'b> {
         }
     }
 
+    /// Returns the original node position only for a node of this actual parse.
+    pub(crate) fn original_index(&self, node: Root<'_>) -> Option<u32> {
+        match (self, node) {
+            (Self::Cry(document), Root::Cry(element)) if element.is_from(document) => {
+                Some(element.index())
+            }
+            (Self::Text(document), Root::Text(node)) if std::ptr::eq(document, node.document()) => {
+                Some(node.id().get())
+            }
+            _ => None,
+        }
+    }
+
     /// Returns the root element.
     pub(crate) fn root(&self) -> Root<'_> {
         match self {
@@ -102,6 +124,10 @@ pub(crate) enum Root<'d> {
 }
 
 impl<'d> Node<'d> for Root<'d> {
+    fn original(self) -> Self {
+        self
+    }
+
     fn name(self) -> &'d str {
         match self {
             Self::Cry(element) => Node::name(element),

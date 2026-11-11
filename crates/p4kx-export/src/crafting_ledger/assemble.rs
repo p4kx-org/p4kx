@@ -16,9 +16,15 @@ use super::ReadCrafting;
 use super::projection::Piece;
 use super::read::Tracked;
 
-fn insert<'f>(data: &mut Crafting<'f>, links: &mut HashMap<Guid, Vec<Guid>>, piece: Piece<'f>) {
+fn insert<'f>(
+    data: &mut Crafting<'f>,
+    blueprints: &mut Vec<crate::blueprint_catalog_read::PreparedBlueprint<'f>>,
+    links: &mut HashMap<Guid, Vec<Guid>>,
+    piece: Piece<'f>,
+) {
     match piece {
         Piece::Blueprint(value) => data.blueprints.push(value),
+        Piece::CanonicalBlueprint(value) => blueprints.push(*value),
         Piece::Property(value) => data.properties.push(value),
         Piece::Distribution(value) => data.quality_distributions.push(value),
         Piece::Quantization(value) => data.quality_quantizations.push(value),
@@ -44,7 +50,7 @@ fn insert<'f>(data: &mut Crafting<'f>, links: &mut HashMap<Guid, Vec<Guid>>, pie
                 .extend(value.dismantle_blacklist_items);
         }
         Piece::Skipped => data.skipped_blueprints = data.skipped_blueprints.saturating_add(1),
-        Piece::Failed(value) => data.failures.push(value),
+        Piece::Failed(value) => data.failures.push(value.into_interpreted()),
     }
 }
 
@@ -72,16 +78,23 @@ pub(super) fn assemble<'f>(
     cancel: Option<&CancelToken>,
 ) -> Result<ReadCrafting<'f>, CatalogError> {
     let mut data = Crafting::default();
+    let mut blueprints = Vec::new();
+    let mut blueprint_rules = crate::blueprint_rule_inputs::BlueprintRules::default();
+    let mut catalog_failures = Vec::new();
     let mut ledger = ExportLedger::default();
     let mut links = HashMap::new();
     let mut quality = Assembly::default();
     let mut gameplay = GameplayPropertyRows::default();
     for tracked in tracked {
         ledger.merge(tracked.ledger);
-        quality.add(tracked.quality);
+        blueprint_rules.merge(tracked.blueprint_rules);
+        quality.add(tracked.quality)?;
         gameplay.add(tracked.gameplay);
         if let Some(piece) = tracked.piece {
-            insert(&mut data, &mut links, piece);
+            match piece {
+                Piece::Failed(failure) if origins.is_some() => catalog_failures.push(failure),
+                piece => insert(&mut data, &mut blueprints, &mut links, piece),
+            }
         }
     }
     data.blueprints.sort_by_key(|item| item.guid);
@@ -98,6 +111,9 @@ pub(super) fn assemble<'f>(
     };
     Ok(ReadCrafting {
         data,
+        blueprints,
+        blueprint_rules,
+        catalog_failures,
         ledger,
         gameplay,
         quality,

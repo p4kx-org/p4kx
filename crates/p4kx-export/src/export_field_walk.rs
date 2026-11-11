@@ -1,21 +1,26 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{
-    CancelToken, MAX_NESTING_DEPTH, MAX_RECORD_VALUES, Record, RecordTree, Reference, StructValue,
-    Value,
-};
+use p4kx_extraction::{CancelToken, Guid, Record, RecordTree, Reference, Value};
 
 use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::FloatToken;
+use crate::catalog_read::original::{
+    ExampleBodyReceipt, OriginalRecordScope, OriginalValueEdge, OriginalValueEvent,
+    OriginalValueSite, OwnedValueEvent, OwnedValueVisit, OwnedValueWalk, ReferenceCapture,
+};
+use crate::catalog_reference;
 use crate::export_diagnostic::{ExportDiagnosticCode, ExportDiagnosticSeverity, ExportSourceRole};
 use crate::export_field_collect::FieldCollector;
 use crate::export_ledger::{ExportAccountingError, ExportLedger};
 use crate::number_position::NumberPosition;
+use crate::record_observation::RecordObservation;
 use crate::resource_raw_policy::ResourceNumberContract;
 use crate::selection::Kind;
 
 /// Inspects only materialized owned values, retaining field failures independently of row mapping.
+#[cfg(test)]
 pub(crate) fn inspect(
     tree: &RecordTree<'_>,
     record: &Record<'_>,
@@ -23,217 +28,295 @@ pub(crate) fn inspect(
     role: ExportSourceRole,
     cancel: Option<&CancelToken>,
 ) -> Result<ExportLedger, CatalogError> {
-    if (tree.record_index(), tree.guid()) != (record.index(), record.guid()) {
+    if !tree.is_from(record) {
         return Err(ExportAccountingError::ConflictingFieldInspection.into());
     }
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
-    let mut walker = Walker {
-        collector: FieldCollector::new(tree, record.index(), kind, role),
-        visited: 0,
-        cancel,
+    let admission = RecordObservation::accounting(record);
+    inspect_observed(None, tree, &admission, kind, role, cancel)
+}
+
+/// Inspects a canonical body paired with its actual original header admission.
+pub(crate) fn inspect_observed<'source>(
+    input: Option<&OriginalCatalogInput<'_, '_>>,
+    tree: &RecordTree<'source>,
+    admission: &RecordObservation<'_, 'source>,
+    kind: Option<Kind>,
+    role: ExportSourceRole,
+    cancel: Option<&CancelToken>,
+) -> Result<ExportLedger, CatalogError> {
+    admission.check_tree(tree)?;
+    if cancel.is_some_and(CancelToken::is_cancelled) {
+        return Err(CatalogError::Cancelled);
+    }
+    let mut inspector = Inspector {
+        collector: FieldCollector::new(tree, admission, kind, role)?,
+        positions: NumberPositions::default(),
     };
-    walker.structure(
-        tree.root(),
-        &mut String::new(),
-        0,
-        None,
-        NumberPosition::Root,
-    )?;
+    if let Some(input) = input {
+        let scope = input.record_scope(admission.record(), tree)?;
+        let mut capture = ReferenceCapture::new(input, admission, &scope)?;
+        inspector.observed(&scope, &mut capture, cancel)?;
+    } else {
+        inspector.accounting(tree, admission.record(), cancel)?;
+    }
     let mut ledger = ExportLedger::default();
-    ledger.field_inspections.push(walker.collector.finish());
+    ledger.field_inspections.push(inspector.collector.finish());
     Ok(ledger)
 }
 
-struct Walker<'t, 'f, 'c> {
-    collector: FieldCollector<'t, 'f>,
-    visited: usize,
-    cancel: Option<&'c CancelToken>,
+struct Inspector<'tree, 'source> {
+    collector: FieldCollector<'tree, 'source>,
+    positions: NumberPositions,
 }
 
-impl Walker<'_, '_, '_> {
-    fn structure(
+impl Inspector<'_, '_> {
+    fn observed(
         &mut self,
-        structure: &StructValue<'_>,
-        path: &mut String,
-        depth: usize,
-        parent_type: Option<&str>,
-        position: NumberPosition,
-    ) -> Result<bool, CatalogError> {
-        if depth > MAX_NESTING_DEPTH {
-            self.collector.limited(path, structure.type_name());
-            return Ok(false);
-        }
-        for field in structure.fields() {
-            let length = path.len();
-            if !path.is_empty() {
-                path.push('.');
-            }
-            path.push_str(field.name());
-            let position = position.field(structure.type_name(), field.name());
-            let complete = self.value(
-                field.value(),
-                path,
-                structure.type_name(),
-                depth,
-                parent_type,
-                position,
-            )?;
-            path.truncate(length);
-            if !complete {
-                return Ok(false);
+        scope: &OriginalRecordScope<'_, '_>,
+        capture: &mut ReferenceCapture<'_, '_, '_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
+        let mut walk = scope.walk(cancel);
+        while let Some(event) = walk.next_event()? {
+            match event {
+                OriginalValueEvent::Value(site) => {
+                    self.visit(site.neutral(), Some((capture, &site)))?;
+                    if matches!(site.value(), Value::Struct(_) | Value::Array(_)) {
+                        capture.enter(&site)?;
+                    }
+                }
+                OriginalValueEvent::EndContainer { ordinal, .. } => {
+                    self.positions.leave(ordinal)?;
+                    capture.leave(ordinal)?;
+                }
             }
         }
-        Ok(true)
+        Ok(())
     }
 
-    fn value(
+    fn accounting<'source>(
         &mut self,
-        value: &Value<'_>,
-        path: &mut String,
-        source_type: &str,
-        depth: usize,
-        parent_type: Option<&str>,
-        position: NumberPosition,
-    ) -> Result<bool, CatalogError> {
-        if self.cancel.is_some_and(CancelToken::is_cancelled) {
-            return Err(CatalogError::Cancelled);
-        }
-        if self.visited == MAX_RECORD_VALUES {
-            self.collector.limited(path, source_type);
-            return Ok(false);
-        }
-        self.visited += 1;
-        match value {
-            Value::Struct(structure) => {
-                self.structure(structure, path, depth + 1, Some(source_type), position)
+        tree: &RecordTree<'source>,
+        record: &Record<'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
+        let mut walk = OwnedValueWalk::new(record, tree, cancel)?;
+        while let Some(event) = walk.next_event()? {
+            match event {
+                OwnedValueEvent::Value(visit) => self.visit(&visit, None)?,
+                OwnedValueEvent::EndContainer { ordinal, .. } => self.positions.leave(ordinal)?,
             }
+        }
+        Ok(())
+    }
+
+    fn visit(
+        &mut self,
+        visit: &OwnedValueVisit<'_, '_, '_>,
+        original: Option<(
+            &ReferenceCapture<'_, '_, '_>,
+            &OriginalValueSite<'_, '_, '_, '_>,
+        )>,
+    ) -> Result<(), CatalogError> {
+        let position = self.positions.at(visit)?;
+        match visit.value() {
+            Value::Struct(_) => self.positions.enter(visit.ordinal(), position),
             Value::Array(values) => {
-                self.array(values, path, source_type, depth, parent_type, position)
+                if values.is_empty() {
+                    self.collector.note(
+                        visit.logical_path(),
+                        visit.owner_type(),
+                        ExportDiagnosticCode::EmptyValue,
+                        ExportDiagnosticSeverity::Information,
+                        None,
+                        example(original)?,
+                    )?;
+                }
+                self.positions.enter(visit.ordinal(), position);
             }
-            _ => Ok(self.scalar(
-                value,
-                path,
-                source_type,
-                parent_type,
-                position.contract(value),
-            )),
+            _ => self.scalar(visit, position.contract(visit.value()), original)?,
         }
+        Ok(())
     }
 
     fn scalar(
         &mut self,
-        value: &Value<'_>,
-        path: &str,
-        source_type: &str,
-        parent_type: Option<&str>,
+        visit: &OwnedValueVisit<'_, '_, '_>,
         contract: Option<ResourceNumberContract>,
-    ) -> bool {
+        original: Option<(
+            &ReferenceCapture<'_, '_, '_>,
+            &OriginalValueSite<'_, '_, '_, '_>,
+        )>,
+    ) -> Result<(), CatalogError> {
+        let value = visit.value();
+        let path = visit.logical_path();
+        let source_type = visit.owner_type();
         if let Some(token) = FloatToken::read(value) {
-            self.collector
-                .non_finite(path, source_type, contract, token);
-            return true;
-        }
-        match value {
-            Value::Null => self.collector.note(
+            self.collector.non_finite(
                 path,
                 source_type,
-                ExportDiagnosticCode::OptionalAbsent,
-                ExportDiagnosticSeverity::Information,
-                None,
-            ),
-            Value::Guid(guid) if *guid == p4kx_extraction::Guid::default() => self.collector.note(
+                visit.ordinal(),
+                contract,
+                token,
+                example(original)?,
+            );
+            return Ok(());
+        }
+        if let Some(code) = informational(value) {
+            self.collector.note(
                 path,
                 source_type,
-                ExportDiagnosticCode::EmptyValue,
+                code,
                 ExportDiagnosticSeverity::Information,
                 None,
-            ),
-            Value::String(text) | Value::Locale(text) | Value::Enum(text) if text.is_empty() => {
-                self.collector.note(
-                    path,
-                    source_type,
-                    ExportDiagnosticCode::EmptyValue,
-                    ExportDiagnosticSeverity::Information,
-                    None,
-                );
+                example(original)?,
+            )?;
+        } else {
+            match value {
+                Value::Error(error) => {
+                    let observation = match original {
+                        Some((capture, site)) => capture.error(site)?,
+                        None => self.collector.accounting_error(path, source_type, *error),
+                    };
+                    let body = match (original, observation.as_ref()) {
+                        (Some(_), Some(reference)) => {
+                            Some(ExampleBodyReceipt::reference(reference)?)
+                        }
+                        _ => example(original)?,
+                    };
+                    crate::export_field_error::record(
+                        &mut self.collector,
+                        path,
+                        source_type,
+                        *error,
+                        body,
+                    )?;
+                    if let Some(observation) = observation {
+                        self.collector.unresolved(observation);
+                    }
+                }
+                Value::Reference(reference) => self.reference(reference, visit, original)?,
+                _ => {}
             }
-            Value::Error(error) => {
-                crate::export_field_error::record(&mut self.collector, path, source_type, *error);
-            }
-            Value::Reference(reference) => {
-                return self.reference(reference, path, source_type, parent_type);
-            }
-            _ => {}
         }
-        true
+        Ok(())
     }
 
     fn reference(
         &mut self,
         reference: &Reference<'_>,
-        path: &str,
-        source_type: &str,
-        parent_type: Option<&str>,
-    ) -> bool {
-        if reference.record_index() != self.collector.owner_index()
-            && reference.location().is_some()
-        {
+        visit: &OwnedValueVisit<'_, '_, '_>,
+        original: Option<(
+            &ReferenceCapture<'_, '_, '_>,
+            &OriginalValueSite<'_, '_, '_, '_>,
+        )>,
+    ) -> Result<(), CatalogError> {
+        let path = visit.logical_path();
+        let source_type = visit.owner_type();
+        let foreign = reference.record_index() != self.collector.owner_index()
+            && reference.location().is_some();
+        let kind =
+            catalog_reference::target_kind(source_type, visit.parent_type(), path, reference);
+        if !foreign && kind.is_none() {
+            return Ok(());
+        }
+        let observation = match original {
+            Some((capture, site)) => capture.reference(site)?,
+            None => self
+                .collector
+                .accounting_reference(path, source_type, reference),
+        };
+        if foreign {
             self.collector.note(
                 path,
                 source_type,
                 ExportDiagnosticCode::OutsideOwner,
                 ExportDiagnosticSeverity::Information,
                 Some(reference.guid()),
-            );
-            self.collector.foreign(path, source_type, reference);
-            true
-        } else {
-            self.collector
-                .catalog_reference(path, source_type, parent_type, reference)
-        }
-    }
-
-    fn array(
-        &mut self,
-        values: &[Value<'_>],
-        path: &mut String,
-        source_type: &str,
-        depth: usize,
-        parent_type: Option<&str>,
-        position: NumberPosition,
-    ) -> Result<bool, CatalogError> {
-        use std::fmt::Write as _;
-
-        if values.is_empty() {
-            self.collector.note(
-                path,
-                source_type,
-                ExportDiagnosticCode::EmptyValue,
-                ExportDiagnosticSeverity::Information,
-                None,
-            );
-        }
-        let indexed = values.iter().enumerate();
-        for (index, value) in indexed {
-            let length = path.len();
-            write!(path, "[{index}]").map_err(|error| {
-                CatalogError::Accounting(ExportAccountingError::FieldPath(error))
-            })?;
-            let complete = self.value(
-                value,
-                path,
-                source_type,
-                depth,
-                parent_type,
-                position.element(),
+                match original {
+                    Some(_) => Some(ExampleBodyReceipt::reference(&observation)?),
+                    None => None,
+                },
             )?;
-            path.truncate(length);
-            if !complete {
-                return Ok(false);
-            }
+            self.collector
+                .unresolved(observation.resolved(crate::ExportReferenceStatus::OutsideOwner));
+        } else if let Some(kind) = kind {
+            self.collector.catalog_reference(kind, observation);
         }
-        Ok(true)
+        Ok(())
     }
 }
+
+fn example(
+    original: Option<(
+        &ReferenceCapture<'_, '_, '_>,
+        &OriginalValueSite<'_, '_, '_, '_>,
+    )>,
+) -> Result<Option<ExampleBodyReceipt>, CatalogError> {
+    original
+        .map(|(capture, site)| capture.example(site))
+        .transpose()
+}
+
+fn informational(value: &Value<'_>) -> Option<ExportDiagnosticCode> {
+    match value {
+        Value::Null => Some(ExportDiagnosticCode::OptionalAbsent),
+        Value::Guid(guid) if *guid == Guid::default() => Some(ExportDiagnosticCode::EmptyValue),
+        Value::String(text) | Value::Locale(text) | Value::Enum(text) if text.is_empty() => {
+            Some(ExportDiagnosticCode::EmptyValue)
+        }
+        _ => None,
+    }
+}
+struct ContainerPosition {
+    ordinal: u64,
+    position: NumberPosition,
+}
+
+/// Numeric contracts accumulated along the actual owned-value event path.
+#[derive(Default)]
+struct NumberPositions {
+    containers: Vec<ContainerPosition>,
+}
+
+impl NumberPositions {
+    fn at(
+        &self,
+        visit: &OwnedValueVisit<'_, '_, '_>,
+    ) -> Result<NumberPosition, ExportAccountingError> {
+        let parent = self.containers.last();
+        if visit.parent_ordinal() != parent.map(|parent| parent.ordinal) {
+            return Err(ExportAccountingError::ConflictingSourceDatum);
+        }
+        let position = parent.map_or(NumberPosition::Root, |parent| parent.position);
+        Ok(match visit.edge() {
+            OriginalValueEdge::Field { .. } => {
+                position.field(visit.owner_type(), visit.field().name())
+            }
+            OriginalValueEdge::Element { .. } => position.element(),
+        })
+    }
+
+    fn enter(&mut self, ordinal: u64, position: NumberPosition) {
+        self.containers
+            .push(ContainerPosition { ordinal, position });
+    }
+
+    fn leave(&mut self, ordinal: u64) -> Result<(), ExportAccountingError> {
+        let container = self
+            .containers
+            .pop()
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        if container.ordinal != ordinal {
+            return Err(ExportAccountingError::ConflictingSourceDatum);
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[path = "export_field_reference_inventory_tests.rs"]
+mod reference_inventory_tests;

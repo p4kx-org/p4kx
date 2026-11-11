@@ -57,7 +57,7 @@ impl Slot {
     }
 
     /// Returns the field name.
-    pub(crate) fn name<'f>(&self, forge: &'f DataForge<'f>) -> Result<&'f str, DataForgeError> {
+    pub(crate) fn name<'f>(&self, forge: &DataForge<'f>) -> Result<&'f str, DataForgeError> {
         forge.blob.get(self.def.name)
     }
 

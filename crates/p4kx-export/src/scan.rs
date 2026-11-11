@@ -12,13 +12,15 @@ use rayon::prelude::*;
 
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read_failure::CatalogReadFailure;
 use crate::entity_selection::{Selected, select};
 use crate::export_diagnostic::ExportSourceRole;
-use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
+use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::harvest_link::Links;
 use crate::item::is_paint;
 use crate::picked::Picked;
 use crate::playability_rules::Evidence;
+use crate::record_observation::RecordObservation;
 use crate::resource_group::Groups;
 use crate::scan_health::{RecordScan, ScanError, ScanRead, SourceTrace};
 use crate::scan_signature::SignatureSlot;
@@ -55,7 +57,7 @@ pub(crate) struct Scan<'o, 'a, 'f> {
     ships: ShipPool<'f>,
     options: &'o CatalogOptions<'a>,
     texts: &'o Texts<'f>,
-    projection: &'o CatalogProjection<'o, 'f>,
+    projection: &'f CatalogProjection<'f, 'f>,
     placements: &'o Placements,
     types: TypeNames<'f>,
     links: Links<'f>,
@@ -75,10 +77,11 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         files: &'f ArchiveFiles<'f>,
         entities: Arc<Entities<'f>>,
         options: &'o CatalogOptions<'a>,
-        projection: &'o CatalogProjection<'o, 'f>,
+        projection: &'f CatalogProjection<'f, 'f>,
         crafting: &CraftingKinds<'f>,
         placements: &'o Placements,
     ) -> Result<ScanRead<'f>, CatalogError> {
+        projection.original().check_forge(forge)?;
         let records: Vec<Record<'f>> = forge.records().collect();
         let groups::GroupRead {
             groups,
@@ -88,13 +91,13 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         } = Self::groups(
             &records,
             options.filter,
-            projection.origins(),
+            projection.original(),
             options.cancel,
         )?;
         let (evidence, evidence_failures, evidence_ledger) =
-            Evidence::read_catalog(&records, options.cancel)?;
+            Evidence::read_captured(&records, projection.original(), options.cancel)?;
         let (signature_slot, slot_failures, slot_problem, slot_ledger) =
-            SignatureSlot::read_catalog(&records, options.cancel)?;
+            SignatureSlot::read_captured(&records, projection.original(), options.cancel)?;
         let scan = Self {
             forge,
             ships: ShipPool::new(entities, files),
@@ -137,7 +140,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         &self,
         checked: Vec<RecordScan<'f>>,
         mut ledger: ExportLedger,
-        failures: impl IntoIterator<Item = crate::CatalogFailure>,
+        failures: impl IntoIterator<Item = CatalogReadFailure<'f>>,
         slot_problem: Option<crate::scan_signature::SlotProblem>,
         crafting: &CraftingKinds<'f>,
     ) -> Result<ScanRead<'f>, CatalogError> {
@@ -185,10 +188,13 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         self.tick();
         let mut trace = SourceTrace::new(record);
         let mut ledger = ExportLedger::default();
-        let capture = Arc::new(crate::export_builder_capture::BuilderCapture::for_root(
-            record.index(),
-            self.options.cancel,
-        ));
+        let capture = Arc::new(
+            crate::export_builder_capture::BuilderCapture::for_input_root(
+                self.projection.original(),
+                record,
+                self.options.cancel,
+            )?,
+        );
         trees.set_read_observer(Some(capture.clone()));
         let mut entity_tags = None;
         let result = self.select(
@@ -201,7 +207,8 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         );
         trees.set_read_observer(None);
         ledger.merge(capture.finish()?);
-        let mut checked = crate::scan_health::finish(record, &trace, result, ledger)?;
+        let mut checked =
+            crate::scan_health::finish(self.projection.original(), record, &trace, result, ledger)?;
         if let Some(checked) = &mut checked {
             checked.entity_tags = entity_tags;
         }
@@ -218,34 +225,35 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
         if kind == Kind::Items {
+            let admission = RecordObservation::capture(self.projection.original(), record)?;
             let tree = match trees.build(record) {
                 Ok(tree) => tree,
                 Err(error) => {
                     ledger.observe(
-                        SourceObservation::new(
-                            kind,
-                            record,
-                            ExportSourceRole::Dependency,
-                            SourceDisposition::ReadFailed,
-                        )
-                        .diagnosed(crate::export_source_failure::diagnosis(&error)),
+                        admission
+                            .source(
+                                Some(kind),
+                                ExportSourceRole::Dependency,
+                                SourceDisposition::ReadFailed,
+                            )?
+                            .diagnosed(crate::export_source_failure::diagnosis(&error)),
                     );
                     return Ok(Some(Picked::Skipped(kind, record.guid())));
                 }
             };
-            ledger.merge(crate::export_field_walk::inspect(
+            ledger.merge(crate::export_field_walk::inspect_observed(
+                Some(self.projection.original()),
                 &tree,
-                record,
+                &admission,
                 Some(kind),
                 ExportSourceRole::Dependency,
                 self.options.cancel,
             )?);
-            ledger.observe(SourceObservation::new(
-                kind,
-                record,
+            ledger.observe(admission.source(
+                Some(kind),
                 ExportSourceRole::Dependency,
                 SourceDisposition::Projected,
-            ));
+            )?);
             return Ok(Some(if is_paint(&tree) {
                 Picked::SkippedPaint
             } else {
@@ -261,7 +269,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         record: &Record<'f>,
         trace: &mut SourceTrace,
         ledger: &mut ExportLedger,
-        capture: &crate::export_builder_capture::BuilderCapture,
+        capture: &crate::export_builder_capture::BuilderCapture<'_>,
         entity_tags: &mut Option<crate::catalog_v3::tag_catalog::EntityTags<'f>>,
     ) -> Result<Option<Picked<'f>>, ScanError> {
         let kind = match select(record, self.options.filter)? {
@@ -288,11 +296,13 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         };
         trace.selected(kind);
         capture.activate(kind)?;
+        let admission = RecordObservation::capture(self.projection.original(), record)?;
         let tree = trees.build(record)?;
         trace.projecting();
-        ledger.merge(crate::export_field_walk::inspect(
+        ledger.merge(crate::export_field_walk::inspect_observed(
+            Some(self.projection.original()),
             &tree,
-            record,
+            &admission,
             Some(kind),
             ExportSourceRole::Selected,
             self.options.cancel,
@@ -300,19 +310,21 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         if tree.type_name() == "EntityClassDefinition" {
             let (tags, notes) = crate::catalog_v3::tag_catalog::entity(
                 &tree,
-                self.projection.origins(),
+                self.projection.original(),
+                &admission,
                 self.options.cancel,
             )?;
             crate::source_projection_notes::record(
                 kind,
                 ExportSourceRole::Selected,
+                &admission,
                 &tree,
                 notes,
                 ledger,
-            );
+            )?;
             *entity_tags = Some(tags);
         }
-        self.project(kind, trees, record, &tree, ledger)
+        self.project(kind, trees, &admission, &tree, ledger)
     }
 
     /// Returns whether the Components of `record` hold a crafter component, read without building

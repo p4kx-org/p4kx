@@ -4,9 +4,9 @@
 use p4kx_extraction::DataForge;
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
-use crate::Kind;
 use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
 use crate::export_ledger::SourceDisposition;
+use crate::{HealthText, Kind};
 
 use super::Evidence;
 
@@ -79,7 +79,7 @@ fn failed_manifest_reads_retain_exact_dependency_identities() -> TestResult {
         "the canonical read failed before projection"
     );
     assert_eq!(
-        source.record_path.as_deref(),
+        source.record_path.as_ref().map(HealthText::as_str),
         Some("synthetic/crew"),
         "the exact dependency path is retained"
     );

@@ -3,25 +3,27 @@
 
 use std::collections::BTreeMap;
 
-use p4kx_extraction::{Guid, RecordTree};
+use p4kx_extraction::{Guid, RecordTree, Reference, ValueError};
 
 use crate::catalog_number_capture::FloatToken;
 use crate::catalog_number_health::NumberRequirement;
-use crate::catalog_reference::{self, CatalogReference};
+use crate::catalog_read::original::{
+    ExampleBodyReceipt, RecordSubject, ReferenceData, ReferenceLink, ReferenceObservation,
+};
+use crate::catalog_reference::CatalogReference;
+use crate::catalog_reference_texts::CatalogReferenceTexts;
 use crate::export_diagnostic::{
-    EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT, ExportDiagnostic, ExportDiagnosticCode,
-    ExportDiagnosticExample, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
-    ExportSourceRole,
+    EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT, ExportDiagnosticCode, ExportDiagnosticSeverity,
+    ExportDiagnosticStage, ExportDiagnosticUnit, ExportSourceRole,
 };
 use crate::export_field_inspection::FieldInspection;
-use crate::export_reference_issue::{
-    ExportReferenceStatus, ExportSourcePointer, ExportUnresolvedReference,
+use crate::health_diagnostic_observation::{
+    DiagnosticObservation as ExportDiagnostic, ExampleObservation as ExportDiagnosticExample,
 };
+use crate::record_observation::RecordObservation;
 use crate::resource_raw_policy::ResourceNumberContract;
 use crate::selection::Kind;
-
-const MAX_CATALOG_REFERENCES: usize = 4096;
-const MAX_CATALOG_REFERENCE_METADATA_BYTES: usize = 1024 * 1024;
+use crate::{CatalogError, ExportAccountingError, HealthText};
 
 type DiagnosticKey = (
     ExportDiagnosticStage,
@@ -39,41 +41,54 @@ struct Note {
     target: Option<Guid>,
 }
 
-/// Bounded diagnostic aggregation for one canonical tree and its complete unresolved identities.
+/// Complete reference inspection with sampled diagnostic examples for one canonical tree.
 pub(crate) struct FieldCollector<'t, 'f> {
     tree: &'t RecordTree<'f>,
     record_index: u32,
+    record_path: HealthText,
+    subject: RecordSubject,
     kind: Option<Kind>,
     role: ExportSourceRole,
     diagnostics: BTreeMap<DiagnosticKey, ExportDiagnostic>,
-    unresolved: Vec<ExportUnresolvedReference>,
+    unresolved: Vec<ReferenceObservation>,
     catalog_references: Vec<CatalogReference>,
-    catalog_reference_bytes: usize,
-    complete: bool,
+    reference_texts: CatalogReferenceTexts,
     numbers: Vec<NumberRequirement>,
 }
 
 impl<'t, 'f> FieldCollector<'t, 'f> {
-    pub(crate) const fn new(
+    pub(crate) fn new(
         tree: &'t RecordTree<'f>,
-        record_index: u32,
+        admission: &RecordObservation<'_, 'f>,
         kind: Option<Kind>,
         role: ExportSourceRole,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, CatalogError> {
+        admission.check_tree(tree)?;
+        let key = admission
+            .subject()
+            .key()
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
+        let record_path = key
+            .path_text()
+            .cloned()
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        if record_path.as_str() != tree.record_path() {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        Ok(Self {
             tree,
-            record_index,
+            record_index: admission.record().index(),
+            record_path,
+            subject: admission.subject().clone(),
             kind,
             role,
             diagnostics: BTreeMap::new(),
             unresolved: Vec::new(),
             catalog_references: Vec::new(),
-            catalog_reference_bytes: 0,
-            complete: true,
+            reference_texts: CatalogReferenceTexts::default(),
             numbers: Vec::new(),
-        }
+        })
     }
-
     pub(crate) fn note(
         &mut self,
         field: &str,
@@ -81,7 +96,8 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
         code: ExportDiagnosticCode,
         severity: ExportDiagnosticSeverity,
         target: Option<Guid>,
-    ) {
+        body: Option<ExampleBodyReceipt>,
+    ) -> Result<(), ExportAccountingError> {
         self.at_stage(
             field,
             source_type,
@@ -92,101 +108,95 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
                 unit: ExportDiagnosticUnit::Values,
                 target,
             },
-        );
+            body,
+        )
     }
 
     pub(crate) fn non_finite(
         &mut self,
         field: &str,
         source_type: &str,
+        original_ordinal: u64,
         contract: Option<ResourceNumberContract>,
         token: FloatToken,
+        body: Option<ExampleBodyReceipt>,
     ) {
-        if let Some(contract) = contract {
-            self.numbers.push(NumberRequirement {
-                record_index: self.record_index,
-                field: field.to_owned(),
-                source_type: source_type.to_owned(),
-                contract,
-                token,
-            });
-            return;
-        }
-        self.at_stage(
-            field,
-            source_type,
-            Note {
-                stage: ExportDiagnosticStage::Projection,
-                code: ExportDiagnosticCode::UnsupportedValue,
-                severity: ExportDiagnosticSeverity::Error,
-                unit: ExportDiagnosticUnit::Values,
-                target: None,
-            },
-        );
+        self.numbers.push(NumberRequirement {
+            record_index: self.record_index,
+            original_ordinal,
+            field: field.to_owned(),
+            source_type: source_type.to_owned(),
+            contract,
+            token,
+            body,
+        });
     }
 
-    /// Captures only bounded metadata for an already resolved source Reference.
+    /// Retains the admitted candidate without expanding its shared descriptive text.
     pub(crate) fn catalog_reference(
+        &mut self,
+        target_kind: Kind,
+        mut original: ReferenceObservation,
+    ) {
+        original.contextualize(self.kind, self.role);
+        self.catalog_references.push(CatalogReference {
+            original,
+            target_kind,
+        });
+    }
+
+    pub(crate) fn accounting_reference(
         &mut self,
         field: &str,
         source_type: &str,
-        parent_type: Option<&str>,
-        reference: &p4kx_extraction::Reference<'_>,
-    ) -> bool {
-        let Some(target_kind) =
-            catalog_reference::target_kind(source_type, parent_type, field, reference)
-        else {
-            return true;
+        target: &Reference<'_>,
+    ) -> ReferenceObservation {
+        let data = ReferenceData {
+            field: self.reference_texts.retain(field),
+            source_type: self.reference_texts.retain(source_type),
+            target_guid: Some(target.guid()),
+            target_record_index: Some(target.record_index()),
+            target_record_path: Some(self.reference_texts.retain(target.record_path())),
+            target_type: Some(self.reference_texts.retain(target.type_name())),
+            target_location: target
+                .location()
+                .map(|location| self.reference_texts.retain(location.as_str())),
+            source_pointer: None,
         };
-        let byte_lengths = [
-            field.len(),
-            source_type.len(),
-            reference.record_path().len(),
-            reference.type_name().len(),
-        ];
-        let bytes = byte_lengths
-            .into_iter()
-            .try_fold(size_of::<CatalogReference>(), usize::checked_add);
-        let Some(bytes) = bytes else {
-            self.limited(field, source_type);
-            return false;
-        };
-        if self.catalog_references.len() == MAX_CATALOG_REFERENCES
-            || bytes
-                > MAX_CATALOG_REFERENCE_METADATA_BYTES.saturating_sub(self.catalog_reference_bytes)
-        {
-            self.limited(field, source_type);
-            return false;
-        }
-        self.catalog_reference_bytes += bytes;
-        self.catalog_references.push(CatalogReference {
-            field: field.to_owned(),
-            source_type: source_type.to_owned(),
-            target_record_index: reference.record_index(),
-            target_guid: reference.guid(),
-            target_record_path: reference.record_path().to_owned(),
-            target_type: reference.type_name().to_owned(),
-            target_kind,
-        });
-        true
+        ReferenceObservation::accounting(self.subject.clone(), data, None)
     }
 
-    pub(crate) fn limited(&mut self, field: &str, source_type: &str) {
-        self.complete = false;
-        self.at_stage(
-            field,
-            source_type,
-            Note {
-                stage: ExportDiagnosticStage::SourceField,
-                code: ExportDiagnosticCode::FieldWalkLimit,
-                severity: ExportDiagnosticSeverity::Error,
-                unit: ExportDiagnosticUnit::Values,
-                target: None,
-            },
-        );
+    pub(crate) fn accounting_error(
+        &mut self,
+        field: &str,
+        source_type: &str,
+        error: ValueError,
+    ) -> Option<ReferenceObservation> {
+        let link = ReferenceLink::from_error(error)?;
+        let data = ReferenceData {
+            field: self.reference_texts.retain(field),
+            source_type: self.reference_texts.retain(source_type),
+            target_guid: link.target,
+            target_record_index: None,
+            target_record_path: None,
+            target_type: None,
+            target_location: None,
+            source_pointer: link.pointer,
+        };
+        Some(ReferenceObservation::accounting(
+            self.subject.clone(),
+            data,
+            Some(link.status),
+        ))
     }
 
-    fn at_stage(&mut self, field: &str, source_type: &str, note: Note) {
+    fn at_stage(
+        &mut self,
+        field: &str,
+        source_type: &str,
+        note: Note,
+        body: Option<ExampleBodyReceipt>,
+    ) -> Result<(), ExportAccountingError> {
         let Note {
             stage,
             code,
@@ -216,73 +226,32 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
                 .and_then(|example| example.field.as_deref())
                 .is_some_and(|last| field > last)
         {
-            return;
+            return Ok(());
         }
-        diagnostic.examples.push(ExportDiagnosticExample {
-            record_index: Some(self.record_index),
-            record_guid: Some(self.tree.guid().to_string()),
-            record_path: Some(self.tree.record_path().to_owned()),
-            field: Some(field.to_owned()),
-            source_type: Some(source_type.to_owned()),
-            target_guid: target.map(|guid| guid.to_string()),
-        });
-        diagnostic.examples.sort();
-        diagnostic.examples.dedup();
-        diagnostic
-            .examples
-            .truncate(EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT);
+        let example = match body {
+            Some(body) => ExportDiagnosticExample::captured(
+                self.subject.clone(),
+                Some(field),
+                Some(source_type),
+                target,
+                body,
+            )?,
+            None => ExportDiagnosticExample::new(
+                self.subject.clone(),
+                Some(field),
+                Some(source_type),
+                target,
+            ),
+        };
+        diagnostic.examples.push(example);
+        diagnostic.examples =
+            crate::health_example_samples::retain(std::mem::take(&mut diagnostic.examples))?;
+        Ok(())
     }
 
-    pub(crate) fn unresolved(
-        &mut self,
-        field: &str,
-        source_type: &str,
-        target: Option<Guid>,
-        status: ExportReferenceStatus,
-        pointer: Option<ExportSourcePointer>,
-    ) {
-        self.unresolved.push(ExportUnresolvedReference {
-            record_index: self.record_index,
-            kind: self.kind,
-            source_role: self.role,
-            record_guid: self.tree.guid().to_string(),
-            record_path: self.tree.record_path().to_owned(),
-            field: field.to_owned(),
-            source_type: source_type.to_owned(),
-            target_guid: target.map(|guid| guid.to_string()),
-            target_record_index: None,
-            target_record_path: None,
-            target_type: None,
-            target_location: None,
-            status,
-            source_pointer: pointer,
-        });
-    }
-
-    pub(crate) fn foreign(
-        &mut self,
-        field: &str,
-        source_type: &str,
-        target: &p4kx_extraction::Reference<'_>,
-    ) {
-        self.unresolved.push(ExportUnresolvedReference {
-            record_index: self.record_index,
-            kind: self.kind,
-            source_role: self.role,
-            record_guid: self.tree.guid().to_string(),
-            record_path: self.tree.record_path().to_owned(),
-            field: field.to_owned(),
-            source_type: source_type.to_owned(),
-            target_guid: Some(target.guid().to_string()),
-            target_record_index: Some(target.record_index()),
-            target_record_path: Some(target.record_path().to_owned()),
-            target_type: Some(target.type_name().to_owned()),
-            target_location: target
-                .location()
-                .map(|location| location.as_str().to_owned()),
-            status: ExportReferenceStatus::OutsideOwner,
-            source_pointer: None,
-        });
+    pub(crate) fn unresolved(&mut self, mut original: ReferenceObservation) {
+        original.contextualize(self.kind, self.role);
+        self.unresolved.push(original);
     }
 
     pub(crate) const fn owner_index(&self) -> u32 {
@@ -296,9 +265,10 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
             record_index: self.record_index,
             kind: self.kind,
             guid: self.tree.guid(),
-            record_path: self.tree.record_path().to_owned(),
+            record_path: self.record_path,
+            subject: self.subject,
             role: self.role,
-            complete: self.complete,
+            complete: true,
             diagnostics,
             number_requirements,
             unresolved_references: self.unresolved,

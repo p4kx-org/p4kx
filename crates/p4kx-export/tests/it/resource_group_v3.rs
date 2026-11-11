@@ -4,6 +4,8 @@
 use p4kx_export::{CatalogPublicationMode, Filter, Kind};
 use serde_json::{Value, json};
 
+use crate::health_reference_json as health;
+
 use crate::commodity_v3_fixture::{DcbOrigin, TestResult, at, guid};
 use crate::resource_group_v3_fixture as fixture;
 
@@ -324,19 +326,28 @@ fn assert_source_reference_and_catalog_family(catalog: &Value, members: &Value) 
         .as_array()
         .ok_or("catalog reference health")?;
     assert!(
-        references.iter().any(|reference| {
-            reference.get("recordIndex").and_then(Value::as_u64) == Some(0)
-                && reference.get("kind").and_then(Value::as_str) == Some("resourceGroups")
-                && reference.get("sourceRole").and_then(Value::as_str) == Some("selected")
-                && reference.get("field").and_then(Value::as_str) == Some("groups[1]")
-                && reference.get("targetGuid").and_then(Value::as_str)
-                    == Some(expected_guid.as_str())
-                && reference.get("targetRecordIndex").and_then(Value::as_u64) == Some(2)
-                && reference.get("targetRecordPath").and_then(Value::as_str)
-                    == Some("synthetic/other")
-                && reference.get("targetType").and_then(Value::as_str) == Some("Other")
-                && reference.get("status").and_then(Value::as_str) == Some("unexpectedTargetType")
-        }),
+        health::any(references, |reference| Ok(reference
+            .pointer("/recordIndex/value")
+            .and_then(Value::as_u64)
+            == Some(0)
+            && reference.get("kind").and_then(Value::as_str)
+                == Some("resourceGroups")
+            && reference.get("sourceRole").and_then(Value::as_str)
+                == Some("selected")
+            && health::text(catalog, reference, "field")? == "groups[1]"
+            && reference
+                .pointer("/targetGuid/value")
+                .and_then(Value::as_str)
+                == Some(expected_guid.as_str())
+            && reference
+                .pointer("/targetRecordIndex/value")
+                .and_then(Value::as_u64)
+                == Some(2)
+            && health::text(catalog, reference, "targetRecordPath")?
+                == "synthetic/other"
+            && health::text(catalog, reference, "targetType")? == "Other"
+            && reference.get("status").and_then(Value::as_str)
+                == Some("unexpectedTargetType")))?,
         "the separate catalog-family health rule rejects the actual wrong-family relationship"
     );
     Ok(())

@@ -3,18 +3,49 @@
 
 use p4kx_extraction::{Guid, Reference};
 
+use crate::ExportAccountingError;
+use crate::catalog_read::original::ReferenceObservation;
 use crate::selection::Kind;
 
-/// A resolved source Reference whose target is a canonical catalog definition.
+/// A resolved catalog candidate retaining its actual original Reference observation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CatalogReference {
-    pub(crate) field: String,
-    pub(crate) source_type: String,
-    pub(crate) target_record_index: u32,
-    pub(crate) target_guid: Guid,
-    pub(crate) target_record_path: String,
-    pub(crate) target_type: String,
+    pub(crate) original: ReferenceObservation,
     pub(crate) target_kind: Kind,
+}
+
+/// Borrowed descriptive target values used only for final catalog-row resolution.
+pub(crate) struct CatalogReferenceTarget<'reference> {
+    pub(crate) index: u32,
+    pub(crate) guid: Guid,
+    pub(crate) path: &'reference str,
+    pub(crate) source_type: &'reference str,
+    pub(crate) kind: Kind,
+}
+
+impl CatalogReference {
+    pub(crate) fn target(&self) -> Result<CatalogReferenceTarget<'_>, ExportAccountingError> {
+        let data = self.original.data();
+        Ok(CatalogReferenceTarget {
+            index: data
+                .target_record_index
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?,
+            guid: data
+                .target_guid
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?,
+            path: data
+                .target_record_path
+                .as_ref()
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?
+                .as_str(),
+            source_type: data
+                .target_type
+                .as_ref()
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?
+                .as_str(),
+            kind: self.target_kind,
+        })
+    }
 }
 
 /// Returns the catalog target kind without treating source-only Entity links as failed joins.

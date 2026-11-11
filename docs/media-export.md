@@ -18,7 +18,7 @@ does not claim an adversarial immutable snapshot or an encoder processing/memory
 
 ```powershell
 p4kx media export 'D:\Games\StarCitizen\PTU\Data.p4k' --out 'D:\Exports\media' --kind archive
-p4kx media export 'D:\Games\StarCitizen\PTU\Data.p4k' --out 'D:\Exports\selected' --filter '*.bnk' --exclude '*.socpak'
+p4kx media export 'D:\Games\StarCitizen\PTU\Data.p4k' --out 'D:\Exports\selected' --kind audio --filter '*.wem'
 p4kx media schema
 p4kx media schema --record
 p4kx media schema --reference
@@ -27,10 +27,9 @@ p4kx media schema --source
 
 Repeat `--kind` for an explicit selection. The known names are `archive`, `model`, `material`,
 `texture`, `shader`, `animation`, `animation-definition`, `audio` and `audio-control`. Omission
-selects every registered provider. The built-in providers preserve `archive`, `shader`
-and `material` sources. An explicitly requested kind without an
-available provider returns a typed capability
-failure and a non-zero exit status, even if the selection would otherwise be empty.
+selects every registered provider. The built-in providers are `archive`, `shader`, `material`
+and `audio`. An explicitly requested kind without an available provider returns a typed
+capability failure and a non-zero exit status, even when the selection is empty.
 
 `--kind shader` exports nested `.ext` declarations and ordered Property fields, with exact raw
 source ranges and lossless mask strings. Selected `.cfib`, `.cfxb` and `.shcb` caches are inventoried
@@ -42,6 +41,12 @@ defines its precise typed fields, statuses and counting units.
 ordered authored fields, layer/texture references and existing interpreted surfaces without
 geometry conversion. [Material source metadata](media-material-metadata.md) defines raw
 preservation, physical candidate resolution, bounds and the separate target-readability contract.
+
+`--kind audio` exports standalone and complete embedded WEM summaries, ordered RIFF chunks,
+cue and LIST annotations, physical soundbank sections, original DIDX and HIRC occurrences,
+and typed Action and Event fields with immediate origins.
+[WEM source metadata](media-audio-metadata.md) and [Soundbank metadata](media-bank-metadata.md)
+define the available fields and diagnostic publication.
 
 The include and exclusion expressions use the existing search Filter syntax. A nested source
 can also be matched through `outer.socpak!inner.pak!path`. Excluding a container excludes its

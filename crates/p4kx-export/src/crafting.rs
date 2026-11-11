@@ -19,10 +19,25 @@ pub(crate) mod ledger;
 
 pub(crate) use ledger::ReadCrafting;
 
+pub(crate) fn unknown_ranges_warning<'read, 'source: 'read>(
+    unknown_types: impl Iterator<Item = &'read [&'source str]>,
+) -> Option<CraftingWarning> {
+    let mut count = 0;
+    let mut types = BTreeSet::new();
+    for names in unknown_types {
+        count += names.len();
+        types.extend(names.iter().copied());
+    }
+    (count > 0).then(|| CraftingWarning::UnknownModifierRanges {
+        count,
+        details: types.into_iter().map(str::to_owned).collect(),
+    })
+}
+
 /// The crafting data of a DataForge: the blueprints with all their tiers and what surrounds them.
 ///
 /// Every list is ordered by the GUID of its Record; [`reward_sources`](Self::reward_sources) by
-/// the order of the Records that hold them. The blueprints are the same set as the `blueprints`
+/// the order of the Records that hold them. The blueprints are the same set as the `definitions.blueprints`
 /// kind of the Basetool catalog (development leftovers left out), selected by the one rule
 /// behind both.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -138,26 +153,6 @@ impl<'f> Crafting<'f> {
             }
         }
         chances
-    }
-
-    fn unknown_ranges_warning(&self) -> Option<CraftingWarning> {
-        let count = self
-            .blueprints
-            .iter()
-            .map(|blueprint| blueprint.unknown_range_types.len())
-            .sum();
-        if count == 0 {
-            return None;
-        }
-        let types: BTreeSet<&str> = self
-            .blueprints
-            .iter()
-            .flat_map(|blueprint| blueprint.unknown_range_types.iter().copied())
-            .collect();
-        Some(CraftingWarning::UnknownModifierRanges {
-            count,
-            details: types.into_iter().map(str::to_owned).collect(),
-        })
     }
 
     fn live_dismantle(&self) -> impl Iterator<Item = &DismantleProcess<'f>> {

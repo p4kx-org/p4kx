@@ -1,33 +1,51 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::contract::{LocalisedText, every_field_required};
-use crate::contract_facts::ContractFacts;
+use crate::contract_facts::{ContractFacts, RequiredIntro};
 use crate::contract_hauling::HaulingOrder;
 use crate::contract_offer::{BlueprintReward, GiverFaction, OfferedAt};
 use crate::contract_reward::FixedReward;
 use crate::guid_text::CatalogGuid;
 use crate::mission_cooldown::ContractCooldown;
+use crate::mission_generator::ContractOccurrence;
+use crate::mission_titles::MissionTitles;
+use crate::resource_integer::ResourceInt64;
 use crate::spawn_model::{LocationPrerequisite, LocationQueryLink, SpawnPoolLink};
 
-/// A contract or one of its sub contracts, with the overrides of sub contract, contract and
-/// handler laid over the template.
+/// One contract projection and its separately published title and description.
+pub(crate) struct ContractWithTitles<'source> {
+    pub(crate) row: ContractEntry<'source>,
+    pub(crate) titles: MissionTitles<'source>,
+}
+
+/// A contract projection with its resolved intro requirements.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ContractEntry<'a> {
-    /// The `id` of the contract.
-    pub(crate) guid: CatalogGuid,
-    /// The `id` of the sub contract; `null` for the contract itself. A contract with sub
-    /// contracts has its own entry and one entry per sub contract.
-    pub(crate) sub_contract_guid: Option<CatalogGuid>,
-    /// The GUID of the `ContractGenerator` Record that holds the contract.
+pub(crate) struct ContractEntry<'source> {
+    #[serde(flatten)]
+    pub(crate) base: ContractBase<'source>,
+    /// The completed-contract tags required by the handler, contract and sub contract in source order.
+    pub(crate) required_intros: SourcedValue<Vec<RequiredIntro>>,
+}
+
+/// A contract or sub contract projected from its original layers.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ContractBase<'a> {
+    /// The actual owner and original source positions of this row.
+    pub(crate) source: ContractOccurrence,
+    /// The original `id` of the contract.
+    pub(crate) guid: SourcedValue<CatalogGuid>,
+    /// The original `id` of this sub contract, absent on the parent row.
+    pub(crate) sub_contract_guid: SourcedValue<CatalogGuid>,
+    #[serde(skip)]
     pub(crate) record_guid: CatalogGuid,
-    /// The record path of the `ContractGenerator` Record, without `.xml`.
-    pub(crate) record_path: &'a str,
     /// The `debugName` of the contract, `null` when it has none.
     pub(crate) debug_name: Option<&'a str>,
     /// The `debugName` of the handler that holds the contract, `null` when it has none.
@@ -41,20 +59,6 @@ pub(crate) struct ContractEntry<'a> {
     pub(crate) not_for_release: Option<bool>,
     /// Whether the contract is marked `workInProgress`, `null` when the flag is absent.
     pub(crate) work_in_progress: Option<bool>,
-    /// The title: the `Title` of the sub contract, else of the contract, else of the handler, else
-    /// the first display string of the template, else the title of the contract's
-    /// `MissionBrokerEntry`. A `~mission(Token)` in it is replaced by the text the first of sub
-    /// contract, contract, handler and template states for the token, or by a placeholder such as
-    /// `[LOCATION]`, `[TARGET]` or `[SHIP]` for what the game picks when the mission starts, or
-    /// `[TOKEN]` when nothing states it. Trailing and leading blanks are removed.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) title: LocalisedText<'a>,
-    /// The description, resolved like the title: the `Description` of the sub contract, else of
-    /// the contract, else of the handler, else the `description` of the contract's
-    /// `MissionBrokerEntry`. A game text that must not be passed on to third parties. The
-    /// template states none.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) description: LocalisedText<'a>,
     /// The GUID of the `MissionType` Record: the override of the sub contract, else of the
     /// contract, else of the handler, else the type of the template, else the type of the
     /// contract's `MissionBrokerEntry`; `null` when there is none.
@@ -94,7 +98,7 @@ pub(crate) struct ContractEntry<'a> {
     /// The reputation the contract grants on success, one entry per amount: the results whose
     /// first mission result (success) is set. A result that fires on failure only is left out; an
     /// amount may be negative (a success that costs standing with a rival, as stored).
-    pub(crate) reputation_gains: Vec<ReputationGain<'a>>,
+    pub(crate) reputation_gains: SourcedValue<Vec<ReputationGain<'a>>>,
     /// The `minStanding` of the contract: the lowest standing that is offered it, the `guid` of an
     /// entry of `reputationStandings`; `null` when the contract states none. A sub contract
     /// shares the contract's value.
@@ -137,10 +141,8 @@ pub(crate) struct ContractEntry<'a> {
     /// variable of `locationQueries` resolves to. On LIVE four contracts (the North Rock PVP
     /// bounties) name a variable no query states.
     pub(crate) location_prerequisites: Vec<LocationPrerequisite>,
-    /// The payouts the contract states itself (`ContractResult_Reward`) for success, as stored;
-    /// empty for the contracts that pay through a calculated reward, whose amount the Archive
-    /// does not state.
-    pub(crate) fixed_rewards: Vec<FixedReward<'a>>,
+    /// The parent contract's ordered successful fixed payouts and their membership evidence.
+    pub(crate) fixed_rewards: SourcedValue<Vec<FixedReward<'a>>>,
 }
 
 /// The level at which a prerequisite is stated.
@@ -208,15 +210,14 @@ pub(crate) struct PickupPlace<'a> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct ReputationGain<'a> {
-    /// The GUID of the faction reputation Record, `null` when the result names none.
-    pub(crate) faction_reputation_guid: Option<CatalogGuid>,
-    /// The Record name of the faction reputation, `null` when the result names none.
-    pub(crate) faction_reputation_name: Option<&'a str>,
-    /// The GUID of the reputation scope Record, `null` when the result names none.
-    pub(crate) scope_guid: Option<CatalogGuid>,
-    /// The Record name of the reputation scope, e.g. the faction or the affinity scope, `null`
-    /// when the result names none.
-    pub(crate) scope_name: Option<&'a str>,
-    /// The `reputationAmount` of the reward Record, `null` when it cannot be read.
-    pub(crate) amount: Option<i64>,
+    /// The original faction reputation Record GUID.
+    pub(crate) faction_reputation_guid: SourcedValue<CatalogGuid>,
+    /// The final path component of the selected faction reputation Record.
+    pub(crate) faction_reputation_name: SourcedValue<&'a str>,
+    /// The original reputation scope Record GUID.
+    pub(crate) scope_guid: SourcedValue<CatalogGuid>,
+    /// The final path component of the selected reputation scope Record.
+    pub(crate) scope_name: SourcedValue<&'a str>,
+    /// The selected Reward's original `reputationAmount` as signed decimal text.
+    pub(crate) amount: SourcedValue<ResourceInt64>,
 }

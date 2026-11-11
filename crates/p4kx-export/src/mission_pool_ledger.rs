@@ -3,7 +3,7 @@
 
 use crate::Kind;
 use crate::export_diagnostic::ExportSourceRole;
-use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDisposition};
+use crate::export_ledger::ExportLedger;
 
 const POOLS: [Kind; 4] = [
     Kind::ContractShipSpawns,
@@ -28,33 +28,6 @@ pub(crate) fn broker(ledger: &mut ExportLedger) {
                 input.role = ExportSourceRole::DerivedInput;
             }
             ledger.observe(input);
-        }
-    }
-}
-
-/// Retains failures of full template expansion without contradicting successful base-pool inputs.
-pub(crate) fn templates(ledger: &mut ExportLedger) {
-    let failed: Vec<_> = ledger
-        .sources
-        .iter()
-        .filter(|source| {
-            source.kind == Some(Kind::ContractTemplates)
-                && source.role == ExportSourceRole::Selected
-                && source.disposition == SourceDisposition::ProjectionFailed
-        })
-        .cloned()
-        .collect();
-    for source in failed {
-        for kind in POOLS {
-            ledger.derived_failure(DerivedFailure {
-                affected_kind: kind,
-                output_kind: Kind::ContractTemplates,
-                record_index: source.record_index,
-                role: ExportSourceRole::DerivedInput,
-                guid: source.guid,
-                record_path: source.record_path.clone(),
-                diagnosis: source.diagnosis.clone(),
-            });
         }
     }
 }

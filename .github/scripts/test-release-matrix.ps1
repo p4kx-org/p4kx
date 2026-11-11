@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'native-test-fixtures.ps1')
 . (Join-Path $PSScriptRoot 'test-documents-evidence-fixture.ps1')
+. (Join-Path $PSScriptRoot 'linux-package-lifecycle-evidence.ps1')
 New-Item -ItemType Directory -Path $Directory -Force | Out-Null
 $contract = Get-P4kxPlatformContract
 $revision = 'a' * 40
@@ -15,7 +16,7 @@ $validator = Join-Path $PSScriptRoot 'check-release-matrix.ps1'
 foreach ($row in $contract.targets) {
     foreach ($package in $row.packages) {
         $name = Get-P4kxAssetName -Target $row.target -Version $version -Package $package
-        Set-Content -LiteralPath (Join-Path $Directory $name) -Value 'synthetic package fixture' -Encoding utf8NoBOM
+        Set-Content -LiteralPath (Join-Path $Directory $name) -Value "synthetic package fixture for $($row.target) $package" -Encoding utf8NoBOM
     }
     foreach ($binary in @('p4kx', 'p4kx-gui', 'p4kx-mcp')) {
         $sbom = [ordered]@{
@@ -60,6 +61,33 @@ foreach ($row in $contract.targets) {
             $smoke
         })
         $proof | Add-Member -NotePropertyName package_smokes -NotePropertyValue $smokes
+        $sourcePackage = if ($row.os -ceq 'windows') { 'portable-zip' } else { 'tar-gz' }
+        $proof.archive_sha256 = ($smokes | Where-Object package -CEQ $sourcePackage).archive_sha256
+    }
+    if ($row.os -ceq 'linux') {
+        $fixtureVersion = Get-P4kxLinuxLifecycleFixtureVersion
+        $settings = Get-P4kxLinuxPackaging
+        $lifecycle = @(foreach ($format in @('deb', 'flatpak')) {
+            $executed = @($smokes | Where-Object package -CEQ $format)[0]
+            if ($format -ceq 'deb') {
+                $identity = "p4kx:$($row.deb_arch)"
+                $baseline = Get-P4kxDebianVersion $fixtureVersion
+                $candidate = Get-P4kxDebianVersion $version
+            } else {
+                $identity = "app/$($settings.application_id)/$($row.unix_arch)/$($settings.flatpak.application_branch)"
+                $baseline = 'e' * 64
+                $candidate = 'd' * 64
+                $executed.producer.flatpak = @{app_ref=$identity; app_commit=$candidate}
+            }
+            @{
+                schema=1; target=$row.target; revision=$revision; package=$format
+                fixture_kind='same-source-lower-package-version'
+                baseline=@{identity=$identity; installed=$baseline; version=$fixtureVersion; archive_sha256='c' * 64}
+                candidate=@{identity=$identity; installed=$candidate; version=$version; archive_sha256=$executed.archive_sha256}
+                candidate_launch='success'; uninstalled='success'; profile_preserved='success'
+            }
+        })
+        $proof | Add-Member -NotePropertyName linux_lifecycle -NotePropertyValue $lifecycle
     }
     if ($row.os -ceq 'windows') {
         $msi = Get-P4kxAssetName -Target $row.target -Version $version -Package msi
@@ -77,6 +105,36 @@ foreach ($row in $contract.targets) {
 }
 
 & $validator -AssetDirectory $Directory -Version $version -Revision $revision
+$notesFixture = Join-Path $Directory 'release-notes-fixture'
+$notesAssets = Join-Path $notesFixture 'assets'
+New-Item -ItemType Directory -Path $notesAssets | Out-Null
+foreach ($fixture in Get-ChildItem -LiteralPath $Directory -File) {
+    Copy-Item -LiteralPath $fixture.FullName -Destination $notesAssets
+}
+$notesInput = Join-Path $notesFixture 'changes.md'
+$notesOutput = Join-Path $notesFixture 'notes.md'
+Set-Content -LiteralPath $notesInput -Value 'Synthetic release notes' -Encoding utf8NoBOM
+& (Join-Path $PSScriptRoot 'assemble-release.ps1') -AssetDirectory $notesAssets -NotesPath $notesInput -OutputNotesPath $notesOutput -Repository 'p4kx-org/p4kx' -Version $version -Revision $revision
+$notes = Get-Content -LiteralPath $notesOutput -Raw
+if ($notes -cmatch 'gh attestation verify' -or
+    $notes -cnotmatch '(?m)^This validation run did not generate Sigstore attestations\.\r?$') {
+    throw 'Validation-only release notes claimed attestations that this run did not generate.'
+}
+foreach ($row in $contract.targets) {
+    $proofPath = Join-Path $Directory "P4KX-$version-$($row.target)-runtime.json"
+    $original = Get-Content -LiteralPath $proofPath -Raw
+    $changed = $original | ConvertFrom-Json
+    $otherPackage = if ($row.os -ceq 'windows') { 'msi' } else { 'app-image' }
+    $otherDigest = ($changed.package_smokes | Where-Object package -CEQ $otherPackage).archive_sha256
+    if ($otherDigest -ceq $changed.archive_sha256) { throw 'Fixture package digests must differ.' }
+    $changed.archive_sha256 = $otherDigest
+    $changed | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath $proofPath -Encoding utf8NoBOM
+    $rejected = $false
+    try { & $validator -AssetDirectory $Directory -Version $version -Revision $revision | Out-Null }
+    catch { $rejected = $true }
+    finally { Set-Content -LiteralPath $proofPath -Value $original -Encoding utf8NoBOM }
+    if (-not $rejected) { throw "Release accepted the $otherPackage digest as the source archive for $($row.target)." }
+}
 $windows = @($contract.targets | Where-Object os -EQ windows)[0]
 $windowsProofPath = Join-Path $Directory "P4KX-$version-$($windows.target)-runtime.json"
 $originalProof = Get-Content -LiteralPath $windowsProofPath -Raw
@@ -112,24 +170,35 @@ foreach ($mutation in @(
     { param($proof) $proof.package_smokes[0].producer.package = 'app-image' },
     { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'app-image').producer.corresponding_source.sha256 = 'f' * 64 },
     { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'flatpak').documents.game_alias_refusal = 'skipped' },
-    { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'flatpak').documents.revision = 'f' * 40 }
+    { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'flatpak').documents.revision = 'f' * 40 },
+    { param($proof) $proof.PSObject.Properties.Remove('linux_lifecycle') },
+    { param($proof) $proof.linux_lifecycle = @($proof.linux_lifecycle[0], $proof.linux_lifecycle[0]) },
+    { param($proof) $proof.linux_lifecycle[0].baseline.installed = $proof.linux_lifecycle[0].candidate.installed },
+    { param($proof) $proof.linux_lifecycle[1].baseline.installed = $proof.linux_lifecycle[1].candidate.installed },
+    { param($proof) $proof.linux_lifecycle[1].candidate.identity = 'app/io.github.foreign/x86_64/stable' },
+    { param($proof) $proof.linux_lifecycle[0].candidate.archive_sha256 = 'f' * 64 },
+    { param($proof) $proof.linux_lifecycle[1].revision = 'f' * 40 },
+    { param($proof) $proof.linux_lifecycle[1].profile_preserved = 'skipped' },
+    { param($proof) $proof.linux_lifecycle[0].candidate_launch = 'skipped' },
+    { param($proof) $proof.linux_lifecycle[1].uninstalled = 'failed' }
 )) {
     $changed = $linuxOriginal | ConvertFrom-Json
     & $mutation $changed
     $changed | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $linuxProofPath -Encoding utf8NoBOM
     $rejected = $false
     try { & $validator -AssetDirectory $Directory -Version $version -Revision $revision | Out-Null } catch { $rejected = $true }
-    if (-not $rejected) { throw 'Changed Linux code/source identity or missing portal execution evidence was accepted.' }
+    if (-not $rejected) { throw 'Changed Linux identity or incomplete portal/lifecycle evidence was accepted.' }
 }
 $linuxOriginal | Set-Content -LiteralPath $linuxProofPath -Encoding utf8NoBOM
 $row = $contract.targets[1]
 $packageName = Get-P4kxAssetName -Target $row.target -Version $version -Package $row.packages[0]
 $packagePath = Join-Path $Directory $packageName
+$originalBytes = [IO.File]::ReadAllBytes($packagePath)
 [IO.File]::WriteAllBytes($packagePath, [byte[]]::new(0))
 $rejected = $false
 try { & $validator -AssetDirectory $Directory -Version $version -Revision $revision | Out-Null } catch { $rejected = $true }
 if (-not $rejected) { throw 'An empty ARM64 package was accepted.' }
-Set-Content -LiteralPath $packagePath -Value 'synthetic package fixture' -Encoding utf8NoBOM
+[IO.File]::WriteAllBytes($packagePath, $originalBytes)
 
 $proofPath = Join-Path $Directory "P4KX-$version-$($row.target)-runtime.json"
 $proof = Get-Content -LiteralPath $proofPath -Raw | ConvertFrom-Json

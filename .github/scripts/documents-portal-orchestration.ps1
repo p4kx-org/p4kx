@@ -37,7 +37,8 @@ function Invoke-P4kxLinuxDocumentsPhases {
     $stock = Join-Path $Context.output 'stock'
     $environment = Get-P4kxDocumentsSessionEnvironment $stock $env:FLATPAK_USER_DIR
     $arguments = @('-Target', $Context.target, '-Version', $Context.version, '-AssetDirectory', $Context.assets,
-        '-FixtureDirectory', $Context.fixture, '-BuildMetadata', $Context.metadata, '-OutputDirectory', $stock)
+        '-FixtureDirectory', $Context.fixture, '-LifecycleFixtureDirectory', $Context.lifecycle_fixtures,
+        '-BuildMetadata', $Context.metadata, '-OutputDirectory', $stock)
     $ended = Invoke-P4kxCheckedDocumentsSession (Join-Path $PSScriptRoot 'check-linux-stock-session.ps1') $arguments $stock 'stock' $environment '' $mountPoint $failures
     if (-not $ended) { throw [AggregateException]::new('Stock session teardown failed; no further bus may start.', $failures) }
     $positive = Join-Path $Context.output 'api5'

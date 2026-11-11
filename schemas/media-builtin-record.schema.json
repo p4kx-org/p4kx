@@ -1,5 +1,136 @@
 {
   "$defs": {
+    "ActionPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ActionRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-action",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ActionPayload"
+    },
+    "ActionRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "action_type": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "play_bank": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PlayBankRecord"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_id": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "action_type",
+            "target_id",
+            "play_bank"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "action_type": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "play_bank": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PlayBankPrefix"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_id": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "layout",
+            "action_type",
+            "target_id",
+            "play_bank"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "action_type": {
+              "type": "null"
+            },
+            "layout": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "play_bank": {
+              "type": "null"
+            },
+            "target_id": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "layout",
+            "action_type",
+            "target_id",
+            "play_bank"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "Algorithm": {
       "description": "Integrity algorithm, without conflating CRC checks with cryptographic hashes.",
       "oneOf": [
@@ -19,6 +150,140 @@
           "type": "string"
         }
       ]
+    },
+    "AnnotationFailure": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "phase": {
+          "$ref": "#/$defs/AnnotationPhase"
+        },
+        "reason": {
+          "$ref": "#/$defs/WemFailureReason"
+        }
+      },
+      "required": [
+        "chunk_ordinal",
+        "phase",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "AnnotationPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/CueHeader"
+            },
+            "record_type": {
+              "const": "wem-cue",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/CuePoint"
+            },
+            "record_type": {
+              "const": "wem-cue-point",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/CueTail"
+            },
+            "record_type": {
+              "const": "wem-cue-tail",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ListHeader"
+            },
+            "record_type": {
+              "const": "wem-list",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ListItem"
+            },
+            "record_type": {
+              "const": "wem-list-item",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnnotationFailure"
+            },
+            "record_type": {
+              "const": "wem-annotation-failure",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "AnnotationPayload"
+    },
+    "AnnotationPhase": {
+      "enum": [
+        "cue",
+        "list"
+      ],
+      "type": "string"
     },
     "ArchiveByteRange": {
       "additionalProperties": false,
@@ -1426,6 +1691,890 @@
       ],
       "type": "object"
     },
+    "AudioPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/WemHeader"
+            },
+            "record_type": {
+              "const": "wem",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/WemChunk"
+            },
+            "record_type": {
+              "const": "wem-chunk",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/WemOpaque"
+            },
+            "record_type": {
+              "const": "wem-opaque",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/WemFailure"
+            },
+            "record_type": {
+              "const": "wem-failure",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "AudioPayload"
+    },
+    "BankDataLink": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "declared_wem_length": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DecimalU64"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "prefetch": {
+              "type": "boolean"
+            },
+            "range": {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            "section_ordinal": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "status": {
+              "const": "resolved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "section_ordinal",
+            "range",
+            "class",
+            "declared_wem_length",
+            "prefetch"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "missing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "candidates": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "status": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "candidates"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data_length": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "section_ordinal": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "status": {
+              "const": "outside-data",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "section_ordinal",
+            "data_length"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "BankEntryRange": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "$ref": "#/$defs/OffsetBasis",
+          "const": {
+            "type": "entry"
+          }
+        },
+        "end_exclusive": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "start": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "basis",
+        "start",
+        "end_exclusive"
+      ],
+      "type": "object"
+    },
+    "BankFailureReason": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "not-soundbank",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "unsupported-version",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "type": {
+              "const": "unsupported-object-layout",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "version",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "available": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "needed": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "section": {
+              "type": "string"
+            },
+            "type": {
+              "const": "truncated",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "section",
+            "available",
+            "needed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "detail": {
+              "type": "string"
+            },
+            "section": {
+              "type": "string"
+            },
+            "type": {
+              "const": "invalid-section",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "section",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "section": {
+              "type": "string"
+            },
+            "type": {
+              "const": "duplicate-section",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "section"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data_length": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "end": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "id": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "offset": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "type": {
+              "const": "media-outside-data",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "offset",
+            "end",
+            "data_length"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "BankFailureRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "$ref": "#/$defs/BankPhase"
+        },
+        "reason": {
+          "$ref": "#/$defs/BankFailureReason"
+        },
+        "section_ordinal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "phase",
+        "section_ordinal",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "BankHeaderRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "bank_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "language_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "section_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "version_supported": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "section_ordinal",
+        "version",
+        "version_supported",
+        "bank_id",
+        "language_id"
+      ],
+      "type": "object"
+    },
+    "BankHircRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "declared_objects": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "section_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "trailing_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        }
+      },
+      "required": [
+        "section_ordinal",
+        "declared_objects",
+        "trailing_range"
+      ],
+      "type": "object"
+    },
+    "BankMediaRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/BankDataLink"
+        },
+        "data_length": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "data_offset": {
+          "description": "Original offset measured from the start of the DATA body.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "index_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "media_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "section_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "section_ordinal",
+        "ordinal",
+        "media_id",
+        "data_offset",
+        "data_length",
+        "index_range",
+        "data"
+      ],
+      "type": "object"
+    },
+    "BankNameRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "bank_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "header_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "name_bytes": {
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 255,
+          "type": "array"
+        },
+        "name_length": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "name_text": {
+          "$ref": "#/$defs/BankNameText"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "section_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "section_ordinal",
+        "ordinal",
+        "bank_id",
+        "name_length",
+        "header_range",
+        "name_range",
+        "name_bytes",
+        "name_text"
+      ],
+      "type": "object"
+    },
+    "BankNameText": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "encoding": {
+              "const": "utf8",
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "encoding",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "encoding": {
+              "const": "invalid-utf8",
+              "type": "string"
+            },
+            "error_length": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "valid_up_to": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "encoding",
+            "valid_up_to",
+            "error_length"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "BankObjectRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "body_range": {
+          "$ref": "#/$defs/BankEntryRange",
+          "description": "Original object body, including its ID."
+        },
+        "header_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "kind": {
+          "description": "Interpretation under the uniquely observed bank version, when available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "object_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "section_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "type_code": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "section_ordinal",
+        "ordinal",
+        "type_code",
+        "kind",
+        "object_id",
+        "header_range",
+        "body_range"
+      ],
+      "type": "object"
+    },
+    "BankPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BankHeaderRecord"
+            },
+            "record_type": {
+              "const": "bank",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BankSectionRecord"
+            },
+            "record_type": {
+              "const": "bank-section",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BankMediaRecord"
+            },
+            "record_type": {
+              "const": "bank-media",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BankObjectRecord"
+            },
+            "record_type": {
+              "const": "bank-object",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BankHircRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BankFailureRecord"
+            },
+            "record_type": {
+              "const": "bank-failure",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "BankPayload"
+    },
+    "BankPhase": {
+      "enum": [
+        "signature",
+        "directory",
+        "header",
+        "media-index",
+        "hierarchy",
+        "names"
+      ],
+      "type": "string"
+    },
+    "BankSectionRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "body_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "duplicate_unique": {
+          "description": "Another occurrence of a section whose format admits one.",
+          "type": "boolean"
+        },
+        "header_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "tag": {
+          "description": "Four original bytes, including non-UTF-8 tags.",
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        }
+      },
+      "required": [
+        "ordinal",
+        "tag",
+        "header_range",
+        "body_range",
+        "duplicate_unique"
+      ],
+      "type": "object"
+    },
+    "BankStidHeader": {
+      "additionalProperties": false,
+      "properties": {
+        "declared_names": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "section_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "string_type": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "section_ordinal",
+        "string_type",
+        "declared_names"
+      ],
+      "type": "object"
+    },
+    "BankStidPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BankStidHeader"
+            },
+            "record_type": {
+              "const": "bank-stid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BankNameRecord"
+            },
+            "record_type": {
+              "const": "bank-name",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BankStidTail"
+            },
+            "record_type": {
+              "const": "bank-stid-tail",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "BankStidPayload"
+    },
+    "BankStidTail": {
+      "additionalProperties": false,
+      "properties": {
+        "section_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "trailing_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        }
+      },
+      "required": [
+        "section_ordinal",
+        "trailing_range"
+      ],
+      "type": "object"
+    },
     "ByteOrder": {
       "description": "Byte order used inside each numeric element.",
       "oneOf": [
@@ -1623,6 +2772,219 @@
       "required": [
         "entry_index",
         "path"
+      ],
+      "type": "object"
+    },
+    "CountEncoding": {
+      "enum": [
+        "fixed-u32",
+        "variable-length"
+      ],
+      "type": "string"
+    },
+    "CueHeader": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "declared_points": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "chunk_ordinal",
+        "declared_points"
+      ],
+      "type": "object"
+    },
+    "CuePoint": {
+      "additionalProperties": false,
+      "properties": {
+        "block_start": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "chunk_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "chunk_start": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "point_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "position": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sample_offset": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "target_chunk": {
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        }
+      },
+      "required": [
+        "chunk_ordinal",
+        "ordinal",
+        "point_range",
+        "id",
+        "position",
+        "target_chunk",
+        "chunk_start",
+        "block_start",
+        "sample_offset"
+      ],
+      "type": "object"
+    },
+    "CueTail": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "trailing_range": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "chunk_ordinal",
+        "trailing_range"
+      ],
+      "type": "object"
+    },
+    "CueText": {
+      "additionalProperties": false,
+      "properties": {
+        "cue_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "raw_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "terminator_offset": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "text_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "utf8": {
+          "$ref": "#/$defs/TextValidity"
+        },
+        "utf8_input_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "utf8_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "cue_id",
+        "raw_range",
+        "text_range",
+        "terminator_offset",
+        "utf8_input_range",
+        "utf8",
+        "utf8_text"
+      ],
+      "type": "object"
+    },
+    "CueTextRegion": {
+      "additionalProperties": false,
+      "properties": {
+        "code_page": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "country": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cue_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dialect": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "language": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "purpose": {
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "sample_length": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "text_range": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "cue_id",
+        "sample_length",
+        "purpose",
+        "country",
+        "language",
+        "dialect",
+        "code_page",
+        "text_range"
       ],
       "type": "object"
     },
@@ -1956,6 +3318,182 @@
         }
       ]
     },
+    "EventActionRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "ordinal",
+        "action_id",
+        "id_range"
+      ],
+      "type": "object"
+    },
+    "EventPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/EventRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-event",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/EventActionRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-event-action",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/EventTail"
+            },
+            "record_type": {
+              "const": "bank-hirc-event-tail",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "EventPayload"
+    },
+    "EventRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "action_count": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "count_encoding": {
+              "$ref": "#/$defs/CountEncoding"
+            },
+            "count_range": {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            }
+          },
+          "required": [
+            "layout",
+            "action_count",
+            "count_encoding",
+            "count_range"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "action_count": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "count_encoding": {
+              "$ref": "#/$defs/CountEncoding"
+            },
+            "count_range": {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "layout",
+            "action_count",
+            "count_encoding",
+            "count_range"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "action_count": {
+              "type": "null"
+            },
+            "count_encoding": {
+              "type": "null"
+            },
+            "count_range": {
+              "type": "null"
+            },
+            "layout": {
+              "const": "unsupported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "layout",
+            "action_count",
+            "count_encoding",
+            "count_range"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EventTail": {
+      "additionalProperties": false,
+      "properties": {
+        "trailing_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        }
+      },
+      "required": [
+        "trailing_range"
+      ],
+      "type": "object"
+    },
     "Float32": {
       "description": "A source float whose raw word survives non-finite values and signed zero.",
       "properties": {
@@ -2199,6 +3737,179 @@
           "type": "string"
         }
       ]
+    },
+    "ListContent": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/CueText"
+            },
+            "type": {
+              "const": "label",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/CueText"
+            },
+            "type": {
+              "const": "note",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/CueTextRegion"
+            },
+            "type": {
+              "const": "text-region",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "opaque",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "available": {
+                  "$ref": "#/$defs/DecimalU64"
+                },
+                "needed": {
+                  "$ref": "#/$defs/DecimalU64"
+                }
+              },
+              "required": [
+                "available",
+                "needed"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "malformed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ListHeader": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "list_type": {
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        }
+      },
+      "required": [
+        "chunk_ordinal",
+        "list_type"
+      ],
+      "type": "object"
+    },
+    "ListItem": {
+      "additionalProperties": false,
+      "properties": {
+        "body_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "chunk_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "content": {
+          "$ref": "#/$defs/ListContent"
+        },
+        "header_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "padding_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tag": {
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        }
+      },
+      "required": [
+        "chunk_ordinal",
+        "ordinal",
+        "tag",
+        "header_range",
+        "body_range",
+        "padding_range",
+        "content"
+      ],
+      "type": "object"
     },
     "MaterialAttributeInfo": {
       "description": "One original attribute and its independent semantic/lexical values.",
@@ -3640,6 +5351,52 @@
     "OriginalIdentifier": {
       "$ref": "#/$defs/IdentifierValue",
       "description": "An unmodified source identifier with a distinct domain and integer width."
+    },
+    "PlayBankPrefix": {
+      "additionalProperties": false,
+      "properties": {
+        "bank_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "bank_type": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "bank_id",
+        "bank_type"
+      ],
+      "type": "object"
+    },
+    "PlayBankRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "bank_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bank_type": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bank_id",
+        "bank_type"
+      ],
+      "type": "object"
     },
     "RawReference": {
       "description": "Retained exact decoded payload, addressed relative to its generation.",
@@ -5136,6 +6893,14 @@
       ],
       "type": "object"
     },
+    "TextValidity": {
+      "enum": [
+        "ascii",
+        "valid",
+        "invalid"
+      ],
+      "type": "string"
+    },
     "Verification": {
       "description": "Comparison against available source-declared integrity, independent of hash computation.",
       "oneOf": [
@@ -5155,6 +6920,341 @@
           "type": "string"
         }
       ]
+    },
+    "WemChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "body_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "header_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "padding_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pad bytes actually skipped by the RIFF traversal."
+        },
+        "tag": {
+          "description": "Original `FourCC` bytes, including non-UTF-8 values.",
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        }
+      },
+      "required": [
+        "ordinal",
+        "tag",
+        "header_range",
+        "body_range",
+        "padding_range"
+      ],
+      "type": "object"
+    },
+    "WemDuration": {
+      "additionalProperties": false,
+      "properties": {
+        "nanoseconds": {
+          "format": "uint32",
+          "maximum": 999999999,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "seconds": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "seconds",
+        "nanoseconds"
+      ],
+      "type": "object"
+    },
+    "WemFailure": {
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "$ref": "#/$defs/WemPhase"
+        },
+        "reason": {
+          "$ref": "#/$defs/WemFailureReason"
+        }
+      },
+      "required": [
+        "phase",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "WemFailureReason": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "invalid-signature",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "available": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "needed": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "type": {
+              "const": "truncated",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "available",
+            "needed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "const": "missing-chunk",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "detail": {
+              "type": "string"
+            },
+            "type": {
+              "const": "invalid-format",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "detail": {
+              "type": "string"
+            },
+            "type": {
+              "const": "unsupported-reader-variant",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "detail"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "WemHeader": {
+      "additionalProperties": false,
+      "properties": {
+        "bits_per_sample": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "block_align": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "byte_order": {
+          "$ref": "#/$defs/ByteOrder"
+        },
+        "channel_layout": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "channel_mask": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "channels": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "codec": {
+          "type": "string"
+        },
+        "declared_sample_rate": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WemDuration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "format_tag": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "loop_points": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WemLoop"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "riff_end_exclusive": {
+          "description": "First decoded byte after the declared RIFF or RIFX extent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sample_count": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Frames, with one sample per channel in each frame."
+        },
+        "sample_rate": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "trailing_length": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Bytes beyond the RIFF extent, available only through the retained raw Entry."
+        }
+      },
+      "required": [
+        "byte_order",
+        "format_tag",
+        "codec",
+        "channels",
+        "block_align",
+        "bits_per_sample",
+        "channel_layout",
+        "channel_mask",
+        "declared_sample_rate",
+        "sample_rate",
+        "sample_count",
+        "duration",
+        "loop_points",
+        "riff_end_exclusive",
+        "trailing_length"
+      ],
+      "type": "object"
+    },
+    "WemLoop": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "First excluded frame."
+        },
+        "frames": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "start": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "First included frame."
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "frames"
+      ],
+      "type": "object"
+    },
+    "WemOpaque": {
+      "additionalProperties": false,
+      "properties": {
+        "class": {
+          "$ref": "#/$defs/WemOpaqueClass"
+        }
+      },
+      "required": [
+        "class"
+      ],
+      "type": "object"
+    },
+    "WemOpaqueClass": {
+      "enum": [
+        "plugin-media",
+        "midi-media"
+      ],
+      "type": "string"
+    },
+    "WemPhase": {
+      "enum": [
+        "riff-header",
+        "summary",
+        "chunk-directory"
+      ],
+      "type": "string"
     },
     "ZipHeaderInfo": {
       "description": "Lossless fixed ZIP directory words without interpreting their flags or host system.",
@@ -7577,6 +9677,2811 @@
             "const": "partial"
           }
         }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-wem"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AudioPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 0,
+                    "minItems": 0
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-wem-chunk"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AudioPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-chunk"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-wem-opaque"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AudioPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-opaque"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 0,
+                    "minItems": 0
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-wem-failure"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AudioPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-failure"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "contains": {
+                  "properties": {
+                    "severity": {
+                      "const": "error"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "failed"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BankPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-section"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BankPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-section"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "duplicate_unique": {
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "duplicate_unique"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-media"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BankPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-media"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "data": {
+                          "properties": {
+                            "status": {
+                              "const": "outside-data"
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-object"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BankPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-object"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BankPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-action"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ActionPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-action"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-failure"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BankPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-failure"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "contains": {
+                  "properties": {
+                    "severity": {
+                      "const": "error"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "failed"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-stid"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BankStidPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-stid"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-name"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BankStidPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-name"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-stid-tail"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BankStidPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-stid-tail"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-event"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/EventPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-event"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-event-action"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/EventPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-event-action"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-event-tail"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/EventPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-event-tail"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-wem-cue"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-cue"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-wem-cue-point"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-cue-point"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-wem-cue-tail"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-cue-tail"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-wem-list"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-list"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-wem-list-item"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-list-item"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "content": {
+                          "properties": {
+                            "type": {
+                              "const": "malformed"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "content"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-wem-annotation-failure"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-annotation-failure"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "contains": {
+                  "properties": {
+                    "severity": {
+                      "const": "error"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "failed"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-wem"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AudioPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-wem-chunk"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AudioPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-chunk"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-wem-failure"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AudioPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-failure"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "contains": {
+                  "properties": {
+                    "severity": {
+                      "const": "error"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "failed"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-wem-cue"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-cue"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-wem-cue-point"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-cue-point"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 4,
+                    "minItems": 4
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-wem-cue-tail"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-cue-tail"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-wem-list"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-list"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-wem-list-item"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-list-item"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 4,
+                    "minItems": 4
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "content": {
+                          "properties": {
+                            "type": {
+                              "const": "malformed"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "content"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-wem-annotation-failure"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/AnnotationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "wem-annotation-failure"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "contains": {
+                  "properties": {
+                    "severity": {
+                      "const": "error"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "failed"
+              }
+            }
+          }
+        ]
       }
     }
   ],

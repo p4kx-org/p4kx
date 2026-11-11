@@ -5,7 +5,8 @@ use std::ops::ControlFlow;
 use std::sync::Mutex;
 
 use p4kx_assembly::{
-    LoadoutDocumentKind, LoadoutError, LoadoutFileError, LoadoutReadEvent, LoadoutReadObserver,
+    LoadoutDocumentKind, LoadoutError, LoadoutFileError, LoadoutFileObservation, LoadoutReadEvent,
+    LoadoutReadObserver,
 };
 use p4kx_extraction::{DataForgeError, Record, RecordTree, ValueError};
 use thiserror::Error;
@@ -113,33 +114,47 @@ fn event_fault(event: &LoadoutReadEvent<'_, '_>) -> Option<Fault> {
             record_index: record.index(),
             source: error.clone(),
         }),
-        LoadoutReadEvent::FileRead {
-            source,
-            kind,
-            outcome: Err(error),
-        } if !matches!(error, LoadoutFileError::NotFound) => Some(Fault::FileRead {
-            entry_index: source.identity().entry_index,
-            path: source.identity().path.to_owned(),
-            kind,
-            source: error.clone(),
-        }),
-        LoadoutReadEvent::FileProjection {
-            source,
-            kind,
-            outcome: Err(reason),
-        } => Some(Fault::FileProjection {
-            entry_index: source.identity().entry_index,
-            path: source.identity().path.to_owned(),
-            kind,
-            reason: reason.to_owned(),
-        }),
+        LoadoutReadEvent::FileRead { observation, .. } => read_fault(observation),
+        LoadoutReadEvent::FileProjection { observation, .. } => projection_fault(observation),
         LoadoutReadEvent::InventoryIncomplete => Some(Fault::IncompleteInventory),
         LoadoutReadEvent::ProvidedTree { .. }
         | LoadoutReadEvent::Reused { .. }
-        | LoadoutReadEvent::FileRead { .. }
-        | LoadoutReadEvent::FileProjection { .. }
+        | LoadoutReadEvent::FileDependency { .. }
+        | LoadoutReadEvent::FileDependencyRefused { .. }
         | LoadoutReadEvent::FileReused { .. } => None,
     }
+}
+
+fn read_fault(observation: &LoadoutFileObservation) -> Option<Fault> {
+    match observation.read_outcome() {
+        Ok(()) | Err(LoadoutFileError::NotFound) => None,
+        Err(error) => {
+            let identity = observation.source().identity();
+            Some(Fault::FileRead {
+                entry_index: identity.entry_index,
+                path: identity.path.to_owned(),
+                kind: observation.kind(),
+                source: error.clone(),
+            })
+        }
+    }
+}
+
+fn projection_fault(observation: &LoadoutFileObservation) -> Option<Fault> {
+    let outcome = observation.projection_outcome();
+    assert!(
+        outcome.is_some(),
+        "an actual FileProjection event retains its original projection outcome"
+    );
+    outcome.and_then(Result::err).map(|reason| {
+        let identity = observation.source().identity();
+        Fault::FileProjection {
+            entry_index: identity.entry_index,
+            path: identity.path.to_owned(),
+            kind: observation.kind(),
+            reason: reason.to_owned(),
+        }
+    })
 }
 
 pub(super) fn canonical<'f>(record: &Record<'f>) -> super::Result<RecordTree<'f>> {

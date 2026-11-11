@@ -32,14 +32,11 @@ fn orders(
     contract: u128,
     sub: Option<u128>,
 ) -> Result<&Vec<Value>, Box<dyn Error>> {
-    let sub = sub.map_or(Value::Null, |sub| Value::from(guid(sub)));
-    catalog["contracts"]
+    let contract = guid(contract);
+    let sub = sub.map(guid);
+    crate::catalog_contracts::entry(catalog, &contract, sub.as_deref())?["haulingOrders"]
         .as_array()
-        .into_iter()
-        .flatten()
-        .find(|entry| entry["guid"] == guid(contract).as_str() && entry["subContractGuid"] == sub)
-        .and_then(|entry| entry["haulingOrders"].as_array())
-        .ok_or_else(|| format!("no hauling orders of {}", guid(contract)).into())
+        .ok_or_else(|| format!("no hauling orders of {contract}").into())
 }
 
 fn resource(guid_value: u128, min: i64, max: i64, container: i64) -> Value {

@@ -321,12 +321,28 @@ fn finished(ui: &mut Ui, laid: &Laid) {
 
 pub(super) fn list(
     ui: &mut Ui,
-    (heading, salt): (&str, &str),
+    heading: (&str, &str),
     lines: &[String],
     reasons: Option<&[usize]>,
     open: bool,
 ) {
-    if lines.is_empty() {
+    list_rows(ui, heading, lines.len(), open, |ui, index| {
+        if let Some(text) = lines.get(index) {
+            let reason = reasons.and_then(|starts| starts.get(index)).copied();
+            list_row(ui, text, reason);
+        }
+    });
+}
+
+/// Renders only the visible rows with the existing list widgets and desktop metrics.
+pub(super) fn list_rows(
+    ui: &mut Ui,
+    (heading, salt): (&str, &str),
+    count: usize,
+    open: bool,
+    mut row: impl FnMut(&mut Ui, usize),
+) {
+    if count == 0 {
         return;
     }
     ui.add_space(SPACE_2);
@@ -337,13 +353,9 @@ pub(super) fn list(
     ScrollArea::vertical()
         .id_salt(salt)
         .max_height(SECTION_LIST_HEIGHT)
-        .show_rows(ui, ROW_HEIGHT, lines.len(), |ui, rows| {
+        .show_rows(ui, ROW_HEIGHT, count, |ui, rows| {
             for index in rows {
-                let Some(text) = lines.get(index) else {
-                    continue;
-                };
-                let reason = reasons.and_then(|starts| starts.get(index)).copied();
-                list_row(ui, text, reason);
+                row(ui, index);
             }
         });
 }

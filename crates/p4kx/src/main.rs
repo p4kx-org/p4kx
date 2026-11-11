@@ -12,7 +12,9 @@ mod bnk;
 mod bnk_objects;
 mod bnk_objects_text;
 mod catalog;
+mod catalog_failure_json;
 mod catalog_input;
+
 mod catalog_json;
 mod catalog_json_shops;
 mod catalog_json_slugs;

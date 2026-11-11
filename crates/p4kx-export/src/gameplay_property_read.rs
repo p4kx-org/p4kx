@@ -8,13 +8,23 @@ use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::NumberCapture;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::CatalogFields;
+use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_text_contract::PublicNameRef;
 use crate::guid_text::CatalogGuid;
+use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
+use crate::template_field_capture::TemplateFieldCapture;
 
 use super::contract::GameplayPropertyDefinition;
 use super::{overrides, transformation};
+
+const AUTHORED_FIELDS: [&str; 4] = [
+    "propertyName",
+    "displayTransformation",
+    "unitFormat",
+    "nameOverrides",
+];
 
 pub(crate) struct GameplayPropertyRead<'source> {
     pub(crate) value: GameplayPropertyDefinition<'source>,
@@ -25,25 +35,22 @@ pub(crate) struct GameplayPropertyRead<'source> {
 pub(crate) fn read<'source>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<GameplayPropertyRead<'source>, CatalogError> {
+    let input = projection.original();
+    let scope = input.record_scope(admission.record(), tree)?;
+    let original = OriginalFlowFields::read(&scope, cancel)?;
+    let capture = TemplateFieldCapture::new(&original, input, admission)?;
     let numbers = NumberCapture::default();
     let context = projection
         .origins()
         .record(tree.record_index())
         .with_numbers(&numbers)
         .with_cancel(cancel);
-    let fields = CatalogFields::new(tree.root(), "", &context);
+    let fields = CatalogFields::observed(tree.root(), "", &context, &capture)?;
     let mut notes = Vec::new();
-    fields.check(
-        &[
-            "propertyName",
-            "displayTransformation",
-            "unitFormat",
-            "nameOverrides",
-        ],
-        &mut notes,
-    );
+    fields.check_observed(&AUTHORED_FIELDS, &mut notes)?;
     let property_name = name(
         &fields,
         "propertyName",
@@ -61,9 +68,21 @@ pub(crate) fn read<'source>(
     let display_transformation = fields
         .structure("displayTransformation", &mut notes)?
         .try_map(|source| {
-            transformation::read(source, "displayTransformation", &context, &mut notes)
+            transformation::read(
+                source,
+                "displayTransformation",
+                &context,
+                &capture,
+                &mut notes,
+            )
         })?;
-    let name_overrides = overrides::read(&fields, tree.record_index(), projection, &mut notes)?;
+    let name_overrides = overrides::read(
+        &fields,
+        tree.record_index(),
+        projection,
+        &capture,
+        &mut notes,
+    )?;
     Ok(GameplayPropertyRead {
         value: GameplayPropertyDefinition {
             physical_guid: CatalogGuid(tree.guid()),
@@ -96,20 +115,15 @@ pub(crate) fn name<'source>(
 /// Binds a concrete-class disposition to the actual original type selector.
 pub(crate) fn payload<T>(
     fields: &CatalogFields<'_, '_, '_>,
-    path: &str,
     value: Option<T>,
     notes: &mut Vec<FieldError>,
 ) -> Result<SourcedValue<T>, CatalogError> {
-    let value = value.map_or_else(
-        || {
-            notes.push(FieldError::Unsupported {
-                source_type: fields.source().type_name().to_owned(),
-                field: path.to_owned(),
-            });
-            SourceValue::Unsupported
-        },
-        SourceValue::Present,
-    );
+    let value = if let Some(value) = value {
+        SourceValue::Present(value)
+    } else {
+        fields.note_unsupported(notes)?;
+        SourceValue::Unsupported
+    };
     fields.context().selector(&fields.location("$type"), value)
 }
 

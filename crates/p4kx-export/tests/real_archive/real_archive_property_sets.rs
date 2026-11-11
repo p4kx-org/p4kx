@@ -72,14 +72,14 @@ fn verify() -> OracleResult {
     let forge = Failure::classify(entry.open(), Failure::ArchiveDcb(ArchiveFault::DcbOpen))?;
     let mut trees = TreeBuilder::new();
     let mut checked = Counts::default();
-    let health = built.summary().export_health();
+    let health = health::read(&catalog)?;
     for record in forge.records() {
         check_watch(watch.poll())?;
         if is_generator(&record)? {
-            compare::check(&record, &mut trees, &published, health, &mut checked)?;
+            compare::check(&record, &mut trees, &published, &health, &mut checked)?;
         }
     }
-    health::reconcile(health, checked.sources, checked.failed)?;
+    health::reconcile(&health, checked.sources, checked.failed)?;
     requirements.check(checked.scoped)?;
     check_watch(watch.check())?;
     check_counts(&checked, published.sets.len(), published.contracts.len())
@@ -92,7 +92,7 @@ fn check_watch<E>(result: Result<(), E>) -> OracleResult {
 fn catalog_failure(error: CatalogError) -> Failure {
     Failure::CatalogBuild(match error {
         CatalogError::Accounting(error) => CatalogFault::Accounting(accounting_failure(&error)),
-        CatalogError::IncompleteExport { .. } => CatalogFault::UnexpectedPublicationRefusal,
+        CatalogError::IncompleteExport(_) => CatalogFault::UnexpectedPublicationRefusal,
         _ => CatalogFault::Build,
     })
 }
@@ -119,11 +119,18 @@ const fn accounting_failure(error: &ExportAccountingError) -> AccountingFault {
             AccountingFault::ConflictingDisposition
         }
         ExportAccountingError::Unreconciled { .. } => AccountingFault::Unreconciled,
+        ExportAccountingError::ConflictingSourceDatum => AccountingFault::ConflictingSourceDatum,
+        ExportAccountingError::UnfilledLootValue { .. } => AccountingFault::UnfilledLootValue,
+        ExportAccountingError::UnsupportedLootSourceValue => {
+            AccountingFault::UnsupportedLootSourceValue
+        }
         ExportAccountingError::CounterOverflow => AccountingFault::CounterOverflow,
         ExportAccountingError::ConflictingTagTrace => AccountingFault::ConflictingTagTrace,
         ExportAccountingError::UnfilledTransformationNode => {
             AccountingFault::UnfilledTransformationNode
         }
+        ExportAccountingError::HealthCaptureClosed => AccountingFault::HealthCaptureClosed,
+        _ => AccountingFault::Unknown,
     }
 }
 

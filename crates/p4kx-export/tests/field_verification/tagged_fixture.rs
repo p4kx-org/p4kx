@@ -52,7 +52,7 @@ pub(crate) fn read() -> super::Result<Tagged> {
             .summary()
             .failures()
             .iter()
-            .map(|failure| failure.guid)
-            .collect(),
+            .map(|failure| failure.guid().parse())
+            .collect::<Result<_, _>>()?,
     })
 }

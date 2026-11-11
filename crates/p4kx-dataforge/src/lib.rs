@@ -23,21 +23,23 @@ mod annotations;
 mod build;
 mod dataforge;
 mod error;
+mod field_escapes;
 mod field_storage;
 mod fields;
 mod flat;
 mod flat_cells;
 mod guid;
 mod header;
-mod inheritance;
 mod instance;
 mod issues;
 mod json;
 mod json_text;
 mod kinds;
 mod layout;
+mod layout_cursor;
 mod location;
 mod nested;
+mod pointer_offsets;
 mod probe;
 pub mod query;
 mod read_observer;
@@ -50,6 +52,12 @@ mod rows;
 mod scalar;
 mod schema;
 mod slot;
+mod source_layout_allocation;
+mod source_layout_index;
+mod source_layout_properties;
+#[cfg(test)]
+mod source_layout_tests;
+mod source_layout_validation;
 mod strings;
 mod survey;
 mod table;
@@ -57,8 +65,13 @@ mod tag_build;
 mod tags;
 mod texts;
 mod tree;
+mod tree_cursor;
 mod tree_owner;
 mod value;
+mod value_clone;
+mod value_debug;
+mod value_drain;
+mod value_eq;
 mod value_error;
 mod value_json;
 mod value_text;
@@ -68,7 +81,7 @@ mod xml_text;
 mod xml_write;
 
 pub use annotations::{Annotations, TAG_TYPE, TagResolver};
-pub use build::{MAX_NESTING_DEPTH, MAX_RECORD_VALUES, TreeBuilder};
+pub use build::TreeBuilder;
 pub use dataforge::DataForge;
 pub use error::DataForgeError;
 pub use field_storage::FieldStorage;
@@ -83,21 +96,28 @@ pub use header::{SNIFF_LEN, SUPPORTED_VERSIONS, looks_like_dataforge};
 pub use issues::{DataForgeIssue, MAX_DATAFORGE_ISSUES};
 pub use json::{JsonLayout, RecordJson};
 pub use kinds::{DataType, ValueKind};
-pub use layout::MAX_RECORD_FIELDS;
 pub use location::{Location, Step};
 pub use nested::{Reference, StructValue};
 pub use probe::PointerProbe;
 pub use read_observer::CanonicalReadObserver;
 pub use record::Record;
 pub use record_metadata::{RecordMetadata, RecordText};
-pub use reference_index::{FileGraph, IndexedReference, MAX_INDEXED_REFERENCES, ReferenceIndex};
+pub use reference_index::{
+    FileGraph, IndexedReference, IndexedReferenceOrigin, MAX_INDEXED_REFERENCES, ObservedFileEdge,
+    ObservedFileGraph, ObservedReferenceIndex, ReferenceIndex, ReferenceIndexError,
+    ReferenceScanGap,
+};
 pub use reference_origin::ReferenceOrigin;
 pub use schema::{Enum, Property, Struct};
 pub use survey::{FormatSurvey, PointerSurvey, TrailingSurvey};
+#[expect(
+    deprecated,
+    reason = "Public compatibility for the released Tag constants"
+)]
+pub use tags::{MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES, MAX_TAG_TEXT_BYTES};
 pub use tags::{
-    MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES, MAX_TAG_TEXT_BYTES, TAG_DATABASE_TYPE,
-    TAG_PATH_SEPARATOR, Tag, TagBuildEvent, TagPathEdgeKind, TagPathIncoming, TagProjectionFailure,
-    TagRelationIssue, TagTree, TagTreeIssues,
+    TAG_DATABASE_TYPE, TAG_PATH_SEPARATOR, Tag, TagBuildEvent, TagPath, TagPathEdgeKind,
+    TagPathIncoming, TagRelationIssue, TagTree, TagTreeIssues,
 };
 pub use texts::{Resolution, TextResolver};
 pub use tree::RecordTree;

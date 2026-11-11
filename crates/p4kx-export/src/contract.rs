@@ -6,23 +6,21 @@ use std::borrow::Cow;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::CatalogProvenance;
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_text_contract::CatalogTexts;
-use p4kx_extraction::SourceInventory;
 
-pub(crate) use crate::broker_entry::BrokerEntry;
 pub(crate) use crate::catalog_v3::resource_group_catalog::ResourceGroup;
 pub(crate) use crate::commodity_contract::Commodity;
 pub(crate) use crate::contract_cargo::CargoManifest;
 pub(crate) use crate::contract_completeness::{Completeness, KindCompleteness};
 pub(crate) use crate::contract_crafter::Crafter;
-pub(crate) use crate::contract_crafting::{Blueprint, Ingredient};
 pub(crate) use crate::contract_entities::{Item, Paint, Ship};
 pub(crate) use crate::contract_harvest::{HarvestableLocation, HarvestableProviderPreset};
 pub(crate) use crate::contract_harvest_config::SubHarvestableMultiConfig;
 pub(crate) use crate::contract_loadout::Loadout;
-pub(crate) use crate::contract_loot::{LootArchetype, LootContainer, LootPoolFilter, LootTable};
+pub(crate) use crate::contract_loot::{LootArchetype, LootContainer, LootTable};
 pub(crate) use crate::contract_loot_legacy::{LegacyLootArchetype, LegacyLootTable};
 pub(crate) use crate::contract_mining::{
     CompositionPart, MineableComposition, MineableElement, MineableEntity, RefiningProcess,
@@ -39,7 +37,6 @@ pub(crate) use crate::contract_shops::Shop;
 pub(crate) use crate::contract_source::{BuildSource, Source};
 pub(crate) use crate::contract_starmap::StarmapObject;
 pub(crate) use crate::contract_store_slugs::ShipStoreSlug;
-pub(crate) use crate::contract_template::ContractTemplate;
 pub(crate) use crate::entity_spawn_model::EntitySpawnPool;
 pub(crate) use crate::location_template::MissionLocationTemplate;
 pub(crate) use crate::mission_property_set::MissionPropertySet;
@@ -71,16 +68,16 @@ pub(crate) struct Catalog<'a> {
     pub(crate) items: Vec<Item<'a>>,
     /// The ships, ordered by GUID.
     pub(crate) ships: Vec<Ship<'a>>,
-    /// The blueprints, ordered by GUID.
-    pub(crate) blueprints: Vec<Blueprint<'a>>,
     /// Canonical source-owned definition rows.
     pub(crate) definitions: CatalogDefinitions<'a>,
+    /// Contextual configurations navigating canonical definitions.
+    pub(crate) configurations: crate::catalog_configurations::CatalogConfigurations<'a>,
     /// Ordered authored declarations from selected physical Records.
     pub(crate) declarations: crate::catalog_v3::catalog_declarations::CatalogDeclarations<'a>,
     /// Explicit derived choices using the canonical definitions' source facts.
-    pub(crate) projections: CatalogProjections,
+    pub(crate) projections: CatalogProjections<'a>,
     /// Physical source observations and actual contribution uses.
-    pub(crate) provenance: SourceInventory,
+    pub(crate) provenance: CatalogProvenance,
     /// Public short-name and protected game-text tables.
     pub(crate) texts: CatalogTexts<'a>,
     /// The blueprint pools with the places that reward them, ordered by GUID.
@@ -96,9 +93,7 @@ pub(crate) struct Catalog<'a> {
     pub(crate) loadouts: Vec<Loadout>,
     /// The starmap objects with their world positions, ordered by GUID.
     pub(crate) starmap_objects: Vec<StarmapObject<'a>>,
-    /// The contracts and sub contracts with resolved titles, mission types and the reputation they
-    /// grant on success, ordered by the GUID of the contract and then of the sub contract.
-    pub(crate) contracts: Vec<ContractEntry<'a>>,
+
     /// The mineable elements, ordered by GUID. Several may link to one `ResourceType`.
     pub(crate) mineable_elements: Vec<MineableElement<'a>>,
     /// The refining processes, ordered by GUID.
@@ -137,8 +132,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) loot_tables: Vec<LootTable<'a>>,
     /// The loot archetypes with the weighted selectors of each, ordered by GUID.
     pub(crate) loot_archetypes: Vec<LootArchetype<'a>>,
-    /// The loot pool filters, ordered by GUID.
-    pub(crate) loot_pool_filters: Vec<LootPoolFilter<'a>>,
     /// The older loot tables, the targets of `lootConfig.lootTableGuid`, ordered by GUID.
     pub(crate) legacy_loot_tables: Vec<LegacyLootTable<'a>>,
     /// The older loot archetypes the older tables draw from, ordered by GUID.
@@ -156,10 +149,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) contract_ship_spawns: Vec<ShipSpawnPool>,
     /// The distinct location queries of the contracts, ordered by identifier.
     pub(crate) contract_location_queries: Vec<LocationQuery>,
-    /// The contract templates, the targets of `contracts[].templateGuid`, ordered by GUID.
-    pub(crate) contract_templates: Vec<ContractTemplate<'a>>,
-    /// The mission broker entries, the targets of `contracts[].brokerEntryGuid`, ordered by GUID.
-    pub(crate) mission_broker_entries: Vec<BrokerEntry<'a>>,
     /// The distinct NPC spawn descriptions of the contracts, templates and broker entries, ordered
     /// by identifier.
     pub(crate) contract_npc_spawns: Vec<NpcSpawnPool<'a>>,

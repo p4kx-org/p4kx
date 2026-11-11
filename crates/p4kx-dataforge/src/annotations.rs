@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
+
 use crate::{Guid, Reference, TextResolver};
 
 /// The struct of the Records a tag Reference points to.
@@ -12,6 +14,11 @@ pub trait TagResolver: Sync {
     /// Returns the tag path of the Tag Record `guid` (`Weapon.Gun`), or `None` when it is no tag
     /// the resolver knows.
     fn tag_path(&self, guid: Guid) -> Option<&str>;
+
+    /// Returns a tag path for immediate use by an output writer.
+    fn tag_path_text(&self, guid: Guid) -> Option<Cow<'_, str>> {
+        self.tag_path(guid).map(Cow::Borrowed)
+    }
 }
 
 /// What the writers of Record XML and Record JSON add to the plain output: the texts of
@@ -66,11 +73,11 @@ impl<'a> Annotations<'a> {
     }
 
     /// Returns the tag path of `reference` when it is a tag Reference the resolver knows.
-    pub(crate) fn tag_path(&self, reference: &Reference<'_>) -> Option<&'a str> {
+    pub(crate) fn tag_path(&self, reference: &Reference<'_>) -> Option<Cow<'a, str>> {
         if reference.type_name() != TAG_TYPE {
             return None;
         }
-        self.tags?.tag_path(reference.guid())
+        self.tags?.tag_path_text(reference.guid())
     }
 }
 

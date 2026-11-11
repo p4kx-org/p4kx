@@ -5,18 +5,26 @@ use std::ops::ControlFlow;
 
 use p4kx_assembly::{
     LoadoutDocumentKind, LoadoutFileError, LoadoutFileIdentity, LoadoutFileObservation,
-    LoadoutFileSource,
+    LoadoutPath, LoadoutRequest, LoadoutSelection,
 };
 
-use crate::CatalogError;
+use crate::entry_source::EntrySource;
 use crate::export_diagnostic::{
-    ExportDiagnostic, ExportDiagnosticCode, ExportDiagnosticExample, ExportDiagnosticSeverity,
-    ExportDiagnosticStage, ExportDiagnosticUnit, ExportSourceRole,
+    ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
+    ExportSourceRole,
 };
 use crate::export_entry_ledger::{ArchiveEntryObservation, EntryOperation};
-use crate::export_ledger::{ExportAccountingError, SourceDiagnosis, SourceDisposition};
+use crate::export_ledger::{ExportAccountingError, SourceDisposition};
+use crate::{CatalogError, HealthText};
+use p4kx_extraction::{InputScope, SourceInput, SourceLocation, SourceUseRole};
 
 use super::Capture;
+use crate::catalog_read::original::{
+    EntryCapture, EntryDiagnosis, ExampleBodyReceipt, LoadoutBodyReceipt, RecordSubject,
+};
+use crate::health_diagnostic_observation::{
+    DiagnosticObservation as ExportDiagnostic, ExampleObservation,
+};
 
 const fn operation(kind: LoadoutDocumentKind) -> EntryOperation {
     match kind {
@@ -34,129 +42,227 @@ const fn bytes_operation(kind: LoadoutDocumentKind) -> EntryOperation {
     }
 }
 
-impl Capture {
+impl Capture<'_> {
     fn file_observation(
         &self,
-        source: &LoadoutFileSource,
+        original: &LoadoutFileObservation,
         operation: EntryOperation,
         disposition: SourceDisposition,
         code: Option<ExportDiagnosticCode>,
-    ) -> ArchiveEntryObservation {
-        let identity = source.identity();
-        ArchiveEntryObservation {
-            operation,
-            kind: self.kind,
-            entry_index: identity.entry_index,
-            container_entry_index: None,
-            path: identity.path.to_owned(),
-            role: ExportSourceRole::Dependency,
-            disposition,
-            diagnosis: SourceDiagnosis {
-                code,
-                field: Some(identity.path.to_owned()),
-                source_type: Some("LoadoutFile".to_owned()),
-                target_guid: None,
-            },
+        receipt: Option<LoadoutBodyReceipt>,
+    ) -> Result<ArchiveEntryObservation, CatalogError> {
+        let diagnosis = EntryDiagnosis::loadout(code);
+        match (self.input, receipt) {
+            (Some(input), Some(receipt)) => {
+                let source =
+                    EntrySource::of_operation(&EntryCapture::for_input(input), receipt, operation)?
+                        .dependency();
+                Ok(source.observation(self.kind, disposition, diagnosis))
+            }
+            (None, None) => {
+                let identity = original.source().identity();
+                Ok(ArchiveEntryObservation {
+                    operation,
+                    kind: self.kind,
+                    entry_index: identity.entry_index,
+                    container_entry_index: None,
+                    path: HealthText::new(identity.path),
+                    role: ExportSourceRole::Dependency,
+                    disposition,
+                    diagnosis,
+                    receipt: None,
+                })
+            }
+            _ => Err(ExportAccountingError::UnboundHealthSubject.into()),
         }
+    }
+
+    fn checked_file(
+        &self,
+        original: &LoadoutFileObservation,
+        request: &LoadoutPath,
+    ) -> Result<(), CatalogError> {
+        let Some(input) = self.input else {
+            return Ok(());
+        };
+        let capture = EntryCapture::for_input(input);
+        let source = original.source();
+        if let Some(archive) = source.archive_input_origin() {
+            capture.check_archive(archive)?;
+        }
+        if let Some(origin) = source.entry_origin() {
+            capture.check_origin(origin)?;
+        }
+        let recipe = self.lock()?.paths.get(request)?;
+        recipe.check_input(input)?;
+        if source.entry_origin().is_none() && source.identity().path != request.value() {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        Ok(())
+    }
+
+    fn attempted_file(&self, original: &LoadoutFileObservation) -> Result<(), CatalogError> {
+        let Some(input) = self.input else {
+            return Ok(());
+        };
+        if matches!(
+            original.read_outcome(),
+            Ok(()) | Err(LoadoutFileError::Unreadable { .. })
+        ) {
+            let source = original
+                .source()
+                .entry_origin()
+                .map_or(SourceInput::Unknown, SourceInput::Archive);
+            input
+                .origins()
+                .uses
+                .observe(source, InputScope::Payload)?
+                .at(
+                    SourceLocation::Subresource {
+                        namespace: "loadoutFileRead".to_owned(),
+                        indices: Vec::new(),
+                        field: "content".to_owned(),
+                    },
+                    SourceUseRole::Attempted,
+                )?;
+        }
+        Ok(())
     }
 
     pub(super) fn file_read(
         &self,
-        source: &LoadoutFileSource,
-        kind: LoadoutDocumentKind,
-        outcome: Result<(), &LoadoutFileError>,
+        original: &LoadoutFileObservation,
+        request: &LoadoutPath,
+        caller: &LoadoutRequest,
     ) -> ControlFlow<()> {
-        if let Some(error) = read_stop(outcome) {
+        if let Some(error) = read_stop(original.read_outcome()) {
             return self.fail(error);
         }
-        let missing = matches!(outcome, Err(LoadoutFileError::NotFound));
-        let (disposition, code) = read_status(outcome);
-        let Ok(mut state) = self.lock() else {
-            return ControlFlow::Break(());
-        };
-        state.ledger.entries.push(self.file_observation(
-            source,
-            bytes_operation(kind),
-            disposition,
-            code,
-        ));
-        if missing {
-            state
-                .ledger
-                .field_diagnostic(missing_file(self.kind, source.identity()));
+        let result = (|| {
+            self.checked_file(original, request)?;
+            self.attempted_file(original)?;
+            let source = original.source();
+            let missing = matches!(original.read_outcome(), Err(LoadoutFileError::NotFound));
+            let (disposition, code) = read_status(original.read_outcome());
+            let mut state = self.lock()?;
+            state.files.read(original)?;
+            let receipt = if let Some(input) = self.input {
+                let candidate = state.paths.get(request)?;
+                let xml_caller = xml_selection(caller);
+                let caller = state.paths.request(caller)?;
+                let selected = state.graph.read(original, candidate, caller, xml_caller)?;
+                Some(LoadoutBodyReceipt::read(
+                    &EntryCapture::for_input(input),
+                    selected,
+                )?)
+            } else {
+                None
+            };
+            let entry = self.file_observation(
+                original,
+                bytes_operation(original.kind()),
+                disposition,
+                code,
+                receipt.clone(),
+            )?;
+            if missing {
+                state
+                    .ledger
+                    .field_diagnostic(missing_file(self.kind, source.identity(), receipt)?);
+            }
+            if original.read_outcome().is_err() && !missing {
+                state.ledger.incomplete_inventory(self.kind);
+            }
+            state.ledger.entries.push(entry);
+            drop(state);
+            Ok::<_, CatalogError>(())
+        })();
+        match result {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(error) => self.fail(error),
         }
-        if outcome.is_err() && !missing {
-            state.ledger.incomplete_inventory(self.kind);
-        }
-        drop(state);
-        ControlFlow::Continue(())
     }
 
     pub(super) fn file_projection(
         &self,
-        source: &LoadoutFileSource,
-        kind: LoadoutDocumentKind,
-        outcome: Result<(), &str>,
+        original: &LoadoutFileObservation,
+        request: &LoadoutPath,
+        caller: &LoadoutRequest,
     ) -> ControlFlow<()> {
-        let Ok(mut state) = self.lock() else {
-            return ControlFlow::Break(());
-        };
-        let read = self.file_observation(
-            source,
-            bytes_operation(kind),
-            SourceDisposition::Projected,
-            None,
-        );
-        if !state.ledger.entries.contains(&read) {
-            drop(state);
+        let Some(outcome) = original.projection_outcome() else {
             return self.fail(ExportAccountingError::UnobservedFailure.into());
-        }
-        let (disposition, code) = projection_status(outcome);
-        state.ledger.entries.push(self.file_observation(
-            source,
-            operation(kind),
-            disposition,
-            code,
-        ));
-        if outcome.is_err() {
-            state.ledger.incomplete_inventory(self.kind);
-        }
-        drop(state);
-        ControlFlow::Continue(())
-    }
-
-    pub(super) fn file_reused(&self, original: &LoadoutFileObservation) -> ControlFlow<()> {
-        if let Some(error) = read_stop(original.read_outcome()) {
-            return self.fail(error);
-        }
-        let (disposition, code) = read_status(original.read_outcome());
-        let read = self.file_observation(
-            original.source(),
-            bytes_operation(original.kind()),
-            disposition,
-            code,
-        );
-        let projected = original.projection_outcome().map(|outcome| {
+        };
+        let result = (|| {
+            self.checked_file(original, request)?;
+            let mut state = self.lock()?;
+            state.files.projected(original)?;
+            let receipt = if let Some(input) = self.input {
+                let candidate = state.paths.get(request)?;
+                let caller = state.paths.request(caller)?;
+                state
+                    .graph
+                    .check_read_context(original, &candidate, &caller)?;
+                Some(LoadoutBodyReceipt::read(
+                    &EntryCapture::for_input(input),
+                    state.graph.selection(original)?,
+                )?)
+            } else {
+                None
+            };
             let (disposition, code) = projection_status(outcome);
-            self.file_observation(
-                original.source(),
+            state.ledger.entries.push(self.file_observation(
+                original,
                 operation(original.kind()),
                 disposition,
                 code,
-            )
-        });
-        let Ok(state) = self.lock() else {
-            return ControlFlow::Break(());
-        };
-        let retained = state.ledger.entries.contains(&read)
-            && projected
-                .as_ref()
-                .is_none_or(|entry| state.ledger.entries.contains(entry));
-        drop(state);
-        if retained {
-            ControlFlow::Continue(())
-        } else {
-            self.fail(ExportAccountingError::UnobservedFailure.into())
+                receipt,
+            )?);
+            if outcome.is_err() {
+                state.ledger.incomplete_inventory(self.kind);
+            }
+            drop(state);
+            Ok::<_, CatalogError>(())
+        })();
+        match result {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(error) => self.fail(error),
+        }
+    }
+
+    pub(super) fn file_reused(
+        &self,
+        original: &LoadoutFileObservation,
+        request: &LoadoutPath,
+        caller: &LoadoutRequest,
+    ) -> ControlFlow<()> {
+        if let Some(error) = read_stop(original.read_outcome()) {
+            return self.fail(error);
+        }
+        let result = (|| {
+            self.checked_file(original, request)?;
+            let state = self.lock()?;
+            if !state.files.contains(original) {
+                return Err(ExportAccountingError::UnobservedFailure.into());
+            }
+            if self.input.is_some() {
+                let candidate = state.paths.get(request)?;
+                state.graph.check_candidate(original, &candidate)?;
+                if let LoadoutRequest::Xml { path } = caller {
+                    let recipe = state.paths.get(path)?;
+                    let selection = path
+                        .selection()
+                        .ok_or(ExportAccountingError::UnboundHealthSubject)?;
+                    state.graph.selected(original, selection, recipe)?;
+                } else {
+                    state.paths.validate_request(caller)?;
+                }
+            }
+            drop(state);
+            Ok::<_, CatalogError>(())
+        })();
+        match result {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(error) => self.fail(error),
         }
     }
 
@@ -167,6 +273,13 @@ impl Capture {
         state.ledger.incomplete_inventory(self.kind);
         drop(state);
         ControlFlow::Continue(())
+    }
+}
+
+const fn xml_selection(caller: &LoadoutRequest) -> Option<&LoadoutSelection> {
+    match caller {
+        LoadoutRequest::Xml { path } => path.selection(),
+        _ => None,
     }
 }
 
@@ -208,8 +321,22 @@ const fn projection_status(
     }
 }
 
-fn missing_file(kind: crate::Kind, source: LoadoutFileIdentity<'_>) -> ExportDiagnostic {
-    ExportDiagnostic {
+fn missing_file(
+    kind: crate::Kind,
+    source: LoadoutFileIdentity<'_>,
+    receipt: Option<LoadoutBodyReceipt>,
+) -> Result<ExportDiagnostic, CatalogError> {
+    let example = match receipt {
+        Some(receipt) => ExampleObservation::captured(
+            RecordSubject::absent(),
+            Some(source.path),
+            None,
+            None,
+            ExampleBodyReceipt::loadout(receipt),
+        )?,
+        None => ExampleObservation::new(RecordSubject::absent(), Some(source.path), None, None),
+    };
+    Ok(ExportDiagnostic {
         kind: Some(kind),
         stage: ExportDiagnosticStage::SourceRead,
         code: ExportDiagnosticCode::DanglingReference,
@@ -218,69 +345,10 @@ fn missing_file(kind: crate::Kind, source: LoadoutFileIdentity<'_>) -> ExportDia
         warning_code: Some("missing_loadout_file".to_owned()),
         count: 1,
         count_unit: ExportDiagnosticUnit::Occurrences,
-        examples: vec![ExportDiagnosticExample {
-            record_index: None,
-            record_guid: None,
-            record_path: None,
-            field: Some(source.path.to_owned()),
-            source_type: None,
-            target_guid: None,
-        }],
-    }
+        examples: vec![example],
+    })
 }
 
 #[cfg(test)]
-mod tests {
-    use std::ops::ControlFlow;
-
-    use p4kx_assembly::{
-        LoadoutDocumentKind, LoadoutFileError, LoadoutFiles, LoadoutReadEvent, LoadoutReadObserver,
-    };
-
-    use super::super::Capture;
-    use super::CatalogError;
-    use crate::export_ledger::ExportLedger;
-
-    struct Unavailable;
-
-    impl LoadoutFiles for Unavailable {
-        fn read(&self, path: &str) -> Result<Vec<u8>, LoadoutFileError> {
-            assert_eq!(
-                path, "synthetic/admission.xml",
-                "the actual requested source"
-            );
-            Err(LoadoutFileError::SourceEvidenceUnavailable)
-        }
-    }
-
-    #[test]
-    fn reported_unavailable_loadout_admission_remains_the_first_fatal_adapter_cause() {
-        let read = Unavailable.read_observed("synthetic/admission.xml");
-        let capture = Capture::new(&ExportLedger::default(), None);
-        let stopped = capture.observe(LoadoutReadEvent::FileRead {
-            source: read.source(),
-            kind: LoadoutDocumentKind::XmlLoadout,
-            outcome: read.outcome().map(|_| ()),
-        });
-        assert!(
-            matches!(stopped, ControlFlow::Break(())),
-            "actual adapter stops immediately"
-        );
-        assert!(
-            capture
-                .observe(LoadoutReadEvent::InventoryIncomplete)
-                .is_break(),
-            "a subsequent event cannot resume the stopped capture"
-        );
-        let outcome = capture.finish();
-        assert!(
-            matches!(
-                outcome,
-                Err(CatalogError::LoadoutSourceEvidence(
-                    LoadoutFileError::SourceEvidenceUnavailable
-                ))
-            ),
-            "the first typed admission failure is neither cancellation nor an ordinary Health row"
-        );
-    }
-}
+#[path = "files_admission_tests.rs"]
+mod tests;

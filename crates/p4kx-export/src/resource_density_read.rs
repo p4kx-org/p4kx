@@ -10,7 +10,7 @@ use crate::resource_density_source::{
     ResourceDensityUnitPayload, ResourceDensityValue, ResourceMolarMass,
 };
 use crate::resource_value_read;
-use crate::source_fields::FieldError;
+use crate::source_fields::{FieldCapture, FieldError};
 
 /// Projects the owned density shape without changing its unit or IEEE values.
 pub(crate) fn read<'f>(
@@ -18,24 +18,31 @@ pub(crate) fn read<'f>(
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<ResourceDensitySource<'f>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
+    let fields = CatalogFields::observed(source, path, context, capture)?;
     let payload = match source.type_name() {
         "ResourceTypeDensityType" => {
-            fields.check(&[], notes);
+            fields.check_observed(&[], notes)?;
             Some(ResourceDensityPayload::EmptyBase)
         }
         "ResourceTypeDensity" => {
-            fields.check(&["densityUnit"], notes);
-            let density_unit = fields
-                .structure("densityUnit", notes)?
-                .try_map(|unit| read_unit(unit, &format!("{path}.densityUnit"), context, notes))?;
+            fields.check_observed(&["densityUnit"], notes)?;
+            let density_unit = fields.structure("densityUnit", notes)?.try_map(|unit| {
+                read_unit(
+                    unit,
+                    &format!("{path}.densityUnit"),
+                    context,
+                    notes,
+                    capture,
+                )
+            })?;
             Some(ResourceDensityPayload::Density(ResourceDensity {
                 density_unit,
             }))
         }
         "ResourceTypeMolarMass" => {
-            fields.check(&["molarMass"], notes);
+            fields.check_observed(&["molarMass"], notes)?;
             Some(ResourceDensityPayload::MolarMass(ResourceMolarMass {
                 molar_mass: resource_value_read::single(&fields, "molarMass", notes)?,
             }))
@@ -56,15 +63,16 @@ fn read_unit<'f>(
     path: &str,
     context: &CatalogRecordContext<'_>,
     notes: &mut Vec<FieldError>,
+    capture: &dyn FieldCapture<'f>,
 ) -> Result<ResourceDensityUnit<'f>, CatalogError> {
-    let fields = CatalogFields::new(source, path, context);
+    let fields = CatalogFields::observed(source, path, context, capture)?;
     let payload = match source.type_name() {
         "BaseDensityUnit" => {
-            fields.check(&[], notes);
+            fields.check_observed(&[], notes)?;
             Some(ResourceDensityUnitPayload::EmptyBase)
         }
         "GramsPerCubicCentimeter" => {
-            fields.check(&["gramsPerCubicCentimeter"], notes);
+            fields.check_observed(&["gramsPerCubicCentimeter"], notes)?;
             Some(ResourceDensityUnitPayload::GramsPerCubicCentimeter(
                 ResourceDensityValue {
                     value: resource_value_read::single(&fields, "gramsPerCubicCentimeter", notes)?,
@@ -72,7 +80,7 @@ fn read_unit<'f>(
             ))
         }
         "KilogramsPerCubicMeter" => {
-            fields.check(&["kilogramsPerCubicMeter"], notes);
+            fields.check_observed(&["kilogramsPerCubicMeter"], notes)?;
             Some(ResourceDensityUnitPayload::KilogramsPerCubicMeter(
                 ResourceDensityValue {
                     value: resource_value_read::single(&fields, "kilogramsPerCubicMeter", notes)?,

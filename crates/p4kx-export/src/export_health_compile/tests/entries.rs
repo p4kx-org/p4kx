@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::HealthText;
+use crate::catalog_read::original::EntryDiagnosis;
 use crate::export_entry_ledger::ArchiveEntryObservation;
-use crate::export_ledger::{SourceDiagnosis, SourceDisposition};
+use crate::export_ledger::SourceDisposition;
 use crate::{CatalogPublicationMode, EntryOperation, ExportSourceRole, Kind};
 
 use super::{TestResult, ledger, rows};
@@ -13,10 +15,11 @@ fn entry(operation: EntryOperation, disposition: SourceDisposition) -> ArchiveEn
         kind: Kind::LootContainers,
         entry_index: Some(7),
         container_entry_index: None,
-        path: "synthetic/container.socpak".to_owned(),
+        path: HealthText::new("synthetic/container.socpak"),
         role: ExportSourceRole::DerivedInput,
         disposition,
-        diagnosis: SourceDiagnosis::default(),
+        diagnosis: EntryDiagnosis::default(),
+        receipt: None,
     }
 }
 
@@ -60,6 +63,7 @@ fn independent_required_entry_operations_do_not_invent_extra_physical_entries() 
             .failed_entries
             .first()
             .ok_or("failed entry")?
+            .source
             .operation,
         EntryOperation::SocTags,
         "the exact failed operation is not hidden by a successful directory read"

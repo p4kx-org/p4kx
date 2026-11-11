@@ -84,9 +84,10 @@ A computed path includes the actual selected ancestor names, actual selected inc
 and the headers that qualified those nodes. Name text contributes as conversion input; incoming
 root/child slots and qualification headers contribute as selectors. Later unused parents, repeated
 edges and duplicate definitions are not counterfactual contributors. The dot separator and closed
-projection states are format/exporter controls, with no invented physical source. Depth, listing
-and selected-parent results retain their corresponding actual construction selectors. An unreadable
-name can produce the existing convenience fallback but leaves its contributor set incomplete.
+projection states are format/exporter controls. Depth, listing and selected-parent results use
+the qualifying headers and selected root and child occurrences. The parent also uses its physical
+Record GUID as payload. An unreadable name can produce a fallback path with an incomplete text
+contribution set. The selected topology still has its original contributors.
 
 These use the original DataForge source context and the one existing shared source-use registry.
 No ID/hash lookup restores authority and no second registry or blanket whole-Record origin is used.
@@ -97,15 +98,20 @@ metadata remains unknown. `x-gameText` protection and encryption origin are sepa
 
 The `tags` kind counts raw Tag definition rows only. TagDatabase Records are dependencies. Root
 and path projection rows do not inflate selected Tag counts. Entity declaration diagnostics belong
-to their actual owning selected Entity kind. Canonical read failures, exact source-field issues,
-ambiguous targets and convenience projection failures use the shared export-health pipeline.
+to their actual owning selected Entity kind. Unclassified Records with unreadable type metadata
+prevent a clean family-selection result; they remain separate from known Tag payload failures.
+Canonical read failures, exact source-field issues
+and ambiguous targets use the shared export-health pipeline.
 
-Existing tree budgets remain unchanged: 64 levels, 256 bytes per name, 1024 bytes per path,
-64 MiB of cumulative path text, and the existing UInt32 node-index limit. A cut retains readable
-raw definitions and arrays, reports a failed derived operation and a specific `tag_path_*_limit`
-or `tag_path_ancestor_discarded` diagnostic. Relation diagnostics distinguish dangling, repeated
-and malformed edges; physical duplicate GUIDs have a separate diagnostic. Unlisted selection is
-visible on each path. A cycle cut never removes the original closing Reference.
+The selected tree retains every readable winning Tag at its actual depth and preserves its full
+name and joined path. The SDK stores local names and parent indices and expands contiguous text
+on demand. Catalog rows store each selected node's local contributions and build one flat
+contributor set as that row is written. The output still carries the full path and sorted
+contribution references, so a chain's total JSON can grow quadratically with depth.
+
+Relation diagnostics distinguish dangling, repeated and malformed edges. Physical duplicate
+GUIDs have a separate diagnostic. Unlisted selection is visible on each path. A cycle cut
+retains the original closing Reference.
 
 Cancellation is checked by the observed callback and during new authored-array projection, in
 addition to the existing TagTree/field-inspection polling. Cancellation propagates the typed stop
@@ -117,7 +123,7 @@ of the last complete output; CLI and GUI prepare and write the same typed v3 res
 Synthetic definitions cover same-name tags, repeated and multiple roots/parents, cycles, dangling
 and wrong-family references, malformed/null slots, duplicate physical GUIDs, unlisted roots,
 source states, exact chosen occurrence provenance, unknown/encrypted DCB origins, selection scope,
-normal publication, source read failures, depth/name/path cuts and the cumulative text boundary.
+normal publication, source read failures, full depth/name/path output and the cumulative text boundary.
 Generated-schema checks require canonical tables, nested carriers and closed payload correlation.
 The minimal current-v3 schema fixture is distinct from the frozen released-v2 artifact.
 

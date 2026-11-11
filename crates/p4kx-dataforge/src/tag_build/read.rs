@@ -4,7 +4,10 @@
 use std::collections::HashSet;
 
 use crate::annotations::TAG_TYPE;
-use crate::tags::{TAG_DATABASE_TYPE, TagBuildEvent, TagRelationIssue, TagTreeIssues};
+use crate::tags::{
+    TAG_DATABASE_TYPE, TagBuildEvent, TagPathEdgeKind, TagPathIncoming, TagRelationIssue,
+    TagTreeIssues,
+};
 use crate::{DataForge, Guid, Record, RecordTree, TreeBuilder, Value, ValueError};
 
 use super::Ticker;
@@ -56,19 +59,27 @@ pub(super) fn read<'f, E>(
             references(
                 tree.field("tags"),
                 &record,
-                "tags",
+                TagPathEdgeKind::Root,
                 &mut listed,
                 issues,
+                ticker,
                 observe,
             )?;
+            if ticker.stopped() {
+                return Ok(None);
+            }
             roots.extend(listed.into_iter().map(|child| Root {
                 record,
                 target: child.target,
                 ordinal: child.ordinal,
             }));
             observe(TagBuildEvent::Projected { record: &record })?;
-        } else if let Some(tag) = tag(&record, &tree, &mut seen, issues, observe)? {
-            raws.push(tag);
+        } else {
+            let tag = tag(&record, &tree, &mut seen, issues, ticker, observe)?;
+            if ticker.stopped() {
+                return Ok(None);
+            }
+            raws.extend(tag);
         }
     }
     Ok(Some(ReadTags { raws, roots }))
@@ -83,6 +94,7 @@ fn canonical<'f, E>(
     let type_name = match record.type_name() {
         Ok(name) => name,
         Err(error) => {
+            issues.unclassified += 1;
             observe(TagBuildEvent::MetadataFailed {
                 record,
                 error: &error,
@@ -111,6 +123,7 @@ fn tag<'f, E>(
     tree: &RecordTree<'f>,
     seen: &mut HashSet<Guid>,
     issues: &mut TagTreeIssues,
+    ticker: &mut Ticker<'_>,
     observe: &mut impl for<'r> FnMut(TagBuildEvent<'r, 'f>) -> Result<(), E>,
 ) -> Result<Option<Raw<'f>>, E> {
     if !seen.insert(record.guid()) {
@@ -130,9 +143,10 @@ fn tag<'f, E>(
     references(
         tree.field("children"),
         record,
-        "children",
+        TagPathEdgeKind::Child,
         &mut children,
         issues,
+        ticker,
         observe,
     )?;
     Ok(Some(Raw {
@@ -147,9 +161,10 @@ fn tag<'f, E>(
 fn references<'f, E>(
     value: Option<&Value<'_>>,
     record: &Record<'f>,
-    field: &'static str,
+    kind: TagPathEdgeKind,
     out: &mut Vec<Child>,
     issues: &mut TagTreeIssues,
+    ticker: &mut Ticker<'_>,
     observe: &mut impl for<'r> FnMut(TagBuildEvent<'r, 'f>) -> Result<(), E>,
 ) -> Result<(), E> {
     let Some(Value::Array(items)) = value else {
@@ -157,6 +172,9 @@ fn references<'f, E>(
     };
     out.reserve(items.len());
     for (ordinal, item) in items.iter().enumerate() {
+        if ticker.stopped() {
+            return Ok(());
+        }
         let (target, reason) = match item {
             Value::Reference(reference) => {
                 out.push(Child {
@@ -173,8 +191,7 @@ fn references<'f, E>(
         };
         issues.dangling += 1;
         observe(TagBuildEvent::RelationSkipped {
-            record,
-            field,
+            incoming: TagPathIncoming::new(record, kind, ordinal),
             target,
             reason,
         })?;

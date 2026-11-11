@@ -32,8 +32,16 @@ pub(crate) fn named_rows<'catalog>(
         .ok_or("unknown catalog Kind")?;
     match kind {
         Kind::GameplayProperties => checked_table(catalog, kind, "/definitions/gameplayProperties"),
+        Kind::LootPoolFilters => checked_table(catalog, kind, "/definitions/lootPoolFilters"),
         Kind::BlueprintCategoryLists => {
             checked_table(catalog, kind, "/declarations/blueprintCategoryLists")
+        }
+        Kind::Blueprints => checked_table(catalog, kind, "/definitions/blueprints"),
+        Kind::ShopInventories => checked_table(catalog, kind, "/definitions/shopInventories"),
+        Kind::Contracts => checked_table(catalog, kind, "/projections/contracts"),
+        Kind::ContractTemplates => checked_table(catalog, kind, "/definitions/contractTemplates"),
+        Kind::MissionBrokerEntries => {
+            checked_table(catalog, kind, "/definitions/missionBrokerEntries")
         }
         Kind::BlueprintCategories => {
             checked_table(catalog, kind, "/definitions/blueprintCategories")
@@ -69,7 +77,13 @@ fn checked_table<'catalog>(
         identity(row, kind)?;
         if matches!(
             kind,
-            Kind::BlueprintCategories | Kind::BlueprintCategoryLists | Kind::GameplayProperties
+            Kind::Blueprints
+                | Kind::ContractTemplates
+                | Kind::MissionBrokerEntries
+                | Kind::BlueprintCategories
+                | Kind::BlueprintCategoryLists
+                | Kind::GameplayProperties
+                | Kind::LootPoolFilters
         ) {
             record_header(row)?;
         }
@@ -157,9 +171,15 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
     let value = row
         .get(name)
         .ok_or_else(|| format!("required {kind} field {name}"))?;
+    if kind == Kind::Contracts && name == "guid" {
+        return present(value);
+    }
     if matches!(
         kind,
-        Kind::BlueprintCategories
+        Kind::Blueprints
+            | Kind::ContractTemplates
+            | Kind::MissionBrokerEntries
+            | Kind::BlueprintCategories
             | Kind::BlueprintCategoryLists
             | Kind::GameplayProperties
             | Kind::Manufacturers
@@ -169,6 +189,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::Tags
             | Kind::QualityDistributions
             | Kind::QualityQuantizations
+            | Kind::LootPoolFilters
     ) {
         present(value)
     } else {
@@ -182,12 +203,13 @@ pub(crate) fn identity(row: &Value, kind: Kind) -> TestResult<&str> {
         Kind::Paints => "itemGuid",
         Kind::Loadouts => "entityGuid",
         Kind::Shops => "key",
+        Kind::ShopInventories => "inputRef",
         _ => "guid",
     };
     let text = field(row, kind, name)?
         .as_str()
         .ok_or("required row identity string")?;
-    if kind != Kind::Shops {
+    if !matches!(kind, Kind::Shops | Kind::ShopInventories) {
         let parsed: Guid = text.parse()?;
         if parsed.to_string() != text {
             return Err("row GUID must use canonical lowercase spelling".into());

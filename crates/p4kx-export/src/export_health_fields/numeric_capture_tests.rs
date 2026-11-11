@@ -12,7 +12,7 @@ use p4kx_testkit::{
 use serde_json::Value;
 
 use crate::export_diagnostic::ExportSourceRole;
-use crate::{CatalogError, CatalogOptions, CatalogPublicationMode, ExportDiagnosticCode, Kind};
+use crate::{CatalogError, CatalogOptions, CatalogPublicationMode, Kind};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -206,12 +206,11 @@ fn filtered_resource_bits_cannot_cover_an_unexported_commodity_dependency() -> T
         filter: Some(&filter),
         ..CatalogOptions::new(UNIX_EPOCH)
     };
+    let outcome = crate::build_catalog(&archive, &options);
     assert!(
-        matches!(
-            crate::build_catalog(&archive, &options),
-            Err(CatalogError::IncompleteExport { .. })
-        ),
-        "an unexported raw value cannot excuse the finite-only Commodity presentation"
+        matches!(&outcome, Err(CatalogError::IncompleteExport(_))),
+        "an unexported raw value cannot excuse the finite-only Commodity presentation: {:?}",
+        outcome.as_ref().map(|_| "catalog")
     );
     assert_missing_capture(&archive, options)
 }
@@ -224,12 +223,11 @@ fn a_same_guid_resource_alias_does_not_cover_the_unexported_physical_source() ->
         filter: Some(&filter),
         ..CatalogOptions::new(UNIX_EPOCH)
     };
+    let outcome = crate::build_catalog(&archive, &options);
     assert!(
-        matches!(
-            crate::build_catalog(&archive, &options),
-            Err(CatalogError::IncompleteExport { .. })
-        ),
-        "a nominal GUID alias does not prove the physical source's raw value was emitted"
+        matches!(&outcome, Err(CatalogError::IncompleteExport(_))),
+        "a nominal GUID alias does not prove the physical source's raw value was emitted: {:?}",
+        outcome.as_ref().map(|_| "catalog")
     );
     assert_missing_capture(&archive, options)
 }
@@ -262,101 +260,94 @@ fn assert_missing_capture(archive: &Archive, mut options: CatalogOptions<'_>) ->
         density.get("value").is_some_and(Value::is_null),
         "the unrepresentable derived density has an explicit nullable value"
     );
-    assert!(
-        catalog["exportHealth"]["diagnostics"]
+    assert_diagnostic_field(&catalog, "densityType.densityUnit.gramsPerCubicCentimeter")?;
+    Ok(())
+}
+
+fn assert_diagnostic_field(catalog: &Value, expected: &str) -> TestResult {
+    let diagnostics = catalog["exportHealth"]["diagnostics"]
+        .as_array()
+        .ok_or("required original numeric diagnostics")?;
+    let mut found = false;
+    for diagnostic in diagnostics {
+        if diagnostic["code"] != "unsupportedValue" || diagnostic["stage"] != "projection" {
+            continue;
+        }
+        for example in diagnostic["examples"]
             .as_array()
-            .ok_or("diagnostics missing")?
-            .iter()
-            .any(|diagnostic| diagnostic["code"] == "unsupportedValue"
-                && diagnostic["stage"] == "projection"
-                && diagnostic["examples"]
-                    .as_array()
-                    .is_some_and(|examples| examples.iter().any(|example| example["field"]
-                        == "densityType.densityUnit.gramsPerCubicCentimeter"))),
-        "the exact nonfinite source field remains an explicit blocking failure"
+            .ok_or("numeric diagnostic examples")?
+        {
+            found |= diagnostic_field(catalog, example)? == Some(expected);
+        }
+    }
+    assert!(
+        found,
+        "the exact nonfinite source field remains an explicit blocking failure: {expected}"
     );
     Ok(())
 }
 
-#[test]
-fn unsupported_numeric_storage_keeps_the_finite_projection_failure() -> TestResult {
-    let fields = [
-        (
-            TestStruct::new("GramsPerCubicCentimeter")
-                .field("gramsPerCubicCentimeter", TestType::Double),
-            TestValue::Double(f64::NAN),
-        ),
-        (
-            TestStruct::new("GramsPerCubicCentimeter")
-                .array("gramsPerCubicCentimeter", TestType::Single),
-            TestValue::Array(vec![TestValue::Single(f32::NAN)]),
-        ),
-        (
-            TestStruct::new("FixtureMolarMass").field("molarMass", TestType::Single),
-            TestValue::Single(f32::NAN),
-        ),
-    ];
-    for (index, (owner, value)) in fields.into_iter().enumerate() {
-        let (name, field) = if index == 2 {
-            ("FixtureMolarMass", "molarMass")
-        } else {
-            ("GramsPerCubicCentimeter", "gramsPerCubicCentimeter")
-        };
-        let bytes = unsupported_storage_database(owner, name, field, value);
-        let forge = DataForge::open(&bytes)?;
-        let record = forge.records().next().ok_or("resource missing")?;
-        let mut trees = TreeBuilder::new();
-        let tree = trees.build(&record)?;
-        let mut ledger = crate::export_field_walk::inspect(
-            &tree,
-            &record,
-            Some(Kind::ResourceTypes),
-            ExportSourceRole::Selected,
-            None,
-        )?;
-        let proof = ledger
-            .field_inspections
-            .pop()
-            .ok_or("field proof missing")?;
+fn diagnostic_field<'catalog>(
+    catalog: &'catalog Value,
+    example: &Value,
+) -> Result<Option<&'catalog str>, Box<dyn Error>> {
+    let cell = example
+        .get("field")
+        .ok_or("original diagnostic field cell")?;
+    if cell["state"] == "absent" {
         assert!(
-            proof.number_requirements.is_empty(),
-            "unsupported numeric shape {index} is never a candidate"
+            cell["value"].is_null(),
+            "absent fields retain explicit null"
         );
-        assert!(
-            proof
-                .diagnostics
-                .iter()
-                .any(|note| note.code == ExportDiagnosticCode::UnsupportedValue),
-            "unsupported numeric shape {index} keeps its blocking diagnostic"
-        );
+        return Ok(None);
     }
-    Ok(())
+    assert_eq!(
+        cell["state"], "present",
+        "the retained original field is readable"
+    );
+    assert_eq!(
+        cell["sourceSetComplete"], true,
+        "this field owns complete immediate provenance"
+    );
+    assert_eq!(
+        cell["containsEncryptedSource"], false,
+        "the actual original fixture field is plain"
+    );
+    assert!(
+        cell["sourceUsesRefs"]
+            .as_array()
+            .is_some_and(|uses| !uses.is_empty()),
+        "the occurrence keeps its own source uses independently of the shared text atom"
+    );
+    let reference = cell["value"]
+        .as_object()
+        .ok_or("actual field text reference")?;
+    assert_eq!(
+        reference.len(),
+        1,
+        "only the structural atom index is stored in the reference"
+    );
+    let raw = reference
+        .get("atomIndex")
+        .and_then(Value::as_str)
+        .ok_or("decimal text atom index")?;
+    let index: usize = raw.parse()?;
+    assert_eq!(
+        index.to_string(),
+        raw,
+        "the atom index is canonical decimal"
+    );
+    let atom = catalog
+        .pointer("/exportHealth/metadata/texts")
+        .and_then(Value::as_array)
+        .and_then(|texts| texts.get(index))
+        .ok_or("same-report retained text atom")?;
+    assert_eq!(atom["state"], "present", "the referenced field text exists");
+    Ok(Some(
+        atom["value"]
+            .as_str()
+            .ok_or("retained original field text")?,
+    ))
 }
-
-fn unsupported_storage_database(
-    owner: TestStruct,
-    name: &str,
-    field: &str,
-    value: TestValue,
-) -> Vec<u8> {
-    DataForgeBuilder::new()
-        .version(8)
-        .structure(
-            TestStruct::new("ResourceType")
-                .field("densityType", TestType::StrongPointer(name.to_owned())),
-        )
-        .structure(owner)
-        .record(
-            TestRecord::new(
-                1,
-                "ResourceType",
-                "ResourceType.Fixture",
-                "libs/foundry/records/resourcetypedatabase/fixture.xml",
-            )
-            .value(
-                "densityType",
-                TestValue::Struct(TestInstance::new(name).value(field, value)),
-            ),
-        )
-        .build()
-}
+#[path = "unsupported_numeric_storage_tests.rs"]
+mod unsupported_storage;

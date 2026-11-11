@@ -4,25 +4,30 @@
 use std::collections::BTreeMap;
 
 use crate::export_diagnostic::{
-    ExportDiagnostic, ExportDiagnosticCode, ExportDiagnosticExample, ExportDiagnosticSeverity,
-    ExportDiagnosticStage, ExportDiagnosticUnit, FailedExportRecord,
+    ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
 };
-use crate::export_ledger::DerivedFailure;
+use crate::export_ledger::{DerivedFailure, ExportAccountingError};
+use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
+use crate::health_failed_observation::FailedRecordObservation as FailedExportRecord;
 
-/// Retains one diagnostic for each distinct failed secondary operation.
+/// Retains distinct failed operations and merges their already paired original subjects.
 pub(crate) fn failures(
     failures: Vec<DerivedFailure>,
-) -> (Vec<FailedExportRecord>, Vec<ExportDiagnostic>) {
-    let mut distinct = BTreeMap::new();
+) -> Result<(Vec<FailedExportRecord>, Vec<ExportDiagnostic>), ExportAccountingError> {
+    let mut distinct = BTreeMap::<_, DerivedFailure>::new();
     for failure in failures {
-        distinct
-            .entry((
-                failure.affected_kind.index(),
-                failure.record_index,
-                failure.output_kind.index(),
-                failure.role,
-            ))
-            .or_insert(failure);
+        failure.check()?;
+        let key = (
+            failure.affected_kind.index(),
+            failure.record_index,
+            failure.output_kind.index(),
+            failure.role,
+        );
+        if let Some(retained) = distinct.get_mut(&key) {
+            retained.merge(failure)?;
+        } else {
+            distinct.insert(key, failure);
+        }
     }
     let mut records = Vec::new();
     let mut diagnostics = Vec::new();
@@ -31,15 +36,13 @@ pub(crate) fn failures(
             .diagnosis
             .code
             .unwrap_or(ExportDiagnosticCode::DerivedProjectionFailure);
-        records.push(FailedExportRecord {
-            kind: Some(failure.affected_kind),
-            record_index: failure.record_index,
-            guid: failure.guid.to_string(),
-            record_path: failure.record_path.clone(),
-            role: failure.role,
-            stage: ExportDiagnosticStage::DerivedProjection,
+        records.push(FailedExportRecord::new(
+            Some(failure.affected_kind),
+            failure.subject().clone(),
+            failure.role,
+            ExportDiagnosticStage::DerivedProjection,
             code,
-        });
+        )?);
         diagnostics.push(ExportDiagnostic {
             kind: Some(failure.affected_kind),
             stage: ExportDiagnosticStage::DerivedProjection,
@@ -49,15 +52,8 @@ pub(crate) fn failures(
             warning_code: None,
             count: 1,
             count_unit: ExportDiagnosticUnit::Projections,
-            examples: vec![ExportDiagnosticExample {
-                record_index: Some(failure.record_index),
-                record_guid: Some(failure.guid.to_string()),
-                record_path: failure.record_path,
-                field: failure.diagnosis.field,
-                source_type: failure.diagnosis.source_type,
-                target_guid: failure.diagnosis.target_guid.map(|guid| guid.to_string()),
-            }],
+            examples: vec![failure.diagnosis.example(failure.subject().clone())?],
         });
     }
-    (records, diagnostics)
+    Ok((records, diagnostics))
 }

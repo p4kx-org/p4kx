@@ -141,6 +141,21 @@ contracts are independent. [Media export](../media-export.md#build-declaration-o
 and [shared observations](../source-contributions.md#build-manifest-observations)
 define the concrete carrier and runtime API.
 
+## Catalog Health Record subjects
+
+Failed Record index, GUID, filename and technical type, plus diagnostic Record subject index,
+GUID and filename, retain immediate source cells from the original admitted Record before a tree
+failure. Private header receipts defer Payload contribution registration until a datum is retained.
+Merge and finish validate the actual inventory and bound physical input independently of equal
+header descriptors. Accounting observations never mint an original binding.
+
+The owning Health report seals one exact-text store for human failures and Record subjects.
+Report-local text indices are structural links; private paired text handles provide infallible
+borrowed views without arbitrary pool/cell mixing. The direct semantic occurrence controls
+per-field filtering. A shared atom's aggregate marker does not transfer an encrypted occurrence's
+membership to a plain occurrence with the same spelling. Public context-bound row collections are
+borrowed; whole-report clones preserve their immutable context.
+
 ## Proof required
 
 A synthetic Basetool consumer, another structured tool output and a field-addressed companion each prove immediate plain/encrypted/unknown fields in one row without global/row/provenanceRef recomputation. Synthetic cases cover v1/v2 recognized/missing/short/invalid-length/unknown/conflicting declarations,

@@ -4,6 +4,7 @@
 use std::ops::Range;
 
 use crate::bank_parse::{self, MediaRange, SectionRange};
+use crate::media_class;
 use crate::{AudioError, BankError, BankWarning, HircObject, MediaClass, SectionId, Wem};
 
 /// The fields of the `BKHD` section this reader decodes.
@@ -16,6 +17,14 @@ pub struct BankHeader {
     /// The language ID: an enum value up to bank version 122, from version 123 on the FNV hash of
     /// the language name.
     pub language_id: u32,
+}
+
+impl BankHeader {
+    /// Returns whether the decoded bank reader supports this header's version.
+    #[must_use]
+    pub const fn is_supported_version(self) -> bool {
+        bank_parse::supported_version(self.version)
+    }
 }
 
 /// One section of a soundbank with its raw body.
@@ -63,20 +72,14 @@ impl<'a> EmbeddedWem<'a> {
     /// Returns the length the RIFF or RIFX header declares for the whole WEM, if there is one.
     #[must_use]
     pub fn declared_len(&self) -> Option<u64> {
-        let size = match self.bytes.first_chunk::<8>()? {
-            [b'R', b'I', b'F', b'F', size @ ..] => u32::from_le_bytes(*size),
-            [b'R', b'I', b'F', b'X', size @ ..] => u32::from_be_bytes(*size),
-            _ => return None,
-        };
-        Some(u64::from(size) + 8)
+        media_class::declared_len(self.bytes)
     }
 
     /// Returns whether the bank holds only the prefetched start of a streamed WEM, whose whole
     /// file is a loose WEM named by the same ID.
     #[must_use]
     pub fn is_prefetch(&self) -> bool {
-        self.declared_len()
-            .is_some_and(|len| len > self.bytes.len() as u64)
+        media_class::is_prefetch(self.declared_len(), self.bytes.len() as u64)
     }
 
     /// Parses the WEM like a loose one, borrowing the bank's bytes.

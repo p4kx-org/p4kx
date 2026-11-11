@@ -59,7 +59,7 @@ fn read(files: Reply, vehicle: bool) -> Result<ExportLedger, Box<dyn std::error:
         },
         &capture,
     )
-    .map_err(|failure| failure.reason)?;
+    .map_err(|failure| failure.reason().to_owned())?;
     assert!(
         row.is_some(),
         "the partial source representation remains retained"

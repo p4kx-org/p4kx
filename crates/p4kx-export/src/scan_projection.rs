@@ -5,26 +5,34 @@ use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
 use super::Scan;
 use crate::commodity_resource::{self, CommodityResource};
-use crate::export_diagnostic::ExportSourceRole;
-use crate::export_ledger::ExportLedger;
+use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
+use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDiagnosis};
 use crate::harvest_config::multi_config;
 use crate::harvest_preset::provider_preset;
+use crate::loot_kinds::LootPick;
 use crate::mining::mineable_entity;
 use crate::picked::Picked;
+use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
+use crate::source_fields::FieldError;
 use crate::starmap::starmap_object;
 use crate::{CatalogError, Kind, item_stats, item_variant};
+
+struct ResourceRead<'source> {
+    record: Record<'source>,
+    tree: RecordTree<'source>,
+}
 
 impl<'f> Scan<'_, '_, 'f> {
     pub(super) fn project(
         &self,
         kind: Kind,
         trees: &mut TreeBuilder<'f>,
-        record: &Record<'f>,
+        admission: &RecordObservation<'_, 'f>,
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
-        if let Some(picked) = self.definition_kind(kind, tree, ledger)? {
+        if let Some(picked) = self.definition_kind(kind, admission, tree, ledger)? {
             return Ok(Some(picked));
         }
         if let Some(picked) = self.harvestable(kind, trees, tree) {
@@ -46,10 +54,13 @@ impl<'f> Scan<'_, '_, 'f> {
             return Ok(Some(Picked::Starmap(object)));
         }
         if kind == Kind::Ships {
-            return Ok(Some(self.ship(record, tree, ledger)?.crafted(tree)));
+            return Ok(Some(self.ship(admission, tree, ledger)?.crafted(tree)));
         }
         if kind == Kind::Commodities {
-            return Ok(Some(self.commodity(trees, tree, ledger)?.crafted(tree)));
+            return Ok(Some(
+                self.commodity(trees, admission, tree, ledger)?
+                    .crafted(tree),
+            ));
         }
         let mut picked = Picked::entity(kind, tree, self.texts);
         if let Some(Picked::Item(item, _, _)) = &mut picked {
@@ -62,24 +73,65 @@ impl<'f> Scan<'_, '_, 'f> {
     fn definition_kind(
         &self,
         kind: Kind,
+        admission: &RecordObservation<'_, 'f>,
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
-        let (picked, notes) = match kind {
+        let Some((picked, notes)) = self.read_definition(kind, admission, tree)? else {
+            return Ok(None);
+        };
+        crate::source_projection_notes::record(
+            kind,
+            ExportSourceRole::Selected,
+            admission,
+            tree,
+            notes,
+            ledger,
+        )?;
+        Ok(Some(picked))
+    }
+
+    fn read_definition(
+        &self,
+        kind: Kind,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<Option<(Picked<'f>, Vec<FieldError>)>, ScanError> {
+        let projection = match kind {
+            Kind::LootPoolFilters => {
+                let value = crate::catalog_v3::loot_filter_catalog::read(
+                    admission.record(),
+                    tree,
+                    self.projection,
+                    self.options.cancel,
+                )?;
+                (Picked::Loot(LootPick::Filter(Box::new(value))), Vec::new())
+            }
             Kind::BlueprintCategoryLists => {
                 let read = crate::catalog_v3::blueprint_category_list_read::read(
                     tree,
                     self.projection,
+                    admission,
                     self.options.cancel,
                 )?;
                 (Picked::BlueprintCategoryList(read.value), read.notes)
             }
             Kind::BlueprintCategories => {
-                let read = crate::blueprint_category::read(tree, self.projection)?;
+                let read = crate::blueprint_category::read(
+                    tree,
+                    self.projection,
+                    admission,
+                    self.options.cancel,
+                )?;
                 (Picked::BlueprintCategory(read.value), read.notes)
             }
             Kind::Manufacturers => {
-                let read = crate::manufacturer::read(tree, self.projection)?;
+                let read = crate::manufacturer::read(
+                    tree,
+                    self.projection,
+                    admission,
+                    self.options.cancel,
+                )?;
                 (Picked::Manufacturer(Box::new(read.value)), read.notes)
             }
             Kind::ResourceTypes => {
@@ -87,39 +139,49 @@ impl<'f> Scan<'_, '_, 'f> {
                     tree,
                     self.projection,
                     self.groups.all_of_resource(&tree.guid()),
+                    admission,
+                    self.options.cancel,
                 )?;
                 (Picked::ResourceType(Box::new(read.value)), read.notes)
             }
-            Kind::ResourceGroups => {
-                let read = crate::resource_group_read::read(
-                    tree,
-                    self.projection,
-                    self.groups
-                        .parent_choice(&tree.guid(), self.options.cancel)?,
-                )?;
-                (Picked::ResourceGroup(read.value), read.notes)
-            }
+            Kind::ResourceGroups => self.resource_group(admission, tree)?,
             _ => return Ok(None),
         };
-        crate::source_projection_notes::record(
-            kind,
-            ExportSourceRole::Selected,
+        Ok(Some(projection))
+    }
+
+    fn resource_group(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let parent = self
+            .groups
+            .parent_choice(&tree.guid(), self.options.cancel)?;
+        let read = crate::resource_group_read::read(
             tree,
-            notes,
-            ledger,
-        );
-        Ok(Some(picked))
+            self.projection,
+            parent,
+            admission,
+            self.options.cancel,
+        )?;
+        Ok((Picked::ResourceGroup(read.value), read.notes))
     }
 
     fn ship(
         &self,
-        record: &Record<'f>,
+        admission: &RecordObservation<'_, 'f>,
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Picked<'f>, CatalogError> {
-        let read = self
-            .ships
-            .read_catalog(record, tree, ledger, self.options.cancel)?;
+        let record = admission.record();
+        let read = self.ships.read_catalog(
+            record,
+            tree,
+            ledger,
+            self.projection.original(),
+            self.options.cancel,
+        )?;
         ledger.merge(read.ledger);
         let mut picked = Picked::of_ship(read.read, |read| {
             crate::ship::ship(tree, self.texts, &self.evidence, read)
@@ -158,6 +220,7 @@ impl<'f> Scan<'_, '_, 'f> {
     fn commodity(
         &self,
         trees: &mut TreeBuilder<'f>,
+        admission: &RecordObservation<'_, 'f>,
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Picked<'f>, ScanError> {
@@ -165,41 +228,44 @@ impl<'f> Scan<'_, '_, 'f> {
         let resource_type = selected
             .link
             .as_ref()
-            .map(|link| self.resource_type(trees, tree, link, ledger))
+            .map(|link| self.resource_type(trees, admission, tree, link, ledger))
             .transpose()?
             .flatten();
         let read = crate::commodity::commodity(
             tree,
             self.projection,
-            resource_type.as_ref(),
+            resource_type.as_ref().map(|resource| &resource.tree),
             &self.groups,
             &selected,
         )?;
         crate::source_projection_notes::record(
             Kind::Commodities,
             ExportSourceRole::Selected,
+            admission,
             tree,
             read.notes,
             ledger,
-        );
+        )?;
         if let Some(resource) = &resource_type {
             crate::source_projection_notes::record(
                 Kind::Commodities,
                 ExportSourceRole::Dependency,
-                resource,
+                &RecordObservation::capture(self.projection.original(), &resource.record)?,
+                &resource.tree,
                 read.resource_notes,
                 ledger,
-            );
+            )?;
         }
         Ok(Picked::Commodity(Box::new(read.value)))
     }
     fn resource_type(
         &self,
         trees: &mut TreeBuilder<'f>,
-        commodity: &RecordTree<'f>,
-        link: &CommodityResource,
+        commodity: &RecordObservation<'_, 'f>,
+        commodity_tree: &RecordTree<'f>,
+        link: &CommodityResource<'_, 'f>,
         ledger: &mut ExportLedger,
-    ) -> Result<Option<RecordTree<'f>>, ScanError> {
+    ) -> Result<Option<ResourceRead<'f>>, ScanError> {
         if link.reference.target_type.as_deref() != Some("ResourceType") {
             return Ok(None);
         }
@@ -210,25 +276,34 @@ impl<'f> Scan<'_, '_, 'f> {
             crate::ExportAccountingError::MissingPhysicalReferenceTarget { index },
         ))?;
         match trees.build(&record) {
-            Ok(tree) => Ok(Some(tree)),
+            Ok(tree) => {
+                self.projection.original().record_scope(&record, &tree)?;
+                Ok(Some(ResourceRead { record, tree }))
+            }
             Err(error) => {
                 let failure = crate::export_source_failure::diagnosis(&error);
-                ledger.derived_failure(crate::export_ledger::DerivedFailure {
-                    affected_kind: Kind::Commodities,
-                    output_kind: Kind::Commodities,
-                    record_index: commodity.record_index(),
-                    role: ExportSourceRole::Selected,
-                    guid: commodity.guid(),
-                    record_path: Some(commodity.record_path().to_owned()),
-                    diagnosis: crate::export_ledger::SourceDiagnosis {
-                        code: failure
-                            .code
-                            .or(Some(crate::ExportDiagnosticCode::SourceReadFailure)),
-                        field: Some(link.field.clone()),
-                        source_type: Some(link.source_type.clone()),
-                        target_guid: Some(link.reference.guid.0),
-                    },
-                });
+                let body = link.failure_body(
+                    self.projection.original(),
+                    commodity,
+                    commodity_tree,
+                    self.options.cancel,
+                )?;
+                let diagnosis = SourceDiagnosis::from_body(
+                    failure
+                        .code
+                        .unwrap_or(ExportDiagnosticCode::SourceReadFailure),
+                    body,
+                )?;
+                ledger.derived_failure(
+                    DerivedFailure::of_subject(
+                        commodity.subject().clone(),
+                        Kind::Commodities,
+                        Kind::Commodities,
+                        ExportSourceRole::Selected,
+                        diagnosis,
+                    )
+                    .map_err(CatalogError::from)?,
+                );
                 Ok(None)
             }
         }

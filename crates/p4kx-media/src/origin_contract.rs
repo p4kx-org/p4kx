@@ -68,6 +68,10 @@ pub enum OriginProfile {
     ShaderSourceLimit,
     /// Reader configuration refusal before source-content inspection.
     ShaderConfigurationFailure,
+    /// Original loose WEM summary, chunk, opaque class or parser diagnosis.
+    AudioWem,
+    /// Original soundbank section, media and object observations.
+    AudioBank,
     /// Successfully parsed material library and its actually used companions.
     MaterialLibrary,
     /// Material parser failure after actual source-content inspection.

@@ -5,32 +5,28 @@ use std::cell::RefCell;
 
 use p4kx_extraction::{StructValue, Value};
 
-use crate::blueprint::as_struct;
 use crate::broker_terms::mission_reward;
-use crate::contract_template::TemplateProperty;
 use crate::mission_hauling::value_requirements;
-use crate::mission_layers::{items, one};
+use crate::mission_layers::one;
 use crate::mission_property_fields as source_fields;
 use crate::mission_property_set::MissionPropertyDeclaration;
 use crate::mission_property_value_read;
-use crate::npc_spawn_read::ai_name;
-use crate::record_fields::{boolean, integer, reference, structs, text};
+use crate::record_fields::{boolean, integer, reference};
 use crate::record_read::ReadError;
+use crate::source_fields::{FieldCapture, unknown_struct};
 use crate::spawn_pools::{Registered, SpawnPools, Target};
 use crate::spawn_read::Reader;
-use crate::template_issues::{TemplateError, Unknowns};
-use crate::template_property::{LinkedOutput, ObjectiveProperty, PropertyKind, PropertyValue};
+use crate::template_property::PropertyValue;
+use crate::template_property_kind::PropertyValueKind;
 use crate::texts::Texts;
+use crate::{CatalogError, ExportAccountingError};
 
 const VALUE_PREFIX: &str = "MissionPropertyValue_";
 
-/// What the properties of the objectives of one Record are read with: its tags and weak pointers,
-/// the texts, the count of unknown names and the pools the spawn descriptions and location queries
-/// they state are registered in.
+/// Reads the authored Generator property-set values through their original guards.
 pub(crate) struct PropertyReader<'r, 'x, 'f> {
     reader: &'r Reader<'x, 'f>,
     texts: &'r Texts<'f>,
-    unknowns: &'r Unknowns,
     pools: &'r RefCell<SpawnPools<'f>>,
 }
 
@@ -45,13 +41,11 @@ impl<'r, 'x, 'f> PropertyReader<'r, 'x, 'f> {
     pub(crate) const fn new(
         reader: &'r Reader<'x, 'f>,
         texts: &'r Texts<'f>,
-        unknowns: &'r Unknowns,
         pools: &'r RefCell<SpawnPools<'f>>,
     ) -> Self {
         Self {
             reader,
             texts,
-            unknowns,
             pools,
         }
     }
@@ -65,18 +59,26 @@ impl<'f> PropertyReader<'_, '_, 'f> {
     /// Returns a source-field or strict value error instead of dropping a declaration.
     pub(crate) fn source_properties(
         &self,
+        parent: &StructValue<'f>,
         values: &[Value<'f>],
     ) -> Result<Vec<Option<MissionPropertyDeclaration<'f>>>, ReadError> {
+        let capture = self
+            .reader
+            .capture()
+            .ok_or_else(|| CatalogError::from(ExportAccountingError::ConflictingSourceDatum))?;
+        capture.check_parent(parent)?;
         values
             .iter()
             .map(|value| {
-                let Some(property) = source_fields::structure(value, "propertyOverrides[]")? else {
+                let Some(property) =
+                    source_fields::structure(parent, value, "propertyOverrides[]", capture)?
+                else {
                     return Ok(None);
                 };
-                let value = source_fields::parameter(property, "value")?;
+                let value = source_fields::parameter(property, "value", capture)?;
                 Ok(Some(MissionPropertyDeclaration {
-                    variable: source_fields::text(property, "missionVariableName")?,
-                    token: source_fields::text(property, "extendedTextToken")?,
+                    variable: source_fields::text(property, "missionVariableName", capture)?,
+                    token: source_fields::text(property, "extendedTextToken", capture)?,
                     value_type: value.map(|value| value_type(value).to_owned()),
                     value: value.map(|value| self.value(value)).transpose()?,
                 }))
@@ -84,122 +86,53 @@ impl<'f> PropertyReader<'_, '_, 'f> {
             .collect()
     }
 
-    /// Reads the mission properties the array field `field` of `root` holds (the
-    /// `contractProperties` of a template, the `properties` of a broker entry): the variable, the
-    /// token and the value of each.
-    ///
-    /// # Errors
-    ///
-    /// Returns the errors of [`Self::properties`].
-    pub(crate) fn mission_properties(
-        &self,
-        root: Option<&StructValue<'f>>,
-        field: &str,
-    ) -> Result<Vec<TemplateProperty<'f>>, ReadError> {
-        let owned = |property: &StructValue<'f>, name: &str| {
-            text(Some(property), name)
-                .filter(|value| !value.is_empty())
-                .map(str::to_owned)
-        };
-        structs(root, field)
-            .map(|property| {
-                let value = one(Some(property), "value");
-                Ok(TemplateProperty {
-                    variable: owned(property, "missionVariableName"),
-                    token: owned(property, "extendedTextToken"),
-                    value_type: value.map(|value| value_type(value).to_owned()),
-                    value: value.map(|value| self.value(value)).transpose()?,
-                })
-            })
-            .collect()
-    }
-
-    /// Reads the `properties` of an objective token.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TemplateError::UnknownStruct`] for a value of a struct the catalog does not know
-    /// and the error of the serialisation that makes the identifier of a description.
-    pub(crate) fn properties(
-        &self,
-        token: &StructValue<'f>,
-    ) -> Result<Vec<ObjectiveProperty<'f>>, ReadError> {
-        items(Some(token), "properties")
-            .iter()
-            .filter_map(as_struct)
-            .map(|property| self.property(property))
-            .collect()
-    }
-
-    fn property(&self, property: &StructValue<'f>) -> Result<ObjectiveProperty<'f>, ReadError> {
-        let parent = Some(property);
-        let embedded = one(parent, "property");
-        let named = embedded.or(parent);
-        let owned = |name: &str| text(named, name).map(str::to_owned);
-        let value = one(embedded, "value")
-            .map(|value| self.value(value))
-            .transpose()?;
-        Ok(ObjectiveProperty {
-            kind: self.unknowns.parse(
-                "objective property",
-                Some(property.type_name()),
-                PropertyKind::parse,
-            ),
-            variable: owned("missionVariableName"),
-            token: owned("extendedTextToken"),
-            contract_property: self.reader.property_variable(parent, "property"),
-            value,
-            linked_output: self.reader.output_link(parent, "linkedOutput").map(
-                |(objective_id, variable)| LinkedOutput {
-                    objective_id,
-                    variable,
-                },
-            ),
-        })
-    }
-
     fn value(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, ReadError> {
-        if let Some(value) = mission_property_value_read::read(self.reader, value, self.texts)? {
+        let capture = self.reader.capture();
+        if let Some(value) =
+            mission_property_value_read::read(self.reader, value, self.texts, capture)?
+        {
             return Ok(value);
         }
         let parent = Some(value);
-        Ok(match value_type(value) {
-            "ScopedLocation" => PropertyValue::ScopedLocation(Box::new(
-                crate::scoped_location_read::read(self.reader, value)?,
+        Ok(match PropertyValueKind::read(value.type_name()) {
+            Some(PropertyValueKind::ScopedLocation) => PropertyValue::ScopedLocation(Box::new(
+                crate::scoped_location_read::read(self.reader, value, capture)?,
             )),
-            "Object" => PropertyValue::Object,
-            "DeliveryOrder" => PropertyValue::DeliveryOrder,
-            "Boolean" => PropertyValue::Boolean {
+            Some(PropertyValueKind::Object) => PropertyValue::Object,
+            Some(PropertyValueKind::DeliveryOrder) => PropertyValue::DeliveryOrder,
+            Some(PropertyValueKind::Boolean) => PropertyValue::Boolean {
                 value: boolean(parent, "value"),
             },
-            "Organization" => PropertyValue::Organization {
+            Some(PropertyValueKind::Organization) => PropertyValue::Organization {
                 conditions: self.reader.conditions(parent, "organization condition")?,
                 forced_organization_guid: reference(parent, "debugForceChosenOrganization"),
             },
-            "MissionItem" => PropertyValue::MissionItem {
+            Some(PropertyValueKind::MissionItem) => PropertyValue::MissionItem {
                 conditions: self.reader.conditions(parent, "item condition")?,
                 forced_item_guid: reference(parent, "debugForceChosenItem"),
                 min_items_to_find: integer(parent, "minItemsToFind"),
                 max_items_to_find: integer(parent, "maxItemsToFind"),
             },
-            "AIName" => {
-                let mut name = ai_name(value);
+            Some(PropertyValueKind::AiName) => {
+                let mut name = self.reader.ai_name(value)?;
                 name.resolve(self.texts);
                 PropertyValue::AiName(name)
             }
-            "CombinedDataSetEntries" => PropertyValue::CombinedDataSetEntries {
-                entry_properties: self
-                    .reader
-                    .property_variables(parent, "dataSetEntryProperties"),
-            },
-            "HaulingOrders" => PropertyValue::HaulingOrders {
+            Some(PropertyValueKind::CombinedDataSetEntries) => {
+                PropertyValue::CombinedDataSetEntries {
+                    entry_properties: self
+                        .reader
+                        .property_variables(parent, "dataSetEntryProperties"),
+                }
+            }
+            Some(PropertyValueKind::HaulingOrders) => PropertyValue::HaulingOrders {
                 requirements: value_requirements(value),
             },
-            "Reward" => PropertyValue::Reward {
+            Some(PropertyValueKind::Reward) => PropertyValue::Reward {
                 reward: one(parent, "rewardDef").map(mission_reward),
             },
-            "StarMapLocation" => PropertyValue::StarMapLocation,
-            _ => return self.spawn(value),
+            Some(PropertyValueKind::StarMapLocation) => PropertyValue::StarMapLocation,
+            _ => return self.spawn(value, capture),
         })
     }
 
@@ -207,10 +140,14 @@ impl<'f> PropertyReader<'_, '_, 'f> {
     ///
     /// # Errors
     ///
-    /// Returns [`TemplateError::UnknownStruct`] for a value of any other struct.
-    fn spawn(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, ReadError> {
+    /// Returns a source or unsupported-value error for an unrepresentable spawn value.
+    fn spawn(
+        &self,
+        value: &StructValue<'f>,
+        capture: Option<&dyn FieldCapture<'f>>,
+    ) -> Result<PropertyValue<'f>, ReadError> {
         let Some(spawn) = self.reader.spawn(value)? else {
-            return Err(TemplateError::unknown("property value", value).into());
+            return Err(unknown_struct(value, "property value", capture));
         };
         let Registered { target, empty } = self.pools.borrow_mut().register(spawn);
         let pool_guid = |guid| (!empty).then_some(guid);

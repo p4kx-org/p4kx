@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_cryxml::Xml;
-
 use crate::ValueOrigin;
 
 /// The deepest element nesting that is read.
@@ -22,6 +20,7 @@ pub(crate) struct Element {
 
 impl Element {
     /// Creates an element read from the base file: every attribute is [`ValueOrigin::Base`].
+    #[cfg(test)]
     pub(crate) const fn read(
         name: String,
         attributes: Vec<(String, String)>,
@@ -256,67 +255,52 @@ pub(crate) fn too_deep() -> String {
     format!("its elements are nested deeper than {MAX_ELEMENT_DEPTH}")
 }
 
-/// Reads the root element of a text XML or `CryXml` document, spending `budget`.
+/// Reads the root element within the supplied budget without source-authorship claims.
 pub(crate) fn parse(bytes: &[u8], budget: &mut Budget) -> Result<Element, String> {
-    match p4kx_cryxml::read(bytes).map_err(|error| error.to_string())? {
-        Xml::CryXml(document) => from_cry(document.root(), 0, budget),
-        Xml::Text(text) => {
-            let text = std::str::from_utf8(text).map_err(|error| error.to_string())?;
-            let text = text.trim_start_matches('\u{feff}');
-            p4kx_cryxml::check_text_depth(text).map_err(|error| error.to_string())?;
-            let document = roxmltree::Document::parse(text).map_err(|error| error.to_string())?;
-            from_text(document.root_element(), 0, budget)
-        }
-    }
+    crate::loadout_xml::parse_unbound(bytes, |root, _| from_node(root, 0, budget))
 }
 
-fn from_cry(
-    element: p4kx_cryxml::Element<'_>,
+pub(crate) fn parse_observed<T>(
+    document: &crate::loadout_file_events::Document,
+    budget: &mut Budget,
+    observation: Option<&crate::resolver_observation::Observation<'_>>,
+    project: impl FnOnce(
+        Element,
+        crate::loadout_xml::Node<'_, '_>,
+        &crate::loadout_xml::Scope<'_, '_>,
+    ) -> Result<T, String>,
+) -> Result<T, String> {
+    crate::loadout_xml::parse(document, observation, |root, scope| {
+        project(from_node(root, 0, budget)?, root, scope)
+    })
+}
+
+fn from_node(
+    node: crate::loadout_xml::Node<'_, '_>,
     depth: usize,
     budget: &mut Budget,
 ) -> Result<Element, String> {
     if depth >= MAX_ELEMENT_DEPTH {
         return Err(too_deep());
     }
-    budget.element(element.name())?;
+    budget.element(node.name())?;
     let mut attributes = Vec::new();
-    for attribute in element.attributes() {
-        budget.attribute(attribute.name(), attribute.value())?;
-        attributes.push((attribute.name().to_owned(), attribute.value().to_owned()));
-    }
-    let children = element
-        .children()
-        .map(|child| from_cry(child, depth.saturating_add(1), budget))
-        .collect::<Result<_, _>>()?;
-    Ok(Element::read(
-        element.name().to_owned(),
-        attributes,
-        children,
-    ))
-}
 
-fn from_text(
-    element: roxmltree::Node<'_, '_>,
-    depth: usize,
-    budget: &mut Budget,
-) -> Result<Element, String> {
-    if depth >= MAX_ELEMENT_DEPTH {
-        return Err(too_deep());
-    }
-    budget.element(element.tag_name().name())?;
-    let mut attributes = Vec::new();
-    for attribute in element.attributes() {
-        budget.attribute(attribute.name(), attribute.value())?;
-        attributes.push((attribute.name().to_owned(), attribute.value().to_owned()));
-    }
-    let children = element
-        .children()
-        .filter(roxmltree::Node::is_element)
-        .map(|child| from_text(child, depth.saturating_add(1), budget))
-        .collect::<Result<_, _>>()?;
-    Ok(Element::read(
-        element.tag_name().name().to_owned(),
+    node.try_for_each_attribute(|name, value| {
+        budget.attribute(name, value)?;
+
+        attributes.push((name.to_owned(), value.to_owned()));
+        Ok(())
+    })?;
+    let mut children = Vec::new();
+    node.try_for_each_child(|child| {
+        children.push(from_node(child, depth.saturating_add(1), budget)?);
+        Ok(())
+    })?;
+    Ok(Element {
+        name: node.name().to_owned(),
         attributes,
         children,
-    ))
+        origins: Vec::new(),
+    })
 }

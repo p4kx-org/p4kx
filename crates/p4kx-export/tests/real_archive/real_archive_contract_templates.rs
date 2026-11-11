@@ -13,84 +13,132 @@ use serde_json::Value;
 
 use crate::real_archive_verification::{TestResult, guids, print_line};
 
-/// Asserts that every `templateGuid` of a contract and every link of a template names an entry of
-/// its kind and that every objective names a parent among those of its template.
+#[path = "real_archive_mission_graph.rs"]
+pub(crate) mod mission_graph;
+use mission_graph::{self as graph, Family, Mission};
+
+/// Checks the canonical Template contexts, their original links and objective parents.
 pub(crate) fn check_template_links(catalog: &Value) -> TestResult {
-    let templates = guids(catalog, "contractTemplates")?;
-    for contract in catalog["contracts"].as_array().ok_or("contracts")? {
+    let templates = graph::contexts(catalog, Family::Template)?;
+    let identities = templates
+        .iter()
+        .map(|mission| graph::guid(mission.definition))
+        .collect::<Result<HashSet<_>, _>>()?;
+    for contract in crate::real_archive_contracts::v3::rows(catalog)? {
         if let Some(guid) = contract["templateGuid"].as_str() {
-            assert!(templates.contains(guid), "template {guid} of a contract");
+            assert!(identities.contains(guid), "template {guid} of a contract");
         }
     }
     let pools = guids(catalog, "contractShipSpawns")?;
     let queries = guids(catalog, "contractLocationQueries")?;
     let types = guids(catalog, "missionTypes")?;
-    for template in catalog["contractTemplates"].as_array().ok_or("templates")? {
-        let name = template["className"].as_str().unwrap_or_default();
-        if let Some(guid) = template["missionTypeGuid"].as_str() {
+    for template in &templates {
+        let name = graph::text(template.definition, "/className/value")?;
+        if let Some(selected) = template
+            .projection
+            .pointer("/inputs/displayInfo/declaration/field")
+            && let Some(info) = template.first_struct(template.field(selected)?)?
+            && let Some(value) = template.member(info, "type")?
+            && let Some(guid) = graph::reference(value)?
+        {
             assert!(types.contains(guid), "{name}: mission type {guid}");
         }
-        for link in template["shipSpawns"].as_array().ok_or("shipSpawns")? {
-            let guid = link["poolGuid"].as_str().ok_or("poolGuid")?;
-            assert!(pools.contains(guid), "{name}: ship spawn pool {guid}");
+        for link in template.pools()? {
+            match link.family {
+                "ships" => assert!(
+                    pools.contains(link.guid),
+                    "{name}: ship spawn pool {}",
+                    link.guid
+                ),
+                "location" => assert!(
+                    queries.contains(link.guid),
+                    "{name}: location query {}",
+                    link.guid
+                ),
+                _ => {}
+            }
         }
-        for link in template["locationQueries"]
-            .as_array()
-            .ok_or("locationQueries")?
+        template.parents()?;
+        objective_properties(template, name, (&pools, &queries))?;
+    }
+    Ok(())
+}
+
+fn objective_properties(
+    mission: &Mission<'_>,
+    name: &str,
+    (pools, queries): (&HashSet<&str>, &HashSet<&str>),
+) -> TestResult {
+    let objectives = graph::array(mission.projection, "objectives")?;
+    let ids = objectives
+        .iter()
+        .map(|objective| {
+            objective
+                .get("id")
+                .ok_or("original objective id declaration")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    for property in graph::array(mission.projection, "properties")?
+        .iter()
+        .filter(|property| {
+            property
+                .get("objective")
+                .is_some_and(|reference| !reference.is_null())
+        })
+    {
+        assert!(
+            property.get("kind").is_some_and(Value::is_string),
+            "{name}: a property of an unknown kind"
+        );
+        let owner = property
+            .get("objective")
+            .ok_or("the actual objective owner")?;
+        assert!(
+            objectives
+                .iter()
+                .any(|objective| objective.get("source") == Some(owner)),
+            "{name}: property belongs to its actual original objective"
+        );
+        let Some(source) = property.get("value").filter(|value| !value.is_null()) else {
+            continue;
+        };
+        if let Some((family, guid)) = mission
+            .registration(source)?
+            .map(|result| result.identifier())
+            .transpose()?
+            .flatten()
         {
-            let guid = link["queryGuid"].as_str().ok_or("queryGuid")?;
-            assert!(queries.contains(guid), "{name}: location query {guid}");
+            match family {
+                "ships" => assert!(pools.contains(guid), "{name}: ship spawn pool {guid}"),
+                "location" => assert!(queries.contains(guid), "{name}: location query {guid}"),
+                _ => {}
+            }
         }
-        let objectives = template["objectives"].as_array().ok_or("objectives")?;
-        let ids: HashSet<&str> = objectives
-            .iter()
-            .filter_map(|objective| objective["id"].as_str())
-            .collect();
-        for objective in objectives {
-            if let Some(parent) = objective["parentId"].as_str() {
-                assert!(ids.contains(parent), "{name}: objective parent {parent}");
-            }
-            for property in objective["objectiveProperties"]
-                .as_array()
-                .ok_or("properties")?
-            {
-                check_property(name, property, (&ids, &pools, &queries));
-            }
+    }
+    objective_outputs(mission, name, &ids)
+}
+
+fn objective_outputs(mission: &Mission<'_>, name: &str, ids: &[&Value]) -> TestResult {
+    for output in graph::array(mission.projection, "linkedOutputs")? {
+        if output
+            .pointer("/objective/interpretation")
+            .and_then(Value::as_str)
+            == Some("id")
+        {
+            let target = output
+                .pointer("/objective/field")
+                .ok_or("actual target id declaration")?;
+            mission.field(target)?;
+            assert!(
+                ids.contains(&target),
+                "{name}: linked output targets an actual objective id"
+            );
         }
     }
     Ok(())
 }
 
-/// Asserts that a property of an objective is of a known kind and that its links name an
-/// objective of the template or an entry of the shared kinds.
-fn check_property(
-    name: &str,
-    property: &Value,
-    (ids, pools, queries): (&HashSet<&str>, &HashSet<&str>, &HashSet<&str>),
-) {
-    assert!(
-        property["kind"].is_string(),
-        "{name}: a property of an unknown kind"
-    );
-    let linked = property.pointer("/linkedOutput/objectiveId");
-    if let Some(objective) = linked.and_then(Value::as_str) {
-        assert!(
-            ids.contains(objective),
-            "{name}: output of objective {objective}"
-        );
-    }
-    let value = &property["value"];
-    if let Some(guid) = value["poolGuid"].as_str() {
-        assert!(pools.contains(guid), "{name}: ship spawn pool {guid}");
-    }
-    if let Some(guid) = value["queryGuid"].as_str() {
-        assert!(queries.contains(guid), "{name}: location query {guid}");
-    }
-}
-
-/// Asserts that every contract-level property of a template and of a broker entry with a value
-/// struct states a value whose links name an entry of the shared kinds, and returns how many
-/// properties state each type of value.
+/// Counts original contract-level property meanings and validates their selected registration.
 fn check_contract_properties(catalog: &Value) -> Result<BTreeMap<String, usize>, String> {
     let mut pools = HashSet::new();
     for kind in [
@@ -102,23 +150,42 @@ fn check_contract_properties(catalog: &Value) -> Result<BTreeMap<String, usize>,
     }
     let queries = guids(catalog, "contractLocationQueries")?;
     let mut types = BTreeMap::new();
-    for (kind, field) in [
-        ("contractTemplates", "contractProperties"),
-        ("missionBrokerEntries", "missionProperties"),
-    ] {
-        for entry in catalog[kind].as_array().ok_or(kind)? {
-            for property in entry[field].as_array().ok_or(field)? {
-                let value = &property["value"];
-                if property["valueType"].is_null() {
+    for family in [Family::Template, Family::Broker] {
+        for mission in graph::contexts(catalog, family)? {
+            for property in graph::array(mission.projection, "properties")?
+                .iter()
+                .filter(|property| property.get("objective") == Some(&Value::Null))
+            {
+                let value = property
+                    .get("value")
+                    .ok_or("required nullable original value")?;
+                let kind = property
+                    .get("valueKind")
+                    .ok_or("required nullable property meaning")?;
+                if kind.is_null() {
                     assert!(value.is_null(), "a value without a value type");
                     continue;
                 }
-                let name = value["type"].as_str().ok_or("a value without a type")?;
-                if let Some(guid) = value["poolGuid"].as_str() {
-                    assert!(pools.contains(guid), "{kind}: spawn pool {guid}");
-                }
-                if let Some(guid) = value["queryGuid"].as_str() {
-                    assert!(queries.contains(guid), "{kind}: location query {guid}");
+                let name = kind.as_str().ok_or("a value without a type")?;
+                assert!(
+                    mission
+                        .follow(value)?
+                        .pointer("/value/value/type")
+                        .and_then(Value::as_str)
+                        == Some("struct"),
+                    "a recognized value retains its actual original Struct"
+                );
+                if let Some((family, guid)) = mission
+                    .registration(value)?
+                    .map(|result| result.identifier())
+                    .transpose()?
+                    .flatten()
+                {
+                    if family == "location" {
+                        assert!(queries.contains(guid), "location query {guid}");
+                    } else {
+                        assert!(pools.contains(guid), "spawn pool {guid}");
+                    }
                 }
                 *types.entry(name.to_owned()).or_default() += 1;
             }
@@ -136,8 +203,8 @@ fn the_contract_properties_of_a_real_archive_state_their_values() -> TestResult 
         .summary()
         .failures()
         .iter()
-        .filter(|failure| failure.reason.contains("MissionPropertyValue_"))
-        .map(|failure| failure.record_path.as_str())
+        .filter(|failure| failure.reason().contains("MissionPropertyValue_"))
+        .map(|failure| failure.record_path())
         .collect();
     assert!(failed.is_empty(), "{failed:?}");
     let catalog: Value = serde_json::from_slice(built.json())?;
@@ -166,25 +233,20 @@ fn the_contract_templates_of_a_real_archive_resolve() -> TestResult {
     let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     check_template_links(&catalog)?;
-    let templates = catalog["contractTemplates"].as_array().ok_or("templates")?;
-    let used: HashSet<&str> = catalog["contracts"]
-        .as_array()
-        .into_iter()
-        .flatten()
+    let templates = graph::contexts(&catalog, Family::Template)?;
+    let used: HashSet<&str> = crate::real_archive_contracts::v3::rows(&catalog)?
+        .iter()
         .filter_map(|contract| contract["templateGuid"].as_str())
         .collect();
-    let count = |field: &str| -> usize {
-        templates
-            .iter()
-            .map(|template| template[field].as_array().map_or(0, Vec::len))
-            .sum()
-    };
-    let (objectives, ships, queries, hauling) = (
-        count("objectives"),
-        count("shipSpawns"),
-        count("locationQueries"),
-        count("haulingOrders"),
-    );
+    let (mut objectives, mut ships, mut queries, mut hauling) = (0, 0, 0, 0);
+    for mission in &templates {
+        objectives += graph::array(mission.projection, "objectives")?.len();
+        hauling += graph::array(mission.projection, "haulingOrders")?.len();
+        for link in mission.pools()? {
+            ships += usize::from(link.family == "ships");
+            queries += usize::from(link.family == "location");
+        }
+    }
     print_line(&format!(
         "{} contract templates, {} named by a contract, {objectives} objectives, {ships} ship spawn links, {queries} location query links, {hauling} hauling orders",
         templates.len(),

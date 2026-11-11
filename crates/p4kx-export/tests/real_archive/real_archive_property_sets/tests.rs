@@ -3,130 +3,165 @@
 
 mod classification;
 mod fixture;
+mod health_wire;
 mod privacy;
+mod wire;
 
-use p4kx_export::{
-    ExportDiagnostic, ExportDiagnosticCode, ExportDiagnosticExample, ExportDiagnosticSeverity,
-    ExportDiagnosticStage, ExportDiagnosticUnit, ExportHealth, ExportHealthStatus,
-    ExportSourceRole, ExportStageStatus, FailedExportRecord, Kind,
-};
+use p4kx_export::{ExportDiagnosticCode, ExportDiagnosticStage, ExportSourceRole, Kind};
 use p4kx_extraction::{Record, TreeBuilder};
 use serde_json::Value;
 
 use super::error::{
     ArrayShape, Failure, MetadataFamily, ProductionFailure, SourceFault, SourceLevel,
 };
-use super::published::Published;
+use super::published::{Published, contract_owner};
 use super::requirements::Requirements;
 use super::{Counts, TestResult, compare, health};
+use crate::real_archive_contracts::v3;
 
-fn remove_source(document: &mut Value, owner: &str) -> TestResult {
-    for key in ["missionPropertySets", "contracts"] {
-        let rows = document
-            .get_mut(key)
-            .and_then(Value::as_array_mut)
-            .ok_or("published rows absent")?;
-        rows.retain(|row| row["recordGuid"] != owner);
-        assert!(
-            !rows.is_empty(),
-            "another source survives, so a nonempty-output check cannot catch this mutation"
-        );
-    }
+fn remove_source(document: &mut Value, record: &Record<'_>) -> TestResult {
+    let owner = record.guid().to_string();
+    let removed = contract_occurrences(document, record.index(), &owner)?;
+    let sets = document
+        .get_mut("missionPropertySets")
+        .and_then(Value::as_array_mut)
+        .ok_or("published property sets absent")?;
+    sets.retain(|row| row["recordGuid"] != owner);
+    assert!(!sets.is_empty(), "another source set survives");
+    let contracts = document
+        .pointer_mut("/projections/contracts/rows")
+        .and_then(Value::as_array_mut)
+        .ok_or("published contract rows absent")?;
+    contracts.retain(|row| {
+        !row.get("source")
+            .is_some_and(|source| removed.contains(source))
+    });
+    assert!(
+        !contracts.is_empty(),
+        "another source survives, so a nonempty-output check cannot catch this mutation"
+    );
+    let titles = document
+        .pointer_mut("/projections/missionTitles/rows")
+        .and_then(Value::as_array_mut)
+        .ok_or("published mission title rows absent")?;
+    titles.retain(|row| {
+        !row.get("contract")
+            .is_some_and(|source| removed.contains(source))
+    });
     Ok(())
 }
 
-fn report_projection_omission(health: &mut ExportHealth, record: &Record<'_>) -> TestResult {
-    health.status = ExportHealthStatus::Incomplete;
-    health.projection = ExportStageStatus::Incomplete;
-    let affected = [
-        (Kind::Contracts, ExportSourceRole::Selected),
-        (Kind::MissionPropertySets, ExportSourceRole::DerivedInput),
-    ];
-    health.written_rows -= affected.len();
-    for (kind, role) in affected {
-        let source = health
-            .kinds
-            .iter_mut()
-            .find(|source| source.kind == kind)
-            .ok_or("source kind absent")?;
-        source.projection = ExportStageStatus::Incomplete;
-        source.source_records.projected -= 1;
-        source.source_records.omitted_after_projection_failure += 1;
-        source.written_rows -= 1;
-        let failed = projection_failure(record, kind, role)?;
-        source.failed_records.push(failed.clone());
-        health.diagnostics.push(projection_diagnostic(&failed));
-        health.failed_records.push(failed);
-        assert_eq!(
-            source.source_records.selected,
-            source.source_records.projected
-                + source.source_records.omitted_after_projection_failure,
-            "the mutated production source accounting truthfully explains its omitted source"
-        );
+fn contract_occurrences(document: &Value, index: u32, owner: &str) -> TestResult<Vec<Value>> {
+    let projections = v3::Projections::read(document)?;
+    let mut removed = Vec::new();
+    for row in v3::rows(document)? {
+        if contract_owner(&projections, row)? == (u64::from(index), owner) {
+            removed.push(
+                row.get("source")
+                    .ok_or("actual removed occurrence")?
+                    .clone(),
+            );
+        }
     }
-    Ok(())
+    assert!(
+        !removed.is_empty(),
+        "the mutation removes the independently read owner"
+    );
+    Ok(removed)
 }
 
-fn projection_failure(
-    record: &Record<'_>,
-    kind: Kind,
-    role: ExportSourceRole,
-) -> TestResult<FailedExportRecord> {
-    let (stage, code) = if role == ExportSourceRole::DerivedInput {
+fn report_projection_omission(document: &mut Value, record: &Record<'_>) -> TestResult {
+    let health = document.get_mut("exportHealth").ok_or("health absent")?;
+    *health.get_mut("status").ok_or("status absent")? = serde_json::json!("incomplete");
+    *health.get_mut("projection").ok_or("projection absent")? = serde_json::json!("incomplete");
+    adjust(health, "writtenRows", -2)?;
+    for (kind, role, stage, code) in [
         (
-            ExportDiagnosticStage::DerivedProjection,
-            ExportDiagnosticCode::DerivedProjectionFailure,
-        )
-    } else {
-        (
+            Kind::Contracts,
+            ExportSourceRole::Selected,
             ExportDiagnosticStage::Projection,
             ExportDiagnosticCode::ProjectionFailure,
-        )
-    };
-    Ok(FailedExportRecord {
-        kind: Some(kind),
-        record_index: record.index(),
-        guid: record.guid().to_string(),
-        record_path: Some(record.record_path()?.to_owned()),
-        role,
-        stage,
-        code,
-    })
+        ),
+        (
+            Kind::MissionPropertySets,
+            ExportSourceRole::DerivedInput,
+            ExportDiagnosticStage::DerivedProjection,
+            ExportDiagnosticCode::DerivedProjectionFailure,
+        ),
+    ] {
+        let failed = wire::failure(document, record, kind, role, stage, code)?;
+        let diagnostic = wire::projection_diagnostic(&failed)?;
+        let health = document.get_mut("exportHealth").ok_or("health absent")?;
+        adjust_kind(health, kind, &failed)?;
+        health
+            .get_mut("diagnostics")
+            .and_then(Value::as_array_mut)
+            .ok_or("diagnostics absent")?
+            .push(diagnostic);
+        wire::push_failure(document, failed)?;
+    }
+    Ok(())
 }
 
-fn projection_diagnostic(failed: &FailedExportRecord) -> ExportDiagnostic {
-    ExportDiagnostic {
-        kind: failed.kind,
-        stage: failed.stage,
-        code: failed.code,
-        severity: ExportDiagnosticSeverity::Error,
-        source_role: Some(failed.role),
-        warning_code: None,
-        count: 1,
-        count_unit: ExportDiagnosticUnit::Records,
-        examples: vec![ExportDiagnosticExample {
-            record_index: Some(failed.record_index),
-            record_guid: Some(failed.guid.clone()),
-            record_path: failed.record_path.clone(),
-            field: None,
-            source_type: None,
-            target_guid: None,
-        }],
-    }
+fn adjust_kind(health: &mut Value, kind: Kind, failed: &Value) -> TestResult {
+    let source = health
+        .get_mut("kinds")
+        .and_then(Value::as_array_mut)
+        .and_then(|kinds| {
+            kinds
+                .iter_mut()
+                .find(|source| source.get("kind").and_then(Value::as_str) == Some(kind.name()))
+        })
+        .ok_or("source kind absent")?;
+    *source.get_mut("projection").ok_or("projection absent")? = serde_json::json!("incomplete");
+    let counts = source
+        .get_mut("sourceRecords")
+        .ok_or("source counts absent")?;
+    adjust(counts, "projected", -1)?;
+    adjust(counts, "omittedAfterProjectionFailure", 1)?;
+    assert_eq!(
+        number(counts, "selected")?,
+        number(counts, "projected")? + number(counts, "omittedAfterProjectionFailure")?,
+        "the mutated production source accounting truthfully explains its omitted source"
+    );
+    adjust(source, "writtenRows", -1)?;
+    source
+        .get_mut("failedRecords")
+        .and_then(Value::as_array_mut)
+        .ok_or("kind failures absent")?
+        .push(failed.clone());
+    Ok(())
+}
+
+fn number(object: &Value, field: &str) -> TestResult<u64> {
+    object
+        .get(field)
+        .and_then(Value::as_u64)
+        .ok_or_else(|| "production count absent".into())
+}
+
+fn adjust(object: &mut Value, field: &str, delta: i64) -> TestResult {
+    let value = number(object, field)?;
+    let value = value
+        .checked_add_signed(delta)
+        .ok_or("invalid count mutation")?;
+    *object.get_mut(field).ok_or("count field absent")? = serde_json::json!(value);
+    Ok(())
 }
 
 #[test]
 fn readable_source_omission_is_rejected_even_when_production_health_explains_it() -> TestResult {
     let fixture = fixture::Fixture::new()?;
-    let (mut document, mut report) = fixture.catalog()?;
+    let mut document = fixture.catalog()?;
     let forge = fixture.entry.open()?;
     let record = forge.record(0).ok_or("first source absent")?;
     assert!(
         record.tree().is_ok(),
         "the independently readable source is real"
     );
-    remove_source(&mut document, &record.guid().to_string())?;
-    report_projection_omission(&mut report, &record)?;
+    remove_source(&mut document, &record)?;
+    report_projection_omission(&mut document, &record)?;
+    let report = health::read(&document)?;
     let published = Published::read(&document)?;
     let mut checked = Counts::default();
     let failure = compare::check(
@@ -165,18 +200,19 @@ fn readable_source_omission_is_rejected_even_when_production_health_explains_it(
 #[test]
 fn a_retained_field_failure_is_not_treated_as_a_whole_source_omission() -> TestResult {
     let fixture = fixture::Fixture::new()?;
-    let (document, mut report) = fixture.catalog()?;
+    let mut document = fixture.catalog()?;
     let forge = fixture.entry.open()?;
     let record = forge.record(0).ok_or("first source absent")?;
-    report.failed_records.push(FailedExportRecord {
-        kind: Some(Kind::MissionPropertySets),
-        record_index: record.index(),
-        guid: record.guid().to_string(),
-        record_path: Some(record.record_path()?.to_owned()),
-        role: ExportSourceRole::DerivedInput,
-        stage: ExportDiagnosticStage::Projection,
-        code: ExportDiagnosticCode::UnreadableSource,
-    });
+    let failed = wire::failure(
+        &mut document,
+        &record,
+        Kind::MissionPropertySets,
+        ExportSourceRole::DerivedInput,
+        ExportDiagnosticStage::Projection,
+        ExportDiagnosticCode::UnreadableSource,
+    )?;
+    wire::push_failure(&mut document, failed)?;
+    let report = health::read(&document)?;
     let published = Published::read(&document)?;
     let mut checked = Counts::default();
     let mut trees = TreeBuilder::new();

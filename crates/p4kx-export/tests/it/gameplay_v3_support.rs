@@ -84,7 +84,7 @@ pub(crate) fn refused(database: &DataForgeBuilder, filter: Option<&Filter>) -> T
     assert!(
         matches!(
             p4kx_export::build_catalog(&archive, &options),
-            Err(CatalogError::IncompleteExport { .. })
+            Err(CatalogError::IncompleteExport(_))
         ),
         "the actual source violation must refuse normal publication"
     );
@@ -101,21 +101,29 @@ pub(crate) fn diagnosis(
     let diagnostics = at(catalog, "/exportHealth/diagnostics")?
         .as_array()
         .ok_or("diagnostics")?;
+    let mut found = false;
+    for diagnostic in diagnostics {
+        if diagnostic.get("kind").and_then(Value::as_str) != Some("gameplayProperties")
+            || diagnostic.get("code").and_then(Value::as_str) != Some(code)
+        {
+            continue;
+        }
+        let examples = diagnostic["examples"]
+            .as_array()
+            .ok_or("gameplay examples")?;
+        for example in examples {
+            found |= example
+                .pointer("/recordIndex/value")
+                .and_then(Value::as_u64)
+                == Some(record)
+                && crate::health_origin_assertions::example_text(catalog, example, "field")?
+                    == Some(&json!(field))
+                && crate::health_origin_assertions::example_text(catalog, example, "sourceType")?
+                    == Some(&json!(owner));
+        }
+    }
     assert!(
-        diagnostics.iter().any(|entry| {
-            entry.get("kind").and_then(Value::as_str) == Some("gameplayProperties")
-                && entry.get("code").and_then(Value::as_str) == Some(code)
-                && entry
-                    .get("examples")
-                    .and_then(Value::as_array)
-                    .is_some_and(|examples| {
-                        examples.iter().any(|example| {
-                            example.get("recordIndex").and_then(Value::as_u64) == Some(record)
-                                && example.get("field").and_then(Value::as_str) == Some(field)
-                                && example.get("sourceType").and_then(Value::as_str) == Some(owner)
-                        })
-                    })
-        }),
+        found,
         "the exact {code} keeps physical Record {record}, original {owner} and {field}"
     );
     Ok(())

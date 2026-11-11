@@ -22,7 +22,10 @@ fn a_failed_soc_does_not_hide_later_selected_sources() -> Result<(), Box<dyn std
         .write_to(&path)?;
     let archive = Archive::open(path)?;
 
-    let (counts, ledger) = super::read(&archive, 0, None);
+    let (counts, ledger) =
+        crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+            super::read(&archive, 0, None, capture)
+        })?;
 
     assert!(
         counts.is_err(),

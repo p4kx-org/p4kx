@@ -1,20 +1,24 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::ExportAccountingError;
 use crate::catalog_number_health::{Coverage, NumberRequirement};
 use crate::export_diagnostic::{
-    EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT, ExportDiagnostic, ExportDiagnosticCode,
-    ExportDiagnosticExample, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
+    EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT, ExportDiagnosticCode, ExportDiagnosticSeverity,
+    ExportDiagnosticStage, ExportDiagnosticUnit,
 };
 use crate::export_field_inspection::FieldInspection;
 use crate::export_ledger::SourceObservation;
+use crate::health_diagnostic_observation::{
+    DiagnosticObservation as ExportDiagnostic, ExampleObservation as ExportDiagnosticExample,
+};
 
 /// Counts all uncovered original numeric tokens with bounded owner/field examples.
 pub(crate) fn uncovered(
     inspection: &FieldInspection,
     source: &SourceObservation,
     coverage: &mut Coverage<'_, '_>,
-) -> Option<ExportDiagnostic> {
+) -> Result<Option<ExportDiagnostic>, ExportAccountingError> {
     let mut diagnostic = ExportDiagnostic {
         kind: source.kind,
         stage: ExportDiagnosticStage::Projection,
@@ -31,16 +35,16 @@ pub(crate) fn uncovered(
             continue;
         }
         diagnostic.count += 1;
-        retain_example(&mut diagnostic, inspection, required);
+        retain_example(&mut diagnostic, inspection, required)?;
     }
-    (diagnostic.count > 0).then_some(diagnostic)
+    Ok((diagnostic.count > 0).then_some(diagnostic))
 }
 
 fn retain_example(
     diagnostic: &mut ExportDiagnostic,
     inspection: &FieldInspection,
     required: &NumberRequirement,
-) {
+) -> Result<(), ExportAccountingError> {
     if diagnostic.examples.len() == EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT
         && diagnostic
             .examples
@@ -48,19 +52,25 @@ fn retain_example(
             .and_then(|example| example.field.as_deref())
             .is_some_and(|last| required.field.as_str() > last)
     {
-        return;
+        return Ok(());
     }
-    diagnostic.examples.push(ExportDiagnosticExample {
-        record_index: Some(inspection.record_index),
-        record_guid: Some(inspection.guid.to_string()),
-        record_path: Some(inspection.record_path.clone()),
-        field: Some(required.field.clone()),
-        source_type: Some(required.source_type.clone()),
-        target_guid: None,
-    });
-    diagnostic.examples.sort();
-    diagnostic.examples.dedup();
-    diagnostic
-        .examples
-        .truncate(EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT);
+    let example = match &required.body {
+        Some(body) => ExportDiagnosticExample::captured(
+            inspection.subject.clone(),
+            Some(&required.field),
+            Some(&required.source_type),
+            None,
+            body.clone(),
+        )?,
+        None => ExportDiagnosticExample::new(
+            inspection.subject.clone(),
+            Some(&required.field),
+            Some(&required.source_type),
+            None,
+        ),
+    };
+    diagnostic.examples.push(example);
+    diagnostic.examples =
+        crate::health_example_samples::retain(std::mem::take(&mut diagnostic.examples))?;
+    Ok(())
 }

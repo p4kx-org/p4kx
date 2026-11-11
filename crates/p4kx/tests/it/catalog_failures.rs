@@ -13,6 +13,8 @@ use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
 };
 
+use super::catalog_health_origins::retained_health_text;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const BROKEN_PATH: &str = "libs/foundry/records/crafting/blueprints/crafting/broken";
@@ -92,10 +94,22 @@ fn json_lists_the_failed_records() -> TestResult {
     let summary: serde_json::Value = serde_json::from_slice(&output.stdout)?;
     let failed = summary["failed"].as_array().ok_or("failed")?;
     assert_eq!(failed.len(), 1, "one failure");
-    assert_eq!(failed[0]["guid"], BROKEN_GUID, "the GUID");
-    assert_eq!(failed[0]["path"], BROKEN_PATH, "the record path");
+    let row = failed.first().ok_or("the failed Record")?;
+    let health = summary
+        .get("export_health")
+        .ok_or("the owning health report")?;
+    assert_eq!(
+        row.pointer("/guid/value"),
+        Some(&serde_json::json!(BROKEN_GUID)),
+        "the GUID"
+    );
+    assert_eq!(
+        retained_health_text(health, row.get("path").ok_or("failed Record path")?)?,
+        BROKEN_PATH,
+        "the record path"
+    );
     assert!(
-        failed[0]["error"].as_str().is_some_and(|e| !e.is_empty()),
+        !retained_health_text(health, row.get("error").ok_or("failed Record reason")?)?.is_empty(),
         "the reason"
     );
     assert_eq!(
@@ -182,9 +196,22 @@ fn explicit_diagnostic_output_marks_the_file_and_retains_failed_source_identity(
             let failed = artifact["exportHealth"]["failedRecords"]
                 .as_array()
                 .ok_or("failed Records")?;
-            assert!(
-                failed.iter().any(|record| record["guid"] == BROKEN_GUID),
-                "full failed-source identity"
+            let row = failed
+                .iter()
+                .find(|record| {
+                    record
+                        .pointer("/guid/value")
+                        .and_then(serde_json::Value::as_str)
+                        == Some(BROKEN_GUID)
+                })
+                .ok_or("full failed-source identity")?;
+            let health = artifact
+                .get("exportHealth")
+                .ok_or("the owning health report")?;
+            assert_eq!(
+                retained_health_text(health, row.get("recordPath").ok_or("failed Record path")?)?,
+                BROKEN_PATH,
+                "the artifact retains the original failed Record path"
             );
             assert_eq!(
                 artifact["definitions"]["manufacturers"]["rows"]

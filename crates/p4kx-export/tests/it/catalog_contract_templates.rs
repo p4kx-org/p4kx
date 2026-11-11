@@ -10,9 +10,16 @@ use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
+use crate::loot_v3_graph as raw;
 use crate::spawns_fixture;
+use crate::template_canonical_graph::Template;
+use crate::template_fixture_context as context;
+use crate::template_fixture_fields as raw_fields;
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+#[path = "catalog_contract_template_checks.rs"]
+mod checks;
 
 const TEMPLATE_GUID: &str = "40000000-0000-4000-8000-000000000001";
 
@@ -29,32 +36,44 @@ pub(crate) fn build() -> Result<Value, Box<dyn Error>> {
     )?)
 }
 
-pub(crate) fn template(catalog: &Value) -> Result<&Value, String> {
-    catalog["contractTemplates"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|template| template["guid"] == TEMPLATE_GUID)
-        .ok_or_else(|| "the template".to_owned())
+pub(crate) fn canonical(catalog: &Value) -> Result<Template<'_>, Box<dyn Error>> {
+    Template::new(catalog, TEMPLATE_GUID)
 }
 
 #[test]
 fn a_contract_template_guid_resolves_to_an_entry_and_a_leftover_is_left_out() -> TestResult {
     let catalog = build()?;
-    let templates = catalog["contractTemplates"].as_array().ok_or("templates")?;
-    assert_eq!(
-        templates.len(),
-        2,
-        "the template outside the folder is kept, the development leftover is left out"
+    assert!(
+        catalog.get("contractTemplates").is_none(),
+        "no retired root mirror"
     );
-    for contract in catalog["contracts"].as_array().ok_or("contracts")? {
-        assert_eq!(contract["templateGuid"], TEMPLATE_GUID);
+    checks::template_identities(&catalog)?;
+    for contract in crate::catalog_contracts::v3::rows(&catalog)? {
+        assert_eq!(
+            contract["templateGuid"], TEMPLATE_GUID,
+            "the same original contract link"
+        );
     }
-    let entry = template(&catalog)?;
-    assert_eq!(entry["className"], "Hunt");
+    let graph = canonical(&catalog)?;
     assert_eq!(
-        entry["recordPath"],
-        "libs/foundry/records/contracts/contracttemplates/hunt"
+        raw::present(
+            graph
+                .definition
+                .get("className")
+                .ok_or("actual class header")?
+        )?,
+        &json!("Hunt"),
+        "the original header-name conversion"
+    );
+    assert_eq!(
+        raw::present(
+            graph
+                .definition
+                .get("recordPath")
+                .ok_or("actual path header")?
+        )?,
+        &json!("libs/foundry/records/contracts/contracttemplates/hunt"),
+        "the original path conversion"
     );
     Ok(())
 }
@@ -62,55 +81,79 @@ fn a_contract_template_guid_resolves_to_an_entry_and_a_leftover_is_left_out() ->
 #[test]
 fn display_info_class_settings_and_deadline_are_exported_as_stored() -> TestResult {
     let catalog = build()?;
-    let entry = template(&catalog)?;
-    assert_eq!(entry["title"]["key"], "@place_name");
-    assert_eq!(entry["title"]["en"], "Hijacked Ship");
+    let graph = canonical(&catalog)?;
+    let title = graph.owner.follow(
+        graph
+            .projection
+            .get("title")
+            .ok_or("actual title source link")?,
+    )?;
+    crate::template_fixture_text::localized(
+        &catalog,
+        &graph,
+        title,
+        "@place_name",
+        Some("Hijacked Ship"),
+        None,
+    )?;
+    let display =
+        raw_fields::structure(&graph, raw_fields::required_input(&graph, "displayInfo")?)?;
+    crate::mission_template_graph::reference(
+        graph.field(display, "type")?,
+        "50000000-0000-4000-8000-000000000001",
+        None,
+    )?;
+    for (name, expected) in [
+        ("illegal", true),
+        ("showLifeTimeInMobiGlas", false),
+        ("preShowObjectives", true),
+    ] {
+        assert_eq!(
+            raw_fields::scalar(graph.field(display, name)?, "boolean")?,
+            &json!(expected),
+            "the exact original display flag"
+        );
+    }
     assert_eq!(
-        entry["missionTypeGuid"],
-        "50000000-0000-4000-8000-000000000001"
+        raw_fields::scalar(
+            raw_fields::required_input(&graph, "notForRelease")?,
+            "boolean"
+        )?,
+        &json!(false),
+        "the exact original release flag"
     );
-    assert_eq!(
-        (
-            &entry["illegal"],
-            &entry["showLifeTimeInMobiGlas"],
-            &entry["preShowObjectives"],
-            &entry["notForRelease"],
-            &entry["workInProgress"],
-        ),
-        (
-            &json!(true),
-            &json!(false),
-            &json!(true),
-            &json!(false),
-            &Value::Null
-        )
+    assert!(
+        raw_fields::input(&graph, "workInProgress")?.is_none(),
+        "the original absent declaration remains absence, never an invented null value"
     );
-    assert_eq!(entry["classType"], "ContractClass_Contract");
-    assert_eq!(entry["settings"]["canBeShared"], true);
-    assert_eq!(entry["settings"]["hasCompleteButton"], false);
-    assert_eq!(entry["autoFinish"]["failIfSentToPrison"], true);
-    assert_eq!(entry["autoFinish"]["completionTime"], 300);
-    assert_eq!(entry["autoFinish"]["autoEnd"], true);
-    assert_eq!(entry["autoFinish"]["resultAfterTimerEnd"], "failed");
-    assert_eq!(entry["autoFinish"]["remainingTimeToShowTimer"], 15);
-    Ok(())
+    checks::class_settings(&graph)
 }
 
 #[test]
 fn properties_list_the_variables_with_the_kind_of_their_value() -> TestResult {
     let catalog = build()?;
-    let properties: Vec<(&str, &str, &str)> = template(&catalog)?["contractProperties"]
-        .as_array()
-        .ok_or("properties")?
-        .iter()
-        .map(|property| {
-            (
-                property["variable"].as_str().unwrap_or_default(),
-                property["token"].as_str().unwrap_or_default(),
-                property["valueType"].as_str().unwrap_or_default(),
-            )
-        })
-        .collect();
+    let graph = canonical(&catalog)?;
+    let mut properties = Vec::new();
+    for property in context::properties(&graph, None)? {
+        let variable = context::binding_text(&graph, property, "variable")?
+            .ok_or("actual original variable")?;
+        let token = context::binding_text(&graph, property, "token")?
+            .ok_or("actual original stored token, including empty text")?;
+        let value = graph.owner.follow(
+            property
+                .get("value")
+                .ok_or("actual selected value source")?,
+        )?;
+        let source_type = raw::payload(value, "struct")?
+            .get("sourceType")
+            .and_then(|cell| cell.get("value"))
+            .and_then(Value::as_str)
+            .ok_or("actual original value type")?;
+        let suffix = source_type
+            .strip_prefix("MissionPropertyValue_")
+            .ok_or("original property family")?;
+        properties.push((variable, token, suffix));
+    }
     assert_eq!(
         properties,
         [
@@ -128,7 +171,8 @@ fn properties_list_the_variables_with_the_kind_of_their_value() -> TestResult {
             ("Pay_BP", "", "Reward"),
             ("Race_BP", "", "TimeTrialRace"),
             ("Map_BP", "", "StarMapLocation"),
-        ]
+        ],
+        "every original variable/token/type and its order remain"
     );
     Ok(())
 }
@@ -136,38 +180,35 @@ fn properties_list_the_variables_with_the_kind_of_their_value() -> TestResult {
 #[test]
 fn ship_spawns_and_location_queries_link_to_the_shared_kinds_at_the_template_level() -> TestResult {
     let catalog = build()?;
-    let entry = template(&catalog)?;
-    let variables = |field: &str| -> Vec<(String, String)> {
-        entry[field]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .map(|link| {
-                (
-                    link["variable"].as_str().unwrap_or_default().to_owned(),
-                    link["level"].as_str().unwrap_or_default().to_owned(),
-                )
-            })
-            .collect()
-    };
+    let graph = canonical(&catalog)?;
+    let ships = context::pools(&graph, "ships")?;
     assert_eq!(
-        variables("shipSpawns"),
-        [("Wave_BP".to_owned(), "template".to_owned())]
+        ships
+            .iter()
+            .map(|row| (row.variable, row.level))
+            .collect::<Vec<_>>(),
+        [("Wave_BP", "template")],
+        "the same selected ship source and level"
     );
+    let locations = context::pools(&graph, "location")?;
     assert_eq!(
-        variables("locationQueries"),
-        [
-            ("Home_BP".to_owned(), "template".to_owned()),
-            ("Place_BP".to_owned(), "template".to_owned())
-        ]
+        locations
+            .iter()
+            .map(|row| (row.variable, row.level))
+            .collect::<Vec<_>>(),
+        [("Home_BP", "template"), ("Place_BP", "template")],
+        "the same source ordering and level"
     );
-    let pool = &entry["shipSpawns"][0]["poolGuid"];
+    let pool = ships
+        .first()
+        .ok_or("actual registered ship pool")?
+        .identifier;
     assert!(
         catalog["contractShipSpawns"]
             .as_array()
             .ok_or("pools")?
             .iter()
-            .any(|spawn| &spawn["guid"] == pool),
+            .any(|spawn| spawn.get("guid") == Some(pool)),
         "the link resolves"
     );
     Ok(())
@@ -176,62 +217,85 @@ fn ship_spawns_and_location_queries_link_to_the_shared_kinds_at_the_template_lev
 #[test]
 fn hauling_orders_name_the_property_and_the_objective_source() -> TestResult {
     let catalog = build()?;
-    let orders = template(&catalog)?["haulingOrders"]
-        .as_array()
-        .ok_or("orders")?;
-    let sources: Vec<(&str, Option<&str>)> = orders
-        .iter()
-        .map(|order| {
-            (
-                order["source"].as_str().unwrap_or_default(),
-                order["variableName"].as_str(),
-            )
-        })
-        .collect();
+    let graph = canonical(&catalog)?;
+    let orders = raw::array(graph.projection, "haulingOrders")?;
+    let mut sources = Vec::new();
+    for order in orders {
+        let variable = match order.get("variable") {
+            Some(Value::Null) => None,
+            Some(reference) => Some(raw_fields::text(graph.bound(reference)?)?),
+            None => return Err("required nullable actual variable link".into()),
+        };
+        sources.push((
+            order
+                .get("source")
+                .and_then(Value::as_str)
+                .ok_or("actual hauling source level")?,
+            variable,
+        ));
+    }
     assert_eq!(
         sources,
-        [("template", Some("Cargo_BP")), ("templateObjective", None)]
+        [("template", Some("Cargo_BP")), ("templateObjective", None)],
+        "the same source levels and original variable"
     );
-    let item = &orders[1]["requirements"][0]["options"][0][0];
-    assert_eq!(item["maxScu"], 8);
+    let item = orders
+        .get(1)
+        .and_then(|row| row.pointer("/requirements/0/options/0/0/source"))
+        .ok_or("the actual grouped objective hauling item")?;
+    let item = graph.owner.follow(item)?;
+    assert_eq!(
+        raw_fields::number(graph.field(item, "maxSCU")?)?,
+        &json!(8),
+        "the same actual grouped resource quantity"
+    );
     Ok(())
 }
 
 #[test]
 fn objectives_follow_the_phases_depth_first_and_skip_a_token_without_an_id() -> TestResult {
     let catalog = build()?;
-    let objectives = template(&catalog)?["objectives"]
-        .as_array()
-        .ok_or("objectives")?;
-    let ids: Vec<(&str, Option<&str>, &str)> = objectives
-        .iter()
-        .map(|objective| {
-            (
-                objective["id"].as_str().unwrap_or_default(),
-                objective["parentId"].as_str(),
-                objective["debugName"].as_str().unwrap_or_default(),
-            )
-        })
-        .collect();
+    let graph = canonical(&catalog)?;
+    checks::objective_ancestry(&graph)?;
+    let first = context::objective(&graph, 0)?;
+    let second = context::objective(&graph, 1)?;
     assert_eq!(
-        ids,
-        [
-            ("70000000-0000-4000-8000-000000000001", None, "Deliver"),
-            (
-                "70000000-0000-4000-8000-000000000002",
-                Some("70000000-0000-4000-8000-000000000001"),
-                ""
-            ),
-            ("70000000-0000-4000-8000-000000000003", None, "Go"),
-        ],
-        "the token without an id is left out"
+        raw_fields::scalar(graph.field(first, "startsActive")?, "boolean")?,
+        &json!(true),
+        "original active flag"
     );
-    assert_eq!(objectives[0]["startsActive"], true);
-    assert_eq!(objectives[1]["startsActive"], false);
-    assert_eq!(objectives[1]["phaseTag"], "Kill");
-    assert_eq!(objectives[0]["phaseTag"], Value::Null);
-    assert_eq!(objectives[1]["variableName"], "PhaseB");
-    assert_eq!(objectives[1]["weight"], 0.5);
-    assert_eq!(objectives[0]["variableName"], Value::Null);
+    assert_eq!(
+        raw_fields::scalar(graph.field(second, "startsActive")?, "boolean")?,
+        &json!(false),
+        "original inactive flag"
+    );
+    let tag = graph.field(second, "missionPhaseIdentifierTag")?;
+    crate::template_fixture_tags::path(&graph, tag, Some("Kill"))?;
+    crate::template_fixture_tags::path(
+        &graph,
+        graph.field(first, "missionPhaseIdentifierTag")?,
+        None,
+    )?;
+    assert_eq!(
+        raw_fields::text(graph.field(second, "variableName")?)?,
+        "PhaseB",
+        "original phase variable"
+    );
+    assert_eq!(
+        raw_fields::number(graph.field(second, "weight")?)?,
+        &json!(0.5),
+        "original phase weight"
+    );
+    let empty = graph.field(first, "variableName")?;
+    assert_eq!(
+        raw_fields::text(empty)?,
+        "",
+        "the actual empty original variable remains present"
+    );
+    assert_eq!(
+        empty.pointer("/value/state"),
+        Some(&json!("present")),
+        "the old nullable no-variable projection never replaces the actual empty source datum"
+    );
     Ok(())
 }

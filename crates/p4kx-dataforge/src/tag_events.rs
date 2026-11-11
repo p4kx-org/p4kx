@@ -3,27 +3,12 @@
 
 use crate::{DataForgeError, Guid, Record, RecordTree};
 
+use super::TagPath;
+
 #[path = "tag_path_source.rs"]
 mod tag_path_source;
 
 pub use tag_path_source::{TagPathEdgeKind, TagPathIncoming};
-
-/// A limit that prevents a canonically read tag from entering the tag tree.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TagProjectionFailure {
-    /// The tag exceeds the permitted depth.
-    Depth,
-    /// The tag name exceeds its byte limit.
-    NameBytes,
-    /// The tag path exceeds its byte limit.
-    PathBytes,
-    /// The accumulated tag paths exceed their byte budget.
-    TextBytes,
-    /// The node count exceeds the supported index range.
-    NodeCount,
-    /// A discarded ancestor prevents this tag from being reached.
-    AncestorDiscarded,
-}
 
 /// Why a tag relation was not added to the tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,26 +58,17 @@ pub enum TagBuildEvent<'r, 'f> {
         parent_position: Option<u32>,
         /// The actual selected source edge, absent for an unlisted root.
         incoming: Option<TagPathIncoming<'r, 'f>>,
-        /// The joined path actually materialized by the tree.
-        path: &'r str,
+        /// The actual selected path through the tag tree.
+        path: TagPath<'r>,
         /// The actual selected tree depth.
-        depth: u16,
+        depth: u32,
         /// Whether this path descends from a declared database root.
         listed: bool,
     },
-    /// A canonical Tag was discarded by a projection limit.
-    ProjectionFailed {
-        /// The physical discarded Record.
-        record: &'r Record<'f>,
-        /// The exact projection limit.
-        reason: TagProjectionFailure,
-    },
     /// A relation was omitted without replacing the source Record's projection outcome.
     RelationSkipped {
-        /// The physical Record that owns the relation.
-        record: &'r Record<'f>,
-        /// The owned relation field.
-        field: &'static str,
+        /// The actual original owner, field role and stored array occurrence.
+        incoming: TagPathIncoming<'r, 'f>,
         /// The target identity when the relation contains one.
         target: Option<Guid>,
         /// Why the relation was omitted.

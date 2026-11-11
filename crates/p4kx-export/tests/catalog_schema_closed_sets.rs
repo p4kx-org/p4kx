@@ -12,6 +12,7 @@ use serde_json::{Map, Value, json};
 
 const VOCABULARY_CLASS: &str = "x-p4kx-vocabularyClass";
 const CONTROL_TYPES: &[&str] = &[
+    "BlueprintRangeKind",
     "CatalogPublicationMode",
     "CommoditySelection",
     "DatasetAvailability",
@@ -24,16 +25,31 @@ const CONTROL_TYPES: &[&str] = &[
     "ExportSourceRole",
     "ExportStageStatus",
     "InputScope",
+    "InventoryMeaning",
+    "LocalizationMeaning",
+    "LocationConditionKind",
+    "NoteInterpretation",
+    "ObjectiveInterpretation",
     "OwnedReferenceStatus",
+    "ProbabilityInterpretation",
+    "PropertyInterpretation",
     "PropertyReferenceStatus",
+    "PropertyValueKind",
     "QuantizationIneligibility",
+    "ResolutionStatus",
+    "ScopedLocationFilterKind",
     "SourceCoordinateOmission",
+    "SourceDataType",
     "SourceDeclarationKind",
     "SourceDetails",
     "SourceEncryptionState",
     "SourceRecordFormat",
     "SourceUseRole",
     "SourceValueState",
+    "StandingOperator",
+    "TemplateModifierKind",
+    "TemplateTagInterpretation",
+    "TemplateValueStatus",
 ];
 const OPEN_TYPES: &[&str] = &[
     "ArchiveKeyState",
@@ -216,27 +232,66 @@ fn catalog_health_rejects_unknown_control_states() -> TestResult {
 }
 
 #[test]
+fn contract_projection_requires_immediate_source_markers() -> TestResult {
+    let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
+    let catalog = minimal_catalog();
+    assert!(validator.is_valid(&catalog), "the minimal catalog is valid");
+    for path in [
+        "/cooldownLayer",
+        "/cooldownLayers/abandonedCooldownTimeVariation",
+        "/hasPersonalCooldown",
+        "/personalCooldownTime",
+        "/timeToComplete",
+        "/buyInAmount",
+        "/canBeShared/value",
+        "/canBeShared/layer",
+        "/maxPlayersPerInstance/value",
+        "/hideInMobiGlas/layer",
+        "/requiredIntros",
+        "/requiredIntros/value/0/tagGuid",
+        "/requiredIntros/value/0/introContracts",
+        "/requiredIntros/value/0/introContracts/value/0",
+    ] {
+        let mut missing = catalog.clone();
+        let row = &mut missing["projections"]["contracts"]["rows"][0];
+        let cell = row
+            .pointer_mut(path)
+            .and_then(Value::as_object_mut)
+            .ok_or(path)?;
+        assert!(cell.remove("containsEncryptedSource").is_some(), "{path}");
+        assert!(
+            !validator.is_valid(&missing),
+            "origin is required at {path}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn a_new_source_annotation_value_is_additive() -> TestResult {
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     let catalog = minimal_catalog();
     assert!(validator.is_valid(&catalog), "the minimal catalog is valid");
 
     let mut new_layer = catalog.clone();
-    new_layer["contracts"][0]["canBeShared"]["layer"] = json!("newLayer");
-    new_layer["contracts"][0]["cooldownLayer"] = json!("newLayer");
+    new_layer["projections"]["contracts"]["rows"][0]["canBeShared"]["layer"]["value"] =
+        json!("newLayer");
+    new_layer["projections"]["contracts"]["rows"][0]["cooldownLayer"]["value"] = json!("newLayer");
     assert!(validator.is_valid(&new_layer), "a new fact layer is valid");
 
     let mut new_level = catalog.clone();
-    new_level["contracts"][0]["standingRequirements"][0]["level"] = json!("newLevel");
-    new_level["contracts"][0]["requiredIntros"][0]["level"] = json!("newLevel");
-    new_level["contracts"][0]["shipSpawns"][0]["level"] = json!("newLevel");
+    new_level["projections"]["contracts"]["rows"][0]["standingRequirements"][0]["level"] =
+        json!("newLevel");
+    new_level["projections"]["contracts"]["rows"][0]["requiredIntros"]["value"][0]["level"]["value"] =
+        json!("newLevel");
+    new_level["projections"]["contracts"]["rows"][0]["shipSpawns"][0]["level"] = json!("newLevel");
     assert!(
         validator.is_valid(&new_level),
         "a new standing or spawn level is valid"
     );
 
     let mut layer_number = catalog;
-    layer_number["contracts"][0]["canBeShared"]["layer"] = json!(3);
+    layer_number["projections"]["contracts"]["rows"][0]["canBeShared"]["layer"]["value"] = json!(3);
     assert!(
         !validator.is_valid(&layer_number),
         "a fact layer stays a string"

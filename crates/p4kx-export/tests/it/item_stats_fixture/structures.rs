@@ -29,7 +29,7 @@ fn singles_component(name: &str, fields: &[&str]) -> TestStruct {
     })
 }
 
-fn weapons() -> Vec<TestStruct> {
+fn weapons(loop_shape: TestStruct) -> Vec<TestStruct> {
     [
         TestStruct::new("EntityClassDefinition")
             .array("Components", pointer("DataForgeComponentParams")),
@@ -69,10 +69,7 @@ fn weapons() -> Vec<TestStruct> {
             .field("lifetime", TestType::Single)
             .field("projectileParams", pointer("BulletProjectileParams"))
             .field("trap", pointer("Loop")),
-        TestStruct::new("Loop")
-            .field("left", class("Loop"))
-            .field("right", class("Loop"))
-            .declared_size(0),
+        loop_shape,
         TestStruct::new("BulletProjectileParams")
             .field("damage", class("DamageInfo"))
             .field("detonationParams", pointer("ProjectileDetonationParams")),
@@ -158,7 +155,25 @@ fn others() -> Vec<TestStruct> {
 }
 
 pub(super) fn builder() -> DataForgeBuilder {
-    weapons()
+    with_loop(
+        TestStruct::new("Loop")
+            .field("left", class("Loop"))
+            .field("right", class("Loop"))
+            .declared_size(0),
+    )
+}
+
+pub(super) fn with_invalid_loop_layout() -> DataForgeBuilder {
+    with_loop(
+        TestStruct::new("Loop")
+            .field("left", TestType::Int8)
+            .field("right", TestType::Int8)
+            .declared_size(3),
+    )
+}
+
+fn with_loop(loop_shape: TestStruct) -> DataForgeBuilder {
+    weapons(loop_shape)
         .into_iter()
         .chain(components())
         .chain(others())

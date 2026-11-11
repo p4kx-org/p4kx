@@ -9,6 +9,7 @@ use p4kx_extraction::{Archive, CancelToken, Guid};
 use rayon::prelude::*;
 
 use crate::CatalogError;
+use crate::catalog_read::original::EntryCapture;
 use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, unreferenced};
 use crate::starmap_parse::{Read, read_all};
@@ -62,14 +63,16 @@ impl Placements {
     pub(crate) fn read(
         archive: &Archive,
         cancel: Option<&CancelToken>,
+        capture: &EntryCapture<'_>,
     ) -> Result<Self, CatalogError> {
-        Self::read_within(archive, cancel, Limits::default())
+        Self::read_within(archive, cancel, Limits::default(), capture)
     }
 
     pub(crate) fn read_within(
         archive: &Archive,
         cancel: Option<&CancelToken>,
         limits: Limits,
+        capture: &EntryCapture<'_>,
     ) -> Result<Self, CatalogError> {
         let started = Instant::now();
         let index = Index::new(archive);
@@ -82,7 +85,8 @@ impl Placements {
             cancel,
             limits.external,
             (limits.depth, limits.children),
-        );
+            capture,
+        )?;
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
@@ -100,25 +104,7 @@ impl Placements {
         placements.counts.systems = systems.len();
         let mut repeated: HashSet<Guid> = HashSet::new();
         let mut opened: HashSet<usize> = HashSet::new();
-        let mut named = 0;
-        for system in read {
-            opened.extend(system.opened.iter().copied());
-            placements.report.deepest_external =
-                placements.report.deepest_external.max(system.deepest);
-            named += system.named;
-            placements.counts.unreadable += system.unreadable;
-            placements.counts.missing += system.missing;
-            placements.counts.malformed += system.malformed;
-            placements
-                .report
-                .containers
-                .extend(system.report.containers);
-            placements.report.issues.extend(system.report.issues);
-            placements.opened.extend(system.containers);
-            for (record, placement) in system.placed {
-                placements.add(record, placement, &mut repeated);
-            }
-        }
+        let named = placements.merge_systems(read, &mut opened, &mut repeated);
         placements.counts.ambiguous = repeated.len();
         placements
             .report
@@ -131,6 +117,30 @@ impl Placements {
         placements.add_unreached(&index, &opened);
         placements.report.elapsed = started.elapsed();
         Ok(placements)
+    }
+
+    fn merge_systems(
+        &mut self,
+        systems: Vec<SystemRead>,
+        opened: &mut HashSet<usize>,
+        repeated: &mut HashSet<Guid>,
+    ) -> usize {
+        let mut named = 0;
+        for system in systems {
+            opened.extend(system.opened.iter().copied());
+            self.report.deepest_external = self.report.deepest_external.max(system.deepest);
+            named += system.named;
+            self.counts.unreadable += system.unreadable;
+            self.counts.missing += system.missing;
+            self.counts.malformed += system.malformed;
+            self.report.containers.extend(system.report.containers);
+            self.report.issues.extend(system.report.issues);
+            self.opened.extend(system.containers);
+            for (record, placement) in system.placed {
+                self.add(record, placement, repeated);
+            }
+        }
+        named
     }
 
     /// Adds the containers below the system folder that the walk did not open, each hanging below

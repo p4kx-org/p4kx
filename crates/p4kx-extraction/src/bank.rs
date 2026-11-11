@@ -1,12 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+//! Bounded soundbank reads, source inspection, and extraction.
+
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use p4kx_archive::Archive;
 use p4kx_audio::{AudioError, EmbeddedWem, MediaClass, Soundbank};
+pub use p4kx_audio::{
+    BankActionFields, BankActionRead, BankDeclaredLengthSource, BankDidx, BankDidxEntry, BankEvent,
+    BankEventAction, BankEventCountEncoding, BankEventRead, BankHirc, BankHircAction,
+    BankHircEvent, BankHircField, BankHircObject, BankHircSemantic, BankMediaClassSource,
+    BankMediaInfo, BankObservedHeader, BankPlayBankDecision, BankPlayBankFields, BankReadError,
+    BankSectionCursor, BankSource, BankSourceSection, BankStid, BankStidName,
+};
 use rayon::prelude::*;
 
 use crate::entry_content::find_entry;

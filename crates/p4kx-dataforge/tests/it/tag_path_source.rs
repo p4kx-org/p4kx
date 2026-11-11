@@ -17,7 +17,7 @@ struct Chosen {
     parent: Option<u32>,
     incoming: Option<(u32, TagPathEdgeKind, usize)>,
     path: String,
-    depth: u16,
+    depth: u32,
     listed: bool,
 }
 
@@ -93,7 +93,7 @@ fn chosen(event: &TagBuildEvent<'_, '_>) -> Option<Chosen> {
         position: *position,
         parent: *parent_position,
         incoming: incoming.map(|edge| (edge.record().index(), edge.kind(), edge.ordinal())),
-        path: (*path).to_owned(),
+        path: path.to_string(),
         depth: *depth,
         listed: *listed,
     })

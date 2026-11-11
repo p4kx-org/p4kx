@@ -97,7 +97,9 @@ fn an_unreadable_record_is_left_out_and_the_catalog_is_still_built() -> TestResu
         "the readable manufacturer is written"
     );
     assert_eq!(
-        catalog["blueprints"].as_array().map(Vec::len),
+        catalog["definitions"]["blueprints"]["rows"]
+            .as_array()
+            .map(Vec::len),
         Some(0),
         "the unreadable blueprints are left out"
     );
@@ -116,7 +118,7 @@ fn an_unreadable_record_is_counted_and_reported_with_path_guid_and_reason() -> T
     let guids: Vec<String> = summary
         .failures()
         .iter()
-        .map(|failure| failure.guid.to_string())
+        .map(|failure| failure.guid().to_string())
         .collect();
     assert_eq!(
         guids,
@@ -129,9 +131,9 @@ fn an_unreadable_record_is_counted_and_reported_with_path_guid_and_reason() -> T
     let failure = summary
         .failures()
         .iter()
-        .find(|failure| failure.record_path == BROKEN_PATH)
+        .find(|failure| failure.record_path() == BROKEN_PATH)
         .ok_or("the record path")?;
-    assert!(!failure.reason.is_empty(), "a reason");
+    assert!(!failure.reason().is_empty(), "a reason");
     Ok(())
 }
 

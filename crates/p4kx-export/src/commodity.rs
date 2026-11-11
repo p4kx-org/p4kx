@@ -8,7 +8,6 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::commodity_authoring_contract::CommodityAuthoring;
 use crate::commodity_authoring_read;
-use crate::commodity_backfill::BackfillEvidence;
 use crate::commodity_contract::{
     Commodity, CommodityDefinition, CommodityPresentation, CommoditySelection,
 };
@@ -43,7 +42,7 @@ pub(crate) fn commodity<'source>(
     projection: &CatalogProjection<'_, 'source>,
     resource: Option<&RecordTree<'source>>,
     groups: &Groups,
-    selected: &CommodityResourceSelection,
+    selected: &CommodityResourceSelection<'_, '_>,
 ) -> Result<CommodityRead<'source>, CatalogError> {
     let prepared = prepare_entity(tree, projection, resource, groups, selected)?;
     finish_entity(tree, selected, projection.origins(), prepared)
@@ -54,7 +53,7 @@ fn prepare_entity<'source>(
     projection: &CatalogProjection<'_, 'source>,
     resource: Option<&RecordTree<'source>>,
     groups: &Groups,
-    selected: &CommodityResourceSelection,
+    selected: &CommodityResourceSelection<'_, '_>,
 ) -> Result<PreparedEntity<'source>, CatalogError> {
     let origins = projection.origins();
     let mut notes = Vec::new();
@@ -91,7 +90,7 @@ fn prepare_entity<'source>(
 }
 
 fn resource_attempt(
-    selected: &CommodityResourceSelection,
+    selected: &CommodityResourceSelection<'_, '_>,
     complete: bool,
     origins: &CatalogOrigins,
 ) -> Result<(), CatalogError> {
@@ -109,13 +108,12 @@ fn resource_attempt(
 
 fn finish_entity<'source>(
     tree: &RecordTree<'source>,
-    selected: &CommodityResourceSelection,
+    selected: &CommodityResourceSelection<'_, '_>,
     origins: &CatalogOrigins,
     prepared: PreparedEntity<'source>,
 ) -> Result<CommodityRead<'source>, CatalogError> {
     let selection = entity_selection(tree, origins)?;
-    let definition =
-        commodity_source::definition(tree, prepared.entity, selection, Vec::new(), origins)?;
+    let definition = commodity_source::definition(tree, prepared.entity, selection, origins)?;
     let crafter = representation_headers(
         tree,
         prepared.crafter_inputs,
@@ -141,7 +139,7 @@ fn finish_entity<'source>(
 }
 fn resource_complete(
     resource: Option<&RecordTree<'_>>,
-    selected: &CommodityResourceSelection,
+    selected: &CommodityResourceSelection<'_, '_>,
 ) -> bool {
     resource.is_some()
         || !selected.link.as_ref().is_some_and(|link| {
@@ -188,7 +186,7 @@ pub(crate) fn resource_commodity<'source>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
     groups: &Groups,
-    evidence: BackfillEvidence<'_>,
+    evidence: &CommodityInputs<'_>,
 ) -> Result<CommodityRead<'source>, CatalogError> {
     let origins = projection.origins();
     let context = origins.record(tree.record_index());
@@ -208,10 +206,9 @@ pub(crate) fn resource_commodity<'source>(
         SourceValue::Present(Some(CatalogGuid(tree.guid()))),
     )?;
     let presentation = presentation_context.finish(tree, texts, subtype, groups)?;
-    let selection = crate::commodity_backfill::selection(&evidence);
+    let selection = evidence.value(CommoditySelection::ResourceFallback);
     let entity = context.header_selector(RecordHeaderField::SourceType, SourceValue::Absent)?;
-    let definition =
-        commodity_source::definition(tree, entity, selection, evidence.diagnostics, origins)?;
+    let definition = commodity_source::definition(tree, entity, selection, origins)?;
     Ok(CommodityRead {
         value: Commodity {
             guid: CatalogGuid(tree.guid()),

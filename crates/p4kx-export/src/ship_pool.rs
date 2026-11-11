@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Record, RecordTree};
 
-use crate::CatalogFailure;
 use crate::ship_base::{ShipRead, ShipReader};
+use crate::{CatalogFailure, CatalogReadFailure};
 
 #[cfg(test)]
 mod tests;
@@ -24,11 +24,11 @@ pub(crate) struct ShipPool<'f> {
 
 struct ObservedReader<'f> {
     reader: ShipReader<'f>,
-    capture: Arc<crate::loadout::ledger::Capture>,
+    capture: Arc<crate::loadout::ledger::Capture<'f>>,
 }
 
-pub(crate) struct CatalogRead {
-    pub(crate) read: Result<ShipRead, CatalogFailure>,
+pub(crate) struct CatalogRead<'f> {
+    pub(crate) read: Result<ShipRead, CatalogReadFailure<'f>>,
     pub(crate) ledger: crate::export_ledger::ExportLedger,
 }
 
@@ -54,7 +54,9 @@ impl<'f> ShipPool<'f> {
             .pop();
         let mut reader = taken
             .unwrap_or_else(|| ShipReader::with_entities(Arc::clone(&self.entities), self.files));
-        let result = reader.read_with_digest(record, tree);
+        let result = reader
+            .read_with_digest(record, tree)
+            .map_err(CatalogReadFailure::into_interpreted);
         self.idle
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -68,11 +70,13 @@ impl<'f> ShipPool<'f> {
         record: &Record<'f>,
         tree: &RecordTree<'f>,
         sources: &crate::export_ledger::ExportLedger,
+        input: &'f crate::build::original_input::OriginalCatalogInput<'f, 'f>,
         cancel: Option<&p4kx_extraction::CancelToken>,
-    ) -> Result<CatalogRead, crate::CatalogError> {
+    ) -> Result<CatalogRead<'f>, crate::CatalogError> {
         let taken = crate::export_evidence_lock::lock(&self.observed)?.pop();
         let mut observed = taken.unwrap_or_else(|| {
-            let capture = Arc::new(crate::loadout::ledger::Capture::for_kind(
+            let capture = Arc::new(crate::loadout::ledger::Capture::for_input(
+                input,
                 sources,
                 cancel,
                 crate::Kind::Ships,
@@ -86,6 +90,7 @@ impl<'f> ShipPool<'f> {
                 capture,
             }
         });
+        observed.capture.check_input(input)?;
         observed.capture.seed_proofs(sources)?;
         let read = observed.reader.read_with_digest(record, tree);
         let ledger = observed.capture.finish()?;
@@ -93,3 +98,7 @@ impl<'f> ShipPool<'f> {
         Ok(CatalogRead { read, ledger })
     }
 }
+
+#[cfg(test)]
+#[path = "ship_pool_cache_tests.rs"]
+mod cache_tests;

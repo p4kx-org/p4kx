@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::{CatalogPublicationMode, Filter};
+use std::collections::BTreeSet;
+
+use p4kx_export::Filter;
+use p4kx_extraction::{DataForge, DataForgeEntry, Value as Raw};
 use p4kx_testkit::DataForgeBuilder;
 use serde_json::{Value, json};
 
-use crate::commodity_v3_fixture::{DcbOrigin, TestResult};
+use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
+use crate::quality_origin_wide_fixture;
 use crate::quality_v3_fixture_schema as schema;
 use crate::quality_v3_fixture_values as values;
 use crate::quality_v3_origin_support::{self as origins, Domain, Use};
@@ -36,15 +40,17 @@ fn database() -> DataForgeBuilder {
 }
 
 #[test]
-fn quality_v3_optional_inventory_cut_keeps_the_complete_inverse_and_late_encrypted_value()
--> TestResult {
+fn quality_v3_complete_inventory_keeps_every_negative_probe_and_late_member() -> TestResult {
     let filter = Filter::new("*/quantizer");
-    let (_, catalog) = support::build(
-        &database(),
-        DcbOrigin::Encrypted,
-        CatalogPublicationMode::Normal,
-        Some(&filter),
-    )?;
+    let database = database();
+    let (_directory, archive) = common::open(&database, DcbOrigin::Encrypted)?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let forge = entry.open()?;
+    let expected = original(&forge)?;
+    let mut options = common::options();
+    options.filter = Some(&filter);
+    let built = p4kx_export::build_catalog_from(&archive, &entry, &options)?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(
         support::rows(&catalog, "definitions/resourceTypes")?.len(),
         0,
@@ -55,15 +61,24 @@ fn quality_v3_optional_inventory_cut_keeps_the_complete_inverse_and_late_encrypt
     support::marker(list, Some(true))?;
     assert_eq!(
         support::at(list, "/sourceSetComplete")?,
-        &json!(false),
-        "optional proof limits remain explicit without truncating the actual relationship scan"
+        &json!(true),
+        "all actual original relation decisions contribute"
     );
-    assert_opaque_encrypted_witness(&catalog, list)?;
+    let retained = quality_origin_wide_fixture::relationships(&catalog, list)?;
+    assert_eq!(
+        retained.len(),
+        expected.len(),
+        "every actual original relationship decision survives"
+    );
+    assert!(
+        retained == expected,
+        "exact physical negative and late positive sources"
+    );
     assert_late_member(&catalog, list)?;
     assert_eq!(
         support::at(&catalog, "/exportHealth/status")?,
         &json!("complete"),
-        "optional provenance-coordinate retention is independent of complete source reads"
+        "complete provenance and source reads are separately measured"
     );
     let health = support::kind_health(&catalog, "qualityQuantizations")?;
     assert_eq!(
@@ -80,7 +95,7 @@ fn assert_late_member(catalog: &Value, list: &Value) -> TestResult {
     assert_eq!(
         members.len(),
         1,
-        "a positive declaration after the inventory cut is still found"
+        "the later actual positive declaration is retained"
     );
     let member = members.first().ok_or("late resource")?;
     support::state(member, "present")?;
@@ -93,7 +108,7 @@ fn assert_late_member(catalog: &Value, list: &Value) -> TestResult {
     assert_eq!(
         support::at(member, "/sourceSetComplete")?,
         &json!(true),
-        "the shared inventory cut does not starve a late value's independent positive proof"
+        "the late value retains its independent positive proof"
     );
     let used = origins::uses(catalog, member)?;
     let late = u64::from(NEGATIVE_RESOURCES) + 1;
@@ -113,39 +128,42 @@ fn assert_late_member(catalog: &Value, list: &Value) -> TestResult {
     Ok(())
 }
 
-fn assert_opaque_encrypted_witness(catalog: &Value, carrier: &Value) -> TestResult {
-    let references = support::at(carrier, "/sourceUsesRefs")?
-        .as_array()
-        .ok_or("bounded references")?;
-    let inventory = support::at(catalog, "/provenance/uses")?
-        .as_array()
-        .ok_or("use inventory")?;
-    let witness = inventory
-        .iter()
-        .find(|used| {
-            used.pointer("/location/type").and_then(Value::as_str) == Some("opaque")
-                && used.get("id").is_some_and(|id| references.contains(id))
-        })
-        .ok_or("a retained original capture-limit witness")?;
+fn original(forge: &DataForge<'_>) -> TestResult<BTreeSet<(u32, usize)>> {
+    let mut found = BTreeSet::new();
+    for record in forge.records().skip(1) {
+        let tree = record.tree()?;
+        assert!(
+            tree.is_from(&record),
+            "each negative source probe uses its actual Resource Record"
+        );
+        let Some(Raw::Array(properties)) = tree.root().field("properties") else {
+            return Err("original properties".into());
+        };
+        let [Raw::Struct(property)] = properties.as_ref() else {
+            return Err("one actual property".into());
+        };
+        let Some(Raw::Struct(quantization)) = property.field("qualityQuantization") else {
+            return Err("actual quantization wrapper".into());
+        };
+        let slot = quantization.field("qualityQuantizationRecord");
+        if record.index() <= u32::from(NEGATIVE_RESOURCES) {
+            assert_eq!(slot, Some(&Raw::Null), "negative authored relationship");
+        } else {
+            let Some(Raw::Reference(reference)) = slot else {
+                return Err("actual late Reference".into());
+            };
+            assert_eq!(
+                reference.record_index(),
+                0,
+                "the original late Reference selects the quantizer by physical index"
+            );
+        }
+        found.insert((record.index(), 0));
+    }
     assert_eq!(
-        support::at(witness, "/location/reason")?,
-        &json!("captureLimit"),
-        "the opaque witness records the actual optional capture boundary"
+        found.len(),
+        usize::from(NEGATIVE_RESOURCES) + 1,
+        "the evidence contains every negative probe and the one late match"
     );
-    assert_eq!(
-        support::at(witness, "/effectiveEncryption")?,
-        &json!("encrypted"),
-        "the retained known encrypted input survives the coordinate cut"
-    );
-    assert_eq!(
-        support::at(witness, "/scope")?,
-        &json!("payload"),
-        "the witness covers the actual DCB payload domain"
-    );
-    assert_eq!(
-        support::at(witness, "/role")?,
-        &json!("selector"),
-        "the bounded inverse inventory contributes as a selector"
-    );
-    Ok(())
+    Ok(found)
 }

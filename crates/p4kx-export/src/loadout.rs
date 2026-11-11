@@ -12,7 +12,7 @@ use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
 use crate::guid_text::CatalogGuid;
 use crate::loadout_port::PortReader;
 use crate::record_fields::elements;
-use crate::{CatalogError, CatalogFailure, LoadoutSummary};
+use crate::{CatalogError, CatalogReadFailure, LoadoutSummary};
 
 #[path = "loadout_ledger.rs"]
 pub(crate) mod ledger;
@@ -43,15 +43,16 @@ pub(crate) fn carries_ports(tree: &RecordTree<'_>) -> bool {
 /// The resolvers and port readers not in use. A resolver keeps the Records it has read, so one
 /// taken for an entity and given back for the next keeps its caches across the splits of the
 /// parallel run.
-struct Pool<'f, 'a> {
-    entities: Arc<Entities<'f>>,
-    files: &'a ArchiveFiles<'a>,
-    idle: Mutex<Vec<(LoadoutResolver<'f>, PortReader)>>,
-    capture: Arc<Capture>,
+struct Pool<'source, 'worker> {
+    forge: &'source DataForge<'source>,
+    entities: Arc<Entities<'worker>>,
+    files: &'worker ArchiveFiles<'worker>,
+    idle: Mutex<Vec<(LoadoutResolver<'worker>, PortReader)>>,
+    capture: Arc<Capture<'worker>>,
 }
 
-impl<'f> Pool<'f, 'f> {
-    fn read(&self, want: Wanted) -> Result<Option<Loadout>, CatalogFailure> {
+impl<'source: 'worker, 'worker> Pool<'source, 'worker> {
+    fn read(&self, want: Wanted) -> Result<Option<Loadout>, CatalogReadFailure<'source>> {
         let taken = self
             .idle
             .lock()
@@ -68,13 +69,7 @@ impl<'f> Pool<'f, 'f> {
                 PortReader::new(),
             )
         });
-        let result = read_with(
-            &mut resolver,
-            &mut reader,
-            self.entities.forge(),
-            want,
-            &self.capture,
-        );
+        let result = read_with(&mut resolver, &mut reader, self.forge, want, &self.capture);
         self.idle
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -92,9 +87,9 @@ pub(crate) struct Wanted {
 }
 
 /// The loadouts of a catalog, the Records that could not be resolved and what was counted.
-pub(crate) struct Loadouts {
+pub(crate) struct Loadouts<'f> {
     pub(crate) entries: Vec<Loadout>,
-    pub(crate) failures: Vec<CatalogFailure>,
+    pub(crate) failures: Vec<CatalogReadFailure<'f>>,
     pub(crate) summary: LoadoutSummary,
     pub(crate) ledger: ExportLedger,
 }
@@ -109,26 +104,28 @@ pub(crate) struct Loadouts {
 /// # Errors
 ///
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
-pub(crate) fn loadouts(
+pub(crate) fn loadouts<'f>(
     archive: &Archive,
-    entities: &Arc<Entities<'_>>,
+    entities: &Arc<Entities<'f>>,
     wanted: &[Wanted],
     known: &HashSet<Guid>,
     source: &ExportLedger,
+    input: &crate::build::original_input::OriginalCatalogInput<'_, 'f>,
     cancel: Option<&CancelToken>,
-) -> Result<Loadouts, CatalogError> {
+) -> Result<Loadouts<'f>, CatalogError> {
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
-    let capture = Arc::new(Capture::new(source, cancel));
+    let capture = Arc::new(Capture::for_input(input, source, cancel, Kind::Loadouts));
     let files = ArchiveFiles::new(archive);
     let pool = Pool {
+        forge: entities.forge(),
         entities: Arc::clone(entities),
         files: &files,
         idle: Mutex::new(Vec::new()),
         capture: Arc::clone(&capture),
     };
-    let read: Vec<Option<Result<Option<Loadout>, CatalogFailure>>> = wanted
+    let read: Vec<Option<Result<Option<Loadout>, CatalogReadFailure<'f>>>> = wanted
         .par_iter()
         .map(|want| {
             if cancel.is_some_and(CancelToken::is_cancelled) {
@@ -158,13 +155,13 @@ pub(crate) fn loadouts(
     })
 }
 
-fn read_with<'f>(
-    resolver: &mut LoadoutResolver<'f>,
+fn read_with<'f: 'worker, 'worker>(
+    resolver: &mut LoadoutResolver<'worker>,
     reader: &mut PortReader,
     forge: &'f DataForge<'f>,
     want: Wanted,
-    capture: &Capture,
-) -> Result<Option<Loadout>, CatalogFailure> {
+    capture: &Capture<'_>,
+) -> Result<Option<Loadout>, CatalogReadFailure<'f>> {
     let Some(record) = forge
         .record(want.record_index)
         .filter(|record| record.guid() == want.guid.0)
@@ -176,7 +173,7 @@ fn read_with<'f>(
         Ok(node) => node,
         Err(error) => {
             capture.root(&record, want.kind, Err(&error));
-            return Err(CatalogFailure::of_loadout(&record, &error));
+            return Err(CatalogReadFailure::of_loadout(&record, &error));
         }
     };
     capture.root(&record, want.kind, Ok(&node));

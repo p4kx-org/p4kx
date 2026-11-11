@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use p4kx_foundation::ByteReader;
 
@@ -9,6 +9,7 @@ use crate::header::Header;
 use crate::issues::Issues;
 use crate::record_table::RecordTable;
 use crate::rows::{DataMapping, EnumDef, NO_PARENT, OptionName, PropertyDef, StructDef};
+use crate::source_layout_index::SourceLayoutIndex;
 use crate::strings::StringTable;
 use crate::table::{Table, take};
 use crate::{DataForgeError, ValueKind};
@@ -35,6 +36,8 @@ pub struct DataForge<'a> {
     pub(crate) instance_counts: Box<[u32]>,
     pub(crate) instance_starts: Box<[u64]>,
     pub(crate) instances: &'a [u8],
+    pub(crate) source_layout_index: OnceLock<SourceLayoutIndex>,
+    pub(crate) source_layout_turn: Mutex<()>,
     pub(crate) guid_index: OnceLock<Box<[u32]>>,
     pub(crate) path_index: OnceLock<Box<[u32]>>,
     pub(crate) root_index: OnceLock<Box<[(u32, u32, u32)]>>,
@@ -93,6 +96,8 @@ impl<'a> DataForge<'a> {
             instance_counts: counts,
             instance_starts: starts,
             instances,
+            source_layout_index: OnceLock::new(),
+            source_layout_turn: Mutex::new(()),
             guid_index: OnceLock::new(),
             path_index: OnceLock::new(),
             root_index: OnceLock::new(),

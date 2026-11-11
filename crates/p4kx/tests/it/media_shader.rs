@@ -136,7 +136,7 @@ fn verify_payloads(rows: &[MediaRecord]) {
 }
 
 #[test]
-fn omission_selects_all_registered_archive_shader_and_material_providers() -> TestResult {
+fn omission_selects_all_registered_providers() -> TestResult {
     let folder = tempfile::tempdir()?;
     let source = source(folder.path())?;
     let output = folder.path().join("export");
@@ -151,7 +151,12 @@ fn omission_selects_all_registered_archive_shader_and_material_providers() -> Te
     let kinds: Vec<_> = index.kinds.iter().map(|kind| kind.provider.kind).collect();
     assert_eq!(
         kinds,
-        [MediaKind::Archive, MediaKind::Shader, MediaKind::Material],
+        [
+            MediaKind::Archive,
+            MediaKind::Shader,
+            MediaKind::Material,
+            MediaKind::Audio
+        ],
         "omission preserves registration order and includes the new available provider"
     );
     assert!(
@@ -173,6 +178,12 @@ fn omission_selects_all_registered_archive_shader_and_material_providers() -> Te
         fs::read(material)?,
         b"",
         "default material provider emits no invented row for a shader-only fixture"
+    );
+    let audio = output.join(&index.artifact_base).join("audio.jsonl");
+    assert_eq!(
+        fs::read(audio)?,
+        b"",
+        "default Audio emits no invented row for a shader-only fixture"
     );
 
     Ok(())

@@ -49,7 +49,10 @@ fn excluded_or_outside_manufacturers_remain_authored_links_without_auto_inclusio
         assert!(
             references(&catalog)?.iter().any(|reference| {
                 reference.get("status").and_then(Value::as_str) == Some(expected)
-                    && reference.get("targetRecordIndex").and_then(Value::as_u64) == Some(0)
+                    && reference
+                        .pointer("/targetRecordIndex/value")
+                        .and_then(Value::as_u64)
+                        == Some(0)
             }),
             "{target:?} keeps its exact materialization status"
         );
@@ -67,7 +70,7 @@ fn equal_guid_aliases_keep_physical_rows_and_cannot_silently_resolve() -> TestRe
         None,
     );
     assert!(
-        matches!(normal, Err(error) if matches!(error.downcast_ref::<CatalogError>(), Some(CatalogError::IncompleteExport { .. })))
+        matches!(normal, Err(error) if matches!(error.downcast_ref::<CatalogError>(), Some(CatalogError::IncompleteExport(_))))
     );
     let (_, catalog) = fixture::build(
         &database,
@@ -110,7 +113,7 @@ fn a_nil_authored_identity_is_retained_as_a_raw_fact_and_diagnosed() -> TestResu
     ));
     let normal = fixture::normal(&database);
     assert!(
-        matches!(normal, Err(error) if matches!(error.downcast_ref::<CatalogError>(), Some(CatalogError::IncompleteExport { .. })))
+        matches!(normal, Err(error) if matches!(error.downcast_ref::<CatalogError>(), Some(CatalogError::IncompleteExport(_))))
     );
     let (_, catalog) = fixture::build(
         &database,
@@ -129,18 +132,21 @@ fn a_nil_authored_identity_is_retained_as_a_raw_fact_and_diagnosed() -> TestResu
     let diagnostics = fixture::at(&catalog, "/exportHealth/diagnostics")?
         .as_array()
         .ok_or("identity diagnostics")?;
+    let mut found = false;
+    for diagnostic in diagnostics {
+        if diagnostic.get("code").and_then(Value::as_str) != Some("malformedSource") {
+            continue;
+        }
+        let examples = diagnostic["examples"]
+            .as_array()
+            .ok_or("identity examples")?;
+        for example in examples {
+            found |= crate::health_origin_assertions::example_text(&catalog, example, "field")?
+                == Some(&json!("$guid"));
+        }
+    }
     assert!(
-        diagnostics.iter().any(|diagnostic| {
-            diagnostic.get("code").and_then(Value::as_str) == Some("malformedSource")
-                && diagnostic
-                    .get("examples")
-                    .and_then(Value::as_array)
-                    .is_some_and(|examples| {
-                        examples.iter().any(|example| {
-                            example.get("field").and_then(Value::as_str) == Some("$guid")
-                        })
-                    })
-        }),
+        found,
         "the actual invalid identity has its typed source location"
     );
     Ok(())

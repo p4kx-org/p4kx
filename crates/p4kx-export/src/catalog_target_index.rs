@@ -134,7 +134,11 @@ fn origins<'source>(
         if !matches!(
             kind,
             Kind::Manufacturers
+                | Kind::ContractTemplates
+                | Kind::MissionBrokerEntries
                 | Kind::GameplayProperties
+                | Kind::Blueprints
+                | Kind::LootPoolFilters
                 | Kind::Tags
                 | Kind::Commodities
                 | Kind::ResourceTypes
@@ -158,15 +162,16 @@ fn origins<'source>(
         if proof.guid != source.guid
             || source
                 .record_path
-                .as_deref()
-                .is_some_and(|path| path != proof.record_path)
+                .as_ref()
+                .map(crate::HealthText::as_str)
+                .is_some_and(|path| path != proof.record_path.as_str())
         {
             return Err(ExportAccountingError::ConflictingFieldInspection);
         }
         let identity = Identity {
             kind: kind.index(),
             guid: proof.guid,
-            path: &proof.record_path,
+            path: proof.record_path.as_str(),
         };
         origins
             .entry(identity)
@@ -175,3 +180,7 @@ fn origins<'source>(
     }
     Ok(origins)
 }
+
+#[cfg(test)]
+#[path = "catalog_broker_row_source_tests.rs"]
+mod broker_source_tests;

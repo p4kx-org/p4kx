@@ -38,6 +38,9 @@ jobs:
       - name: Complete release matrix regression cases
         shell: pwsh
         run: .github/scripts/test-release-matrix.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'release-matrix-fixtures')
+      - name: Required release scan evidence regression cases
+        shell: pwsh
+        run: .github/scripts/test-release-scan.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'release-scan-fixtures')
 
   lint:
     name: Lint (${{ matrix.target }})

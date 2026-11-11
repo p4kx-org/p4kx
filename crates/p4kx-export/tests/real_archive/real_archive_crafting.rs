@@ -14,6 +14,7 @@ use p4kx_testkit::real_archive_path;
 use serde_json::Value;
 
 use crate::catalog_v3_consumer;
+use crate::real_archive_blueprints::Blueprints;
 use crate::real_archive_canonical_texts::{TextDomain, TextIndex, TextReferenceShape};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -144,14 +145,20 @@ fn described_count(choices: &[Value], texts: &TextIndex<'_>) -> Result<usize, Bo
 }
 
 fn check_blueprints(catalog: &Value) -> TestResult {
-    let blueprints = list(catalog, "blueprints")?;
+    let blueprints = Blueprints::read(catalog)?;
     let items: HashSet<&str> = list(catalog, "items")?
         .iter()
         .filter_map(|item| item["guid"].as_str())
         .collect();
     let produced: Vec<&str> = blueprints
+        .rows()
         .iter()
-        .filter_map(|blueprint| blueprint["producedItemGuid"].as_str())
+        .filter_map(|blueprint| {
+            blueprint
+                .presentation
+                .pointer("/producedItem/value")
+                .and_then(Value::as_str)
+        })
         .collect();
     let known = produced.iter().filter(|guid| items.contains(*guid)).count();
     assert!(
@@ -159,38 +166,46 @@ fn check_blueprints(catalog: &Value) -> TestResult {
         "{known} of {} produced items are catalog items",
         produced.len()
     );
-    check_ingredients(catalog)?;
-    check_craft_times(blueprints);
+    check_ingredients(catalog, &blueprints)?;
+    check_craft_times(&blueprints);
     Ok(())
 }
 
-fn check_ingredients(catalog: &Value) -> TestResult {
-    let blueprints = list(catalog, "blueprints")?;
-    let lines: Vec<&Value> = blueprints
-        .iter()
-        .filter_map(|blueprint| blueprint["ingredients"].as_array())
-        .flatten()
-        .collect();
+fn check_ingredients(catalog: &Value, blueprints: &Blueprints<'_>) -> TestResult {
+    let mut lines = Vec::new();
+    for blueprint in blueprints.rows() {
+        lines.extend(blueprint.ingredients()?);
+    }
     assert!(!lines.is_empty(), "ingredient lines");
     let resource_lines: HashSet<&str> = lines
         .iter()
-        .filter_map(|line| line["resourceGuid"].as_str())
+        .filter_map(|line| {
+            line.pointer("/meaning/resourceGuid/value")
+                .and_then(Value::as_str)
+        })
         .collect();
     check_resource_links(catalog, &resource_lines)?;
     assert!(
-        lines.iter().any(|line| line["itemGuid"].is_string()),
+        lines.iter().any(|line| line
+            .pointer("/meaning/itemGuid/value")
+            .is_some_and(Value::is_string)),
         "some ingredient is an item"
     );
     assert!(
-        lines
-            .iter()
-            .all(|line| line["resourceGuid"].is_string() != line["itemGuid"].is_string()),
+        lines.iter().all(|line| line
+            .pointer("/meaning/resourceGuid/value")
+            .is_some_and(Value::is_string)
+            != line
+                .pointer("/meaning/itemGuid/value")
+                .is_some_and(Value::is_string)),
         "a line is a resource or an item"
     );
     assert!(
-        lines
-            .iter()
-            .any(|line| line["minQuality"].as_i64().is_some_and(|q| q > 0)),
+        lines.iter().any(|line| line
+            .pointer("/meaning/minQuality/value")
+            .and_then(Value::as_str)
+            .and_then(|q| q.parse::<i64>().ok())
+            .is_some_and(|q| q > 0)),
         "some ingredient has a minimum quality"
     );
     Ok(())
@@ -214,19 +229,26 @@ pub(crate) fn check_resource_links(catalog: &Value, lines: &HashSet<&str>) -> Te
     Ok(())
 }
 
-fn check_craft_times(blueprints: &[Value]) {
-    let timed = blueprints
+fn check_craft_times(blueprints: &Blueprints<'_>) {
+    let rows = blueprints.rows();
+    let timed = rows
         .iter()
         .filter(|blueprint| {
-            blueprint["craftTimeSeconds"]
-                .as_i64()
-                .is_some_and(|s| s > 0)
+            blueprint
+                .tiers
+                .first()
+                .and_then(|tier| {
+                    tier.pointer("/craftTimeSeconds/value")
+                        .and_then(Value::as_str)
+                })
+                .and_then(|seconds| seconds.parse::<i64>().ok())
+                .is_some_and(|seconds| seconds > 0)
         })
         .count();
     assert!(
-        ratio(timed, blueprints.len()) > 0.9,
+        ratio(timed, rows.len()) > 0.9,
         "most blueprints have a craft time: {timed} of {}",
-        blueprints.len()
+        rows.len()
     );
 }
 

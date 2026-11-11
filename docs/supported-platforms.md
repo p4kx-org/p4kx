@@ -89,18 +89,27 @@ Before checksums and release notes are assembled, `check-release-matrix.ps1` req
 The filenames are `P4KX-{version}-{target}-{binary}.cdx.json` and
 `P4KX-{version}-{target}-runtime.json`. Runtime artifacts state their `native-synthetic` scope
 and preserve device-verification states. A missing target/package/binary fails preflight.
+The top-level archive digest must match the actual portable ZIP on Windows or tar.gz on Linux.
+Each package's execution proof carries its own digest.
 Windows runtime evidence additionally covers both the portable ZIP and installed MSI payload,
 with package hashes and the exact release EXE hashes. Missing, skipped or mismatched packaged
 runtime evidence fails preflight. [Windows packages](windows-packages.md) describes lifecycle,
 rollback and CPU replacement verification.
 Linux runtime evidence covers all four actual package launchers and retains post-transformation
 ELF hashes with unchanged source `.text` hashes, plus Flatpak runtime/app OSTree identity and
-Documents-portal grants. [Linux packages](linux-packages.md) defines the Ubuntu 24.04 / glibc 2.39
+Documents-portal grants. The two native Linux runs also require deb and Flatpak in-place
+upgrades from separately installed workflow fixtures, launch of the candidate version,
+removal and profile preservation. [Linux packages](linux-packages.md) defines the Ubuntu 24.04 / glibc 2.39
 host baseline, separate Freedesktop 25.08 runtime, source/relink artifacts and permission policy.
 Flatpak additionally requires host Documents API 5 with `GetHostPaths`; an older Documents
 service is a startup failure rather than a successful or skipped runtime check.
 Packaging checks, signatures, scans, provenance and the full export/device audit remain required
-parts of the final release gate.
+parts of the final release gate. Tag publication requires a completed VirusTotal report for the
+exact SHA-256 of each of the twelve native packages. The assembly job compares the scan receipt
+against the package bytes, source revision, version and workflow run. The receipt stays with the
+workflow evidence and the release notes link the reports. Pending, missing or failed reports
+prevent publication. Pull requests and operating-system-specific dry runs do not contact VirusTotal.
+A full manual branch run records scan availability in its notes.
 
 All hosted checks use synthetic data. Real Archive tests stay ignored/local or explicitly
 private, and no game assets, keys or confidential values enter CI artifacts or releases.

@@ -1,15 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
+
 use super::VehicleImplementation;
+use super::elem::Modification;
 use super::file_read;
 use super::paths;
 use super::paths::DIRECTORY;
+use super::request;
 use crate::loadout_file_events::Document;
 use crate::loadout_file_trace::FileTrace;
-use crate::markup::Budget;
+use crate::markup::{Budget, Element};
 use crate::resolver_observation::Observation;
-use crate::{LoadoutDocumentKind, LoadoutError, LoadoutFiles};
+use crate::{
+    LoadoutDocumentKind, LoadoutError, LoadoutFailurePath, LoadoutFiles, LoadoutPath,
+    LoadoutPathOperation, LoadoutRequest,
+};
 use modification::AppliedModification;
 
 #[path = "locate_modification.rs"]
@@ -22,72 +29,87 @@ pub(super) fn issue(path: &str, reason: impl Into<String>) -> LoadoutError {
     }
 }
 
-fn missing(path: &str) -> LoadoutError {
-    LoadoutError::MissingVehicleImplementation {
-        path: path.to_owned(),
-    }
+const fn missing(path: LoadoutFailurePath) -> LoadoutError {
+    LoadoutError::MissingVehicleImplementation { path }
 }
-/// What selects the Modification: the implementation file, its name, the Entity's class name and
-/// the Modification's name.
+
 struct Selection<'a> {
     path: &'a str,
     stem: &'a str,
     class_name: &'a str,
-    modification: &'a str,
+    definition: &'a LoadoutPath,
+    modification: &'a LoadoutPath,
+    selected: Option<&'a Modification>,
+    class_request: &'a LoadoutPath,
+    caller: &'a LoadoutRequest,
 }
 
-/// Reads the vehicle implementation an Entity names, with the Modification it selects.
-///
-/// The file is the Record's `vehicleDefinition`; when the Archive has none of that path, the
-/// file of the same name in the implementation folder, then the file named after the Entity's
-/// class name. The Modification's patch file is its `patchFile`, else
-/// `Modifications/<definition name>_<modification>.xml`, else `Modifications/<class name>.xml`.
-/// Every path must lie below the implementation folder. A patch file or Modification that cannot
-/// be found, read or applied within the budget is an issue of the result; the implementation
-/// without it is still returned.
 pub(crate) fn load(
     files: &dyn LoadoutFiles,
     class_name: &str,
     definition: &str,
     modification: &str,
 ) -> Result<VehicleImplementation, LoadoutError> {
-    load_observed(
-        files,
-        class_name,
-        definition,
-        modification,
-        None,
-        &mut FileTrace::default(),
-    )
+    let caller = LoadoutRequest::Vehicle {
+        definition: LoadoutPath::unbound(definition),
+        modification: LoadoutPath::unbound(modification),
+        class_name: None,
+    };
+    load_observed(files, class_name, &caller, None, &mut FileTrace::default())
 }
 
 pub(crate) fn load_observed(
     files: &dyn LoadoutFiles,
     class_name: &str,
-    definition: &str,
-    modification: &str,
-    observation: Option<&Observation>,
+    caller: &LoadoutRequest,
+    observation: Option<&Observation<'_>>,
     trace: &mut FileTrace,
 ) -> Result<VehicleImplementation, LoadoutError> {
+    let LoadoutRequest::Vehicle {
+        definition,
+        modification,
+        class_name: record_name,
+    } = caller
+    else {
+        return Err(issue(
+            class_name,
+            "the vehicle reader requires a vehicle caller",
+        ));
+    };
+    let class_request = record_name.as_ref().map_or_else(
+        || Cow::Owned(LoadoutPath::unbound(class_name)),
+        Cow::Borrowed,
+    );
     let stem = paths::file_stem(definition);
-    let candidates = definition_candidates(class_name, definition, stem);
+    let candidates = definition_candidates(
+        class_name,
+        definition,
+        class_request.as_ref(),
+        stem,
+        observation,
+    )?;
     let shown = if definition.is_empty() {
-        class_name
+        class_request.as_ref()
     } else {
         definition
     };
-    let (path, bytes) = read_definition(files, &candidates, shown, observation, trace)?;
+    let (path, bytes) = read_definition(files, &candidates, shown, caller, observation, trace)?;
     let mut budget = Budget::new(bytes.len());
-    let mut root = file_read::base(&path, bytes, &mut budget, observation)?;
+    let (mut root, selected_element) =
+        file_read::base(&path, bytes, &mut budget, modification, observation)?;
     let mut issues = Vec::new();
 
-    let selected = (!modification.is_empty()).then(|| modification.to_owned());
-    let modified = if let Some(name) = &selected {
+    let selected = (!modification.is_empty()).then(|| modification.to_string());
+    let modified = if selected.is_some() {
         let selection = Selection {
             path: &path,
             stem,
             class_name,
-            modification: name,
+            definition,
+            modification,
+            selected: selected_element.as_ref(),
+            class_request: class_request.as_ref(),
+            caller,
         };
         modification::apply(
             files,
@@ -101,9 +123,19 @@ pub(crate) fn load_observed(
     } else {
         AppliedModification::default()
     };
-    let parts = super::read::parts(&root);
-    Ok(VehicleImplementation {
-        structure: super::structure::digest(&root),
+    Ok(project(path, selected, &root, modified, issues))
+}
+
+fn project(
+    path: String,
+    selected: Option<String>,
+    root: &Element,
+    modified: AppliedModification,
+    issues: Vec<LoadoutError>,
+) -> VehicleImplementation {
+    let parts = super::read::parts(root);
+    VehicleImplementation {
+        structure: super::structure::digest(root),
         path,
         patch_path: modified.patch_path,
         modification: selected,
@@ -113,33 +145,58 @@ pub(crate) fn load_observed(
         port_paths: super::read::port_paths(&parts),
         parts,
         issues,
-    })
+    }
 }
 
-/// Returns the candidates for the implementation file: the definition, the file of its name in
-/// the implementation folder and the file named after the class.
-fn definition_candidates(class_name: &str, definition: &str, stem: &str) -> Vec<String> {
+fn definition_candidates(
+    class_name: &str,
+    definition: &LoadoutPath,
+    class_request: &LoadoutPath,
+    stem: &str,
+    observation: Option<&Observation<'_>>,
+) -> Result<Vec<LoadoutPath>, LoadoutError> {
     let mut candidates = Vec::new();
-    paths::add_candidate(&mut candidates, definition);
+    request::add(
+        &mut candidates,
+        definition,
+        LoadoutPathOperation::VehicleDefinition,
+        &[definition],
+        observation,
+    )?;
     if paths::usable_name(stem) {
-        paths::add_candidate(&mut candidates, &format!("{DIRECTORY}/{stem}.xml"));
+        request::add(
+            &mut candidates,
+            &format!("{DIRECTORY}/{stem}.xml"),
+            LoadoutPathOperation::VehicleDefinitionStem,
+            &[definition],
+            observation,
+        )?;
     }
     if paths::usable_name(class_name) {
-        paths::add_candidate(&mut candidates, &format!("{DIRECTORY}/{class_name}.xml"));
+        request::add(
+            &mut candidates,
+            &format!("{DIRECTORY}/{class_name}.xml"),
+            LoadoutPathOperation::VehicleClass,
+            &[class_request],
+            observation,
+        )?;
     }
-    candidates
+    Ok(candidates)
 }
 
 fn read_definition(
     files: &dyn LoadoutFiles,
-    candidates: &[String],
-    shown: &str,
-    observation: Option<&Observation>,
+    candidates: &[LoadoutPath],
+    shown: &LoadoutPath,
+    caller: &LoadoutRequest,
+    observation: Option<&Observation<'_>>,
     trace: &mut FileTrace,
 ) -> Result<(String, Document), LoadoutError> {
+    let first = trace.position();
     match file_read::first(
         files,
         candidates,
+        caller,
         LoadoutDocumentKind::VehicleImplementation,
         observation,
         trace,
@@ -148,7 +205,10 @@ fn read_definition(
         Ok(None) => Err(if candidates.is_empty() {
             issue(shown, format!("the path is not below {DIRECTORY}"))
         } else {
-            missing(shown)
+            missing(LoadoutFailurePath::from_attempts(
+                shown.clone(),
+                trace.attempts(first, candidates.len()),
+            ))
         }),
         Err(error) => Err(error),
     }

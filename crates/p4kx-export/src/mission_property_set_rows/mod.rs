@@ -2,49 +2,100 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 mod compare;
-
 #[cfg(test)]
 mod tests;
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use p4kx_extraction::Guid;
-
-use crate::guid_text::{self, CatalogGuid};
+use std::collections::BTreeMap;
 
 use super::MissionPropertySet;
+use crate::catalog_read::original::{ExampleBodyReceipt, RecordSubject};
+use crate::guid_text::{self, CatalogGuid};
+use crate::{CatalogError, ExportAccountingError};
 
-struct Row<'f> {
-    set: MissionPropertySet<'f>,
-    owners: BTreeSet<u32>,
+type Owners<'source> = BTreeMap<u32, SetOwner<'source>>;
+struct Row<'source> {
+    set: MissionPropertySet<'source>,
+    owners: Owners<'source>,
 }
 
-/// The exact physical owner of a quarantined canonical source identity.
-pub(crate) struct SetOwner<'f> {
+/// One physical property-set owner and its original header and field admissions.
+#[derive(Clone)]
+pub(crate) struct SetOwner<'source> {
     pub(crate) record_index: u32,
     pub(crate) guid: CatalogGuid,
-    pub(crate) path: &'f str,
-    pub(crate) source_type: &'f str,
+    pub(crate) path: &'source str,
+    pub(crate) source_type: &'source str,
     pub(crate) location: String,
+    subject: RecordSubject,
+    body: Option<ExampleBodyReceipt>,
 }
 
-impl<'f> SetOwner<'f> {
-    fn of(record_index: u32, set: &MissionPropertySet<'f>) -> Self {
-        Self {
-            record_index,
+impl<'source> SetOwner<'source> {
+    fn of(
+        set: &MissionPropertySet<'source>,
+        subject: RecordSubject,
+        body: ExampleBodyReceipt,
+    ) -> Result<Self, CatalogError> {
+        body.check_record_owner(&subject)?;
+        body.check_description(Some(&set.source_location), Some(set.source_type), None)?;
+        Self::new(set, subject, Some(body))
+    }
+
+    fn new(
+        set: &MissionPropertySet<'source>,
+        subject: RecordSubject,
+        body: Option<ExampleBodyReceipt>,
+    ) -> Result<Self, CatalogError> {
+        let key = subject
+            .key()
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
+        if key.guid() != set.record_guid.0 || key.path() != Some(set.record_path) {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        Ok(Self {
+            record_index: key.index(),
             guid: set.record_guid,
             path: set.record_path,
             source_type: set.source_type,
             location: set.source_location.clone(),
+            subject,
+            body,
+        })
+    }
+    pub(crate) const fn subject(&self) -> &RecordSubject {
+        &self.subject
+    }
+    pub(crate) fn body(&self) -> Result<&ExampleBodyReceipt, ExportAccountingError> {
+        self.body
+            .as_ref()
+            .ok_or(ExportAccountingError::UnboundHealthSubject)
+    }
+
+    fn merge(&mut self, other: Self) -> Result<(), CatalogError> {
+        if self.record_index != other.record_index
+            || self.guid != other.guid
+            || self.path != other.path
+            || self.source_type != other.source_type
+            || self.location != other.location
+        {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
+        self.subject.merge(other.subject)?;
+        match (&mut self.body, other.body) {
+            (Some(body), Some(other)) => body.merge(other)?,
+            (None, None) => {}
+            _ => return Err(ExportAccountingError::UnboundHealthSubject.into()),
+        }
+        Ok(())
     }
 }
 
-/// Canonical source sets and permanently quarantined incompatible identities.
+/// Canonical sets and quarantined aliases retaining every actual physical owner.
 #[derive(Default)]
-pub(crate) struct MissionPropertySets<'f> {
-    rows: BTreeMap<Guid, Row<'f>>,
-    conflicts: BTreeMap<Guid, BTreeMap<u32, SetOwner<'f>>>,
+pub(crate) struct MissionPropertySets<'source> {
+    rows: BTreeMap<Guid, Row<'source>>,
+    conflicts: BTreeMap<Guid, Owners<'source>>,
 }
 
 impl std::fmt::Debug for MissionPropertySets<'_> {
@@ -56,62 +107,86 @@ impl std::fmt::Debug for MissionPropertySets<'_> {
     }
 }
 
-fn add_owners<'f>(owners: &mut BTreeMap<u32, SetOwner<'f>>, row: &Row<'f>) {
-    for &index in &row.owners {
-        owners
-            .entry(index)
-            .or_insert_with(|| SetOwner::of(index, &row.set));
+fn merge_owners<'source>(
+    target: &mut Owners<'source>,
+    incoming: Owners<'source>,
+) -> Result<(), CatalogError> {
+    for (index, owner) in incoming {
+        if let Some(retained) = target.get_mut(&index) {
+            retained.merge(owner)?;
+        } else {
+            target.insert(index, owner);
+        }
     }
+    Ok(())
 }
 
-impl<'f> MissionPropertySets<'f> {
+impl<'source> MissionPropertySets<'source> {
     pub(crate) fn contains(&self, guid: CatalogGuid) -> bool {
         self.rows.contains_key(&guid.0) || self.conflicts.contains_key(&guid.0)
     }
-
     pub(crate) fn is_ambiguous(&self, guid: CatalogGuid) -> bool {
         self.conflicts.contains_key(&guid.0)
     }
 
+    #[cfg(test)]
     pub(crate) fn insert(
         &mut self,
-        record_index: u32,
-        set: MissionPropertySet<'f>,
-    ) -> Result<(), serde_json::Error> {
+        index: u32,
+        set: MissionPropertySet<'source>,
+    ) -> Result<(), CatalogError> {
+        let subject = RecordSubject::accounting(
+            index,
+            set.record_guid.0,
+            Some(crate::HealthText::new(set.record_path)),
+        );
+        let owner = SetOwner::new(&set, subject, None)?;
+        self.insert_owner(set, owner)
+    }
+    pub(crate) fn insert_subject(
+        &mut self,
+        subject: RecordSubject,
+        set: MissionPropertySet<'source>,
+        body: ExampleBodyReceipt,
+    ) -> Result<(), CatalogError> {
+        let owner = SetOwner::of(&set, subject, body)?;
+        self.insert_owner(set, owner)
+    }
+    fn insert_owner(
+        &mut self,
+        set: MissionPropertySet<'source>,
+        owner: SetOwner<'source>,
+    ) -> Result<(), CatalogError> {
         self.absorb(
             set.guid.0,
             Row {
                 set,
-                owners: BTreeSet::from([record_index]),
+                owners: BTreeMap::from([(owner.record_index, owner)]),
             },
         )
     }
-
-    fn absorb(&mut self, guid: Guid, mut row: Row<'f>) -> Result<(), serde_json::Error> {
+    fn absorb(&mut self, guid: Guid, row: Row<'source>) -> Result<(), CatalogError> {
         if let Some(owners) = self.conflicts.get_mut(&guid) {
-            add_owners(owners, &row);
+            merge_owners(owners, row.owners)?;
         } else if let Some(mut known) = self.rows.remove(&guid) {
-            if compare::equal(&known.set, &row.set)? {
-                known.owners.append(&mut row.owners);
+            if compare::equal(&known.set, &row.set).map_err(CatalogError::Json)? {
+                merge_owners(&mut known.owners, row.owners)?;
                 self.rows.insert(guid, known);
             } else {
-                let mut owners = BTreeMap::new();
-                add_owners(&mut owners, &known);
-                add_owners(&mut owners, &row);
-                self.conflicts.insert(guid, owners);
+                merge_owners(&mut known.owners, row.owners)?;
+                self.conflicts.insert(guid, known.owners);
             }
         } else {
             self.rows.insert(guid, row);
         }
         Ok(())
     }
-
-    pub(crate) fn merge(&mut self, other: Self) -> Result<(), serde_json::Error> {
+    pub(crate) fn merge(&mut self, other: Self) -> Result<(), CatalogError> {
         for (guid, owners) in other.conflicts {
             let target = self.conflicts.entry(guid).or_default();
-            target.extend(owners);
+            merge_owners(target, owners)?;
             if let Some(row) = self.rows.remove(&guid) {
-                add_owners(target, &row);
+                merge_owners(target, row.owners)?;
             }
         }
         for (guid, row) in other.rows {
@@ -119,12 +194,10 @@ impl<'f> MissionPropertySets<'f> {
         }
         Ok(())
     }
-
-    pub(crate) fn ambiguous_owners(&self) -> impl Iterator<Item = &SetOwner<'f>> {
+    pub(crate) fn ambiguous_owners(&self) -> impl Iterator<Item = &SetOwner<'source>> {
         self.conflicts.values().flat_map(BTreeMap::values)
     }
-
-    pub(crate) fn into_rows(self) -> Vec<MissionPropertySet<'f>> {
+    pub(crate) fn into_rows(self) -> Vec<MissionPropertySet<'source>> {
         let mut rows: Vec<_> = self.rows.into_values().map(|row| row.set).collect();
         guid_text::sort_by_guid(&mut rows, |set| set.guid);
         rows

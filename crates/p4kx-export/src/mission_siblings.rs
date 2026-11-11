@@ -5,10 +5,11 @@ use p4kx_extraction::{CancelToken, DataForge, Filter};
 
 use crate::CatalogError;
 use crate::broker_entry_read::{self, BrokerEntries};
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::contract_template_read::{self, ContractTemplates};
 use crate::location_template::{self, LocationTemplates};
 use crate::mission_index::MissionIndex;
-use crate::texts::Texts;
 
 /// The kinds read beside the contracts: the mission location templates, the contract templates
 /// and the mission broker entries.
@@ -27,20 +28,25 @@ pub(crate) struct Siblings<'f> {
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
 pub(crate) fn read<'f>(
     forge: &'f DataForge<'f>,
-    (texts, index): (&Texts<'f>, &MissionIndex<'f>),
+    projection: &CatalogProjection<'_, 'f>,
+    (captured_tags, index): (&CapturedTags<'_, 'f>, &MissionIndex<'f>),
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
 ) -> Result<Siblings<'f>, CatalogError> {
+    let input = projection.original();
+    let texts = projection.legacy_texts();
     let tags = index.tags();
-    let contract_templates = contract_template_read::read(forge, texts, tags, filter, cancel)?;
+    let contract_templates =
+        contract_template_read::read(forge, projection, captured_tags, filter, cancel)?;
     let broker_entries = broker_entry_read::read(
         forge,
-        (texts, index, &contract_templates.unknowns),
+        projection,
+        (captured_tags, index, &contract_templates.unknowns),
         filter,
         cancel,
     )?;
     Ok(Siblings {
-        location_templates: location_template::read(forge, texts, tags, filter, cancel)?,
+        location_templates: location_template::read(forge, input, texts, tags, filter, cancel)?,
         contract_templates,
         broker_entries,
     })

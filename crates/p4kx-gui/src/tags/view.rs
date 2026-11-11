@@ -94,11 +94,10 @@ impl TagsView {
     #[must_use]
     pub fn irregularities(&self) -> usize {
         let issues = self.tree.issues();
-        issues.unreadable()
+        issues.unclassified()
+            + issues.unreadable()
             + issues.dangling()
             + issues.repeated()
-            + issues.too_deep()
-            + issues.too_long()
             + issues.duplicate()
             + issues.unlisted()
     }
@@ -157,8 +156,11 @@ impl TagsView {
         }
         let lowered = needle.to_lowercase();
         let mut keep = vec![false; self.tree.len()];
+        let mut path = String::new();
         for tag in self.tree.iter() {
-            if contains_ignoring_case(tag.path(), &lowered) {
+            path.clear();
+            tag.path_view().append_to(&mut path);
+            if contains_ignoring_case(&path, &lowered) {
                 for ancestor in tag.ancestors_and_self() {
                     match keep.get_mut(ancestor.position()) {
                         Some(flag) if !*flag => *flag = true,

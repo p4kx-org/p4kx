@@ -20,6 +20,7 @@ mod catalog_model;
 mod catalog_publication;
 mod catalog_render;
 mod catalog_resource_wire;
+mod catalog_snapshot_api;
 mod catalog_tags_window;
 mod catalog_window;
 mod cataloging;

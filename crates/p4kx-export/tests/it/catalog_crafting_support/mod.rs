@@ -3,6 +3,7 @@
 
 //! Building and reading the catalog of a synthetic Archive for the crafting catalog tests.
 
+pub(crate) mod blueprint;
 pub(crate) mod blueprint_categories;
 pub(crate) mod commodity;
 pub(crate) mod groups;
@@ -81,15 +82,23 @@ pub(crate) fn diagnostic_from(
     forge: &DataForgeBuilder,
     filter: Option<&Filter>,
 ) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
-    let built = build_with_mode(
+    let built = build_diagnostic(forge, filter)?;
+    let json = resource_v3_view::project(serde_json::from_slice(built.json())?)?;
+    Ok((built, json))
+}
+
+/// Builds an intentionally incomplete fixture with the actual catalog wire output.
+pub(crate) fn build_diagnostic(
+    forge: &DataForgeBuilder,
+    filter: Option<&Filter>,
+) -> Result<BuiltCatalog, Box<dyn Error>> {
+    build_with_mode(
         forge,
         filter,
         None,
         p4kx_export::CatalogPublicationMode::DiagnosticPartial,
         Vec::new(),
-    )?;
-    let json = resource_v3_view::project(serde_json::from_slice(built.json())?)?;
-    Ok((built, json))
+    )
 }
 
 /// Builds the catalog of an Archive holding `forge`, reporting its progress to `progress`.
@@ -147,13 +156,4 @@ fn build_data(
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
     };
     Ok(build_catalog(&archive, &options)?)
-}
-
-/// Returns the blueprint with the GUID `guid`.
-pub(crate) fn blueprint(catalog: &Value, guid: u128) -> Result<&Value, Box<dyn Error>> {
-    let wanted = text(guid);
-    catalog["blueprints"]
-        .as_array()
-        .and_then(|list| list.iter().find(|entry| entry["guid"] == wanted.as_str()))
-        .ok_or_else(|| format!("blueprint {wanted}").into())
 }

@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use p4kx_export::{
-    CatalogError, CatalogFailure, CatalogFile, CatalogOptions, CatalogPublicationMode,
+    CatalogError, CatalogFailures, CatalogFile, CatalogOptions, CatalogPublicationMode,
     CatalogSummary, Compression, CraftingWarning, Filter, catalog_schema, write_catalog_file,
 };
 use p4kx_extraction::Archive;
@@ -118,13 +118,15 @@ fn write_file(
     Ok(summary)
 }
 
-fn print_failures(failures: &[CatalogFailure]) -> io::Result<()> {
+fn print_failures(failures: CatalogFailures<'_>) -> io::Result<()> {
     let mut err = io::stderr().lock();
     for failure in failures {
         writeln!(
             err,
             "failed {} ({}): {}",
-            failure.record_path, failure.guid, failure.reason
+            failure.record_path(),
+            failure.guid(),
+            failure.reason()
         )?;
     }
     Ok(())
@@ -158,7 +160,7 @@ fn into_anyhow(error: CatalogError) -> anyhow::Error {
 pub(crate) fn hint(error: &anyhow::Error) -> Option<&'static str> {
     matches!(
         error.downcast_ref::<CatalogError>(),
-        Some(CatalogError::IncompleteExport { .. })
+        Some(CatalogError::IncompleteExport(_))
     )
     .then_some("use --diagnostic-partial only to write an explicitly marked diagnostic catalog")
 }

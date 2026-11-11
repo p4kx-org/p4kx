@@ -23,8 +23,8 @@ Decided for issue #822.
   `.txt` extension lets users open them with a double click. SHA3-512 is
   computed with .NET on an Ubuntu runner, whose OpenSSL supports it.
 - The VirusTotal scan covers the MSI and the portable ZIP, never runs on a pull request, and never
-  blocks a Release; the notes state when it did not run, also when the script crashes, times out
-  or the job fails. Its worst case (two files, 5 minutes upload and 10 minutes polling each) stays
+  blocks the original Release workflow; the notes state when it did not run, also when the script
+  crashes, times out or the job fails. The v0.5.0 tag contract below supersedes that policy. Its worst case (two files, 5 minutes upload and 10 minutes polling each) stays
   below the 55-minute step timeout, and messages that reach the public notes are sanitised and
   capped.
 - The `rust-cache` step of the package job carries `zizmor: ignore[cache-poisoning]`. This is acceptable because
@@ -35,6 +35,16 @@ Decided for issue #822.
 
 ## Consequences
 
-- A pull request that touches the workflow or its scripts builds and assembles everything but
-  scans, attests and publishes nothing, so the tag-only steps are the only untested ones.
-- The other workflows still use version tags; pinning them is a follow-up.
+- A pull request that touches the workflow or its scripts builds and assembles the package matrix.
+  Validation notes record that the run skipped Sigstore attestations. Tag notes include attestation
+  verification commands after all attestation jobs succeed.
+
+## v0.5.0 tag publication
+
+The v0.5.0 acceptance criteria in #1116, #1114 and #1022 require a completed VirusTotal
+report for the exact SHA-256 of each native package in the four-target matrix. Tag assembly
+requires successful scanning and checks that every required package matches the structured
+report receipt from the same version, revision and workflow run. An incomplete scan prevents
+publication. Pull requests and operating-system-specific dry runs skip the external scan.
+Full manual branch runs retain best-effort diagnostics. The architecture-neutral add-on
+keeps its separate provenance attestation.

@@ -5,18 +5,23 @@ use std::collections::HashSet;
 
 use p4kx_extraction::Guid;
 
-use crate::blueprint_category::{BlueprintCategory, unlink_categories};
+use crate::blueprint_catalog_rows::BlueprintRow;
+use crate::blueprint_category::BlueprintCategory;
+use crate::broker_definition::BrokerDefinition;
+use crate::broker_entry::BrokerProjection;
 use crate::catalog_crafting::CraftingKinds;
+use crate::catalog_read_failure::CatalogReadFailure;
+use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::contract::{
-    Blueprint, BlueprintPool, BrokerEntry, Commodity, ContractEntry, Crafter, CraftingGlobal,
-    DismantleProcess, HarvestableLocation, HarvestableProviderPreset, Item, Loadout, LootContainer,
+    BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
+    HarvestableLocation, HarvestableProviderPreset, Item, Loadout, LootContainer,
     MineableComposition, MineableElement, MineableEntity, MiningGlobalParams, Paint,
     RefiningProcess, ResourceGroup, ResourceType, Ship, Shop, StarmapObject,
     SubHarvestableMultiConfig,
 };
-use crate::contract_template::ContractTemplate;
+use crate::contract_missions::ContractWithTitles;
 use crate::crafting_warning::CraftingWarning;
 use crate::entity_spawn_model::EntitySpawnPool;
 use crate::export_diagnostic::ExportSourceRole;
@@ -25,19 +30,25 @@ use crate::guid_text::CatalogGuid;
 use crate::location_template::{LocationTemplates, MissionLocationTemplate};
 use crate::loot_kinds::LootKinds;
 use crate::manufacturer::Manufacturer;
+use crate::mission_generator::GeneratorDefinition;
 use crate::mission_kinds::MissionKinds;
 use crate::mission_property_set::MissionPropertySet;
+use crate::mission_titles::MissionTitles;
 use crate::npc_spawn_model::NpcSpawnPool;
 use crate::paint_port::VehicleFacts;
 use crate::picked::Picked;
 use crate::playability::PlayabilitySummary;
 use crate::quality_catalog::QualityRows;
 use crate::record_read::KindRead;
+use crate::shop_inventories::ShopInventoryTable;
+use crate::shop_inventory_resolution::ShopInventoryResolution;
 use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 use crate::spawn_pools::SpawnPools;
+use crate::template_definition::TemplateDefinition;
 use crate::template_issues::Unknowns;
+use crate::template_rows::TemplateConfigurations;
 use crate::texts::Texts;
-use crate::{CatalogFailure, ItemClassSummary, Kind, KindSummary};
+use crate::{ItemClassSummary, Kind, KindSummary};
 
 #[path = "collected_counts.rs"]
 mod counts;
@@ -52,7 +63,8 @@ pub(crate) struct Collected<'f> {
     pub(crate) items: Vec<Item<'f>>,
     pub(crate) ships: Vec<Ship<'f>>,
     pub(crate) commodities: Vec<Commodity<'f>>,
-    pub(crate) blueprints: Vec<Blueprint<'f>>,
+    pub(crate) blueprints: Vec<BlueprintRow<'f>>,
+    pub(crate) missing_blueprint_categories: HashSet<Guid>,
     pub(crate) resource_groups: Vec<ResourceGroup<'f>>,
     pub(crate) resource_group_members:
         Vec<crate::catalog_v3::resource_group_catalog::ResourceGroupMembers>,
@@ -67,11 +79,15 @@ pub(crate) struct Collected<'f> {
     pub(crate) paints: Vec<Paint>,
     pub(crate) loadouts: Vec<Loadout>,
     pub(crate) contracts: Vec<ContractEntry<'f>>,
+    pub(crate) mission_titles: Vec<MissionTitles<'f>>,
+    pub(crate) contract_generators: Vec<GeneratorDefinition<'f>>,
     pub(crate) mission_location_templates: Vec<MissionLocationTemplate<'f>>,
     pub(crate) contract_ship_spawns: Vec<ShipSpawnPool>,
     pub(crate) contract_location_queries: Vec<LocationQuery>,
-    pub(crate) contract_templates: Vec<ContractTemplate<'f>>,
-    pub(crate) mission_broker_entries: Vec<BrokerEntry<'f>>,
+    pub(crate) contract_templates: Vec<TemplateDefinition<'f>>,
+    pub(crate) template_configurations: TemplateConfigurations<'f>,
+    pub(crate) broker_projections: Vec<BrokerProjection<'f>>,
+    pub(crate) broker_definitions: Vec<BrokerDefinition<'f>>,
     pub(crate) contract_npc_spawns: Vec<NpcSpawnPool<'f>>,
     pub(crate) contract_entity_spawns: Vec<EntitySpawnPool>,
     pub(crate) mission_property_sets: Vec<MissionPropertySet<'f>>,
@@ -87,13 +103,15 @@ pub(crate) struct Collected<'f> {
     pub(crate) harvestable_locations: Vec<HarvestableLocation>,
     pub(crate) loot_containers: Vec<LootContainer>,
     pub(crate) shops: Vec<Shop>,
+    pub(crate) shop_inventories: ShopInventoryTable,
+    pub(crate) shop_inventory_resolution: CatalogTable<ShopInventoryResolution>,
     pub(crate) crafters: Vec<Crafter<'f>>,
     pub(crate) mission_kinds: MissionKinds<'f>,
     pub(crate) loot_kinds: LootKinds<'f>,
     pub(crate) vehicles: Vec<VehicleFacts>,
     pub(crate) item_classes: ItemClassSummary,
     pub(crate) playability: PlayabilitySummary,
-    pub(crate) failures: Vec<CatalogFailure>,
+    pub(crate) failures: Vec<CatalogReadFailure<'f>>,
     pub(crate) warnings: Vec<CraftingWarning>,
     skipped: [usize; Kind::ALL.len()],
 }
@@ -121,7 +139,7 @@ impl<'f> Collected<'f> {
                 })
                 .map(|source| source.guid),
         );
-        unlink_categories(&mut collected.blueprints, &missing_categories);
+        collected.missing_blueprint_categories = missing_categories;
         collected.order();
         collected
     }
@@ -136,6 +154,7 @@ impl<'f> Collected<'f> {
             ships: Vec::new(),
             commodities: Vec::new(),
             blueprints: crafting.blueprints,
+            missing_blueprint_categories: HashSet::new(),
             resource_groups: Vec::new(),
             resource_group_members: Vec::new(),
             resource_types: Vec::new(),
@@ -149,11 +168,15 @@ impl<'f> Collected<'f> {
             paints: Vec::new(),
             loadouts: Vec::new(),
             contracts: Vec::new(),
+            mission_titles: Vec::new(),
+            contract_generators: Vec::new(),
             mission_location_templates: Vec::new(),
             contract_ship_spawns: Vec::new(),
             contract_location_queries: Vec::new(),
             contract_templates: Vec::new(),
-            mission_broker_entries: Vec::new(),
+            template_configurations: TemplateConfigurations::default(),
+            broker_projections: Vec::new(),
+            broker_definitions: Vec::new(),
             contract_npc_spawns: Vec::new(),
             contract_entity_spawns: Vec::new(),
             mission_property_sets: Vec::new(),
@@ -169,6 +192,8 @@ impl<'f> Collected<'f> {
             harvestable_locations: Vec::new(),
             loot_containers: Vec::new(),
             shops: Vec::new(),
+            shop_inventories: ShopInventoryTable::default(),
+            shop_inventory_resolution: CatalogTable::empty(DatasetAvailability::Absent),
             crafters: Vec::new(),
             mission_kinds: MissionKinds::default(),
             loot_kinds: LootKinds::default(),
@@ -257,11 +282,14 @@ impl<'f> Collected<'f> {
     /// Stores the contracts, counts the entries left out as `skipped` and adds the failures.
     pub(crate) fn add_contracts(
         &mut self,
-        contracts: Vec<ContractEntry<'f>>,
+        contracts: Vec<ContractWithTitles<'f>>,
         skipped: usize,
-        failures: Vec<CatalogFailure>,
+        failures: Vec<CatalogReadFailure<'f>>,
     ) {
-        self.contracts = contracts;
+        (self.contracts, self.mission_titles) = contracts
+            .into_iter()
+            .map(|contract| (contract.row, contract.titles))
+            .unzip();
         if let Some(slot) = self.skipped.get_mut(Kind::Contracts.index()) {
             *slot = skipped;
         }
@@ -294,11 +322,13 @@ impl<'f> Collected<'f> {
     /// warns of the stored names `unknowns` counted.
     pub(crate) fn add_contract_templates(
         &mut self,
-        templates: KindRead<ContractTemplate<'f>>,
+        templates: KindRead<'f, TemplateDefinition<'f>>,
+        configurations: TemplateConfigurations<'f>,
         unknowns: Unknowns,
     ) {
         self.ledger.merge(templates.ledger);
         self.contract_templates = templates.items;
+        self.template_configurations = configurations;
         if let Some(slot) = self.skipped.get_mut(Kind::ContractTemplates.index()) {
             *slot = templates.skipped;
         }
@@ -312,9 +342,14 @@ impl<'f> Collected<'f> {
 
     /// Stores the mission broker entries, counts the ones left out as `skipped` and adds the
     /// failures.
-    pub(crate) fn add_broker_entries(&mut self, entries: KindRead<BrokerEntry<'f>>) {
+    pub(crate) fn add_broker_entries(
+        &mut self,
+        entries: KindRead<'f, BrokerProjection<'f>>,
+        definitions: Vec<BrokerDefinition<'f>>,
+    ) {
         self.ledger.merge(entries.ledger);
-        self.mission_broker_entries = entries.items;
+        self.broker_projections = entries.items;
+        self.broker_definitions = definitions;
         if let Some(slot) = self.skipped.get_mut(Kind::MissionBrokerEntries.index()) {
             *slot = entries.skipped;
         }
@@ -322,16 +357,16 @@ impl<'f> Collected<'f> {
     }
 
     /// Adds `failures` and orders all of them by the text of the GUID, one per Record.
-    pub(crate) fn add_failures(&mut self, failures: Vec<CatalogFailure>) {
+    pub(crate) fn add_failures(&mut self, failures: Vec<CatalogReadFailure<'f>>) {
         self.failures.extend(failures);
         self.order_failures();
     }
 
     fn order_failures(&mut self) {
         self.failures
-            .sort_by_cached_key(|failure| CatalogGuid(failure.guid).text());
+            .sort_by_cached_key(|failure| CatalogGuid(failure.guid()).text());
         self.failures
-            .dedup_by(|later, earlier| later.guid == earlier.guid);
+            .dedup_by(|later, earlier| later.guid() == earlier.guid());
     }
 
     /// Returns the counts of every kind, in the order of [`Kind::ALL`].
@@ -342,7 +377,7 @@ impl<'f> Collected<'f> {
                 kind,
                 count: self.count(kind),
                 skipped: self.skipped.get(kind.index()).copied().unwrap_or_default(),
-                complete: complete || kind == Kind::Tags,
+                complete: complete || matches!(kind, Kind::Tags | Kind::ShopInventories),
             })
             .collect()
     }

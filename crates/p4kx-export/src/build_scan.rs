@@ -8,6 +8,7 @@ use p4kx_extraction::{Archive, CancelToken, DataForge};
 
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::original::EntryCapture;
 use crate::collected::Collected;
 use crate::scan::Scan;
 use crate::starmap_containers::Placements;
@@ -20,7 +21,7 @@ pub(super) fn scan<'f>(
     files: &'f ArchiveFiles<'f>,
     entities: &Arc<Entities<'f>>,
     options: &CatalogOptions<'_>,
-    projection: &CatalogProjection<'_, 'f>,
+    projection: &'f CatalogProjection<'f, 'f>,
     crafting: CraftingKinds<'f>,
 ) -> Result<(Collected<'f>, Placements), CatalogError> {
     let rules = [
@@ -34,7 +35,11 @@ pub(super) fn scan<'f>(
         })
     });
     let placements = if wanted {
-        Placements::read(archive, options.cancel)?
+        Placements::read(
+            archive,
+            options.cancel,
+            &EntryCapture::for_input(projection.original()),
+        )?
     } else {
         Placements::default()
     };

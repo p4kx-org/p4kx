@@ -14,6 +14,10 @@ impl ResourceInt64 {
     pub(crate) const fn new(value: i64) -> Self {
         Self(value)
     }
+
+    pub(crate) const fn get(self) -> i64 {
+        self.0
+    }
 }
 
 impl Serialize for ResourceInt64 {

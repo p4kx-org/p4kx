@@ -7,6 +7,7 @@ use p4kx_extraction::{Archive, CancelToken};
 
 use crate::CatalogError;
 use crate::Kind;
+use crate::catalog_read::original::EntryCapture;
 use crate::collected::Collected;
 use crate::crafting_warning::CraftingWarning;
 use crate::harvest_locations::{Objects, locate};
@@ -24,6 +25,7 @@ pub(crate) fn add_harvest_locations(
     placements: &Placements,
     collected: &mut Collected<'_>,
     cancel: Option<&CancelToken>,
+    capture: &EntryCapture<'_>,
 ) -> Result<(), CatalogError> {
     if collected.harvestable_provider_presets.is_empty() {
         collected.ledger.inventory(Kind::HarvestableLocations);
@@ -45,7 +47,8 @@ pub(crate) fn add_harvest_locations(
         &presets,
         &Objects::new(&collected.starmap_objects),
         cancel,
-    );
+        capture,
+    )?;
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }

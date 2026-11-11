@@ -13,6 +13,9 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
+use crate::real_archive_contracts::{
+    reputation_gain_amount, reputation_gain_text, reputation_gains,
+};
 use crate::real_archive_verification::print_line;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -38,7 +41,7 @@ fn every_contract_links_its_places_and_reports_pickup_list_lengths() -> TestResu
     let catalog = catalog()?;
     let localities = guids(&catalog, "missionLocalities");
     let objects = guids(&catalog, "starmapObjects");
-    let contracts = catalog["contracts"].as_array().ok_or("contracts")?;
+    let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let (mut with_places, mut max_pickup, mut unlinked) = (0_usize, 0_usize, 0_usize);
     for entry in contracts {
         let offered = &entry["offeredAt"];
@@ -96,7 +99,7 @@ fn every_contract_links_its_places_and_reports_pickup_list_lengths() -> TestResu
 fn the_giver_faction_follows_the_handler_then_a_positive_result_then_a_prerequisite() -> TestResult
 {
     let catalog = catalog()?;
-    let contracts = catalog["contracts"].as_array().ok_or("contracts")?;
+    let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let mut counts: HashMap<&str, usize> = HashMap::new();
     for entry in contracts {
         let giver = &entry["giverFaction"];
@@ -115,12 +118,7 @@ fn the_giver_faction_follows_the_handler_then_a_positive_result_then_a_prerequis
             "reputationResult" => {
                 assert_eq!(entry["faction"], Value::Null);
                 assert!(
-                    entry["reputationGains"]
-                        .as_array()
-                        .into_iter()
-                        .flatten()
-                        .any(|gain| gain["factionReputationGuid"] == *guid
-                            && gain["amount"].as_i64().is_some_and(|amount| amount > 0)),
+                    has_positive_result_for(entry, guid.as_str().ok_or("giver faction GUID")?)?,
                     "a positive success amount of that faction"
                 );
             }
@@ -145,7 +143,7 @@ fn the_giver_faction_follows_the_handler_then_a_positive_result_then_a_prerequis
     assert_eq!(counts.get("handler"), Some(&4010));
     assert_eq!(counts.get("reputationResult"), Some(&232));
     assert_eq!(counts.get("reputationPrerequisite"), Some(&57));
-    print_line(&result_giver_census(contracts));
+    print_line(&result_giver_census(contracts)?);
     Ok(())
 }
 
@@ -153,7 +151,7 @@ fn the_giver_faction_follows_the_handler_then_a_positive_result_then_a_prerequis
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_blueprint_rewards_of_an_entry_match_the_reward_sources_of_the_pools() -> TestResult {
     let catalog = catalog()?;
-    let contracts = catalog["contracts"].as_array().ok_or("contracts")?;
+    let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let pools = catalog["blueprintPools"]
         .as_array()
         .ok_or("blueprintPools")?;
@@ -170,7 +168,7 @@ fn the_blueprint_rewards_of_an_entry_match_the_reward_sources_of_the_pools() -> 
     let mut entries = 0_usize;
     let mut listed: HashMap<&str, HashSet<&str>> = HashMap::new();
     for entry in contracts {
-        let contract = entry["guid"].as_str().unwrap_or_default();
+        let (contract, sub) = crate::real_archive_contracts::v3::identity(entry)?;
         let rewards = entry["blueprintRewards"]
             .as_array()
             .ok_or("blueprintRewards")?;
@@ -186,7 +184,7 @@ fn the_blueprint_rewards_of_an_entry_match_the_reward_sources_of_the_pools() -> 
             found.insert(pool);
             entries += 1;
         }
-        if entry["subContractGuid"].is_null() {
+        if sub.is_none() {
             continue;
         }
         let own = rewards
@@ -214,38 +212,51 @@ fn the_blueprint_rewards_of_an_entry_match_the_reward_sources_of_the_pools() -> 
     Ok(())
 }
 
+fn has_positive_result_for(entry: &Value, guid: &str) -> Result<bool, Box<dyn Error>> {
+    for gain in reputation_gains(entry)? {
+        if reputation_gain_text(gain, "factionReputationGuid")? == Some(guid)
+            && reputation_gain_amount(gain)?.is_some_and(|amount| amount > 0)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 /// Counts the `reputationResult` entries with more than one distinct positive faction and the
 /// scopes of the picked gains.
 #[expect(
     clippy::indexing_slicing,
     reason = "indexing a JSON value by key yields null, never a panic"
 )]
-fn result_giver_census(contracts: &[Value]) -> String {
+fn result_giver_census(contracts: &[Value]) -> Result<String, Box<dyn Error>> {
     let mut several = 0_usize;
     let mut scopes: HashMap<String, usize> = HashMap::new();
     for entry in contracts {
         if entry["giverFaction"]["source"] != "reputationResult" {
             continue;
         }
-        let positive = || {
-            entry["reputationGains"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter(|gain| gain["amount"].as_i64().is_some_and(|amount| amount > 0))
-        };
-        let factions: HashSet<&str> = positive()
-            .filter_map(|gain| gain["factionReputationGuid"].as_str())
-            .collect();
+        let giver = entry["giverFaction"]["faction"]["guid"]
+            .as_str()
+            .ok_or("giver faction GUID")?;
+        let mut factions = HashSet::new();
+        let mut picked_scope = None;
+        for gain in reputation_gains(entry)? {
+            if reputation_gain_amount(gain)?.is_some_and(|amount| amount > 0)
+                && let Some(faction) = reputation_gain_text(gain, "factionReputationGuid")?
+            {
+                factions.insert(faction);
+                if picked_scope.is_none() && faction == giver {
+                    picked_scope = Some(reputation_gain_text(gain, "scopeName")?.unwrap_or("none"));
+                }
+            }
+        }
         several += usize::from(factions.len() > 1);
-        let picked = positive()
-            .find(|gain| gain["factionReputationGuid"] == entry["giverFaction"]["faction"]["guid"]);
-        let scope = picked
-            .and_then(|gain| gain["scopeName"].as_str())
-            .unwrap_or("none");
-        *scopes.entry(scope.to_owned()).or_default() += 1;
+        *scopes
+            .entry(picked_scope.unwrap_or("none").to_owned())
+            .or_default() += 1;
     }
-    format!(
+    Ok(format!(
         "reputationResult: {several} entries with several positive factions; picked scopes {scopes:?}"
-    )
+    ))
 }

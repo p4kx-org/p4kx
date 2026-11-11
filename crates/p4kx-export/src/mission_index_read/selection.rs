@@ -40,7 +40,13 @@ impl Action {
 }
 
 pub(super) fn choose(record: &Record<'_>) -> Result<Option<Action>, DataForgeError> {
-    let path = record.record_path()?;
+    choose_at_path(record, record.record_path()?)
+}
+
+pub(super) fn choose_at_path(
+    record: &Record<'_>,
+    path: &str,
+) -> Result<Option<Action>, DataForgeError> {
     for (prefix, action) in [
         (TEMPLATES, Action::Template),
         (TYPES, Action::Type),

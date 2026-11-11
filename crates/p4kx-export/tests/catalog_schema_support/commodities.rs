@@ -20,7 +20,6 @@ pub(super) fn definitions() -> Value {
         "recordIndex": present(json!(0)),
         "sourceType": present(json!("EntityClassDefinition")),
         "selection": present(json!("entity")),
-        "selectionDiagnostics": [],
         "entity": present(json!({
             "purchasableParameters": present(json!([])),
             "displayParameters": present(json!([])),

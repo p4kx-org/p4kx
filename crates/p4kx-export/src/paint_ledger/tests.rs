@@ -2,10 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::EntryOperation;
+use crate::HealthText;
 use crate::Kind;
+use crate::catalog_read::original::EntryDiagnosis;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_entry_ledger::ArchiveEntryObservation;
-use crate::export_ledger::{ExportLedger, SourceDiagnosis, SourceDisposition};
+use crate::export_ledger::{ExportLedger, SourceDisposition};
 
 use super::vehicle_entries;
 
@@ -21,10 +23,11 @@ fn entry(
         kind: Kind::Ships,
         entry_index: Some(index),
         container_entry_index: None,
-        path: format!("synthetic/{index}.xml"),
+        path: HealthText::new(&format!("synthetic/{index}.xml")),
         role: ExportSourceRole::Dependency,
         disposition,
-        diagnosis: SourceDiagnosis::default(),
+        diagnosis: EntryDiagnosis::default(),
+        receipt: None,
     }
 }
 
@@ -95,7 +98,7 @@ fn required_vehicle_read_and_parse_failures_remain_blocking_paint_dependencies()
         );
         let failed = evidence.failed.first().ok_or("paint dependency failure")?;
         assert_eq!(
-            (failed.entry_index, failed.operation),
+            (failed.source.entry_index, failed.source.operation),
             (Some(3), operation),
             "the exact physical source and operation are preserved"
         );

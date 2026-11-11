@@ -12,8 +12,9 @@ use p4kx_export::{
     CancelToken, CatalogError, CatalogFile, CatalogOptions, CatalogProgress,
     CatalogPublicationMode, CatalogSummary, Compression, ExportHealth, write_catalog_file_from,
 };
-use p4kx_extraction::{ArchiveWriteProtection, is_same_file};
+use p4kx_extraction::{ArchiveWriteProtection, SourceInventory, is_same_file};
 
+use super::refusal::Refusal;
 use super::{
     CatalogExportOptions, CatalogExportProgress, CatalogExportStage, CatalogExportSummary, Shared,
 };
@@ -42,7 +43,7 @@ pub enum CatalogExportStatus<'a> {
 
 enum Outcome {
     Written(Box<CatalogExportSummary>),
-    Incomplete(Box<ExportHealth>),
+    Incomplete(Refusal),
     Cancelled,
     IsArchive,
 }
@@ -56,7 +57,7 @@ enum State {
     Cancelled,
     IsArchive,
     GzipNotSupported,
-    Incomplete(Box<ExportHealth>),
+    Incomplete(Refusal),
     Failed(Option<String>),
 }
 
@@ -125,11 +126,24 @@ impl CatalogExport {
             State::Cancelled => CatalogExportStatus::Cancelled,
             State::IsArchive => CatalogExportStatus::IsArchive,
             State::GzipNotSupported => CatalogExportStatus::GzipNotSupported,
-            State::Incomplete(health) => CatalogExportStatus::Incomplete(health),
+            State::Incomplete(report) => CatalogExportStatus::Incomplete(report.health()),
             State::Failed(reason) => CatalogExportStatus::Failed(reason.as_deref()),
         }
     }
 
+    /// Borrows the immutable inventory retained by a completed or refused catalog result.
+    #[must_use]
+    pub fn source_inventory(&self) -> Option<&SourceInventory> {
+        match &self.state {
+            State::Finished(summary) => Some(summary.summary().source_inventory()),
+            State::Incomplete(report) => Some(report.inventory()),
+            State::Running(_)
+            | State::Cancelled
+            | State::IsArchive
+            | State::GzipNotSupported
+            | State::Failed(_) => None,
+        }
+    }
     /// Returns whether the catalog is still being created.
     #[must_use]
     pub const fn is_running(&self) -> bool {
@@ -189,7 +203,7 @@ fn ended(outcome: Option<RunResult>) -> State {
         Some(Ok(Outcome::Written(summary))) => State::Finished(summary),
         Some(Ok(Outcome::Cancelled)) => State::Cancelled,
         Some(Ok(Outcome::IsArchive)) => State::IsArchive,
-        Some(Ok(Outcome::Incomplete(health))) => State::Incomplete(health),
+        Some(Ok(Outcome::Incomplete(report))) => State::Incomplete(report),
         Some(Err(reason)) => State::Failed(Some(reason)),
         None => State::Failed(None),
     }
@@ -312,8 +326,8 @@ impl Job {
             Err(error) if crate::installation::guard_cancelled(&error) => {
                 return Ok(Outcome::Cancelled);
             }
-            Err(CatalogError::IncompleteExport { health }) => {
-                return Ok(Outcome::Incomplete(health));
+            Err(CatalogError::IncompleteExport(report)) => {
+                return Ok(Outcome::Incomplete(Refusal::new(report)));
             }
             Err(error) => return Err(describe(&error)),
         };

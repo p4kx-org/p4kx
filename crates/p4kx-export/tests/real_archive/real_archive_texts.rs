@@ -316,7 +316,11 @@ fn check_coverage(
         if baselined
             && matches!(
                 kind,
-                Kind::Manufacturers | Kind::ResourceTypes | Kind::Commodities
+                Kind::Manufacturers
+                    | Kind::ResourceTypes
+                    | Kind::Commodities
+                    | Kind::ContractTemplates
+                    | Kind::MissionBrokerEntries
             )
             && row_count > 0
         {

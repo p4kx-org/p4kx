@@ -3,7 +3,6 @@
 
 use std::fmt;
 
-use p4kx_export::ExportHealth;
 use p4kx_extraction::{TreeBuilder, Value as SourceValue};
 use serde_json::Value;
 
@@ -12,7 +11,7 @@ use super::super::error::{
     JoinFault, OutputFault, ProductionFailure, ReadFault, SetupFault, SourceFault, SourceLevel,
 };
 use super::super::published::Published;
-use super::super::{Counts, TestResult, compare, values};
+use super::super::{Counts, TestResult, compare, health, values};
 use super::fixture::Fixture;
 
 pub(super) const SENTINEL: &str = "SENTINEL_PRIVATE_VALUE_GUID_RECORD_PATH";
@@ -70,17 +69,14 @@ pub(super) fn assert_sanitized(failure: Failure) {
     );
 }
 
-fn compare_mutation(
-    fixture: &Fixture,
-    document: &Value,
-    report: &ExportHealth,
-) -> TestResult<Failure> {
+fn compare_mutation(fixture: &Fixture, document: &Value) -> TestResult<Failure> {
     let published = Published::read(document)?;
+    let report = health::read(document)?;
     let forge = fixture.entry.open()?;
     let mut trees = TreeBuilder::new();
     let mut checked = Counts::default();
     for record in forge.records() {
-        if let Err(failure) = compare::check(&record, &mut trees, &published, report, &mut checked)
+        if let Err(failure) = compare::check(&record, &mut trees, &published, &report, &mut checked)
         {
             return Ok(failure);
         }
@@ -110,7 +106,7 @@ fn every_stage_discards_the_original_error_before_display_or_debug() -> TestResu
 #[test]
 fn declaration_value_mismatches_retain_no_source_or_output_content() -> TestResult {
     let fixture = Fixture::new()?;
-    let (mut document, report) = fixture.catalog()?;
+    let mut document = fixture.catalog()?;
     let variable = document
         .get_mut("missionPropertySets")
         .and_then(Value::as_array_mut)
@@ -121,7 +117,7 @@ fn declaration_value_mismatches_retain_no_source_or_output_content() -> TestResu
         .and_then(|property| property.get_mut("variable"))
         .ok_or("source declaration absent")?;
     *variable = Value::String(SENTINEL.to_owned());
-    let failure = compare_mutation(&fixture, &document, &report)?;
+    let failure = compare_mutation(&fixture, &document)?;
     assert_eq!(
         failure,
         Failure::SourceCompare(SourceFault::DeclarationTextValue),
@@ -149,16 +145,16 @@ fn invalid_raw_shapes_retain_no_source_value() -> TestResult {
 #[test]
 fn unresolved_joins_retain_no_configured_target_identity() -> TestResult {
     let fixture = Fixture::new()?;
-    let (mut document, report) = fixture.catalog()?;
+    let mut document = fixture.catalog()?;
     let links = document
-        .get_mut("contracts")
+        .pointer_mut("/projections/contracts/rows")
         .and_then(Value::as_array_mut)
         .and_then(|rows| rows.first_mut())
         .and_then(|row| row.get_mut("propertySetGuids"))
         .and_then(Value::as_array_mut)
         .ok_or("contract links absent")?;
     *links = vec![Value::String(SENTINEL.to_owned())];
-    let failure = compare_mutation(&fixture, &document, &report)?;
+    let failure = compare_mutation(&fixture, &document)?;
     assert_eq!(
         failure,
         Failure::Joins(JoinFault::Target),

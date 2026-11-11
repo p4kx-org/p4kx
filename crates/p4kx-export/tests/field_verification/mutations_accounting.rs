@@ -165,8 +165,8 @@ fn a_successful_public_mapper_cannot_hide_a_populated_nested_block() -> super::R
             .summary()
             .failures()
             .iter()
-            .map(|failure| failure.guid)
-            .collect(),
+            .map(|failure| failure.guid().parse())
+            .collect::<Result<_, _>>()?,
         BTreeMap::new(),
         &|| false,
     )?;

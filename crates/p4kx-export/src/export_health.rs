@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::{CatalogFailureDetails, CatalogFailures, HealthMetadata};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -109,9 +110,9 @@ pub struct KindExportHealth {
     /// Failed derived operations whose original source row can remain present.
     pub failed_derived_projections: usize,
     /// Exact affected identities for import retention, without a sample limit.
-    pub failed_records: Vec<FailedExportRecord>,
+    pub(crate) failed_records: Vec<FailedExportRecord>,
     /// Exact failed Archive Entry identities, without a sample limit.
-    pub failed_entries: Vec<crate::export_entry_ledger::FailedExportEntry>,
+    pub(crate) failed_entries: Vec<crate::export_entry_ledger::FailedExportEntry>,
     /// Exact unresolved source links reported for this kind.
     pub unresolved_reference_count: usize,
 }
@@ -121,6 +122,10 @@ pub struct KindExportHealth {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub struct ExportHealth {
+    /// Shared storage whose aggregate markers remain separate from occurrence markers.
+    pub(crate) metadata: HealthMetadata,
+    /// Retained human failures with independently sourced original Record cells.
+    pub(crate) failures: Vec<CatalogFailureDetails>,
     /// Whether every required read and projection completed without a source warning.
     pub status: ExportHealthStatus,
     /// Overall canonical source-read health.
@@ -136,18 +141,79 @@ pub struct ExportHealth {
     /// Sum of the rows serialized for all catalog kinds.
     pub written_rows: usize,
     /// Health in the same order as the catalog kinds.
-    pub kinds: Vec<KindExportHealth>,
+    pub(crate) kinds: Vec<KindExportHealth>,
     /// Exact failed identities across kinds and non-kind sources, without a sample limit.
-    pub failed_records: Vec<FailedExportRecord>,
+    pub(crate) failed_records: Vec<FailedExportRecord>,
     /// Exact failed Archive Entry identities across kinds, without a sample limit.
-    pub failed_entries: Vec<crate::export_entry_ledger::FailedExportEntry>,
+    pub(crate) failed_entries: Vec<crate::export_entry_ledger::FailedExportEntry>,
     /// Exact unresolved source links, including declared target identities beyond the example limit.
-    pub unresolved_references: Vec<ExportUnresolvedReference>,
+    pub(crate) unresolved_references: Vec<ExportUnresolvedReference>,
     /// Deterministically ordered diagnostic counts and bounded examples.
-    pub diagnostics: Vec<ExportDiagnostic>,
+    pub(crate) diagnostics: Vec<ExportDiagnostic>,
+}
+
+impl KindExportHealth {
+    /// Borrows this kind's failed original Record occurrences.
+    #[must_use]
+    pub fn failed_records(&self) -> &[FailedExportRecord] {
+        &self.failed_records
+    }
+
+    /// Borrows this kind's failed original Entry operations.
+    #[must_use]
+    pub fn failed_entries(&self) -> &[crate::export_entry_ledger::FailedExportEntry] {
+        &self.failed_entries
+    }
 }
 
 impl ExportHealth {
+    /// Borrows the kind reports belonging to this exact text and source context.
+    #[must_use]
+    pub fn kinds(&self) -> &[KindExportHealth] {
+        &self.kinds
+    }
+
+    /// Borrows failed Record occurrences in this report's immutable text context.
+    ///
+    /// ```compile_fail
+    /// use p4kx_export::ExportHealth;
+    /// fn reparent(target: &mut ExportHealth, foreign: &ExportHealth) {
+    ///     target.failed_records.extend(foreign.failed_records.iter().cloned());
+    /// }
+    /// ```
+    #[must_use]
+    pub fn failed_records(&self) -> &[FailedExportRecord] {
+        &self.failed_records
+    }
+
+    /// Borrows failed Entry operations belonging to this report.
+    #[must_use]
+    pub fn failed_entries(&self) -> &[crate::export_entry_ledger::FailedExportEntry] {
+        &self.failed_entries
+    }
+
+    /// Borrows unresolved links in their original occurrence order.
+    #[must_use]
+    pub fn unresolved_references(&self) -> &[ExportUnresolvedReference] {
+        &self.unresolved_references
+    }
+
+    /// Borrows diagnostics whose subject references belong to this report's text context.
+    #[must_use]
+    pub fn diagnostics(&self) -> &[ExportDiagnostic] {
+        &self.diagnostics
+    }
+    /// Borrows immutable shared storage without classifying an occurrence by its atom's marker.
+    #[must_use]
+    pub const fn metadata(&self) -> &HealthMetadata {
+        &self.metadata
+    }
+
+    /// Borrows human failures without expanding their shared strings.
+    #[must_use]
+    pub fn failures(&self) -> CatalogFailures<'_> {
+        CatalogFailures::new(&self.failures)
+    }
     /// Returns whether every required source read and projection completed.
     #[must_use]
     pub const fn is_complete(&self) -> bool {

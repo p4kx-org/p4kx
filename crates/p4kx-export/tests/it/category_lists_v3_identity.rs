@@ -103,7 +103,10 @@ fn assert_existing_alias_refusal() -> TestResult {
     assert!(
         failures.iter().any(|row| {
             row.get("status").and_then(Value::as_str) == Some("ambiguousIdentity")
-                && row.get("targetRecordIndex").and_then(Value::as_u64) == Some(0)
+                && row
+                    .pointer("/targetRecordIndex/value")
+                    .and_then(Value::as_u64)
+                    == Some(0)
         }),
         "adding raw category lists cannot waive an existing Resource physical-identity failure"
     );

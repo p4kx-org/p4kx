@@ -3,32 +3,35 @@
 
 use p4kx_extraction::{Archive, CancelToken};
 
-use crate::Kind;
+use crate::catalog_read::original::{EntryCapture, EntryRead};
 use crate::container_read::{self, MAX_SOC_LEN};
 use crate::entry_source::EntrySource;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::loot_soc::EntityTags;
 use crate::loot_unreadable::Unreadable;
+use crate::{CatalogError, Kind};
 
 /// Counts each selected SOC and retains every actual source operation.
 pub(crate) fn read(
     archive: &Archive,
     entry: usize,
     cancel: Option<&CancelToken>,
-) -> (Result<EntityTags, Unreadable>, ExportLedger) {
+    capture: &EntryCapture<'_>,
+) -> Result<(Result<EntityTags, Unreadable>, ExportLedger), CatalogError> {
     let mut ledger = ExportLedger::default();
     let Some(socpak) = archive.entries().get(entry) else {
-        return (Err(Unreadable::NoSuchEntry), ledger);
+        return Ok((Err(Unreadable::NoSuchEntry), ledger));
     };
-    let source = EntrySource::outer(socpak);
+    let source = EntrySource::outer(capture, archive, socpak)?;
+    source.receipt().attempted_payload()?;
     let Ok(container) = archive.open_container(socpak) else {
         source.record(
             &mut ledger,
             Kind::LootContainers,
             SourceDisposition::ReadFailed,
         );
-        return (Err(Unreadable::NotAContainer), ledger);
+        return Ok((Err(Unreadable::NotAContainer), ledger));
     };
     source.record(
         &mut ledger,
@@ -41,8 +44,10 @@ pub(crate) fn read(
         if cancel.is_some_and(CancelToken::is_cancelled) {
             break;
         }
-        let source = EntrySource::inner(socpak, soc).operation(EntryOperation::SocTags);
-        let Some(bytes) = container_read::read_limited(&container, soc, MAX_SOC_LEN) else {
+        let source = EntrySource::inner(capture, archive, socpak, &container, soc)?
+            .operation(EntryOperation::SocTags);
+        let Ok(bytes) = EntryRead::read(source.receipt().clone(), &container, soc, MAX_SOC_LEN)?
+        else {
             source.record(
                 &mut ledger,
                 Kind::LootContainers,
@@ -51,7 +56,7 @@ pub(crate) fn read(
             failure.get_or_insert(Unreadable::SocFile);
             continue;
         };
-        match counts.add_soc(&bytes) {
+        match counts.add_soc(bytes.bytes()) {
             Ok(()) => source.record(
                 &mut ledger,
                 Kind::LootContainers,
@@ -67,7 +72,7 @@ pub(crate) fn read(
             }
         }
     }
-    (failure.map_or(Ok(counts), Err), ledger)
+    Ok((failure.map_or(Ok(counts), Err), ledger))
 }
 
 #[cfg(test)]

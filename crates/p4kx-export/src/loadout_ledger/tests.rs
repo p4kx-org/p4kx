@@ -69,7 +69,7 @@ fn an_explicit_zero_row_item_loadout_remains_a_successful_actual_input() -> Test
         },
         &capture,
     )
-    .map_err(|failure| failure.reason)?;
+    .map_err(|failure| failure.reason().to_owned())?;
     let ledger = capture.finish()?;
     assert!(
         row.is_none(),
@@ -264,7 +264,7 @@ fn a_represented_unknown_attachment_is_information_and_keeps_the_row() -> TestRe
         },
         &capture,
     )
-    .map_err(|failure| failure.reason)?;
+    .map_err(|failure| failure.reason().to_owned())?;
     let row = row.ok_or("represented unresolved port row missing")?;
     assert_eq!(
         row.ports.first().ok_or("port missing")?.unresolved,
@@ -319,7 +319,7 @@ fn real_field_decoder_errors_survive_optional_loadout_mapping() -> TestResult {
         },
         &capture,
     )
-    .map_err(|failure| failure.reason)?;
+    .map_err(|failure| failure.reason().to_owned())?;
     let ledger = capture.finish()?;
     assert!(
         ledger

@@ -1,20 +1,59 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::{
-    ExportDiagnosticCode, ExportDiagnosticStage, ExportHealth, ExportSourceRole, Kind,
-};
+mod cells;
+mod controls;
+mod document;
+
+use p4kx_export::{ExportDiagnosticCode, ExportDiagnosticStage};
+use serde_json::Value;
 
 use super::OracleResult;
 use super::error::{Failure, HealthFault, MetadataFamily, ProductionFailure};
 
-pub(super) fn production_failure(health: &ExportHealth, index: u32) -> ProductionFailure {
+/// One producer document's validated wire facts, without original-source authority.
+pub(super) struct Health<'document> {
+    _document: &'document Value,
+    records: Vec<FailedRecord>,
+    diagnostics: Vec<Diagnostic>,
+    counts: Counts,
+}
+
+struct FailedRecord {
+    index: u32,
+    relevant: bool,
+    stage: ExportDiagnosticStage,
+    code: ExportDiagnosticCode,
+}
+
+struct Diagnostic {
+    relevant: bool,
+    examples: Vec<Example>,
+}
+
+struct Example {
+    index: Option<u32>,
+    family: MetadataFamily,
+}
+
+struct Counts {
+    selected: usize,
+    read_omissions: usize,
+    projection_omissions: usize,
+    projected: usize,
+    skipped: usize,
+}
+
+pub(super) fn read(document: &Value) -> OracleResult<Health<'_>> {
+    document::read(document)
+}
+
+pub(super) fn production_failure(health: &Health<'_>, index: u32) -> ProductionFailure {
     let failures = || {
-        health.failed_records.iter().filter(|failure| {
-            failure.record_index == index
-                && failure.kind == Some(Kind::MissionPropertySets)
-                && failure.role == ExportSourceRole::DerivedInput
-        })
+        health
+            .records
+            .iter()
+            .filter(|failure| failure.relevant && failure.index == index)
     };
     failures()
         .find(|failure| {
@@ -37,31 +76,22 @@ pub(super) fn production_failure(health: &ExportHealth, index: u32) -> Productio
         })
 }
 
-pub(super) fn unsupported_family(health: &ExportHealth, index: u32) -> MetadataFamily {
-    let diagnostics = health.diagnostics.iter().filter(|diagnostic| {
-        diagnostic.kind == Some(Kind::MissionPropertySets)
-            && diagnostic.source_role == Some(ExportSourceRole::DerivedInput)
-            && diagnostic.code == ExportDiagnosticCode::UnsupportedValue
-            && matches!(
-                diagnostic.stage,
-                ExportDiagnosticStage::Projection | ExportDiagnosticStage::DerivedProjection
-            )
-    });
+pub(super) fn unsupported_family(health: &Health<'_>, index: u32) -> MetadataFamily {
     let mut found = None;
+    let diagnostics = health
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.relevant);
     for diagnostic in diagnostics {
         let examples = diagnostic
             .examples
             .iter()
-            .filter(|example| example.record_index == Some(index));
+            .filter(|example| example.index == Some(index));
         for example in examples {
-            let family = example
-                .source_type
-                .as_deref()
-                .map_or(MetadataFamily::MetadataAbsent, schema_family);
-            if found.is_some_and(|previous| previous != family) {
+            if found.is_some_and(|previous| previous != example.family) {
                 return MetadataFamily::ConflictingExamples;
             }
-            found = Some(family);
+            found = Some(example.family);
         }
     }
     found.unwrap_or(MetadataFamily::ExampleUnavailable)
@@ -79,42 +109,41 @@ fn schema_family(name: &str) -> MetadataFamily {
     }
 }
 
-pub(super) fn read_failed(health: &ExportHealth, index: u32) -> bool {
-    health.failed_records.iter().any(|failure| {
-        failure.record_index == index
-            && failure.kind == Some(Kind::MissionPropertySets)
-            && failure.role == ExportSourceRole::DerivedInput
+pub(super) fn read_failed(health: &Health<'_>, index: u32) -> bool {
+    health.records.iter().any(|failure| {
+        failure.relevant
+            && failure.index == index
             && failure.stage == ExportDiagnosticStage::SourceRead
     })
 }
 
-pub(super) fn ambiguous(health: &ExportHealth, index: u32) -> bool {
-    health.failed_records.iter().any(|failure| {
-        failure.record_index == index
-            && failure.kind == Some(Kind::MissionPropertySets)
-            && failure.role == ExportSourceRole::DerivedInput
+pub(super) fn ambiguous(health: &Health<'_>, index: u32) -> bool {
+    health.records.iter().any(|failure| {
+        failure.relevant
+            && failure.index == index
             && failure.stage == ExportDiagnosticStage::DerivedProjection
             && failure.code == ExportDiagnosticCode::AmbiguousIdentity
     })
 }
 
-pub(super) fn reconcile(health: &ExportHealth, sources: usize, unreadable: usize) -> OracleResult {
-    let kind = health
-        .kind(Kind::MissionPropertySets)
-        .ok_or(Failure::HealthReconcile(HealthFault::MissingKind))?;
-    if kind.source_records.selected != sources {
+pub(super) fn reconcile(health: &Health<'_>, sources: usize, unreadable: usize) -> OracleResult {
+    let counts = &health.counts;
+    if counts.selected != sources {
         return Err(Failure::HealthReconcile(HealthFault::SelectedCount));
     }
-    if kind.source_records.omitted_after_read_failure != unreadable {
+    if counts.read_omissions != unreadable {
         return Err(Failure::HealthReconcile(HealthFault::ReadOmissionCount));
     }
-    if kind.source_records.omitted_after_projection_failure != 0 {
+    if counts.projection_omissions != 0 {
         return Err(Failure::HealthReconcile(HealthFault::ProjectionOmission));
     }
-    if kind.source_records.projected != sources - unreadable {
+    let projected = sources
+        .checked_sub(unreadable)
+        .ok_or(Failure::HealthReconcile(HealthFault::ProjectedCount))?;
+    if counts.projected != projected {
         return Err(Failure::HealthReconcile(HealthFault::ProjectedCount));
     }
-    if kind.source_records.intentionally_skipped != 0 {
+    if counts.skipped != 0 {
         return Err(Failure::HealthReconcile(HealthFault::IntentionalSkip));
     }
     Ok(())

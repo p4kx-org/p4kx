@@ -148,7 +148,7 @@ fn an_additional_declared_base_field_requires_diagnostic_publication() -> TestRe
     };
     assert!(matches!(
         error.downcast_ref::<CatalogError>(),
-        Some(CatalogError::IncompleteExport { .. })
+        Some(CatalogError::IncompleteExport(_))
     ));
     let (_, catalog) = catalog_crafting_support::diagnostic_from(&database, None)?;
     assert_eq!(
@@ -159,14 +159,17 @@ fn an_additional_declared_base_field_requires_diagnostic_publication() -> TestRe
     let diagnostics = catalog["exportHealth"]["diagnostics"]
         .as_array()
         .ok_or("the diagnostics")?;
-    let has_field = diagnostics.iter().any(|diagnostic| {
-        diagnostic["code"] == "unsupportedValue"
-            && diagnostic["examples"].as_array().is_some_and(|examples| {
-                examples
-                    .iter()
-                    .any(|example| example["field"] == "qualityDistribution.additionalField")
-            })
-    });
+    let mut has_field = false;
+    for diagnostic in diagnostics {
+        if diagnostic["code"] != "unsupportedValue" {
+            continue;
+        }
+        let examples = diagnostic["examples"].as_array().ok_or("source examples")?;
+        for example in examples {
+            has_field |= crate::health_origin_assertions::example_text(&catalog, example, "field")?
+                == Some(&json!("qualityDistribution.additionalField"));
+        }
+    }
     assert!(
         has_field,
         "a fieldless base cannot silently discard an added source field"

@@ -9,7 +9,6 @@ use crate::{Guid, Reference, StructValue, ValueError};
 /// Text is borrowed from the DataForge. Owned children are nested; other Records and weak
 /// pointers are [`Value::Reference`] links and never embedded. A value that cannot be read is an
 /// [`Value::Error`] at its place, so the rest of the Record still builds.
-#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Value<'f> {
     /// A boolean.

@@ -73,7 +73,7 @@ fn warnings_keep_their_stable_code_without_copying_raw_detail_values() -> TestRe
         super::ledger(),
         &super::rows(Kind::Blueprints, 0),
         &[],
-        &[warning],
+        std::slice::from_ref(&warning),
         CatalogPublicationMode::DiagnosticPartial,
     )?;
     let diagnostic = report.diagnostics.first().ok_or("warning diagnostic")?;
@@ -92,7 +92,11 @@ fn warnings_keep_their_stable_code_without_copying_raw_detail_values() -> TestRe
         "the producer's actual count is retained"
     );
     assert!(
-        !serde_json::to_string(&report)?.contains("confidential synthetic payload"),
+        !serde_json::to_string(&super::original::finish_json(
+            false,
+            std::slice::from_ref(&warning)
+        )?)?
+        .contains("confidential synthetic payload"),
         "raw values are excluded from artifact diagnostic messages"
     );
     assert!(
@@ -134,32 +138,8 @@ fn every_compatibility_failure_requires_a_production_explanation() {
 
 #[test]
 fn a_file_only_roundtrip_distinguishes_failure_from_successful_absence() -> TestResult {
-    let mut failed = super::ledger();
-    super::observe(
-        &mut failed,
-        super::source(
-            Kind::Blueprints,
-            1,
-            ExportSourceRole::Selected,
-            SourceDisposition::ProjectionFailed,
-        ),
-    );
-    let failed = export_health_compile::compile(
-        failed,
-        &super::rows(Kind::Blueprints, 0),
-        &[],
-        &[],
-        CatalogPublicationMode::DiagnosticPartial,
-    )?;
-    let empty = export_health_compile::compile(
-        super::ledger(),
-        &super::rows(Kind::Blueprints, 0),
-        &[],
-        &[],
-        CatalogPublicationMode::Normal,
-    )?;
-    let failed: serde_json::Value = serde_json::from_slice(&serde_json::to_vec(&failed)?)?;
-    let empty: serde_json::Value = serde_json::from_slice(&serde_json::to_vec(&empty)?)?;
+    let failed = super::original::finish_json(true, &[])?;
+    let empty = super::original::finish_json(false, &[])?;
     assert_eq!(
         failed.get("writtenRows"),
         empty.get("writtenRows"),

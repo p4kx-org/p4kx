@@ -51,7 +51,7 @@ pub(crate) fn assert_normal_refusal(database: &DataForgeBuilder) -> TestResult {
     assert!(
         matches!(
             p4kx_export::build_catalog(&archive, &common::options()),
-            Err(CatalogError::IncompleteExport { .. })
+            Err(CatalogError::IncompleteExport(_))
         ),
         "the actual required field violation must block normal publication"
     );
@@ -126,19 +126,28 @@ pub(crate) fn assert_field_error(catalog: &Value, field: &str, source_type: &str
     let diagnostics = at(catalog, "/exportHealth/diagnostics")?
         .as_array()
         .ok_or("diagnostics")?;
-    let found = diagnostics.iter().any(|diagnostic| {
-        diagnostic.get("code").and_then(Value::as_str) == Some("malformedSource")
-            && diagnostic
-                .get("examples")
-                .and_then(Value::as_array)
-                .is_some_and(|examples| {
-                    examples.iter().any(|example| {
-                        example.get("field").and_then(Value::as_str) == Some(field)
-                            && example.get("sourceType").and_then(Value::as_str)
-                                == Some(source_type)
-                    })
-                })
-    });
+    let health = at(catalog, "/exportHealth")?;
+    let mut found = false;
+    for diagnostic in diagnostics {
+        if diagnostic.get("code").and_then(Value::as_str) != Some("malformedSource") {
+            continue;
+        }
+        let examples = at(diagnostic, "/examples")?
+            .as_array()
+            .ok_or("diagnostic examples")?;
+        for example in examples {
+            let actual_field = at(example, "/field")?;
+            let actual_type = at(example, "/sourceType")?;
+            if actual_field.get("state").and_then(Value::as_str) == Some("present")
+                && actual_type.get("state").and_then(Value::as_str) == Some("present")
+            {
+                found |= crate::health_origin_assertions::text_value(health, actual_field)?
+                    == &json!(field)
+                    && crate::health_origin_assertions::text_value(health, actual_type)?
+                        == &json!(source_type);
+            }
+        }
+    }
     assert!(
         found,
         "the field violation keeps its original source type and exact field location"

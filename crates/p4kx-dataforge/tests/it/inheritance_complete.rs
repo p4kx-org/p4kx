@@ -104,7 +104,7 @@ fn completion_keeps_a_distant_ancestor_and_inherited_field() -> TestResult {
     let bytes = database(96)?;
     let forge = DataForge::open(&bytes)?;
     assert_original_chain(&forge, 96)?;
-    let schema = QuerySchema::of(&forge);
+    let schema = QuerySchema::of(&forge)?;
     let text = "from Holder select parts[N000";
     let completion = schema.complete(text, text.len()).ok_or("type completion")?;
     let names: Vec<_> = completion

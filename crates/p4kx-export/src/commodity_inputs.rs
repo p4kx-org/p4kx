@@ -88,6 +88,18 @@ impl<'context> CommodityInputs<'context> {
         self.complete &= complete;
     }
 
+    pub(crate) fn extend_retained(
+        &mut self,
+        uses: &[SourceUse],
+        complete: bool,
+    ) -> Result<(), CatalogError> {
+        self.uses
+            .try_reserve(uses.len())
+            .map_err(CatalogError::SourceUseAllocation)?;
+        self.extend(uses.iter().cloned(), complete);
+        Ok(())
+    }
+
     pub(crate) const fn require_complete(&mut self, complete: bool) {
         self.complete &= complete;
     }

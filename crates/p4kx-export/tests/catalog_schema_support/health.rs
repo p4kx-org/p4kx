@@ -2,80 +2,93 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::{
-    CatalogPublicationMode, ExportDiagnostic, ExportDiagnosticCode, ExportDiagnosticSeverity,
-    ExportDiagnosticStage, ExportDiagnosticUnit, ExportEntryCounts, ExportHealth,
-    ExportHealthStatus, ExportSourceCounts, ExportSourceMode, ExportSourceRole, ExportStageStatus,
-    Kind, KindExportHealth,
+    CatalogPublicationMode, ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage,
+    ExportDiagnosticUnit, ExportEntryCounts, ExportHealthStatus, ExportSourceCounts,
+    ExportSourceMode, ExportSourceRole, ExportStageStatus, Kind,
 };
 use serde_json::{Value, json};
 
 /// Marks authored schema data as diagnostic without claiming any decoder or source inventory ran.
 pub(super) fn fixture(catalog: &Value) -> Value {
-    let kinds: Vec<_> = Kind::ALL
-        .into_iter()
-        .map(|kind| kind_health(kind, catalog))
-        .collect();
-    json!(ExportHealth {
-        status: ExportHealthStatus::Incomplete,
-        read: ExportStageStatus::Incomplete,
-        projection: ExportStageStatus::Incomplete,
-        publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        unique_selected_source_records: 0,
-        selected_kind_records: 0,
-        written_rows: kinds.iter().map(|kind| kind.written_rows).sum(),
-        kinds,
-        failed_records: Vec::new(),
-        failed_entries: Vec::new(),
-        unresolved_references: Vec::new(),
-        diagnostics: vec![ExportDiagnostic {
-            kind: None,
-            stage: ExportDiagnosticStage::Selection,
-            code: ExportDiagnosticCode::SelectionFailure,
-            severity: ExportDiagnosticSeverity::Error,
-            source_role: Some(ExportSourceRole::SelectionCandidate),
-            warning_code: None,
-            count: 1,
-            count_unit: ExportDiagnosticUnit::Occurrences,
-            examples: Vec::new(),
+    let mut kinds = Vec::new();
+    let mut written_rows = 0;
+    for kind in Kind::ALL {
+        let count = row_count(kind, catalog);
+        written_rows += count;
+        kinds.push(kind_health(kind, count));
+    }
+    json!({
+        "metadata": { "texts": [] },
+        "failures": [],
+        "status": ExportHealthStatus::Incomplete,
+        "read": ExportStageStatus::Incomplete,
+        "projection": ExportStageStatus::Incomplete,
+        "publicationMode": CatalogPublicationMode::DiagnosticPartial,
+        "uniqueSelectedSourceRecords": 0,
+        "selectedKindRecords": 0,
+        "writtenRows": written_rows,
+        "kinds": kinds,
+        "failedRecords": [],
+        "failedEntries": [],
+        "unresolvedReferences": [],
+        "diagnostics": [{
+            "kind": null,
+            "stage": ExportDiagnosticStage::Selection,
+            "code": ExportDiagnosticCode::SelectionFailure,
+            "severity": ExportDiagnosticSeverity::Error,
+            "sourceRole": ExportSourceRole::SelectionCandidate,
+            "warningCode": null,
+            "count": 1,
+            "countUnit": ExportDiagnosticUnit::Occurrences,
+            "examples": [],
         }],
     })
 }
 
-fn kind_health(kind: Kind, catalog: &Value) -> KindExportHealth {
-    KindExportHealth {
-        kind,
-        source_mode: mode(kind),
-        source_inventory_complete: false,
-        field_inventory_complete: false,
-        read: ExportStageStatus::Incomplete,
-        projection: ExportStageStatus::Incomplete,
-        source_records: ExportSourceCounts::default(),
-        source_entries: ExportEntryCounts::default(),
-        written_rows: match kind {
-            Kind::BlueprintCategories => catalog.pointer("/definitions/blueprintCategories/rows"),
-            Kind::GameplayProperties => catalog.pointer("/definitions/gameplayProperties/rows"),
-            Kind::BlueprintCategoryLists => {
-                catalog.pointer("/declarations/blueprintCategoryLists/rows")
-            }
-            Kind::Manufacturers => catalog.pointer("/definitions/manufacturers/rows"),
-            Kind::Tags => catalog.pointer("/definitions/tags/rows"),
-            Kind::Commodities => catalog.pointer("/definitions/commodities/rows"),
-            Kind::ResourceTypes => catalog.pointer("/definitions/resourceTypes/rows"),
-            _ => catalog.get(kind.name()),
+fn kind_health(kind: Kind, written_rows: usize) -> Value {
+    json!({
+        "kind": kind,
+        "sourceMode": mode(kind),
+        "sourceInventoryComplete": false,
+        "fieldInventoryComplete": false,
+        "read": ExportStageStatus::Incomplete,
+        "projection": ExportStageStatus::Incomplete,
+        "sourceRecords": ExportSourceCounts::default(),
+        "sourceEntries": ExportEntryCounts::default(),
+        "writtenRows": written_rows,
+        "intentionallySkippedRows": 0,
+        "failedDerivedProjections": 0,
+        "failedRecords": [],
+        "failedEntries": [],
+        "unresolvedReferenceCount": 0,
+    })
+}
+
+fn row_count(kind: Kind, catalog: &Value) -> usize {
+    match kind {
+        Kind::Blueprints => catalog.pointer("/definitions/blueprints/rows"),
+        Kind::ShopInventories => catalog.pointer("/definitions/shopInventories/rows"),
+        Kind::ContractTemplates => catalog.pointer("/definitions/contractTemplates/rows"),
+        Kind::MissionBrokerEntries => catalog.pointer("/definitions/missionBrokerEntries/rows"),
+        Kind::BlueprintCategories => catalog.pointer("/definitions/blueprintCategories/rows"),
+        Kind::GameplayProperties => catalog.pointer("/definitions/gameplayProperties/rows"),
+        Kind::LootPoolFilters => catalog.pointer("/definitions/lootPoolFilters/rows"),
+        Kind::BlueprintCategoryLists => {
+            catalog.pointer("/declarations/blueprintCategoryLists/rows")
         }
-        .and_then(Value::as_array)
-        .map_or(0, Vec::len),
-        intentionally_skipped_rows: 0,
-        failed_derived_projections: 0,
-        failed_records: Vec::new(),
-        failed_entries: Vec::new(),
-        unresolved_reference_count: 0,
+        Kind::Manufacturers => catalog.pointer("/definitions/manufacturers/rows"),
+        Kind::Tags => catalog.pointer("/definitions/tags/rows"),
+        Kind::Commodities => catalog.pointer("/definitions/commodities/rows"),
+        Kind::ResourceTypes => catalog.pointer("/definitions/resourceTypes/rows"),
+        _ => catalog.get(kind.name()),
     }
+    .and_then(Value::as_array)
+    .map_or(0, Vec::len)
 }
 
 const fn mode(kind: Kind) -> ExportSourceMode {
     match kind {
-        Kind::HarvestableLocations | Kind::LootContainers | Kind::Shops => {
+        Kind::HarvestableLocations | Kind::LootContainers | Kind::Shops | Kind::ShopInventories => {
             ExportSourceMode::ArchiveEntries
         }
         Kind::Paints

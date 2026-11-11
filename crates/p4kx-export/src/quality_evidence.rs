@@ -1,23 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{
-    SourceCoordinateOmission, SourceLocation, SourceUse, SourceUseRole, SourceValue, SourcedValue,
-    Value,
-};
+use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value};
 
 use crate::CatalogError;
-use crate::catalog_input_limits::{MAX_DECISION_INPUT_BYTES, MAX_DECISION_INPUTS};
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::CatalogRecordContext;
 use crate::record_header_field::RecordHeaderInput;
 
-/// Bounded actual original decision inputs, independent of reduced output values.
-#[derive(Debug, Clone)]
+/// Actual original decision inputs and the completeness of the consulted source.
+#[derive(Debug)]
 pub(crate) struct Evidence {
     uses: Vec<SourceUse>,
-    cut: Option<SourceUse>,
-    bytes: usize,
     pub(crate) complete: bool,
 }
 
@@ -25,8 +19,6 @@ impl Default for Evidence {
     fn default() -> Self {
         Self {
             uses: Vec::new(),
-            cut: None,
-            bytes: 0,
             complete: true,
         }
     }
@@ -39,7 +31,9 @@ impl Evidence {
         field: RecordHeaderInput,
         readable: bool,
     ) -> Result<(), CatalogError> {
-        let mut actual = Vec::new();
+        self.uses
+            .try_reserve(2)
+            .map_err(CatalogError::SourceUseAllocation)?;
         context.append_header_input(
             field,
             if readable {
@@ -47,107 +41,91 @@ impl Evidence {
             } else {
                 SourceUseRole::Attempted
             },
-            &mut actual,
+            &mut self.uses,
         )?;
-        for source in actual {
-            self.keep(source);
-        }
         self.complete &= readable;
         Ok(())
     }
 
-    pub(crate) fn field(
+    pub(super) fn lookup<'view, 'source>(
+        &mut self,
+        context: &CatalogRecordContext<'_>,
+        parent: &'view StructValue<'source>,
+        name: &str,
+        path: &str,
+        survey: impl FnOnce() -> Result<SourceUse, CatalogError>,
+    ) -> Result<Option<&'view Value<'source>>, CatalogError> {
+        let value = parent.field(name);
+        if let Some(value) = value {
+            self.field(context, path, value)?;
+        } else {
+            self.keep(survey()?)?;
+        }
+        Ok(value)
+    }
+
+    pub(super) fn field(
         &mut self,
         context: &CatalogRecordContext<'_>,
         path: &str,
-        value: Option<&Value<'_>>,
+        value: &Value<'_>,
     ) -> Result<(), CatalogError> {
-        let readable = !matches!(value, Some(Value::Error(_)));
-        self.keep(context.observe(
-            path,
-            if readable {
-                SourceUseRole::Selector
-            } else {
-                SourceUseRole::Attempted
-            },
-        )?);
+        let readable = !matches!(value, Value::Error(_));
+        let role = if readable {
+            SourceUseRole::Selector
+        } else {
+            SourceUseRole::Attempted
+        };
+        self.keep(context.observe(path, role)?)?;
         self.complete &= readable;
         Ok(())
     }
 
-    pub(crate) fn keep(&mut self, source: SourceUse) {
-        let bytes =
-            coordinate_bytes(&source).and_then(|bytes| bytes.checked_add(size_of::<SourceUse>()));
-        if self.cut.is_some()
-            || self.uses.len() == MAX_DECISION_INPUTS
-            || bytes.is_none_or(|bytes| bytes > MAX_DECISION_INPUT_BYTES.saturating_sub(self.bytes))
-        {
-            if self.cut.is_none() {
-                self.cut = Some(source);
-            }
-            self.complete = false;
-            return;
-        }
-        if let Some(bytes) = bytes {
-            self.bytes += bytes;
-        }
+    pub(super) fn concrete_type<'source>(
+        &mut self,
+        context: &CatalogRecordContext<'_>,
+        path: &str,
+        value: &StructValue<'source>,
+    ) -> Result<&'source str, CatalogError> {
+        self.keep(context.observe(&format!("{path}.$type"), SourceUseRole::Selector)?)?;
+        Ok(value.type_name())
+    }
+
+    pub(crate) fn keep(&mut self, source: SourceUse) -> Result<(), CatalogError> {
+        self.uses
+            .try_reserve(1)
+            .map_err(CatalogError::SourceUseAllocation)?;
         self.uses.push(source);
+        Ok(())
     }
 
-    pub(crate) fn append(&mut self, other: &Self) {
+    pub(crate) fn append(&mut self, other: &Self) -> Result<(), CatalogError> {
+        self.uses
+            .try_reserve(other.uses.len())
+            .map_err(CatalogError::SourceUseAllocation)?;
+        self.uses.extend(other.uses.iter().cloned());
         self.complete &= other.complete;
-        for source in &other.uses {
-            self.keep(source.clone());
-            if self.cut.is_some() {
-                break;
-            }
-        }
-        if self.cut.is_none() {
-            self.cut.clone_from(&other.cut);
-        }
-        self.complete &= self.cut.is_none();
+        Ok(())
     }
 
-    pub(crate) fn sources(&self, origins: &CatalogOrigins) -> Result<Vec<SourceUse>, CatalogError> {
-        let mut uses = self.uses.clone();
-        if let Some(actual) = &self.cut {
-            uses.push(
-                origins
-                    .uses
-                    .opaque_use(actual, SourceCoordinateOmission::CaptureLimit)?,
-            );
-        }
-        Ok(uses)
+    pub(super) fn clear(&mut self) {
+        self.uses.clear();
+        self.complete = true;
     }
 
-    pub(crate) fn value<T>(
-        &self,
-        origins: &CatalogOrigins,
-        value: T,
-    ) -> Result<SourcedValue<T>, CatalogError> {
-        Ok(origins.uses.value(
-            SourceValue::Present(value),
-            &self.sources(origins)?,
-            self.complete,
-        ))
+    pub(crate) fn copy(&self) -> Result<Self, CatalogError> {
+        let mut result = Self::default();
+        result.append(self)?;
+        Ok(result)
     }
-}
 
-fn coordinate_bytes(source: &SourceUse) -> Option<usize> {
-    match source.description().location() {
-        SourceLocation::DataForge { field, .. } | SourceLocation::Metadata { field } => {
-            Some(field.len())
-        }
-        SourceLocation::Subresource {
-            namespace,
-            indices,
-            field,
-        } => namespace.len().checked_add(field.len()).and_then(|bytes| {
-            indices
-                .len()
-                .checked_mul(size_of::<u64>())
-                .and_then(|indices| bytes.checked_add(indices))
-        }),
-        _ => Some(0),
+    pub(crate) const fn inputs(&self) -> &[SourceUse] {
+        self.uses.as_slice()
+    }
+
+    pub(crate) fn value<T>(&self, origins: &CatalogOrigins, value: T) -> SourcedValue<T> {
+        origins
+            .uses
+            .value(SourceValue::Present(value), self.inputs(), self.complete)
     }
 }

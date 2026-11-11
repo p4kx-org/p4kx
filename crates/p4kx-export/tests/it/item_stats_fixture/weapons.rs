@@ -137,7 +137,7 @@ pub(super) fn ammo(guid: u128) -> TestRecord {
     )
 }
 
-pub(super) fn unbuildable_ammo(guid: u128) -> TestRecord {
+pub(super) fn cyclic_ammo(guid: u128) -> TestRecord {
     TestRecord::new(
         guid,
         "AmmoParams",

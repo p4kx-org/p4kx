@@ -14,6 +14,11 @@ use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::Value;
 
+#[path = "shop_inventory_complete.rs"]
+mod inventory_complete;
+#[path = "shop_inventory_normalized.rs"]
+mod inventory_normalized;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn shop<'a>(catalog: &'a Value, entity: &str) -> Result<&'a Value, Box<dyn Error>> {

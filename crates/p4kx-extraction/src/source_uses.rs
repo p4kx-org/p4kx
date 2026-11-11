@@ -4,7 +4,7 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use crate::field_origin::FieldOrigin;
+use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
 use crate::source_details::{SourceCoordinateOmission, SourceDetails};
 use crate::source_evidence_error::{self, SourceEvidenceError};
 use crate::source_inventory::SourceInventory;
@@ -109,16 +109,60 @@ impl SourceUses {
         uses: &[SourceUse],
         source_set_complete: bool,
     ) -> SourcedValue<T> {
+        SourcedValue::new(value, self.origin(uses, source_set_complete))
+    }
+
+    /// Binds navigation to its actual contributing inputs without duplicating a game value.
+    #[must_use]
+    pub fn origin(&self, uses: &[SourceUse], source_set_complete: bool) -> FieldOrigin {
+        let (own, complete) = self.owned_uses(uses, source_set_complete);
+        FieldOrigin::new(own, complete)
+    }
+
+    /// Captures a contributor set shared by values derived from the same source survey.
+    #[must_use]
+    pub fn shared_origin(
+        &self,
+        uses: &[SourceUse],
+        source_set_complete: bool,
+    ) -> SharedFieldOrigin {
+        let (own, complete) = self.owned_uses(uses, source_set_complete);
+        SharedFieldOrigin::new(Arc::clone(&self.identity), own, complete)
+    }
+
+    /// Binds a value to the union of a shared original contributor set and its own uses.
+    ///
+    /// # Errors
+    /// Returns an error when the shared origin belongs to another inventory.
+    pub fn value_with_shared_origin<T>(
+        &self,
+        value: SourceValue<T>,
+        shared: &SharedFieldOrigin,
+        uses: &[SourceUse],
+        source_set_complete: bool,
+    ) -> Result<SourcedValue<T>, SourceEvidenceError> {
+        if !shared.belongs_to(&self.identity) {
+            return Err(SourceEvidenceError::ForeignEvidence);
+        }
+        let (own, complete) = self.owned_uses(uses, source_set_complete);
+        Ok(SourcedValue::new(
+            value,
+            FieldOrigin::with_shared(shared, own, complete),
+        ))
+    }
+
+    fn owned_uses<'a>(
+        &'a self,
+        uses: &'a [SourceUse],
+        source_set_complete: bool,
+    ) -> (impl Iterator<Item = &'a SourceUse> + 'a, bool) {
         let foreign = uses.iter().any(|source| {
             source.role().contributes() && !Arc::ptr_eq(&source.identity, &self.identity)
         });
         let own = uses
             .iter()
-            .filter(|source| Arc::ptr_eq(&source.identity, &self.identity));
-        SourcedValue::new(
-            value,
-            FieldOrigin::new(own, source_set_complete && !foreign),
-        )
+            .filter(move |source| Arc::ptr_eq(&source.identity, &self.identity));
+        (own, source_set_complete && !foreign)
     }
 
     /// Freezes sorted source/use rows after projection for repeatable serialization passes.

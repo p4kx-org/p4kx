@@ -10,13 +10,15 @@ use crate::{Field, Guid, Location, Value};
 
 /// A struct inside a Record, or the Record's own fields: an inline class, the target of a strong
 /// pointer, or the root of a [`RecordTree`](crate::RecordTree).
-#[derive(Debug, Clone, PartialEq)]
 pub struct StructValue<'f> {
     pub(crate) type_name: &'f str,
     pub(crate) fields: Vec<Field<'f>>,
 }
 
 impl<'f> StructValue<'f> {
+    pub(crate) fn into_fields(mut self) -> Vec<Field<'f>> {
+        std::mem::take(&mut self.fields)
+    }
     /// Returns the name of the struct, which for a strong pointer may derive from the declared
     /// one.
     #[must_use]

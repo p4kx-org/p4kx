@@ -4,9 +4,11 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
-use crate::{DataForge, Field, Guid, Record, TreeBuilder, Value, ValueError};
+use crate::tree_cursor::Cursor;
+use crate::{DataForge, Field, Guid, Record, Step, TreeBuilder, Value, ValueError};
 
 use super::UNRESOLVED;
+use super::observed::{Evidence, ReferenceIndexError};
 
 /// The Records each parallel task reads.
 pub(super) const RECORDS_PER_TASK: u32 = 512;
@@ -17,49 +19,57 @@ pub(super) const RECORDS_PER_TASK: u32 = 512;
 pub(super) struct Chunk {
     pub(super) sources: Vec<u32>,
     pub(super) targets: Vec<u32>,
-    pub(super) shapes: Vec<u32>,
-    pub(super) index_starts: Vec<u32>,
+    pub(super) shapes: Vec<usize>,
+    pub(super) index_starts: Vec<usize>,
     pub(super) indices: Vec<u32>,
-    pub(super) unresolved: Vec<(u32, [u8; 16])>,
-    pub(super) shape_ids: HashMap<Box<str>, u32>,
+    pub(super) unresolved: Vec<(usize, [u8; 16])>,
+    pub(super) shape_ids: HashMap<Box<str>, usize>,
     pub(super) unreadable: u32,
+    pub(super) truncated: bool,
+    pub(super) evidence: Option<Evidence>,
 }
 
 impl Chunk {
-    fn shape(&mut self, text: &str) -> u32 {
+    fn shape(&mut self, text: &str) -> usize {
         if let Some(id) = self.shape_ids.get(text) {
             return *id;
         }
-        let id = u32::try_from(self.shape_ids.len()).unwrap_or(u32::MAX);
+        let id = self.shape_ids.len();
         self.shape_ids.insert(text.into(), id);
         id
     }
 }
 
-/// Reads the References of the Records in `range` into one chunk, stopping once the chunk alone
-/// holds more than `limit` References or `stop` says so; what the chunk holds depends on the
-/// Records alone.
-pub(super) fn collect<'f>(
+/// Reads References in Record order until the first omission or cancellation.
+pub(super) fn collect<'f, const OBSERVED: bool>(
     forge: &'f DataForge<'f>,
     builder: &mut TreeBuilder<'f>,
     range: Range<u32>,
     limit: usize,
     stop: &(dyn Fn() -> bool + Sync),
 ) -> Chunk {
-    let mut chunk = Chunk::default();
-    let mut walker = Walker {
-        forge,
+    let mut chunk = Chunk {
+        evidence: OBSERVED.then(Evidence::default),
+        ..Chunk::default()
+    };
+    let mut walker = Walker::<OBSERVED> {
         source: 0,
-        own: Guid::default(),
+        limit,
         path: String::new(),
         indices: Vec::new(),
         chunk: &mut chunk,
     };
     for index in range {
-        if walker.chunk.sources.len() > limit || stop() {
+        if walker.chunk.truncated
+            || walker.chunk.evidence.as_ref().is_some_and(Evidence::failed)
+            || stop()
+        {
             break;
         }
         let Some(record) = forge.record(index) else {
+            if let Some(evidence) = &mut walker.chunk.evidence {
+                evidence.fail(ReferenceIndexError::Inconsistent);
+            }
             continue;
         };
         if !walker.record(builder, &record) {
@@ -69,22 +79,26 @@ pub(super) fn collect<'f>(
     chunk
 }
 
-struct Walker<'w, 'f> {
-    forge: &'f DataForge<'f>,
+struct Walker<'w, const OBSERVED: bool> {
     source: u32,
-    own: Guid,
+    limit: usize,
     path: String,
     indices: Vec<u32>,
     chunk: &'w mut Chunk,
 }
 
-impl<'f> Walker<'_, 'f> {
-    fn record(&mut self, builder: &mut TreeBuilder<'f>, record: &Record<'f>) -> bool {
-        let Ok(tree) = builder.build(record) else {
-            return false;
+impl<const OBSERVED: bool> Walker<'_, OBSERVED> {
+    fn record<'f>(&mut self, builder: &mut TreeBuilder<'f>, record: &Record<'f>) -> bool {
+        let tree = match builder.build(record) {
+            Ok(tree) => tree,
+            Err(error) => {
+                if let Some(evidence) = &mut self.chunk.evidence {
+                    evidence.tree_error(record.index(), error);
+                }
+                return false;
+            }
         };
         self.source = record.index();
-        self.own = tree.guid();
         self.path.clear();
         self.indices.clear();
         self.fields(tree.fields());
@@ -92,46 +106,72 @@ impl<'f> Walker<'_, 'f> {
     }
 
     fn fields(&mut self, fields: &[Field<'_>]) {
-        for field in fields {
-            let mark = self.path.len();
-            if mark > 0 {
-                self.path.push('.');
+        let mut cursor = Cursor::new(fields);
+        let mut ordinal = 0_u64;
+        while let Some(visit) = cursor.next() {
+            let current = ordinal;
+            if OBSERVED {
+                let Some(next) = ordinal.checked_add(1) else {
+                    if let Some(evidence) = &mut self.chunk.evidence {
+                        evidence.fail(ReferenceIndexError::Inconsistent);
+                    }
+                    break;
+                };
+                ordinal = next;
+                if let Value::Error(error) = visit.value
+                    && let Some(evidence) = &mut self.chunk.evidence
+                {
+                    evidence.value_error(self.source, current, visit.data_type, *error);
+                    if evidence.failed() {
+                        break;
+                    }
+                }
             }
-            self.path.push_str(field.name());
-            self.value(field.value());
-            self.path.truncate(mark);
+            let (target, guid) = match visit.value {
+                Value::Reference(reference) if reference.record_index() != self.source => {
+                    (reference.record_index(), reference.guid())
+                }
+                Value::Error(ValueError::DanglingReference { guid }) => (UNRESOLVED, *guid),
+                _ => continue,
+            };
+            if self.chunk.sources.len() == self.limit {
+                self.chunk.truncated = true;
+                break;
+            }
+            if let Some(evidence) = &mut self.chunk.evidence
+                && let Err(error) = evidence.retain(current)
+            {
+                evidence.fail(error);
+                break;
+            }
+            self.set_path(visit.steps);
+            self.push(target, guid);
         }
     }
 
-    fn value(&mut self, value: &Value<'_>) {
-        match value {
-            Value::Struct(structure) => self.fields(structure.fields()),
-            Value::Array(items) => {
-                let mark = self.path.len();
-                for (index, item) in (0_u32..).zip(items.iter()) {
+    fn set_path(&mut self, steps: &[Step<'_>]) {
+        self.path.clear();
+        self.indices.clear();
+        for step in steps {
+            match step {
+                Step::Field(name) => {
+                    if !self.path.is_empty() {
+                        self.path.push('.');
+                    }
+                    self.path.push_str(name);
+                }
+                Step::Element(index) => {
                     self.path.push_str("[]");
-                    self.indices.push(index);
-                    self.value(item);
-                    self.indices.pop();
-                    self.path.truncate(mark);
+                    self.indices.push(*index);
                 }
             }
-            Value::Reference(reference) if reference.guid() != self.own => {
-                let target = self
-                    .forge
-                    .record_by_guid(reference.guid())
-                    .map_or(UNRESOLVED, |record| record.index());
-                self.push(target, reference.guid());
-            }
-            Value::Error(ValueError::DanglingReference { guid }) => self.push(UNRESOLVED, *guid),
-            _ => {}
         }
     }
 
     fn push(&mut self, target: u32, guid: Guid) {
         let shape = self.chunk.shape(&self.path);
-        let start = u32::try_from(self.chunk.indices.len()).unwrap_or(u32::MAX);
-        let entry = u32::try_from(self.chunk.sources.len()).unwrap_or(u32::MAX);
+        let start = self.chunk.indices.len();
+        let entry = self.chunk.sources.len();
         self.chunk.sources.push(self.source);
         self.chunk.targets.push(target);
         self.chunk.shapes.push(shape);

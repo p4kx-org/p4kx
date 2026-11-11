@@ -5,6 +5,7 @@ mod investigation;
 mod schema;
 
 use crate::mission_property_sets_fixture;
+use crate::mission_template_graph::Property;
 use crate::scoped_fixture;
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::Archive;
@@ -25,6 +26,22 @@ pub(crate) enum Owner {
     Generator,
     Template,
     Broker,
+}
+
+impl Owner {
+    pub(crate) fn property<'catalog>(
+        self,
+        catalog: &'catalog Value,
+        variable: &str,
+    ) -> Result<Property<'catalog>, Box<dyn Error>> {
+        match self {
+            Self::Template => Property::new(catalog, variable),
+            Self::Broker => Property::broker(catalog, variable),
+            Self::Generator => {
+                Err("generator values belong to the selected MissionPropertySet".into())
+            }
+        }
+    }
 }
 
 pub(crate) const fn object(value: TestInstance) -> TestValue {
@@ -139,27 +156,12 @@ pub(crate) fn build(
     Ok(serde_json::from_slice(built.json())?)
 }
 
-pub(crate) fn value<'d>(
-    document: &'d Value,
-    owner: Owner,
+pub(crate) fn generator_value<'catalog>(
+    document: &'catalog Value,
     variable: &str,
-) -> Result<&'d Value, Box<dyn Error>> {
-    match owner {
-        Owner::Generator => {
-            let set = mission_property_sets_fixture::level(document, "handler")?;
-            Ok(mission_property_sets_fixture::property(set, variable)?
-                .get("value")
-                .ok_or("value missing")?)
-        }
-        Owner::Template => Ok(scoped_fixture::value(
-            document,
-            "contractTemplates",
-            variable,
-        )?),
-        Owner::Broker => Ok(scoped_fixture::value(
-            document,
-            "missionBrokerEntries",
-            variable,
-        )?),
-    }
+) -> Result<&'catalog Value, Box<dyn Error>> {
+    let set = mission_property_sets_fixture::level(document, "handler")?;
+    mission_property_sets_fixture::property(set, variable)?
+        .get("value")
+        .ok_or_else(|| "value missing".into())
 }

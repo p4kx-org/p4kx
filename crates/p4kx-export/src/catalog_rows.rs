@@ -7,6 +7,7 @@ use crate::catalog_number_health::EmittedNumber;
 use crate::catalog_row::{CatalogRow, CatalogRows};
 use crate::collected::Collected;
 use crate::selection::Kind;
+use crate::template_number_capture::TemplateNumbers;
 
 /// Captures the actual final row selection independently of successful source projections.
 pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> CatalogRows {
@@ -31,6 +32,24 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
     append_resources(&mut emitted, collected);
     append(
         &mut emitted,
+        Kind::Blueprints,
+        collected
+            .blueprints
+            .iter()
+            .map(|row| (row.definition.physical_guid.0, row.definition.physical_path)),
+    );
+    append_missions(&mut emitted, collected);
+    append(
+        &mut emitted,
+        Kind::LootPoolFilters,
+        collected
+            .loot_kinds
+            .filters
+            .iter()
+            .map(|row| (row.physical_guid.0, row.physical_path)),
+    );
+    append(
+        &mut emitted,
         Kind::GameplayProperties,
         collected
             .gameplay_properties
@@ -49,7 +68,41 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
         emitted,
         filter: filter.cloned(),
         numbers: numbers(collected),
+        template_numbers: template_numbers(collected),
     }
+}
+
+fn template_numbers(collected: &Collected<'_>) -> Vec<TemplateNumbers> {
+    collected
+        .contract_templates
+        .iter()
+        .map(|row| row.numbers.clone())
+        .chain(
+            collected
+                .broker_definitions
+                .iter()
+                .map(|row| row.numbers.clone()),
+        )
+        .collect()
+}
+
+fn append_missions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
+    append(
+        emitted,
+        Kind::ContractTemplates,
+        collected
+            .contract_templates
+            .iter()
+            .map(|row| (row.physical_guid.0, row.physical_path)),
+    );
+    append(
+        emitted,
+        Kind::MissionBrokerEntries,
+        collected
+            .broker_definitions
+            .iter()
+            .map(|row| (row.physical_guid.0, row.physical_path)),
+    );
 }
 
 fn append_resources(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
@@ -117,6 +170,12 @@ fn numbers(collected: &Collected<'_>) -> Vec<EmittedNumber> {
         .map(|row| (Kind::ResourceTypes, &row.numbers))
         .chain(
             collected
+                .blueprints
+                .iter()
+                .map(|row| (Kind::Blueprints, &row.definition.numbers)),
+        )
+        .chain(
+            collected
                 .gameplay_properties
                 .iter()
                 .map(|row| (Kind::GameplayProperties, &row.numbers)),
@@ -134,6 +193,13 @@ fn numbers(collected: &Collected<'_>) -> Vec<EmittedNumber> {
                 .quantizations
                 .iter()
                 .map(|row| (Kind::QualityQuantizations, &row.numbers)),
+        )
+        .chain(
+            collected
+                .loot_kinds
+                .filters
+                .iter()
+                .map(|row| (Kind::LootPoolFilters, &row.numbers)),
         )
     {
         numbers.extend(

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{self, Write};
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
@@ -15,7 +14,6 @@ use crate::build_starmap::add_starmap;
 use crate::catalog_crafting::kinds;
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_output::{Compression, emit};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
@@ -26,7 +24,20 @@ use crate::recovery::{Recovery, read_recovery};
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
 use crate::texts::{TextSources, Texts};
-use crate::{BuiltCatalog, CatalogError, CatalogOptions, CatalogSummary};
+use crate::{CatalogError, CatalogOptions, CatalogProvenance};
+
+#[path = "build_catalog.rs"]
+mod api;
+pub use api::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
+
+#[path = "catalog_refusal.rs"]
+pub(crate) mod refusal;
+use refusal::CatalogRefusal;
+
+#[path = "original_catalog_inputs.rs"]
+pub(crate) mod original_input;
+use crate::catalog_read::original::EntryCapture;
+use original_input::OriginalCatalogInput;
 
 #[path = "build_parts.rs"]
 mod parts;
@@ -39,98 +50,6 @@ pub(crate) use metadata::source;
 #[path = "build_scan.rs"]
 mod scanning;
 use scanning::scan;
-
-/// Builds a deterministic Basetool catalog from the DataForge and available localization inputs.
-///
-/// Resource definitions retain per-value source origins and canonical text references.
-/// Normal publication requires complete export health; diagnostic mode retains available rows.
-///
-/// # Errors
-///
-/// Returns an input, projection, accounting or cancellation error when the catalog cannot be built.
-/// Returns [`CatalogError::IncompleteExport`] when normal publication is unsafe.
-pub fn build_catalog(
-    archive: &Archive,
-    options: &CatalogOptions<'_>,
-) -> Result<BuiltCatalog, CatalogError> {
-    if options.cancel.is_some_and(CancelToken::is_cancelled) {
-        return Err(CatalogError::Cancelled);
-    }
-    let entry = DataForgeEntry::read(archive).map_err(CatalogError::Load)?;
-    build_catalog_from(archive, &entry, options)
-}
-
-/// Builds the Basetool catalog like [`build_catalog`] and streams it like [`write_catalog_from`].
-///
-/// # Errors
-///
-/// As [`build_catalog`] and [`write_catalog_from`].
-pub fn write_catalog<W: Write>(
-    archive: &Archive,
-    options: &CatalogOptions<'_>,
-    compression: Compression,
-    create: impl FnOnce() -> io::Result<W>,
-) -> Result<(CatalogSummary, W), CatalogError> {
-    if options.cancel.is_some_and(CancelToken::is_cancelled) {
-        return Err(CatalogError::Cancelled);
-    }
-    let entry = DataForgeEntry::read(archive).map_err(CatalogError::Load)?;
-    write_catalog_from(archive, &entry, options, compression, create)
-}
-
-/// Builds the Basetool catalog like [`build_catalog`] from `entry`, the DataForge Entry already
-/// read from `archive`, so that a caller holding it does not read it again.
-///
-/// # Errors
-///
-/// As [`build_catalog`], except that the DataForge Entry is not read here.
-pub fn build_catalog_from(
-    archive: &Archive,
-    entry: &DataForgeEntry,
-    options: &CatalogOptions<'_>,
-) -> Result<BuiltCatalog, CatalogError> {
-    let (parts, written) = assemble(archive, entry, options, |catalog| {
-        emit(catalog, Vec::new(), Compression::None, options.cancel)
-    })?;
-    Ok(BuiltCatalog {
-        summary: parts.summary(written.size, written.compressed),
-        json: written.sink,
-    })
-}
-
-/// Builds the Basetool catalog like [`build_catalog_from`] and streams its JSON into the writer
-/// `create` returns, compressed as `compression` says.
-///
-/// The JSON is never held in memory; zstd serialises it twice, once to count its length for the
-/// frame header.
-///
-/// `create` is called once after the build passes its publication policy, before the first byte
-/// is written; a refused or cancelled build creates nothing. Returns the summary, whose
-/// [`size`](CatalogSummary::size) is the JSON size and whose
-/// [`compressed_size`](CatalogSummary::compressed_size) is the size written when compressed, and
-/// the writer, flushed and with the compressed frame finished.
-///
-/// # Errors
-///
-/// As [`build_catalog`], except that the DataForge Entry is not read here, plus
-/// [`CatalogError::Write`] when `create` or the writer fails and [`CatalogError::Cancelled`] when
-/// the [`CancelToken`] of `options` is cancelled while writing.
-pub fn write_catalog_from<W: Write>(
-    archive: &Archive,
-    entry: &DataForgeEntry,
-    options: &CatalogOptions<'_>,
-    compression: Compression,
-    create: impl FnOnce() -> io::Result<W>,
-) -> Result<(CatalogSummary, W), CatalogError> {
-    let (parts, written) = assemble(archive, entry, options, |catalog| {
-        let out = create().map_err(CatalogError::Write)?;
-        emit(catalog, out, compression, options.cancel)
-    })?;
-    Ok((
-        parts.summary(written.size, written.compressed),
-        written.sink,
-    ))
-}
 
 /// Builds the catalog and hands it to `emit`, which serialises it.
 #[expect(
@@ -150,7 +69,9 @@ fn assemble<R>(
     let sources = TextSources::read(archive)?;
     let texts = Texts::parse(&sources)?;
     let origins = CatalogOrigins::new(archive, entry, &sources)?;
-    let projection = CatalogProjection::new(&texts, &origins);
+    let input = OriginalCatalogInput::new(&forge, &origins);
+    let projection = CatalogProjection::new(&texts, &input);
+    let entry_capture = EntryCapture::for_input(&input);
     let crafting = kinds(
         read_with_progress(
             &forge,
@@ -159,9 +80,9 @@ fn assemble<R>(
             options.progress,
             &projection,
         )?,
-        &texts,
+        &origins,
         options.filter,
-    );
+    )?;
     let files = ArchiveFiles::new(archive);
     let entities = Arc::new(Entities::new(&forge));
     let (mut collected, placements) = scan(
@@ -173,30 +94,52 @@ fn assemble<R>(
         &projection,
         crafting,
     )?;
-    let mut tags = crate::catalog_v3::tag_catalog::read(&forge, &origins, options.cancel)?;
+    let need_mission_tags =
+        crate::mission_index::MissionIndex::needs_index(&forge, options.filter, options.cancel)?;
+    let mut tags =
+        crate::catalog_v3::tag_catalog::read(&forge, &input, options.cancel, need_mission_tags)?;
     tags.rows.entity_tags = std::mem::take(&mut collected.tags.entity_tags);
     collected.tags = tags.rows;
     collected.ledger.merge(tags.ledger);
     collected.add_failures(tags.failures);
     collected.ledger.archive_inventory_problem = crate::export_archive_health::inventory(archive);
-    let paint_summary = add_paints(&forge, &mut collected, options.cancel)?;
-    let loadout_summary = add_loadouts(archive, &entities, &mut collected, options.cancel)?;
+    let paint_summary = add_paints(&forge, &input, &mut collected, options.cancel)?;
+    let loadout_summary = add_loadouts(archive, &entities, &mut collected, &input, options.cancel)?;
     let variants = collected.group_variants();
     let starmap_summary = add_starmap(&mut collected, placements.counts);
-    add_harvest_locations(archive, &placements, &mut collected, options.cancel)?;
-    add_loot_containers(archive, &placements, &mut collected, options.cancel)?;
-    add_contracts(&forge, &texts, options, &mut collected)?;
+    add_harvest_locations(
+        archive,
+        &placements,
+        &mut collected,
+        options.cancel,
+        &entry_capture,
+    )?;
+    add_loot_containers(
+        archive,
+        &placements,
+        &mut collected,
+        options.cancel,
+        &entry_capture,
+    )?;
+    add_contracts(
+        &forge,
+        &projection,
+        (&tags.context, tags.dependencies),
+        options,
+        &mut collected,
+    )?;
     collected.ledger.merge(link_scenario_factions(
         &forge,
         &mut collected.mission_kinds.scenarios,
+        &input,
         options.cancel,
     )?);
-    let shop_summary = add_shops(archive, &files, &mut collected, options)?;
+    let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
     let Recovery {
         rules,
         failures,
         ledger,
-    } = read_recovery(&forge, options.filter, options.cancel)?;
+    } = read_recovery(&forge, &input, options.filter, options.cancel)?;
     collected.ledger.merge(ledger);
     collected.add_failures(failures);
     let kinds = collected.summary(options.filter.is_none());
@@ -209,17 +152,27 @@ fn assemble<R>(
     {
         collected.ledger.conflicting_catalog_rows = true;
     }
-    let health = crate::export_health_compile::compile(
+    let blueprints = crate::blueprint_catalog_rows::tables(
+        std::mem::take(&mut collected.blueprints),
+        &collected.missing_blueprint_categories,
+        &collected.ledger.sources,
+        &forge,
+        &origins,
+    )?;
+    let health = crate::export_health_prepare::compile_captured(
         std::mem::take(&mut collected.ledger),
         &kinds,
         &collected.failures,
         &collected.warnings,
         options.publication_mode,
+        &input,
+        options.cancel,
     )?;
     if !health.permits_publication(options.publication_mode) {
-        return Err(CatalogError::IncompleteExport {
-            health: Box::new(health),
-        });
+        return Err(CatalogError::IncompleteExport(CatalogRefusal::new(
+            Box::new(health),
+            CatalogProvenance::new(origins.uses.freeze()?),
+        )));
     }
     let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
@@ -258,13 +211,13 @@ fn assemble<R>(
         export_health: health.clone(),
         items: collected.items,
         ships: collected.ships,
-        blueprints: collected.blueprints,
         declarations: crate::catalog_v3::catalog_declarations::CatalogDeclarations {
             blueprint_category_lists: crate::catalog_v3::blueprint_category_list_read::table(
                 &forge,
                 collected.blueprint_category_lists,
             ),
             resource_group_members: group_tables.members,
+            shop_inventory_resolution: collected.shop_inventory_resolution,
             tag_roots: CatalogTable::new(&forge, &["TagDatabase"], collected.tags.roots),
             entity_tags: CatalogTable::new(
                 &forge,
@@ -273,6 +226,28 @@ fn assemble<R>(
             ),
         },
         definitions: CatalogDefinitions {
+            blueprints: blueprints.definitions,
+            shop_inventories: collected.shop_inventories,
+            contract_generators: CatalogTable::new(
+                &forge,
+                &["ContractGenerator"],
+                collected.contract_generators,
+            ),
+            contract_templates: CatalogTable::new(
+                &forge,
+                &["ContractTemplate"],
+                collected.contract_templates,
+            ),
+            mission_broker_entries: CatalogTable::new(
+                &forge,
+                &["MissionBrokerEntry"],
+                collected.broker_definitions,
+            ),
+            loot_pool_filters: CatalogTable::new(
+                &forge,
+                &["PoolFilterRecord"],
+                collected.loot_kinds.filters,
+            ),
             gameplay_properties: crate::catalog_v3::gameplay_property_catalog::table(
                 &forge,
                 collected.gameplay_properties,
@@ -301,6 +276,13 @@ fn assemble<R>(
             manufacturers: crate::manufacturer::table(&forge, collected.manufacturers),
         },
         projections: CatalogProjections {
+            contracts: CatalogTable::new(&forge, &["ContractGenerator"], collected.contracts),
+            mission_titles: CatalogTable::new(
+                &forge,
+                &["ContractGenerator"],
+                collected.mission_titles,
+            ),
+            blueprint_presentation: blueprints.presentation,
             quality_quantization_resources: CatalogTable::new(
                 &forge,
                 &["CraftingQualityQuantizationRecord"],
@@ -310,15 +292,37 @@ fn assemble<R>(
             tag_paths: CatalogTable::new(&forge, &["Tag"], collected.tags.paths),
             commodity_presentation,
         },
+        configurations: crate::catalog_configurations::CatalogConfigurations {
+            blueprint_tiers: blueprints.tiers,
+            contract_templates: CatalogTable::new(
+                &forge,
+                &["ContractTemplate"],
+                collected.template_configurations.templates,
+            ),
+            mission_broker_entries: CatalogTable::new(
+                &forge,
+                &["MissionBrokerEntry"],
+                collected.broker_projections,
+            ),
+            mission_flows: CatalogTable::new(
+                &forge,
+                &["ContractTemplate", "MissionBrokerEntry"],
+                collected.template_configurations.flows,
+            ),
+            mission_properties: CatalogTable::new(
+                &forge,
+                &["ContractTemplate", "MissionBrokerEntry"],
+                collected.template_configurations.properties,
+            ),
+        },
         texts: projection.finish()?,
-        provenance: origins.uses.freeze()?,
+        provenance: CatalogProvenance::new(origins.uses.freeze()?),
         blueprint_pools: collected.blueprint_pools,
         dismantle_processes: collected.dismantle_processes,
         crafting_global: collected.crafting_global,
         paints: collected.paints,
         loadouts: collected.loadouts,
         starmap_objects: collected.starmap_objects,
-        contracts: collected.contracts,
         mineable_elements: collected.mineable_elements,
         refining_processes: collected.refining_processes,
         mineable_compositions: collected.mineable_compositions,
@@ -337,7 +341,6 @@ fn assemble<R>(
         contract_scenarios: collected.mission_kinds.scenarios,
         loot_tables: collected.loot_kinds.tables,
         loot_archetypes: collected.loot_kinds.archetypes,
-        loot_pool_filters: collected.loot_kinds.filters,
         legacy_loot_tables: collected.loot_kinds.legacy_tables,
         legacy_loot_archetypes: collected.loot_kinds.legacy_archetypes,
         mineable_entities: collected.mineable_entities,
@@ -346,8 +349,6 @@ fn assemble<R>(
         mission_location_templates: collected.mission_location_templates,
         contract_ship_spawns: collected.contract_ship_spawns,
         contract_location_queries: collected.contract_location_queries,
-        contract_templates: collected.contract_templates,
-        mission_broker_entries: collected.mission_broker_entries,
         contract_npc_spawns: collected.contract_npc_spawns,
         contract_entity_spawns: collected.contract_entity_spawns,
         mission_property_sets: collected.mission_property_sets,
@@ -358,6 +359,7 @@ fn assemble<R>(
     Ok((
         Parts {
             export_health: health,
+            provenance: catalog.provenance,
             kinds,
             texts: texts.summary(),
             notes: texts.notes().to_vec(),
@@ -371,7 +373,6 @@ fn assemble<R>(
             playability: collected.playability,
             variants,
             quantizations: collected.quality.summary,
-            failures: collected.failures,
             warnings: collected.warnings,
             archive_key: key_use,
         },

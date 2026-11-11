@@ -173,22 +173,27 @@ fn assert_diagnosis(catalog: &Value, code: &str, field: &str) -> TestResult {
     let diagnostics = fixture::at(catalog, "/exportHealth/diagnostics")?
         .as_array()
         .ok_or("list diagnostics")?;
+    let mut found = false;
+    for diagnostic in diagnostics {
+        if diagnostic.get("kind").and_then(Value::as_str) != Some(fixture::KIND)
+            || diagnostic.get("code").and_then(Value::as_str) != Some(code)
+        {
+            continue;
+        }
+        let examples = diagnostic["examples"].as_array().ok_or("list examples")?;
+        for example in examples {
+            found |= example
+                .pointer("/recordIndex/value")
+                .and_then(Value::as_u64)
+                == Some(0)
+                && crate::health_origin_assertions::example_text(catalog, example, "field")?
+                    == Some(&json!(field))
+                && crate::health_origin_assertions::example_text(catalog, example, "sourceType")?
+                    == Some(&json!(fixture::TYPE));
+        }
+    }
     assert!(
-        diagnostics.iter().any(|row| {
-            row.get("kind").and_then(Value::as_str) == Some(fixture::KIND)
-                && row.get("code").and_then(Value::as_str) == Some(code)
-                && row
-                    .get("examples")
-                    .and_then(Value::as_array)
-                    .is_some_and(|examples| {
-                        examples.iter().any(|example| {
-                            example.get("recordIndex").and_then(Value::as_u64) == Some(0)
-                                && example.get("field").and_then(Value::as_str) == Some(field)
-                                && example.get("sourceType").and_then(Value::as_str)
-                                    == Some(fixture::TYPE)
-                        })
-                    })
-        }),
+        found,
         "the field failure retains exact original owner, type and field"
     );
     Ok(())
@@ -201,8 +206,8 @@ fn assert_failed_physical(catalog: &Value) -> TestResult {
         .ok_or("failed physical Records")?;
     assert!(
         failures.iter().any(|row| {
-            row.get("recordIndex").and_then(Value::as_u64) == Some(0)
-                && row.get("guid").and_then(Value::as_str) == Some(guid.as_str())
+            row.pointer("/recordIndex/value").and_then(Value::as_u64) == Some(0)
+                && row.pointer("/guid/value").and_then(Value::as_str) == Some(guid.as_str())
                 && row.get("kind").and_then(Value::as_str) == Some(fixture::KIND)
                 && row.get("role").and_then(Value::as_str) == Some("selected")
                 && row.get("code").and_then(Value::as_str) == Some("sourceReadFailure")

@@ -4,10 +4,12 @@
 use p4kx_extraction::{CancelToken, Record, RecordTree, TreeBuilder, Value};
 use rayon::prelude::*;
 
+use crate::build::original_input::OriginalCatalogInput;
 use crate::crafting_warning::CraftingWarning;
 use crate::export_ledger::ExportLedger;
 use crate::record_fields::{elements, locale_key, structure};
-use crate::{CatalogError, CatalogFailure, Kind};
+use crate::record_observation::RecordObservation;
+use crate::{CatalogError, CatalogReadFailure, Kind};
 
 const RADAR_GLOBAL_PARAMS: &str = "RadarSystemGlobalParams";
 const SCAN_SIGNATURE_KEY: &str = "@hud_scanning_info_rs_signature";
@@ -45,9 +47,9 @@ impl SlotProblem {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SignatureSlot(Option<(usize, usize)>);
 
-type CatalogSlotRead = (
+type CatalogSlotRead<'f> = (
     SignatureSlot,
-    Vec<CatalogFailure>,
+    Vec<CatalogReadFailure<'f>>,
     Option<SlotProblem>,
     ExportLedger,
 );
@@ -65,10 +67,27 @@ impl SignatureSlot {
     }
 
     /// Reads scan-signature dependencies and retains their canonical field inspections.
-    pub(crate) fn read_catalog(
-        records: &[Record<'_>],
+    #[cfg(test)]
+    pub(crate) fn read_catalog<'f>(
+        records: &[Record<'f>],
         cancel: Option<&CancelToken>,
-    ) -> Result<CatalogSlotRead, CatalogError> {
+    ) -> Result<CatalogSlotRead<'f>, CatalogError> {
+        Self::read_observed(records, None, cancel)
+    }
+
+    pub(crate) fn read_captured<'f>(
+        records: &[Record<'f>],
+        input: &OriginalCatalogInput<'_, '_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<CatalogSlotRead<'f>, CatalogError> {
+        Self::read_observed(records, Some(input), cancel)
+    }
+
+    fn read_observed<'f>(
+        records: &[Record<'f>],
+        input: Option<&OriginalCatalogInput<'_, '_>>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<CatalogSlotRead<'f>, CatalogError> {
         let found = records
             .par_iter()
             .map_init(TreeBuilder::new, |trees, record| {
@@ -78,16 +97,21 @@ impl SignatureSlot {
                 if record.type_name().ok() != Some(RADAR_GLOBAL_PARAMS) {
                     return Ok(None);
                 }
+                let admission = match input {
+                    Some(input) => RecordObservation::capture(input, record)?,
+                    None => RecordObservation::accounting(record),
+                };
                 let read = crate::export_dependency_read::read(
+                    input,
                     trees,
-                    record,
+                    &admission,
                     Kind::MineableEntities,
                     cancel,
                 )?;
                 let outcome = read
                     .tree
                     .map(|tree| Self::of_tree(&tree))
-                    .map_err(|error| CatalogFailure::of(record, &error));
+                    .map_err(|error| CatalogReadFailure::of(record, &error));
                 Ok(Some((outcome, read.ledger)))
             })
             .filter_map(Result::transpose)

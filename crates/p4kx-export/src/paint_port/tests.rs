@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::LoadoutError;
+use p4kx_assembly::{LoadoutError, LoadoutFailurePath};
 
 use super::VehiclePorts;
 
@@ -12,7 +12,7 @@ fn typed_missing_vehicle_files_remain_represented_source_facts() {
         None,
         Some(path),
         &[LoadoutError::MissingVehicleImplementation {
-            path: path.to_owned(),
+            path: LoadoutFailurePath::unbound(path),
         }],
     );
     assert!(

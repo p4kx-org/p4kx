@@ -45,7 +45,7 @@ fn authored_sets_keep_declarations_and_deduplicate_contract_fanout() -> TestResu
     );
     assert_eq!(handler["properties"][1], Value::Null);
     let contract = level(&report.document, "contract")?;
-    let contracts = report.document["contracts"].as_array().ok_or("contracts")?;
+    let contracts = crate::catalog_contracts::v3::rows(&report.document)?;
     assert_eq!(contracts.len(), 3);
     for row in contracts {
         let links = row["propertySetGuids"]
@@ -53,7 +53,7 @@ fn authored_sets_keep_declarations_and_deduplicate_contract_fanout() -> TestResu
             .ok_or("propertySetGuids")?;
         assert_eq!(links.first(), Some(&handler["guid"]));
         assert_eq!(links.get(1), Some(&contract["guid"]));
-        let expected = if row["subContractGuid"].is_null() {
+        let expected = if crate::catalog_contracts::v3::identity(row)?.1.is_none() {
             2
         } else {
             3

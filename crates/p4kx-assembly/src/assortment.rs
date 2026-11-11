@@ -4,6 +4,7 @@
 //! Loadouts generated from `SLoadoutAssortment` Records: the alternative of each group whose
 //! Requirement is not known to fail, the first unless [`LoadoutPicks`] choose another.
 
+use crate::LoadoutTargetGuid;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -12,10 +13,13 @@ use p4kx_dataforge::{Guid, Record, StructValue, TreeBuilder, Value};
 use crate::LoadoutError;
 use crate::assortment_group::Group;
 use crate::assortment_requirement::{Verdict, evaluate};
+use crate::loadout_path::PathRead;
+use crate::loadout_reference::LoadoutReference;
 use crate::pick::LoadoutPicks;
 use crate::read::{as_struct, struct_items, text};
 use crate::resolver::{Entries, LoadoutResolver};
-use crate::spec::{LoadoutSpec, TargetSpec, read_loadout, reference_target};
+use crate::spec::{LoadoutSpec, TargetSpec, read_loadout};
+use crate::target_spec;
 
 const ASSORTMENT_TYPE: &str = "SLoadoutAssortment";
 
@@ -23,15 +27,13 @@ const ASSORTMENT_TYPE: &str = "SLoadoutAssortment";
 /// cannot be used. The picks are applied after reading, so one read serves every pick.
 #[derive(Debug, Clone)]
 pub(crate) struct Assorted {
-    guid: Guid,
     groups: Arc<[Group]>,
     issues: Arc<[LoadoutError]>,
 }
 
 impl Assorted {
-    fn new(guid: Guid, groups: Vec<Group>, issues: Vec<LoadoutError>) -> Self {
+    fn new(groups: Vec<Group>, issues: Vec<LoadoutError>) -> Self {
         Self {
-            guid,
             groups: groups.into(),
             issues: issues.into(),
         }
@@ -45,27 +47,38 @@ impl Assorted {
         picks: &LoadoutPicks,
         seen: &mut HashSet<String>,
         issues: &mut Vec<LoadoutError>,
+        reference: &LoadoutReference,
     ) -> Vec<LoadoutSpec> {
-        issues.extend(self.issues.iter().cloned());
+        issues.extend(
+            self.issues
+                .iter()
+                .cloned()
+                .map(|error| error.with_reference(reference)),
+        );
         seen.extend(self.groups.iter().map(|g| g.name().to_ascii_lowercase()));
         self.groups
             .iter()
-            .filter_map(|group| group.chosen(picks, self.guid, issues))
+            .filter_map(|group| group.chosen(picks, reference, issues))
             .collect()
     }
 }
 
 /// Reads the assortments a generated Loadout names; `None` when it names none.
-pub(crate) fn read_assortments(loadout: &StructValue<'_>) -> Option<LoadoutSpec> {
+pub(crate) fn read_assortments(
+    loadout: &StructValue<'_>,
+    paths: &PathRead<'_>,
+) -> Option<LoadoutSpec> {
     let Some(Value::Array(items)) = loadout.field("LoadoutAssortments") else {
         return None;
     };
-    let guids: Arc<[Guid]> = items
+    let guids: Arc<[LoadoutReference]> = items
         .iter()
-        .filter_map(|item| match reference_target(item) {
-            TargetSpec::Reference(guid) => Some(guid),
-            _ => None,
-        })
+        .filter_map(
+            |item| match target_spec::reference_target_at(loadout, item, paths) {
+                TargetSpec::Reference(reference) => Some(reference),
+                _ => None,
+            },
+        )
         .collect();
     (!guids.is_empty()).then_some(LoadoutSpec::Assortments(guids))
 }
@@ -117,13 +130,16 @@ impl Undecided {
 fn read_assorted<'f>(
     builder: &mut TreeBuilder<'f>,
     record: &Record<'f>,
-    observation: Option<&crate::resolver_observation::Observation>,
+    observation: Option<&crate::resolver_observation::Observation<'_>>,
 ) -> Assorted {
     let guid = record.guid();
     if !matches!(record.type_name(), Ok(ASSORTMENT_TYPE)) {
         let found = record.type_name().unwrap_or("Record of an unreadable type");
         let reason = format!("the Record is a {found}, not an assortment");
-        let issue = LoadoutError::Assortment { guid, reason };
+        let issue = LoadoutError::Assortment {
+            guid: LoadoutTargetGuid::unbound(guid),
+            reason,
+        };
         if let Err(error) = crate::resolver_observation::notify(
             observation,
             crate::LoadoutReadEvent::Rejected {
@@ -131,21 +147,32 @@ fn read_assorted<'f>(
                 error: &issue,
             },
         ) {
-            return Assorted::new(guid, Vec::new(), vec![error]);
+            return Assorted::new(Vec::new(), vec![error]);
         }
-        return Assorted::new(guid, Vec::new(), vec![issue]);
+        return Assorted::new(Vec::new(), vec![issue]);
     }
     let tree = match crate::resolver_observation::canonical(builder, record, observation) {
         Ok(tree) => tree,
         Err(error) => {
-            return Assorted::new(guid, Vec::new(), vec![error]);
+            return Assorted::new(Vec::new(), vec![error]);
         }
     };
+    crate::resolver_path_read::with_record_paths(record, &tree, observation, |paths| {
+        read_assorted_tree(guid, &tree, paths)
+    })
+    .unwrap_or_else(|error| Assorted::new(Vec::new(), vec![error]))
+}
+
+fn read_assorted_tree(
+    guid: Guid,
+    tree: &p4kx_dataforge::RecordTree<'_>,
+    paths: &PathRead<'_>,
+) -> Assorted {
     let path: Arc<str> = Arc::from(tree.record_path());
     let mut groups = Vec::new();
     let mut undecided = Undecided::default();
     if !undecided.applies(None, tree.field("Requirement")) {
-        return Assorted::new(guid, groups, Vec::new());
+        return Assorted::new(groups, Vec::new());
     }
     if let Some(Value::Array(items)) = tree.field("GroupedLoadouts") {
         for group in items.iter().filter_map(as_struct) {
@@ -154,13 +181,13 @@ fn read_assorted<'f>(
                 continue;
             }
             let alternatives = struct_items(group, "Loadouts")
-                .map(|loadout| read_loadout(loadout, &path))
+                .map(|loadout| read_loadout(loadout, &path, paths))
                 .collect();
             groups.push(Group::new(name.to_owned(), alternatives));
         }
     }
     let issues = undecided.into_note(guid).into_iter().collect();
-    Assorted::new(guid, groups, issues)
+    Assorted::new(groups, issues)
 }
 
 impl LoadoutResolver<'_> {
@@ -181,11 +208,11 @@ impl LoadoutResolver<'_> {
             self.reuse_read(crate::resolver_observation::Cache::Assortment, guid)?;
             return Ok(assorted.clone());
         }
-        let record = self
-            .entities
-            .forge()
-            .record_by_guid(guid)
-            .ok_or(LoadoutError::DanglingReference { guid })?;
+        let record = self.entities.forge().record_by_guid(guid).ok_or_else(|| {
+            LoadoutError::DanglingReference {
+                guid: LoadoutTargetGuid::unbound(guid),
+            }
+        })?;
         self.remember_read(crate::resolver_observation::Cache::Assortment, record);
         let assorted = read_assorted(&mut self.builder, &record, self.observation.as_deref());
         self.assortments.insert(guid, assorted.clone());
@@ -199,24 +226,30 @@ impl LoadoutResolver<'_> {
     /// An assortment that is missing, cannot be read or is used while it is being resolved, which
     /// is a cycle, is an issue; the others still apply. When none gives anything the entries are
     /// empty and carry the issues.
-    pub(crate) fn assortment_entries(&mut self, guids: &[Guid]) -> Entries {
+    pub(crate) fn assortment_entries(&mut self, guids: &[LoadoutReference]) -> Entries {
         let mut layers = Vec::new();
         let mut issues = Vec::new();
         let mut resolving = Vec::new();
-        for &guid in guids {
+        for reference in guids {
+            let guid = reference.guid();
             if self.assorting.contains(&guid) {
                 issues.push(LoadoutError::Assortment {
-                    guid,
+                    guid: LoadoutTargetGuid::from_reference(reference),
                     reason: "it names itself, directly or through another assortment".to_owned(),
                 });
                 continue;
             }
             match self.assorted(guid) {
                 Ok(assorted) => {
-                    layers.extend(assorted.layers(&self.picks, &mut self.seen_groups, &mut issues));
+                    layers.extend(assorted.layers(
+                        &self.picks,
+                        &mut self.seen_groups,
+                        &mut issues,
+                        reference,
+                    ));
                     resolving.push(guid);
                 }
-                Err(error) => issues.push(error),
+                Err(error) => issues.push(error.with_reference(reference)),
             }
         }
         let depth = self.assorting.len();
@@ -236,6 +269,7 @@ impl LoadoutResolver<'_> {
         Entries {
             list,
             issues: issues.into(),
+            xml_use: None,
         }
     }
 }

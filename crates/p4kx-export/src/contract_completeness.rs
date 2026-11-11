@@ -67,6 +67,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) loot_containers: KindCompleteness<'a>,
     /// The completeness of `shops`.
     pub(crate) shops: KindCompleteness<'a>,
+    /// The complete physical inventory file selection, independent of Record filters.
+    pub(crate) shop_inventories: KindCompleteness<'a>,
     /// The completeness of `factionReputations`.
     pub(crate) faction_reputations: KindCompleteness<'a>,
     /// The completeness of `reputationScopes`.
@@ -149,6 +151,7 @@ impl<'a> Completeness<'a> {
             harvestable_locations: completeness,
             loot_containers: completeness,
             shops: completeness,
+            shop_inventories: KindCompleteness::Complete,
             faction_reputations: completeness,
             reputation_scopes: completeness,
             reputation_standings: completeness,

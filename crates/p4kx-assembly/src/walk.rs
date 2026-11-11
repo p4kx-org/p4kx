@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::LoadoutTargetGuid;
 use p4kx_dataforge::Guid;
 
 use crate::plan::Plan;
@@ -71,7 +72,9 @@ impl Walk {
     /// Returns why the Entity `guid` may not be attached below the current branch, if it may not.
     pub(crate) fn limit(&self, guid: Guid) -> Option<LoadoutError> {
         if self.ancestors.contains(&guid) {
-            Some(LoadoutError::Cycle { guid })
+            Some(LoadoutError::Cycle {
+                guid: LoadoutTargetGuid::unbound(guid),
+            })
         } else if self.depth() > MAX_LOADOUT_DEPTH {
             Some(LoadoutError::TooDeep)
         } else {

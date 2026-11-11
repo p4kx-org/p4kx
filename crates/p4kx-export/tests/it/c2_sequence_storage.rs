@@ -22,7 +22,7 @@ fn readable_class_array_in_sequence_cannot_receive_healthy_normal_publication() 
     source::check(&database, DataType::Class, Case::TwoOwned)?;
     let (_folder, archive) = common::open(&database, DcbOrigin::Plain)?;
     match p4kx_export::build_catalog(&archive, &common::options()) {
-        Err(CatalogError::IncompleteExport { health, .. }) => diagnosis(&health),
+        Err(CatalogError::IncompleteExport(refusal)) => diagnosis(refusal.health()),
         Ok(built) => Err(format!(
             "readable Class declaration received a normal catalog with {:?} health",
             built.summary().export_health().status
@@ -127,15 +127,16 @@ fn diagnosis(health: &ExportHealth) -> TestResult {
         "the declaration mismatch is explicit projection health"
     );
     assert!(
-        health.diagnostics.iter().any(|entry| {
+        health.diagnostics().iter().any(|entry| {
             entry.kind == Some(Kind::GameplayProperties)
                 && entry.code == ExportDiagnosticCode::MalformedSource
                 && entry.stage == ExportDiagnosticStage::Projection
                 && entry.severity == ExportDiagnosticSeverity::Error
-                && entry.examples.iter().any(|example| {
-                    example.record_index == Some(0)
-                        && example.field.as_deref() == Some("displayTransformation.transformations")
-                        && example.source_type.as_deref() == Some(schema::SEQUENCE)
+                && entry.examples().iter().any(|example| {
+                    example.record_index().value() == Some(&0)
+                        && example.field_text().value()
+                            == Some("displayTransformation.transformations")
+                        && example.source_type_text().value() == Some(schema::SEQUENCE)
                 })
         }),
         "the diagnostic names the physical owner and wrong original Sequence field"

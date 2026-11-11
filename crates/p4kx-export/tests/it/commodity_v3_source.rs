@@ -264,10 +264,7 @@ fn carriers(value: &Value) -> TestResult {
         }
         Value::Object(object) => {
             for (name, value) in object {
-                if matches!(
-                    name.as_str(),
-                    "status" | "type" | "code" | "selectionDiagnostics"
-                ) {
+                if matches!(name.as_str(), "status" | "type" | "code") {
                     continue;
                 }
                 assert!(

@@ -3,12 +3,15 @@
 
 #[path = "real_archive_text_forms_mutations.rs"]
 mod forms_mutations;
+#[path = "real_archive_mission_locale_tests.rs"]
+mod mission_locales;
 
 use std::collections::BTreeSet;
 use std::error::Error;
 
 use p4kx_export::Kind;
 use p4kx_extraction::{Language, LocalizationSet};
+use p4kx_testkit::DataForgeBuilder;
 use serde_json::{Value, json};
 
 use super::{Coverage, Oracle, check_coverage};
@@ -27,7 +30,11 @@ struct Fixture {
 impl Fixture {
     fn new() -> TestResult<Self> {
         let database = source::with_keys("@shared", "@shared", "@shared");
-        let (_folder, archive) = source::open(&database, DcbOrigin::Plain)?;
+        Self::from_database(&database)
+    }
+
+    fn from_database(database: &DataForgeBuilder) -> TestResult<Self> {
+        let (_folder, archive) = source::open(database, DcbOrigin::Plain)?;
         let built = p4kx_export::build_catalog(&archive, &source::options())?;
         let catalog = serde_json::from_slice(built.json())?;
         let locales = LocalizationSet::read(&archive, &[Language::English, Language::German])?;

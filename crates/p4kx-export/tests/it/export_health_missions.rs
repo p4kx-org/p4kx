@@ -24,22 +24,13 @@ fn unsupported_mission_values_are_explained_inside_the_file() -> TestResult {
         Some("incomplete"),
         "the artifact itself describes the failed typed projection"
     );
-    let diagnostics = health
-        .get("diagnostics")
-        .and_then(Value::as_array)
-        .ok_or("diagnostics")?;
     assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.get("code").and_then(Value::as_str)
-                == Some("unsupportedValue")
-                && diagnostic
-                    .get("examples")
-                    .and_then(Value::as_array)
-                    .is_some_and(|examples| examples
-                        .iter()
-                        .any(|example| example.get("sourceType").and_then(Value::as_str)
-                            == Some("LocationCondition_UnknownClass")))),
+        crate::mission_canonical_health::example(
+            &report.document,
+            Some("unsupportedValue"),
+            "LocationCondition_UnknownClass",
+            |_| true,
+        )?,
         "the concrete unsupported variant is diagnosed without parsing an error-display string"
     );
     let failed = health

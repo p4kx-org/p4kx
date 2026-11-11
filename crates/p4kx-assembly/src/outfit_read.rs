@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use p4kx_dataforge::{Guid, StructValue, Value, ValueError};
 
+use crate::loadout_path::PathRead;
 use crate::read::{struct_field, struct_items};
 use crate::spec::{LoadoutSpec, read_loadout};
 
@@ -54,9 +55,14 @@ pub(crate) fn applied(tagged: &[bool]) -> Vec<bool> {
 /// Reads an outfit once. The layers are the base Loadout, then the Loadouts of the outfits that
 /// apply. With `report`, the XML files of the outfits that do not apply are read too, for
 /// [`OutfitInfo`]; without it their Loadouts are not touched.
-pub(crate) fn read(outfit: &StructValue<'_>, record: &Arc<str>, report: bool) -> OutfitRead {
-    let base =
-        struct_field(outfit, "BaseLoadout").and_then(|loadout| read_loadout(loadout, record));
+pub(crate) fn read(
+    outfit: &StructValue<'_>,
+    record: &Arc<str>,
+    report: bool,
+    paths: &PathRead<'_>,
+) -> OutfitRead {
+    let base = struct_field(outfit, "BaseLoadout")
+        .and_then(|loadout| read_loadout(loadout, record, paths));
     let candidates: Vec<&StructValue<'_>> = struct_items(outfit, "Outfits").collect();
     let tags: Vec<Vec<TagSpec>> = candidates.iter().map(|outfit| tag_specs(outfit)).collect();
     let tagged: Vec<bool> = tags.iter().map(|tags| !tags.is_empty()).collect();
@@ -68,8 +74,8 @@ pub(crate) fn read(outfit: &StructValue<'_>, record: &Arc<str>, report: bool) ->
         if !applied && !report {
             continue;
         }
-        let loadouts =
-            struct_items(candidate, "Loadouts").filter_map(|loadout| read_loadout(loadout, record));
+        let loadouts = struct_items(candidate, "Loadouts")
+            .filter_map(|loadout| read_loadout(loadout, record, paths));
         let mut files = Vec::new();
         for loadout in loadouts {
             loadout.xml_paths(&mut files);

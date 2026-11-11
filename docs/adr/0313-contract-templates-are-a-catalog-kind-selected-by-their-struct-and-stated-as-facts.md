@@ -46,9 +46,10 @@ held only because those two conditions were `other`.
   `other` with its `structName` and the fields its siblings share; none occurs on LIVE. A weak
   pointer to an objective is the `id` of that objective, a weak pointer to a property its
   `missionVariableName`, a pointer to nothing is `null`.
-- **Depth.** Nothing is cut silently. A Record whose objective phases nest deeper than 32 levels
-  or whose flow conditions nest deeper than 16 cannot be read: it is a failure of the build with
-  that reason and no entry. The Records of LIVE nest five and three levels.
+- **Depth.** Every readable objective phase is flattened in source preorder with its parent ID;
+  the catalog adds no phase-depth cutoff. Canonical reader resource-policy errors remain explicit
+  and cannot be published as complete source data. Flow conditions nested deeper than 16 still
+  fail their Record. The historical LIVE observation was five phase and three condition levels.
 - **Closed sets and unknown names.** Stored enum names (a state, a category, a comms timing or
   reason, a kind of objective property) are closed value sets (ADR-0054): a string with
   `x-values`. A name the catalog does not know is `null` and counted in the warning

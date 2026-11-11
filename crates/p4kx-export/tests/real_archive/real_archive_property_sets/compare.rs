@@ -3,15 +3,16 @@
 
 use std::collections::HashMap;
 
-use p4kx_export::ExportHealth;
 use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 use serde_json::Value;
 
 use super::error::{
     self, ArrayShape, Failure, JoinFault, OutputFault, ProductionFailure, ReadFault, SourceFault,
 };
+use super::health::Health;
 use super::published::Published;
 use super::{Counts, OracleResult, health, source, values};
+use crate::real_archive_contracts::v3;
 
 struct SourceOutcome {
     ambiguous: bool,
@@ -22,7 +23,7 @@ pub(super) fn check<'f>(
     record: &Record<'f>,
     trees: &mut TreeBuilder<'f>,
     published: &Published<'_>,
-    health: &ExportHealth,
+    health: &Health<'_>,
     checked: &mut Counts,
 ) -> OracleResult {
     checked.sources += 1;
@@ -36,11 +37,7 @@ pub(super) fn check<'f>(
         return Ok(());
     };
     let owner = record.guid().to_string();
-    let rows: Vec<_> = published
-        .contracts
-        .iter()
-        .filter(|row| row["recordGuid"] == owner)
-        .collect();
+    let rows = published.contracts_of(record.index(), &owner);
     let sets: Vec<_> = published
         .sets
         .iter()
@@ -48,7 +45,7 @@ pub(super) fn check<'f>(
         .collect();
     check_owner(
         &tree,
-        &rows,
+        rows,
         &sets,
         &published.by_guid,
         &SourceOutcome {
@@ -97,17 +94,13 @@ fn check_owner(
         );
     }
     for row in rows {
-        let key = (
-            row["guid"]
-                .as_str()
-                .ok_or(Failure::Joins(JoinFault::ContractIdentity))?
-                .to_owned(),
-            row["subContractGuid"].as_str().map(str::to_owned),
-        );
-        if !raw.rows.contains_key(&key) {
+        let (contract, sub) =
+            v3::identity(row).map_err(|_| Failure::Joins(JoinFault::ContractIdentity))?;
+        let key = (contract.to_owned(), sub.map(str::to_owned));
+        let Some(expected) = raw.rows.get(&key) else {
             continue;
-        }
-        check_joins(row, &raw, by_guid, &owner, outcome.ambiguous)?;
+        };
+        check_joins(row, expected, by_guid, &owner, outcome.ambiguous)?;
         checked.rows.insert(key);
     }
     Ok(())
@@ -138,19 +131,11 @@ fn check_set(
 
 fn check_joins(
     row: &Value,
-    raw: &source::Sources<'_, '_>,
+    expected: &[String],
     sets: &HashMap<&str, &Value>,
     owner: &str,
     ambiguous: bool,
 ) -> OracleResult {
-    let contract = row["guid"]
-        .as_str()
-        .ok_or(Failure::Joins(JoinFault::ContractIdentity))?;
-    let sub = row["subContractGuid"].as_str();
-    let expected = raw
-        .rows
-        .get(&(contract.to_owned(), sub.map(str::to_owned)))
-        .ok_or(Failure::Joins(JoinFault::MissingRawContract))?;
     let expected: Vec<_> = expected
         .iter()
         .filter(|location| {
