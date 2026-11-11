@@ -1,0 +1,95 @@
+name: Validate macOS device evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate-run-id:
+        description: Tag-triggered Release workflow run ID
+        required: true
+        type: string
+      macos-current-version:
+        description: Observed current stable macOS version
+        required: true
+        type: string
+      macos-device-evidence:
+        description: Native minimum and current macOS device receipt JSON array
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  intake:
+    name: Verify and retain native device evidence
+    if: github.repository == 'p4kx-org/p4kx' && github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Resolve the candidate DMG and its original attestation
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate-run-id }}
+          MACOS_CURRENT_VERSION: ${{ inputs.macos-current-version }}
+        run: |
+          . .github/scripts/macos-device-evidence-intake.ps1
+          $candidate = Resolve-P4kxMacosIntakeCandidate $env:CANDIDATE_RUN_ID $env:MACOS_CURRENT_VERSION
+          foreach ($key in $candidate.Keys) {
+            Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "$key=$($candidate[$key])" -Encoding utf8
+          }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.packages-id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.candidate.outputs.run-id }}
+          path: candidate/packages
+          digest-mismatch: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.bundles-id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.candidate.outputs.run-id }}
+          path: candidate/bundles
+          digest-mismatch: error
+      - name: Validate both device records against the candidate bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+          CANDIDATE_RUN_ID: ${{ steps.candidate.outputs.run-id }}
+          MACOS_CURRENT_VERSION: ${{ steps.candidate.outputs.current-version }}
+        run: |
+          . .github/scripts/macos-device-evidence-intake.ps1
+          New-Item -ItemType Directory -Path 'device-intake' | Out-Null
+          Save-P4kxMacosDeviceIntake 'candidate/packages' 'candidate/bundles' 'device-intake' $env:VERSION $env:CANDIDATE_RUN_ID $env:MACOS_CURRENT_VERSION
+      - name: Attest the binding between the original DMG and the native receipt
+        id: attestation
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: device-intake/binding.json
+      - name: Retain the portable binding attestation
+        env:
+          BUNDLE: ${{ steps.attestation.outputs.bundle-path }}
+        run: Copy-Item -LiteralPath $env:BUNDLE -Destination 'device-intake/binding.sigstore.json'
+      - name: Retain the exact native receipt and signed binding
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.candidate.outputs.artifact-name }}
+          path: |
+            device-intake/device-evidence.json
+            device-intake/binding.json
+            device-intake/binding.sigstore.json
+          if-no-files-found: error

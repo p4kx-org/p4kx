@@ -81,6 +81,18 @@ acceptance. Delivery requires the evidence below.
   provenance. Update the supported-platform guide, installation help, Release notes and changelog
   when implementation and evidence are ready.
 
+## Submit the native device receipt
+
+Download the signed macOS DMG from the tagged Release run. Run the device checks against those
+exact bytes and record the minimum and current stable macOS results in the receipt JSON. Use the
+same tag for the **Validate macOS device evidence** workflow. Give it the original Release run ID,
+the observed current stable version and the receipt. Keep the receipt to technical checks and
+digests. Keep local game data and paths out of it.
+
+After the device evidence workflow succeeds, re-run only the failed jobs of the original Release
+run. Assembly verifies the attested receipt against the DMG and revision from that run. Rebuilding
+the candidate can change its bytes and requires matching device evidence.
+
 ## References
 
 - [Shared native platform contract (ADR-0343)](adr/0343-one-native-platform-contract-and-target-bound-runtime-evidence.md)

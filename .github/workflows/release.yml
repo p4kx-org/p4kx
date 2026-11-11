@@ -248,6 +248,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
+      actions: read
       contents: read
     defaults:
       run:
@@ -266,15 +267,42 @@ jobs:
           pattern: "{changelog-notes,virustotal-note}"
           path: notes
           merge-multiple: true
+      - name: Find the signed macOS device receipt for this candidate
+        if: github.ref_type == 'tag' && github.event_name == 'push'
+        id: macos-device-intake
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          . .github/scripts/macos-device-evidence-intake.ps1
+          $intake = Find-P4kxDeviceIntakeArtifact $env:GITHUB_RUN_ID
+          foreach ($key in $intake.Keys) {
+            Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "$key=$($intake[$key])" -Encoding utf8
+          }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: github.ref_type == 'tag' && github.event_name == 'push'
+        with:
+          artifact-ids: ${{ steps.macos-device-intake.outputs.artifact-id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.macos-device-intake.outputs.run-id }}
+          path: notes/device-intake
+          digest-mismatch: error
       - name: Validate every required native asset before preparing checksums
         env:
           REPOSITORY: ${{ github.repository }}
           VERSION: ${{ needs.prepare.outputs.version }}
           SCAN_RESULT: ${{ needs.scan.result }}
           MACOS_CURRENT_VERSION: ${{ vars.P4KX_MACOS_CURRENT_STABLE }}
+          MACOS_INTAKE_RUN_ID: ${{ steps.macos-device-intake.outputs.run-id }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $deviceEvidence = Join-Path 'assets' "P4KX-$env:VERSION-aarch64-apple-darwin-device-evidence.json"
+          $deviceEvidence = $null
+          $currentMacos = $null
           if ($env:GITHUB_REF_TYPE -ceq 'tag') {
+            . .github/scripts/macos-device-evidence-intake.ps1
+            $device = Read-P4kxMacosDeviceIntake 'notes/device-intake' 'assets' $env:VERSION $env:GITHUB_RUN_ID $env:MACOS_INTAKE_RUN_ID $env:MACOS_CURRENT_VERSION
+            $deviceEvidence = $device.Path
+            $currentMacos = $device.CurrentVersion
             . .github/scripts/release-scan-evidence.ps1
             Assert-P4kxReleaseScanEvidence -EvidencePath notes/virustotal-evidence.json -AssetDirectory assets -Version $env:VERSION -Revision $env:GITHUB_SHA -RunId $env:GITHUB_RUN_ID
             if (-not (Test-Path -LiteralPath notes/virustotal.md -PathType Leaf)) { throw 'The required VirusTotal report note is missing.' }
@@ -284,7 +312,7 @@ jobs:
           }
           $scan = if (Test-Path notes/virustotal.md) { 'notes/virustotal.md' }
           $tagAttestations = $env:GITHUB_REF_TYPE -ceq 'tag'
-          .github/scripts/assemble-release.ps1 -AssetDirectory assets -NotesPath notes/release-notes.md -OutputNotesPath notes/final-notes.md -VirusTotalNotePath $scan -Repository $env:REPOSITORY -Version $env:VERSION -Revision $env:GITHUB_SHA -TagAttestations:$tagAttestations -RequireMacosDeviceEvidence:$tagAttestations -MacosCurrentVersion $env:MACOS_CURRENT_VERSION -MacosDeviceEvidencePath $deviceEvidence
+          .github/scripts/assemble-release.ps1 -AssetDirectory assets -NotesPath notes/release-notes.md -OutputNotesPath notes/final-notes.md -VirusTotalNotePath $scan -Repository $env:REPOSITORY -Version $env:VERSION -Revision $env:GITHUB_SHA -TagAttestations:$tagAttestations -RequireMacosDeviceEvidence:$tagAttestations -MacosCurrentVersion $currentMacos -MacosDeviceEvidencePath $deviceEvidence
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-assets
