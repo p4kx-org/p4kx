@@ -102,9 +102,9 @@ P4KX reads your own Star Citizen installation and ships no game data.
 
 ## Local development setup
 
-Install rustup on Windows or Linux; the repository's
+Install rustup on a [supported platform](docs/supported-platforms.md). The repository's
 [`rust-toolchain.toml`](rust-toolchain.toml) selects the exact compiler and components. For the
-Blender add-on you also need Python and Blender 5.2 LTS. Install the exact test runner selected by
+Blender add-on you also need Python and Blender 5.2 LTS or 5.3. Install the exact test runner selected by
 [`.config/nextest-version`](.config/nextest-version):
 
 ```powershell
@@ -117,7 +117,7 @@ Update both files deliberately and run the configuration check, workspace tests,
 clippy and repository checks before accepting new versions; see
 [ADR-0340](docs/adr/0340-exact-build-tool-versions.md). Native target/runtime validation is separate
 from pin consistency.
-The [native platform contract](docs/supported-platforms.md) drives all four target rows, target-bound
+The [native platform contract](docs/supported-platforms.md) drives the target matrix, target-bound
 test archives and release preflight. Run the PowerShell platform/evidence regression scripts when
 changing their contracts, and preserve the recorded distinction between native synthetic checks
 and physical device verification.
