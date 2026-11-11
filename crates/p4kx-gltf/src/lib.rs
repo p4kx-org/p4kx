@@ -53,6 +53,7 @@ mod nodes;
 mod package_support;
 mod rig;
 mod rig_animation;
+mod rig_emission;
 mod rig_mount;
 mod scene;
 mod scene_light;
@@ -85,10 +86,11 @@ pub use package_support::{
     node_transform, texture_path,
 };
 pub use rig::{
-    RigPiece, write_rigged_glb, write_rigged_glb_animated, write_rigged_glb_animated_with,
-    write_rigged_glb_with,
+    RigPiece, write_rigged_glb, write_rigged_glb_animated, write_rigged_glb_animated_observed,
+    write_rigged_glb_animated_with, write_rigged_glb_with,
 };
 pub use rig_animation::{RigAnimation, SampledAnimation, SampledBone, SampledWeights};
+pub use rig_emission::{RiggedGlbEmission, RiggedPartEmission};
 pub use rig_mount::RigMount;
 pub use scene::{Scene, SceneNode, ScenePart, write_scene_glb, write_scene_glb_with};
 pub use scene_light::{SceneLight, SceneLightKind};

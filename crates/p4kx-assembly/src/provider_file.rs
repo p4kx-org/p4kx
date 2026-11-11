@@ -3,11 +3,31 @@
 
 use std::io::Read;
 
-use p4kx_extraction::{Entry, EntryOrigin};
+use p4kx_extraction::{
+    AnimationChoice, AnimationSet, ArchiveAnimationRead, ConversionError, Entry, EntryOrigin,
+};
 
 use super::{ArchiveModels, ModelFailure, read_failure};
 
 impl ArchiveModels<'_> {
+    /// Returns the selected animations with each admitted Archive Entry.
+    ///
+    /// # Errors
+    /// As [`Self::animations`].
+    pub fn animations_with_archive_sources(
+        &self,
+        folders: &[&str],
+        choice: &AnimationChoice,
+        extra: &[String],
+    ) -> Result<ArchiveAnimationRead, ConversionError> {
+        let folders: Vec<String> = folders
+            .iter()
+            .map(|folder| format!("Data/{}", folder.trim_start_matches(['/', '\\'])))
+            .collect();
+        let folders: Vec<&str> = folders.iter().map(String::as_str).collect();
+        AnimationSet::from_folders_with_archive_sources(&self.index, &folders, choice, extra)
+    }
+
     pub(crate) fn observed_file(
         &self,
         path: &str,

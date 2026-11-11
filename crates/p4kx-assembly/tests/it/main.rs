@@ -3,8 +3,10 @@
 
 //! Integration tests of `p4kx-assembly`, built as one test binary.
 
+mod animation_archive_sources;
 mod armour_archive_sources;
 mod armour_build;
+mod armour_glb_emission;
 mod armour_mount;
 mod armour_natural_hair;
 mod armour_palette;

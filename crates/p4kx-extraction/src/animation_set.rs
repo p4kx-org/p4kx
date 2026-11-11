@@ -7,8 +7,8 @@ use p4kx_model::Animation;
 use rayon::prelude::*;
 
 use crate::animation_load::{kind, load};
-use crate::animation_select::read;
-use crate::animation_sources::{disk_sources, open_entry, with_extras};
+use crate::animation_select::{Gathered, read};
+use crate::animation_sources::{ArchiveAnimationRead, disk_sources, open_entry, with_extras};
 use crate::{CancelToken, ChunkSource, ConversionError, Entry, PathIndex};
 
 /// The largest `.caf` or `.dba` file read into memory, far above the largest of a real Archive.
@@ -250,6 +250,20 @@ impl AnimationSet {
         choice: &AnimationChoice,
         extra: &[String],
     ) -> Result<Self, ConversionError> {
+        Self::from_folders_with_archive_sources(index, folders, choice, extra)
+            .map(ArchiveAnimationRead::into_set)
+    }
+
+    /// Reads selected animations and retains the Archive Entry bound to each successful read.
+    ///
+    /// # Errors
+    /// As [`Self::from_folders`].
+    pub fn from_folders_with_archive_sources(
+        index: &PathIndex<'_>,
+        folders: &[&str],
+        choice: &AnimationChoice,
+        extra: &[String],
+    ) -> Result<ArchiveAnimationRead, ConversionError> {
         let prefixes: Vec<String> = folders
             .iter()
             .map(|folder| format!("{}/", normalised(folder).trim_end_matches('/')))
@@ -261,7 +275,7 @@ impl AnimationSet {
             .filter(|entry| kind(entry.path()).is_some() && under_prefixes(entry.path(), &prefixes))
             .map(source_of)
             .collect();
-        Self::from_sources(index, sources, choice, extra, None)
+        Self::gather_sources(index, sources, choice, extra, None).map(ArchiveAnimationRead::from)
     }
 
     fn from_sources(
@@ -271,6 +285,16 @@ impl AnimationSet {
         extra: &[String],
         cancel: Option<&CancelToken>,
     ) -> Result<Self, ConversionError> {
+        Self::gather_sources(index, sources, choice, extra, cancel).map(Self::from)
+    }
+
+    fn gather_sources(
+        index: &PathIndex<'_>,
+        sources: Vec<Source>,
+        choice: &AnimationChoice,
+        extra: &[String],
+        cancel: Option<&CancelToken>,
+    ) -> Result<Gathered<Animation>, ConversionError> {
         let sources = with_extras(index, sources, choice, extra)?;
         read(
             sources,
@@ -278,7 +302,6 @@ impl AnimationSet {
             |label| open_entry(index, label, cancel),
             |file, label, kind, _| load(file, label, kind),
         )
-        .map(Self::from)
     }
 
     /// Reads the animations `choice` selects from the `.caf` and `.dba` files in the folder of

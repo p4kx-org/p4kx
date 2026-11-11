@@ -162,7 +162,10 @@ mod vehicle;
 mod walk;
 mod xml;
 
-pub use animation_folders::{AnimationFolders, animation_choice, character_animations};
+pub use animation_folders::{
+    AnimationFolders, animation_choice, character_animations,
+    character_animations_with_archive_sources,
+};
 pub use armour::{
     Armour, ArmourPart, BodyVariant, CharacterAnimations, Expressions, ForgeItems, Head, HeadError,
     HeadItems, Look, MAX_ANIMATION_VALUES, MAX_DNA_RIG_LEN, NpcHead, PartOrigin, Piece, Replaced,

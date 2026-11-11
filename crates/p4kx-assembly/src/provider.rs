@@ -277,12 +277,8 @@ impl<'a> ArchiveModels<'a> {
         choice: &AnimationChoice,
         extra: &[String],
     ) -> Result<AnimationSet, ConversionError> {
-        let folders: Vec<String> = folders
-            .iter()
-            .map(|folder| format!("Data/{}", folder.trim_start_matches(['/', '\\'])))
-            .collect();
-        let folders: Vec<&str> = folders.iter().map(String::as_str).collect();
-        AnimationSet::from_folders(&self.index, &folders, choice, extra)
+        self.animations_with_archive_sources(folders, choice, extra)
+            .map(p4kx_extraction::ArchiveAnimationRead::into_set)
     }
 
     pub(crate) fn entry_of(&self, path: &str) -> Option<String> {

@@ -4,6 +4,7 @@
 #[path = "model_archive_source.rs"]
 mod model_archive_source;
 
+pub use crate::animation_sources::ArchiveAnimationRead;
 pub use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
 pub use crate::field_origin_seed::FieldOriginSeed;
 pub use crate::field_origins::{FieldOrigins, FieldOriginsError};

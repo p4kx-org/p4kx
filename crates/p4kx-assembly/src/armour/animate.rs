@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "animate_origins.rs"]
+mod origins;
+
 use std::collections::HashSet;
 use std::io::Write;
 
 use p4kx_character::{Dna, DnaRig, FaceRig, RigLogic};
 use p4kx_gltf::{
-    GlbOptions, GlbSummary, GltfError, RigAnimation, RigPiece, SampledAnimation, SampledWeights,
-    TextureLoader, write_rigged_glb_animated, write_rigged_glb_animated_with,
+    GlbOptions, GlbSummary, GltfError, RigPiece, SampledAnimation, SampledWeights, TextureLoader,
+    write_rigged_glb_animated, write_rigged_glb_animated_with,
 };
 use p4kx_model::Animation;
 
@@ -33,8 +36,9 @@ const MAX_SAMPLES: usize = 1 << 15;
 /// [`Armour::animate`].
 #[derive(Debug, Clone, Default)]
 pub struct CharacterAnimations<'a> {
-    keys: Vec<(&'a Animation, Vec<u32>)>,
+    keys: Vec<(usize, &'a Animation, Vec<u32>)>,
     sampled: Vec<SampledAnimation>,
+    sampled_indices: Vec<usize>,
     issues: Vec<Issue>,
     values: usize,
 }
@@ -210,7 +214,7 @@ impl Armour {
         let mut out = CharacterAnimations::default();
         let mut loaded: Option<Result<Loaded, String>> = None;
         let mut budget_left = ValueBudget::new(budget);
-        for animation in animations {
+        for (index, animation) in animations.iter().enumerate() {
             let bound = animation.bind(&self.skeleton.bones);
             let ids: HashSet<u32> = bound
                 .bound
@@ -239,12 +243,13 @@ impl Armour {
             let mut used = sampled.is_some();
             if let Some(sampled) = sampled {
                 out.sampled.push(sampled);
+                out.sampled_indices.push(index);
             }
             let mut reported = false;
             match budget_left.fit_keys(animation, !bound.bound.is_empty()) {
                 KeyFit::Fits(cost) => {
                     budget_left.spend(cost);
-                    out.keys.push((animation, driven));
+                    out.keys.push((index, animation, driven));
                     used = true;
                 }
                 KeyFit::OverBudget(reason) => {
@@ -376,12 +381,7 @@ impl Armour {
         out: &mut impl Write,
     ) -> Result<GlbSummary, GltfError> {
         let pieces: Vec<RigPiece<'_>> = self.parts.iter().map(ArmourPart::rig_piece).collect();
-        let list: Vec<RigAnimation<'_>> = animations
-            .keys
-            .iter()
-            .map(|(animation, driven)| RigAnimation::Keys(animation, driven))
-            .chain(animations.sampled.iter().map(RigAnimation::Sampled))
-            .collect();
+        let list = animations.rig_animations();
         let bones = &self.skeleton.bones;
         match textures {
             Some(textures) => {

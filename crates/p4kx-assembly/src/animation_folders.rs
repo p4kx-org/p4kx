@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{AnimationChoice, AnimationSet, ConversionError};
+use p4kx_extraction::{AnimationChoice, AnimationSet, ArchiveAnimationRead, ConversionError};
 
 use crate::{ArchiveModels, BodyVariant};
 
@@ -75,19 +75,33 @@ pub fn animation_choice(names: &[String]) -> Option<AnimationChoice> {
 pub fn character_animations(
     models: &ArchiveModels<'_>,
     variant: BodyVariant,
-    (names, sources): (&[String], &[String]),
+    requested: (&[String], &[String]),
     folders: &AnimationFolders,
 ) -> Result<AnimationSet, ConversionError> {
+    character_animations_with_archive_sources(models, variant, requested, folders)
+        .map(ArchiveAnimationRead::into_set)
+}
+
+/// Selects Character animations with the bound Archive Entry for each successful read.
+///
+/// # Errors
+/// As [`character_animations`].
+pub fn character_animations_with_archive_sources(
+    models: &ArchiveModels<'_>,
+    variant: BodyVariant,
+    (names, sources): (&[String], &[String]),
+    folders: &AnimationFolders,
+) -> Result<ArchiveAnimationRead, ConversionError> {
     let Some(choice) = animation_choice(names) else {
-        return Ok(AnimationSet::default());
+        return Ok(ArchiveAnimationRead::default());
     };
     if !folders.folders.is_empty() {
         let own: Vec<&str> = folders.folders.iter().map(String::as_str).collect();
-        match models.animations(&own, &choice, sources) {
+        match models.animations_with_archive_sources(&own, &choice, sources) {
             Ok(found) => return Ok(found),
             Err(ConversionError::UnknownAnimations { .. }) if folders.fallback => {}
             Err(error) => return Err(error),
         }
     }
-    models.animations(&variant.animation_folders(), &choice, sources)
+    models.animations_with_archive_sources(&variant.animation_folders(), &choice, sources)
 }
