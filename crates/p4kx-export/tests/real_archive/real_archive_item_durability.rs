@@ -240,6 +240,13 @@ impl<'read, 'source> Trace<'read, 'source> {
         self.part(cell, raw, "$value", role)
     }
 
+    pub(super) fn ordinal(&self, raw: &DataValue<'source>) -> Result<usize> {
+        self.ordinals
+            .get(&std::ptr::from_ref(raw))
+            .copied()
+            .ok_or_else(|| "original value ordinal".into())
+    }
+
     pub(super) fn part(
         &self,
         cell: &Value,
@@ -247,10 +254,7 @@ impl<'read, 'source> Trace<'read, 'source> {
         field: &str,
         role: &str,
     ) -> Result {
-        let ordinal = self
-            .ordinals
-            .get(&std::ptr::from_ref(raw))
-            .ok_or("original value ordinal")?;
+        let ordinal = self.ordinal(raw)?;
         self.location(
             cell,
             "dataforgeValue",
@@ -281,14 +285,11 @@ impl<'read, 'source> Trace<'read, 'source> {
     }
 
     pub(super) fn attempted_value(&self, cell: &Value, raw: &DataValue<'source>) -> Result {
-        let ordinal = self
-            .ordinals
-            .get(&std::ptr::from_ref(raw))
-            .ok_or("original value ordinal")?;
+        let ordinal = self.ordinal(raw)?;
         self.attempted(
             cell,
             "dataforgeValue",
-            vec![u64::from(self.owner), u64::try_from(*ordinal)?],
+            vec![u64::from(self.owner), u64::try_from(ordinal)?],
             "$value",
         )
     }

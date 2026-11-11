@@ -70,6 +70,7 @@ mod real_archive_variant_groups;
 mod real_archive_variant_keys;
 mod real_archive_variants;
 mod real_archive_verification;
+mod real_archive_weapon_actions;
 mod ship_matrix_compare;
 
 #[path = "../it/resource_density_schema_fixture.rs"]

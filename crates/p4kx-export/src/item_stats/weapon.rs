@@ -5,71 +5,22 @@ use p4kx_extraction::{
     DataForge, DataForgeError, Record, RecordTree, StructValue, TreeBuilder, Value,
 };
 
-use super::parts::damage;
 use super::walk::owner_of;
-use crate::contract_stats::{AmmoStats, FireAction, Spread, WeaponStats};
+use crate::contract_stats::{AmmoStats, WeaponStats};
 use crate::record_fields::{
-    component_occurrence, elements, integer, number, record_reference, reference, structure, text,
+    component_occurrence, integer, number, record_reference, reference, structure,
 };
 
-const SEQUENCE_ENTRIES: &str = "sequenceEntries";
-const PARALLEL_ACTIONS: &str = "weaponActions";
+#[path = "weapon_legacy_actions.rs"]
+mod actions;
+#[cfg(test)]
+#[path = "weapon_deep_tests.rs"]
+mod deep_tests;
+
+use super::parts::damage;
+use actions::read as fire_actions;
 const AMMO_PARAMS: &str = "AmmoParams";
 const ENTITY: &str = "EntityClassDefinition";
-
-fn collect<'f>(action: &StructValue<'f>, actions: &mut Vec<FireAction<'f>>) {
-    if action.field(SEQUENCE_ENTRIES).is_some() {
-        for entry in elements(Some(action), SEQUENCE_ENTRIES) {
-            if let Value::Struct(entry) = entry
-                && let Some(inner) = structure(Some(entry), "weaponAction")
-            {
-                collect(inner, actions);
-            }
-        }
-        return;
-    }
-    if action.field(PARALLEL_ACTIONS).is_some() {
-        for entry in elements(Some(action), PARALLEL_ACTIONS) {
-            if let Value::Struct(entry) = entry {
-                collect(entry, actions);
-            }
-        }
-        return;
-    }
-    let inner = structure(Some(action), "weaponAction");
-    let launch =
-        structure(Some(action), "launchParams").or_else(|| structure(inner, "launchParams"));
-    let value = |name| number(Some(action), name).or_else(|| number(inner, name));
-    actions.push(FireAction {
-        kind: action.type_name(),
-        name: text(Some(action), "name").or_else(|| text(inner, "name")),
-        fire_rate: value("fireRate"),
-        pellets: integer(launch, "pelletCount").or_else(|| integer(launch, "pellets")),
-        ammo_cost: integer(launch, "ammoCost"),
-        heat_per_shot: value("heatPerShot"),
-        charge_time: value("chargeTime"),
-        overcharge_time: value("overchargeTime"),
-        cooldown_time: value("cooldownTime"),
-        hit_type: text(Some(action), "hitType").or_else(|| text(inner, "hitType")),
-        full_damage_range: value("fullDamageRange"),
-        zero_damage_range: value("zeroDamageRange"),
-        damage_per_second: damage(structure(Some(action), "damagePerSecond"))
-            .or_else(|| damage(structure(inner, "damagePerSecond"))),
-        spread: spread(launch).or_else(|| spread(Some(action))),
-    });
-}
-
-fn spread(launch: Option<&StructValue<'_>>) -> Option<Spread> {
-    let spread = structure(launch, "spreadParams")?;
-    let value = |name| number(Some(spread), name);
-    Some(Spread {
-        min: value("min"),
-        max: value("max"),
-        first_attack: value("firstAttack"),
-        attack: value("attack"),
-        decay: value("decay"),
-    })
-}
 
 pub(crate) fn ammo(tree: &RecordTree<'_>) -> AmmoStats {
     let projectile = structure(Some(tree.root()), "projectileParams");
@@ -163,12 +114,7 @@ pub(super) fn weapon<'f, E>(
     let Some((occurrence, weapon)) = component_occurrence(tree, WEAPON_COMPONENT) else {
         return Ok(None);
     };
-    let mut fire_actions = Vec::new();
-    for action in elements(Some(weapon), "fireActions") {
-        if let Value::Struct(action) = action {
-            collect(action, &mut fire_actions);
-        }
-    }
+    let fire_actions = fire_actions(weapon);
     let (ammo_capacity, ammo) =
         if let Some((original, container)) = component_occurrence(tree, AMMO_CONTAINER) {
             observe_magazine(MagazineRead {
