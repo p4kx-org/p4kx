@@ -49,3 +49,23 @@ Explicit stdout companion paths may replace a prior stdout companion. Canonical
 file companion names, publication lock names and unrelated existing files are
 reserved. The write guards reject destinations that alias the observed input or
 lie inside a protected installation.
+
+## CHF conversion
+
+`p4kx chf to-json` addresses the exact scalar and empty-container JSON values
+with JSON Pointers. The original CHF values and its label hashes come from the
+observed standalone file. A label that uses an Archive name records the item
+Record's port or the material lookup and material Entry that supplied it. The
+material coordinate records the original material ID and, for parameter names,
+the attribute's ordinal across that material's `PublicParams` elements. Names
+that lose the lookup and unread optional Entries supply no label data.
+
+`p4kx chf from-json` records the emitted binary as one opaque datum and binds it
+to the observed JSON conversion. An earlier loose file receipt does not establish
+original P4K lineage for a later read. Both file-output commands add
+`originReceipt`, `fieldOrigins` and `provenance` to their `--json` summaries.
+
+With raw JSON on stdout, `chf to-json --origin-stderr` emits the JSONL companion
+from its header through its end row in place of the usual name-count line.
+Archive warnings may still appear before or after that block. Use
+`--origin-out <file>` for a companion file. Raw stdout retains its original JSON.

@@ -32,6 +32,7 @@ mod label;
 mod material;
 mod name_table;
 mod named_json;
+mod named_json_field;
 mod names;
 mod rig;
 mod rig_blend;
@@ -59,6 +60,7 @@ pub use label::Label;
 pub use material::{ColorParam, FloatParam, Material, SubMaterial, Texture};
 pub use name_table::{MAX_NAME_LEN, MAX_NAMES, NameTable};
 pub use named_json::{LABEL_SUFFIX, NameSummary};
+pub use named_json_field::{ChfJsonField, ChfJsonName, ChfJsonNameUse, ChfNameKind};
 pub use names::{
     BODY_COLOR, EYE_COLOR, HAIR_DYE_COLOR, HAIR_TINT_COLOR, lowered_hash, name_hash,
     skin_attachment,

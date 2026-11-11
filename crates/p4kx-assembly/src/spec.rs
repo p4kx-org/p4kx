@@ -15,7 +15,7 @@ use crate::manual_loadout::ManualLoadout;
 use crate::merge::port_key;
 use crate::outfit_read::OutfitInfo;
 use crate::port::{PortDefinition, read_definition};
-use crate::read::{as_struct, struct_field, struct_items, text, unsigned};
+use crate::read::{as_struct, indexed_struct_items, struct_field, text, unsigned};
 pub(crate) use crate::spec_loadout::read_loadout;
 use crate::target_spec;
 pub(crate) use crate::target_spec::TargetSpec;
@@ -90,6 +90,8 @@ pub(crate) struct PortSpec {
     pub(crate) name: String,
     pub(crate) definition: Arc<PortDefinition>,
     pub(crate) default_item: TargetSpec,
+    pub(crate) component_index: usize,
+    pub(crate) port_index: usize,
 }
 
 /// The vehicle implementation a Record names and the Modification it selects.
@@ -145,7 +147,7 @@ impl EntitySpec {
         let components = components_of(tree);
         let record: Arc<str> = Arc::from(tree.record_path());
         let (loadout, outfit) = read_default_loadout(&components, &record, paths);
-        let (ports, port_flags) = read_ports(&components, paths);
+        let (ports, port_flags) = read_ports(tree, paths);
         let mut port_index = HashMap::with_capacity(ports.len());
         for (at, port) in ports.iter().enumerate() {
             port_index.entry(port_key(&port.name)).or_insert(at);
@@ -251,30 +253,36 @@ fn read_default_loadout(
 
 /// Reads the item ports of the port containers among `components`, and the flags the containers
 /// give all their ports.
-fn read_ports(
-    components: &[&StructValue<'_>],
-    paths: &PathRead<'_>,
-) -> (Vec<PortSpec>, Vec<String>) {
+fn read_ports(tree: &RecordTree<'_>, paths: &PathRead<'_>) -> (Vec<PortSpec>, Vec<String>) {
+    let components = match tree.field("Components") {
+        Some(Value::Array(items)) => &items[..],
+        _ => &[],
+    };
     let containers = || {
-        components
-            .iter()
-            .filter(|component| component.type_name() == PORT_CONTAINER)
+        components.iter().enumerate().filter_map(|(index, value)| {
+            as_struct(value)
+                .filter(|component| component.type_name() == PORT_CONTAINER)
+                .map(|component| (index, component))
+        })
     };
     let ports = containers()
-        .flat_map(|component| struct_items(component, "Ports"))
-        .map(|port| PortSpec {
-            name: text(port, "Name").to_owned(),
-            definition: Arc::new(read_definition(port)),
-            default_item: struct_field(port, "defaultItem")
-                .and_then(|item| {
-                    item.field("entityClass")
-                        .map(|value| target_spec::reference_target_at(item, value, paths))
-                })
-                .unwrap_or(TargetSpec::None),
+        .flat_map(|(component_index, component)| {
+            indexed_struct_items(component, "Ports").map(move |(port_index, port)| PortSpec {
+                name: text(port, "Name").to_owned(),
+                definition: Arc::new(read_definition(port)),
+                default_item: struct_field(port, "defaultItem")
+                    .and_then(|item| {
+                        item.field("entityClass")
+                            .map(|value| target_spec::reference_target_at(item, value, paths))
+                    })
+                    .unwrap_or(TargetSpec::None),
+                component_index,
+                port_index,
+            })
         })
         .collect();
     let flags = containers()
-        .flat_map(|component| text(component, "PortFlags").split_whitespace())
+        .flat_map(|(_, component)| text(component, "PortFlags").split_whitespace())
         .map(str::to_owned)
         .collect();
     (ports, flags)

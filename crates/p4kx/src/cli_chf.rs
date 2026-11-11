@@ -24,17 +24,7 @@ pub(crate) enum ChfAction {
     /// byte-exactly. A hash that a known name matches gets a `*_label` key with the name beside it;
     /// `from-json` ignores the labels, and a summary counts the hashes that stay unnamed.
     #[command(name = "to-json", after_help = EXIT_CODES_HELP)]
-    ToJson {
-        /// The CHF file.
-        file: PathBuf,
-        /// Writes the JSON to this file instead of stdout; needed with --json.
-        #[arg(long, value_name = "FILE")]
-        out: Option<PathBuf>,
-        /// Reads more names from this Data.p4k Archive: the item ports of the items the character
-        /// wears, and the sub-materials and parameters of the materials it chooses.
-        #[arg(long, value_name = "ARCHIVE")]
-        archive: Option<PathBuf>,
-    },
+    ToJson(ChfToJsonArgs),
     /// Converts the JSON that `to-json` writes back to a CHF file; an unchanged JSON gives the
     /// original bytes, an edited one a new file with a correct CRC-32C. The tool never writes into
     /// a Star Citizen installation, including its `user` folder: write the file elsewhere and copy
@@ -78,6 +68,25 @@ pub(crate) enum ChfAction {
     /// character without face DNA or for an unknown head rig is invalid input.
     #[command(after_help = EXIT_CODES_HELP)]
     Glb(ChfGlbArgs),
+}
+
+/// Arguments of `p4kx chf to-json`.
+#[derive(Debug, Args)]
+pub(crate) struct ChfToJsonArgs {
+    /// The CHF file.
+    pub(crate) file: PathBuf,
+    /// Writes the JSON to this file instead of stdout; needed with --json.
+    #[arg(long, value_name = "FILE")]
+    pub(crate) out: Option<PathBuf>,
+    /// Reads the names of worn item ports and chosen material parameters from this Archive.
+    #[arg(long, value_name = "ARCHIVE")]
+    pub(crate) archive: Option<PathBuf>,
+    /// Writes the raw stdout stream's field-origin companion to stderr.
+    #[arg(long, conflicts_with = "out")]
+    pub(crate) origin_stderr: bool,
+    /// Saves the raw stdout stream's field-origin companion to this file.
+    #[arg(long, value_name = "FILE", conflicts_with = "out")]
+    pub(crate) origin_out: Option<PathBuf>,
 }
 
 /// The output formats of `p4kx chf diff --format`.

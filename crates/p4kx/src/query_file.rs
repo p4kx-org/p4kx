@@ -8,20 +8,6 @@ use std::process;
 
 use p4kx_extraction::{ArchiveWriteProtection, CancelToken, check_protected_output};
 
-/// Calls `write` with a new temporary file next to `out` and renames it to `out` once `write`
-/// succeeded, replacing an existing file; on any error the temporary file is removed, so `out`
-/// is never half written.
-///
-/// # Errors
-///
-/// Returns the [`io::Error`] of `write`, or of creating, flushing or renaming the file.
-pub(crate) fn write_replacing<T>(
-    out: &Path,
-    write: impl FnOnce(&mut BufWriter<File>) -> io::Result<T>,
-) -> io::Result<T> {
-    write_replacing_protected(out, None, None, write)
-}
-
 /// Atomically writes under the source protection retained by one Archive job.
 pub(crate) fn write_replacing_protected<T>(
     out: &Path,

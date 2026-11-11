@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::error::Error;
-use std::io::Read;
 use std::sync::Arc;
 
 use p4kx_extraction::model::{
@@ -14,6 +13,9 @@ use p4kx_extraction::{
     PathIndex, TextureVerdicts, archive_error_in,
 };
 use thiserror::Error;
+
+#[path = "provider_file.rs"]
+mod file;
 
 use crate::MAX_ASSEMBLY_VERTICES;
 use crate::cdf::is_character_definition;
@@ -315,21 +317,8 @@ impl ModelProvider for ArchiveModels<'_> {
     }
 
     fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {
-        let path = self.entry_of(path).ok_or(ModelFailure::Missing)?;
-        let entry = self.index.find(&path).ok_or(ModelFailure::Missing)?;
-        let size = entry.uncompressed_size();
-        if size > limit {
-            return Err(ModelFailure::Unreadable {
-                reason: format!("the file holds {size} bytes, more than the limit of {limit}"),
-            });
-        }
-        let reader = self.archive.open_entry(entry).map_err(read_failure)?;
-        let mut bytes = Vec::with_capacity(usize::try_from(size).unwrap_or_default());
-        reader
-            .take(limit)
-            .read_to_end(&mut bytes)
-            .map_err(read_failure)?;
-        Ok(bytes)
+        let entry = self.file_entry(path).ok_or(ModelFailure::Missing)?;
+        self.read_file_entry(entry, limit)
     }
 
     fn deployed(&self, path: &str, model: &Model) -> Result<Option<Model>, ModelFailure> {

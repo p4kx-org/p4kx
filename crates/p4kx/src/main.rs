@@ -26,6 +26,8 @@ mod chf;
 mod chf_diff;
 mod chf_glb;
 mod chf_names;
+mod chf_origin_fields;
+mod chf_origin_io;
 mod chunks;
 mod cli;
 mod cli_actionmap;

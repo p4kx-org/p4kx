@@ -38,6 +38,7 @@ mod chf_diff;
 mod chf_glb;
 mod chf_glb_dressed;
 mod chf_names;
+mod chf_origins;
 mod chunks;
 mod compare;
 mod compare_diff;

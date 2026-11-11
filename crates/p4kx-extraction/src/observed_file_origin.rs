@@ -96,10 +96,26 @@ impl ObservedFileRead {
 /// # Errors
 /// Returns a file-open, metadata or read failure.
 pub fn read_observed_file(path: &Path) -> io::Result<ObservedFileRead> {
+    read_file(path, None)
+}
+
+/// Reads up to the requested number of bytes and observes full input only when complete.
+///
+/// # Errors
+/// Returns a file-open, metadata or read failure.
+pub fn read_observed_file_limit(path: &Path, limit: u64) -> io::Result<ObservedFileRead> {
+    read_file(path, Some(limit))
+}
+
+fn read_file(path: &Path, limit: Option<u64>) -> io::Result<ObservedFileRead> {
     let mut file = File::open(path)?;
     let before = FileStamp::from_metadata(&file.metadata()?);
     let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
+    if let Some(limit) = limit {
+        (&mut file).take(limit).read_to_end(&mut bytes)?;
+    } else {
+        file.read_to_end(&mut bytes)?;
+    }
     let origin = ObservedFileOrigin::of_read(path, &file, before, bytes.len())?;
     Ok(ObservedFileRead { bytes, origin })
 }

@@ -655,6 +655,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   [docs/chf-hashes.md](chf-hashes.md). A hash that a known name matches gets that name in a
   `*_label` key beside it (`from-json` ignores the keys), `--archive` adds the names the Archive
   knows, and the hashes without a name are counted.
+  The file outputs have a sibling `<file>.p4kx-origin.jsonl` companion. For
+  raw JSON on stdout, `to-json --origin-stderr` writes the companion to stderr
+  and `--origin-out <file>` saves it. See [Standalone field origins](source-origin.md).
 - `p4kx chf diff <a.chf> <b.chf> [--format text|json] [--archive <Data.p4k>]` lists the fields in
   which two CHF files differ, by path with the old and the new value: header, DNA by face part and
   blend, item port tree, and materials down to textures, float and colour parameters. Hashes that

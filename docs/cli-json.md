@@ -2652,6 +2652,11 @@ the converted JSON would otherwise share stdout with the summary; without it the
 An `--out` inside a Star Citizen installation, including a Channel's `user` folder, is refused with
 exit code 2; copy a CHF file into `CustomCharacters` by hand.
 
+The summaries add `originReceipt`, the companion basename, and immediate
+`fieldOrigins` and `provenance`. The companion binds the unchanged artifact
+bytes and addresses each emitted JSON datum or the opaque binary CHF.
+See [Standalone field origins](source-origin.md).
+
 ### The CHF JSON
 
 `to-json` writes, and `from-json` reads, one indented object. `from-json` of an unchanged

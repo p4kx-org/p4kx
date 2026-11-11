@@ -87,6 +87,7 @@ mod cdf;
 mod cdf_bone;
 mod changes;
 mod character_path;
+mod chf_name_sources;
 mod chf_names;
 mod compat;
 mod creature_animation;
@@ -174,7 +175,8 @@ pub use assembly::{
 pub use attached::AttachedModel;
 pub use catalogue::{EntityCatalogue, EntityKind, EntitySummary};
 pub use changes::{ChangeError, ChangedLoadout, LoadoutChanges, PortChange, ReplacementMismatch};
-pub use chf_names::archive_names;
+pub use chf_name_sources::{ChfNameContributions, ObservedChfNames};
+pub use chf_names::{archive_names, archive_names_observed};
 pub use compat::{AcceptedType, Incompatibility, ItemFacts, PortConstraints};
 pub use creature_animation::{CreatureAnimations, CreatureClips, creature_animations};
 pub use entities::{ENTITY_TYPE, Entities};

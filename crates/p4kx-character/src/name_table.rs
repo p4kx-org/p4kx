@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use crate::{BODY_COLOR, EYE_COLOR, lowered_hash, name_hash, skin_attachment};
+use crate::{BODY_COLOR, ChfNameKind, EYE_COLOR, lowered_hash, name_hash, skin_attachment};
 
 /// The longest name a [`NameTable`] keeps; a longer one is not a port, material or parameter name.
 pub const MAX_NAME_LEN: usize = 256;
@@ -130,6 +130,18 @@ impl NameTable {
         join(&mut self.sub_materials, &other.sub_materials);
         join(&mut self.params, &other.params);
         join(&mut self.rigs, &other.rigs);
+    }
+
+    /// Returns the exact current lookup winner for this CHF hash family.
+    #[must_use]
+    pub fn get(&self, kind: ChfNameKind, hash: u32) -> Option<&str> {
+        match kind {
+            ChfNameKind::Rig => self.rig(hash),
+            ChfNameKind::Port => self.port(hash),
+            ChfNameKind::Attachment => self.attachment(hash),
+            ChfNameKind::SubMaterial => self.sub_material(hash),
+            ChfNameKind::Parameter => self.param(hash),
+        }
     }
 
     /// Returns the name of the item port with the hash `hash`.

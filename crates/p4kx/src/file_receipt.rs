@@ -43,7 +43,15 @@ impl<'source> FileReceipt<'source> {
         protection: Option<&'source ArchiveWriteProtection>,
         receipt_protection: Option<&'source ArchiveWriteProtection>,
     ) -> io::Result<Self> {
-        let cancel = CancelToken::new();
+        Self::new_with_cancel(output, protection, receipt_protection, CancelToken::new())
+    }
+
+    pub(crate) fn new_with_cancel(
+        output: &Path,
+        protection: Option<&'source ArchiveWriteProtection>,
+        receipt_protection: Option<&'source ArchiveWriteProtection>,
+        cancel: CancelToken,
+    ) -> io::Result<Self> {
         let artifact = target(output, protection, &cancel)?;
         let name = artifact
             .file_name()

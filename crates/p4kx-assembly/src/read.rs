@@ -24,11 +24,21 @@ pub(crate) fn struct_items<'v, 'f>(
     structure: &'v StructValue<'f>,
     name: &str,
 ) -> impl Iterator<Item = &'v StructValue<'f>> {
+    indexed_struct_items(structure, name).map(|(_, structure)| structure)
+}
+
+pub(crate) fn indexed_struct_items<'v, 'f>(
+    structure: &'v StructValue<'f>,
+    name: &str,
+) -> impl Iterator<Item = (usize, &'v StructValue<'f>)> {
     let items = match structure.field(name) {
         Some(Value::Array(items)) => &items[..],
         _ => &[],
     };
-    items.iter().filter_map(as_struct)
+    items
+        .iter()
+        .enumerate()
+        .filter_map(|(index, item)| as_struct(item).map(|structure| (index, structure)))
 }
 
 /// Returns whether the array field `name` holds at least one element.

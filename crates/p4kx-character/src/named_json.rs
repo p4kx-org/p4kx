@@ -4,6 +4,7 @@
 use std::collections::BTreeSet;
 
 use crate::json_tree::Node;
+use crate::named_json_field::{self, ChfJsonField, ChfJsonName, ChfJsonNameUse, ChfNameKind};
 use crate::{Chf, ChfError, NameTable};
 
 /// The suffix of the output-only key that names the hash in the key before it.
@@ -28,7 +29,7 @@ struct Tally {
 }
 
 impl Tally {
-    fn label<'n>(&mut self, object: &mut Node, key: &str, lookup: impl Fn(u32) -> Option<&'n str>) {
+    fn label(&mut self, object: &mut Node, key: &str, kind: ChfNameKind, names: &NameTable) {
         let Node::Object(fields) = object else {
             return;
         };
@@ -41,11 +42,30 @@ impl Tally {
         }) else {
             return;
         };
-        if let Some(name) = lookup(hash) {
+        let name = names.get(kind, hash);
+        if let Some((_, value)) = fields.get_mut(index) {
+            let usage = if name.is_some() {
+                ChfJsonNameUse::ResolvedHash
+            } else {
+                ChfJsonNameUse::UnresolvedHash
+            };
+            *value = Node::ChfHash(ChfJsonName { kind, hash, usage });
+        }
+        if let Some(name) = name {
             self.named += 1;
             fields.insert(
                 index + 1,
-                (format!("{key}{LABEL_SUFFIX}"), Node::Text(name.to_owned())),
+                (
+                    format!("{key}{LABEL_SUFFIX}"),
+                    Node::ChfLabel(
+                        name.to_owned(),
+                        ChfJsonName {
+                            kind,
+                            hash,
+                            usage: ChfJsonNameUse::Label,
+                        },
+                    ),
+                ),
             );
         } else {
             self.unresolved_total += 1;
@@ -63,7 +83,7 @@ impl Tally {
 }
 
 fn label_ports(port: &mut Node, names: &NameTable, tally: &mut Tally) {
-    tally.label(port, "port", |hash| names.port(hash));
+    tally.label(port, "port", ChfNameKind::Port, names);
     if let Some(children) = port.field_mut("children") {
         for child in children.items_mut() {
             label_ports(child, names, tally);
@@ -72,16 +92,16 @@ fn label_ports(port: &mut Node, names: &NameTable, tally: &mut Tally) {
 }
 
 fn label_material(material: &mut Node, names: &NameTable, tally: &mut Tally) {
-    tally.label(material, "attachment", |hash| names.attachment(hash));
+    tally.label(material, "attachment", ChfNameKind::Attachment, names);
     let Some(subs) = material.field_mut("sub_materials") else {
         return;
     };
     for sub in subs.items_mut() {
-        tally.label(sub, "name", |hash| names.sub_material(hash));
+        tally.label(sub, "name", ChfNameKind::SubMaterial, names);
         for key in ["floats", "colors"] {
             if let Some(params) = sub.field_mut(key) {
                 for param in params.items_mut() {
-                    tally.label(param, "name", |hash| names.param(hash));
+                    tally.label(param, "name", ChfNameKind::Parameter, names);
                 }
             }
         }
@@ -97,11 +117,31 @@ impl Chf {
     ///
     /// [`ChfError::Json`] when serialisation fails.
     pub fn to_json_named(&self, names: &NameTable) -> Result<(String, NameSummary), ChfError> {
+        let (tree, tally) = self.named_tree(names)?;
+        Ok((serde_json::to_string_pretty(&tree)?, tally))
+    }
+
+    /// Returns named JSON and reports the exact emitted data fields.
+    ///
+    /// # Errors
+    /// Returns a serialization error before reporting fields when the JSON cannot be written.
+    pub fn to_json_named_observed(
+        &self,
+        names: &NameTable,
+        mut observe: impl FnMut(ChfJsonField<'_>),
+    ) -> Result<(String, NameSummary), ChfError> {
+        let (tree, tally) = self.named_tree(names)?;
+        let json = serde_json::to_string_pretty(&tree)?;
+        named_json_field::observe(&tree, &mut observe);
+        Ok((json, tally))
+    }
+
+    fn named_tree(&self, names: &NameTable) -> Result<(Node, NameSummary), ChfError> {
         let mut tree: Node = serde_json::from_str(&serde_json::to_string(self)?)?;
         let mut tally = Tally::default();
         if let Some(character) = tree.field_mut("character") {
             if let Some(dna) = character.field_mut("dna") {
-                tally.label(dna, "gender_hash", |hash| names.rig(hash));
+                tally.label(dna, "gender_hash", ChfNameKind::Rig, names);
             }
             if let Some(root) = character.field_mut("item_ports") {
                 label_ports(root, names, &mut tally);
@@ -112,6 +152,6 @@ impl Chf {
                 }
             }
         }
-        Ok((serde_json::to_string_pretty(&tree)?, tally.finish()))
+        Ok((tree, tally.finish()))
     }
 }
