@@ -203,10 +203,12 @@ separate self-check and cannot substitute for an independent reference compariso
 An allowed difference is separately counted under its reason, never exact equality.
 
 - unp4k: only a nonempty all-zero suffix of encrypted Stored or effective method-100 pass-through
-  bytes with validated matching source and the inspected unmodified producer revision. The retained
-  prefix has one byte (possibly zero), or at least three bytes ending in nonzero. Unknown context,
-  inconsistent retained zeros/two-byte prefixes, nonzero loss and actual Deflate/Zstandard logical
-  loss fail ([ADR-0341](adr/0341-reference-zero-trimming-requires-effective-decoder-and-producer-evidence.md)).
+  bytes with validated matching source and the inspected unmodified producer revision. Stored
+  output retains one byte (possibly zero), or at least three bytes ending in a nonzero byte.
+  Method-100 output retains at least four bytes ending in a nonzero byte because the producer
+  rewinds its four-byte probe after trimming. Unknown context, inconsistent retained prefixes,
+  nonzero loss and actual Deflate/Zstandard logical loss fail
+  ([ADR-0341](adr/0341-reference-zero-trimming-requires-effective-decoder-and-producer-evidence.md)).
 - unforge: `BUGGED` against a nonempty value, and its documented byte-wise interpretation of
   non-ASCII UTF-8. Other value changes fail.
 - StarBreaker: the narrowly typed weak-pointer, dangling-reference, invalid-bool and non-finite

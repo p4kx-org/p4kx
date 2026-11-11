@@ -11,6 +11,9 @@ pub(crate) const PRODUCER_REVISION: &str = "b492ab14d26280c6ec91c4365ff0faf5f3e2
 pub(crate) const TRAILING_ZEROS: &str =
     "validated unp4k b492ab14: encrypted direct bytes, exact pre-decompression zero trim";
 
+const MIN_TRIMMED_NONZERO_PREFIX: u64 = 3;
+const METHOD_100_PROBE_BYTES: u64 = 4;
+
 /// The Entry identity verified against the reference run's source manifest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SourceIdentity<'a> {
@@ -53,13 +56,6 @@ pub(crate) fn allows(
     {
         return false;
     }
-    if !matches!(
-        (source.compression, encoding),
-        (Compression::Store, EffectiveEncoding::Stored)
-            | (Compression::Zstd, EffectiveEncoding::PassThrough)
-    ) {
-        return false;
-    }
     let Verdict::ReferenceShorter {
         zeros_only: true,
         extra,
@@ -69,7 +65,16 @@ pub(crate) fn allows(
     else {
         return false;
     };
-    extra > 0
-        && (reference_len == 1 && last_reference_byte.is_some()
-            || (reference_len >= 3 && last_reference_byte.is_some_and(|byte| byte != 0)))
+    if extra == 0 {
+        return false;
+    }
+    match (source.compression, encoding, last_reference_byte) {
+        (Compression::Store, EffectiveEncoding::Stored, Some(last)) => {
+            reference_len == 1 || (reference_len >= MIN_TRIMMED_NONZERO_PREFIX && last != 0)
+        }
+        (Compression::Zstd, EffectiveEncoding::PassThrough, Some(last)) => {
+            reference_len >= METHOD_100_PROBE_BYTES && last != 0
+        }
+        _ => false,
+    }
 }

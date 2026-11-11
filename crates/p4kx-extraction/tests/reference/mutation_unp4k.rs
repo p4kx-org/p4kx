@@ -152,27 +152,51 @@ fn removing_any_compressed_logical_zero_suffix_is_a_difference() -> TestResult {
 }
 
 #[test]
-fn the_producer_retains_one_byte_even_when_that_byte_is_zero() -> TestResult {
-    for encoding in [EffectiveEncoding::Stored, EffectiveEncoding::PassThrough] {
-        let producer = context(encoding, true);
-        for first in [0, 1] {
-            let mut data = vec![0; 100];
-            let byte = data.first_mut().ok_or("empty data")?;
-            *byte = first;
-            assert_allowed(&compare(encoding, true, &data, &[first], Some(&producer))?);
-            for length in [0, 2, 3, 50] {
-                let reference = data.get(..length).ok_or("invalid length")?;
-                assert_different(&compare(encoding, true, &data, reference, Some(&producer))?);
-            }
+fn stored_retains_one_byte_even_when_that_byte_is_zero() -> TestResult {
+    let encoding = EffectiveEncoding::Stored;
+    let producer = context(encoding, true);
+    for first in [0, 1] {
+        let mut data = vec![0; 100];
+        let byte = data.first_mut().ok_or("empty data")?;
+        *byte = first;
+        assert_allowed(&compare(encoding, true, &data, &[first], Some(&producer))?);
+        for length in [0, 2, 3, 50] {
+            let reference = data.get(..length).ok_or("invalid length")?;
+            assert_different(&compare(encoding, true, &data, reference, Some(&producer))?);
         }
+    }
+    assert_different(&compare(
+        encoding,
+        true,
+        &[1, 2, 0, 0],
+        &[1, 2],
+        Some(&producer),
+    )?);
+    Ok(())
+}
+
+#[test]
+fn method_100_rewind_requires_a_full_four_byte_retained_prefix() -> TestResult {
+    let encoding = EffectiveEncoding::PassThrough;
+    let producer = context(encoding, true);
+    for reference in [[0].as_slice(), &[1], &[1, 2, 3], &[1, 2, 3, 0]] {
+        let mut original = reference.to_vec();
+        original.extend([0; 32]);
         assert_different(&compare(
             encoding,
             true,
-            &[1, 2, 0, 0],
-            &[1, 2],
+            &original,
+            reference,
             Some(&producer),
         )?);
     }
+    assert_allowed(&compare(
+        encoding,
+        true,
+        &[1, 2, 3, 4, 0, 0],
+        &[1, 2, 3, 4],
+        Some(&producer),
+    )?);
     Ok(())
 }
 

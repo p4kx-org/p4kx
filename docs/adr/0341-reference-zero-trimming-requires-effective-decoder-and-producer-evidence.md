@@ -11,11 +11,18 @@ trims decrypted **encoded** bytes in
 before [GetInputStream selects decompression](https://github.com/dolkensp/unp4k/blob/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b/src/ICSharpCode.SharpZipLib/Zip/ZipFile.cs#L738-L795).
 It does not justify loss from arbitrary decompressed output.
 
-The loop stops at position one. An observed shorter direct-byte result therefore has one byte,
-even when that byte is zero, or at least three bytes ending in a nonzero byte. A shorter
-two-byte result or a longer retained prefix ending in zero does not match this algorithm.
-The source loop can also drop a nonzero byte at position one; that loss remains a difference,
-rather than an exception to the zero-only rule.
+The trim loop stops at position one. Stored output can therefore retain one byte, including
+zero, or at least three bytes ending in a nonzero byte. A two-byte result or a longer retained
+prefix ending in zero is inconsistent with the loop. The loop can also drop a nonzero byte
+at position one. That loss remains a difference.
+
+After trimming, the method-100 branch reads up to four bytes from the decrypted memory stream.
+Both outcomes of its positive-read branch seek back exactly four bytes. If the stream holds
+one to three bytes, the rewind fails before the producer can return a stream to its caller.
+A successful shorter method-100 pass-through reference therefore retains at least four bytes
+and ends in a nonzero byte. The producer's
+[Zstandard recognizer](https://github.com/dolkensp/unp4k/blob/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b/src/Zstd.Net/Zstd.cs#L24-L32)
+uses the same four-byte frame magic as the P4KX decoder.
 
 ## Decision
 
@@ -46,7 +53,8 @@ rather than an exception to the zero-only rule.
 
 Synthetic v1/v2, encrypted/plain Archive fixtures exercise the public observation while preserving
 the full byte stream. Reference mutation tests cover real Deflate, real Zstandard, method-100
-pass-through and Stored payloads with logical zero suffixes, the one-byte minimum, inconsistent
+pass-through and Stored payloads with logical zero suffixes, the Stored one-byte minimum, the
+method-100 four-byte rewind boundary, inconsistent
 retained-zero/two-byte boundaries, source/producer mismatches, unknown contexts, nonzero loss,
 changed/added bytes, multi-block suffixes and exact comparisons. Hosted tests use synthetic keys
 and bytes only. Local independent-reference runs retain their matching Build/source evidence.
