@@ -105,7 +105,7 @@ impl Scope {
         header: HeaderRead,
         writer: &MediaWriter<'_>,
     ) -> Result<(), MediaError> {
-        let owner = bank_entry(writer)?;
+        let owner = current_entry(writer)?;
         let mut observed = self.observed.try_borrow_mut().map_err(|_| borrowed())?;
         observed
             .headers
@@ -128,7 +128,7 @@ impl Scope {
     ) -> Result<DecimalU64, MediaError> {
         writer.checkpoint()?;
         let key = QueryKey {
-            owner_entry: bank_entry(writer)?,
+            owner_entry: current_entry(writer)?,
             target_id,
             selector,
         };
@@ -176,11 +176,11 @@ impl Interests {
     }
 }
 
-fn bank_entry(writer: &MediaWriter<'_>) -> Result<usize, MediaError> {
+fn current_entry(writer: &MediaWriter<'_>) -> Result<usize, MediaError> {
     let Some(Identity::Entry { entry, .. }) = writer.source.as_ref().map(|source| &source.identity)
     else {
         return Err(MediaError::Contract(
-            "soundbank observation outside its physical Entry".into(),
+            "soundbank observation or query outside its physical Entry".into(),
         ));
     };
     Ok(entry.entry_index)

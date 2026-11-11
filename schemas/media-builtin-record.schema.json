@@ -1774,6 +1774,1079 @@
       ],
       "type": "object"
     },
+    "AtlBinaryText": {
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "position",
+        "value"
+      ],
+      "type": "object"
+    },
+    "AtlContent": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "$ref": "#/$defs/AtlContentValue"
+        },
+        "location": {
+          "$ref": "#/$defs/AtlLocation"
+        },
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        }
+      },
+      "required": [
+        "location",
+        "position",
+        "content"
+      ],
+      "type": "object"
+    },
+    "AtlContentValue": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "lexeme": {
+              "type": "string"
+            },
+            "type": {
+              "const": "text",
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value",
+            "lexeme"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "lexeme": {
+              "type": "string"
+            },
+            "type": {
+              "const": "comment",
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value",
+            "lexeme"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "target": {
+              "type": "string"
+            },
+            "type": {
+              "const": "processing-instruction",
+              "type": "string"
+            },
+            "value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "target",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AtlDeclaration": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/AtlDeclarationKind"
+        },
+        "lexeme": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "qualified_name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "qualified_name",
+        "value",
+        "lexeme",
+        "kind",
+        "position"
+      ],
+      "type": "object"
+    },
+    "AtlDeclarationKind": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "namespace": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "attribute",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "namespace"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "prefix": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "namespace",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "prefix"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AtlDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "$ref": "#/$defs/AtlFamily"
+        }
+      },
+      "required": [
+        "family"
+      ],
+      "type": "object"
+    },
+    "AtlDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/AtlFormat"
+        },
+        "repaired_string_bytes": {
+          "type": "boolean"
+        },
+        "root_is_atl_config": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "format",
+        "root_is_atl_config",
+        "repaired_string_bytes"
+      ],
+      "type": "object"
+    },
+    "AtlElement": {
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "$ref": "#/$defs/AtlLocation"
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "qualified_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "qualified_name",
+        "namespace",
+        "location",
+        "position"
+      ],
+      "type": "object"
+    },
+    "AtlFailure": {
+      "enum": [
+        "unsupported-reader",
+        "binary-or-unknown-format",
+        "text-encoding",
+        "text-xml",
+        "source-span"
+      ],
+      "type": "string"
+    },
+    "AtlFamily": {
+      "enum": [
+        "configuration",
+        "triggers",
+        "trigger",
+        "wwise-event",
+        "rtpcs",
+        "rtpc",
+        "wwise-rtpc",
+        "switches",
+        "switch",
+        "switch-state",
+        "wwise-switch",
+        "wwise-state",
+        "wwise-value",
+        "environments",
+        "environment",
+        "wwise-aux-bus",
+        "preloads",
+        "preload-request",
+        "preload",
+        "rtpc-dependees",
+        "rtpc-dependee",
+        "config-group",
+        "platforms",
+        "platform",
+        "tags",
+        "tag",
+        "wwise-file",
+        "external-sources",
+        "external-source",
+        "external-source-entry",
+        "wwise-external-source"
+      ],
+      "type": "string"
+    },
+    "AtlField": {
+      "enum": [
+        "name",
+        "path",
+        "wwise-name",
+        "localised",
+        "duration-type",
+        "duration-min",
+        "duration-max",
+        "radius-max",
+        "listener-rtpc",
+        "rtpc-group-name",
+        "preload-type",
+        "config-group-name",
+        "multiplier",
+        "shift",
+        "wwise-value"
+      ],
+      "type": "string"
+    },
+    "AtlFieldRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/AtlField"
+        },
+        "typed_value": {
+          "$ref": "#/$defs/AtlScalar"
+        }
+      },
+      "required": [
+        "field",
+        "typed_value"
+      ],
+      "type": "object"
+    },
+    "AtlFileKind": {
+      "enum": [
+        "bank",
+        "external-media"
+      ],
+      "type": "string"
+    },
+    "AtlFormat": {
+      "enum": [
+        "plain-xml",
+        "cry-xml",
+        "cry-xml-b",
+        "cry3-sdk"
+      ],
+      "type": "string"
+    },
+    "AtlLocation": {
+      "additionalProperties": false,
+      "properties": {
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sibling_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "parent",
+        "sibling_ordinal"
+      ],
+      "type": "object"
+    },
+    "AtlPathCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "key_required": {
+          "type": "boolean"
+        },
+        "state": {
+          "$ref": "#/$defs/CandidateState"
+        },
+        "target_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "target_entry_index",
+        "state",
+        "key_required"
+      ],
+      "type": "object"
+    },
+    "AtlPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlDocument"
+            },
+            "record_type": {
+              "const": "document",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlElement"
+            },
+            "record_type": {
+              "const": "element",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlDeclaration"
+            },
+            "record_type": {
+              "const": "declaration",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlContent"
+            },
+            "record_type": {
+              "const": "content",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlBinaryText"
+            },
+            "record_type": {
+              "const": "binary-text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlDefinition"
+            },
+            "record_type": {
+              "const": "definition",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlFieldRecord"
+            },
+            "record_type": {
+              "const": "field",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlReference"
+            },
+            "record_type": {
+              "const": "reference",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlReferenceResolution"
+            },
+            "record_type": {
+              "const": "reference-resolution",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlReferenceCandidate"
+            },
+            "record_type": {
+              "const": "reference-candidate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlPathCandidate"
+            },
+            "record_type": {
+              "const": "path-candidate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlFailure"
+            },
+            "record_type": {
+              "const": "failure",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "AtlPayload"
+    },
+    "AtlPosition": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "end_exclusive": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "start": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "type": {
+              "const": "text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "start",
+            "end_exclusive"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "node_index": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "cry-xml-node",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "node_index"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "attribute_index": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "node_index": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "cry-xml-attribute",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "node_index",
+            "attribute_index"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "node_index": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "cry-xml-content",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "node_index"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AtlReference": {
+      "additionalProperties": false,
+      "properties": {
+        "link": {
+          "$ref": "#/$defs/AtlReferenceLink"
+        },
+        "target": {
+          "$ref": "#/$defs/AtlReferenceTarget"
+        }
+      },
+      "required": [
+        "target",
+        "link"
+      ],
+      "type": "object"
+    },
+    "AtlReferenceCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "target_declaration_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_element_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "target_entry_index",
+        "target_element_index",
+        "target_declaration_ordinal"
+      ],
+      "type": "object"
+    },
+    "AtlReferenceLink": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "query_index": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "status": {
+              "const": "soundbank-search",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "query_index"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "not-selected",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "query_index": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "status": {
+              "const": "scoped-search",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "query_index"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "candidates_complete": {
+              "type": "boolean"
+            },
+            "observed_candidates": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "resolution": {
+              "$ref": "#/$defs/PathDisposition"
+            },
+            "status": {
+              "const": "path-search",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "resolution",
+            "observed_candidates",
+            "candidates_complete"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/AtlReferenceUnavailable"
+            },
+            "status": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AtlReferenceResolution": {
+      "additionalProperties": false,
+      "properties": {
+        "blocked_documents": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "candidates_complete": {
+          "type": "boolean"
+        },
+        "directory_complete": {
+          "type": "boolean"
+        },
+        "observed_candidates": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "owner_declaration_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "owner_element_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "owner_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "resolution": {
+          "$ref": "#/$defs/Resolution"
+        }
+      },
+      "required": [
+        "owner_entry_index",
+        "owner_element_index",
+        "owner_declaration_ordinal",
+        "directory_complete",
+        "candidates_complete",
+        "observed_candidates",
+        "blocked_documents",
+        "resolution"
+      ],
+      "type": "object"
+    },
+    "AtlReferenceTarget": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "short_id": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "wwise-event",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name",
+            "short_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/AtlFamily"
+            },
+            "name": {
+              "type": "string"
+            },
+            "short_id": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "wwise-object",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "kind",
+            "name",
+            "short_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/NamedKind"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "const": "named",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "kind",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/AtlFileKind"
+            },
+            "path": {
+              "type": "string"
+            },
+            "type": {
+              "const": "file",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "kind",
+            "path"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AtlReferenceUnavailable": {
+      "enum": [
+        "empty-name",
+        "no-owning-preload",
+        "unsafe-path",
+        "unproved-target-path",
+        "target-not-indexed"
+      ],
+      "type": "string"
+    },
+    "AtlScalar": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "text",
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "boolean",
+              "type": "string"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "number",
+              "type": "string"
+            },
+            "value": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "wwise-event",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "invalid-boolean",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "invalid-number",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "AudioPayload": {
       "oneOf": [
         {
@@ -6869,6 +7942,14 @@
       ],
       "title": "MusicTrackPayload"
     },
+    "NamedKind": {
+      "enum": [
+        "preload-request",
+        "rtpc",
+        "config-group"
+      ],
+      "type": "string"
+    },
     "NodeBase": {
       "additionalProperties": false,
       "properties": {
@@ -7072,6 +8153,83 @@
     "OriginalIdentifier": {
       "$ref": "#/$defs/IdentifierValue",
       "description": "An unmodified source identifier with a distinct domain and integer width."
+    },
+    "PathDisposition": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "resolved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "missing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/NotSelectedReason"
+            },
+            "status": {
+              "const": "not-selected",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/ReferenceUnavailable"
+            },
+            "status": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "PayloadAccess": {
       "enum": [
@@ -20816,6 +21974,739 @@
               }
             }
           }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-document"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "document"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "partial"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 0,
+                "minItems": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-element"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "element"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-declaration"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "declaration"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-content"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "content"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-binary-text"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "binary-text"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-definition"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "definition"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-field"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "field"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-reference"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "reference"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-reference-resolution"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "reference-resolution"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-reference-candidate"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "reference-candidate"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-path-candidate"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "path-candidate"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-failure"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "failure"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "failed"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 0,
+                "minItems": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
         ]
       }
     }

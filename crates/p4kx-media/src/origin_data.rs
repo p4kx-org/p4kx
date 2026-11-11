@@ -41,7 +41,8 @@ pub(crate) fn scope(profile: OriginProfile, pointer: &str) -> ScopeMapping {
         | OriginProfile::ArchiveBuild
         | OriginProfile::IndexBuild
         | OriginProfile::AudioWem
-        | OriginProfile::AudioBank => ScopeMapping::Unmapped,
+        | OriginProfile::AudioBank
+        | OriginProfile::AudioControl => ScopeMapping::Unmapped,
     }
 }
 
@@ -120,6 +121,7 @@ pub(crate) fn independent(profile: OriginProfile, pointer: &str) -> bool {
             crate::origin_material_profile::independent(profile, pointer)
         }
         OriginProfile::AudioWem | OriginProfile::AudioBank => audio_independent(pointer),
+        OriginProfile::AudioControl => matches!(pointer, "/data/record_type" | "/issues"),
         OriginProfile::ArchiveEntry
         | OriginProfile::Unmigrated
         | OriginProfile::ArchiveBuild

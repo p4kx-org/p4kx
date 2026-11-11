@@ -28,7 +28,7 @@ p4kx media schema --source
 Repeat `--kind` for an explicit selection. The known names are `archive`, `model`, `material`,
 `texture`, `shader`, `animation`, `animation-definition`, `audio` and `audio-control`. Omission
 selects every registered provider. The built-in providers are `archive`, `shader`, `material`
-and `audio`. An explicitly requested kind without an available provider returns a typed
+`audio` and `audio-control`. An explicitly requested kind without an available provider returns a typed
 capability failure and a non-zero exit status, even when the selection is empty.
 
 `--kind shader` exports nested `.ext` declarations and ordered Property fields, with exact raw
@@ -47,6 +47,10 @@ cue and LIST annotations, physical soundbank sections, original DIDX and HIRC oc
 and typed Action and Event fields with immediate origins.
 [WEM source metadata](media-audio-metadata.md) and [Soundbank metadata](media-bank-metadata.md)
 define the available fields and diagnostic publication.
+
+`--kind audio-control` exports original ATL XML and CryXml syntax, typed control families and
+source-scoped reference rows. [ATL audio controls](media-audio-control.md) describes the exact
+physical keys, per-field origins and optional Wwise Event links.
 
 The include and exclusion expressions use the existing search Filter syntax. A nested source
 can also be matched through `outer.socpak!inner.pak!path`. Excluding a container excludes its

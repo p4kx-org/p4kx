@@ -158,6 +158,12 @@ fn verify_profile(stream: OriginStream, profile: OriginProfile) -> Result<(), Me
             )
             | (
                 OriginStream::Records {
+                    kind: MediaKind::AudioControl
+                },
+                OriginProfile::AudioControl
+            )
+            | (
+                OriginStream::Records {
                     kind: MediaKind::Material
                 },
                 OriginProfile::MaterialLibrary

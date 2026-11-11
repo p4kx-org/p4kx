@@ -59,23 +59,23 @@ fn default_audio_provider_projects_selected_loose_wems_with_original_raw_receipt
 }
 
 #[test]
-fn the_unregistered_audio_control_kind_refuses_before_publication() -> TestResult {
+fn an_unregistered_kind_refuses_before_publication() -> TestResult {
     let folder = tempfile::tempdir()?;
     let archive = archive(folder.path(), &wem_bytes())?;
     let destination = folder.path().join("audio-control");
     let options = ExportOptions {
-        kinds: vec![MediaKind::AudioControl],
+        kinds: vec![MediaKind::AnimationDefinition],
         ..ExportOptions::default()
     };
     assert!(
         matches!(
             p4kx_media::export(&archive, &destination, &options),
             Err(MediaError::Unsupported {
-                kind: MediaKind::AudioControl,
+                kind: MediaKind::AnimationDefinition,
                 ..
             })
         ),
-        "explicit missing AudioControl is a typed capability failure"
+        "explicit missing AnimationDefinition is a typed capability failure"
     );
     assert!(
         !destination.exists(),

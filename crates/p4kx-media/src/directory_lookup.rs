@@ -3,6 +3,9 @@
 
 use std::cell::Cell;
 
+#[path = "directory_path_candidates.rs"]
+mod path_candidates;
+
 use p4kx_extraction::sound::wwise_path::{self, LooseName};
 use p4kx_extraction::{Archive, Entry, TextureMemberCandidate};
 

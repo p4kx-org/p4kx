@@ -155,7 +155,8 @@ fn omission_selects_all_registered_providers() -> TestResult {
             MediaKind::Archive,
             MediaKind::Shader,
             MediaKind::Material,
-            MediaKind::Audio
+            MediaKind::Audio,
+            MediaKind::AudioControl,
         ],
         "omission preserves registration order and includes the new available provider"
     );
@@ -178,6 +179,14 @@ fn omission_selects_all_registered_providers() -> TestResult {
         fs::read(material)?,
         b"",
         "default material provider emits no invented row for a shader-only fixture"
+    );
+    let audio_control = output
+        .join(&index.artifact_base)
+        .join("audio-control.jsonl");
+    assert_eq!(
+        fs::read(audio_control)?,
+        b"",
+        "default audio control provider emits no invented row for a shader-only fixture"
     );
     let audio = output.join(&index.artifact_base).join("audio.jsonl");
     verify_empty_audio_inventories(&audio)

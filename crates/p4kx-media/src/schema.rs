@@ -46,7 +46,8 @@ pub fn builtin_record_schema() -> Result<Value, MediaError> {
     let archive = crate::archive_metadata_schema::bind_record_schema(shader)?;
     let layout = crate::archive_layout_schema::bind_record_schema(archive)?;
     let material = crate::material_schema::bind_record_schema(layout)?;
-    crate::audio_schema::bind_record_schema(material)
+    let audio = crate::audio_schema::bind_record_schema(material)?;
+    crate::audio_control_schema::bind_record_schema(audio)
 }
 
 /// Returns the JSON Schema of the common typed reference envelope.

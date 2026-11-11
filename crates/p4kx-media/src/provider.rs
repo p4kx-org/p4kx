@@ -4,6 +4,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::audio_control_provider::AudioControlProvider;
 use crate::audio_provider::AudioProvider;
 use crate::{
     ArchiveProvider, MaterialProvider, MediaError, MediaKind, MediaWriter, RootSource,
@@ -169,6 +170,7 @@ impl Default for ProviderRegistry {
                 Box::new(ShaderProvider::default()),
                 Box::new(MaterialProvider::default()),
                 Box::new(AudioProvider),
+                Box::new(AudioControlProvider),
             ],
         }
     }

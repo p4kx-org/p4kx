@@ -72,6 +72,8 @@ pub enum OriginProfile {
     AudioWem,
     /// Original soundbank section, media and object observations.
     AudioBank,
+    /// Original ATL XML and CryXml source observations.
+    AudioControl,
     /// Successfully parsed material library and its actually used companions.
     MaterialLibrary,
     /// Material parser failure after actual source-content inspection.
