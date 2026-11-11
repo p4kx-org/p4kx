@@ -8,7 +8,9 @@ use std::path::PathBuf;
 use p4kx_assembly::{ChangeError, EntityLookupError, LoadoutError};
 use p4kx_extraction::model::MaterialError;
 use p4kx_extraction::query::SelectionError;
-use p4kx_extraction::{ArchiveError, ConversionError, DataForgeError, EntryReadError, FilterError};
+use p4kx_extraction::{
+    ArchiveError, ConversionError, DataForgeError, EntryReadError, FilterError, SourceEvidenceError,
+};
 use p4kx_settings::{KeyChoiceError, SettingsError};
 use thiserror::Error;
 
@@ -87,6 +89,9 @@ pub(crate) enum ToolError {
     /// ask for less.
     #[error("{0}")]
     Refused(String),
+    /// The image preview's original input evidence could not be retained.
+    #[error("cannot retain the image preview source evidence")]
+    ImageEvidence(#[from] SourceEvidenceError),
     /// A material library cannot be read.
     #[error("cannot read the material library {path}")]
     Material {

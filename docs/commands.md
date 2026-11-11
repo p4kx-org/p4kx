@@ -814,6 +814,15 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | `entity_loadout` | The default Loadout of an Entity (`entity`: class name, record path or GUID) as a list of ports, parents first: path, depth, source, what the port takes, the Entity attached and for each unresolved port the reason; each Entity states its `issues` and, only when it has any, its `notes` (all admitted undecidable spawn requirements, such as an `assortment_requirement`, as in the CLI JSON); `max_depth` (16 by default, at most 32) and a cursor bound it; retained identities, paths, values and reasons are complete within the 256 KiB response budget, with explicit refusal for an item that cannot fit first |
 
 `list_entries`, `search_entries` (with `container`), `read_entry_text`, `read_entry_bytes`,
+For `image_preview`, `fieldOrigins` uses JSON Pointers into the complete MCP tool result. For example,
+`/structuredContent/texture_width` addresses the decoded header width and `/content/1/data` addresses
+the unchanged PNG image block. Each origin gives the encryption marker, actual use references and
+contributor completeness. The `provenance` inventory identifies the original Entries and their
+containing Entries. DDS header uses carry `ddsHeader` coordinates `[offset, length]`. DDS mip uses
+carry `ddsMipPayload` coordinates `[level, offset, length, stride, count]` for the exact decoded Entry
+byte spans. A single selected cubemap face contributes only its own color and alpha mip bytes.
+Offsets are relative to the uncompressed Entry. Stored path lookups use Archive directory metadata.
+
 `image_preview` and `mtl_summary` open socpak containers with `::`: `outer.socpak::inner.socpak::path`
 reads an Entry of a container inside a container, and `outer.socpak::` lists a container's top level
 ([ADR-0129](adr/0129-container-paths-in-mcp-tools-join-containers-with-a-double-colon.md)).

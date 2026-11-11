@@ -15,7 +15,8 @@ use crate::server::Server;
 impl Server {
     #[tool(
         description = "Show a DDS texture of the Archive as a PNG image content block, with its size, format and mip count \
-        as structured content. The path is the texture header Entry; its parts and alpha tail are merged. Without mip the \
+        as structured content, with per-field origin evidence for the metadata and the PNG. The path is the texture header \
+        Entry; its parts and alpha tail are merged. Without mip the \
         largest level that fits max_side (512 by default, at most 2048) is shown; a cubemap is shown as a cross of its six \
         faces, or one face with face; an array or volume as a sheet. The PNG is at most 1 MiB; a larger mip is an error. \
         The image may be forwarded by the client to third parties; game texts and media must not be redistributed.",

@@ -28,7 +28,14 @@ impl Texture<'_> {
     /// Returns the errors of [`Texture::decode_surfaces`], and a [`ConversionError`] wrapping a
     /// texture error when the cross or the sheet cannot be laid out.
     pub fn decode_preview(&self, level: u32) -> Result<RgbaImage, ConversionError> {
-        match <[RgbaImage; 1]>::try_from(self.decode_images(level, true)?) {
+        self.layout_preview(self.decode_surfaces(level)?)
+    }
+
+    pub(crate) fn layout_preview(
+        &self,
+        images: Vec<RgbaImage>,
+    ) -> Result<RgbaImage, ConversionError> {
+        match <[RgbaImage; 1]>::try_from(self.layout_cube_crosses(images, true)?) {
             Ok([only]) => Ok(only),
             Err(units) => {
                 let count = units.len() as u64;

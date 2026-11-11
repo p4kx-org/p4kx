@@ -336,8 +336,8 @@ pub use p4kx_localization::{
 pub use p4kx_model as model;
 pub use p4kx_texture::MAX_HEADER_LEN as MAX_DDS_HEADER_LEN;
 pub use p4kx_texture::{
-    BlockLayout, DdsDx10Fields, DdsHeader, DdsLegacyFields, DdsPixelFormatFields, DdsRawHeader,
-    DxgiFormat, HdrImage, MergeReport, Mip, RgbaImage, TextureError, TextureFormat,
+    BlockLayout, DdsDx10Fields, DdsHeader, DdsHeaderField, DdsLegacyFields, DdsPixelFormatFields,
+    DdsRawHeader, DxgiFormat, HdrImage, MergeReport, Mip, RgbaImage, TextureError, TextureFormat,
 };
 pub use part_escape::escape_part;
 pub use path_index::{PathIndex, PathKeys};
@@ -385,8 +385,9 @@ pub use texture_member_keys::{
     TextureMemberCandidate, TextureMemberIndex, TextureMemberKeys, TextureMemberRelation,
 };
 pub use texture_png::{CUBE_FACE_NAMES, CubemapLayout, PngReport};
-pub use texture_preview_png::PreviewPng;
-pub use textures::Texture;
+pub use textures::{
+    ObservedPreviewPng, PreviewPng, PreviewPngEvidence, PreviewTextureEvidence, Texture,
+};
 pub use ui_extract::{UiAssetFailure, UiAssetKind, UiExtraction, WrittenUiAsset};
 pub use ui_images::{ArchiveImages, MAX_SCREEN_TEXTURE_PIXELS};
 pub use ui_imports::{

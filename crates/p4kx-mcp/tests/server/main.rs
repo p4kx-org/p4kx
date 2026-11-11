@@ -50,6 +50,7 @@ mod exact_material_late_item;
 mod exact_material_strings;
 mod forge;
 mod image_preview;
+mod image_preview_origins;
 mod legal_notice;
 mod model_animations;
 mod models;

@@ -126,7 +126,14 @@ impl Texture<'_> {
         level: u32,
         cross: bool,
     ) -> Result<Vec<RgbaImage>, ConversionError> {
-        let images = self.decode_surfaces(level)?;
+        self.layout_cube_crosses(self.decode_surfaces(level)?, cross)
+    }
+
+    pub(crate) fn layout_cube_crosses(
+        &self,
+        images: Vec<RgbaImage>,
+        cross: bool,
+    ) -> Result<Vec<RgbaImage>, ConversionError> {
         if !(cross && self.header().faces() as usize == CUBE_FACES) {
             return Ok(images);
         }

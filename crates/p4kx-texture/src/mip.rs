@@ -7,7 +7,10 @@ use rayon::prelude::*;
 
 use crate::header::MAX_HEADER_LEN;
 use crate::merge::{check_trailer, checked_part_len, read_prefix, read_up_to};
-use crate::{DdsHeader, HdrImage, RgbaImage, SiblingReader, TextureError, decode, decode_hdr};
+use crate::mip_source::{LocatedMip, MipPayloadLocation};
+use crate::{
+    DdsHeader, DdsRawHeader, HdrImage, RgbaImage, SiblingReader, TextureError, decode, decode_hdr,
+};
 
 /// The data of one mip of a texture: one image, or one per cubemap face or array element.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -170,11 +173,29 @@ const fn side(full: u32, level: u32) -> u32 {
 /// the trailer is not `CExtCEnd`, and a part or header error when the mip's data is missing,
 /// truncated, oversized or unreadable.
 pub fn read_mip<R, S>(
-    mut header: R,
+    header: R,
     header_size: u64,
     siblings: &S,
     level: u32,
 ) -> Result<Mip, TextureError>
+where
+    R: Read,
+    S: SiblingReader + ?Sized,
+{
+    read_mip_with_location(header, header_size, siblings, level).map(|read| read.mip)
+}
+
+/// Reads one mip and returns the original source spans of its retained bytes.
+///
+/// # Errors
+///
+/// Returns the errors of a mip read.
+pub fn read_mip_with_location<R, S>(
+    mut header: R,
+    header_size: u64,
+    siblings: &S,
+    level: u32,
+) -> Result<LocatedMip, TextureError>
 where
     R: Read,
     S: SiblingReader + ?Sized,
@@ -184,7 +205,8 @@ where
         usize::try_from(header_size).map_or(MAX_HEADER_LEN, |size| size.min(MAX_HEADER_LEN));
     let prefix_len = read_prefix(&mut header, prefix.get_mut(..limit).unwrap_or_default())?;
     let start = prefix.get(..prefix_len).unwrap_or_default();
-    let dds = DdsHeader::parse(start)?;
+    let raw_header = DdsRawHeader::parse(start)?;
+    let dds = DdsHeader::from_raw(&raw_header)?;
     if level >= dds.mip_count() {
         return Err(TextureError::NoSuchMip {
             level,
@@ -195,11 +217,14 @@ where
     let header_size = dds.data_len(entry_size);
     let trailer_len = entry_size.saturating_sub(header_size);
     let parts = dds.part_count(header_size)?;
-    let data = if level < parts {
+    let (data, location) = if level < parts {
         let size = dds
             .mip_size(level)
             .ok_or_else(|| TextureError::UnsupportedFormat(dds.format()))?;
-        read_from_part(&dds, parts, level, size, siblings)?
+        let index = parts - level;
+        let data = read_from_part(&dds, parts, index, size, siblings)?;
+        let location = MipPayloadLocation::part(index, data.len() as u64, &dds, level);
+        (data, location)
     } else {
         let tail = start.get(dds.header_len()..).unwrap_or_default();
         read_from_tail(
@@ -210,24 +235,27 @@ where
             (header_size, trailer_len),
         )?
     };
-    Ok(Mip {
-        header: dds,
-        level,
-        data,
+    Ok(LocatedMip {
+        mip: Mip {
+            header: dds,
+            level,
+            data,
+        },
+        raw_header,
+        payload: location,
     })
 }
 
 fn read_from_part<S>(
     dds: &DdsHeader,
     parts: u32,
-    level: u32,
+    index: u32,
     size: u64,
     siblings: &S,
 ) -> Result<Vec<u8>, TextureError>
 where
     S: SiblingReader + ?Sized,
 {
-    let index = parts - level;
     checked_part_len(dds, parts, index, siblings)?;
     let reader = siblings
         .open_part(index)
@@ -254,7 +282,7 @@ fn read_from_tail(
     level: u32,
     mut tail: impl Read,
     data_trailer: (u64, u64),
-) -> Result<Vec<u8>, TextureError> {
+) -> Result<(Vec<u8>, MipPayloadLocation), TextureError> {
     let (header_size, trailer_len) = data_trailer;
     let unsupported = || TextureError::UnsupportedFormat(dds.format());
     let size = dds.surface_size(level).ok_or_else(unsupported)?;
@@ -295,5 +323,9 @@ fn read_from_tail(
         }
         check_trailer(tail, trailer_len, header_size)?;
     }
-    Ok(data)
+    let offset = (dds.header_len() as u64)
+        .checked_add(before)
+        .ok_or_else(unsupported)?;
+    let location = MipPayloadLocation::tail(dds, level, offset, size, between)?;
+    Ok((data, location))
 }

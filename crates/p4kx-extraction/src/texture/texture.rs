@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 
 use p4kx_archive::Archive;
 use p4kx_texture::{
-    DdsHeader, DdsRawHeader, MergeReport, Mip, RgbaImage, TextureError, merge, merge_alpha,
-    read_mip,
+    DdsHeader, DdsRawHeader, LocatedMip, MergeReport, Mip, MipPayloadLocation, RgbaImage,
+    TextureError, merge, merge_alpha, read_mip_with_location,
 };
 
 use crate::disk_parts::DiskParts;
@@ -15,6 +15,7 @@ use crate::output_file::{read_error, write_replacing_protected};
 use crate::path_index::PathIndex;
 use crate::source_protection::SourceProtection;
 use crate::texture_parts::{Found, Parts};
+use crate::texture_preview_png::input::{PreviewInputs, TexturePreviewInput};
 use crate::{ConversionError, DdsSourceInfo, ExtractionError, UnknownEntries, texture_header};
 
 /// A DDS texture whose header is an Entry of an Archive or a file on disk, with its sibling parts
@@ -209,8 +210,12 @@ impl<'a> Texture<'a> {
     /// Returns a [`ConversionError`] naming the part when the mip's part is missing, truncated,
     /// oversized or unreadable, and another one when the level does not exist.
     pub fn read_mip(&self, level: u32) -> Result<Mip, ConversionError> {
+        self.read_mip_with_source(level).map(|read| read.mip)
+    }
+
+    fn read_mip_with_source(&self, level: u32) -> Result<LocatedMip, ConversionError> {
         let header = self.open_header()?;
-        read_mip(header, self.header_size, &self.parts, level)
+        read_mip_with_location(header, self.header_size, &self.parts, level)
             .map_err(|error| ConversionError::of_texture(&self.name, error))
     }
 
@@ -253,9 +258,20 @@ impl<'a> Texture<'a> {
     /// and the errors of [`Texture::read_mip`]. A tail that cannot be used is an error, never
     /// silently dropped.
     pub fn decode_surfaces(&self, level: u32) -> Result<Vec<RgbaImage>, ConversionError> {
+        self.decode_surfaces_with_inputs(level)
+            .map(|(images, _)| images)
+    }
+
+    pub(crate) fn decode_surfaces_with_inputs(
+        &self,
+        level: u32,
+    ) -> Result<(Vec<RgbaImage>, PreviewInputs<'a, MipPayloadLocation>), ConversionError> {
         let alpha = self.checked_alpha_tail(level)?;
-        let images = self.decode_mip_data(&self.read_mip(level)?)?;
-        Self::with_alpha_tail(alpha, level, images)
+        let read = self.read_mip_with_source(level)?;
+        let mut images = self.decode_mip_data(&read.mip)?;
+        let color = TexturePreviewInput::of_read(&self.parts, read.raw_header, read.payload);
+        let alpha = Self::merge_alpha_input(alpha, level, &mut images)?;
+        Ok((images, PreviewInputs { color, alpha }))
     }
 
     /// Returns the size of the header in bytes.
@@ -301,23 +317,42 @@ impl<'a> Texture<'a> {
         level: u32,
         mut images: Vec<RgbaImage>,
     ) -> Result<Vec<RgbaImage>, ConversionError> {
+        Self::merge_alpha_input(alpha, level, &mut images)?;
+        Ok(images)
+    }
+
+    fn merge_alpha_input(
+        alpha: Option<Self>,
+        level: u32,
+        images: &mut [RgbaImage],
+    ) -> Result<Option<TexturePreviewInput<'a, MipPayloadLocation>>, ConversionError> {
         let Some(alpha) = alpha else {
-            return Ok(images);
+            return Ok(None);
         };
-        let tails = alpha.decode_surfaces(level)?;
+        let (tails, inputs) = alpha.decode_surfaces_with_inputs(level)?;
+        alpha.merge_decoded_alpha(level, images, &tails)?;
+        Ok(Some(inputs.color))
+    }
+
+    fn merge_decoded_alpha(
+        &self,
+        level: u32,
+        images: &mut [RgbaImage],
+        tails: &[RgbaImage],
+    ) -> Result<(), ConversionError> {
         if tails.len() != images.len() {
             return Err(ConversionError::of_texture(
-                &alpha.name,
+                &self.name,
                 TextureError::UnsupportedImage {
-                    images: alpha.header.images(level),
+                    images: self.header.images(level),
                 },
             ));
         }
-        for (image, tail) in images.iter_mut().zip(&tails) {
-            merge_alpha(image, tail, alpha.header.format())
-                .map_err(|error| ConversionError::of_texture(&alpha.name, error))?;
+        for (image, tail) in images.iter_mut().zip(tails) {
+            merge_alpha(image, tail, self.header.format())
+                .map_err(|error| ConversionError::of_texture(&self.name, error))?;
         }
-        Ok(images)
+        Ok(())
     }
 
     fn check_decodable(&self) -> Result<(), ConversionError> {

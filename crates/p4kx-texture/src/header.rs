@@ -29,6 +29,18 @@ pub struct DdsHeader {
     header_len: usize,
 }
 
+pub(crate) const fn legacy_is_volume(flags: u32, caps2: u32) -> bool {
+    !legacy_volume_uses_depth_flag(caps2) || flags & FLAG_DEPTH != 0
+}
+
+pub(crate) const fn legacy_volume_uses_depth_flag(caps2: u32) -> bool {
+    caps2 & CAPS2_VOLUME == 0
+}
+
+pub(crate) const fn dx10_is_volume(dimension: u32) -> bool {
+    dimension == DIMENSION_TEXTURE3D
+}
+
 struct Fields {
     flags: u32,
     height: u32,
@@ -97,7 +109,7 @@ impl DdsHeader {
     }
 
     fn from_legacy(fields: &Fields, header_len: usize) -> Self {
-        let is_volume = fields.caps2 & CAPS2_VOLUME != 0 || fields.flags & FLAG_DEPTH != 0;
+        let is_volume = legacy_is_volume(fields.flags, fields.caps2);
         let faces = if fields.caps2 & CAPS2_CUBEMAP == 0 {
             1
         } else {
@@ -121,7 +133,7 @@ impl DdsHeader {
             format: TextureFormat::Dxgi(DxgiFormat(format)),
             width: fields.width,
             height: fields.height,
-            depth: if dimension == DIMENSION_TEXTURE3D {
+            depth: if dx10_is_volume(dimension) {
                 fields.depth.max(1)
             } else {
                 1

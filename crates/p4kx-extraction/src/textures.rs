@@ -7,3 +7,7 @@ mod disk;
 mod texture;
 
 pub use texture::Texture;
+
+pub use crate::texture_preview_png::{
+    ObservedPreviewPng, PreviewPng, PreviewPngEvidence, PreviewTextureEvidence,
+};
