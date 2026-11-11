@@ -129,6 +129,7 @@ impl<'a> Generation<'a> {
                 .as_ref()
                 .filter(|previous| previous.generation == index.generation)
         {
+            checkpoint.finish()?;
             index.artifact_base.clone_from(&previous.artifact_base);
             return Ok(false);
         }

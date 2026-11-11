@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
+use std::io::Write;
 
 use p4kx_extraction::{Archive, ArchiveWatch, ArchiveWriteProtection, ConflictPolicy};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
@@ -180,6 +181,101 @@ fn cancellation_at_index_replacement_cleans_the_temporary_index_and_keeps_the_co
     assert_eq!(leftovers.len(), expected.len());
     assert!(expected.iter().all(|name| output.join(name).exists()));
     Ok(())
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ReuseStop {
+    Cancelled,
+    SourceChanged,
+}
+
+#[test]
+fn unchanged_generation_checks_cancel_and_source_at_its_return_boundary() -> TestResult {
+    for stop in [ReuseStop::Cancelled, ReuseStop::SourceChanged] {
+        unchanged_generation_stop(stop)?;
+    }
+    Ok(())
+}
+
+fn unchanged_generation_stop(stop: ReuseStop) -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let archive = named_archive(folder.path(), "unchanged")?;
+    let output = folder.path().join("media");
+    let options = ExportOptions::default();
+    crate::export(&archive, &output, &options)?;
+    let previous_index = fs::read(output.join("media-index.json"))?;
+
+    let watch = ArchiveWatch::new(&archive);
+    let protection = ArchiveWriteProtection::new(archive.path(), options.cancel.flag())?;
+    let checkpoint = Checkpoint {
+        cancel: &options.cancel,
+        watch: &watch,
+        protection: &protection,
+    };
+    let registry = ProviderRegistry::default();
+    let providers = registry.selected(&[])?;
+    let mut generation = Generation::new(&output, Limits::default(), &checkpoint)?;
+    let mut index = export_run::build(
+        &archive,
+        generation.stage.permit(),
+        &options,
+        &providers,
+        checkpoint,
+    )?;
+    assert_eq!(
+        generation
+            .previous
+            .as_ref()
+            .map(|previous| &previous.generation),
+        Some(&index.generation),
+        "unchanged data takes the same-generation branch"
+    );
+
+    let result = generation.publish_observed(
+        &mut index,
+        ConflictPolicy::IfChanged,
+        &checkpoint,
+        |boundary| {
+            if boundary == Boundary::ArtifactsComplete {
+                stop.inject(&archive, &options)?;
+            }
+            Ok(())
+        },
+    );
+    let result = generation.finish(result);
+    assert!(
+        matches!(
+            (stop, result),
+            (ReuseStop::Cancelled, Err(MediaError::Cancelled))
+                | (ReuseStop::SourceChanged, Err(MediaError::Changed(_)))
+        ),
+        "{stop:?} must not return a successful reuse"
+    );
+    assert_eq!(
+        fs::read(output.join("media-index.json"))?,
+        previous_index,
+        "{stop:?} leaves the verified previous index in place"
+    );
+    Ok(())
+}
+
+impl ReuseStop {
+    fn inject(self, archive: &Archive, options: &ExportOptions) -> Result<(), MediaError> {
+        match self {
+            Self::Cancelled => {
+                options.cancel.cancel();
+                Ok(())
+            }
+            Self::SourceChanged => {
+                let path = archive.path();
+                OpenOptions::new()
+                    .append(true)
+                    .open(path)
+                    .and_then(|mut file| file.write_all(b"changed"))
+                    .map_err(|source| error::io(path, source))
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -208,7 +208,8 @@ bound, preserving the generation fingerprint of supported older indexes without 
 publishes another complete generation. `if-changed` compares deterministic content generation
 SHA-256, including source identity, provider contracts, bounds, counts and artifact hashes, rather
 than CRC or file size alone. Existing or newly staged artifacts are verified under the caller's
-budgets. An unrelated or invalid index is refused instead of overwritten as an export.
+budgets. Returning an unchanged generation still requires the final cancellation and Archive
+change checks. An unrelated or invalid index is refused instead of overwritten as an export.
 
 Normal export refuses an inventory already known to be recovered or truncated before hashing the
 entire Archive or retaining payloads. `--diagnostic` explicitly permits retaining an incomplete
