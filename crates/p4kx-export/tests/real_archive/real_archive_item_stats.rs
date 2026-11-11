@@ -14,12 +14,8 @@ use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-const BLOCKS: [(&str, &[&str]); 6] = [
+const BLOCKS: [(&str, &[&str]); 5] = [
     ("weapon", &["fireActions", "ammoCapacity", "ammo"]),
-    (
-        "quantumDrive",
-        &["fuelRequirement", "jumpRange", "driveSpeed", "spoolUpTime"],
-    ),
     ("powerPlant", &["powerOutput", "unit"]),
     ("cooler", &["coolingRate", "unit"]),
     (
@@ -174,10 +170,19 @@ fn known_items_carry_their_known_values() -> TestResult {
     assert_eq!(plant["powerPlant"]["powerOutput"], 24.0);
     let laser = stats_of(items, "VNCL_LaserCannon_S1")?;
     assert_eq!(laser["weapon"]["fireActions"][0]["fireRate"], 350.0);
-    let drive = stats_of(items, "QDRV_WETK_S04_Idris_TEMP")?;
+    let item = item_of(items, "QDRV_WETK_S04_Idris_TEMP")?;
+    let guid = item.get("guid").ok_or("known quantum drive item GUID")?;
+    let drive = catalog
+        .pointer("/configurations/quantumDrives/rows")
+        .and_then(Value::as_array)
+        .ok_or("canonical quantum drives")?
+        .iter()
+        .find(|row| row.pointer("/ownerGuid/value") == Some(guid))
+        .ok_or("known quantum drive configuration")?;
     assert!(
-        drive["quantumDrive"]["jumpRange"]
-            .as_f64()
+        drive
+            .pointer("/jumpRange/value/finite")
+            .and_then(Value::as_f64)
             .is_some_and(|range| range > 3.4e38),
         "the stored f32::MAX"
     );

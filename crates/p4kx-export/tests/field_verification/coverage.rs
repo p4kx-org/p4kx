@@ -19,6 +19,9 @@ use super::source::{self, Observations};
 use super::source_scope;
 
 pub(super) const SHIELD_GENERATORS: &str = "shieldGenerators";
+pub(super) const QUANTUM_DRIVES: &str = "quantumDrives";
+pub(super) const QUANTUM_PROFILES: &str = "quantumDriveProfiles";
+pub(super) const QUANTUM_PROFILE_TYPE: &str = "QuantumDriveParams";
 
 fn observations(
     forge: &DataForge<'_>,
@@ -83,30 +86,43 @@ pub(super) fn projections<'a>(
             )?,
         );
     }
-    if inventory.fields.iter().any(|mapping| {
-        matches!(&mapping.disposition, Disposition::Exported { group, .. }
-            if group == SHIELD_GENERATORS)
-    }) {
-        projections.insert(
-            SHIELD_GENERATORS.to_owned(),
-            shield_projections(catalog, cancelled)?,
-        );
+    let requested = |group_name| {
+        inventory.fields.iter().any(|mapping| {
+        matches!(&mapping.disposition, Disposition::Exported { group, .. } if group == group_name)
+    })
+    };
+    if requested(SHIELD_GENERATORS) {
+        let rows = component_projections(catalog, SHIELD_GENERATORS, cancelled)?;
+        projections.insert(SHIELD_GENERATORS.to_owned(), rows);
+    }
+    if requested(QUANTUM_DRIVES) || requested(QUANTUM_PROFILES) {
+        let rows = component_projections(catalog, QUANTUM_DRIVES, cancelled)?;
+        if requested(QUANTUM_PROFILES) {
+            projections.insert(
+                QUANTUM_PROFILES.to_owned(),
+                quantum_profiles(&rows, cancelled)?,
+            );
+        }
+        projections.insert(QUANTUM_DRIVES.to_owned(), rows);
     }
     Ok(projections)
 }
 
-fn shield_projections<'a>(
+fn component_projections<'a>(
     catalog: &'a Value,
+    group: &str,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<Index<'a>> {
     let rows = catalog
-        .pointer("/configurations/shieldGenerators/rows")
+        .pointer(&format!("/configurations/{group}/rows"))
         .and_then(Value::as_array)
-        .ok_or_else(|| Error::new(Kind::Input, "missing canonical shield configuration rows"))?;
+        .ok_or_else(|| Error::new(Kind::Input, format!("missing canonical {group} rows")))?;
     for row in rows {
         error::check(cancelled)?;
         if row.pointer("/ownerGuid/state").and_then(Value::as_str) != Some("present") {
-            return Err(Error::new(Kind::Identity, "shield owner GUID is not present").into());
+            return Err(
+                Error::new(Kind::Identity, format!("{group} owner GUID is not present")).into(),
+            );
         }
     }
     joins::index(
@@ -115,6 +131,27 @@ fn shield_projections<'a>(
         Multiplicity::Many,
         cancelled,
     )
+}
+
+fn quantum_profiles<'a>(
+    drives: &Index<'a>,
+    cancelled: &impl Fn() -> bool,
+) -> super::Result<Index<'a>> {
+    let mut profiles = Index::new();
+    for (&owner, rows) in drives {
+        for row in rows {
+            error::check(cancelled)?;
+            for pointer in ["/standard/value", "/spline/value"] {
+                if let Some(profile) = row.pointer(pointer)
+                    && profile.pointer("/sourceType/value").and_then(Value::as_str)
+                        == Some(QUANTUM_PROFILE_TYPE)
+                {
+                    profiles.entry(owner).or_default().push(profile);
+                }
+            }
+        }
+    }
+    Ok(profiles)
 }
 
 pub(crate) fn run(

@@ -4,7 +4,9 @@
 use p4kx_extraction::{Reference, Value as Original};
 use serde_json::Value;
 
-use super::{TestResult, numbers};
+use crate::original_item_numbers as numbers;
+
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 use crate::real_archive_item_components::cell;
 use crate::real_archive_item_durability as proof;
 

@@ -209,6 +209,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `configurations.weaponActions` | Physical weapon component owners, ordered authored action slots, stored launcher selectors and independent heat fields. [Authored weapon actions and launchers](catalog-ammo-definitions.md#authored-weapon-actions-and-launchers) |
 | `definitions.blueprints` | Physical Blueprint Records and their complete original value arenas in GUID order |
 | `configurations.durability`, `configurations.degradation`, `configurations.distortion` | Original item component occurrences, raw values and provenance. [Item durability](catalog-durability.md) |
+| `configurations.quantumDrives` | Original quantum drive components with independent standard, spline, thermal and boost values. [Quantum drives](catalog-quantum-drives.md) |
 | `configurations.shieldGenerators` | Original shield generator component occurrences, typed values and provenance. [Shield generators](catalog-shield-generators.md) |
 | `configurations.explosives` | Original sensor mine triggers and explosive ordnance settings by physical Item and component position. [Explosive components](catalog-explosives.md) |
 | `configurations.hackingChips` | Original chip charge counts and ordered removable modifier declarations by physical Item and component slot. [Hacking chips](catalog-hacking-chips.md) |
@@ -438,8 +439,9 @@ those parts too. No value is below 1 or above 7.
 `stats` holds raw facts of the Archive and no derived value (ADR-0065): every number is the stored
 field in the stored unit, `p4kx` computes no damage per second, no cycle time, no acceleration and
 no fuel rate. The Basetool owns those formulas. `stats` is present for items with any block below
-and for shield generators with health or resource states. Absent blocks and unstated fields
-are `null`. Shield generator fields are in [`configurations.shieldGenerators`](catalog-shield-generators.md).
+and for shield generators and quantum drives with health or resource states. Absent blocks and
+unstated fields are `null`. The physical device rows live in [`configurations.shieldGenerators`](catalog-shield-generators.md)
+and [`configurations.quantumDrives`](catalog-quantum-drives.md).
 The `kind` of a fire mode and
 `trackingSignalType` are closed sets that the schema keeps as strings. The blocks `armor`,
 `clothing`, `radar`, `tractorBeam` and `weaponModifier` and the fire-mode field `damagePerSecond`
@@ -455,7 +457,6 @@ proof that an unexamined source field is absent.
 | Block | Present when | Fields and sources |
 |-------|--------------|--------------------|
 | `weapon` | the item has `Components[SCItemWeaponComponentParams]` (ship weapons and FPS weapons) | `fireActions`: per element of `fireActions`, in stored order, with a sequence (`sequenceEntries`) flattened to its entries: `kind` (the struct, e.g. `SWeaponActionFireRapidParams`), `name`, `fireRate` (rounds per minute), `pelletCount` (as `pellets`; `pellets` where a Record states that instead) and `ammoCost` of `launchParams`, `heatPerShot`, `chargeTime`, `overchargeTime`, `cooldownTime` (each of the fire mode, when stated), and `damagePerSecond` (the damage types of the beam's `damagePerSecond`, the power of a mining laser; `null` for a mode without one), and `spread` (see below); a beam also has `hitType`, `fullDamageRange` and `zeroDamageRange` (the two ranges in metres); a parallel mode (`weaponActions`) is listed as its entries; a charged or wrapped mode reads `fireRate`, `launchParams` and `name` from its `weaponAction` when it has none of its own. `ammoCapacity`: `maxAmmoCount` of the ammo container, the magazine's capacity (see below). `ammo`: the `AmmoParams` Record that the container's `ammoParamsRecord` links to, `null` without a readable one: `speed`, `lifetime`, `damage` (the damage types of `projectileParams.damage`), `detonationDamage`, `detonationMinRadius` and `detonationMaxRadius` (from `explosionParams`) |
-| `quantumDrive` | `Components[SCItemQuantumDriveParams]` | `fuelRequirement` (`quantumFuelRequirement`, as stored), `jumpRange`, `disconnectRange`, and of `params`: `driveSpeed`, `cooldownTime`, `spoolUpTime`, `stageOneAccelRate`, `stageTwoAccelRate`, `engageSpeed` |
 | `powerPlant` | `AttachDef.Type` is `PowerPlant`, ignoring case | `powerOutput`: the `amount` of the first `generation` flow of `resourceStates` whose resource is `Power`, and `unit`: the `unit` of that flow |
 | `cooler` | `AttachDef.Type` is `Cooler`, ignoring case | `coolingRate` and `unit`: as for the power plant, for the resource `Coolant` (a cooler's flow is an `ItemResourceDeltaConversion`) |
 | `missile` | `Components[SCItemMissileParams]` | `damage` (the damage types of `explosionParams.damage`), `explosionMinRadius`, `explosionMaxRadius`, `trackingSignalType`, `lockTime`, `lockingAngle`, `lockRangeMin`, `lockRangeMax` (of `targetingParams`) and `linearSpeed` (of `GCSParams`) |
@@ -498,8 +499,8 @@ modifier scales the base value of the field; an additive one adds to it.
 | `GPP_Shield_MaxHealth` | `configurations.shieldGenerators.rows[].maxHealth` | shields |
 | `GPP_Radar_MinAimAssistDistance` | `radar.aimAssistDistanceMin` | radars |
 | `GPP_Radar_MaxAimAssistDistance` | `radar.aimAssistDistanceMax` | radars |
-| `GPP_Quantum_Speed` | `quantumDrive.driveSpeed` | quantum drives |
-| `GPP_Quantum_FuelRequirement` | `quantumDrive.fuelRequirement` | quantum drives |
+| `GPP_Quantum_Speed` | `configurations.quantumDrives.rows[].standard.value.driveSpeed` | quantum drives |
+| `GPP_Quantum_FuelRequirement` | `configurations.quantumDrives.rows[].fuelRequirement` | quantum drives |
 | `GPP_Weapon_Tractor_Force` | `tractorBeam.maxForce` | tractor beams, salvage heads |
 | `GPP_Weapon_Tractor_MaxDist` | `tractorBeam.maxDistance` | tractor beams, salvage heads |
 | `GPP_Weapon_Tractor_FullStrengthDist` | `tractorBeam.fullStrengthDistance` | tractor beams, salvage heads |
@@ -547,10 +548,10 @@ Units differ between structs and are not converted. A delta without a `generatio
 
 Raw values that need care:
 
-- `quantumDrive.jumpRange` is `f32::MAX` (3.4028235e38) on a drive the Archive leaves unbounded (a
-  development drive of the Idris). It is exported as stored; a reader treats a value at that
-  magnitude as unlimited.
-- A number that is not finite (NaN, infinity) is `null`, never written.
+- A quantum drive range of `f32::MAX` retains its exact source bits in
+  `configurations.quantumDrives.rows[].jumpRange`.
+- A nonfinite number in a remaining flat stat block is `null`. Canonical numeric cells preserve
+  its bits and provide a null finite projection.
 - `weapon.ammoCapacity` is the capacity of the ammo container, which is the magazine and not the
   weapon body: a ship weapon holds `Components[SAmmoContainerComponentParams]` itself; a weapon
   without one (the personal weapons, ballistic and energy alike) links its magazine entity by

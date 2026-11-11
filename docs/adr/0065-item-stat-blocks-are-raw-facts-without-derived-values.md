@@ -91,3 +91,16 @@ component. The independent durability rows retain exact Single bits and all sele
 occurrences. Explosion payloads use the shared authored explosion model. Linked Records retain
 their own identity and scope. Item resource self-repair, vehicle hull health and vehicle armour
 tuning remain distinct source families.
+
+## Catalog schema 3 quantum drive configuration
+
+Schema 3 follows ADR-0356 with one `configurations.quantumDrives` row per original
+`SCItemQuantumDriveParams` occurrence. Each row identifies its physical item and component slot.
+The standard and spline parameter Classes have separate source states and values. Their declared
+types, optional heat and boost Classes, state/effect subtrees and other authored members carry
+their own source evidence. The row preserves original numeric widths and representations.
+
+The previous compact flat values continue to feed variant identity in their original byte order.
+Their mode-specific meanings map to the standard block sourced from `params`. The public
+configuration is the source-typed row. Source paths and units are documented in
+[Quantum drive configurations](../catalog-quantum-drives.md).

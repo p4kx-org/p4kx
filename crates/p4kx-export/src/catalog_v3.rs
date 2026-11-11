@@ -53,6 +53,8 @@ pub(crate) mod catalog_explosives;
 pub(crate) mod catalog_hacking_chips;
 #[path = "catalog_item_components.rs"]
 pub(crate) mod catalog_item_components;
+#[path = "catalog_quantum_drive.rs"]
+pub(crate) mod catalog_quantum_drive;
 #[path = "catalog_shield_generator.rs"]
 pub(crate) mod catalog_shield_generator;
 #[path = "catalog_weapon_actions.rs"]
@@ -65,6 +67,14 @@ mod item_component_owner;
 mod ordnance_fields;
 #[path = "projectile_range.rs"]
 mod projectile_range;
+#[path = "quantum_boost.rs"]
+mod quantum_boost;
+#[path = "quantum_fields.rs"]
+mod quantum_fields;
+#[path = "quantum_heat.rs"]
+mod quantum_heat;
+#[path = "quantum_profile.rs"]
+mod quantum_profile;
 #[path = "sensor_mine.rs"]
 mod sensor_mine;
 

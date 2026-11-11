@@ -3428,6 +3428,9 @@
         "missionProperties": {
           "$ref": "#/$defs/CatalogTableOfMissionPropertyConfiguration"
         },
+        "quantumDrives": {
+          "$ref": "#/$defs/CatalogTableOfQuantumDrive"
+        },
         "shieldGenerators": {
           "$ref": "#/$defs/CatalogTableOfShieldGenerator"
         },
@@ -3450,6 +3453,7 @@
         "missionBrokerEntries",
         "missionFlows",
         "missionProperties",
+        "quantumDrives",
         "shieldGenerators",
         "weaponActions"
       ],
@@ -4297,6 +4301,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/QualityQuantizationResources"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfQuantumDrive": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/QuantumDrive"
           },
           "type": "array"
         }
@@ -12649,17 +12672,6 @@
           ],
           "description": "The power plant block, for an item of the type `PowerPlant`."
         },
-        "quantumDrive": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/QuantumDriveStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The quantum drive block, from `SCItemQuantumDriveParams`."
-        },
         "radar": {
           "anyOf": [
             {
@@ -12721,7 +12733,6 @@
         "miningModifier",
         "missile",
         "powerPlant",
-        "quantumDrive",
         "radar",
         "resourceStates",
         "tractorBeam",
@@ -19695,92 +19706,267 @@
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
-    "QuantumDriveStats": {
-      "description": "A quantum drive.",
+    "QuantumBoost": {
+      "description": "The authored boost configuration of one quantum drive.",
       "properties": {
-        "cooldownTime": {
-          "description": "`params.cooldownTime`, in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
-        "disconnectRange": {
-          "description": "`disconnectRange`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "boostRechargeTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "driveSpeed": {
-          "description": "`params.driveSpeed`, in metres per second.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "boostUseTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "engageSpeed": {
-          "description": "`params.engageSpeed`, in metres per second.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "ifcsHandoverDownTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "fuelRequirement": {
-          "description": "`quantumFuelRequirement`, as stored.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "ifcsHandoverRespoolTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "jumpRange": {
-          "description": "`jumpRange`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "maxBoostSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "spoolUpTime": {
-          "description": "`params.spoolUpTime`, in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "minJumpDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "stageOneAccelRate": {
-          "description": "`params.stageOneAccelRate`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "stageTwoAccelRate": {
-          "description": "`params.stageTwoAccelRate`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "stopTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "timeToMaxBoostSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         }
       },
       "required": [
-        "cooldownTime",
+        "additionalFields",
+        "boostRechargeTime",
+        "boostUseTime",
+        "ifcsHandoverDownTime",
+        "ifcsHandoverRespoolTime",
+        "maxBoostSpeed",
+        "minJumpDistance",
+        "sourceType",
+        "stopTime",
+        "timeToMaxBoostSpeed"
+      ],
+      "type": "object"
+    },
+    "QuantumDrive": {
+      "description": "The stored configuration of one physical quantum drive component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "boost": {
+          "$ref": "#/$defs/SourcedValueOfQuantumBoost"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "disconnectRange": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "fuelRequirement": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "heat": {
+          "$ref": "#/$defs/SourcedValueOfQuantumHeat"
+        },
+        "jumpRange": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "spline": {
+          "$ref": "#/$defs/SourcedValueOfQuantumProfile"
+        },
+        "standard": {
+          "$ref": "#/$defs/SourcedValueOfQuantumProfile"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "boost",
+        "componentOrdinal",
         "disconnectRange",
-        "driveSpeed",
-        "engageSpeed",
         "fuelRequirement",
+        "heat",
         "jumpRange",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType",
+        "spline",
+        "standard"
+      ],
+      "type": "object"
+    },
+    "QuantumHeat": {
+      "description": "The authored thermal energy inputs of one quantum drive.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "inFlightThermalEnergyDraw": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "postRampDownThermalEnergyDraw": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "preRampUpThermalEnergyDraw": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "rampDownThermalEnergyDraw": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "rampUpThermalEnergyDraw": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "inFlightThermalEnergyDraw",
+        "postRampDownThermalEnergyDraw",
+        "preRampUpThermalEnergyDraw",
+        "rampDownThermalEnergyDraw",
+        "rampUpThermalEnergyDraw",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "QuantumProfile": {
+      "description": "One authored quantum drive mode with its independent configuration.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "calibrationDelayInSeconds": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "calibrationProcessAngleLimit": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "calibrationRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "calibrationWarningAngleLimit": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "cooldownTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "driveSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "effectTags": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "engageSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "idleState": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "interdictionEffectTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "maxCalibrationRequirement": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "minCalibrationRequirement": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "shaderNodeEngageVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "shaderNodeMaxStrengthVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "shaderNodeShutdownVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "spoolUpTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "stageOneAccelRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "stageTwoAccelRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "travellingState": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "vfxEntryFlashVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "vfxExitEffectVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "vfxPinchEffectTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "vfxPinchMaxVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "vfxSpoolEndVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "vfxTrailStartVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "vfxTravelEffectEndVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "vfxTravelEffectStartVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "calibrationDelayInSeconds",
+        "calibrationProcessAngleLimit",
+        "calibrationRate",
+        "calibrationWarningAngleLimit",
+        "cooldownTime",
+        "driveSpeed",
+        "effectTags",
+        "engageSpeed",
+        "idleState",
+        "interdictionEffectTime",
+        "maxCalibrationRequirement",
+        "minCalibrationRequirement",
+        "shaderNodeEngageVelocity",
+        "shaderNodeMaxStrengthVelocity",
+        "shaderNodeShutdownVelocity",
+        "sourceType",
         "spoolUpTime",
         "stageOneAccelRate",
-        "stageTwoAccelRate"
+        "stageTwoAccelRate",
+        "travellingState",
+        "vfxEntryFlashVelocity",
+        "vfxExitEffectVelocity",
+        "vfxPinchEffectTime",
+        "vfxPinchMaxVelocity",
+        "vfxSpoolEndVelocity",
+        "vfxTrailStartVelocity",
+        "vfxTravelEffectEndVelocity",
+        "vfxTravelEffectStartVelocity"
       ],
       "type": "object"
     },
@@ -48720,6 +48906,396 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/QuantizationEligibility"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQuantumBoost": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QuantumBoost"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQuantumHeat": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QuantumHeat"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfQuantumProfile": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/QuantumProfile"
               }
             }
           }

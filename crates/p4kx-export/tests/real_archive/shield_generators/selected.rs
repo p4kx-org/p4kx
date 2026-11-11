@@ -6,7 +6,9 @@ use std::collections::BTreeSet;
 use p4kx_extraction::{DataForge, DataType, Field, StructValue, Value as Original};
 use serde_json::Value;
 
-use super::{Counts, TestResult, arena, numbers};
+use super::{Counts, TestResult};
+use crate::original_item_arena::{self as arena, source_type};
+use crate::original_item_numbers as numbers;
 use crate::real_archive_item_components::{cell, require_state};
 use crate::real_archive_item_durability::{self as proof, Trace};
 use crate::real_archive_verification::print_line;
@@ -156,7 +158,7 @@ pub(super) fn compare<'source>(
             consumed.insert(name);
         }
     }
-    arena::compare(trace, source, exported, consumed, counts)
+    count_additional(trace, source, exported, consumed, counts)
 }
 
 fn stun<'source>(
@@ -177,7 +179,7 @@ fn stun<'source>(
         &STUN,
         &mut counts.stun_fields.0,
     )?;
-    arena::compare(trace, source, exported, consumed, counts)
+    count_additional(trace, source, exported, consumed, counts)
 }
 
 #[derive(Clone, Copy)]
@@ -220,7 +222,7 @@ fn ranges<'source>(
             RangeGroup::Absorption => &mut counts.absorption_fields.0,
         };
         let consumed = fields(trace, raw, structure, body, &RANGE, coverage)?;
-        arena::compare(trace, structure, body, consumed, counts)?;
+        count_additional(trace, structure, body, consumed, counts)?;
     }
     Ok(())
 }
@@ -334,21 +336,6 @@ fn find<'read, 'source>(
     source.fields().iter().find(|field| field.name() == name)
 }
 
-pub(super) fn source_type<'source>(
-    trace: &Trace<'_, 'source>,
-    raw: &Original<'source>,
-    source: &StructValue<'source>,
-    exported: &Value,
-) -> TestResult {
-    let kind = cell(exported, "sourceType")?;
-    require_state(kind, "present")?;
-    assert!(
-        proof::text(kind, "/value")? == source.type_name(),
-        "the concrete type follows its original Class"
-    );
-    trace.part(kind, raw, "$type", "selector")
-}
-
 fn other<'source>(
     trace: &Trace<'_, 'source>,
     raw: Option<&Original<'source>>,
@@ -373,4 +360,17 @@ fn other<'source>(
             trace.check(exported, raw, "selector")
         }
     }
+}
+
+fn count_additional<'source>(
+    trace: &Trace<'_, 'source>,
+    source: &StructValue<'source>,
+    exported: &Value,
+    consumed: BTreeSet<&'static str>,
+    counts: &mut Counts,
+) -> TestResult {
+    let arena = arena::additional(trace, source, exported, consumed)?;
+    counts.authored_roots += arena.roots;
+    counts.authored_nodes += arena.nodes;
+    Ok(())
 }

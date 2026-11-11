@@ -5,8 +5,8 @@ use serde_json::Value;
 
 use super::stats_digest;
 use crate::contract_stats::{
-    ItemStats, ItemStatsFields, PublishedItemStats, ResourceFlow, ResourceState, ShieldStats,
-    Signature, WeaponStats,
+    ItemStats, ItemStatsFields, PublishedItemStats, QuantumDriveStats, ResourceFlow, ResourceState,
+    ShieldStats, Signature, WeaponStats,
 };
 use crate::digest::Wide;
 
@@ -17,8 +17,13 @@ const SHIELD: &str = concat!(
     r#","shield":{"maxHealth":8000.0,"maxRegen":160.0,"decayRatio":0.25,"#,
     r#""downedRegenDelay":5.0,"damagedRegenDelay":2.5}"#,
 );
+const QUANTUM: &str = concat!(
+    r#","quantumDrive":{"fuelRequirement":-0.0,"jumpRange":50000.0,"disconnectRange":null,"#,
+    r#""driveSpeed":12000.0,"cooldownTime":null,"spoolUpTime":7.0,"#,
+    r#""stageOneAccelRate":null,"stageTwoAccelRate":null,"engageSpeed":40.0}"#,
+);
 const REMAINING: &str = concat!(
-    r#","quantumDrive":null,"powerPlant":null,"cooler":null,"missile":null,"armor":null,"#,
+    r#","powerPlant":null,"cooler":null,"missile":null,"armor":null,"#,
     r#""clothing":null,"radar":null,"tractorBeam":null,"weaponModifier":null,"#,
     r#""miningLaser":null,"miningModifier":null,"health":450.0,"resourceStates":[{"#,
     r#""name":"Online","emSignature":{"nominal":-0.0,"decayRate":null},"irSignature":null,"#,
@@ -36,7 +41,24 @@ fn shield() -> ShieldStats {
     }
 }
 
-fn stats(shield: Option<ShieldStats>) -> ItemStats<'static> {
+fn quantum() -> QuantumDriveStats {
+    QuantumDriveStats {
+        fuel_requirement: Some(-0.0),
+        jump_range: Some(50_000.0),
+        disconnect_range: None,
+        drive_speed: Some(12_000.0),
+        cooldown_time: None,
+        spool_up_time: Some(7.0),
+        stage_one_accel_rate: None,
+        stage_two_accel_rate: None,
+        engage_speed: Some(40.0),
+    }
+}
+
+fn stats(
+    shield: Option<ShieldStats>,
+    quantum_drive: Option<QuantumDriveStats>,
+) -> ItemStats<'static> {
     ItemStats {
         weapon: Some(WeaponStats {
             fire_actions: Vec::new(),
@@ -44,8 +66,8 @@ fn stats(shield: Option<ShieldStats>) -> ItemStats<'static> {
             ammo: None,
         }),
         shield,
+        quantum_drive,
         fields: ItemStatsFields {
-            quantum_drive: None,
             power_plant: None,
             cooler: None,
             missile: None,
@@ -77,12 +99,15 @@ fn stats(shield: Option<ShieldStats>) -> ItemStats<'static> {
 }
 
 #[test]
-fn compact_item_variant_bytes_and_digest_keep_the_shield_slot() -> TestResult {
+fn compact_item_variant_bytes_and_digest_keep_the_device_slots() -> TestResult {
     use std::hash::Hasher as _;
 
-    for (source, shield) in [(Some(shield()), SHIELD), (None, r#","shield":null"#)] {
-        let stats = stats(source);
-        let expected = format!("{WEAPON}{shield}{REMAINING}");
+    for (source, drive, shield, quantum) in [
+        (Some(shield()), Some(quantum()), SHIELD, QUANTUM),
+        (None, None, r#","shield":null"#, r#","quantumDrive":null"#),
+    ] {
+        let stats = stats(source, drive);
+        let expected = format!("{WEAPON}{shield}{quantum}{REMAINING}");
         assert_eq!(
             serde_json::to_vec(&stats)?,
             expected.as_bytes(),
@@ -105,8 +130,8 @@ fn compact_item_variant_bytes_and_digest_keep_the_shield_slot() -> TestResult {
 }
 
 #[test]
-fn published_stats_share_all_legacy_fields_besides_shield() -> TestResult {
-    let published = stats(Some(shield()))
+fn published_stats_keep_fields_outside_device_configurations() -> TestResult {
+    let published = stats(Some(shield()), Some(quantum()))
         .into_published()
         .ok_or("public stats still present")?;
     let expected = format!("{WEAPON}{REMAINING}");

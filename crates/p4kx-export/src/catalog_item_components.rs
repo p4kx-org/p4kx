@@ -11,6 +11,7 @@ use super::catalog_ammo_containers::{self, AmmoContainer};
 use super::catalog_durability::{self, DurabilityComponent, DurabilityRows, DurabilityTables};
 use super::catalog_explosives::{self, Explosive, ExplosiveComponent};
 use super::catalog_hacking_chips::{self, HackingChip, HackingComponent};
+use super::catalog_quantum_drive::{self, QuantumDrive};
 use super::catalog_shield_generator::{self, ShieldGenerator};
 use super::catalog_weapon_actions::{self, WeaponActions};
 use super::catalog_weapon_magazine_slots::{self, WeaponMagazineSlots};
@@ -37,6 +38,7 @@ pub(crate) struct ItemComponentRows<'source> {
     pub(crate) ammo_containers: Vec<AmmoContainer<'source>>,
     pub(crate) ammo_bindings: Vec<AmmoBinding<'source>>,
     pub(crate) weapon_actions: Vec<WeaponActions<'source>>,
+    pub(crate) quantum_drives: Vec<QuantumDrive<'source>>,
     pub(crate) shield_generators: Vec<ShieldGenerator<'source>>,
     pub(crate) magazine_resolutions: Vec<WeaponMagazineResolution>,
     pub(crate) numbers: Vec<CapturedNumber>,
@@ -50,6 +52,7 @@ impl<'source> ItemComponentRows<'source> {
         self.ammo_containers.extend(other.ammo_containers);
         self.ammo_bindings.extend(other.ammo_bindings);
         self.weapon_actions.extend(other.weapon_actions);
+        self.quantum_drives.extend(other.quantum_drives);
         self.shield_generators.extend(other.shield_generators);
         self.magazine_resolutions.extend(other.magazine_resolutions);
         self.numbers.extend(other.numbers);
@@ -63,6 +66,7 @@ impl<'source> ItemComponentRows<'source> {
             ammo_containers: catalog_ammo_containers::table(forge, self.ammo_containers),
             ammo_bindings: catalog_ammo_bindings::table(forge, self.ammo_bindings),
             weapon_actions: catalog_weapon_actions::table(forge, self.weapon_actions),
+            quantum_drives: catalog_quantum_drive::table(forge, self.quantum_drives),
             shield_generators: catalog_shield_generator::table(forge, self.shield_generators),
             magazine_resolutions: resolution::table(forge, self.magazine_resolutions),
         }
@@ -76,6 +80,7 @@ pub(crate) struct ItemComponentTables<'source> {
     pub(crate) ammo_containers: CatalogTable<AmmoContainer<'source>>,
     pub(crate) ammo_bindings: CatalogTable<AmmoBinding<'source>>,
     pub(crate) weapon_actions: CatalogTable<WeaponActions<'source>>,
+    pub(crate) quantum_drives: CatalogTable<QuantumDrive<'source>>,
     pub(crate) shield_generators: CatalogTable<ShieldGenerator<'source>>,
     pub(crate) magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
 }
@@ -121,21 +126,13 @@ impl<'source> ItemComponentsRead<'source> {
                     &mut self.notes,
                 )?);
             }
-            Component::Weapon => {
-                self.rows.weapon_actions.push(WeaponActions::read(
-                    owner.clone(),
+            Component::Weapon => self.push_weapon(owner, observed)?,
+            Component::QuantumDrive => {
+                self.rows.quantum_drives.push(QuantumDrive::read(
+                    owner,
                     observed,
                     &mut self.notes,
                 )?);
-                self.rows
-                    .ammo_bindings
-                    .push(AmmoBinding::WeaponMagazineSlots {
-                        value: Box::new(WeaponMagazineSlots::read(
-                            owner,
-                            observed,
-                            &mut self.notes,
-                        )?),
-                    });
             }
             Component::ShieldGenerator => {
                 self.rows.shield_generators.push(ShieldGenerator::read(
@@ -155,6 +152,24 @@ impl<'source> ItemComponentsRead<'source> {
         }
         Ok(())
     }
+
+    fn push_weapon(
+        &mut self,
+        owner: ComponentOwner,
+        observed: Observed<'_, '_, '_, 'source>,
+    ) -> Result<(), CatalogError> {
+        self.rows.weapon_actions.push(WeaponActions::read(
+            owner.clone(),
+            observed,
+            &mut self.notes,
+        )?);
+        self.rows
+            .ammo_bindings
+            .push(AmmoBinding::WeaponMagazineSlots {
+                value: Box::new(WeaponMagazineSlots::read(owner, observed, &mut self.notes)?),
+            });
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -164,6 +179,7 @@ enum Component {
     Hacking(HackingComponent),
     AmmoContainer,
     Weapon,
+    QuantumDrive,
     ShieldGenerator,
 }
 
@@ -175,6 +191,7 @@ impl Component {
         let name = source.type_name();
         match name {
             catalog_ammo_containers::SOURCE_TYPE => return Some((value, Self::AmmoContainer)),
+            catalog_quantum_drive::SOURCE_TYPE => return Some((value, Self::QuantumDrive)),
             catalog_shield_generator::SOURCE_TYPE => return Some((value, Self::ShieldGenerator)),
             catalog_weapon_magazine_slots::SOURCE_TYPE => {
                 return Some((value, Self::Weapon));

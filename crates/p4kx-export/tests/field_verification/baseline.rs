@@ -7,18 +7,6 @@ use super::path::{Path, Step};
 use super::published_model::{Family, Field};
 use super::units::Unit;
 
-fn mapped(owner: &str, field: &str, block: &str, target: &str) -> Mapping {
-    Mapping {
-        source: FieldKey::new(owner, field),
-        declared_target: None,
-        disposition: Disposition::Exported {
-            group: "items".to_owned(),
-            path: Path::fields(&["stats", block, target]),
-        },
-        previously_empty: false,
-    }
-}
-
 fn shield_mappings() -> impl Iterator<Item = Mapping> {
     [
         ("MaxShieldHealth", "maxHealth"),
@@ -53,38 +41,103 @@ fn shield_mappings() -> impl Iterator<Item = Mapping> {
     })
 }
 
-pub(crate) fn inventory() -> Inventory {
-    let mut fields: Vec<_> = shield_mappings().collect();
-    for (source, target) in [
+fn quantum_mappings() -> impl Iterator<Item = Mapping> {
+    let roots = [
         ("quantumFuelRequirement", "fuelRequirement"),
         ("jumpRange", "jumpRange"),
         ("disconnectRange", "disconnectRange"),
-    ] {
-        fields.push(mapped(
+        ("params", "standard"),
+        ("splineJumpParams", "spline"),
+        ("heatParams", "heat"),
+        ("quantumBoostParams", "boost"),
+    ]
+    .into_iter()
+    .map(|(source, target)| {
+        quantum_mapped(
             "SCItemQuantumDriveParams",
             source,
-            "quantumDrive",
+            super::coverage::QUANTUM_DRIVES,
             target,
-        ));
+            (source == "params").then_some(super::coverage::QUANTUM_PROFILE_TYPE),
+        )
+    });
+    roots.chain(quantum_profile_mappings())
+}
+
+fn quantum_profile_mappings() -> impl Iterator<Item = Mapping> {
+    [
+        ("driveSpeed", "driveSpeed"),
+        ("cooldownTime", "cooldownTime"),
+        ("spoolUpTime", "spoolUpTime"),
+        ("stageOneAccelRate", "stageOneAccelRate"),
+        ("stageTwoAccelRate", "stageTwoAccelRate"),
+        ("engageSpeed", "engageSpeed"),
+        ("calibrationRate", "calibrationRate"),
+        ("minCalibrationRequirement", "minCalibrationRequirement"),
+        ("maxCalibrationRequirement", "maxCalibrationRequirement"),
+        (
+            "calibrationProcessAngleLimit",
+            "calibrationProcessAngleLimit",
+        ),
+        (
+            "calibrationWarningAngleLimit",
+            "calibrationWarningAngleLimit",
+        ),
+        ("calibrationDelayInSeconds", "calibrationDelayInSeconds"),
+        ("interdictionEffectTime", "interdictionEffectTime"),
+        ("VFXSpoolEndVelocity", "vfxSpoolEndVelocity"),
+        ("VFXPinchEffectTime", "vfxPinchEffectTime"),
+        ("VFXPinchMaxVelocity", "vfxPinchMaxVelocity"),
+        ("VFXEntryFlashVelocity", "vfxEntryFlashVelocity"),
+        ("VFXTrailStartVelocity", "vfxTrailStartVelocity"),
+        (
+            "VFXTravelEffectStartVelocity",
+            "vfxTravelEffectStartVelocity",
+        ),
+        ("VFXTravelEffectEndVelocity", "vfxTravelEffectEndVelocity"),
+        ("VFXExitEffectVelocity", "vfxExitEffectVelocity"),
+        ("ShaderNodeEngageVelocity", "shaderNodeEngageVelocity"),
+        ("ShaderNodeShutdownVelocity", "shaderNodeShutdownVelocity"),
+        (
+            "ShaderNodeMaxStrengthVelocity",
+            "shaderNodeMaxStrengthVelocity",
+        ),
+        ("idleState", "idleState"),
+        ("travellingState", "travellingState"),
+        ("effectTags", "effectTags"),
+    ]
+    .into_iter()
+    .map(|(source, target)| {
+        quantum_mapped(
+            super::coverage::QUANTUM_PROFILE_TYPE,
+            source,
+            super::coverage::QUANTUM_PROFILES,
+            target,
+            None,
+        )
+    })
+}
+
+fn quantum_mapped(
+    owner: &str,
+    field: &str,
+    group: &str,
+    target: &str,
+    declared_target: Option<&str>,
+) -> Mapping {
+    Mapping {
+        source: FieldKey::new(owner, field),
+        declared_target: declared_target.map(str::to_owned),
+        disposition: Disposition::Exported {
+            group: group.to_owned(),
+            path: Path::fields(&[target, "value"]),
+        },
+        previously_empty: false,
     }
-    let mut params = mapped(
-        "SCItemQuantumDriveParams",
-        "params",
-        "quantumDrive",
-        "driveSpeed",
-    );
-    params.declared_target = Some("QuantumDriveParams".to_owned());
-    fields.push(params);
-    for name in [
-        "driveSpeed",
-        "cooldownTime",
-        "spoolUpTime",
-        "stageOneAccelRate",
-        "stageTwoAccelRate",
-        "engageSpeed",
-    ] {
-        fields.push(mapped("QuantumDriveParams", name, "quantumDrive", name));
-    }
+}
+
+pub(crate) fn inventory() -> Inventory {
+    let fields = shield_mappings().chain(quantum_mappings()).collect();
     Inventory {
         schema_version: 1,
         roots: vec![

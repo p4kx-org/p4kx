@@ -49,7 +49,6 @@ pub(crate) use metadata::source;
 
 #[path = "build_scan.rs"]
 mod scanning;
-use scanning::scan;
 
 /// Builds the catalog and hands it to `emit`, which serialises it.
 #[expect(
@@ -85,7 +84,7 @@ fn assemble<R>(
     )?;
     let files = ArchiveFiles::new(archive);
     let entities = Arc::new(Entities::new(&forge));
-    let (mut collected, placements) = scan(
+    let (mut collected, placements) = scanning::scan(
         archive,
         &forge,
         &files,
@@ -316,6 +315,7 @@ fn assemble<R>(
             hacking_chips: components.hacking_chips,
             ammo_containers: components.ammo_containers,
             weapon_actions: components.weapon_actions,
+            quantum_drives: components.quantum_drives,
             shield_generators: components.shield_generators,
             contract_templates: CatalogTable::new(
                 &forge,

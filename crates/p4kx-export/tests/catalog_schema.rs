@@ -204,7 +204,7 @@ fn the_stat_blocks_accept_additions_and_new_closed_values_but_stay_required() ->
             "ammo": null,
             "extra": true
         },
-        "shield": null, "quantumDrive": null, "powerPlant": null, "cooler": null,
+        "powerPlant": null, "cooler": null,
         "armor": null, "clothing": null, "radar": null, "tractorBeam": null,
         "weaponModifier": null, "miningLaser": null, "miningModifier": null,
         "missile": {

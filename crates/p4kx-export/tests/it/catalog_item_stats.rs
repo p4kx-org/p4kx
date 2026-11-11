@@ -26,6 +26,8 @@ mod ammo_definitions;
 mod ammo_source;
 #[path = "catalog_durability.rs"]
 mod durability;
+#[path = "catalog_quantum.rs"]
+mod quantum;
 #[path = "catalog_shield.rs"]
 mod shield;
 
@@ -183,10 +185,11 @@ fn a_personal_weapon_takes_capacity_and_ammunition_from_its_magazine() -> TestRe
 
 #[test]
 fn an_unbounded_jump_range_is_exported_as_stored() -> TestResult {
-    let drive = item(&catalog()?, UNBOUNDED_DRIVE)?;
+    let catalog = catalog()?;
+    let row = quantum_drive(&catalog, UNBOUNDED_DRIVE)?;
     assert!(
-        drive["stats"]["quantumDrive"]["jumpRange"]
-            .as_f64()
+        row.pointer("/jumpRange/value/finite")
+            .and_then(Value::as_f64)
             .is_some_and(|range| range > 3.4e38),
         "the stored f32::MAX"
     );
@@ -231,22 +234,42 @@ fn a_shield_carries_its_values_and_its_health() -> TestResult {
 
 #[test]
 fn a_quantum_drive_carries_its_range_and_drive_parameters() -> TestResult {
-    let drive = item(&catalog()?, DRIVE)?;
-    assert_eq!(
-        drive["stats"]["quantumDrive"],
-        json!({
-            "fuelRequirement": 0.5,
-            "jumpRange": 5.0e10,
-            "disconnectRange": 20000.0,
-            "driveSpeed": 2.0e8,
-            "cooldownTime": 6.0,
-            "spoolUpTime": 10.0,
-            "stageOneAccelRate": 1000.0,
-            "stageTwoAccelRate": 2000.0,
-            "engageSpeed": 20.0
-        })
+    let catalog = catalog()?;
+    let drive = item(&catalog, DRIVE)?;
+    assert!(
+        drive.pointer("/stats/quantumDrive").is_none(),
+        "one canonical quantum drive wire location"
     );
+    let row = quantum_drive(&catalog, DRIVE)?;
+    for (path, expected) in [
+        ("/fuelRequirement/value/finite", 0.5),
+        ("/jumpRange/value/finite", 5.0e10),
+        ("/disconnectRange/value/finite", 20_000.0),
+        ("/standard/value/driveSpeed/value/finite", 2.0e8),
+        ("/standard/value/cooldownTime/value/finite", 6.0),
+        ("/standard/value/spoolUpTime/value/finite", 10.0),
+        ("/standard/value/stageOneAccelRate/value/finite", 1_000.0),
+        ("/standard/value/stageTwoAccelRate/value/finite", 2_000.0),
+        ("/standard/value/engageSpeed/value/finite", 20.0),
+    ] {
+        assert_eq!(
+            row.pointer(path),
+            Some(&json!(expected)),
+            "canonical quantum field {path}"
+        );
+    }
     Ok(())
+}
+
+fn quantum_drive(catalog: &Value, guid: u128) -> Result<&Value, Box<dyn Error>> {
+    let item = item(catalog, guid)?;
+    catalog
+        .pointer("/configurations/quantumDrives/rows")
+        .and_then(Value::as_array)
+        .ok_or("canonical quantum drive rows")?
+        .iter()
+        .find(|row| row.pointer("/ownerGuid/value") == item.get("guid"))
+        .ok_or_else(|| "canonical quantum drive of the selected item".into())
 }
 
 #[test]

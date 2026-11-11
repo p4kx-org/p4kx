@@ -5,7 +5,7 @@ use p4kx_extraction::Value as Original;
 use serde::Serialize;
 use serde_json::{Value, json};
 
-use super::TestResult;
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 pub(super) fn expected(raw: &Original<'_>) -> TestResult<Option<Value>> {
     let (kind, value) = match raw {

@@ -16,9 +16,6 @@ use crate::real_archive_item_components::{self as components, Rows, cell};
 use crate::real_archive_item_durability::{self as proof, Trace};
 use crate::{real_archive_shop_inventory_v3, real_archive_verification};
 
-mod arena;
-mod numbers;
-mod scalar;
 mod selected;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;

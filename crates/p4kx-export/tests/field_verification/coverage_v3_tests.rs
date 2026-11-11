@@ -179,3 +179,59 @@ fn shield_field_audit_joins_multiple_physical_configurations_by_sourced_owner() 
     );
     Ok(())
 }
+
+#[test]
+fn canonical_quantum_modes_join_by_owner_and_actual_source_type() -> super::Result<()> {
+    let mut catalog = catalog()?;
+    let path = "/configurations/quantumDrives/rows";
+    let owner = "00000000-0000-0000-0000-000000000001";
+    let profile = |kind, speed| {
+        json!({
+            "state":"present",
+            "value":{"sourceType":{"value":kind},"driveSpeed":{"value":speed}},
+        })
+    };
+    *catalog.pointer_mut(path).ok_or("canonical quantum table")? = json!([
+        {
+            "ownerGuid":{"state":"present","value":owner},
+            "standard":profile(super::coverage::QUANTUM_PROFILE_TYPE, 1),
+            "spline":profile(super::coverage::QUANTUM_PROFILE_TYPE, 2),
+        },
+        {
+            "ownerGuid":{"state":"present","value":owner},
+            "standard":profile("FixtureUnmappedQuantumMode", 3),
+            "spline":profile(super::coverage::QUANTUM_PROFILE_TYPE, 4),
+        },
+    ]);
+    let mut inventory = super::baseline::inventory();
+    inventory.fields.retain(|mapping| {
+        matches!(&mapping.disposition, Disposition::Exported { group, .. }
+            if group == super::coverage::QUANTUM_DRIVES || group == super::coverage::QUANTUM_PROFILES)
+    });
+    assert_eq!(
+        super::audit_scope::kinds(&inventory)?,
+        [p4kx_export::Kind::Items],
+        "both quantum audit groups depend on the source Items scope"
+    );
+    let owner = super::joins::guid(owner)?;
+    let projections = super::coverage::projections(&catalog, &inventory, &|| false)?;
+    let drives = projections
+        .get(super::coverage::QUANTUM_DRIVES)
+        .and_then(|index| index.get(&owner))
+        .ok_or("physical quantum owners")?;
+    assert_eq!(drives.len(), 2, "every physical drive keeps its owner");
+    let profiles = projections
+        .get(super::coverage::QUANTUM_PROFILES)
+        .and_then(|index| index.get(&owner))
+        .ok_or("canonical quantum mode projection")?;
+    let speeds: Vec<_> = profiles
+        .iter()
+        .filter_map(|profile| profile.pointer("/driveSpeed/value").and_then(Value::as_u64))
+        .collect();
+    assert_eq!(
+        speeds,
+        [1, 2, 4],
+        "shared source-type audit visits both modes and excludes the distinct type"
+    );
+    Ok(())
+}

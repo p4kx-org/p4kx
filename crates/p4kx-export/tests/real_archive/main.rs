@@ -8,6 +8,12 @@ mod catalog_v3_blueprint_category_tests;
 mod catalog_v3_consumer;
 mod catalog_v3_loot_consumer_tests;
 mod catalog_v3_mission_definition_tests;
+#[path = "shield_generators/arena.rs"]
+mod original_item_arena;
+#[path = "shield_generators/numbers.rs"]
+mod original_item_numbers;
+#[path = "shield_generators/scalar.rs"]
+mod original_item_scalar;
 mod real_archive;
 mod real_archive_auto_spawns;
 mod real_archive_blueprints;
@@ -52,6 +58,7 @@ mod real_archive_paints;
 mod real_archive_playability;
 mod real_archive_property_sets;
 mod real_archive_quantization;
+mod real_archive_quantum_drives;
 mod real_archive_records;
 mod real_archive_reputation;
 mod real_archive_resource_oracles;

@@ -74,8 +74,8 @@ pub(crate) fn read_with_sources<'f, E>(
     let mut stats = ItemStats {
         weapon,
         shield,
+        quantum_drive,
         fields: ItemStatsFields {
-            quantum_drive,
             power_plant,
             cooler,
             missile,

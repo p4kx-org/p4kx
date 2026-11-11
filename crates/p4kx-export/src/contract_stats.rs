@@ -16,6 +16,7 @@ use crate::contract_stats_mining::{MiningLaserStats, MiningModifierStats};
 pub(crate) struct ItemStats<'a> {
     pub(crate) weapon: Option<WeaponStats<'a>>,
     pub(crate) shield: Option<ShieldStats>,
+    pub(crate) quantum_drive: Option<QuantumDriveStats>,
     #[serde(flatten)]
     pub(crate) fields: ItemStatsFields<'a>,
 }
@@ -31,13 +32,11 @@ pub(crate) struct PublishedItemStats<'a> {
     fields: ItemStatsFields<'a>,
 }
 
-/// Shared item stat fields in their serialization order after the weapon and shield.
+/// Shared item stat fields in their serialization order after the device configurations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct ItemStatsFields<'a> {
-    /// The quantum drive block, from `SCItemQuantumDriveParams`.
-    pub(crate) quantum_drive: Option<QuantumDriveStats>,
     /// The power plant block, for an item of the type `PowerPlant`.
     pub(crate) power_plant: Option<PowerPlantStats<'a>>,
     /// The cooler block, for an item of the type `Cooler`.
@@ -69,7 +68,10 @@ pub(crate) struct ItemStatsFields<'a> {
 
 impl<'a> ItemStats<'a> {
     pub(crate) const fn has_specialist(&self) -> bool {
-        self.weapon.is_some() || self.shield.is_some() || self.fields.has_specialist()
+        self.weapon.is_some()
+            || self.shield.is_some()
+            || self.quantum_drive.is_some()
+            || self.fields.has_specialist()
     }
 
     pub(crate) fn into_published(self) -> Option<PublishedItemStats<'a>> {
@@ -84,8 +86,7 @@ impl<'a> ItemStats<'a> {
 
 impl ItemStatsFields<'_> {
     const fn has_specialist(&self) -> bool {
-        self.quantum_drive.is_some()
-            || self.power_plant.is_some()
+        self.power_plant.is_some()
             || self.cooler.is_some()
             || self.missile.is_some()
             || self.armor.is_some()
@@ -270,10 +271,9 @@ pub(crate) struct ShieldStats {
     pub(crate) damaged_regen_delay: Option<f32>,
 }
 
-/// A quantum drive.
-#[derive(Debug, Serialize, JsonSchema)]
+/// The compact quantum values consumed by variant identity.
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct QuantumDriveStats {
     /// `quantumFuelRequirement`, as stored.
     pub(crate) fuel_requirement: Option<f32>,

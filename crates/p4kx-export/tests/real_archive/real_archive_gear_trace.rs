@@ -58,7 +58,7 @@ const FIELDS: [(&str, &[&str]); 29] = [
         "gpp_itemresource_coolantgeneration",
         &["cooler.coolingRate"],
     ),
-    ("gpp_shield_maxhealth", &["shield.maxHealth"]),
+    ("gpp_shield_maxhealth", &["shield.maxHealth.value"]),
     (
         "gpp_radar_minaimassistdistance",
         &["radar.aimAssistDistanceMin"],
@@ -67,10 +67,13 @@ const FIELDS: [(&str, &[&str]); 29] = [
         "gpp_radar_maxaimassistdistance",
         &["radar.aimAssistDistanceMax"],
     ),
-    ("gpp_quantum_speed", &["quantumDrive.driveSpeed"]),
+    (
+        "gpp_quantum_speed",
+        &["quantumDrive.standard.value.driveSpeed.value"],
+    ),
     (
         "gpp_quantum_fuelrequirement",
-        &["quantumDrive.fuelRequirement"],
+        &["quantumDrive.fuelRequirement.value"],
     ),
     ("gpp_weapon_tractor_force", &["tractorBeam.maxForce"]),
     ("gpp_weapon_tractor_maxdist", &["tractorBeam.maxDistance"]),
@@ -121,6 +124,39 @@ fn filled(value: &Value, name: &str) -> bool {
             .is_some_and(|items| !items.is_empty());
     }
     value.get(name).is_some_and(|inner| !inner.is_null())
+}
+
+fn source_blocks<'catalog>(
+    catalog: &'catalog Value,
+    item: &'catalog Value,
+    block: &str,
+) -> Vec<&'catalog Value> {
+    let table = match block {
+        "shield" => "/configurations/shieldGenerators/rows",
+        "quantumDrive" => "/configurations/quantumDrives/rows",
+        _ => {
+            return item["stats"]
+                .get(block)
+                .filter(|value| !value.is_null())
+                .into_iter()
+                .collect();
+        }
+    };
+    let guid = item.get("guid");
+    catalog
+        .pointer(table)
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|row| guid.is_some() && row.pointer("/ownerGuid/value") == guid)
+        .collect()
+}
+
+fn item_reaches(catalog: &Value, item: &Value, path: &str) -> bool {
+    let (block, fields) = path.split_once('.').unwrap_or((path, ""));
+    source_blocks(catalog, item, block)
+        .into_iter()
+        .any(|source| fields.is_empty() || reaches(source, fields))
 }
 
 #[test]
@@ -180,7 +216,7 @@ fn every_modified_property_is_filled_on_the_item_the_blueprint_produces() -> Tes
                 unmapped += 1;
                 continue;
             };
-            if !paths.iter().any(|path| reaches(&item["stats"], path)) {
+            if !paths.iter().any(|path| item_reaches(&catalog, item, path)) {
                 let beams_only = item["stats"]["weapon"]["fireActions"]
                     .as_array()
                     .is_some_and(|actions| {
@@ -191,7 +227,7 @@ fn every_modified_property_is_filled_on_the_item_the_blueprint_produces() -> Tes
                 let without_source = (class == "gpp_weapon_firerate" && beams_only)
                     || paths.iter().all(|path| {
                         let block = path.split('.').next().unwrap_or(path);
-                        item["stats"].get(block).is_none_or(Value::is_null)
+                        source_blocks(&catalog, item, block).is_empty()
                     });
                 let list = if without_source {
                     &mut no_source

@@ -6,22 +6,51 @@ use std::collections::BTreeSet;
 use p4kx_extraction::{DataType, Field, StructValue, Value as Original};
 use serde_json::Value;
 
-use super::{Counts, TestResult, scalar, selected};
+use crate::original_item_scalar as scalar;
+
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 use crate::real_archive_item_components::{cell, require_state};
 use crate::real_archive_item_durability::{self as proof, Trace};
 
-pub(super) fn compare<'source>(
+pub(super) fn source_type<'source>(
+    trace: &Trace<'_, 'source>,
+    raw: &Original<'source>,
+    source: &StructValue<'source>,
+    exported: &Value,
+) -> TestResult {
+    let kind = cell(exported, "sourceType")?;
+    require_state(kind, "present")?;
+    assert!(
+        proof::text(kind, "/value")? == source.type_name(),
+        "the concrete type follows its original Class"
+    );
+    trace.part(kind, raw, "$type", "selector")
+}
+
+pub(super) struct Coverage {
+    pub(super) roots: usize,
+    pub(super) nodes: usize,
+}
+
+pub(super) fn additional<'source>(
     trace: &Trace<'_, 'source>,
     source: &StructValue<'source>,
     exported: &Value,
     mut consumed: BTreeSet<&'static str>,
-    counts: &mut Counts,
-) -> TestResult {
+) -> TestResult<Coverage> {
     let arena = cell(exported, "additionalFields")?;
     let fields = source
         .fields()
         .iter()
         .filter(|field| !consumed.remove(field.name()));
+    compare(trace, fields, arena)
+}
+
+pub(super) fn compare<'read, 'source: 'read>(
+    trace: &Trace<'_, 'source>,
+    fields: impl Iterator<Item = &'read Field<'source>>,
+    arena: &Value,
+) -> TestResult<Coverage> {
     let mut pending = Vec::new();
     let nodes = proof::rows(arena, "/values")?;
     let roots = proof::rows(arena, "/roots")?;
@@ -42,9 +71,10 @@ pub(super) fn compare<'source>(
         visited.len() == nodes.len(),
         "every authored node is reachable"
     );
-    counts.authored_roots += roots.len();
-    counts.authored_nodes += nodes.len();
-    Ok(())
+    Ok(Coverage {
+        roots: roots.len(),
+        nodes: nodes.len(),
+    })
 }
 
 type Pending<'read, 'source, 'catalog> = Vec<(&'read Original<'source>, &'catalog Value)>;
@@ -158,7 +188,7 @@ fn compare_node<'read, 'source, 'catalog>(
                 proof::text(body, "/type")? == "struct",
                 "original struct node"
             );
-            selected::source_type(trace, raw, structure, body)?;
+            source_type(trace, raw, structure, body)?;
             push_fields(
                 trace,
                 structure.fields().iter(),

@@ -128,6 +128,34 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         })
     }
 
+    /// Retains one exact authored member without narrowing its storage or payload type.
+    pub(in crate::catalog_v3) fn authored_member(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<SourceArenaOutput<'source>>, CatalogError> {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
+            return self.absent();
+        };
+        let state = match fact.value() {
+            Value::Null => SourceValue::Null,
+            value @ Value::Error(_) => {
+                self.failure(name, value, "a readable authored member", notes)?
+            }
+            _ => SourceValue::Present(source_value_catalog::read_subtree(
+                self.originals,
+                fact,
+                |child| self.retain_raw_number(child),
+            )?),
+        };
+        self.bind_field(
+            fact,
+            OriginalValuePart::Value,
+            state,
+            SourceUseRole::Selector,
+        )
+    }
+
     fn retain_raw_number(
         &self,
         original: &Fact<'scope, 'read, 'source>,
