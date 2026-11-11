@@ -83,6 +83,16 @@ fn unrelated_loadout_failure_does_not_invalidate_healthy_paint_vehicle_facts() -
                 && failure.operation() == EntryOperation::XmlLoadout),
         "the unrelated XML failure actually occurred"
     );
+    let ship = health.kind(Kind::Ships).ok_or("ship health")?;
+    assert_eq!(
+        (
+            ship.written_rows,
+            ship.source_records.omitted_after_read_failure,
+            ship.source_records.omitted_after_projection_failure
+        ),
+        (1, 0, 0),
+        "a retained ship with a failed XML dependency stays a written ship"
+    );
     let paints = health.kind(Kind::Paints).ok_or("paint health")?;
     assert!(
         paints.source_inventory_complete,

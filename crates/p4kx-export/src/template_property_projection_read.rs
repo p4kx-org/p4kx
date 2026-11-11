@@ -32,9 +32,9 @@ fn one<'fields, 'scope, 'read, 'source>(
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
     };
     let kind = property.objective.and_then(|_| {
-        unknowns.parse(
+        unknowns.parse_type(
             "objective property",
-            Some(source.type_name()),
+            source.type_name(),
             PropertyKind::parse,
         )
     });

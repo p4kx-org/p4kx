@@ -136,7 +136,7 @@ impl<'fields, 'scope, 'read, 'source> VocabularyReader<'_, 'fields, 'scope, 'rea
         &mut self,
         parent: &'fields OriginalValueFact<'scope, 'read, 'source>,
         name: &str,
-        what: &str,
+        what: &'static str,
         vocabulary: Vocabulary,
     ) -> Result<(), CatalogError> {
         let Some((_, fact)) = self.members.fields().field(Some(parent), name)? else {

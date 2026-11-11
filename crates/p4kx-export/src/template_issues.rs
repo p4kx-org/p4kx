@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -56,32 +57,50 @@ impl TemplateError {
     }
 }
 
-/// The stored enum names of the contract templates that the catalog does not know, counted per
-/// kind of name and value; each one is `null` in the catalog and a warning of the build.
+/// Counts unsupported vocabulary by technical category.
 #[derive(Debug, Default)]
-pub(crate) struct Unknowns(Mutex<BTreeMap<String, usize>>);
+pub(crate) struct Unknowns(Mutex<BTreeMap<Cow<'static, str>, usize>>);
 
 impl Unknowns {
-    /// Returns what `parse` makes of the stored name `stored`; a name it does not know is counted
-    /// under `what`.
+    /// Interprets an authored value and counts an unsupported value by category.
     pub(crate) fn parse<T>(
         &self,
-        what: &str,
+        category: &'static str,
         stored: Option<&str>,
         parse: impl FnOnce(&str) -> Option<T>,
     ) -> Option<T> {
-        let stored = stored?;
+        self.parse_counted(stored?, parse, || Cow::Borrowed(category))
+    }
+
+    /// Interprets a declared source type and retains its technical name when unsupported.
+    pub(crate) fn parse_type<T>(
+        &self,
+        category: &'static str,
+        source_type: &str,
+        parse: impl FnOnce(&str) -> Option<T>,
+    ) -> Option<T> {
+        self.parse_counted(source_type, parse, || {
+            Cow::Owned(format!("{category} {source_type}"))
+        })
+    }
+
+    fn parse_counted<T>(
+        &self,
+        stored: &str,
+        parse: impl FnOnce(&str) -> Option<T>,
+        label: impl FnOnce() -> Cow<'static, str>,
+    ) -> Option<T> {
         let parsed = parse(stored);
         if parsed.is_none()
             && let Ok(mut counts) = self.0.lock()
         {
-            let count = counts.entry(format!("{what} {stored}")).or_insert(0);
+            let count = counts.entry(label()).or_insert(0);
             *count = count.saturating_add(1);
         }
         parsed
     }
 
-    /// Returns the number of names counted and one description per kind and value, ordered.
+    /// Returns the total count and ordered counts by technical category.
     pub(crate) fn into_details(self) -> (usize, Vec<String>) {
         let counts = self.0.into_inner().unwrap_or_default();
         let total = counts

@@ -29,6 +29,7 @@ mod catalog_key;
 mod catalog_snapshot_api;
 mod catalog_snapshot_inventory;
 mod catalog_support;
+mod catalog_warning_privacy;
 mod channel_notice;
 mod channels;
 mod character_package;

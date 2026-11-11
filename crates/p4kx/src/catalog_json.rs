@@ -128,6 +128,7 @@ impl From<StarmapSummary> for StarmapJson {
 enum WarningJson {
     UnreadableRewardRecords { count: usize },
     UnknownModifierRanges { count: usize, details: Vec<String> },
+    UnknownTemplateValues { count: usize, details: Vec<String> },
     AmbiguousDismantle { count: usize },
     UnreadableVehicleFiles { count: usize, details: Vec<String> },
     UnplacedStarmapContainers { count: usize },
@@ -148,6 +149,12 @@ impl From<&CraftingWarning> for WarningJson {
             }
             CraftingWarning::UnknownModifierRanges { count, details } => {
                 Self::UnknownModifierRanges {
+                    count: *count,
+                    details: details.clone(),
+                }
+            }
+            CraftingWarning::UnknownTemplateValues { count, details } => {
+                Self::UnknownTemplateValues {
                     count: *count,
                     details: details.clone(),
                 }

@@ -118,7 +118,7 @@ fn assert_failures(failed: &[(&str, &str)], expected: &[(&str, &str)]) {
 }
 
 #[test]
-fn stored_names_the_catalog_does_not_know_are_counted_in_a_warning() -> TestResult {
+fn unknown_vocabulary_is_counted_by_category_in_the_warning() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(
         spawns_fixture::write_archive(dir.path())?,
@@ -137,11 +137,11 @@ fn stored_names_the_catalog_does_not_know_are_counted_in_a_warning() -> TestResu
     assert_eq!(
         warning.details(),
         [
-            "comparison Sideways (1)",
-            "end comms reason Vanish (1)",
-            "flow state Sleeping (1)",
-            "month Smarch (1)",
-            "reaction Gloating (1)"
+            "comparison (1)",
+            "end comms reason (1)",
+            "flow state (1)",
+            "month (1)",
+            "reaction (1)"
         ]
     );
     assert!(matches!(

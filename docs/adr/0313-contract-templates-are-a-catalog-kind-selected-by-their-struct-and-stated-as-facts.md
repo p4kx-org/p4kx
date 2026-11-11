@@ -53,8 +53,9 @@ held only because those two conditions were `other`.
 - **Closed sets and unknown names.** Stored enum names (a state, a category, a comms timing or
   reason, a kind of objective property) are closed value sets (ADR-0054): a string with
   `x-values`. A name the catalog does not know is `null` and counted in the warning
-  `unknown_template_values` of the build, with each kind and value; the real-Archive test requires
-  none on LIVE.
+  `unknown_template_values` of the build. Warnings carry ordered category counts and unsupported
+  declared struct names. The catalog retains authored enum and string values in their sourced
+  fields. The real-Archive test requires no unknown names on LIVE.
 - **Reuse.** The rewards and the reputation of a contract are read for `contracts` and are not
   repeated: the payout links to `reputationScopes`. The Record reading loop is one helper
   (`read_kind`) shared with the mission location templates; the links come from the same level
