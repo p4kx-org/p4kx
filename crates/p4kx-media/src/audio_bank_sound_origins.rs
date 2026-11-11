@@ -35,12 +35,7 @@ pub(crate) fn prepare(
     writer: &MediaWriter<'_>,
 ) -> Result<PreparedRecordOrigins, MediaError> {
     let object = &sound.object;
-    let sites = SoundSites {
-        object: [object.section_ordinal(), object.ordinal()],
-        body: [object.body_offset()],
-        header: [version.body_offset],
-        plugin: Scalar::new(sound.fields.plugin_id.as_ref(), "soundPluginId"),
-    };
+    let sites = SoundSites::new(sound, version);
     let mut prepared = BankOrigins::new(input, writer)?;
     let routing = prepared.capture([sites.route()])?;
     prepared.indices(routing)?;
@@ -51,6 +46,16 @@ pub(crate) fn prepare(
 }
 
 impl SoundSites {
+    pub(crate) fn new(sound: &BankHircSound, version: VersionSite) -> Self {
+        let object = &sound.object;
+        Self {
+            object: [object.section_ordinal(), object.ordinal()],
+            body: [object.body_offset()],
+            header: [version.body_offset],
+            plugin: Scalar::new(sound.fields.plugin_id.as_ref(), "soundPluginId"),
+        }
+    }
+
     fn fields(
         &self,
         prepared: &mut BankOrigins<'_, '_, '_>,
@@ -146,7 +151,7 @@ impl SoundSites {
         prepared.field(path, evidence)
     }
 
-    const fn route(&self) -> EvidenceSite<'_> {
+    pub(crate) const fn route(&self) -> EvidenceSite<'_> {
         (
             OriginSite::new("bnkHircPrefix", &self.object, "objectRouting"),
             SourceUseRole::Selector,

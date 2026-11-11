@@ -26,6 +26,8 @@ and fallback selection.
 | `audio-bank-hirc-event-action-candidate` | `bank-hirc-event-action-candidate` | HIRC section, Event object, action and candidate ordinals |
 | `audio-bank-hirc-event-tail` | `bank-hirc-event-tail` | HIRC section and Event object ordinals |
 | `audio-bank-hirc-sound` | `bank-hirc-sound` | HIRC section and Sound object ordinals |
+| `audio-bank-hirc-sound-media-resolution` | `bank-hirc-sound-media-resolution` | HIRC section and Sound object ordinals |
+| `audio-bank-hirc-sound-media-candidate` | `bank-hirc-sound-media-candidate` | HIRC section, Sound object and candidate ordinals |
 | `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
 | `audio-bank-music-segment` | `bank-music-segment` | HIRC section and segment object ordinals |
@@ -101,6 +103,13 @@ counts and the word immediately before the parent. An admitted source plug-in bl
 its declared length and exact raw parameter range. A malformed Sound contributes its
 successfully read fields and checked ranges to diagnostic output. An unsupported version
 retains the original body and reports its layout explicitly.
+
+For a decoded Sound with embedded or prefetched media, the resolution row classifies the
+original source ID against the DIDX triplets of the same physical bank. Each candidate row
+links to an `audio-bank-media` record by section and triplet ordinal. Repeated IDs retain
+every occurrence in physical order. An incomplete DIDX inventory reports `unavailable` and
+retains the observed candidate prefix. The linked DIDX row describes DATA availability and
+prefetch extent. A resolved DIDX identity alone makes no claim about media readability.
 
 Container rows preserve the version 154 Random, Sequence, Switch and Blend layout, original
 parent ID and declared child count. The Random/Sequence row carries the original mode byte.

@@ -5,12 +5,14 @@ use p4kx_extraction::SectionId;
 use p4kx_extraction::bank::{BankObservedHeader, BankSourceSection};
 
 use crate::MediaError;
+use crate::audio_bank_didx_index::DidxIndex;
 use crate::hirc_object_index::HircObjectIndex;
 
 pub(crate) struct BankInventory {
     pub(crate) last_child_section: Option<u64>,
     pub(crate) complete: bool,
     pub(crate) hirc_objects: HircObjectIndex,
+    pub(crate) didx_entries: DidxIndex,
     headers: u64,
     header: Option<BankObservedHeader>,
     data: DataInventory,
@@ -36,6 +38,7 @@ impl BankInventory {
             last_child_section: None,
             complete: true,
             hirc_objects: HircObjectIndex::default(),
+            didx_entries: DidxIndex::default(),
             headers: 0,
             header: None,
             data: DataInventory::Missing,

@@ -12,6 +12,7 @@ use crate::audio_bank_hirc_sound::{self, SoundPayload};
 use crate::audio_bank_media::MEDIA_NAMESPACE;
 use crate::audio_bank_payload::BankPayload;
 use crate::audio_bank_projection::{HEADER_NAMESPACE, SECTION_NAMESPACE};
+use crate::audio_bank_sound_reference;
 use crate::audio_bank_stid::{NAME_NAMESPACE, STID_NAMESPACE, STID_TAIL_NAMESPACE};
 use crate::audio_bank_stid_payload::BankStidPayload;
 use crate::audio_loose_inventory::{self, LooseInventoryPayload};
@@ -237,7 +238,7 @@ const fn bank_bindings() -> [Binding; 5] {
     ]
 }
 
-const fn hirc_bindings() -> [Binding; 4] {
+const fn hirc_bindings() -> [Binding; 6] {
     [
         Binding::exact(
             ACTION_PAYLOAD,
@@ -252,6 +253,20 @@ const fn hirc_bindings() -> [Binding; 4] {
             "bank-hirc-sound",
             2,
             StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            SOUND_PAYLOAD,
+            audio_bank_sound_reference::RESOLUTION_NAMESPACE,
+            "bank-hirc-sound-media-resolution",
+            2,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            SOUND_PAYLOAD,
+            audio_bank_sound_reference::CANDIDATE_NAMESPACE,
+            "bank-hirc-sound-media-candidate",
+            3,
+            StatusRule::Complete,
         ),
         Binding::exact(
             CONTAINER_PAYLOAD,

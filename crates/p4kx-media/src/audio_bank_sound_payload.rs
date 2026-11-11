@@ -11,6 +11,7 @@ use serde::Serialize;
 
 use crate::MediaError;
 use crate::audio_bank_payload::BankEntryRange;
+use crate::audio_bank_sound_reference::{SoundMediaCandidate, SoundMediaResolution};
 
 #[derive(Serialize, JsonSchema)]
 #[serde(
@@ -21,6 +22,10 @@ use crate::audio_bank_payload::BankEntryRange;
 )]
 pub(crate) enum SoundPayload {
     BankHircSound(SoundRecord),
+    #[serde(rename = "bank-hirc-sound-media-resolution")]
+    Resolution(SoundMediaResolution),
+    #[serde(rename = "bank-hirc-sound-media-candidate")]
+    Candidate(SoundMediaCandidate),
 }
 
 #[derive(Serialize, JsonSchema)]

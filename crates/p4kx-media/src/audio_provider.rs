@@ -183,7 +183,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-sound-fields",
-            "Original HIRC Sound source, storage, cache and flag fields, source plug-in extents and node parent with exact receipts.",
+            "Original HIRC Sound source and node fields with exact receipts and physical DIDX candidates for embedded and prefetch media.",
         ),
         FieldGroup::new(
             "bank-name-index",

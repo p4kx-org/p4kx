@@ -3,10 +3,12 @@
 
 use p4kx_extraction::bank::{BankHircSound, BankSoundRead};
 
+use crate::audio_bank_didx_index::DidxIndex;
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_projection::BankProjection;
 use crate::audio_bank_sound_origins;
 use crate::audio_bank_sound_payload::SoundRecord;
+use crate::audio_bank_sound_reference;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
 pub(crate) use crate::audio_bank_sound_payload::SoundPayload;
@@ -17,6 +19,7 @@ pub(crate) fn project(
     projection: &BankProjection<'_>,
     version: VersionSite,
     sound: &BankHircSound,
+    didx: &DidxIndex,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let (record, status, issue) = match &sound.status {
@@ -61,5 +64,6 @@ pub(crate) fn project(
         status,
         &SoundPayload::BankHircSound(record),
         issue.as_slice(),
-    )
+    )?;
+    audio_bank_sound_reference::project(projection, version, sound, didx, writer)
 }

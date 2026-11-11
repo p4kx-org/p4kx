@@ -46,6 +46,7 @@ fn directory<R: Read + Seek>(
                 projection.failure(BankPhase::Directory, None, cause, writer)?;
                 inventory.complete = false;
                 inventory.hirc_objects.mark_incomplete();
+                inventory.didx_entries.mark_incomplete();
                 break;
             }
         };
@@ -56,9 +57,12 @@ fn directory<R: Read + Seek>(
                 observe_header(projection, source, &section, &mut inventory, writer)?;
             }
             SectionId::DATA => inventory.observe_data(section)?,
+            SectionId::DIDX => inventory
+                .didx_entries
+                .observe_didx(projection, source, &section)?,
             SectionId::HIRC => inventory
                 .hirc_objects
-                .observe(projection, source, &section)?,
+                .observe_hirc(projection, source, &section)?,
             _ => {}
         }
     }
@@ -107,14 +111,7 @@ fn subresources<R: Read + Seek>(
                 audio_bank_media::project(projection, source, &section, inventory.data(), writer)?;
             }
             SectionId::HIRC => {
-                audio_bank_hirc::project(
-                    projection,
-                    source,
-                    &section,
-                    inventory.observed_header(),
-                    &inventory.hirc_objects,
-                    writer,
-                )?;
+                audio_bank_hirc::project(projection, source, &section, inventory, writer)?;
             }
             SectionId::STID => audio_bank_stid::project(projection, source, &section, writer)?,
             _ => {}

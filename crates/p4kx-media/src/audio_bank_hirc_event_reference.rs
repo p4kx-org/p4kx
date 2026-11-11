@@ -7,6 +7,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::audio_bank_projection::BankProjection;
+use crate::bank_candidate_index::Resolution;
 use crate::hirc_object_index::HircObjectIndex;
 use crate::{MediaError, MediaWriter, Status, Subresource};
 
@@ -26,15 +27,6 @@ pub(crate) struct ResolutionRecord {
     observed_candidates: DecimalU64,
     matching_candidates: DecimalU64,
     candidates_complete: bool,
-}
-
-#[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-enum Resolution {
-    Resolved,
-    Missing,
-    Ambiguous,
-    Unavailable,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -60,12 +52,7 @@ pub(super) fn project(
         .filter(|target| is_action(target, sites.version()))
         .count() as u64;
     let complete = objects.is_complete();
-    let resolution = match (complete, matching) {
-        (false, _) => Resolution::Unavailable,
-        (true, 0) => Resolution::Missing,
-        (true, 1) => Resolution::Resolved,
-        (true, _) => Resolution::Ambiguous,
-    };
+    let resolution = objects.resolution(matching);
     let indices = sites.action_indices(action.ordinal);
     let origins = origins::resolution(projection.input, sites, action, complete, writer)?;
     origins.write(
