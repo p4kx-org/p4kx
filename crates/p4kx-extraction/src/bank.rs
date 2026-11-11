@@ -36,6 +36,10 @@ pub use p4kx_audio::{
     BankMusicSwitchTarget,
 };
 pub use p4kx_audio::{
+    BankHircRtpc, BankRtpcCurve, BankRtpcExtent, BankRtpcPoint, BankRtpcRead, BankRtpcRow,
+    BankRtpcRows,
+};
+pub use p4kx_audio::{
     BankHircSoundStates, BankInlineStateRow, BankInlineStateRows, BankSoundStateRead,
     BankStateBinding, BankStateGroup,
 };

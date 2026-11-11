@@ -11,10 +11,7 @@ use p4kx_audio::{
 };
 use p4kx_testkit::{TestBank, TestHircObject};
 
-#[path = "bnk_inline_state_fixture.rs"]
-mod fixture;
-
-use self::fixture::{
+use super::bnk_inline_state_fixture::{
     BINDING_ID, Fixture, GROUP_ID, PARENT_ID, PROPERTY_IDS, SOUND_ID, STATE_ID, VALUE_BITS,
     rtpc_bytes, sound_bank, source_body, state_bytes,
 };

@@ -7,6 +7,7 @@ use crate::bank_object_fields::{BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
 use crate::hirc::{self, MediaStorage, SoundSource};
 use crate::hirc_node::{self, BankNodeParentFields};
+use crate::hirc_rtpc::BankRtpcExtent;
 use crate::{BankError, SectionId};
 
 const FIRST_SOUND_VERSION: u32 = 150;
@@ -96,6 +97,8 @@ pub struct BankSoundNodeBase {
     pub fields: BankNodeParentFields,
     /// Checked original inline State extent when its full layout was readable.
     pub state_chunk: Option<Range<u64>>,
+    /// Original RTPC count and complete curve prefix when the count was readable.
+    pub rtpc_chunk: Option<BankRtpcExtent>,
     /// Consumed node base bytes, including its checked opaque regions.
     pub consumed: Range<u64>,
     /// Residual bytes after a complete node traversal, including an empty range.
@@ -194,10 +197,17 @@ fn read_node<F: ObjectFields>(
     let start = fields.offset();
     let mut parent_fields = BankNodeParentFields::default();
     let mut state_chunk = None;
-    let parent = hirc_node::read_base_with_state(fields, &mut parent_fields, &mut state_chunk);
+    let mut rtpc_chunk = None;
+    let parent = hirc_node::read_base_observed(
+        fields,
+        &mut parent_fields,
+        &mut state_chunk,
+        &mut rtpc_chunk,
+    );
     observed.base = Some(BankSoundNodeBase {
         fields: parent_fields,
         state_chunk,
+        rtpc_chunk,
         consumed: start..fields.offset(),
         trailing: parent.is_ok().then(|| remainder(fields)),
     });
