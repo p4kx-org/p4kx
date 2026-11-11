@@ -15,7 +15,7 @@ use crate::schema_fields::every_field_required;
 use crate::{CatalogError, ExportAccountingError};
 
 /// The shared physical Record and original Components slot of a configuration.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(super) struct ComponentOwner {

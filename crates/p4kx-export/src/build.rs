@@ -223,6 +223,7 @@ fn assemble<R>(
                 collected.blueprint_category_lists,
             ),
             resource_group_members: group_tables.members,
+            ammo_bindings: components.ammo_bindings,
             shop_inventory_resolution: collected.shop_inventory_resolution,
             tag_roots: CatalogTable::new(&forge, &["TagDatabase"], collected.tags.roots),
             entity_tags: CatalogTable::new(
@@ -313,6 +314,7 @@ fn assemble<R>(
             distortion: components.durability.distortion,
             explosives: components.explosives,
             hacking_chips: components.hacking_chips,
+            ammo_containers: components.ammo_containers,
             contract_templates: CatalogTable::new(
                 &forge,
                 &["ContractTemplate"],

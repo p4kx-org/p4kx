@@ -5,6 +5,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::blueprint_category_list::BlueprintCategoryList;
+use super::catalog_ammo_bindings::AmmoBinding;
 use super::catalog_table::CatalogTable;
 use super::tag_catalog::{EntityTags, TagRoots};
 use crate::schema_fields::every_field_required;
@@ -19,6 +20,7 @@ pub(crate) struct CatalogDeclarations<'source> {
     pub(crate) tag_roots: CatalogTable<TagRoots<'source>>,
     pub(crate) shop_inventory_resolution: CatalogTable<ShopInventoryResolution>,
     pub(crate) entity_tags: CatalogTable<EntityTags<'source>>,
+    pub(crate) ammo_bindings: CatalogTable<AmmoBinding<'source>>,
     pub(crate) resource_group_members:
         CatalogTable<super::resource_group_catalog::ResourceGroupMembers>,
 }

@@ -355,6 +355,28 @@
       ],
       "type": "object"
     },
+    "AmmoBinding": {
+      "description": "The original ammunition links authored on a physical Item component.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "containerSlots",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ContainerAmmoSlots"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
     "AmmoBreakablePhysics": {
       "description": "Original breakable physics parameters.",
       "properties": {
@@ -404,6 +426,78 @@
       "required": [
         "gameCollisionClass",
         "gameIgnoreCollisionClass"
+      ],
+      "type": "object"
+    },
+    "AmmoContainer": {
+      "description": "The authored configuration of one physical Item ammunition container.",
+      "properties": {
+        "allowAmmoRepool": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "ammoContainerType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "ammoCountAnimationBlendTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "ammoCountFragment": {
+          "$ref": "#/$defs/SourcedValueOfAmmoFragment"
+        },
+        "attachableEntities": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfAttachableEntity"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "despawnEmptyAmmoContainer": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "emptyGeometryTag": {
+          "$ref": "#/$defs/SourcedValueOfSourceText"
+        },
+        "hideAttachments": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfHideAttachment"
+        },
+        "initialAmmoCount": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "lowAmmoWarningPercentage": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxAmmoCount": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "maxRestockCount": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "allowAmmoRepool",
+        "ammoContainerType",
+        "ammoCountAnimationBlendTime",
+        "ammoCountFragment",
+        "attachableEntities",
+        "componentOrdinal",
+        "despawnEmptyAmmoContainer",
+        "emptyGeometryTag",
+        "hideAttachments",
+        "initialAmmoCount",
+        "lowAmmoWarningPercentage",
+        "maxAmmoCount",
+        "maxRestockCount",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -614,6 +708,21 @@
         "useInConvergence",
         "whizSound",
         "whizSoundDistance"
+      ],
+      "type": "object"
+    },
+    "AmmoFragment": {
+      "properties": {
+        "forceWeaponController": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "fragment": {
+          "$ref": "#/$defs/SourcedValueOfSourceText"
+        }
+      },
+      "required": [
+        "forceWeaponController",
+        "fragment"
       ],
       "type": "object"
     },
@@ -1051,6 +1160,25 @@
       "required": [
         "damageResistance",
         "integrityMilestoneToBreak"
+      ],
+      "type": "object"
+    },
+    "AttachableEntity": {
+      "properties": {
+        "entityClassName": {
+          "$ref": "#/$defs/SourcedValueOfSourceText"
+        },
+        "sourcePort": {
+          "$ref": "#/$defs/SourcedValueOfSourceText"
+        },
+        "targetPort": {
+          "$ref": "#/$defs/SourcedValueOfSourceText"
+        }
+      },
+      "required": [
+        "entityClassName",
+        "sourcePort",
+        "targetPort"
       ],
       "type": "object"
     },
@@ -2894,6 +3022,9 @@
     "CatalogConfigurations": {
       "description": "Contextual configurations referring to their physical owners.",
       "properties": {
+        "ammoContainers": {
+          "$ref": "#/$defs/CatalogTableOfAmmoContainer"
+        },
         "blueprintTiers": {
           "$ref": "#/$defs/CatalogTableOfBlueprintTier"
         },
@@ -2935,6 +3066,7 @@
         }
       },
       "required": [
+        "ammoContainers",
         "blueprintTiers",
         "contractTemplates",
         "degradation",
@@ -2954,6 +3086,9 @@
     "CatalogDeclarations": {
       "description": "Original ordered uses, independently of reusable definitions and derived paths.",
       "properties": {
+        "ammoBindings": {
+          "$ref": "#/$defs/CatalogTableOfAmmoBinding"
+        },
         "blueprintCategoryLists": {
           "$ref": "#/$defs/CatalogTableOfBlueprintCategoryList"
         },
@@ -2971,6 +3106,7 @@
         }
       },
       "required": [
+        "ammoBindings",
         "blueprintCategoryLists",
         "entityTags",
         "resourceGroupMembers",
@@ -3165,6 +3301,44 @@
         "status",
         "targetRecordIndex",
         "targetType"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfAmmoBinding": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/AmmoBinding"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfAmmoContainer": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/AmmoContainer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
       ],
       "type": "object"
     },
@@ -5093,6 +5267,34 @@
         }
       ],
       "required": []
+    },
+    "ContainerAmmoSlots": {
+      "description": "The two ordered source roles owned by one container.",
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "primaryAmmo": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "secondaryAmmo": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "primaryAmmo",
+        "secondaryAmmo"
+      ],
+      "type": "object"
     },
     "ContractEntry": {
       "description": "A contract projection with its resolved intro requirements.",
@@ -10164,6 +10366,25 @@
       "required": [
         "normalTemperatureMultiplier",
         "overheatTemperatureMultiplier"
+      ],
+      "type": "object"
+    },
+    "HideAttachment": {
+      "properties": {
+        "ammoThreshold": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "attachmentName": {
+          "$ref": "#/$defs/SourcedValueOfSourceText"
+        },
+        "visible": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "ammoThreshold",
+        "attachmentName",
+        "visible"
       ],
       "type": "object"
     },
@@ -23042,6 +23263,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfAmmoFragment": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AmmoFragment"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfAmmoPenetration": {
       "allOf": [
         {
@@ -23926,6 +24277,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfAccumulator"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfAttachableEntity": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfAttachableEntity"
                 },
                 "type": "array"
               }
@@ -25389,6 +25873,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfHealthDamageState"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfHideAttachment": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfHideAttachment"
                 },
                 "type": "array"
               }
@@ -28187,6 +28804,136 @@
                   "type": "integer"
                 },
                 "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAttachableEntity": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AttachableEntity"
               }
             }
           }
@@ -33907,6 +34654,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/HeatMultipliers"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfHideAttachment": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/HideAttachment"
               }
             }
           }

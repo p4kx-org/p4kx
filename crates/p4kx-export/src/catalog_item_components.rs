@@ -6,6 +6,8 @@ use std::cell::RefCell;
 use p4kx_extraction::{CancelToken, DataForge, RecordTree, Value};
 
 use super::authored_fields::Observed;
+use super::catalog_ammo_bindings::{self, AmmoBinding};
+use super::catalog_ammo_containers::{self, AmmoContainer};
 use super::catalog_durability::{self, DurabilityComponent, DurabilityRows, DurabilityTables};
 use super::catalog_explosives::{self, Explosive, ExplosiveComponent};
 use super::catalog_hacking_chips::{self, HackingChip, HackingComponent};
@@ -24,6 +26,8 @@ pub(crate) struct ItemComponentRows<'source> {
     pub(crate) durability: DurabilityRows<'source>,
     pub(crate) explosives: Vec<Explosive<'source>>,
     pub(crate) hacking_chips: Vec<HackingChip<'source>>,
+    pub(crate) ammo_containers: Vec<AmmoContainer<'source>>,
+    pub(crate) ammo_bindings: Vec<AmmoBinding<'source>>,
     pub(crate) numbers: Vec<CapturedNumber>,
 }
 
@@ -32,6 +36,8 @@ impl<'source> ItemComponentRows<'source> {
         self.durability.extend(other.durability);
         self.explosives.extend(other.explosives);
         self.hacking_chips.extend(other.hacking_chips);
+        self.ammo_containers.extend(other.ammo_containers);
+        self.ammo_bindings.extend(other.ammo_bindings);
         self.numbers.extend(other.numbers);
     }
 
@@ -40,6 +46,8 @@ impl<'source> ItemComponentRows<'source> {
             durability: catalog_durability::tables(forge, self.durability),
             explosives: catalog_explosives::table(forge, self.explosives),
             hacking_chips: catalog_hacking_chips::table(forge, self.hacking_chips),
+            ammo_containers: catalog_ammo_containers::table(forge, self.ammo_containers),
+            ammo_bindings: catalog_ammo_bindings::table(forge, self.ammo_bindings),
         }
     }
 }
@@ -48,6 +56,8 @@ pub(crate) struct ItemComponentTables<'source> {
     pub(crate) durability: DurabilityTables<'source>,
     pub(crate) explosives: CatalogTable<Explosive<'source>>,
     pub(crate) hacking_chips: CatalogTable<HackingChip<'source>>,
+    pub(crate) ammo_containers: CatalogTable<AmmoContainer<'source>>,
+    pub(crate) ammo_bindings: CatalogTable<AmmoBinding<'source>>,
 }
 
 #[derive(Default)]
@@ -79,6 +89,18 @@ impl<'source> ItemComponentsRead<'source> {
                     .explosives
                     .push(Explosive::read(kind, owner, observed, &mut self.notes)?);
             }
+            Component::AmmoContainer => {
+                self.rows.ammo_containers.push(AmmoContainer::read(
+                    owner.clone(),
+                    observed,
+                    &mut self.notes,
+                )?);
+                self.rows.ammo_bindings.push(AmmoBinding::container(
+                    owner,
+                    observed,
+                    &mut self.notes,
+                )?);
+            }
             Component::Hacking(kind) => {
                 self.rows.hacking_chips.push(HackingChip::read(
                     kind,
@@ -97,6 +119,7 @@ enum Component {
     Durability(DurabilityComponent),
     Explosive(ExplosiveComponent),
     Hacking(HackingComponent),
+    AmmoContainer,
 }
 
 impl Component {
@@ -105,6 +128,9 @@ impl Component {
             return None;
         };
         let name = source.type_name();
+        if name == catalog_ammo_containers::SOURCE_TYPE {
+            return Some((value, Self::AmmoContainer));
+        }
         let kind = DurabilityComponent::of(name)
             .map(Self::Durability)
             .or_else(|| ExplosiveComponent::of(name).map(Self::Explosive))

@@ -62,7 +62,10 @@ fn weapons(loop_shape: TestStruct) -> Vec<TestStruct> {
             &["min", "max", "firstAttack", "attack", "decay"],
         ),
         component("SAmmoContainerComponentParams")
-            .field("ammoParamsRecord", TestType::Reference)
+            .field(
+                "ammoParamsRecord",
+                TestType::ReferenceTo("AmmoParams".to_owned()),
+            )
             .field("maxAmmoCount", TestType::Int32),
         TestStruct::new("AmmoParams")
             .field("speed", TestType::Single)

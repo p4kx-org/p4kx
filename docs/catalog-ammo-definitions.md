@@ -52,5 +52,25 @@ Record is materialized once for both the selected definition and weapon
 dependencies in a catalog scan. A filtered-out definition can still supply
 the legacy view of a selected weapon.
 
-Ammo-container configuration, primary/secondary binding and launcher
-selection have separate source owners and remain follow-up work.
+## Physical containers and slots
+
+`configurations.ammoContainers` contains one row for each physical
+`SAmmoContainerComponentParams` on a selected Item. The rows follow
+`ownerRecordIndex` and `componentOrdinal`, which together identify the
+original component occurrence. Repeated components keep separate rows.
+
+The container keeps the signed `initialAmmoCount` and `maxAmmoCount`, and
+the unsigned `maxRestockCount`. The warning percentage stays in its
+authored Single representation. The original enum, despawn and repool
+flags, empty geometry tag, fragment and blend time remain separate fields.
+Both attachment arrays preserve their original entries and order.
+
+`declarations.ammoBindings` carries a `containerSlots` declaration for each
+container occurrence. `primaryAmmo` and `secondaryAmmo` retain the original
+`ammoParamsRecord` and `secondaryAmmoParamsRecord` References separately.
+Join a resolved `targetRecordIndex` to the physical index in
+`definitions.ammoDefinitions` when the definition is selected. The binding
+retains its Reference status when the definition is excluded by the filter.
+Each slot requires a scalar Reference declared for `AmmoParams`. The source
+diagnostic preserves an incompatible declaration independently of a
+correctly declared Reference with a missing or differently typed target.

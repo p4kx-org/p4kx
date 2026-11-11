@@ -35,6 +35,10 @@ mod authored_ammo_inputs;
 mod authored_effect_resource;
 #[path = "authored_projectile.rs"]
 mod authored_projectile;
+#[path = "catalog_ammo_bindings.rs"]
+pub(crate) mod catalog_ammo_bindings;
+#[path = "catalog_ammo_containers.rs"]
+pub(crate) mod catalog_ammo_containers;
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
 #[path = "catalog_explosives.rs"]
