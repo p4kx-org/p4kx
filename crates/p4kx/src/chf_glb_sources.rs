@@ -32,6 +32,7 @@ mod parts;
 #[path = "chf_glb_report_origins.rs"]
 mod report;
 
+use character::CharacterInput;
 use parts::{Parts, image_material, rig};
 
 pub(super) struct Projection {
@@ -162,10 +163,19 @@ pub(super) fn project(
         "GLB texture evidence count differs"
     );
     let uses = SourceUses::new();
-    let character = character::whole(&uses, input)?;
-    let shape = character::shape(&uses, input, dna, armour, emission, summary.bones > 0)?;
-    let parts = Parts::read(&uses, armour, emission, summary.bones > 0, forge, shape)?;
-    let images = images(&uses, textures, emission, armour, forge)?;
+    let input = CharacterInput::observe(&uses, input)?;
+    let character = input.whole()?;
+    let shape = character::shape(&input, dna, armour, emission, summary.bones > 0)?;
+    let parts = Parts::read(
+        &uses,
+        armour,
+        emission,
+        summary.bones > 0,
+        forge,
+        shape,
+        &input,
+    )?;
+    let images = images(&uses, textures, emission, armour, forge, &input)?;
     let clips = animations(&uses, prepared, found, summary, &parts.bones)?;
     let mut payload = Contributors::default();
     for group in [
@@ -202,6 +212,7 @@ fn images(
     emission: &RiggedGlbEmission,
     armour: &Armour,
     forge: &DataForgeOrigin,
+    input: &CharacterInput,
 ) -> Result<Images> {
     let mut all = Contributors::default();
     let mut fields = Vec::new();
@@ -213,6 +224,7 @@ fn images(
             armour,
             forge,
             emission.image_material(index),
+            input,
         )?;
         for &read in image {
             if read.fallback {

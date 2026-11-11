@@ -27,6 +27,9 @@ type TestResult = Result<(), Box<dyn Error>>;
 #[path = "chf_glb_selectors.rs"]
 mod selectors;
 
+#[path = "chf_glb_look_origins.rs"]
+mod look_origins;
+
 fn stored(guid: u128) -> Result<[u8; 16], Box<dyn Error>> {
     let text = format!("{guid:032x}");
     let dashed = format!(

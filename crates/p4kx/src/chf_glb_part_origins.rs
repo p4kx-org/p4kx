@@ -13,6 +13,7 @@ use p4kx_extraction::{
 use p4kx_extraction::{RiggedGlbEmission, RiggedPartEmission};
 
 use super::Contributors;
+use super::character::CharacterInput;
 
 #[derive(Default)]
 pub(super) struct Parts {
@@ -46,6 +47,7 @@ impl Parts {
         bones_written: bool,
         forge: &DataForgeOrigin,
         shape: Contributors,
+        input: &CharacterInput,
     ) -> Result<Self> {
         let mut found = Self {
             shape,
@@ -55,7 +57,7 @@ impl Parts {
             add_model(uses, &mut found.bones, armour.skeleton_archive_source())?;
         }
         for (part, emitted) in armour.parts().iter().zip(emission.parts()) {
-            let origins = Part::read(uses, part, emitted, forge, &found.shape)?;
+            let origins = Part::read(uses, part, emitted, forge, &found.shape, input)?;
             if !part.model().nodes.is_empty() {
                 found.nodes.extend(&origins.selection);
             }
@@ -79,6 +81,7 @@ impl Part {
         emitted: &RiggedPartEmission,
         forge: &DataForgeOrigin,
         shape_choice: &Contributors,
+        input: &CharacterInput,
     ) -> Result<Self> {
         let mut found = Self {
             shaped: !part.shape_archive_sources().is_empty(),
@@ -129,7 +132,7 @@ impl Part {
                 }
             }
         }
-        found.material_slots = materials(uses, part, emitted, forge)?;
+        found.material_slots = materials(uses, part, emitted, forge, input)?;
         for material in found.material_slots.values() {
             found.materials.extend(material);
         }
@@ -194,6 +197,7 @@ fn materials(
     part: &ArmourPart,
     emitted: &RiggedPartEmission,
     forge: &DataForgeOrigin,
+    input: &CharacterInput,
 ) -> Result<BTreeMap<usize, Contributors>> {
     let mut found = BTreeMap::new();
     let archive = part.material_archive_origins();
@@ -202,6 +206,9 @@ fn materials(
         let mut source = Contributors::default();
         source.entry(uses, archive.library(), SourceUseRole::Conversion)?;
         dataforge_selector(uses, &mut source, forge, part.material_selector())?;
+        if emitted.material_uses_diffuse(slot) {
+            input.look(&mut source, part.look_sources_for(slot))?;
+        }
         for layer in emitted.material_layers(slot) {
             selected_layer(uses, &mut source, archive, slot, layer)?;
         }
@@ -219,6 +226,7 @@ pub(super) fn image_material(
     armour: &Armour,
     forge: &DataForgeOrigin,
     source: Option<&TextureMaterialSource>,
+    input: &CharacterInput,
 ) -> Result<()> {
     let Some(source) = source else {
         found.incomplete();
@@ -234,6 +242,9 @@ pub(super) fn image_material(
     let archive = part.material_archive_origins();
     found.entry(uses, archive.library(), SourceUseRole::Selector)?;
     dataforge_selector(uses, found, forge, part.material_selector())?;
+    if source.uses_diffuse {
+        input.look(found, part.look_sources_for(slot))?;
+    }
     for &layer in &source.layers {
         selected_layer(uses, found, archive, slot, layer)?;
     }

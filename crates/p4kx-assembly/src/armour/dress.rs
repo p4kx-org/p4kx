@@ -102,18 +102,19 @@ struct Dressing<'a> {
 
 impl Dressing<'_> {
     /// Returns the material choice for the item port `port`; the scalp takes the hair's.
-    fn choice_for(&self, port: &str) -> Option<&p4kx_character::Material> {
+    fn choice_for(&self, port: &str) -> Option<(usize, &p4kx_character::Material)> {
         let wanted = if port == SCALP_PORT { HAIR_PORT } else { port };
         let hash = skin_attachment(wanted);
         self.character
             .materials
             .iter()
-            .find(|material| material.attachment == hash)
+            .enumerate()
+            .find(|(_, material)| material.attachment == hash)
     }
 
     /// Draws `piece` as the Character chose its materials for `port`.
     fn styled(&self, mut piece: Piece, port: &str, items: &dyn HeadItems) -> Piece {
-        let Some(choice) = self.choice_for(port) else {
+        let Some((index, choice)) = self.choice_for(port) else {
             return piece;
         };
         if choice.base_material != ChfGuid::default() {
@@ -124,7 +125,7 @@ impl Dressing<'_> {
                 piece.noting(Note::UnknownMaterial(base.to_string()))
             };
         }
-        let look = Look::new(choice);
+        let look = Look::new(choice).observed_at(index);
         let textures = look.texture_choices();
         if textures > 0 {
             let what = format!("the {textures} texture choices (blemishes, makeup, tattoos)");

@@ -132,7 +132,8 @@ used to choose an item model or material library. A selected encrypted
 DataForge field can mark the result when the chosen model and texture files
 are clear. Shaped surface and morph values also identify the actual CHF
 face blend coordinates they consume. UV and index ranges have independent
-origins.
+origins. The receipt also identifies CHF colour and numeric values actually
+used by a material factor or a baked image.
 
 The `--json` report adds `originReceipt`, `fieldOrigins`, `provenance` and
 `textureImageOrigins`. Field origins use JSON Pointers into the report. The

@@ -51,8 +51,10 @@ pub(crate) enum TexturePaletteUse {
     /// The image conversion used no palette-controlled values.
     #[default]
     None,
-    /// The image conversion used the material's diffuse or specular shading.
-    Shading,
+    /// The image conversion used diffuse and specular shading.
+    DiffuseAndSpecular,
+    /// The image conversion used specular shading.
+    Specular,
     /// The image conversion used stencil decal colours.
     Decal,
     /// The image conversion used tint values of the selected layers.
@@ -61,6 +63,7 @@ pub(crate) enum TexturePaletteUse {
 
 /// The material that supplied the selected job for an embedded image.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct TextureMaterialSource {
     /// The part that supplied the selected job.
     pub part: usize,
@@ -70,4 +73,6 @@ pub struct TextureMaterialSource {
     pub layers: Vec<usize>,
     /// Whether the image conversion used palette-controlled values.
     pub uses_palette: bool,
+    /// Whether the image conversion used the material's own diffuse colour.
+    pub uses_diffuse: bool,
 }

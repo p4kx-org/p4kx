@@ -11,17 +11,49 @@ use p4kx_extraction::{
 
 use super::Contributors;
 
-pub(super) fn whole(uses: &SourceUses, input: &ObservedFileRead) -> Result<Contributors> {
-    let scope = observe(uses, input)?;
-    Ok(Contributors {
-        values: vec![scope.at(location("character".into()), SourceUseRole::Conversion)?],
-        complete: input.origin().is_some(),
-    })
+pub(super) struct CharacterInput {
+    scope: SourceScope,
+    complete: bool,
+}
+
+impl CharacterInput {
+    pub(super) fn observe(uses: &SourceUses, input: &ObservedFileRead) -> Result<Self> {
+        let origin = input.origin();
+        let scope = uses.observe(
+            origin.map_or(SourceInput::Unknown, SourceInput::File),
+            InputScope::Payload,
+        )?;
+        Ok(Self {
+            scope,
+            complete: origin.is_some(),
+        })
+    }
+
+    pub(super) fn whole(&self) -> Result<Contributors> {
+        Ok(Contributors {
+            values: vec![
+                self.scope
+                    .at(location("character".into()), SourceUseRole::Conversion)?,
+            ],
+            complete: self.complete,
+        })
+    }
+
+    pub(super) fn look(&self, found: &mut Contributors, fields: &[SourceLocation]) -> Result<()> {
+        if !fields.is_empty() {
+            found.complete &= self.complete;
+            for field in fields {
+                found
+                    .values
+                    .push(self.scope.at(field.clone(), SourceUseRole::Conversion)?);
+            }
+        }
+        Ok(())
+    }
 }
 
 pub(super) fn shape(
-    uses: &SourceUses,
-    input: &ObservedFileRead,
+    input: &CharacterInput,
     dna: Option<&Dna>,
     armour: &Armour,
     emission: &RiggedGlbEmission,
@@ -43,8 +75,8 @@ pub(super) fn shape(
         found.incomplete();
         return Ok(found);
     };
-    let scope = observe(uses, input)?;
-    found.complete = input.origin().is_some();
+    let scope = &input.scope;
+    found.complete = input.complete;
     found.values.push(scope.at(
         location("/character/dna/gender_hash".into()),
         SourceUseRole::Selector,
@@ -69,15 +101,6 @@ pub(super) fn shape(
         }
     }
     Ok(found)
-}
-
-fn observe(uses: &SourceUses, input: &ObservedFileRead) -> Result<SourceScope> {
-    Ok(uses.observe(
-        input
-            .origin()
-            .map_or(SourceInput::Unknown, SourceInput::File),
-        InputScope::Payload,
-    )?)
 }
 
 fn location(field: String) -> SourceLocation {

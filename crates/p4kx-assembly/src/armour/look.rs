@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::BTreeMap;
+
 use p4kx_character::{
     BODY_COLOR, EYE_COLOR, HAIR_DYE_COLOR, HAIR_TINT_COLOR, Material as Choice, SubMaterial,
     lowered_hash, name_hash,
 };
-use p4kx_model::{DIFFUSE_SLOT, Material, MaterialLibrary, MaterialStatus, srgb8_to_linear};
+use p4kx_extraction::SourceLocation;
+use p4kx_model::{DIFFUSE_SLOT, Material, MaterialLibrary, MaterialStatus};
+
+#[path = "look_inputs.rs"]
+mod inputs;
+
+use inputs::{ChosenFields, colour_of};
 
 const SKIN_SHADER: &str = "HumanSkin_V2";
 const EYE_SHADER: &str = "Eye";
@@ -27,6 +35,12 @@ const AUBURN: [f32; 3] = [0.25, 0.06, 0.02];
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Look {
     source: Source,
+    position: Option<usize>,
+}
+
+pub(super) struct AppliedLook {
+    pub(super) status: MaterialStatus,
+    pub(super) fields: BTreeMap<usize, Vec<SourceLocation>>,
 }
 
 /// Where the colours of a [`Look`] come from.
@@ -44,6 +58,7 @@ impl Look {
     pub fn new(choice: &Choice) -> Self {
         Self {
             source: Source::Chosen(choice.clone()),
+            position: None,
         }
     }
 
@@ -53,7 +68,13 @@ impl Look {
     pub const fn natural() -> Self {
         Self {
             source: Source::Natural,
+            position: None,
         }
+    }
+
+    pub(super) const fn observed_at(mut self, position: usize) -> Self {
+        self.position = Some(position);
+        self
     }
 
     /// Returns how many textures the choice sets, which the export does not draw.
@@ -74,18 +95,28 @@ impl Look {
     /// material changes.
     #[must_use]
     pub fn apply(&self, status: &MaterialStatus) -> Option<MaterialStatus> {
+        self.apply_observed(status).map(|applied| applied.status)
+    }
+
+    pub(super) fn apply_observed(&self, status: &MaterialStatus) -> Option<AppliedLook> {
         let library = status.library()?;
         let dyes = library
             .materials
             .iter()
             .any(|material| is_hair(material) && material.public_param("DyeAmount").is_some());
+        let mut fields = BTreeMap::new();
         let materials = match &self.source {
             Source::Natural => natural_materials(&library.materials, dyes),
-            Source::Chosen(choice) => chosen_materials(&library.materials, choice, dyes),
+            Source::Chosen(choice) => {
+                chosen_materials(&library.materials, choice, dyes, self.position, &mut fields)
+            }
         }?;
         let mut library: MaterialLibrary = library.clone();
         library.materials = materials;
-        Some(MaterialStatus::Loaded(library))
+        Some(AppliedLook {
+            status: MaterialStatus::Loaded(library),
+            fields,
+        })
     }
 }
 
@@ -107,12 +138,20 @@ fn chosen_materials(
     materials: &[Material],
     choice: &Choice,
     takes_dye: bool,
+    position: Option<usize>,
+    fields: &mut BTreeMap<usize, Vec<SourceLocation>>,
 ) -> Option<Vec<Material>> {
     let mut painted = materials.to_vec();
     let mut changed = false;
-    for material in &mut painted {
-        if let Some(sub) = sub_for(choice, material) {
-            changed |= customise(material, sub, takes_dye);
+    for (slot, material) in painted.iter_mut().enumerate() {
+        if let Some((index, sub)) = sub_for(choice, material) {
+            let mut read = ChosenFields::new(position, index);
+            if customise(material, sub, takes_dye, &mut read) {
+                changed = true;
+                if let Some(observed) = read.finish() {
+                    fields.insert(slot, observed);
+                }
+            }
         }
     }
     changed.then_some(painted)
@@ -122,19 +161,21 @@ fn chosen_materials(
 /// A hair material takes the first choice that sets a colour or a number when none is named so,
 /// because the choice of a beard or brow keeps the name of the sub-material of the style chosen
 /// before.
-fn sub_for<'c>(choice: &'c Choice, material: &Material) -> Option<&'c SubMaterial> {
+fn sub_for<'c>(choice: &'c Choice, material: &Material) -> Option<(usize, &'c SubMaterial)> {
     let hash = lowered_hash(&material.name);
     choice
         .sub_materials
         .iter()
-        .find(|sub| sub.name == hash)
+        .enumerate()
+        .find(|(_, sub)| sub.name == hash)
         .or_else(|| {
             is_hair(material)
                 .then(|| {
                     choice
                         .sub_materials
                         .iter()
-                        .find(|sub| !sub.colors.is_empty() || !sub.floats.is_empty())
+                        .enumerate()
+                        .find(|(_, sub)| !sub.colors.is_empty() || !sub.floats.is_empty())
                 })
                 .flatten()
         })
@@ -146,26 +187,6 @@ fn is_hair(material: &Material) -> bool {
         .any(|name| material.shader.eq_ignore_ascii_case(name))
 }
 
-fn linear([red, green, blue, _]: [u8; 4]) -> [f32; 3] {
-    [red, green, blue].map(srgb8_to_linear)
-}
-
-fn colour_of(sub: &SubMaterial, name: u32) -> Option<[f32; 3]> {
-    sub.colors
-        .iter()
-        .find(|colour| colour.name == name)
-        .map(|colour| linear(colour.rgba))
-}
-
-fn number(sub: Option<&SubMaterial>, material: &Material, name: &str) -> f32 {
-    let hash = name_hash(name);
-    sub.and_then(|sub| sub.floats.iter().find(|param| param.name == hash))
-        .map(|param| param.value)
-        .or_else(|| material.public_param(name).map(|value| value[0]))
-        .filter(|value| value.is_finite())
-        .map_or(0.0, |value| value.clamp(0.0, 1.0))
-}
-
 fn has_diffuse_texture(material: &Material) -> bool {
     material
         .textures
@@ -175,19 +196,23 @@ fn has_diffuse_texture(material: &Material) -> bool {
 
 /// Applies `sub` to `material`; `takes_dye` tells whether the library of a hair takes a dye, which
 /// the materials of brows do not: their shader has no dye parameters, so the choice's dye is unused.
-fn customise(material: &mut Material, sub: &SubMaterial, takes_dye: bool) -> bool {
-    let shader = material.shader.clone();
-    if shader.eq_ignore_ascii_case(SKIN_SHADER) {
+fn customise(
+    material: &mut Material,
+    sub: &SubMaterial,
+    takes_dye: bool,
+    read: &mut ChosenFields,
+) -> bool {
+    if material.shader.eq_ignore_ascii_case(SKIN_SHADER) {
         let Some(tone) = colour_of(sub, BODY_COLOR) else {
             return false;
         };
-        rebase(material, tone, "SourceAverageColor");
+        rebase(material, read.colour(tone), "SourceAverageColor");
         true
-    } else if shader.eq_ignore_ascii_case(EYE_SHADER) {
+    } else if material.shader.eq_ignore_ascii_case(EYE_SHADER) {
         let Some(iris) = colour_of(sub, EYE_COLOR) else {
             return false;
         };
-        rebase(material, iris, "IrisColor");
+        rebase(material, read.colour(iris), "IrisColor");
         true
     } else if is_hair(material) {
         let dye = colour_of(sub, HAIR_DYE_COLOR);
@@ -202,7 +227,9 @@ fn customise(material: &mut Material, sub: &SubMaterial, takes_dye: bool) -> boo
         {
             return false;
         }
-        material.diffuse = hair_colour(material, Some(sub), dye.filter(|_| takes_dye), tint);
+        let dye = dye.filter(|_| takes_dye).map(|colour| read.colour(colour));
+        let tint = tint.map(|colour| read.colour(colour));
+        material.diffuse = hair_colour(material, Some(sub), dye, tint, read);
         true
     } else {
         false
@@ -214,7 +241,7 @@ fn customise(material: &mut Material, sub: &SubMaterial, takes_dye: bool) -> boo
 fn own_hair(material: &mut Material, takes_dye: bool) {
     let tint = colour_param(material, HAIR_TINT_PARAM);
     let dye = colour_param(material, HAIR_DYE_PARAM).filter(|_| takes_dye);
-    material.diffuse = hair_colour(material, None, dye, tint);
+    material.diffuse = hair_colour(material, None, dye, tint, &mut ChosenFields::default());
 }
 
 /// Returns the colour parameter `name` of `material` with each channel clamped to 0..1; `None`
@@ -249,9 +276,10 @@ fn hair_colour(
     sub: Option<&SubMaterial>,
     dyed: Option<[f32; 3]>,
     tint: Option<[f32; 3]>,
+    read: &mut ChosenFields,
 ) -> [f32; 3] {
-    let melanin = number(sub, material, "BaseMelanin");
-    let redness = number(sub, material, "BaseMelaninRedness");
+    let melanin = read.number(sub, material, "BaseMelanin");
+    let redness = read.number(sub, material, "BaseMelaninRedness");
     let tint = tint.unwrap_or([1.0; 3]);
     let natural = natural_hair(melanin, redness);
     let natural = [0, 1, 2].map(|channel| {
@@ -259,7 +287,7 @@ fn hair_colour(
             * tint.get(channel).copied().unwrap_or(1.0)
     });
     dyed.map_or(natural, |dye| {
-        lerp(natural, dye, number(sub, material, "DyeAmount"))
+        lerp(natural, dye, read.number(sub, material, "DyeAmount"))
     })
 }
 

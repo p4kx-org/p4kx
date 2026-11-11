@@ -20,6 +20,12 @@ impl ArmourPart {
     pub const fn material_selector(&self) -> Option<&SourceLocation> {
         self.material_selector.as_ref()
     }
+    /// Returns the original CHF values applied to the slot's diffuse colour.
+    #[must_use]
+    pub fn look_sources_for(&self, slot: usize) -> &[SourceLocation] {
+        self.look_sources.get(&slot).map_or(&[], Vec::as_slice)
+    }
+
     /// Returns the material library and layer reads selected for this part.
     #[must_use]
     pub fn material_archive_origins(&self) -> &MaterialArchiveOrigins {

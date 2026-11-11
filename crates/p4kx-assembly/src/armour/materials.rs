@@ -3,10 +3,10 @@
 
 //! The material libraries the pieces of an Armour are drawn with.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
-use p4kx_extraction::{ArchiveMaterialRead, MaterialArchiveOrigins};
+use p4kx_extraction::{ArchiveMaterialRead, MaterialArchiveOrigins, SourceLocation};
 use p4kx_model::MaterialStatus;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -22,6 +22,7 @@ pub(super) struct Library {
     pub(super) status: Arc<MaterialStatus>,
     pub(super) origins: Arc<MaterialArchiveOrigins>,
     pub(super) palette: Option<PaletteApplication>,
+    pub(super) look_sources: BTreeMap<usize, Vec<SourceLocation>>,
 }
 
 impl From<ArchiveMaterialRead> for Library {
@@ -30,6 +31,7 @@ impl From<ArchiveMaterialRead> for Library {
             status: Arc::new(read.status),
             origins: Arc::new(read.origins),
             palette: None,
+            look_sources: BTreeMap::new(),
         }
     }
 }
@@ -80,12 +82,17 @@ pub(super) fn drawn_with(
     let (painted, palette) = painted(tints, library.status, job, issues);
     library.palette = palette;
     let natural = Look::natural();
-    library.status = job
+    if let Some(applied) = job
         .look
         .as_ref()
         .unwrap_or(&natural)
-        .apply(&painted)
-        .map_or(painted, Arc::new);
+        .apply_observed(&painted)
+    {
+        library.status = Arc::new(applied.status);
+        library.look_sources = applied.fields;
+    } else {
+        library.status = painted;
+    }
     library
 }
 

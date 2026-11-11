@@ -73,7 +73,7 @@ fn image_material(
     let uses_palette = match outcome.palette_use {
         TexturePaletteUse::None => false,
         TexturePaletteUse::Decal => true,
-        TexturePaletteUse::Shading => {
+        TexturePaletteUse::DiffuseAndSpecular | TexturePaletteUse::Specular => {
             layers.extend(
                 shaded_layers(material)
                     .into_iter()
@@ -89,6 +89,8 @@ fn image_material(
         }
         TexturePaletteUse::Layers => layer_palette(material, &layers),
     };
+    let uses_diffuse =
+        outcome.palette_use == TexturePaletteUse::DiffuseAndSpecular && layers.is_empty();
     TextureMaterialSource {
         part,
         slot: match slot {
@@ -97,6 +99,7 @@ fn image_material(
         },
         layers,
         uses_palette,
+        uses_diffuse,
     }
 }
 

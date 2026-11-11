@@ -171,6 +171,7 @@ fn part_of(
             }
         }),
         materials: materials.status,
+        look_sources: materials.look_sources,
         material_archive_origins: materials.origins,
         palette: materials.palette,
         shape_sources,

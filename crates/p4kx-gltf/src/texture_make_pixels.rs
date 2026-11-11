@@ -42,7 +42,7 @@ pub(super) fn make_base(
         );
     }
     if specular.is_some() {
-        outcome.palette_use = TexturePaletteUse::Shading;
+        outcome.palette_use = TexturePaletteUse::DiffuseAndSpecular;
     }
     let components = if keep_alpha && diffuse.has_alpha {
         TextureComponents::ColorAndAlpha
@@ -107,7 +107,7 @@ pub(super) fn make_packed(
     ) {
         Ok(Some(packed)) => {
             if specular.is_some() {
-                outcome.palette_use = TexturePaletteUse::Shading;
+                outcome.palette_use = TexturePaletteUse::Specular;
             }
             outcome.texture_sources.extend(
                 gloss

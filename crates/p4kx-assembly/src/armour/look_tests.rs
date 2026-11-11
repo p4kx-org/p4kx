@@ -2,9 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_character::{
-    BODY_COLOR, ColorParam, EYE_COLOR, FloatParam, Guid, HAIR_DYE_COLOR, Label, Material as Choice,
-    SubMaterial, lowered_hash, name_hash,
+    BODY_COLOR, ColorParam, EYE_COLOR, FloatParam, Guid, HAIR_DYE_COLOR, HAIR_TINT_COLOR, Label,
+    Material as Choice, SubMaterial, lowered_hash, name_hash,
 };
+use p4kx_extraction::SourceLocation;
 use p4kx_model::{MaterialLibrary, MaterialStatus};
 
 use super::Look;
@@ -248,4 +249,51 @@ fn a_choice_that_names_no_material_changes_nothing() {
 
     assert!(skin.apply(&library(SKIN)).is_none());
     assert!(skin.apply(&MaterialStatus::Unnamed).is_none());
+}
+
+#[test]
+fn look_sources_preserve_applied_rgb_and_numeric_slots_without_unused_dye() {
+    let choice = look(
+        "another_hair",
+        vec![
+            colour(HAIR_DYE_COLOR, [0, 0, 255, 255]),
+            colour(HAIR_TINT_COLOR, [255, 0, 0, 255]),
+        ],
+        vec![
+            FloatParam {
+                name: name_hash("BaseMelanin"),
+                label: Label,
+                value: 0.5,
+            },
+            FloatParam {
+                name: name_hash("DyeAmount"),
+                label: Label,
+                value: 1.0,
+            },
+        ],
+    )
+    .observed_at(4);
+    let selected = choice
+        .apply_observed(&library(PLAIN))
+        .expect("applied hair tint");
+    let paths: Vec<_> = selected
+        .fields
+        .get(&0)
+        .expect("the first material slot")
+        .iter()
+        .filter_map(|input| match input {
+            SourceLocation::Subresource { field, .. } => Some(field.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        paths,
+        [
+            "/character/materials/4/sub_materials/0/colors/1/rgba/0",
+            "/character/materials/4/sub_materials/0/colors/1/rgba/1",
+            "/character/materials/4/sub_materials/0/colors/1/rgba/2",
+            "/character/materials/4/sub_materials/0/floats/0/value",
+        ],
+        "the unsupported dye and ignored alpha do not contribute"
+    );
 }

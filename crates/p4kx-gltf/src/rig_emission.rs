@@ -7,7 +7,7 @@ use crate::instance::Instance;
 use crate::layout::Layout;
 use crate::materials::Slot;
 use crate::rig_addresses::{Addresses, RiggedBufferView, RiggedJsonAddress};
-use crate::shading::shaded_layers;
+use crate::shading::{shaded_layers, uses_plain_diffuse};
 use crate::texture_origins::{TextureMaterialSource, TextureReadUse};
 use crate::texture_plan::TextureSet;
 
@@ -18,6 +18,7 @@ pub struct RiggedPartEmission {
     skinned: bool,
     morphs: bool,
     material_slots: BTreeMap<usize, BTreeSet<usize>>,
+    diffuse_slots: BTreeSet<usize>,
 }
 
 impl RiggedPartEmission {
@@ -53,6 +54,12 @@ impl RiggedPartEmission {
             .copied()
     }
 
+    /// Returns whether the material factor used this slot's own diffuse colour.
+    #[must_use]
+    pub fn material_uses_diffuse(&self, slot: usize) -> bool {
+        self.diffuse_slots.contains(&slot)
+    }
+
     fn observe_slot(
         &mut self,
         part: usize,
@@ -62,6 +69,7 @@ impl RiggedPartEmission {
     ) {
         self.material_slots.entry(slot).or_insert_with(|| {
             let material_slot = Slot::Library(slot);
+            let material = instance.plan.material(material_slot);
             let images = textures.of(part, material_slot);
             let tinted = images.base.is_some_and(|base| base.tinted);
             let layered = images.base.is_some_and(|base| base.layered);
@@ -74,12 +82,15 @@ impl RiggedPartEmission {
             let mut layers = BTreeSet::new();
             if !tinted || !roughness || (layered && !metallic) {
                 layers.extend(
-                    shaded_layers(instance.plan.material(material_slot))
+                    shaded_layers(material)
                         .into_iter()
                         .flatten()
                         .filter(|layer| layer.share > 0.0)
                         .map(|layer| layer.at),
                 );
+            }
+            if !tinted && layers.is_empty() && uses_plain_diffuse(material) {
+                self.diffuse_slots.insert(slot);
             }
             for image in [images.base.map(|image| image.image), images.normal]
                 .into_iter()

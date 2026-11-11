@@ -46,6 +46,7 @@ mod vec3;
 mod wearable;
 mod zones;
 
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::sync::Arc;
 
@@ -95,6 +96,7 @@ pub struct ArmourPart {
     pub(crate) definition_origin: Option<EntryOrigin>,
     pub(crate) geometry_selector: Option<SourceLocation>,
     pub(crate) material_selector: Option<SourceLocation>,
+    pub(crate) look_sources: BTreeMap<usize, Vec<SourceLocation>>,
     pub(crate) materials: Arc<MaterialStatus>,
     pub(crate) material_archive_origins: Arc<MaterialArchiveOrigins>,
     pub(crate) palette: Option<materials::PaletteApplication>,
