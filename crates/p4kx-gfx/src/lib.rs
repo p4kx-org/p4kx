@@ -51,6 +51,7 @@ mod raster_budget;
 mod raster_mask;
 mod raster_paint;
 mod reader;
+mod render_inputs;
 mod scene;
 mod scene_compose;
 mod scene_edit_text;
@@ -107,6 +108,10 @@ pub use scene::{
     MAX_SCENE_MASKS, MAX_SCENE_PATHS, MAX_SCENE_PLACEMENTS, MAX_SCENE_RECORDS, MAX_SCENE_SEGMENTS,
     Origin, Paint, PathCommand, Scene, SceneItem, SceneMask, ScenePath, ScenePoint, SceneShape,
     ShapeLayer, Spread, StrokeStyle,
+};
+pub use scene_compose::{
+    ObservedScene, SceneDefinitionOrigin, SceneDrawOrigin, SceneGlyphOrigin, SceneMaskOrigin,
+    SceneOrigins, ScenePlacementOrigin,
 };
 pub use scene_report::{MAX_SPRITE_DEPTH, SkipReason, Skipped};
 pub use scene_text::MAX_SCENE_GLYPHS;

@@ -11,6 +11,7 @@ mod imports;
 mod render_bitmap_inputs;
 mod render_limits;
 mod render_scene;
+mod render_scene_inputs;
 mod render_shapes;
 mod robustness;
 mod shapes;

@@ -21,6 +21,8 @@ pub(crate) mod ui_movie;
 pub(crate) mod ui_movie_evidence;
 #[path = "ui_render_bitmap_sources.rs"]
 mod ui_render_bitmap_sources;
+#[path = "ui_render_geometry.rs"]
+mod ui_render_geometry;
 
 pub use ui_extract::{
     ObservedUiExtraction, UiAssetFailure, UiAssetKind, UiExtraction, WrittenUiAsset,

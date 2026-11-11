@@ -194,6 +194,15 @@ fn only_painted_bitmaps_bind_the_actual_selected_movie_and_dds_entries() -> Test
     assert_eq!(painted.id, 3);
     assert_eq!(painted.origin.contains_encrypted_source(), Some(true));
     assert!(painted.origin.source_set_complete());
+    assert_eq!(
+        observed.movie_geometry.contains_encrypted_source(),
+        Some(false),
+        "the unencrypted movie geometry has a different origin from the painted pixels"
+    );
+    assert!(
+        observed.movie_geometry.source_set_complete(),
+        "the actually drawn movie declarations are bound"
+    );
     check_bitmap_sources(&observed.provenance)
 }
 

@@ -4,7 +4,7 @@
 use crate::assets::Assets;
 use crate::header::{Header, read_file_header, read_movie};
 use crate::scene::Scene;
-use crate::scene_compose::Composer;
+use crate::scene_compose::{Composer, ObservedScene};
 use crate::text_fonts::TextOptions;
 use crate::walker::Walker;
 use crate::{AssetOrigins, GfxError, MovieSource};
@@ -117,5 +117,15 @@ impl Movie {
     #[must_use]
     pub fn first_frame_with_text(&self, assets: &Assets<'_>, options: &TextOptions<'_>) -> Scene {
         Composer::compose(assets, self.header.frame_size, options)
+    }
+
+    /// Composes a frame and retains the physical asset ordinals selected by its drawings.
+    #[must_use]
+    pub fn first_frame_observed(
+        &self,
+        assets: &Assets<'_>,
+        options: &TextOptions<'_>,
+    ) -> ObservedScene {
+        Composer::compose_observed(assets, self.header.frame_size, options)
     }
 }

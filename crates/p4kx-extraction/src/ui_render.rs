@@ -5,7 +5,7 @@ use std::path::Path;
 
 use p4kx_gfx::{
     Assets, GfxError, Localise, MAX_BITMAP_PIXELS, Raster, RasterOptions, RgbaImage, Scene,
-    Skipped, TagFailure, TextOptions,
+    SceneOrigins, Skipped, TagFailure, TextOptions,
 };
 use p4kx_localization::decode_line_breaks;
 
@@ -47,6 +47,7 @@ pub struct UiRender {
 /// A composed first frame with its decoded bitmaps.
 pub(crate) struct ComposedFrame<'archive> {
     pub(crate) scene: Scene,
+    pub(crate) origins: Option<SceneOrigins>,
     pub(crate) bitmaps: FrameBitmaps<'archive>,
     pub(crate) tag_failures: Vec<TagFailure>,
     pub(crate) imports: ImportReport,
@@ -88,13 +89,14 @@ impl<'archive> UiMovie<'archive> {
         &self,
         options: &RasterOptions,
     ) -> Result<ComposedFrame<'archive>, ConversionError> {
-        self.compose_frame_with_assets(options, self.movie().assets())
+        self.compose_frame_with_assets(options, self.movie().assets(), false)
     }
 
     pub(crate) fn compose_frame_with_assets(
         &self,
         options: &RasterOptions,
         mut assets: Assets<'_>,
+        observe: bool,
     ) -> Result<ComposedFrame<'archive>, ConversionError> {
         let ini = self
             .texts()
@@ -120,13 +122,22 @@ impl<'archive> UiMovie<'archive> {
             fonts: &imported.fonts,
             localise: ini.as_ref().map(|_| &lookup as Localise<'_>),
         };
-        let scene = self.movie().first_frame_with_text(&assets, &text_options);
+        let (scene, origins) = if observe {
+            let observed = self.movie().first_frame_observed(&assets, &text_options);
+            (observed.scene, Some(observed.origins))
+        } else {
+            (
+                self.movie().first_frame_with_text(&assets, &text_options),
+                None,
+            )
+        };
         scene
             .canvas_size(options.size)
             .map_err(|source| self.frame_error(source))?;
         let bitmaps = self.frame_bitmaps(&assets, &scene.bitmap_ids());
         Ok(ComposedFrame {
             scene,
+            origins,
             bitmaps,
             tag_failures: std::mem::take(&mut assets.failures),
             imports: imported.report,

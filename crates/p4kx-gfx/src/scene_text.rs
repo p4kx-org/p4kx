@@ -184,6 +184,9 @@ impl Composer<'_> {
         let (shape, issues) = filled_glyph(font.id, color, records);
         let index = self.insert_shape(shape, issues);
         self.text.glyph_shapes.insert(key, index);
+        if let Some(origins) = &mut self.origins {
+            origins.glyph(index, (key.0, key.1));
+        }
         Some(index)
     }
 

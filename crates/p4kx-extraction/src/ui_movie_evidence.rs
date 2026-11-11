@@ -131,6 +131,10 @@ impl UiMovieEvidence {
         self.bound
     }
 
+    pub(crate) const fn stage(&self) -> MovieSpan {
+        self.read.stage
+    }
+
     /// Registers the stored Entry name or the observed standalone filename.
     ///
     /// # Errors

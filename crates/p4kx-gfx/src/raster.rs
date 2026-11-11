@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use tiny_skia::{Color, FillRule, Mask, Path, Pixmap};
@@ -12,6 +12,7 @@ use crate::image::RgbaImage;
 use crate::raster_budget::{Coverage, RasterLimits, covered_pixels};
 use crate::raster_mask::Masks;
 use crate::raster_paint::{BitmapCache, paint, path, stroke, transform};
+use crate::render_inputs::RenderInputs;
 use crate::scene::{Affine, LayerKind, Paint as ScenePaint, Scene, SceneItem};
 use crate::scene_report::{SkipReason, Skipped};
 
@@ -77,6 +78,8 @@ pub struct ObservedRaster {
     pub raster: Raster,
     /// Sorted bitmap IDs supplied to successful on-canvas paint operations.
     pub bitmap_inputs: Vec<u16>,
+    /// Scene item ordinals supplied to successful on-canvas paint operations.
+    pub item_inputs: Vec<usize>,
 }
 
 impl Scene {
@@ -109,16 +112,13 @@ impl Scene {
         bitmaps: &HashMap<u16, RgbaImage>,
         options: &RasterOptions,
     ) -> Result<ObservedRaster, GfxError> {
-        let mut bitmap_inputs = BTreeSet::new();
-        let raster = self.rasterize_observing(
-            bitmaps,
-            options,
-            &RasterLimits::DEFAULT,
-            Some(&mut bitmap_inputs),
-        )?;
+        let mut inputs = RenderInputs::default();
+        let raster =
+            self.rasterize_observing(bitmaps, options, &RasterLimits::DEFAULT, Some(&mut inputs))?;
         Ok(ObservedRaster {
             raster,
-            bitmap_inputs: bitmap_inputs.into_iter().collect(),
+            bitmap_inputs: inputs.bitmaps.into_iter().collect(),
+            item_inputs: inputs.items,
         })
     }
 
@@ -145,7 +145,7 @@ impl Scene {
         bitmaps: &HashMap<u16, RgbaImage>,
         options: &RasterOptions,
         limits: &RasterLimits,
-        bitmap_inputs: Option<&mut BTreeSet<u16>>,
+        inputs: Option<&mut RenderInputs>,
     ) -> Result<Raster, GfxError> {
         let (width, height, root) = canvas(self, options.size)?;
         let mut pixmap =
@@ -177,7 +177,7 @@ impl Scene {
             coverage: Coverage::new(width, height, limits.coverage_factor),
             canvas: (width, height),
             exhausted: false,
-            bitmap_inputs,
+            inputs,
         };
         let mut masks = Masks::new(self, width, height, limits.mask_bytes);
         for (at, item) in self.items.iter().enumerate() {
@@ -196,7 +196,7 @@ impl Scene {
                 },
                 None => None,
             };
-            frame.draw(item, &mut pixmap, mask);
+            frame.draw(at, item, &mut pixmap, mask);
             masks.release(at);
             if frame.exhausted {
                 break;
@@ -219,7 +219,7 @@ struct Frame<'s, 'b, 'uses> {
     coverage: Coverage,
     canvas: (u32, u32),
     exhausted: bool,
-    bitmap_inputs: Option<&'uses mut BTreeSet<u16>>,
+    inputs: Option<&'uses mut RenderInputs>,
 }
 
 impl Frame<'_, '_, '_> {
@@ -235,7 +235,7 @@ impl Frame<'_, '_, '_> {
         }
     }
 
-    fn draw(&mut self, item: &SceneItem, pixmap: &mut Pixmap, mask: Option<&Mask>) {
+    fn draw(&mut self, ordinal: usize, item: &SceneItem, pixmap: &mut Pixmap, mask: Option<&Mask>) {
         let (Some(shape), Some(outlines)) = (
             self.scene.shapes.get(item.shape),
             self.paths.get(item.shape),
@@ -279,18 +279,21 @@ impl Frame<'_, '_, '_> {
                 Err(reason) => Err(reason),
             };
             match drawn {
-                Ok(()) => self.observe_paint(cost, &layer.paint),
+                Ok(()) => self.observe_paint(ordinal, cost, &layer.paint),
                 Err(reason) => self.skip(item, reason),
             }
         }
     }
 
-    fn observe_paint(&mut self, coverage: u64, paint: &ScenePaint) {
-        if coverage != 0
-            && let ScenePaint::Bitmap(bitmap) = paint
-            && let Some(inputs) = self.bitmap_inputs.as_deref_mut()
-        {
-            inputs.insert(bitmap.bitmap_id);
+    fn observe_paint(&mut self, ordinal: usize, coverage: u64, paint: &ScenePaint) {
+        if coverage == 0 {
+            return;
+        }
+        if let Some(inputs) = self.inputs.as_deref_mut() {
+            inputs.item(ordinal);
+            if let ScenePaint::Bitmap(bitmap) = paint {
+                inputs.bitmaps.insert(bitmap.bitmap_id);
+            }
         }
     }
 }

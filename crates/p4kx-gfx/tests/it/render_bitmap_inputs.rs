@@ -104,6 +104,7 @@ fn raster_reports_successful_on_canvas_bitmap_paints_and_keeps_the_same_pixels()
         [2],
         "only admitted on-canvas paints"
     );
+    assert_eq!(observed.item_inputs, [0, 1], "actual raster paint items");
     assert_eq!(
         observed.raster, original,
         "identical pixels and diagnostics"
@@ -131,6 +132,8 @@ fn svg_reports_the_images_emitted_even_if_one_is_positioned_outside_the_canvas()
         [2, 3],
         "these images occur in the SVG bytes"
     );
+    assert_eq!(observed.item_inputs, [0, 1, 2], "actual SVG use elements");
+    assert!(observed.mask_inputs.is_empty(), "no emitted masks");
     assert_eq!(observed.svg, prior, "identical dimensions and diagnostics");
     assert_eq!(output, original, "byte-for-byte output parity");
     let document = std::str::from_utf8(&output)?;
@@ -139,5 +142,24 @@ fn svg_reports_the_images_emitted_even_if_one_is_positioned_outside_the_canvas()
         2,
         "actual embedded images"
     );
+    Ok(())
+}
+
+#[test]
+fn svg_records_a_written_mask_and_excludes_unemitted_masks() -> TestResult {
+    let (mut scene, bitmaps) = fixture()?;
+    for _ in 0..2 {
+        scene.masks.push(p4kx_gfx::SceneMask {
+            shapes: vec![(0, Affine::IDENTITY)],
+            parent: None,
+        });
+    }
+    scene.items.first_mut().ok_or("painted item")?.mask = Some(0);
+    let mut output = Vec::new();
+    let observed = scene.write_svg_observed(&bitmaps, &OPTIONS, None, &mut output)?;
+    assert_eq!(observed.mask_inputs, [0], "only the written mask");
+    let xml = std::str::from_utf8(&output)?;
+    assert!(xml.contains("<mask id=\"m0\""), "used mask definition");
+    assert!(!xml.contains("<mask id=\"m1\""), "unused mask omitted");
     Ok(())
 }

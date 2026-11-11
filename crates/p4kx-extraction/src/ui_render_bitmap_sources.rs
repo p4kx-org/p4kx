@@ -5,7 +5,7 @@ use std::io;
 
 use p4kx_gfx::RasterOptions;
 
-use super::ui_bitmap_sources;
+use super::{ui_bitmap_sources, ui_render_geometry};
 use crate::output_file::read_error;
 use crate::{
     ConversionError, FieldOrigin, SourceInventory, SourceUses, UiMovie, UiMovieEvidence, UiRender,
@@ -29,7 +29,9 @@ pub struct UiRenderBitmapSources {
     pub render: UiRender,
     /// The bitmap inputs selected by the raster backend.
     pub bitmaps: Vec<UiRenderedBitmap>,
-    /// The physical sources and uses referenced by those bitmap inputs.
+    /// Stage and drawing instructions supplied by the main movie.
+    pub movie_geometry: FieldOrigin,
+    /// The physical sources and uses referenced by the movie geometry and bitmap inputs.
     pub provenance: SourceInventory,
 }
 
@@ -44,44 +46,51 @@ impl UiMovie<'_> {
         options: &RasterOptions,
     ) -> Result<UiRenderBitmapSources, ConversionError> {
         let observed = self.movie().assets_observed();
-        let frame = self.compose_frame_with_assets(options, observed.assets)?;
+        let frame = self.compose_frame_with_assets(options, observed.assets, true)?;
         let raster = frame
             .scene
             .rasterize_observed(&frame.bitmaps.images, options)
             .map_err(|source| self.frame_error(source))?;
         let evidence = || -> io::Result<_> {
             let uses = SourceUses::new();
+            let movie = UiMovieEvidence::observe(self, &uses).map_err(io::Error::other)?;
+            let movie_geometry = ui_render_geometry::register(
+                &uses,
+                &movie,
+                &observed.origins,
+                &frame,
+                &raster.item_inputs,
+                options.background,
+            )?;
             let mut bitmaps = Vec::new();
-            if !raster.bitmap_inputs.is_empty() {
-                let movie = UiMovieEvidence::observe(self, &uses).map_err(io::Error::other)?;
-                for id in raster.bitmap_inputs {
-                    let (order, source) = frame.bitmaps.source(id).ok_or_else(|| {
-                        io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "drawn bitmap has no decoded source",
-                        )
-                    })?;
-                    let (contributions, complete) = ui_bitmap_sources::contributions(
-                        &movie,
-                        &observed.origins,
-                        &uses,
-                        order,
-                        source,
-                    )?;
-                    bitmaps.push(UiRenderedBitmap {
-                        id,
-                        origin: uses.origin(&contributions, complete),
-                    });
-                }
+            for id in raster.bitmap_inputs {
+                let (order, source) = frame.bitmaps.source(id).ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "drawn bitmap has no decoded source",
+                    )
+                })?;
+                let (contributions, complete) = ui_bitmap_sources::contributions(
+                    &movie,
+                    &observed.origins,
+                    &uses,
+                    order,
+                    source,
+                )?;
+                bitmaps.push(UiRenderedBitmap {
+                    id,
+                    origin: uses.origin(&contributions, complete),
+                });
             }
             let provenance = uses.freeze().map_err(io::Error::other)?;
-            Ok((bitmaps, provenance))
+            Ok((bitmaps, movie_geometry, provenance))
         };
-        let (bitmaps, provenance) =
+        let (bitmaps, movie_geometry, provenance) =
             evidence().map_err(|source| read_error(self.name().as_ref(), source))?;
         Ok(UiRenderBitmapSources {
             render: frame.into_render(raster.raster),
             bitmaps,
+            movie_geometry,
             provenance,
         })
     }
