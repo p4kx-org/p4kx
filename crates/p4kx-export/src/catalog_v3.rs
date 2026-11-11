@@ -33,6 +33,8 @@ mod authored_effect_resource;
 pub(crate) mod catalog_declarations;
 #[path = "catalog_explosives.rs"]
 pub(crate) mod catalog_explosives;
+#[path = "catalog_hacking_chips.rs"]
+pub(crate) mod catalog_hacking_chips;
 #[path = "catalog_item_components.rs"]
 pub(crate) mod catalog_item_components;
 #[path = "item_component_owner.rs"]

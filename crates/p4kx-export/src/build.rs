@@ -203,10 +203,7 @@ fn assemble<R>(
         collected.resource_groups,
         collected.resource_group_members,
     );
-    let durability =
-        crate::catalog_v3::catalog_durability::tables(&forge, collected.item_components.durability);
-    let explosives =
-        crate::catalog_v3::catalog_explosives::table(&forge, collected.item_components.explosives);
+    let components = collected.item_components.into_tables(&forge);
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
         source: source(
@@ -309,10 +306,11 @@ fn assemble<R>(
             item_recovery_economy,
             item_recovery_overrides,
             item_recovery_policy,
-            durability: durability.health,
-            degradation: durability.degradation,
-            distortion: durability.distortion,
-            explosives,
+            durability: components.durability.health,
+            degradation: components.durability.degradation,
+            distortion: components.durability.distortion,
+            explosives: components.explosives,
+            hacking_chips: components.hacking_chips,
             contract_templates: CatalogTable::new(
                 &forge,
                 &["ContractTemplate"],

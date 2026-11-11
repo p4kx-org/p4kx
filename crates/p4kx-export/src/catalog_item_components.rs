@@ -3,16 +3,18 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, RecordTree, Value};
+use p4kx_extraction::{CancelToken, DataForge, RecordTree, Value};
 
 use super::authored_fields::Observed;
-use super::catalog_durability::{DurabilityComponent, DurabilityRows};
-use super::catalog_explosives::{Explosive, ExplosiveComponent};
+use super::catalog_durability::{self, DurabilityComponent, DurabilityRows, DurabilityTables};
+use super::catalog_explosives::{self, Explosive, ExplosiveComponent};
+use super::catalog_hacking_chips::{self, HackingChip, HackingComponent};
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_table::CatalogTable;
 use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
@@ -21,15 +23,31 @@ use crate::template_field_capture::TemplateFieldCapture;
 pub(crate) struct ItemComponentRows<'source> {
     pub(crate) durability: DurabilityRows<'source>,
     pub(crate) explosives: Vec<Explosive<'source>>,
+    pub(crate) hacking_chips: Vec<HackingChip<'source>>,
     pub(crate) numbers: Vec<CapturedNumber>,
 }
 
-impl ItemComponentRows<'_> {
+impl<'source> ItemComponentRows<'source> {
     pub(crate) fn extend(&mut self, other: Self) {
         self.durability.extend(other.durability);
         self.explosives.extend(other.explosives);
+        self.hacking_chips.extend(other.hacking_chips);
         self.numbers.extend(other.numbers);
     }
+
+    pub(crate) fn into_tables(self, forge: &DataForge<'_>) -> ItemComponentTables<'source> {
+        ItemComponentTables {
+            durability: catalog_durability::tables(forge, self.durability),
+            explosives: catalog_explosives::table(forge, self.explosives),
+            hacking_chips: catalog_hacking_chips::table(forge, self.hacking_chips),
+        }
+    }
+}
+
+pub(crate) struct ItemComponentTables<'source> {
+    pub(crate) durability: DurabilityTables<'source>,
+    pub(crate) explosives: CatalogTable<Explosive<'source>>,
+    pub(crate) hacking_chips: CatalogTable<HackingChip<'source>>,
 }
 
 #[derive(Default)]
@@ -61,6 +79,14 @@ impl<'source> ItemComponentsRead<'source> {
                     .explosives
                     .push(Explosive::read(kind, owner, observed, &mut self.notes)?);
             }
+            Component::Hacking(kind) => {
+                self.rows.hacking_chips.push(HackingChip::read(
+                    kind,
+                    owner,
+                    observed,
+                    &mut self.notes,
+                )?);
+            }
         }
         Ok(())
     }
@@ -70,6 +96,7 @@ impl<'source> ItemComponentsRead<'source> {
 enum Component {
     Durability(DurabilityComponent),
     Explosive(ExplosiveComponent),
+    Hacking(HackingComponent),
 }
 
 impl Component {
@@ -80,7 +107,8 @@ impl Component {
         let name = source.type_name();
         let kind = DurabilityComponent::of(name)
             .map(Self::Durability)
-            .or_else(|| ExplosiveComponent::of(name).map(Self::Explosive))?;
+            .or_else(|| ExplosiveComponent::of(name).map(Self::Explosive))
+            .or_else(|| HackingComponent::of(name).map(Self::Hacking))?;
         Some((value, kind))
     }
 }

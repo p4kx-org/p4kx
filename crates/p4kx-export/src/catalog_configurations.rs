@@ -8,6 +8,7 @@ use crate::broker_entry::BrokerProjection;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_durability::{Degradation, Distortion, Durability};
 use crate::catalog_v3::catalog_explosives::Explosive;
+use crate::catalog_v3::catalog_hacking_chips::HackingChip;
 use crate::contract_recovery::{ItemRecoveryEconomy, ItemRecoveryOverrides};
 use crate::recovery::ItemRecoveryPolicy;
 use crate::schema_fields::every_field_required;
@@ -25,6 +26,7 @@ pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) degradation: CatalogTable<Degradation>,
     pub(crate) distortion: CatalogTable<Distortion>,
     pub(crate) explosives: CatalogTable<Explosive<'source>>,
+    pub(crate) hacking_chips: CatalogTable<HackingChip<'source>>,
     pub(crate) mission_broker_entries: CatalogTable<BrokerProjection<'source>>,
     pub(crate) item_recovery_economy: CatalogTable<ItemRecoveryEconomy<'source>>,
     pub(crate) item_recovery_overrides: CatalogTable<ItemRecoveryOverrides>,
