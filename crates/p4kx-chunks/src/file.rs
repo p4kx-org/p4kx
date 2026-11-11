@@ -17,6 +17,7 @@ pub struct ChunkFile<B> {
     bytes: B,
     container: Container,
     chunks: Vec<Chunk>,
+    table: Range<u64>,
 }
 
 impl<B: AsRef<[u8]>> ChunkFile<B> {
@@ -55,6 +56,7 @@ impl<B: AsRef<[u8]>> ChunkFile<B> {
             bytes,
             container,
             chunks,
+            table: layout.table,
         })
     }
 
@@ -68,6 +70,20 @@ impl<B: AsRef<[u8]>> ChunkFile<B> {
     #[must_use]
     pub fn chunks(&self) -> &[Chunk] {
         &self.chunks
+    }
+
+    /// Returns the byte interval occupied by the validated table.
+    #[must_use]
+    pub fn table_range(&self) -> Range<u64> {
+        self.table.clone()
+    }
+
+    /// Returns the source intervals of one original table row.
+    #[must_use]
+    pub fn table_row(&self, index: usize) -> Option<ChunkTableRow> {
+        self.chunks.get(index)?;
+        let start = self.table.start + index as u64 * TABLE_ENTRY_LEN as u64;
+        Some(ChunkTableRow::at(start, self.container))
     }
 
     /// Returns the data of the chunk at `index` in the table, or `None` when there is no such chunk.
@@ -108,6 +124,44 @@ impl<B: AsRef<[u8]>> ChunkFile<B> {
             .iter()
             .enumerate()
             .find(|(_, chunk)| chunk.id == Some(id))
+    }
+}
+
+/// Byte intervals for the stored words of a validated chunk table row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ChunkTableRow {
+    /// The chunk type word.
+    pub kind: Range<u64>,
+    /// The layout version, including the byte-order flag in CrCh.
+    pub version: Range<u64>,
+    /// The chunk ID word when stored.
+    pub id: Option<Range<u64>>,
+    /// The payload offset word.
+    pub offset: Range<u64>,
+    /// The payload size word when stored.
+    pub size: Option<Range<u64>>,
+}
+
+impl ChunkTableRow {
+    fn at(start: u64, container: Container) -> Self {
+        let at = |from: u64, to: u64| start + from..start + to;
+        match container {
+            Container::Ivo => Self {
+                kind: at(0, 4),
+                version: at(4, 8),
+                id: None,
+                offset: at(8, 16),
+                size: None,
+            },
+            Container::CrCh => Self {
+                kind: at(0, 2),
+                version: at(2, 4),
+                id: Some(at(4, 8)),
+                offset: at(12, 16),
+                size: Some(at(8, 12)),
+            },
+        }
     }
 }
 

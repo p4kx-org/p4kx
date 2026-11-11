@@ -13,6 +13,9 @@ use p4kx_testkit::{
 };
 use predicates::prelude::predicate;
 
+#[path = "chunks_origin.rs"]
+mod origin;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const MODEL_ENTRY: &str = "Data\\Objects\\Test\\cube.cgf";
@@ -90,7 +93,17 @@ fn list_json_gives_every_chunk_as_an_object() -> TestResult {
         .output()?;
 
     assert_eq!(output.status.code(), Some(0), "success: {output:?}");
-    insta::assert_snapshot!(String::from_utf8(output.stdout)?);
+    let mut actual: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let report = actual.as_object_mut().ok_or("chunk report object")?;
+    assert!(report.remove("fieldOrigins").is_some(), "per-field origins");
+    assert!(report.remove("provenance").is_some(), "source inventory");
+    let previous =
+        include_str!("snapshots/it__chunks__list_json_gives_every_chunk_as_an_object.snap")
+            .lines()
+            .find(|line| line.starts_with('{'))
+            .ok_or("previous chunk-list JSON")?;
+    let previous: serde_json::Value = serde_json::from_str(previous)?;
+    assert_eq!(actual, previous, "the existing fields retain their values");
     Ok(())
 }
 

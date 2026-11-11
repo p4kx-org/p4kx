@@ -15,7 +15,7 @@ use crate::path_index::PathIndex;
 use crate::sound::read_capped;
 use crate::source_protection::SourceProtection;
 use crate::texture_parts::is_same_file;
-use crate::{ConversionError, UnknownEntries};
+use crate::{ConversionError, FileStamp, ObservedFileOrigin, SourceInput, UnknownEntries};
 
 /// The largest chunk file read into memory, far above the largest model of a real Archive.
 pub const MAX_CHUNK_FILE_LEN: u64 = 1 << 30;
@@ -28,6 +28,7 @@ pub struct ChunkSource {
     path: Option<PathBuf>,
     file: ChunkFile<Vec<u8>>,
     archive_origin: Option<EntryOrigin>,
+    file_origin: Option<ObservedFileOrigin>,
 }
 
 impl ChunkSource {
@@ -95,7 +96,19 @@ impl ChunkSource {
     /// [`ConversionError::ChunkFile`] when it is no valid chunk file, and another
     /// [`ConversionError`] when it cannot be read.
     pub fn from_file(path: &Path) -> Result<Self, ConversionError> {
-        let file = File::open(path).map_err(|source| {
+        Self::read_file(path, false)
+    }
+
+    /// Reads the standalone chunk file and observes its original input.
+    ///
+    /// # Errors
+    /// Returns a file-read, parse or source-observation error.
+    pub fn from_file_observed(path: &Path) -> Result<Self, ConversionError> {
+        Self::read_file(path, true)
+    }
+
+    fn read_file(path: &Path, observe: bool) -> Result<Self, ConversionError> {
+        let mut file = File::open(path).map_err(|source| {
             if source.kind() == io::ErrorKind::NotFound {
                 ConversionError::NoSuchFile {
                     path: path.to_path_buf(),
@@ -104,19 +117,27 @@ impl ChunkSource {
                 read_error(path, source)
             }
         })?;
-        let len = file
-            .metadata()
-            .map_err(|source| read_error(path, source))?
-            .len();
-        let bytes = read_capped(file, len, MAX_CHUNK_FILE_LEN)
+        let metadata = file.metadata().map_err(|source| read_error(path, source))?;
+        let bytes = read_capped(&mut file, metadata.len(), MAX_CHUNK_FILE_LEN)
             .map_err(|source| read_error(path, source))?;
-        Self::parse(
+        let byte_length = bytes.as_ref().map_or(0, Vec::len);
+        let mut source = Self::parse(
             path.display().to_string(),
             Some(path.to_path_buf()),
             bytes,
             MAX_CHUNK_FILE_LEN,
             SourceProtection::new(None),
-        )
+        )?;
+        if observe {
+            source.file_origin = ObservedFileOrigin::of_read(
+                path,
+                &file,
+                FileStamp::from_metadata(&metadata),
+                byte_length,
+            )
+            .map_err(|error| read_error(path, error))?;
+        }
+        Ok(source)
     }
 
     fn parse(
@@ -136,6 +157,7 @@ impl ChunkSource {
                 path,
                 file,
                 archive_origin: None,
+                file_origin: None,
             }),
             Err(source) => Err(ConversionError::ChunkFile { file: name, source }),
         }
@@ -157,6 +179,16 @@ impl ChunkSource {
     #[must_use]
     pub const fn archive_origin(&self) -> Option<&EntryOrigin> {
         self.archive_origin.as_ref()
+    }
+
+    /// Returns the exact Archive Entry or standalone file used by this read.
+    #[must_use]
+    pub const fn original_input(&self) -> SourceInput<'_> {
+        match (&self.archive_origin, &self.file_origin) {
+            (Some(entry), _) => SourceInput::Archive(entry),
+            (None, Some(file)) => SourceInput::File(file),
+            (None, None) => SourceInput::Unknown,
+        }
     }
 
     pub(crate) fn into_protection(self) -> SourceProtection {

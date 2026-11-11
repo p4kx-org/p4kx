@@ -18,6 +18,6 @@ mod types;
 pub use chunk::{Chunk, ChunkType};
 pub use container::{ByteOrder, Container};
 pub use error::ChunkError;
-pub use file::ChunkFile;
+pub use file::{ChunkFile, ChunkTableRow};
 pub use known::KnownChunkType;
 pub use types::{crch, ivo};

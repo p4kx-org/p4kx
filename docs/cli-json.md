@@ -2118,6 +2118,12 @@ any chunk, the chunk table or the end of the file, alignment padding included, s
 share an offset share their span; the table may list chunks in any order. A file that is no chunk
 file, has another container version or is truncated prints no JSON; it fails with exit code 3.
 
+The report also includes field-addressed origins in `fieldOrigins` and the referenced
+`provenance` inventory. Coordinates for stored words identify half-open decoded-file ranges.
+A table coordinate lists the row ordinal followed by the byte range. A derived `#ivo` size
+also links the offset column, table boundary and decoded extent. An Archive directory path
+has its own origin. A standalone file has unknown original Archive encryption.
+
 ## `p4kx chunks dump <archive> <entry> --chunk <index> --out <file> --json`
 
 Also `p4kx chunks dump <file> --chunk <index> --out <file> --json` for a chunk file on disk.
