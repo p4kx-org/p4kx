@@ -50,9 +50,12 @@ impl ArchiveAudio<'_> {
             .map(|event| select_holders(index, index.event_holders(event.id()), choice))
             .collect();
         let mut walks = self.walk_soundbanks(index, events, &holders, choice);
+        let definition = index.definition_file(trigger);
         let mut sounds = TriggerSounds {
             trigger,
-            definition_path: index.definition_path(trigger),
+            definition_path: definition.map(|(path, _)| path),
+            definition_entry: definition.map(|(_, position)| position),
+            choice: choice.clone(),
             variants: Vec::new(),
             breaks: Vec::new(),
         };

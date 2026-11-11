@@ -23,6 +23,12 @@ impl IndexedSoundbank {
         &self.path
     }
 
+    /// Returns the position of the soundbank Entry in the owning Archive.
+    #[must_use]
+    pub const fn entry_position(&self) -> usize {
+        self.entry
+    }
+
     /// Returns the file name of the soundbank Entry, e.g. `SSAM_ORIG_890J.bnk`.
     #[must_use]
     pub fn file_name(&self) -> &str {

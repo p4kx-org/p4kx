@@ -26,6 +26,7 @@ mod txtp;
 mod users;
 mod walk;
 mod walk_banks;
+mod wem_selection;
 
 pub use atl::{AtlTrigger, WwiseEvent};
 pub use banks::IndexedSoundbank;
@@ -45,6 +46,7 @@ pub use search::{MAX_SEARCH_PAGE, SearchPage, TriggerHit};
 pub use sounds::{NodeKind, PathStep, SoundVariant, SourceKind, TriggerSounds, WemLocation};
 pub use txtp::{TxtpFile, TxtpReport, TxtpSkip, write_txtp};
 pub use users::TriggerUsers;
+pub use wem_selection::WemSelection;
 
 /// The largest soundbank Entry that is read, 32 MiB: six times the largest live soundbank.
 pub const MAX_SOUNDBANK_LEN: u64 = 32 << 20;

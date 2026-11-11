@@ -26,7 +26,7 @@ use super::{
 /// name the same trigger, the first by Entry path wins.
 #[derive(Debug, Default)]
 pub struct AudioIndex {
-    atl_files: Vec<Box<str>>,
+    atl_files: Vec<DefinitionEntry>,
     triggers: Vec<AtlTrigger>,
     by_name: HashMap<Box<str>, usize>,
     soundbanks: Vec<IndexedSoundbank>,
@@ -36,6 +36,12 @@ pub struct AudioIndex {
     media: HashMap<u32, Box<[MediaSpot]>>,
     loose: LooseMedia,
     issues: Vec<AudioIssue>,
+}
+
+#[derive(Debug)]
+struct DefinitionEntry {
+    path: Box<str>,
+    position: usize,
 }
 
 impl AudioIndex {
@@ -50,10 +56,11 @@ impl AudioIndex {
     /// then.
     #[must_use]
     pub fn build_until(archive: &Archive, cancel: &CancelToken) -> Option<Self> {
-        let mut atl_entries: Vec<&Entry> = archive
+        let mut atl_entries: Vec<(usize, &Entry)> = archive
             .entries()
             .iter()
-            .filter(|entry| {
+            .enumerate()
+            .filter(|(_, entry)| {
                 starts_with_folder(entry.path(), ATL_FOLDER) && has_extension(entry.path(), "xml")
             })
             .collect();
@@ -76,7 +83,7 @@ impl AudioIndex {
                 len: entry.uncompressed_size(),
             })
             .collect();
-        atl_entries.sort_by(|a, b| folded_order(a.path(), b.path()));
+        atl_entries.sort_by(|(_, a), (_, b)| folded_order(a.path(), b.path()));
         bank_entries.sort_by(|(_, a), (_, b)| folded_order(a.path(), b.path()));
         wem_entries.sort_by(|a, b| folded_order(a.path, b.path));
         let definitions = read_definitions(archive, &atl_entries, cancel)?;
@@ -98,9 +105,15 @@ impl AudioIndex {
         Some(index)
     }
 
-    fn add_definitions(&mut self, entries: &[&Entry], definitions: Vec<DefinitionRead>) {
-        self.atl_files = entries.iter().map(|entry| entry.path().into()).collect();
-        for (entry, definition) in entries.iter().zip(definitions) {
+    fn add_definitions(&mut self, entries: &[(usize, &Entry)], definitions: Vec<DefinitionRead>) {
+        self.atl_files = entries
+            .iter()
+            .map(|&(position, entry)| DefinitionEntry {
+                path: entry.path().into(),
+                position,
+            })
+            .collect();
+        for ((_, entry), definition) in entries.iter().zip(definitions) {
             let error = match definition {
                 Ok(triggers) => self.add_triggers(triggers).err(),
                 Err(error) => Some(error),
@@ -188,8 +201,21 @@ impl AudioIndex {
     /// trigger of another index.
     #[must_use]
     pub fn definition_path(&self, trigger: &AtlTrigger) -> Option<&str> {
-        let file = usize::try_from(trigger.file).ok()?;
-        self.atl_files.get(file).map(|path| &**path)
+        self.definition_file(trigger).map(|(path, _)| path)
+    }
+
+    /// Returns the Archive position of the Entry that defines this admitted trigger.
+    #[must_use]
+    pub fn definition_entry_position(&self, trigger: &AtlTrigger) -> Option<usize> {
+        self.definition_file(trigger).map(|(_, position)| position)
+    }
+
+    pub(super) fn definition_file(&self, trigger: &AtlTrigger) -> Option<(&str, usize)> {
+        if !std::ptr::eq(self.trigger(trigger.name())?, trigger) {
+            return None;
+        }
+        let file = self.atl_files.get(usize::try_from(trigger.file).ok()?)?;
+        Some((&file.path, file.position))
     }
 
     /// Returns every soundbank that was parsed, in path order.

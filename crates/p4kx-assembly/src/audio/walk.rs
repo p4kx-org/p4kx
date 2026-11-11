@@ -261,6 +261,7 @@ impl<'i> Walk<'_, 'i> {
             path: self.public_path(),
             source,
             location: located.location,
+            selection: located.selection,
             localised: located.localised,
             language: located.language,
             fallback: located.fallback,

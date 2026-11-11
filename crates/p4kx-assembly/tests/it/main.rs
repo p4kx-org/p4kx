@@ -38,6 +38,7 @@ mod audio_trigger_fields;
 mod audio_txtp;
 mod audio_txtp_edges;
 mod audio_txtp_support;
+mod audio_wem_selection;
 mod body_restyle;
 mod body_zones;
 mod cdf_attachment_storage;
