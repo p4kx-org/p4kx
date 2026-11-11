@@ -9,6 +9,7 @@ use p4kx_extraction::bank::{
 
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_music_segment::MusicChildField;
+use crate::audio_bank_music_stinger_schedule;
 use crate::audio_bank_music_value::{MusicNodeChildRecord, MusicStingerRecord};
 use crate::audio_bank_projection::BankProjection;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
@@ -50,7 +51,12 @@ pub(crate) fn project<R: Read + Seek>(
         let row = row.map_err(|cause| projection.replay_failure(cause))?;
         emit(projection, &sites, row, rows.current_item_depth(), writer)?;
     }
-    Ok(())
+    audio_bank_music_stinger_schedule::tail(
+        projection.input,
+        sites.node(),
+        playlist.fields.node.stinger_tail.as_ref(),
+        writer,
+    )
 }
 
 fn emit(
@@ -75,6 +81,13 @@ fn emit(
         }
         BankMusicPlaylistRow::Stinger { ordinal, value } => {
             let ordinal = u64::from(ordinal);
+            audio_bank_music_stinger_schedule::complete(
+                input,
+                sites.node(),
+                ordinal,
+                &value,
+                writer,
+            )?;
             (
                 STINGER,
                 ordinal,

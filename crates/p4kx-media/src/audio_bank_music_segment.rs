@@ -11,6 +11,7 @@ use p4kx_extraction::bank::{
 };
 
 use crate::audio_bank_inventory::VersionSite;
+use crate::audio_bank_music_stinger_schedule;
 use crate::audio_bank_music_value::MusicStingerRecord;
 use crate::audio_bank_projection::BankProjection;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource, error};
@@ -55,7 +56,12 @@ pub(crate) fn project<R: Read + Seek>(
         let row = row.map_err(|cause| projection.replay_failure(cause))?;
         emit(projection, &sites, row, &mut rows, writer)?;
     }
-    Ok(())
+    audio_bank_music_stinger_schedule::tail(
+        projection.input,
+        &sites,
+        segment.fields.node.stinger_tail.as_ref(),
+        writer,
+    )
 }
 
 fn emit<R: Read + Seek>(
@@ -91,6 +97,13 @@ fn emit<R: Read + Seek>(
         }
         BankMusicSegmentRow::Stinger { ordinal, value } => {
             let ordinal = u64::from(ordinal);
+            audio_bank_music_stinger_schedule::complete(
+                projection.input,
+                sites,
+                ordinal,
+                &value,
+                writer,
+            )?;
             let data = MusicSegmentPayload::Stinger(MusicStingerRecord::new(ordinal, &value));
             sites
                 .stinger(projection.input, ordinal, &value, writer)?

@@ -55,10 +55,6 @@ pub struct BankMusicPlaylistFields {
 /// An ordered original row of a music playlist.
 #[derive(Debug)]
 #[non_exhaustive]
-#[expect(
-    clippy::large_enum_variant,
-    reason = "Original item receipts stream without per-row allocation"
-)]
 pub enum BankMusicPlaylistRow {
     /// One original child ID.
     Child {

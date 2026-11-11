@@ -8726,6 +8726,134 @@
       ],
       "type": "object"
     },
+    "MusicStingerSchedulePayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MusicStingerScheduleRecord"
+            },
+            "record_type": {
+              "const": "bank-music-stinger-schedule",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "MusicStingerSchedulePayload"
+    },
+    "MusicStingerScheduleRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "cue_filter_hash": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "dont_repeat_time": {
+              "$ref": "#/$defs/StingerRepeatTime"
+            },
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "ordinal": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "segment_id": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "segment_look_ahead": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "sync_play_at": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "trigger_id": {
+              "$ref": "#/$defs/BankField_uint32"
+            }
+          },
+          "required": [
+            "layout",
+            "ordinal",
+            "trigger_id",
+            "segment_id",
+            "sync_play_at",
+            "cue_filter_hash",
+            "dont_repeat_time",
+            "segment_look_ahead"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "cue_filter_hash": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BankField_uint32"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dont_repeat_time": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/StingerRepeatTime"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "ordinal": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "segment_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BankField_uint32"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sync_play_at": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BankField_uint32"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "trigger_id": {
+              "$ref": "#/$defs/BankField_uint32"
+            }
+          },
+          "required": [
+            "layout",
+            "ordinal",
+            "trigger_id"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "MusicSwitchPayload": {
       "oneOf": [
         {
@@ -14029,6 +14157,23 @@
           "type": "string"
         }
       ]
+    },
+    "StingerRepeatTime": {
+      "additionalProperties": false,
+      "properties": {
+        "bits": {
+          "$ref": "#/$defs/BankField_uint32"
+        },
+        "signed_value": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bits",
+        "signed_value"
+      ],
+      "type": "object"
     },
     "Storage": {
       "enum": [
@@ -22249,6 +22394,132 @@
               },
               "status": {
                 "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-stinger-schedule"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicStingerSchedulePayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-stinger-schedule"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
               }
             }
           }

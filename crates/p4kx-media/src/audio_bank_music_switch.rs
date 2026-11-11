@@ -10,6 +10,7 @@ use p4kx_extraction::bank::{
 
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_music_segment::MusicChildField;
+use crate::audio_bank_music_stinger_schedule;
 use crate::audio_bank_music_value::{MusicNodeChildRecord, MusicStingerRecord};
 use crate::audio_bank_projection::BankProjection;
 use crate::origin_prepared::PreparedRecordOrigins;
@@ -56,7 +57,12 @@ pub(crate) fn project<R: Read + Seek>(
         let row = row.map_err(|cause| projection.replay_failure(cause))?;
         emit(projection, &sites, row, &rows, writer)?;
     }
-    Ok(())
+    audio_bank_music_stinger_schedule::tail(
+        projection.input,
+        sites.node(),
+        switch.fields.node.stinger_tail.as_ref(),
+        writer,
+    )
 }
 
 fn emit<R>(
@@ -79,6 +85,13 @@ fn emit<R>(
         }
         BankMusicSwitchRow::Stinger { ordinal, value } => {
             let ordinal = u64::from(ordinal);
+            audio_bank_music_stinger_schedule::complete(
+                input,
+                sites.node(),
+                ordinal,
+                &value,
+                writer,
+            )?;
             let data = MusicSwitchPayload::Stinger(MusicStingerRecord::new(ordinal, &value));
             let origins = sites.node().stinger(input, ordinal, &value, writer)?;
             (STINGER, ordinal, data, origins)

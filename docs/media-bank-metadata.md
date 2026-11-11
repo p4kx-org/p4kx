@@ -83,6 +83,7 @@ and fallback selection.
 | `audio-bank-music-segment` | `bank-music-segment` | HIRC section and segment object ordinals |
 | `audio-bank-music-segment-child` | `bank-music-segment-child` | HIRC section, segment and child ordinals |
 | `audio-bank-music-segment-stinger` | `bank-music-segment-stinger` | HIRC section, segment and stinger ordinals |
+| `audio-bank-music-stinger-schedule` | `bank-music-stinger-schedule` | HIRC section, owning MusicSegment, MusicSwitch or MusicPlaylist object and stinger ordinals |
 | `audio-bank-music-segment-marker` | `bank-music-segment-marker` | HIRC section, segment and marker ordinals |
 | `audio-bank-music-track` | `bank-music-track` | HIRC section and track object ordinals |
 | `audio-bank-music-track-source` | `bank-music-track-source` | HIRC section and track and source ordinals |
@@ -367,6 +368,13 @@ trigger and segment IDs, and marker IDs, positions and names. Stingers expose th
 extent of the original scheduling bytes after the IDs. Marker names carry their byte range,
 original NUL position and UTF-8 status. A malformed name keeps the earlier fully read rows
 and the original segment remains available through the retained bank.
+
+Version-154 MusicSegment, MusicSwitch and MusicPlaylist stingers also emit one
+shared scheduling record per physical occurrence. These records retain the
+original sync code, cue filter hash, signed repeat-time word with its raw bits,
+and segment look-ahead count. A truncated final stinger retains every readable
+word from its trigger ID onward. Field receipts identify exact bytes in the
+owning bank. The original stinger records retain their existing opaque ranges.
 
 Version 154 MusicTrack rows carry the authored parent, list counts, raw track kind byte,
 interpreted kind, and switch or state group when present. Separate rows preserve ordered

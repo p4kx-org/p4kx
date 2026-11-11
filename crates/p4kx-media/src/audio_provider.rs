@@ -199,15 +199,15 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-music-playlist-fields",
-            "Original MusicPlaylist node, children, stingers, transition extent and ordered item fields.",
+            "Original MusicPlaylist node, children, stingers and their scheduling words, transition extent and ordered item fields.",
         ),
         FieldGroup::new(
             "bank-music-segment-fields",
-            "Original MusicSegment node, meter, tracks, stingers and marker values with exact source ranges.",
+            "Original MusicSegment node, meter, tracks, stingers and their scheduling words, and marker values with exact source ranges.",
         ),
         FieldGroup::new(
             "bank-music-switch-fields",
-            "Original MusicSwitch group and physical decision-node words, checked target paths and transition extents.",
+            "Original MusicSwitch group and physical decision-node words, stinger scheduling words, checked target paths and transition extents.",
         ),
         FieldGroup::new(
             "bank-music-track-fields",

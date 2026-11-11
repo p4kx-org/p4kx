@@ -6,9 +6,10 @@ use std::ops::Range;
 use crate::BankHircField;
 use crate::bank_object_fields::ObjectFields;
 use crate::hirc_music::MusicMeter;
-use crate::hirc_node::{self, BankNodeParentFields, ID_LEN};
+use crate::hirc_music_stinger::{self, BankMusicStingerTail};
+use crate::hirc_node::{self, BankNodeParentFields};
 
-pub(crate) const STINGER_LEN: usize = 24;
+pub(crate) use crate::hirc_music_stinger::{BankMusicStinger, STINGER_LEN, stinger};
 
 /// Original parent, child count, meter and stinger count of a music node.
 #[derive(Debug, Default)]
@@ -34,18 +35,8 @@ pub struct BankMusicNodeFields {
     pub beat_value: Option<BankHircField<u8>>,
     /// Original stinger count.
     pub stinger_count: Option<BankHircField<u32>>,
-}
-
-/// One original stinger, including the checked opaque bytes after the decoded IDs.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct BankMusicStinger {
-    /// Original trigger ID.
-    pub trigger_id: BankHircField<u32>,
-    /// Original segment ID.
-    pub segment_id: BankHircField<u32>,
-    /// Original extent after the IDs.
-    pub opaque_range: Range<u64>,
+    /// Readable original fields of a truncated final stinger when reached.
+    pub stinger_tail: Option<BankMusicStingerTail>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -83,8 +74,11 @@ pub(crate) fn scan<F: ObjectFields>(
     meter(reader, fields)?;
     let stingers = stinger_count(reader, fields)?;
     lists.stingers.start = reader.offset();
-    for _ in 0..stingers {
-        stinger(reader)?;
+    for ordinal in 0..stingers {
+        if reader.remaining_bytes() < STINGER_LEN as u64 {
+            return hirc_music_stinger::tail(reader, ordinal, &mut fields.stinger_tail);
+        }
+        reader.skip_bytes(STINGER_LEN as u64)?;
         lists.stingers.record(reader.offset());
     }
     Ok(())
@@ -145,16 +139,4 @@ pub(crate) fn stinger_count<F: ObjectFields>(
     let value = count.value;
     fields.stinger_count = Some(count);
     Ok(value)
-}
-
-pub(crate) fn stinger<F: ObjectFields>(reader: &mut F) -> Result<BankMusicStinger, F::Error> {
-    let trigger_id = reader.read_u32()?;
-    let segment_id = reader.read_u32()?;
-    let start = reader.offset();
-    reader.skip_bytes((STINGER_LEN - 2 * ID_LEN) as u64)?;
-    Ok(BankMusicStinger {
-        trigger_id,
-        segment_id,
-        opaque_range: start..reader.offset(),
-    })
 }

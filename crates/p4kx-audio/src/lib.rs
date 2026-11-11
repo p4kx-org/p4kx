@@ -52,6 +52,7 @@ mod hirc_music_parse;
 mod hirc_music_playlist;
 mod hirc_music_playlist_depth;
 mod hirc_music_segment;
+mod hirc_music_stinger;
 mod hirc_music_switch;
 mod hirc_music_switch_traversal;
 mod hirc_music_track;
@@ -168,9 +169,10 @@ pub use hirc_music::{
     MusicPlaylistItem, MusicSegment, MusicStinger, MusicSwitch, MusicTrack, MusicTrackKind,
     MusicTrackSwitch,
 };
-pub use hirc_music_node::{BankMusicNodeFields, BankMusicStinger};
+pub use hirc_music_node::BankMusicNodeFields;
 pub use hirc_music_playlist::BankMusicPlaylistItem;
 pub use hirc_music_segment::BankMusicSegmentFields;
+pub use hirc_music_stinger::{BankMusicStinger, BankMusicStingerTail};
 pub use hirc_music_switch::{BankMusicSwitchFields, BankMusicSwitchGroup, BankMusicSwitchNode};
 pub use hirc_music_switch_traversal::{BankMusicSwitchBranch, BankMusicSwitchTarget};
 pub use hirc_music_track::{

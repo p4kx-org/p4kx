@@ -18,6 +18,9 @@ use crate::origin_input::MediaOriginInput;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::{MediaError, MediaWriter, Subresource};
 
+#[path = "audio_bank_music_stinger_origins.rs"]
+mod stinger_schedule;
+
 #[path = "audio_bank_music_segment_origin_words.rs"]
 mod words;
 

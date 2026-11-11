@@ -5,6 +5,7 @@ use serde_json::Value;
 
 use crate::audio_bank_music_playlist::{self, MusicPlaylistPayload};
 use crate::audio_bank_music_segment::{self, MusicSegmentPayload};
+use crate::audio_bank_music_stinger_schedule_payload::{self, MusicStingerSchedulePayload};
 use crate::audio_bank_music_switch::{self, MusicSwitchPayload};
 use crate::audio_bank_music_track::{self, MusicTrackPayload};
 use crate::audio_schema_status::StatusRule;
@@ -16,6 +17,7 @@ const MUSIC_PLAYLIST_PAYLOAD: &str = "MusicPlaylistPayload";
 const MUSIC_SEGMENT_PAYLOAD: &str = "MusicSegmentPayload";
 const MUSIC_SWITCH_PAYLOAD: &str = "MusicSwitchPayload";
 const MUSIC_TRACK_PAYLOAD: &str = "MusicTrackPayload";
+const STINGER_SCHEDULE_PAYLOAD: &str = "MusicStingerSchedulePayload";
 
 pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
     schema_merge::insert_payload(
@@ -37,10 +39,15 @@ pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
         base,
         MUSIC_SWITCH_PAYLOAD,
         schema_merge::serialized_payload::<MusicSwitchPayload>(),
+    )?;
+    schema_merge::insert_payload(
+        base,
+        STINGER_SCHEDULE_PAYLOAD,
+        schema_merge::serialized_payload::<MusicStingerSchedulePayload<'static>>(),
     )
 }
 
-pub(super) const fn bindings() -> [Binding; 18] {
+pub(super) const fn bindings() -> [Binding; 19] {
     let [segment, track_id, segment_stinger, marker] = segment_bindings();
     let [track, source, clip, switch_member] = track_bindings();
     let [playlist, child, playlist_stinger, item] = playlist_bindings();
@@ -64,6 +71,13 @@ pub(super) const fn bindings() -> [Binding; 18] {
         group,
         node,
         target,
+        Binding::exact(
+            STINGER_SCHEDULE_PAYLOAD,
+            audio_bank_music_stinger_schedule_payload::NAMESPACE,
+            "bank-music-stinger-schedule",
+            3,
+            StatusRule::MalformedLayout,
+        ),
     ]
 }
 

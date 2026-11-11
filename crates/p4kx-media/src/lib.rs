@@ -47,6 +47,8 @@ mod audio_bank_media;
 mod audio_bank_media_origins;
 mod audio_bank_music_playlist;
 mod audio_bank_music_segment;
+mod audio_bank_music_stinger_schedule;
+mod audio_bank_music_stinger_schedule_payload;
 mod audio_bank_music_switch;
 mod audio_bank_music_track;
 mod audio_bank_music_track_automation;
