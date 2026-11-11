@@ -249,4 +249,9 @@ pub(crate) struct BytesResult {
     pub(crate) clamped: bool,
     /// The `max_bytes` used.
     pub(crate) max_bytes: usize,
+    /// Exact field origins for the structured response.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: crate::content_origin::BytesFieldOrigins,
+    /// Physical sources and byte ranges used by the response.
+    pub(crate) provenance: p4kx_extraction::SourceInventory,
 }

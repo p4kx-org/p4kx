@@ -92,6 +92,9 @@ pub(crate) enum ToolError {
     /// The image preview's original input evidence could not be retained.
     #[error("cannot retain the image preview source evidence")]
     ImageEvidence(#[from] SourceEvidenceError),
+    /// The Entry read's original input evidence could not be retained.
+    #[error("cannot retain the Entry read source evidence")]
+    EntryEvidence(#[source] SourceEvidenceError),
     /// A material library cannot be read.
     #[error("cannot read the material library {path}")]
     Material {

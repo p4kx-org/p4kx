@@ -7,6 +7,7 @@ use p4kx_extraction::{
     Archive, Entry, EntryReadError, MIN_TEXT_LEN, TextEncoding, find_entry, read_bytes, read_text,
 };
 
+use crate::content_origin::BytesFieldOrigins;
 use crate::error::ToolError;
 use crate::shapes::{BytesResult, TextResult};
 
@@ -85,6 +86,8 @@ pub(crate) fn bytes(
     let range =
         read_bytes(archive, entry, offset, length.value).map_err(|error| failed(entry, error))?;
     let next_offset = range.next_offset();
+    let (field_origins, provenance) =
+        BytesFieldOrigins::capture(archive, entry, &range).map_err(ToolError::EntryEvidence)?;
     Ok(BytesResult {
         archive: archive.path().display().to_string(),
         path: entry.path().to_owned(),
@@ -97,6 +100,8 @@ pub(crate) fn bytes(
         next_offset,
         clamped: length.clamped,
         max_bytes: length.value,
+        field_origins,
+        provenance,
     })
 }
 

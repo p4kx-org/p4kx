@@ -812,7 +812,7 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | `list_entries` | One folder of an Archive (`folder`, e.g. `Data/Libs`): its subfolders with their Entry count, then its Entries |
 | `search_entries` | The Entries matching a Filter (`filter`), with the rules of `p4kx search` |
 | `read_entry_text` | A range of an Entry as text (`path`, `offset`, `max_bytes`): CryXml as XML, UTF-16 by its byte order mark, otherwise UTF-8 |
-| `read_entry_bytes` | A range of an Entry's data as base64 (`path`, `offset`, `max_bytes`) |
+| `read_entry_bytes` | A range of an Entry's data as base64 (`path`, `offset`, `max_bytes`) with per-field provenance |
 | `get_record` | A Record by `guid`, or every Record of a record `path`, as Record JSON |
 | `search_records` | The Records whose record `path` and `type` name match Filters, in Record order |
 | `list_structs` | The struct definitions matching a `name` Filter, with parent and declared fields (data type, array, target struct or enum) |
@@ -832,7 +832,6 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | `mtl_summary` | A `.mtl` Entry (`path`), paged by sub-material: name, shader, surface type, flags, colours, opacity, glow, complete admitted texture-slot, shader-parameter and layer lists; retained strings are complete, paging observes the 256 KiB response budget, and an item that cannot fit alone is explicitly refused |
 | `entity_loadout` | The default Loadout of an Entity (`entity`: class name, record path or GUID) as a list of ports, parents first: path, depth, source, what the port takes, the Entity attached and for each unresolved port the reason; each Entity states its `issues` and, only when it has any, its `notes` (all admitted undecidable spawn requirements, such as an `assortment_requirement`, as in the CLI JSON); `max_depth` (16 by default, at most 32) and a cursor bound it; retained identities, paths, values and reasons are complete within the 256 KiB response budget, with explicit refusal for an item that cannot fit first |
 
-`list_entries`, `search_entries` (with `container`), `read_entry_text`, `read_entry_bytes`,
 For `image_preview`, `fieldOrigins` uses JSON Pointers into the complete MCP tool result. For example,
 `/structuredContent/texture_width` addresses the decoded header width and `/content/1/data` addresses
 the unchanged PNG image block. Each origin gives the encryption marker, actual use references and
@@ -842,6 +841,12 @@ carry `ddsMipPayload` coordinates `[level, offset, length, stride, count]` for t
 byte spans. A single selected cubemap face contributes only its own color and alpha mip bytes.
 Offsets are relative to the uncompressed Entry. Stored path lookups use Archive directory metadata.
 
+For `read_entry_bytes`, each `fieldOrigins` key addresses the complete MCP tool result.
+The `archiveEntryDecodedBytes` coordinates on `/structuredContent/data` give the half-open
+byte range `[start, endExclusive)` before base64 encoding. The path and Entry size use Archive
+directory metadata, including the origin of enclosing containers. A page at EOF has no payload use.
+
+`list_entries`, `search_entries` (with `container`), `read_entry_text`, `read_entry_bytes`,
 `image_preview` and `mtl_summary` open socpak containers with `::`: `outer.socpak::inner.socpak::path`
 reads an Entry of a container inside a container, and `outer.socpak::` lists a container's top level
 ([ADR-0129](adr/0129-container-paths-in-mcp-tools-join-containers-with-a-double-colon.md)).

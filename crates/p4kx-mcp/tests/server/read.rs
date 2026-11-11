@@ -13,10 +13,17 @@ fn bytes_come_as_base64_from_an_offset_with_a_maximum_length() -> TestResult {
         b"0123456789".to_vec(),
     )])?;
     let mut server = install.serve(&["--archive", "LIVE"])?;
-    let first = server.ok(
+    let mut first = server.ok(
         "read_entry_bytes",
         &json!({ "path": r"data\OBJECTS\ship.cgf", "offset": 2, "max_bytes": 5 }),
     )?;
+    let payload = first.as_object_mut().ok_or("structured byte result")?;
+    for member in ["fieldOrigins", "provenance"] {
+        assert!(
+            payload.remove(member).is_some(),
+            "the result contains {member}"
+        );
+    }
     assert_eq!(
         first,
         json!({

@@ -58,6 +58,7 @@ mod mtl_summary;
 mod query;
 mod query_selection;
 mod read;
+mod read_bytes_origins;
 mod read_only;
 mod read_text;
 mod real_archive;
