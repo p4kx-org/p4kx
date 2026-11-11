@@ -31,7 +31,7 @@ fn install() -> TestResult<Install> {
         ))
         .object(TestHircObject::sound(15, 100, 2, 4096))
         .object(TestHircObject::event(19, &[20]))
-        .object(TestHircObject::raw(7, 16, [0; 8]))
+        .object(TestHircObject::raw(0xFE, 16, [0; 8]))
         .object(TestHircObject::raw(2, 17, [0; 3]))
         .bytes();
     let newer = TestBank::new(2)
@@ -55,10 +55,12 @@ fn objects_of_a_newer_bank_version_are_listed_as_unsupported() -> TestResult {
     )?;
     assert_eq!(
         result["layouts"],
-        json!({ "decoded": 0, "undecoded": 1, "unsupported": 1, "malformed": 0 }),
+        json!({ "decoded": 0, "undecoded": 0, "unsupported": 2, "malformed": 0 }),
         "counted"
     );
-    assert_eq!(result["objects"][0]["status"], "unsupported", "listed");
+    assert_eq!(result["objects"][0]["status"], "unsupported", "Event");
+    assert_eq!(result["objects"][1]["type"], "actor-mixer");
+    assert_eq!(result["objects"][1]["status"], "unsupported", "ActorMixer");
     Ok(())
 }
 

@@ -15,6 +15,7 @@ mod bank_parse;
 mod bank_reader;
 mod bank_rtpc_rows;
 mod bank_source;
+mod bank_source_actor_mixer;
 mod bank_source_container;
 mod bank_source_didx;
 mod bank_source_event;
@@ -30,6 +31,7 @@ mod codec;
 mod error;
 mod hirc;
 mod hirc_action;
+mod hirc_actor_mixer;
 mod hirc_container;
 mod hirc_event;
 mod hirc_layout;
@@ -77,6 +79,7 @@ pub use bank_rtpc_rows::{BankRtpcRow, BankRtpcRows};
 pub use bank_source::{
     BankObservedHeader, BankReadError, BankSectionCursor, BankSource, BankSourceSection,
 };
+pub use bank_source_actor_mixer::BankHircActorMixer;
 pub use bank_source_container::{
     BankContainerChild, BankContainerChildren, BankContainerRead, BankHircContainer,
 };
@@ -107,6 +110,7 @@ pub use hirc::{HircKind, HircObject, HircValue, MediaStorage, SoundSource};
 pub use hirc_action::{
     ActionTarget, BankActionFields, BankPlayBankDecision, BankPlayBankFields, PlayBank,
 };
+pub use hirc_actor_mixer::{ActorMixer, BankActorMixerFields};
 pub use hirc_container::BankContainerFields;
 pub use hirc_event::BankEventCountEncoding;
 pub use hirc_layout::HircLayout;

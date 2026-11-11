@@ -36,7 +36,7 @@ Bank ID:     3512036681
 #7  sound  15  parent 740367150  children 0
     source 100 streamed, plugin 0x40001, 4096 bytes in memory
 #8  event  19  parent -  children 1 [20]
-#9  actor-mixer  16  parent -  children 0  undecoded
+#9  other  16  parent -  children 0  undecoded
 #10  sound  17  parent -  children 0  malformed
     the soundbank section HIRC is truncated: 7 bytes, 8 needed
 11 objects (9 decoded, 1 undecoded, 0 unsupported, 1 malformed); 11 match: showing 1-11 of 11

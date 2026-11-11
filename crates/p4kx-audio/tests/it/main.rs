@@ -7,6 +7,7 @@ mod adpcm;
 mod adpcm_blocks;
 mod adpcm_signal;
 mod bnk;
+mod bnk_actor_mixer;
 mod bnk_containers;
 mod bnk_corrupt;
 mod bnk_hirc;

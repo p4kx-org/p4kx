@@ -291,7 +291,8 @@ expression: "serde_json::to_string_pretty(&report)?"
       "index": 9,
       "parent": null,
       "status": "undecoded",
-      "type": "actor-mixer"
+      "type": "other",
+      "type_byte": 254
     },
     {
       "children": [],

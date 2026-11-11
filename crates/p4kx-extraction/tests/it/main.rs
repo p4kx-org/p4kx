@@ -27,6 +27,7 @@ mod folder_conversion;
 mod folder_dataforge;
 mod folder_links;
 mod folder_policy;
+mod hirc_actor_mixer_view;
 mod hirc_state_view;
 mod installation;
 mod language_texts;

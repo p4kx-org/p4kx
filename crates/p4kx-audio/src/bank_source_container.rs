@@ -130,7 +130,7 @@ fn scan<R: Read + Seek>(
     hirc_container::tail(layout, &mut fields, observed)
 }
 
-const fn child_reader<'input, R>(
+pub(crate) const fn child_reader<'input, R>(
     input: &'input mut SeekSource<R>,
     stopped: &'input mut bool,
     range: &Range<u64>,

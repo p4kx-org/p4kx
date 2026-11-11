@@ -104,7 +104,7 @@ mod tests {
             .object(TestHircObject::sound(10, 100, 2, 4096))
             .object(TestHircObject::event(11, &[12]))
             .object(TestHircObject::sound(12, 101, 2, 4096))
-            .object(TestHircObject::raw(7, 13, [0; 4]))
+            .object(TestHircObject::raw(0xFE, 13, [0; 4]))
             .bytes()
     }
 

@@ -78,7 +78,7 @@ fn property_view(property: &StateProperty) -> StatePropertyView {
 }
 
 impl StateRange {
-    const fn new(range: &Range<u64>) -> Self {
+    pub(super) const fn new(range: &Range<u64>) -> Self {
         Self {
             start: DecimalU64::new(range.start),
             end_exclusive: DecimalU64::new(range.end),

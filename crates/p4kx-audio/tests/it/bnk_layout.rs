@@ -25,7 +25,7 @@ fn layouts(bank: &TestBank) -> Result<Vec<HircLayout>, Box<dyn std::error::Error
 fn decoded_undecoded_unsupported_and_malformed_objects_are_told_apart() -> TestResult {
     let bank = TestBank::new(1)
         .object(TestHircObject::event(1, &[2]))
-        .object(TestHircObject::raw(7, 3, [0; 8]))
+        .object(TestHircObject::raw(8, 3, [0; 8]))
         .object(TestHircObject::raw(2, 4, [0; 3]));
     assert_eq!(
         layouts(&bank)?,
@@ -60,7 +60,11 @@ fn parent_and_children_follow_the_hierarchy() -> TestResult {
         .object(TestHircObject::music_segment(4, &[5], &[]))
         .object(TestHircObject::music_track(5, &[70, 71]))
         .object(TestHircObject::music_playlist(6, &[4]))
-        .object(TestHircObject::raw(7, 7, [0; 8]))
+        .object(TestHircObject::actor_mixer(
+            7,
+            &[6, 2, 6],
+            TestNodeBase::Plain,
+        ))
         .bytes();
     let bank = Soundbank::parse(bytes.as_slice())?;
     let report = |id| -> Result<(Option<u32>, Vec<u32>), Box<dyn std::error::Error>> {
@@ -74,7 +78,7 @@ fn parent_and_children_follow_the_hierarchy() -> TestResult {
     assert_eq!(report(4)?, (Some(PARENT), vec![5]), "segment");
     assert_eq!(report(5)?, (Some(PARENT), vec![70, 71]), "track sources");
     assert_eq!(report(6)?.1, [4], "playlist");
-    assert_eq!(report(7)?, (None, vec![]), "undecoded");
+    assert_eq!(report(7)?, (Some(PARENT), vec![6, 2, 6]), "actor-mixer");
     Ok(())
 }
 
@@ -184,14 +188,15 @@ fn a_decoder_exists_for_exactly_the_kinds_the_reader_decodes() -> TestResult {
         TestHircObject::music_track(8, &[1]),
         TestHircObject::music_switch(9, &[7], 1, &[7]),
         TestHircObject::music_playlist(10, &[7]),
+        TestHircObject::actor_mixer(12, &[1], TestNodeBase::Plain),
     ];
     let standalone_state = TestHircObject::raw(1, 11, [0; 2]);
     let undecoded: Vec<TestHircObject> = (2_u8..=22)
-        .filter(|byte| ![2, 3, 4, 5, 6, 9, 10, 11, 12, 13].contains(byte))
+        .filter(|byte| ![2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13].contains(byte))
         .zip(100_u32..)
         .map(|(byte, id)| TestHircObject::raw(byte, id, [0; 8]))
         .collect();
-    assert_eq!(undecoded.len(), 11, "the kinds without a decoder");
+    assert_eq!(undecoded.len(), 10, "the kinds without a decoder");
     let bank = |version: u32| {
         decoded
             .iter()
@@ -204,7 +209,7 @@ fn a_decoder_exists_for_exactly_the_kinds_the_reader_decodes() -> TestResult {
     for (version, known) in [(154, HircLayout::Decoded), (160, HircLayout::Unsupported)] {
         let mut expected = vec![known; decoded.len()];
         expected.push(HircLayout::Unsupported);
-        expected.extend([HircLayout::Undecoded; 11]);
+        expected.extend([HircLayout::Undecoded; 10]);
         assert_eq!(
             layouts(&bank(version))?,
             expected,

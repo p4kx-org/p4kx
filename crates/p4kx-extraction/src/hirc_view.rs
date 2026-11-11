@@ -56,6 +56,8 @@ pub enum Detail<'a> {
     Action(ActionDetail),
     /// A random, sequence, switch or blend container.
     Container(ContainerDetail),
+    /// An `ActorMixer`.
+    ActorMixer(ActorMixerDetail),
     /// A music segment.
     Segment(SegmentDetail<'a>),
     /// A music track.
@@ -99,6 +101,18 @@ pub struct ActionDetail {
 pub struct ContainerDetail {
     /// `random`, `sequence`, `switch`, `blend` or `other`.
     pub container_kind: &'static str,
+}
+
+/// Original spans of an `ActorMixer`'s shared node base and ordered children.
+#[derive(Debug, Serialize, JsonSchema)]
+#[non_exhaustive]
+pub struct ActorMixerDetail {
+    /// Traversed shared node base, including checked opaque data.
+    pub node_range: StateRange,
+    /// Original child count word.
+    pub child_count_range: StateRange,
+    /// Original ordered child ID words.
+    pub children_range: StateRange,
 }
 
 /// A music segment.

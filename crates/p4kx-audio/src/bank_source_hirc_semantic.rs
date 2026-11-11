@@ -5,6 +5,7 @@ use std::io::{Read, Seek};
 
 use crate::BankHircState;
 use crate::BankSoundStateRead;
+use crate::bank_source_actor_mixer::{self, BankHircActorMixer};
 use crate::bank_source_container::{self, BankHircContainer};
 use crate::bank_source_event;
 use crate::bank_source_music_playlist::{self, BankHircMusicPlaylist};
@@ -44,6 +45,8 @@ pub enum BankHircSemantic<'input, R> {
     State(BankHircState),
     /// Owner-bound container interpretation and ordered children.
     Container(Box<BankHircContainer<'input, R>>),
+    /// Owner-bound `ActorMixer` node regions and ordered children.
+    ActorMixer(Box<BankHircActorMixer<'input, R>>),
     /// Owner-bound music playlist interpretation and ordered values.
     MusicPlaylist(Box<BankHircMusicPlaylist<'input, R>>),
     /// Owner-bound music segment interpretation and ordered values.
@@ -66,6 +69,7 @@ impl<R> BankHircSemantic<'_, R> {
             Self::SoundWithNode(node) => &node.sound().object,
             Self::State(state) => &state.object,
             Self::Container(container) => &container.object,
+            Self::ActorMixer(actor) => actor.object(),
             Self::MusicPlaylist(playlist) => &playlist.object,
             Self::MusicSegment(segment) => &segment.object,
             Self::MusicSwitch(switch) => &switch.object,
@@ -204,6 +208,15 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                     .map(BankHircSemantic::Event);
             }
             HircKind::Action => self.action(object, version).map(BankHircSemantic::Action),
+            HircKind::ActorMixer => {
+                return bank_source_actor_mixer::observe(
+                    self.input,
+                    &mut self.stopped,
+                    object,
+                    version,
+                )
+                .map(|actor| BankHircSemantic::ActorMixer(Box::new(actor)));
+            }
             HircKind::State if mode != NodeMode::Raw => {
                 self.state(object, version).map(BankHircSemantic::State)
             }

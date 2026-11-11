@@ -81,7 +81,7 @@ fn emit_semantic<R: Read + Seek>(
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     match (semantic, version) {
-        (BankHircSemantic::Raw(_), _) => Ok(()),
+        (BankHircSemantic::Raw(_), _) | (BankHircSemantic::ActorMixer(_), Some(_)) => Ok(()),
         (BankHircSemantic::Action(action), Some(version)) => audio_bank_hirc_action::project(
             projection,
             &action.object,

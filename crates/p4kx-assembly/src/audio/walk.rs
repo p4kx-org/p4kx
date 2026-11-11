@@ -174,8 +174,19 @@ impl<'i> Walk<'_, 'i> {
                 }
             }
             HircValue::Sound(source) => self.sound(*source),
-            HircValue::Malformed(error) if object.kind != HircKind::State => {
-                self.broke(BreakReason::Malformed(error.clone()));
+            HircValue::ActorMixer(_)
+            | HircValue::State(_)
+            | HircValue::Malformed(_)
+            | HircValue::Raw => self.unresolved_object(object),
+        }
+    }
+
+    fn unresolved_object(&mut self, object: &HircObject) {
+        let reason = match &object.value {
+            HircValue::Malformed(error)
+                if !matches!(object.kind, HircKind::State | HircKind::ActorMixer) =>
+            {
+                BreakReason::Malformed(error.clone())
             }
             HircValue::Raw
                 if matches!(
@@ -190,14 +201,13 @@ impl<'i> Walk<'_, 'i> {
                         | HircKind::MusicPlaylist
                 ) =>
             {
-                self.broke(BreakReason::UnknownLayout {
+                BreakReason::UnknownLayout {
                     version: self.current.bank.header().version,
-                });
+                }
             }
-            HircValue::State(_) | HircValue::Malformed(_) | HircValue::Raw => {
-                self.broke(BreakReason::Unsupported);
-            }
-        }
+            _ => BreakReason::Unsupported,
+        };
+        self.broke(reason);
     }
 
     fn chained(&mut self, follow: impl FnOnce(&mut Self)) {

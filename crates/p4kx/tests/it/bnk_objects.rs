@@ -46,7 +46,7 @@ fn music_bank() -> TestBank {
         ))
         .object(TestHircObject::sound(15, 100, 2, 4096))
         .object(TestHircObject::event(19, &[20]))
-        .object(TestHircObject::raw(7, 16, [0; 8]))
+        .object(TestHircObject::raw(0xFE, 16, [0; 8]))
         .object(TestHircObject::raw(2, 17, [0; 3]))
 }
 
@@ -235,10 +235,30 @@ fn objects_of_a_newer_bank_version_are_unsupported() -> TestResult {
 
     assert_eq!(
         report["layouts"],
-        serde_json::json!({"decoded": 0, "undecoded": 1, "unsupported": 1, "malformed": 0})
+        serde_json::json!({"decoded": 0, "undecoded": 0, "unsupported": 2, "malformed": 0})
     );
     assert_eq!(report["objects"][0]["status"], "unsupported");
-    assert!(text(&[], &file)?.contains("1 unsupported"));
+    assert!(text(&[], &file)?.contains("2 unsupported"));
+    Ok(())
+}
+
+#[test]
+fn a_supported_actor_mixer_exposes_its_original_parent_and_ordered_children() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let children = [37, 19, 37];
+    let bank = TestBank::new(12).object(TestHircObject::actor_mixer(
+        1,
+        &children,
+        TestNodeBase::Full,
+    ));
+    let file = write_bank(dir.path(), &bank)?;
+    let report = json(&["--type", "actor-mixer"], &file)?;
+    let actor = &report["objects"][0];
+    assert_eq!(actor["type"], "actor-mixer");
+    assert_eq!(actor["status"], "decoded");
+    assert_eq!(actor["parent"], 0x2C21_1B2E_u32);
+    assert_eq!(actor["children"], serde_json::json!(children));
+    assert!(actor["detail"]["children_range"]["start"].is_string());
     Ok(())
 }
 

@@ -91,7 +91,7 @@ fn write_detail(out: &mut impl Write, detail: Option<&Detail<'_>>) -> io::Result
                 .iter()
                 .try_for_each(|item| item_line(out, item))
         }
-        None => Ok(()),
+        Some(Detail::ActorMixer(_)) | None => Ok(()),
     }
 }
 
