@@ -26,6 +26,9 @@ use crate::audio_wem_projection::{
 };
 use crate::{MediaError, schema_merge};
 
+#[path = "audio_schema_music.rs"]
+mod music;
+
 const WEM_PAYLOAD: &str = "AudioPayload";
 const ANNOTATION_PAYLOAD: &str = "AnnotationPayload";
 const BANK_PAYLOAD: &str = "BankPayload";
@@ -146,7 +149,7 @@ fn insert_audio_payloads(base: &mut Value) -> Result<(), MediaError> {
         CONTAINER_PAYLOAD,
         schema_merge::serialized_payload::<ContainerPayload>(),
     )?;
-    Ok(())
+    music::insert_payload(base)
 }
 
 pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
@@ -164,6 +167,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             .iter()
             .chain(bank_bindings().iter())
             .chain(hirc_bindings().iter())
+            .chain(music::bindings().iter())
             .chain(std::iter::once(&BANK_FAILURE_BINDING))
             .chain(stid_bindings().iter())
             .chain(event_bindings().iter())

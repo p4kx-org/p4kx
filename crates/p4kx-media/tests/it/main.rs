@@ -10,6 +10,7 @@ mod audio_bank_hirc_action_provider;
 mod audio_bank_hirc_container_provider;
 mod audio_bank_hirc_event_provider;
 mod audio_bank_hirc_sound_provider;
+mod audio_bank_music_segment_provider;
 mod audio_bank_provider;
 mod audio_bank_stid_provider;
 mod audio_provider_sources;

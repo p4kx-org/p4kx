@@ -148,6 +148,7 @@ fn audio_independent(pointer: &str) -> bool {
         "node_range",
         "children_range",
         "suffix_range",
+        "opaque_range",
         "continuation/opaque_range",
         "continuation/plugin_parameters_range",
         "continuation/node_base/consumed_range",

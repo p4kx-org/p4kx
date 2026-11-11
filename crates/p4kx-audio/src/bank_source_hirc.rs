@@ -8,6 +8,7 @@ use crate::bank_object_fields::SeekObjectFields;
 use crate::bank_reader::SectionReader;
 use crate::bank_source_container::{self, BankHircContainer};
 use crate::bank_source_event;
+use crate::bank_source_music_segment::{self, BankHircMusicSegment};
 use crate::bank_source_sound::{self, BankHircSound};
 use crate::bank_structure::{HircEnvelope, OBJECT_HEADER_LEN, OBJECT_ID_LEN};
 use crate::hirc::{self, CONTAINER_VERSION};
@@ -139,6 +140,8 @@ pub enum BankHircSemantic<'input, R> {
     Sound(Box<BankHircSound>),
     /// Owner-bound container interpretation and ordered children.
     Container(Box<BankHircContainer<'input, R>>),
+    /// Owner-bound music segment interpretation and ordered values.
+    MusicSegment(Box<BankHircMusicSegment<'input, R>>),
 }
 
 impl<R> BankHircSemantic<'_, R> {
@@ -151,6 +154,7 @@ impl<R> BankHircSemantic<'_, R> {
             Self::Event(event) => &event.object,
             Self::Sound(sound) => &sound.object,
             Self::Container(container) => &container.object,
+            Self::MusicSegment(segment) => &segment.object,
         }
     }
 }
@@ -258,6 +262,12 @@ impl<R: Read + Seek> BankHirc<'_, R> {
             Err(cause) => return Some(Err(cause)),
         };
         let kind = object.kind(version);
+        if version >= CONTAINER_VERSION && kind == HircKind::MusicSegment {
+            return Some(
+                bank_source_music_segment::observe(self.input, &mut self.stopped, object, version)
+                    .map(|segment| BankHircSemantic::MusicSegment(Box::new(segment))),
+            );
+        }
         if version >= CONTAINER_VERSION
             && let Some(layout) = ContainerLayout::of(kind)
         {

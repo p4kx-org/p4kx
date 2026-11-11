@@ -18,6 +18,10 @@ Short IDs and display paths may repeat. The source's exact verified bytes are in
 | `audio-bank-hirc-sound` | `bank-hirc-sound` | HIRC section and Sound object ordinals |
 | `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
+| `audio-bank-music-segment` | `bank-music-segment` | HIRC section and segment object ordinals |
+| `audio-bank-music-segment-child` | `bank-music-segment-child` | HIRC section, segment and child ordinals |
+| `audio-bank-music-segment-stinger` | `bank-music-segment-stinger` | HIRC section, segment and stinger ordinals |
+| `audio-bank-music-segment-marker` | `bank-music-segment-marker` | HIRC section, segment and marker ordinals |
 | `audio-bank-hirc` | `bank-hirc` | HIRC section ordinal |
 | `audio-bank-stid` | `bank-stid` | STID section ordinal |
 | `audio-bank-name` | `bank-name` | STID section and name ordinals |
@@ -77,6 +81,14 @@ body retains the count and leaves the child extent absent. Earlier undecoded ver
 their physical object rows. Later unsupported versions report their layout explicitly.
 The opt-in `original_hirc_containers_and_children_reconcile` test checks
 the projected rows and retained child words against the slice reader.
+
+Version 154 MusicSegment rows carry the original parent, counts, tempo, meter, grid period,
+grid offset and duration. Floating-point values keep their original IEEE-754 words and a
+finite JSON value when available. Separate ordered rows retain child track IDs, stinger
+trigger and segment IDs, and marker IDs, positions and names. Stingers expose the checked
+extent of the original scheduling bytes after the IDs. Marker names carry their byte range,
+original NUL position and UTF-8 status. A malformed name keeps the earlier fully read rows
+and the original segment remains available through the retained bank.
 
 STID header rows retain the authored string type and name count. Each name row carries its
 original ID and byte count, exact header and name ranges, original bytes and UTF-8 result.

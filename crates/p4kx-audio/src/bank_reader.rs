@@ -60,10 +60,6 @@ impl<'a> SectionReader<'a> {
         Ok(f64::from_le_bytes(self.array()?))
     }
 
-    pub(crate) fn f32(&mut self) -> Result<f32, BankError> {
-        Ok(f32::from_le_bytes(self.array()?))
-    }
-
     pub(crate) fn i32(&mut self) -> Result<i32, BankError> {
         Ok(i32::from_le_bytes(self.array()?))
     }

@@ -32,6 +32,7 @@ mod audio_bank_hirc_sound;
 mod audio_bank_inventory;
 mod audio_bank_media;
 mod audio_bank_media_origins;
+mod audio_bank_music_segment;
 mod audio_bank_origins;
 mod audio_bank_payload;
 mod audio_bank_projection;

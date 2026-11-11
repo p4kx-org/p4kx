@@ -88,7 +88,7 @@ fn wem_field_groups() -> [FieldGroup; 5] {
     ]
 }
 
-fn bank_field_groups() -> [FieldGroup; 10] {
+fn bank_field_groups() -> [FieldGroup; 11] {
     [
         FieldGroup::new(
             "bank-directory",
@@ -113,6 +113,10 @@ fn bank_field_groups() -> [FieldGroup; 10] {
         FieldGroup::new(
             "bank-container-fields",
             "Original HIRC container parent, kind, mode and ordered child IDs with exact byte ranges.",
+        ),
+        FieldGroup::new(
+            "bank-music-segment-fields",
+            "Original MusicSegment node, meter, tracks, stingers and marker values with exact source ranges.",
         ),
         FieldGroup::new(
             "bank-sound-fields",

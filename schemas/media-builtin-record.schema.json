@@ -5500,6 +5500,202 @@
         }
       ]
     },
+    "MusicChildRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "track_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ordinal",
+        "track_id",
+        "id_range"
+      ],
+      "type": "object"
+    },
+    "MusicFloat": {
+      "additionalProperties": false,
+      "properties": {
+        "finite": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "raw_bits": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "raw_bits",
+        "finite"
+      ],
+      "type": "object"
+    },
+    "MusicMarkerEncoding": {
+      "enum": [
+        "utf8",
+        "invalid-utf8"
+      ],
+      "type": "string"
+    },
+    "MusicMarkerRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "encoding": {
+          "$ref": "#/$defs/MusicMarkerEncoding"
+        },
+        "marker_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "name_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "position": {
+          "$ref": "#/$defs/MusicFloat"
+        },
+        "terminator_offset": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "ordinal",
+        "marker_id",
+        "position",
+        "name",
+        "encoding",
+        "name_range",
+        "terminator_offset"
+      ],
+      "type": "object"
+    },
+    "MusicSegmentLayout": {
+      "enum": [
+        "decoded",
+        "malformed",
+        "unsupported"
+      ],
+      "type": "string"
+    },
+    "MusicSegmentPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SegmentRecord"
+            },
+            "record_type": {
+              "const": "bank-music-segment",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MusicChildRecord"
+            },
+            "record_type": {
+              "const": "bank-music-segment-child",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MusicStingerRecord"
+            },
+            "record_type": {
+              "const": "bank-music-segment-stinger",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MusicMarkerRecord"
+            },
+            "record_type": {
+              "const": "bank-music-segment-marker",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "MusicSegmentPayload"
+    },
+    "MusicStingerRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "opaque_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "segment_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "trigger_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ordinal",
+        "trigger_id",
+        "segment_id",
+        "opaque_range"
+      ],
+      "type": "object"
+    },
     "NodeBase": {
       "additionalProperties": false,
       "properties": {
@@ -6049,6 +6245,118 @@
           "type": "object"
         }
       ]
+    },
+    "SegmentRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "beat_value": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "beats_per_bar": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "child_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MusicFloat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "grid_offset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MusicFloat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "grid_period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MusicFloat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "layout": {
+          "$ref": "#/$defs/MusicSegmentLayout"
+        },
+        "marker_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "parent_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "stinger_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tempo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MusicFloat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "layout",
+        "parent_id",
+        "child_count",
+        "grid_period",
+        "grid_offset",
+        "tempo",
+        "beats_per_bar",
+        "beat_value",
+        "stinger_count",
+        "duration",
+        "marker_count"
+      ],
+      "type": "object"
     },
     "Severity": {
       "description": "Severity attached to a stable diagnostic.",
@@ -11449,6 +11757,366 @@
                     "properties": {
                       "record_type": {
                         "const": "bank-hirc-container-child"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-segment"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicSegmentPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-segment"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-segment-child"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicSegmentPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-segment-child"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-segment-stinger"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicSegmentPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-segment-stinger"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-segment-marker"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicSegmentPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-segment-marker"
                       }
                     },
                     "required": [

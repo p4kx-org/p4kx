@@ -4,14 +4,14 @@
 use crate::bank_reader::SectionReader;
 use crate::hirc::{self, MediaStorage, SoundSource};
 use crate::hirc_music::{
-    MusicClip, MusicMarker, MusicMeter, MusicNode, MusicPlaylist, MusicPlaylistItem, MusicSegment,
+    MusicClip, MusicMarker, MusicNode, MusicPlaylist, MusicPlaylistItem, MusicSegment,
     MusicStinger, MusicSwitch, MusicTrack, MusicTrackKind, MusicTrackSwitch,
 };
-use crate::hirc_node::{self, children, skip_items};
+use crate::hirc_music_node::{self, BankMusicNodeFields, STINGER_LEN};
+use crate::hirc_music_segment::{self, BankMusicSegmentFields, finish};
+use crate::hirc_node::{self, ID_LEN, children, skip_items};
 use crate::{BankError, SectionId};
 
-const ID_LEN: usize = 4;
-const STINGER_LEN: usize = 24;
 const CLIP_LEN: usize = 16 + 32;
 const CLIP_WITHOUT_CACHE_ID_LEN: usize = CLIP_LEN - ID_LEN;
 const SOURCE_LEN: usize = 4 + 1 + 4 + 4 + 4 + 1;
@@ -29,14 +29,17 @@ const SWITCH_TRACK: u8 = 3;
 
 pub(crate) fn segment(fields: &mut SectionReader<'_>) -> Result<MusicSegment, BankError> {
     let node = node(fields)?;
-    let duration = fields.f64()?;
-    let count = fields.u32()?;
+    let (duration, count) =
+        hirc_music_segment::header(fields, &mut BankMusicSegmentFields::default())?;
     let mut markers = Vec::with_capacity(capacity(fields, count, ID_LEN + 8 + 1));
     for _ in 0..count {
-        let id = fields.u32()?;
-        let position = fields.f64()?;
+        let words = hirc_music_segment::marker(fields)?;
         let name = String::from_utf8_lossy(fields.c_string()?).into();
-        markers.push(MusicMarker { id, position, name });
+        markers.push(MusicMarker {
+            id: words.id.value,
+            position: f64::from_bits(words.position.value),
+            name,
+        });
     }
     finish(fields)?;
     Ok(MusicSegment {
@@ -246,26 +249,17 @@ pub(crate) fn playlist(fields: &mut SectionReader<'_>) -> Result<MusicPlaylist, 
 }
 
 fn node(fields: &mut SectionReader<'_>) -> Result<MusicNode, BankError> {
-    fields.u8()?;
-    let parent_id = hirc_node::node_base(fields)?;
-    let children = children(fields)?;
-    let meter = MusicMeter {
-        grid_period: fields.f64()?,
-        grid_offset: fields.f64()?,
-        tempo: fields.f32()?,
-        beats_per_bar: fields.u8()?,
-        beat_value: fields.u8()?,
-    };
-    fields.u8()?;
-    let count = fields.u32()?;
+    let mut original = BankMusicNodeFields::default();
+    let (parent_id, count, _) = hirc_music_node::head(fields, &mut original)?;
+    let children = hirc_node::read_children(fields, count)?;
+    let meter = hirc_music_node::meter(fields, &mut original)?;
+    let count = hirc_music_node::stinger_count(fields, &mut original)?;
     let mut stingers = Vec::with_capacity(capacity(fields, count, STINGER_LEN));
     for _ in 0..count {
-        let trigger_id = fields.u32()?;
-        let segment_id = fields.u32()?;
-        fields.skip(STINGER_LEN - 2 * ID_LEN)?;
+        let original = hirc_music_node::stinger(fields)?;
         stingers.push(MusicStinger {
-            trigger_id,
-            segment_id,
+            trigger_id: original.trigger_id.value,
+            segment_id: original.segment_id.value,
         });
     }
     Ok(MusicNode {
@@ -305,14 +299,4 @@ fn capacity(fields: &SectionReader<'_>, count: u32, item_len: usize) -> usize {
     usize::try_from(count)
         .unwrap_or(usize::MAX)
         .min(fields.remaining() / item_len)
-}
-
-const fn finish(fields: &SectionReader<'_>) -> Result<(), BankError> {
-    if fields.remaining() > 0 {
-        return Err(BankError::invalid(
-            SectionId::HIRC,
-            "bytes follow the fields of a music object",
-        ));
-    }
-    Ok(())
 }

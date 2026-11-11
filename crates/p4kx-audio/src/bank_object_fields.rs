@@ -8,6 +8,7 @@ use crate::read_at::SeekSource;
 use crate::{BankError, BankReadError, SectionId};
 
 const MAX_VARIABLE_LENGTH_BYTES: usize = 5;
+const STRING_READ_BYTES: usize = 64;
 
 /// A scalar read and its original half-open byte range in the bank.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -112,6 +113,38 @@ impl<'input, R> SeekObjectFields<'input, R> {
             });
         }
         Ok(needed)
+    }
+}
+
+impl<R: Read + Seek> SeekObjectFields<'_, R> {
+    pub(crate) fn read_nul_range(&mut self) -> Result<Range<u64>, BankReadError> {
+        let start = self.offset();
+        let mut scratch = [0; STRING_READ_BYTES];
+        while self.remaining_bytes() > 0 {
+            let len = usize::try_from(self.remaining_bytes())
+                .unwrap_or(usize::MAX)
+                .min(STRING_READ_BYTES);
+            let bytes = scratch.get_mut(..len).ok_or_else(|| {
+                BankError::invalid(
+                    SectionId::HIRC,
+                    "the marker name window exceeds its scratch buffer",
+                )
+            })?;
+            self.input.read_io_at(self.offset(), bytes)?;
+            if let Some(length) = bytes.iter().position(|&byte| byte == 0) {
+                self.position += length as u64;
+                let end = self.offset();
+                self.position += 1;
+                return Ok(start..end);
+            }
+            self.position += len as u64;
+        }
+        Err(BankError::Truncated {
+            section: SectionId::HIRC,
+            len: self.len,
+            needed: self.len + 1,
+        }
+        .into())
     }
 }
 

@@ -17,6 +17,7 @@ mod bank_source_container;
 mod bank_source_didx;
 mod bank_source_event;
 mod bank_source_hirc;
+mod bank_source_music_segment;
 mod bank_source_sound;
 mod bank_stid;
 mod bank_structure;
@@ -28,7 +29,9 @@ mod hirc_container;
 mod hirc_event;
 mod hirc_layout;
 mod hirc_music;
+mod hirc_music_node;
 mod hirc_music_parse;
+mod hirc_music_segment;
 mod hirc_node;
 mod hirc_plugin;
 mod hirc_source;
@@ -65,6 +68,10 @@ pub use bank_source_event::{BankEvent, BankEventAction, BankEventRead, BankHircE
 pub use bank_source_hirc::{
     BankActionRead, BankHirc, BankHircAction, BankHircObject, BankHircSemantic,
 };
+pub use bank_source_music_segment::{
+    BankHircMusicSegment, BankMusicMarker, BankMusicSegmentRead, BankMusicSegmentRow,
+    BankMusicSegmentRows,
+};
 pub use bank_source_sound::{BankHircSound, BankSoundRead};
 pub use bank_stid::{BankStid, BankStidName};
 pub use codec::Codec;
@@ -81,6 +88,8 @@ pub use hirc_music::{
     MusicPlaylistItem, MusicSegment, MusicStinger, MusicSwitch, MusicTrack, MusicTrackKind,
     MusicTrackSwitch,
 };
+pub use hirc_music_node::{BankMusicNodeFields, BankMusicStinger};
+pub use hirc_music_segment::BankMusicSegmentFields;
 pub use hirc_node::{BankNodeParentFields, Container, ContainerKind};
 pub use hirc_source::{
     BankSoundContinuation, BankSoundFields, BankSoundNodeBase, BankSoundNodeFields,
