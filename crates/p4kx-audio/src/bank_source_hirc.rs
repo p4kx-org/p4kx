@@ -8,13 +8,15 @@ use crate::bank_object_fields::SeekObjectFields;
 use crate::bank_reader::SectionReader;
 use crate::bank_structure::{HircEnvelope, OBJECT_HEADER_LEN, OBJECT_ID_LEN};
 use crate::hirc;
-use crate::hirc_action;
+use crate::hirc_action::{self, BankPlayProperties};
 use crate::read_at::SeekSource;
 use crate::{
     ActionTarget, BankActionFields, BankError, BankObservedHeader, BankReadError,
     BankSourceSection, HircKind, SectionId,
 };
 
+#[path = "bank_hirc_action_properties.rs"]
+mod action_properties;
 #[path = "bank_source_hirc_semantic.rs"]
 mod semantic;
 #[path = "bank_hirc_sound_node.rs"]
@@ -25,6 +27,7 @@ mod sound_rtpc;
 mod sound_states;
 #[path = "bank_source_state.rs"]
 mod state;
+pub use self::action_properties::BankHircActionProperties;
 pub use self::semantic::BankHircSemantic;
 pub use self::sound_node::BankHircSoundNode;
 pub use self::sound_rtpc::{BankHircRtpc, BankRtpcRead};
@@ -241,6 +244,15 @@ impl<R: Read + Seek> BankHirc<'_, R> {
         object: BankHircObject,
         version: u32,
     ) -> Result<BankHircAction, BankReadError> {
+        self.action_observed(object, version, &mut None)
+    }
+
+    fn action_observed(
+        &mut self,
+        object: BankHircObject,
+        version: u32,
+        properties: &mut Option<BankPlayProperties>,
+    ) -> Result<BankHircAction, BankReadError> {
         let kind = object.kind(version);
         let status = if kind != HircKind::Action {
             BankActionRead::NotAction
@@ -256,7 +268,7 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                 OBJECT_ID_LEN as u64,
             );
             let mut fields = BankActionFields::default();
-            match hirc_action::read(version, &mut reader, &mut fields) {
+            match hirc_action::read(version, &mut reader, &mut fields, properties) {
                 Ok(target) => BankActionRead::Decoded { target, fields },
                 Err(BankReadError::Format(error)) => BankActionRead::Malformed { error, fields },
                 Err(error) => return Err(error),

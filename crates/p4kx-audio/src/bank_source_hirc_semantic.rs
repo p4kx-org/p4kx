@@ -19,7 +19,9 @@ use crate::hirc_source;
 use crate::{BankHircEvent, BankObservedHeader, BankReadError, HircKind};
 
 use super::sound_states;
-use super::{BankHirc, BankHircAction, BankHircObject, BankHircSoundNode};
+use super::{
+    BankHirc, BankHircAction, BankHircActionProperties, BankHircObject, BankHircSoundNode,
+};
 
 /// A physical HIRC occurrence and any selected bounded interpretation.
 #[non_exhaustive]
@@ -28,6 +30,8 @@ pub enum BankHircSemantic<'input, R> {
     Raw(BankHircObject),
     /// Owner-bound Action interpretation.
     Action(BankHircAction),
+    /// Owner-bound Play action with checked property rows.
+    ActionWithProperties(Box<BankHircActionProperties<'input, R>>),
     /// Owner-bound Event interpretation.
     Event(BankHircEvent<'input, R>),
     /// Owner-bound Sound interpretation.
@@ -64,6 +68,7 @@ impl<R> BankHircSemantic<'_, R> {
         match self {
             Self::Raw(object) => object,
             Self::Action(action) => &action.object,
+            Self::ActionWithProperties(action) => &action.action().object,
             Self::Event(event) => &event.object,
             Self::Sound(sound) | Self::SoundWithStates { sound, .. } => &sound.object,
             Self::SoundWithNode(node) => &node.sound().object,
@@ -83,6 +88,7 @@ enum NodeMode {
     Raw,
     States,
     StatesAndRtpc,
+    SourceFields,
 }
 
 impl<R: Read + Seek> BankHirc<'_, R> {
@@ -114,6 +120,16 @@ impl<R: Read + Seek> BankHirc<'_, R> {
         header: &BankObservedHeader,
     ) -> Option<Result<BankHircSemantic<'_, R>, BankReadError>> {
         self.next_semantic_in(header, NodeMode::StatesAndRtpc)
+    }
+
+    /// Reads semantic fields with Sound node regions and Play action property rows.
+    ///
+    /// The observed bank header must belong to the same input.
+    pub fn next_semantic_with_source_fields(
+        &mut self,
+        header: &BankObservedHeader,
+    ) -> Option<Result<BankHircSemantic<'_, R>, BankReadError>> {
+        self.next_semantic_in(header, NodeMode::SourceFields)
     }
 
     fn next_semantic_in(
@@ -207,6 +223,9 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                 return bank_source_event::observe(self.input, &mut self.stopped, object, version)
                     .map(BankHircSemantic::Event);
             }
+            HircKind::Action if mode == NodeMode::SourceFields => {
+                return self.action_with_properties(object, version);
+            }
             HircKind::Action => self.action(object, version).map(BankHircSemantic::Action),
             HircKind::ActorMixer => {
                 return bank_source_actor_mixer::observe(
@@ -231,6 +250,27 @@ impl<R: Read + Seek> BankHirc<'_, R> {
         result
     }
 
+    fn action_with_properties(
+        &mut self,
+        object: BankHircObject,
+        version: u32,
+    ) -> Result<BankHircSemantic<'_, R>, BankReadError> {
+        let mut properties = None;
+        let action = match self.action_observed(object, version, &mut properties) {
+            Ok(action) => action,
+            Err(cause) => {
+                self.stopped = true;
+                return Err(cause);
+            }
+        };
+        Ok(match properties {
+            Some(fields) => BankHircSemantic::ActionWithProperties(Box::new(
+                BankHircActionProperties::new(self.input, action, fields),
+            )),
+            None => BankHircSemantic::Action(action),
+        })
+    }
+
     fn sound_semantic(
         &mut self,
         object: BankHircObject,
@@ -249,9 +289,11 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                 let states = sound_states::read(self.input, &sound);
                 Ok(BankHircSemantic::SoundWithStates { sound, states })
             }
-            (NodeMode::StatesAndRtpc, hirc_source::NODE_BASE_VERSION) => Ok(
-                BankHircSemantic::SoundWithNode(BankHircSoundNode::new(self.input, sound)),
-            ),
+            (NodeMode::StatesAndRtpc | NodeMode::SourceFields, hirc_source::NODE_BASE_VERSION) => {
+                Ok(BankHircSemantic::SoundWithNode(BankHircSoundNode::new(
+                    self.input, sound,
+                )))
+            }
             _ => Ok(BankHircSemantic::Sound(sound)),
         }
     }

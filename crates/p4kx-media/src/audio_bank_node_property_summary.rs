@@ -4,16 +4,16 @@
 use std::ops::Range;
 
 use p4kx_extraction::BankError;
-use p4kx_extraction::bank::{
-    BankNodeParentFields, BankNodePropertyExtent, BankNodePropertyExtents, BankNodePropertyKind,
-};
+use p4kx_extraction::bank::{BankNodeParentFields, BankNodePropertyExtents, BankNodePropertyKind};
 
 use crate::audio_bank_node_origins::NodeSites;
 use crate::audio_bank_node_properties::{NodePropertyProjection, SUMMARY_NAMESPACE};
 use crate::audio_bank_node_property_payload::{
-    NodePropertyListRecord, NodePropertyObservations, NodePropertyPayload, NodePropertySummary,
+    NodePropertyObservations, NodePropertyPayload, NodePropertySummary,
 };
 use crate::audio_bank_origins::BankOrigins;
+use crate::audio_bank_property_labels;
+use crate::audio_bank_property_list;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
@@ -164,70 +164,19 @@ fn observations(
             source.routing.parent_id.as_ref(),
             "nodeParentId",
         )?,
-        properties: list(
+        properties: audio_bank_property_list::record(
             sites,
             prepared,
             "observed/properties",
             source.properties.get(BankNodePropertyKind::Properties),
+            &audio_bank_property_labels::NODE,
         )?,
-        ranged_modifiers: list(
+        ranged_modifiers: audio_bank_property_list::record(
             sites,
             prepared,
             "observed/ranged_modifiers",
             source.properties.get(BankNodePropertyKind::RangedModifiers),
+            &audio_bank_property_labels::NODE,
         )?,
     })
-}
-
-fn list(
-    sites: &NodeSites,
-    prepared: &mut BankOrigins<'_, '_, '_>,
-    path: &str,
-    extent: Option<&BankNodePropertyExtent>,
-) -> Result<Option<NodePropertyListRecord>, MediaError> {
-    let Some(extent) = extent else {
-        return Ok(None);
-    };
-    let count = &extent.declared_count;
-    sites.field(
-        prepared,
-        &format!("{path}/declared_count"),
-        &count.range,
-        "nodePropertyCount",
-    )?;
-    sites.range(prepared, &format!("{path}/ids_range"), &extent.ids_range)?;
-    let ids = count.range.start..extent.ids_range.end;
-    sites.converted(
-        prepared,
-        &format!("{path}/checked_id_count"),
-        &ids,
-        "nodePropertyCheckedIds",
-    )?;
-    let end = if let Some(words) = &extent.words_range {
-        sites.range(prepared, &format!("{path}/words_range"), words)?;
-        words.end
-    } else {
-        ids.end
-    };
-    let inspected = count.range.start..end;
-    sites.converted(
-        prepared,
-        &format!("{path}/checked_word_count"),
-        &inspected,
-        "nodePropertyCheckedWords",
-    )?;
-    sites.converted(
-        prepared,
-        &format!("{path}/complete"),
-        &inspected,
-        "nodePropertyCoverage",
-    )?;
-    Ok(Some(NodePropertyListRecord {
-        declared_count: count.into(),
-        checked_id_count: extent.checked_id_count(),
-        checked_word_count: extent.checked_word_count(),
-        ids_range: (&extent.ids_range).into(),
-        words_range: extent.words_range.as_ref().map(Into::into),
-        complete: extent.is_complete(),
-    }))
 }

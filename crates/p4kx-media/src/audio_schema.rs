@@ -23,6 +23,8 @@ use crate::audio_wem_diagnostic::OPAQUE_NAMESPACE;
 use crate::audio_wem_projection::{EMBEDDED_INDEX_COUNT, embedded_namespace};
 use crate::{MediaError, schema_merge};
 
+#[path = "audio_schema_action_properties.rs"]
+mod action_properties;
 #[path = "audio_schema_actor_mixer.rs"]
 mod actor_mixer;
 #[path = "audio_schema_foreign.rs"]
@@ -183,6 +185,7 @@ fn insert_audio_payloads(base: &mut Value) -> Result<(), MediaError> {
     node_properties::insert_payload(base)?;
     node_declarations::insert_payload(base)?;
     node_playback::insert_payload(base)?;
+    action_properties::insert_payload(base)?;
     foreign::insert_payload(base)
 }
 
@@ -210,6 +213,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             .chain(node_properties::bindings().iter())
             .chain(node_declarations::bindings().iter())
             .chain(node_playback::bindings().iter())
+            .chain(action_properties::bindings().iter())
             .chain(foreign::bindings().iter())
             .chain(std::iter::once(&BANK_FAILURE_BINDING))
             .chain(stid_bindings().iter())

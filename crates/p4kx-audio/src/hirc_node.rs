@@ -17,8 +17,6 @@ pub(crate) use crate::hirc_rtpc::CURVE_POINT_LEN;
 use crate::{BankError, SectionId};
 
 pub(crate) const ID_LEN: usize = 4;
-pub(crate) const PROP_LEN: usize = 5;
-pub(crate) const RANGED_PROP_LEN: usize = 9;
 
 /// The kind of a container object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

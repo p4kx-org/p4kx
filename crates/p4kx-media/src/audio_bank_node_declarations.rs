@@ -242,7 +242,19 @@ pub(crate) fn unsupported(
     playback_summaries(&declarations, Disposition::Unsupported, None, writer)
 }
 
-impl Declarations<'_, '_> {
+impl<'context, 'source> Declarations<'context, 'source> {
+    pub(crate) const fn new(
+        bank: &'context BankProjection<'source>,
+        object: &BankHircObject,
+        version: VersionSite,
+    ) -> Self {
+        Self {
+            bank,
+            object: *object,
+            version,
+        }
+    }
+
     pub(crate) const fn sites(&self, kind: NodeKind) -> NodeSites {
         NodeSites::new(&self.object, self.version, kind)
     }

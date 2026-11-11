@@ -102,8 +102,9 @@ pub use bank_source_didx::{BankDidx, BankDidxEntry, BankMediaInfo};
 pub use bank_source_event::{BankEvent, BankEventAction, BankEventRead, BankHircEvent};
 pub use bank_source_hirc::BankHircSoundNode;
 pub use bank_source_hirc::{
-    BankActionRead, BankHirc, BankHircAction, BankHircObject, BankHircRtpc, BankHircSemantic,
-    BankHircSoundStates, BankHircState, BankRtpcRead, BankSoundStateRead, BankStateRead,
+    BankActionRead, BankHirc, BankHircAction, BankHircActionProperties, BankHircObject,
+    BankHircRtpc, BankHircSemantic, BankHircSoundStates, BankHircState, BankRtpcRead,
+    BankSoundStateRead, BankStateRead,
 };
 pub use bank_source_music_playlist::{
     BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistRead,
@@ -123,7 +124,8 @@ pub use codec::Codec;
 pub use error::AudioError;
 pub use hirc::{HircKind, HircObject, HircValue, MediaStorage, SoundSource};
 pub use hirc_action::{
-    ActionTarget, BankActionFields, BankPlayBankDecision, BankPlayBankFields, PlayBank,
+    ActionTarget, BankActionFields, BankPlayBankDecision, BankPlayBankFields, BankPlayProperties,
+    PlayBank,
 };
 pub use hirc_actor_mixer::{ActorMixer, BankActorMixerFields};
 pub use hirc_container::BankContainerFields;

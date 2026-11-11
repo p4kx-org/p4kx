@@ -111,21 +111,21 @@ pub(crate) fn project(
     projection: &BankProjection<'_>,
     object: &BankHircObject,
     version: VersionSite,
-    action: BankActionRead,
+    action: &BankActionRead,
     objects: &HircObjectIndex,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let (record, fields, status, issue, target) = match action {
         BankActionRead::NotAction => return Ok(()),
         BankActionRead::Decoded { target, fields } => (
-            ActionRecord::decoded(target),
+            ActionRecord::decoded(*target),
             Some(fields),
             Status::Complete,
             None,
-            Some(target),
+            Some(*target),
         ),
         BankActionRead::Malformed { error, fields } => (
-            ActionRecord::malformed(&fields),
+            ActionRecord::malformed(fields),
             Some(fields),
             Status::Partial,
             Some(MediaIssue::new(
@@ -154,7 +154,7 @@ pub(crate) fn project(
             ));
         }
     };
-    let sites = origins::Sites::new(object, version, fields.as_ref());
+    let sites = origins::Sites::new(object, version, fields);
     let prepared = origins::prepare(projection.input, &sites, issue.is_some(), writer)?;
     prepared.write(
         writer,

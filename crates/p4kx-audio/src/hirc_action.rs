@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::bank_object_fields::{self, BankHircField, ObjectFields};
+use std::ops::Range;
+
+use crate::bank_object_fields::{BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
-use crate::hirc_node::{PROP_LEN, RANGED_PROP_LEN};
+use crate::hirc_node_property::{self, BankNodePropertyExtents, BankNodePropertyKind};
 use crate::{BankError, SectionId};
 
 const PLAY_BANK_VERSION: u32 = 154;
@@ -70,7 +72,7 @@ pub enum BankPlayBankDecision {
     /// Required Action fields failed before the branch could be consulted.
     #[default]
     Unreached,
-    /// The bank version has no `PlayBank` fields.
+    /// The bank version is outside the checked `PlayBank` layout.
     VersionGated,
     /// The original action type does not identify Play.
     NonPlay,
@@ -82,9 +84,9 @@ pub enum BankPlayBankDecision {
 #[derive(Debug, Default)]
 #[non_exhaustive]
 pub struct BankPlayBankFields {
-    /// The count of ordinary properties skipped by this reader, when readable.
+    /// The original ordinary property count when readable.
     pub property_count: Option<BankHircField<u8>>,
-    /// The count of ranged properties skipped by this reader, when readable.
+    /// The original ranged property count when readable.
     pub ranged_property_count: Option<BankHircField<u8>>,
     /// The original bank ID, including zero, when readable.
     pub bank_id: Option<BankHircField<u32>>,
@@ -92,17 +94,55 @@ pub struct BankPlayBankFields {
     pub bank_type: Option<BankHircField<u32>>,
 }
 
+/// Checked flags and planar property lists of a version-154 Play action.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct BankPlayProperties {
+    /// Original start after the target ID, including a truncated continuation.
+    pub start: u64,
+    /// Original target flags, including unknown bits.
+    pub target_flags: Option<BankHircField<u8>>,
+    /// Original ordinary and ranged property list extents.
+    pub lists: BankNodePropertyExtents,
+    /// Original fade flags when the complete property lists precede them.
+    pub fade_flags: Option<BankHircField<u8>>,
+}
+
+impl BankPlayProperties {
+    /// Returns whether the bank version has the checked Play property layout.
+    #[must_use]
+    pub const fn supports_version(version: u32) -> bool {
+        version == PLAY_BANK_VERSION
+    }
+
+    fn new(start: u64) -> Self {
+        Self {
+            start,
+            target_flags: None,
+            lists: BankNodePropertyExtents::default(),
+            fade_flags: None,
+        }
+    }
+
+    /// Returns the original property and flag range once all fields fit.
+    #[must_use]
+    pub fn complete_range(&self) -> Option<Range<u64>> {
+        Some(self.start..self.fade_flags.as_ref()?.range.end)
+    }
+}
+
 pub(crate) fn action(
     version: u32,
     fields: &mut SectionReader<'_>,
 ) -> Result<ActionTarget, BankError> {
-    read(version, fields, &mut BankActionFields::default())
+    read(version, fields, &mut BankActionFields::default(), &mut None)
 }
 
 pub(crate) fn read<F: ObjectFields>(
     version: u32,
     fields: &mut F,
     observed: &mut BankActionFields,
+    properties: &mut Option<BankPlayProperties>,
 ) -> Result<ActionTarget, F::Error> {
     let action_type = fields.read_u16()?;
     let code = action_type.value;
@@ -115,11 +155,13 @@ pub(crate) fn read<F: ObjectFields>(
     };
     observed.target_id = Some(target_id);
 
-    if version != PLAY_BANK_VERSION {
+    if !BankPlayProperties::supports_version(version) {
         observed.play_bank = BankPlayBankDecision::VersionGated;
     } else if action.is_play() {
         let mut play = BankPlayBankFields::default();
-        let result = play_bank(fields, &mut play);
+        let mut original = BankPlayProperties::new(fields.offset());
+        let result = play_bank(fields, &mut play, &mut original);
+        *properties = Some(original);
         observed.play_bank = BankPlayBankDecision::Play(play);
         action.bank = Some(result?);
     } else {
@@ -131,18 +173,15 @@ pub(crate) fn read<F: ObjectFields>(
 fn play_bank<F: ObjectFields>(
     fields: &mut F,
     observed: &mut BankPlayBankFields,
+    properties: &mut BankPlayProperties,
 ) -> Result<PlayBank, F::Error> {
-    fields.read_array::<1>()?;
-    let props = fields.read_u8()?;
-    let count = u32::from(props.value);
-    observed.property_count = Some(props);
-    fields.skip_bytes(bank_object_fields::item_bytes(count, PROP_LEN)? as u64)?;
-
-    let ranged = fields.read_u8()?;
-    let count = u32::from(ranged.value);
-    observed.ranged_property_count = Some(ranged);
-    fields.skip_bytes(bank_object_fields::item_bytes(count, RANGED_PROP_LEN)? as u64)?;
-    fields.read_array::<1>()?;
+    properties.target_flags = Some(fields.read_u8()?);
+    let read = hirc_node_property::scan(fields, &mut properties.lists);
+    observed.property_count = original_count(properties, BankNodePropertyKind::Properties);
+    observed.ranged_property_count =
+        original_count(properties, BankNodePropertyKind::RangedModifiers);
+    read?;
+    properties.fade_flags = Some(fields.read_u8()?);
 
     let bank_id = fields.read_u32()?;
     let id = bank_id.value;
@@ -161,4 +200,14 @@ fn play_bank<F: ObjectFields>(
         bank_id: id,
         bank_type: kind,
     })
+}
+
+fn original_count(
+    properties: &BankPlayProperties,
+    kind: BankNodePropertyKind,
+) -> Option<BankHircField<u8>> {
+    properties
+        .lists
+        .get(kind)
+        .map(|extent| extent.declared_count.clone())
 }

@@ -20,6 +20,8 @@ and fallback selection.
 | `audio-bank-media` | `bank-media` | DIDX section and triplet ordinals |
 | `audio-bank-object` | `bank-object` | HIRC section and object ordinals |
 | `audio-bank-hirc-action` | `bank-hirc-action` | HIRC section and object ordinals |
+| `audio-bank-hirc-action-properties` | `bank-hirc-action-properties` | HIRC section and owning Action object ordinals |
+| `audio-bank-hirc-action-property` | `bank-hirc-action-property` | HIRC section, owning Action object, property list and original property ordinals |
 | `audio-bank-hirc-action-target-resolution` | `bank-hirc-action-target-resolution` | Local Play or PlayEvent target inventory and foreign lookup availability |
 | `audio-bank-hirc-action-target-candidate` | `bank-hirc-action-target-candidate` | One same-ID local HIRC object with its physical type and match flag |
 | `audio-bank-foreign-target-resolution` | `bank-foreign-target-resolution` | Directory-local query index |
@@ -230,6 +232,15 @@ marks the ActorMixer malformed, while complete child words and earlier State and
 observations remain available. Unsupported bank versions retain the original bank and
 an explicit unsupported layout. Child IDs are authored references. Their receipts use the
 owning bank bytes and do not attribute target payloads to the original word.
+
+Version-154 Play action property summaries include the original target and
+fade flag bytes and checked ordinary and ranged lists. Physical list indices
+0 and 1 identify ordinary and ranged values. Each property row preserves its
+original ID and complete raw words. The summary independently reports
+complete or malformed property coverage, including when a later bank reference
+is truncated. Other Action groups report absent Play properties. Other bank
+versions report unsupported property coverage. The Action target, PlayBank
+and CLI/MCP inspection fields keep their established meanings.
 
 Version-154 Sound and ActorMixer node property summaries include the original override bus
 and direct parent words and the checked property and ranged modifier lists. Explicit zero

@@ -5,6 +5,7 @@
 
 mod archive;
 mod archive_layout;
+mod audio_bank_action_properties_provider;
 mod audio_bank_action_target_provider;
 mod audio_bank_actor_mixer_provider;
 mod audio_bank_actor_mixer_raw;

@@ -22,9 +22,9 @@ use crate::audio_bank_rtpc;
 use crate::audio_bank_rtpc_payload::RtpcOwner;
 use crate::audio_bank_state::{self, StateProjection};
 use crate::{
-    MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource, audio_bank_hirc_action,
-    audio_bank_hirc_container, audio_bank_hirc_event, audio_bank_hirc_origins,
-    audio_bank_hirc_sound, audio_bank_inline_state,
+    MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource,
+    audio_bank_action_properties, audio_bank_hirc_container, audio_bank_hirc_event,
+    audio_bank_hirc_origins, audio_bank_hirc_sound, audio_bank_inline_state,
 };
 use crate::{
     audio_bank_music_playlist, audio_bank_music_segment, audio_bank_music_switch,
@@ -54,7 +54,7 @@ pub(crate) fn project<R: Read + Seek>(
     });
     loop {
         let next = match header {
-            Some(header) => hierarchy.next_semantic_with_node_fields(header),
+            Some(header) => hierarchy.next_semantic_with_source_fields(header),
             None => hierarchy
                 .next()
                 .map(|result| result.map(BankHircSemantic::Raw)),
@@ -93,14 +93,24 @@ fn emit_semantic<R: Read + Seek>(
         (BankHircSemantic::ActorMixer(actor), Some(version)) => {
             audio_bank_actor_mixer::project(projection, version, *actor, writer)
         }
-        (BankHircSemantic::Action(action), Some(version)) => audio_bank_hirc_action::project(
-            projection,
-            &action.object,
-            version,
-            action.status,
-            &inventory.hirc_objects,
-            writer,
-        ),
+        (BankHircSemantic::Action(action), Some(version)) => {
+            audio_bank_action_properties::unobserved(
+                projection,
+                version,
+                &action,
+                &inventory.hirc_objects,
+                writer,
+            )
+        }
+        (BankHircSemantic::ActionWithProperties(mut action), Some(version)) => {
+            audio_bank_action_properties::play(
+                projection,
+                version,
+                &mut action,
+                &inventory.hirc_objects,
+                writer,
+            )
+        }
         (BankHircSemantic::Container(container), Some(version)) => {
             audio_bank_hirc_container::project(projection, version, *container, writer)
         }

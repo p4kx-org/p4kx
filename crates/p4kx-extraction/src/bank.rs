@@ -20,16 +20,16 @@ pub use p4kx_audio::{
     BankMusicStinger, BankMusicTrackClip, BankMusicTrackFields, BankMusicTrackRead,
     BankMusicTrackRow, BankMusicTrackRows, BankMusicTrackSource, BankMusicTrackSwitchFields,
     BankNodeParentFields, BankObservedHeader, BankPlayBankDecision, BankPlayBankFields,
-    BankReadError, BankSectionCursor, BankSoundContinuation, BankSoundFields, BankSoundNodeBase,
-    BankSoundNodeFields, BankSoundRead, BankSource, BankSourceSection, BankStateRead, BankStid,
-    BankStidName, ContainerKind, MediaStorage, MusicTrackKind, SoundSource, StateObject,
-    StateProperties, StateProperty,
+    BankPlayProperties, BankReadError, BankSectionCursor, BankSoundContinuation, BankSoundFields,
+    BankSoundNodeBase, BankSoundNodeFields, BankSoundRead, BankSource, BankSourceSection,
+    BankStateRead, BankStid, BankStidName, ContainerKind, MediaStorage, MusicTrackKind,
+    SoundSource, StateObject, StateProperties, StateProperty,
 };
 pub use p4kx_audio::{
-    BankActorMixerFields, BankHircActorMixer, BankHircSoundNode, BankNodeAuxFields,
-    BankNodeFxFields, BankNodeFxKind, BankNodeFxList, BankNodeFxSlot, BankNodeFxSlots,
-    BankNodePropertyExtent, BankNodePropertyExtents, BankNodePropertyKind, BankNodePropertyRow,
-    BankNodePropertyRows, BankNodePropertyValue, BankNodeUserAuxBuses,
+    BankActorMixerFields, BankHircActionProperties, BankHircActorMixer, BankHircSoundNode,
+    BankNodeAuxFields, BankNodeFxFields, BankNodeFxKind, BankNodeFxList, BankNodeFxSlot,
+    BankNodeFxSlots, BankNodePropertyExtent, BankNodePropertyExtents, BankNodePropertyKind,
+    BankNodePropertyRow, BankNodePropertyRows, BankNodePropertyValue, BankNodeUserAuxBuses,
 };
 pub use p4kx_audio::{
     BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistItem,

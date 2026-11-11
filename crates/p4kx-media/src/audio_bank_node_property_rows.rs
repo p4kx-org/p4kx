@@ -8,16 +8,52 @@ use p4kx_extraction::bank::{
     BankNodePropertyKind, BankNodePropertyRow, BankNodePropertyRows, BankNodePropertyValue,
 };
 
+use crate::audio_bank_action_property_payload::{
+    ActionPropertyPayload, PROPERTY_NAMESPACE as ACTION_PROPERTY_NAMESPACE,
+};
 use crate::audio_bank_node_origins::NodeSites;
-use crate::audio_bank_node_properties::{NodePropertyProjection, PROPERTY_NAMESPACE};
+use crate::audio_bank_node_properties::PROPERTY_NAMESPACE;
 use crate::audio_bank_node_property_payload::{
     NodePropertyPayload, NodePropertyRecord, NodePropertyWords,
 };
 use crate::audio_bank_origins::BankOrigins;
+use crate::audio_bank_projection::BankProjection;
+use crate::audio_bank_property_labels::{self, PropertyLabels};
 use crate::{MediaError, MediaWriter, Status, Subresource};
 
+#[derive(Clone, Copy)]
+pub(crate) enum PropertyScope {
+    Node,
+    Action,
+}
+
+impl PropertyScope {
+    const fn labels(self) -> &'static PropertyLabels {
+        match self {
+            Self::Node => &audio_bank_property_labels::NODE,
+            Self::Action => &audio_bank_property_labels::ACTION,
+        }
+    }
+}
+
+pub(crate) struct PropertyRows<'context, 'source> {
+    bank: &'context BankProjection<'source>,
+    sites: &'context NodeSites,
+    scope: PropertyScope,
+}
+
+impl<'context, 'source> PropertyRows<'context, 'source> {
+    pub(crate) const fn new(
+        bank: &'context BankProjection<'source>,
+        sites: &'context NodeSites,
+        scope: PropertyScope,
+    ) -> Self {
+        Self { bank, sites, scope }
+    }
+}
+
 pub(crate) fn emit<R: Read + Seek>(
-    projection: &NodePropertyProjection<'_, '_>,
+    projection: &PropertyRows<'_, '_>,
     kind: BankNodePropertyKind,
     rows: BankNodePropertyRows<'_, R>,
     writer: &mut MediaWriter<'_>,
@@ -40,50 +76,50 @@ pub(crate) fn emit<R: Read + Seek>(
 }
 
 fn emit_row(
-    projection: &NodePropertyProjection<'_, '_>,
+    projection: &PropertyRows<'_, '_>,
     list: u64,
     count: &Range<u64>,
     row: &BankNodePropertyRow,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let sites = &projection.sites;
+    let sites = projection.sites;
+    let labels = projection.scope.labels();
     let mut prepared = sites.record(projection.bank.input, writer, Some(&row.id.range))?;
-    sites.field(
-        &mut prepared,
-        "property_id",
-        &row.id.range,
-        "nodePropertyId",
-    )?;
-    sites.converted(
-        &mut prepared,
-        "ordinal",
-        &row.id.range,
-        "nodePropertyPosition",
-    )?;
-    sites.converted(&mut prepared, "words/kind", count, "nodePropertyWordLayout")?;
-    let words = observed_words(sites, &mut prepared, &row.value)?;
+    sites.field(&mut prepared, "property_id", &row.id.range, labels.id)?;
+    sites.converted(&mut prepared, "ordinal", &row.id.range, labels.position)?;
+    sites.converted(&mut prepared, "words/kind", count, labels.word_layout)?;
+    let words = observed_words(sites, &mut prepared, &row.value, labels)?;
     let data = NodePropertyRecord {
         ordinal: row.ordinal,
         property_id: (&row.id).into(),
         words,
     };
     let [section, object] = sites.indices();
-    prepared.finish().write(
-        writer,
-        &Subresource::new(
-            PROPERTY_NAMESPACE,
-            vec![section, object, list, u64::from(row.ordinal)],
+    let indices = vec![section, object, list, u64::from(row.ordinal)];
+    let prepared = prepared.finish();
+    match projection.scope {
+        PropertyScope::Node => prepared.write(
+            writer,
+            &Subresource::new(PROPERTY_NAMESPACE, indices),
+            Status::Complete,
+            &NodePropertyPayload::BankHircNodeProperty(&data),
+            &[],
         ),
-        Status::Complete,
-        &NodePropertyPayload::BankHircNodeProperty(&data),
-        &[],
-    )
+        PropertyScope::Action => prepared.write(
+            writer,
+            &Subresource::new(ACTION_PROPERTY_NAMESPACE, indices),
+            Status::Complete,
+            &ActionPropertyPayload::Property(&data),
+            &[],
+        ),
+    }
 }
 
 fn observed_words(
     sites: &NodeSites,
     prepared: &mut BankOrigins<'_, '_, '_>,
     value: &BankNodePropertyValue,
+    labels: &PropertyLabels,
 ) -> Result<NodePropertyWords, MediaError> {
     Ok(match value {
         BankNodePropertyValue::Scalar(bits) => NodePropertyWords::Scalar {
@@ -91,7 +127,7 @@ fn observed_words(
                 prepared,
                 "words/scalar_bits",
                 bits.as_ref(),
-                "nodePropertyScalarBits",
+                labels.scalar_bits,
             )?,
         },
         BankNodePropertyValue::Ranged {
@@ -101,13 +137,13 @@ fn observed_words(
                 prepared,
                 "words/minimum_bits",
                 minimum.as_ref(),
-                "nodePropertyMinimumBits",
+                labels.minimum_bits,
             )?,
             maximum_bits: sites.scalar(
                 prepared,
                 "words/maximum_bits",
                 maximum.as_ref(),
-                "nodePropertyMaximumBits",
+                labels.maximum_bits,
             )?,
         },
         _ => {

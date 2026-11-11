@@ -187,7 +187,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-action-fields",
-            "HIRC Action type and target, original PlayBank words, local Play and PlayEvent candidates, and checked foreign candidates in their owning Archive.",
+            "HIRC Action type and target, original PlayBank words, flags and planar property lists, local Play and PlayEvent candidates, and checked foreign candidates in their owning Archive.",
         ),
         FieldGroup::new(
             "bank-event-fields",

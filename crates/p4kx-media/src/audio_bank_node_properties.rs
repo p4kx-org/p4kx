@@ -11,7 +11,7 @@ use p4kx_extraction::bank::{
 
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_node_origins::{NodeKind, NodeSites};
-use crate::audio_bank_node_property_rows;
+use crate::audio_bank_node_property_rows::{self, PropertyRows, PropertyScope};
 use crate::audio_bank_node_property_summary::{self, SourceNode};
 use crate::audio_bank_projection::BankProjection;
 use crate::{MediaError, MediaWriter};
@@ -81,7 +81,8 @@ pub(crate) fn sound<R: Read + Seek>(
     audio_bank_node_property_summary::supported(&projection, original.as_ref(), error, writer)?;
     for kind in LISTS {
         if let Some(rows) = node.properties(kind) {
-            audio_bank_node_property_rows::emit(&projection, kind, rows, writer)?;
+            let properties = PropertyRows::new(bank, &projection.sites, PropertyScope::Node);
+            audio_bank_node_property_rows::emit(&properties, kind, rows, writer)?;
         }
     }
     Ok(())
@@ -114,7 +115,8 @@ pub(crate) fn actor_mixer<R: Read + Seek>(
     audio_bank_node_property_summary::supported(&projection, Some(&original), error, writer)?;
     for kind in LISTS {
         if let Some(rows) = actor.properties(kind) {
-            audio_bank_node_property_rows::emit(&projection, kind, rows, writer)?;
+            let properties = PropertyRows::new(bank, &projection.sites, PropertyScope::Node);
+            audio_bank_node_property_rows::emit(&properties, kind, rows, writer)?;
         }
     }
     Ok(())
