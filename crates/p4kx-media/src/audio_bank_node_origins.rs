@@ -28,6 +28,7 @@ pub(crate) enum NodeKind {
     ActionProperties,
     RandomSequence,
     SwitchContainer,
+    BlendContainer,
 }
 
 impl NodeKind {
@@ -44,6 +45,7 @@ impl NodeKind {
             Self::ActionProperties => "bnkHircActionProperties",
             Self::RandomSequence => "bnkHircRandomSequence",
             Self::SwitchContainer => "bnkHircSwitchContainer",
+            Self::BlendContainer => "bnkHircBlendContainer",
         }
     }
 
@@ -60,6 +62,7 @@ impl NodeKind {
             Self::ActionProperties => "actionPropertyPosition",
             Self::RandomSequence => "randomSequencePlaylistPosition",
             Self::SwitchContainer => "switchContainerPosition",
+            Self::BlendContainer => "blendContainerPosition",
         }
     }
 
@@ -76,6 +79,7 @@ impl NodeKind {
             Self::ActionProperties => "actionPropertyExtent",
             Self::RandomSequence => "randomSequenceExtent",
             Self::SwitchContainer => "switchContainerExtent",
+            Self::BlendContainer => "blendContainerExtent",
         }
     }
 }

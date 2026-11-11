@@ -40,8 +40,12 @@ pub(crate) fn project<R: Read + Seek>(
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let sites = NodeSites::new(original, version, NodeKind::Rtpc);
-    let body = original.body_offset()..original.body_end_exclusive();
+    let body = match owner {
+        RtpcOwner::BlendLayer(layer) => layer.checked_range(),
+        _ => original.body_offset()..original.body_end_exclusive(),
+    };
     let mut prepared = sites.record(projection.input, writer, None)?;
+    capture_layer(owner, &sites, &mut prepared)?;
     let observed = observe(&sites, &mut prepared, &body, version.version, read)?;
     let status = if observed.issue.is_some() {
         Status::Partial
@@ -50,13 +54,27 @@ pub(crate) fn project<R: Read + Seek>(
     };
     prepared.finish().write(
         writer,
-        &Subresource::new(owner.summary_namespace(), sites.indices().to_vec()),
+        &Subresource::new(
+            owner.summary_namespace(),
+            owner.indices(sites.indices(), &[]),
+        ),
         status,
         &owner.summary(&observed.record),
         observed.issue.as_slice(),
     )?;
     if let Some(rows) = observed.rows {
         audio_bank_rtpc_rows::project(projection, &sites, owner, rows, writer)?;
+    }
+    Ok(())
+}
+
+pub(super) fn capture_layer(
+    owner: RtpcOwner,
+    sites: &NodeSites,
+    prepared: &mut BankOrigins<'_, '_, '_>,
+) -> Result<(), MediaError> {
+    if let RtpcOwner::BlendLayer(layer) = owner {
+        sites.index(prepared, 2, &layer.id_range(), "blendLayerPosition")?;
     }
     Ok(())
 }

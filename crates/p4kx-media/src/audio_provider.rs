@@ -195,7 +195,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-container-fields",
-            "Original HIRC container parent, kind, mode and ordered children, ActorMixer children, and version-154 shared node properties, FX, auxiliary routing, positioning, advanced settings, State and RTPC fields for containers and ActorMixer. Version-154 Random/Sequence timing, mode codes, flags and ordered signed playlist weights, and Switch defaults, ordered memberships and per-child configurations.",
+            "Original HIRC container parent, kind, mode and ordered children, ActorMixer children, and version-154 shared node properties, FX, auxiliary routing, positioning, advanced settings, State and RTPC fields for containers and ActorMixer. Version-154 Random/Sequence timing, mode codes, flags and ordered signed playlist weights, Switch defaults, ordered memberships and per-child configurations, and Blend layers, per-layer RTPCs, child associations and crossfade graph points.",
         ),
         FieldGroup::new(
             "bank-music-playlist-fields",

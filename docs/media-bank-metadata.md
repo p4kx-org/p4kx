@@ -70,6 +70,13 @@ and fallback selection.
 | `audio-bank-hirc-switch-membership-group` | `bank-hirc-switch-membership-group` | HIRC section, Switch object and membership group ordinals |
 | `audio-bank-hirc-switch-membership` | `bank-hirc-switch-membership` | HIRC section, Switch object, membership group and member ordinals |
 | `audio-bank-hirc-switch-child-configuration` | `bank-hirc-switch-child-configuration` | HIRC section, Switch object and child configuration ordinals |
+| `audio-bank-hirc-blend-container` | `bank-hirc-blend-container` | HIRC section and Blend object ordinals |
+| `audio-bank-hirc-blend-layer` | `bank-hirc-blend-layer` | HIRC section, Blend object and Layer ordinals |
+| `audio-bank-hirc-blend-association` | `bank-hirc-blend-association` | HIRC section, Blend object, Layer and child association ordinals |
+| `audio-bank-hirc-blend-point` | `bank-hirc-blend-point` | HIRC section, Blend object, Layer, child association and point ordinals |
+| `audio-bank-hirc-blend-layer-rtpc` | `bank-hirc-blend-layer-rtpc` | HIRC section, Blend object and Layer ordinals |
+| `audio-bank-hirc-blend-layer-rtpc-curve` | `bank-hirc-blend-layer-rtpc-curve` | HIRC section, Blend object, Layer and RTPC curve ordinals |
+| `audio-bank-hirc-blend-layer-rtpc-point` | `bank-hirc-blend-layer-rtpc-point` | HIRC section, Blend object, Layer, RTPC curve and point ordinals |
 | `audio-bank-hirc-container-rtpc` | `bank-hirc-container-rtpc` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-rtpc-curve` | `bank-hirc-container-rtpc-curve` | HIRC section, container object and curve ordinals |
 | `audio-bank-hirc-container-rtpc-point` | `bank-hirc-container-rtpc-point` | HIRC section, container object, curve and point ordinals |
@@ -278,6 +285,17 @@ bits, in their authored order. Repeated IDs and zero values remain present.
 Each checked member and configuration uses its owning bank for field origins.
 A truncated table retains its checked rows and readable field prefixes. Child
 references carry unchecked resolution, independent of the original child list.
+
+Ordinary version-154 Blend records preserve the original Layer count and
+continuous-validation byte. Each Layer carries its original crossfade RTPC
+ID and type code, checked child associations and its own initial RTPC rows.
+Association points preserve ordered input and output binary32 words and
+original interpolation codes. Finite numeric interpretations retain original
+units. Repeated IDs, unknown codes and explicit zeroes remain present. A
+malformed association can retain readable words and its original declared
+count. A complete initial RTPC region remains usable when later association
+bytes are truncated. Raw custom version markers remain unsupported. Each row
+uses the checked physical source in its owning bank.
 
 Version-154 Sound, ActorMixer and container node property summaries include the original override bus
 and direct parent words and the checked property and ranged modifier lists. Explicit zero

@@ -7,6 +7,7 @@ use p4kx_extraction::bank::{BankRtpcCurve, BankRtpcPoint, BankRtpcRow, BankRtpcR
 
 use crate::audio_bank_node_origins::NodeSites;
 use crate::audio_bank_projection::BankProjection;
+use crate::audio_bank_rtpc;
 use crate::audio_bank_rtpc_payload::{RtpcCurveRecord, RtpcOwner, RtpcPointRecord};
 use crate::origin_input::MediaOriginInput;
 use crate::{MediaError, MediaWriter, Status, Subresource};
@@ -53,6 +54,7 @@ fn emit_curve(
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let mut prepared = sites.record(input, writer, Some(&fields.rtpc_id.range))?;
+    audio_bank_rtpc::capture_layer(owner, sites, &mut prepared)?;
     for (name, range, original) in [
         ("rtpc_id", &fields.rtpc_id.range, "rtpcId"),
         ("rtpc_type", &fields.rtpc_type.range, "rtpcType"),
@@ -81,12 +83,11 @@ fn emit_curve(
         scaling: (&fields.scaling).into(),
         point_count: (&fields.point_count).into(),
     };
-    let [section, object] = sites.indices();
     prepared.finish().write(
         writer,
         &Subresource::new(
             owner.curve_namespace(),
-            vec![section, object, u64::from(ordinal)],
+            owner.indices(sites.indices(), &[u64::from(ordinal)]),
         ),
         Status::Complete,
         &owner.curve(&record),
@@ -104,6 +105,7 @@ fn emit_point(
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let mut prepared = sites.record(input, writer, Some(&fields.from_bits.range))?;
+    audio_bank_rtpc::capture_layer(owner, sites, &mut prepared)?;
     for (name, range, original, interpretation) in [
         (
             "from_bits",
@@ -131,12 +133,11 @@ fn emit_point(
         input: input.is_finite().then_some(input),
         output: output.is_finite().then_some(output),
     };
-    let [section, object] = sites.indices();
     prepared.finish().write(
         writer,
         &Subresource::new(
             owner.point_namespace(),
-            vec![section, object, u64::from(curve), u64::from(ordinal)],
+            owner.indices(sites.indices(), &[u64::from(curve), u64::from(ordinal)]),
         ),
         Status::Complete,
         &owner.point(&record),

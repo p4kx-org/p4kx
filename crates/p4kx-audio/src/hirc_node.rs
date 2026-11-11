@@ -14,7 +14,6 @@ use crate::hirc_node_property::{self, BankNodePropertyExtents};
 use crate::hirc_node_state;
 use crate::hirc_rtpc::{self, BankRtpcExtent};
 
-pub(crate) use crate::hirc_rtpc::CURVE_POINT_LEN;
 use crate::{BankError, SectionId};
 
 pub(crate) const ID_LEN: usize = 4;
@@ -158,10 +157,6 @@ fn read_parent<F: ObjectFields>(
     let id = parent.value;
     observed.parent_id = Some(parent);
     Ok(id)
-}
-
-pub(crate) fn skip_rtpcs<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
-    hirc_rtpc::scan(fields, &mut None)
 }
 
 pub(crate) fn checked_child_bytes(count: u32, available: u64) -> Result<u64, BankError> {

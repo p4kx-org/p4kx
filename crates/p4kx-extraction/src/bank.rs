@@ -33,6 +33,11 @@ pub use p4kx_audio::{
     BankNodeUserAuxBuses,
 };
 pub use p4kx_audio::{
+    BankBlendAssociation, BankBlendAssociationFields, BankBlendAssociations,
+    BankBlendContainerFields, BankBlendExtent, BankBlendLayer, BankBlendLayerFields,
+    BankBlendLayers, BankBlendPoint, BankBlendPointRows,
+};
+pub use p4kx_audio::{
     BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistItem,
     BankMusicPlaylistRead, BankMusicPlaylistRow, BankMusicPlaylistRows, BankMusicTransitionFields,
     MusicPlayMode,

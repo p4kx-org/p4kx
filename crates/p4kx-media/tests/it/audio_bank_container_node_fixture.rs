@@ -66,13 +66,34 @@ pub(crate) fn export(
     inspect: impl FnOnce(&[MediaRecord], &Evidence<'_>) -> TestResult,
 ) -> TestResult {
     verify_layout(source, expected)?;
+    export_observed(
+        source,
+        encrypted,
+        expected == HircLayout::Malformed,
+        inspect,
+    )
+}
+
+pub(crate) fn export_raw_bank(
+    source: &[u8],
+    encrypted: bool,
+    inspect: impl FnOnce(&[MediaRecord], &Evidence<'_>) -> TestResult,
+) -> TestResult {
+    export_observed(source, encrypted, false, inspect)
+}
+
+fn export_observed(
+    source: &[u8],
+    encrypted: bool,
+    diagnostic: bool,
+    inspect: impl FnOnce(&[MediaRecord], &Evidence<'_>) -> TestResult,
+) -> TestResult {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("Data.p4k");
     let entry = TestEntry::zstd(PATH, source);
     let entry = if encrypted { entry.encrypted() } else { entry };
     ArchiveBuilder::new().entry(entry).write_to(&path)?;
     let archive = Archive::open_with(path, OpenOptions::new().key(Some(test_key())))?;
-    let diagnostic = expected == HircLayout::Malformed;
     let mut export_options = options();
     export_options.diagnostic = diagnostic;
     let output = folder.path().join("out");

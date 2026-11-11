@@ -8,6 +8,8 @@
 //! `HIRC` objects and the WEMs they embed.
 
 mod adpcm;
+mod bank_blend_point_rows;
+mod bank_blend_rows;
 mod bank_error;
 mod bank_inline_state_rows;
 mod bank_node_fx_slots;
@@ -38,6 +40,7 @@ mod error;
 mod hirc;
 mod hirc_action;
 mod hirc_actor_mixer;
+mod hirc_blend_container;
 mod hirc_container;
 mod hirc_event;
 mod hirc_layout;
@@ -86,6 +89,10 @@ mod wem_source;
 mod wem_text;
 mod wwise_id;
 
+pub use bank_blend_point_rows::{BankBlendPoint, BankBlendPointRows};
+pub use bank_blend_rows::{
+    BankBlendAssociation, BankBlendAssociations, BankBlendLayer, BankBlendLayers,
+};
 pub use bank_error::{BankError, BankWarning, SectionId};
 pub use bank_inline_state_rows::{BankInlineStateRow, BankInlineStateRows};
 pub use bank_node_fx_slots::{BankNodeFxSlot, BankNodeFxSlots};
@@ -140,6 +147,9 @@ pub use hirc_action::{
     PlayBank,
 };
 pub use hirc_actor_mixer::{ActorMixer, BankActorMixerFields};
+pub use hirc_blend_container::{
+    BankBlendAssociationFields, BankBlendContainerFields, BankBlendExtent, BankBlendLayerFields,
+};
 pub use hirc_container::BankContainerFields;
 pub use hirc_event::BankEventCountEncoding;
 pub use hirc_layout::HircLayout;

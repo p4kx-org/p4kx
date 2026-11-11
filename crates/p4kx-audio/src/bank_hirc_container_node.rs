@@ -3,6 +3,7 @@
 
 use std::io::{Read, Seek};
 
+use crate::bank_blend_rows::BankBlendLayers;
 use crate::bank_inline_state_rows::BankInlineStateRows;
 use crate::bank_node_fx_slots::BankNodeFxSlots;
 use crate::bank_node_property_rows::BankNodePropertyRows;
@@ -90,6 +91,12 @@ impl<R> BankHircContainerNode<'_, R> {
             self.stopped,
             extent,
         ))
+    }
+
+    /// Borrows checked original Blend Layers with nested source cursors.
+    pub fn blend_layers(&mut self) -> Option<BankBlendLayers<'_, R>> {
+        let extent = self.observation.fields.blend.as_ref()?.layers.as_ref()?;
+        Some(BankBlendLayers::new(self.input, self.stopped, extent))
     }
 
     /// Borrows the checked original property rows.

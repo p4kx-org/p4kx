@@ -5,14 +5,14 @@ use std::ops::Range;
 
 use crate::bank_object_fields::ObjectFields;
 use crate::bank_reader::SectionReader;
-use crate::hirc_node::{self, BankNodeParentFields, CURVE_POINT_LEN, Container, ContainerKind};
+use crate::hirc_blend_container::{self, BankBlendContainerFields};
+use crate::hirc_node::{self, BankNodeParentFields, Container, ContainerKind};
 use crate::hirc_node_parameters::BankNodeParameters;
 use crate::hirc_random_sequence::{self, BankRandomSequenceFields};
 use crate::hirc_switch_container::{self, BankSwitchContainerFields};
 use crate::{BankError, BankHircField, HircKind, SectionId};
 
 const SEQUENCE_MODE: u8 = 1;
-const LAYER_ASSOCIATION_LEN: u64 = 5;
 
 /// Original fields and checked extents of one container body.
 #[derive(Debug, Default)]
@@ -30,6 +30,8 @@ pub struct BankContainerFields {
     pub random_sequence: Option<BankRandomSequenceFields>,
     /// Original Switch decision fields when reached.
     pub switch: Option<BankSwitchContainerFields>,
+    /// Original Blend decision fields when reached.
+    pub blend: Option<BankBlendContainerFields>,
     /// The decoded container kind when selected.
     pub kind: Option<ContainerKind>,
     /// Original child count when readable.
@@ -159,7 +161,10 @@ pub(crate) fn tail<F: ObjectFields>(
             })?;
             hirc_switch_container::tables(fields, decisions)?;
         }
-        Layout::Blend => blend_tail(fields)?,
+        Layout::Blend => {
+            let observed = observed.blend.insert(BankBlendContainerFields::new(start));
+            hirc_blend_container::tail(fields, observed)?;
+        }
         Layout::RandomSequence => {
             let decisions = observed.random_sequence.as_mut().ok_or_else(|| {
                 BankError::invalid(
@@ -175,20 +180,5 @@ pub(crate) fn tail<F: ObjectFields>(
             BankError::invalid(SectionId::HIRC, "bytes follow the fields of a container").into(),
         );
     }
-    Ok(())
-}
-
-fn blend_tail<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
-    for _ in 0..fields.read_u32()?.value {
-        fields.read_array::<4>()?;
-        hirc_node::skip_rtpcs(fields)?;
-        fields.skip_bytes(LAYER_ASSOCIATION_LEN)?;
-        for _ in 0..fields.read_u32()?.value {
-            fields.read_array::<4>()?;
-            let count = fields.read_u32()?.value;
-            hirc_node::skip_items(fields, count, CURVE_POINT_LEN)?;
-        }
-    }
-    fields.read_array::<1>()?;
     Ok(())
 }

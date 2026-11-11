@@ -27,6 +27,8 @@ use crate::{MediaError, schema_merge};
 mod action_properties;
 #[path = "audio_schema_actor_mixer.rs"]
 mod actor_mixer;
+#[path = "audio_schema_blend.rs"]
+mod blend;
 #[path = "audio_schema_foreign.rs"]
 mod foreign;
 #[path = "audio_schema_hirc.rs"]
@@ -196,7 +198,8 @@ fn insert_hirc_field_payloads(base: &mut Value) -> Result<(), MediaError> {
     node_playback::insert_payload(base)?;
     action_properties::insert_payload(base)?;
     random_sequence::insert_payload(base)?;
-    switch_container::insert_payload(base)
+    switch_container::insert_payload(base)?;
+    blend::insert_payload(base)
 }
 
 pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
@@ -226,6 +229,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             .chain(action_properties::bindings().iter())
             .chain(random_sequence::bindings().iter())
             .chain(switch_container::bindings().iter())
+            .chain(blend::bindings().iter())
             .chain(foreign::bindings().iter())
             .chain(std::iter::once(&BANK_FAILURE_BINDING))
             .chain(stid_bindings().iter())

@@ -12,6 +12,7 @@ use p4kx_extraction::{DecimalU64, HircKind};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::audio_bank_blend_container;
 use crate::audio_bank_container_node;
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_payload::BankEntryRange;
@@ -101,6 +102,9 @@ pub(crate) fn project<R: Read + Seek>(
         }
         HircKind::SwitchContainer => {
             audio_bank_switch_container::project(projection, version, &mut container, writer)
+        }
+        HircKind::LayerContainer => {
+            audio_bank_blend_container::project(projection, version, &mut container, writer)
         }
         _ => Ok(()),
     }

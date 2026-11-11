@@ -6,6 +6,7 @@ use std::io::{Read, Seek};
 use p4kx_extraction::HircKind;
 use p4kx_extraction::bank::{BankContainerRead, BankHircContainerNode, BankHircObject};
 
+use crate::audio_bank_blend_container;
 use crate::audio_bank_inline_state::{self, InlineStateRead};
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_node_declarations::{self, Disposition, Owner};
@@ -65,6 +66,9 @@ pub(crate) fn unsupported(
         }
         HircKind::SwitchContainer => {
             audio_bank_switch_container::unsupported(projection, version, original, writer)
+        }
+        HircKind::LayerContainer => {
+            audio_bank_blend_container::unsupported(projection, version, original, writer)
         }
         _ => Ok(()),
     }

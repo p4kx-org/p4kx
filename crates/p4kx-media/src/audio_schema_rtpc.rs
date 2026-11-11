@@ -3,13 +3,17 @@
 
 use serde_json::Value;
 
-use crate::audio_bank_rtpc_payload::{ContainerRtpcPayload, RtpcOwner, RtpcPayload};
+use crate::audio_bank_rtpc_payload::{
+    BLEND_CURVE_NAMESPACE, BLEND_POINT_NAMESPACE, BLEND_SUMMARY_NAMESPACE, BlendLayerRtpcPayload,
+    ContainerRtpcPayload, RtpcOwner, RtpcPayload,
+};
 use crate::{MediaError, schema_merge};
 
 use super::{Binding, StatusRule};
 
 const RTPC_PAYLOAD: &str = "RtpcPayload";
 const CONTAINER_PAYLOAD: &str = "ContainerRtpcPayload";
+const BLEND_PAYLOAD: &str = "BlendLayerRtpcPayload";
 
 pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
     schema_merge::insert_payload(
@@ -21,11 +25,17 @@ pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
         base,
         CONTAINER_PAYLOAD,
         schema_merge::serialized_payload::<ContainerRtpcPayload<'static>>(),
+    )?;
+    schema_merge::insert_payload(
+        base,
+        BLEND_PAYLOAD,
+        schema_merge::serialized_payload::<BlendLayerRtpcPayload<'static>>(),
     )
 }
 
-pub(super) const fn bindings() -> [Binding; 9] {
+pub(super) const fn bindings() -> [Binding; 12] {
     let [summary, curve, point] = container_bindings();
+    let [blend_summary, blend_curve, blend_point] = blend_bindings();
     [
         Binding::exact(
             RTPC_PAYLOAD,
@@ -72,6 +82,9 @@ pub(super) const fn bindings() -> [Binding; 9] {
         summary,
         curve,
         point,
+        blend_summary,
+        blend_curve,
+        blend_point,
     ]
 }
 
@@ -96,6 +109,32 @@ const fn container_bindings() -> [Binding; 3] {
             RtpcOwner::Container.point_namespace(),
             "bank-hirc-container-rtpc-point",
             4,
+            StatusRule::Complete,
+        ),
+    ]
+}
+
+const fn blend_bindings() -> [Binding; 3] {
+    [
+        Binding::exact(
+            BLEND_PAYLOAD,
+            BLEND_SUMMARY_NAMESPACE,
+            "bank-hirc-blend-layer-rtpc",
+            3,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            BLEND_PAYLOAD,
+            BLEND_CURVE_NAMESPACE,
+            "bank-hirc-blend-layer-rtpc-curve",
+            4,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            BLEND_PAYLOAD,
+            BLEND_POINT_NAMESPACE,
+            "bank-hirc-blend-layer-rtpc-point",
+            5,
             StatusRule::Complete,
         ),
     ]
