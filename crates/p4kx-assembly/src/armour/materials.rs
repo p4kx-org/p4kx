@@ -15,12 +15,13 @@ use super::jobs::{Job, issue};
 use super::read_models::Loaded;
 use crate::build::library_key_of;
 use crate::build_palettes::Palettes;
-use crate::{Issue, IssueKind, ModelProvider};
+use crate::{Issue, IssueKind, ModelProvider, PaletteRecords};
 
 #[derive(Clone)]
 pub(super) struct Library {
     pub(super) status: Arc<MaterialStatus>,
     pub(super) origins: Arc<MaterialArchiveOrigins>,
+    pub(super) palette: Option<PaletteApplication>,
 }
 
 impl From<ArchiveMaterialRead> for Library {
@@ -28,7 +29,23 @@ impl From<ArchiveMaterialRead> for Library {
         Self {
             status: Arc::new(read.status),
             origins: Arc::new(read.origins),
+            palette: None,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct PaletteApplication {
+    records: PaletteRecords,
+    slots: Vec<usize>,
+}
+
+impl PaletteApplication {
+    pub(super) fn records_for(&self, slot: usize) -> Option<PaletteRecords> {
+        self.slots
+            .binary_search(&slot)
+            .is_ok()
+            .then_some(self.records)
     }
 }
 
@@ -60,7 +77,8 @@ pub(super) fn drawn_with(
     {
         issues.push(issue(job, IssueKind::MaterialLibrary { reason }));
     }
-    let painted = painted(tints, library.status, job, issues);
+    let (painted, palette) = painted(tints, library.status, job, issues);
+    library.palette = palette;
     let natural = Look::natural();
     library.status = job
         .look
@@ -79,25 +97,31 @@ fn painted(
     materials: Arc<MaterialStatus>,
     job: &Job,
     issues: &mut Vec<Issue>,
-) -> Arc<MaterialStatus> {
+) -> (Arc<MaterialStatus>, Option<PaletteApplication>) {
     let Some(library) = materials
         .library()
         .filter(|library| library.materials.iter().any(|m| m.palette.is_some()))
     else {
-        return materials;
+        return (materials, None);
     };
-    let (palette, unresolved) = tints.of_named(job.palette.as_ref(), &materials);
+    let (palette, unresolved) = tints.of_named_observed(job.palette.as_ref(), &materials);
     issues.extend(unresolved.into_iter().map(|kind| issue(job, kind)));
     let Some(palette) = palette else {
-        return materials;
+        return (materials, None);
     };
     let mut library = library.clone();
-    for material in &mut library.materials {
-        if let Some(tinted) = palette.apply(material) {
+    let mut slots = Vec::new();
+    for (slot, material) in library.materials.iter_mut().enumerate() {
+        if let Some(tinted) = palette.palette.apply(material) {
+            slots.push(slot);
             *material = tinted;
         }
     }
-    Arc::new(MaterialStatus::Loaded(library))
+    let applied = (!slots.is_empty()).then_some(PaletteApplication {
+        records: palette.records,
+        slots,
+    });
+    (Arc::new(MaterialStatus::Loaded(library)), applied)
 }
 
 /// Returns the key under which the library of a job is cached.

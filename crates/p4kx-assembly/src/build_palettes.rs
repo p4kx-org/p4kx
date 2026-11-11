@@ -9,9 +9,15 @@ use p4kx_model::{MaterialStatus, TintPalette};
 
 use crate::build_models::Loaded;
 use crate::flatten::Draft;
-use crate::{Geometry, IssueKind, PaletteFailure, PaletteProvider};
+use crate::{Geometry, IssueKind, PaletteFailure, PaletteProvider, PaletteRecords};
 
-type Cached = Result<Arc<TintPalette>, PaletteFailure>;
+type Cached = Result<ChosenPalette, PaletteFailure>;
+
+#[derive(Clone)]
+pub(crate) struct ChosenPalette {
+    pub(crate) palette: Arc<TintPalette>,
+    pub(crate) records: PaletteRecords,
+}
 
 /// The palette of a part and the one it hands down to its attachments.
 #[derive(Default)]
@@ -83,11 +89,13 @@ impl<'p> Palettes<'p> {
         };
         let own = geometry
             .and_then(Geometry::palette)
-            .and_then(|named| self.named(provider, named, &mut issues));
+            .and_then(|named| self.named(provider, named, &mut issues))
+            .map(|chosen| chosen.palette);
         let handed_down = own.or_else(|| inherited.cloned());
-        let palette = handed_down
-            .clone()
-            .or_else(|| self.library_default(provider, library, &mut issues));
+        let palette = handed_down.clone().or_else(|| {
+            self.library_default(provider, library, &mut issues)
+                .map(|chosen| chosen.palette)
+        });
         (
             Resolved {
                 palette,
@@ -104,6 +112,15 @@ impl<'p> Palettes<'p> {
         named: Option<&crate::PaletteRef>,
         library: &MaterialStatus,
     ) -> (Option<Arc<TintPalette>>, Vec<IssueKind>) {
+        let (chosen, issues) = self.of_named_observed(named, library);
+        (chosen.map(|chosen| chosen.palette), issues)
+    }
+
+    pub(crate) fn of_named_observed(
+        &mut self,
+        named: Option<&crate::PaletteRef>,
+        library: &MaterialStatus,
+    ) -> (Option<ChosenPalette>, Vec<IssueKind>) {
         let mut issues = Vec::new();
         let Some(provider) = self.provider else {
             return (None, issues);
@@ -119,7 +136,7 @@ impl<'p> Palettes<'p> {
         provider: &dyn PaletteProvider,
         named: &crate::PaletteRef,
         issues: &mut Vec<IssueKind>,
-    ) -> Option<Arc<TintPalette>> {
+    ) -> Option<ChosenPalette> {
         let guid = named.guid();
         let what = format!("the tint palette {guid}");
         let found = if named.child_path().is_empty() {
@@ -143,15 +160,16 @@ impl<'p> Palettes<'p> {
         provider: &dyn PaletteProvider,
         library: &MaterialStatus,
         issues: &mut Vec<IssueKind>,
-    ) -> Option<Arc<TintPalette>> {
+    ) -> Option<ChosenPalette> {
         let path = library
             .library()
             .and_then(|library| library.default_palette.as_deref())?;
         let what = format!("the default tint palette {path} of the material library");
-        match provider
-            .guid_at(path)
-            .and_then(|guid| self.read(provider, guid))
-        {
+        match provider.guid_at_observed(path).and_then(|selector| {
+            let mut chosen = self.read(provider, selector.value)?;
+            chosen.records.selector = selector.record;
+            Ok(chosen)
+        }) {
             Ok(palette) => Some(palette),
             Err(failure) => {
                 self.note(issues, &what, &failure);
@@ -163,7 +181,15 @@ impl<'p> Palettes<'p> {
     fn read(&mut self, provider: &dyn PaletteProvider, guid: Guid) -> Cached {
         self.cache
             .entry(guid)
-            .or_insert_with(|| provider.by_guid(guid).map(Arc::new))
+            .or_insert_with(|| {
+                provider.by_guid_observed(guid).map(|read| ChosenPalette {
+                    palette: Arc::new(read.value),
+                    records: PaletteRecords {
+                        selector: None,
+                        palette: read.record,
+                    },
+                })
+            })
             .clone()
     }
 

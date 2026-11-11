@@ -92,6 +92,7 @@ pub struct ArmourPart {
     pub(crate) definition_origin: Option<EntryOrigin>,
     pub(crate) materials: Arc<MaterialStatus>,
     pub(crate) material_archive_origins: Arc<MaterialArchiveOrigins>,
+    pub(crate) palette: Option<materials::PaletteApplication>,
     pub(crate) morphs: Vec<MorphTarget>,
     pub(crate) follows: Vec<usize>,
     pub(crate) face: Option<Arc<facial::FaceLink>>,

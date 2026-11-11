@@ -10,6 +10,7 @@ mod armour_glb_emission;
 mod armour_mount;
 mod armour_natural_hair;
 mod armour_palette;
+mod armour_palette_origins;
 mod assembly_build;
 mod assembly_changes;
 mod assembly_followups;

@@ -4,12 +4,19 @@
 use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource};
 
 use super::{Armour, ArmourPart};
+use crate::PaletteRecords;
 
 impl ArmourPart {
     /// Returns the material library and layer reads selected for this part.
     #[must_use]
     pub fn material_archive_origins(&self) -> &MaterialArchiveOrigins {
         &self.material_archive_origins
+    }
+
+    /// Returns the palette Records for a slot that took tint values.
+    #[must_use]
+    pub fn palette_records_for(&self, slot: usize) -> Option<PaletteRecords> {
+        self.palette.as_ref()?.records_for(slot)
     }
 
     /// Returns the physical model and companion inputs selected for this part.

@@ -7,6 +7,11 @@ use thiserror::Error;
 
 use crate::read::{as_struct, struct_field, text, unsigned};
 
+#[path = "palette_source.rs"]
+mod source;
+
+pub use source::{PaletteRead, PaletteRecordSelection, PaletteRecords};
+
 const TINT_PALETTE_TREE: &str = "TintPaletteTree";
 /// The fields of the palette root that hold the colours of the red, green and blue masks of a
 /// stencil map.
@@ -55,6 +60,22 @@ pub trait PaletteProvider {
     ///
     /// Returns [`PaletteFailure::Missing`] when no tint palette is at the path.
     fn guid_at(&self, path: &str) -> Result<Guid, PaletteFailure>;
+
+    /// Reads a palette and its selected DataForge Record coordinate.
+    ///
+    /// # Errors
+    /// As [`Self::by_guid`].
+    fn by_guid_observed(&self, guid: Guid) -> Result<PaletteRead<TintPalette>, PaletteFailure> {
+        self.by_guid(guid).map(PaletteRead::unobserved)
+    }
+
+    /// Selects a palette GUID and the actual Record that supplied it.
+    ///
+    /// # Errors
+    /// As [`Self::guid_at`].
+    fn guid_at_observed(&self, path: &str) -> Result<PaletteRead<Guid>, PaletteFailure> {
+        self.guid_at(path).map(PaletteRead::unobserved)
+    }
 }
 
 /// Reads tint palettes from the `TintPaletteTree` Records of a DataForge.
@@ -73,14 +94,26 @@ impl<'f> ForgePalettes<'f> {
 
 impl PaletteProvider for ForgePalettes<'_> {
     fn by_guid(&self, guid: Guid) -> Result<TintPalette, PaletteFailure> {
+        self.by_guid_observed(guid).map(|read| read.value)
+    }
+
+    fn guid_at(&self, path: &str) -> Result<Guid, PaletteFailure> {
+        self.guid_at_observed(path).map(|read| read.value)
+    }
+
+    fn by_guid_observed(&self, guid: Guid) -> Result<PaletteRead<TintPalette>, PaletteFailure> {
         let record = self
             .forge
             .record_by_guid(guid)
             .ok_or(PaletteFailure::Missing)?;
-        read_record(&record)
+        let value = read_record(&record)?;
+        Ok(PaletteRead {
+            value,
+            record: Some(PaletteRecordSelection::of(&record)),
+        })
     }
 
-    fn guid_at(&self, path: &str) -> Result<Guid, PaletteFailure> {
+    fn guid_at_observed(&self, path: &str) -> Result<PaletteRead<Guid>, PaletteFailure> {
         self.forge
             .records_at_path(path)
             .find(|record| {
@@ -88,7 +121,10 @@ impl PaletteProvider for ForgePalettes<'_> {
                     .type_name()
                     .is_ok_and(|name| name == TINT_PALETTE_TREE)
             })
-            .map(|record| record.guid())
+            .map(|record| PaletteRead {
+                value: record.guid(),
+                record: Some(PaletteRecordSelection::of(&record)),
+            })
             .ok_or(PaletteFailure::Missing)
     }
 }

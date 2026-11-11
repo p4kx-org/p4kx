@@ -216,7 +216,10 @@ pub use node_body::CharacterBody;
 pub use object_containers::{ContainerSource, ObjectContainerRef};
 pub use outfit::{Outfit, OutfitReport};
 pub use p4kx_character as character;
-pub use palette::{ForgePalettes, PaletteFailure, PaletteProvider};
+pub use palette::{
+    ForgePalettes, PaletteFailure, PaletteProvider, PaletteRead, PaletteRecordSelection,
+    PaletteRecords,
+};
 pub use pick::LoadoutPicks;
 pub use port::{PortDefinition, PortTransform, PortType};
 pub use prefab::{

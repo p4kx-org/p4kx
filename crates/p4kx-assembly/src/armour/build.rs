@@ -162,6 +162,7 @@ fn part_of(
         definition_origin: found.definition_origin.clone(),
         materials: materials.status,
         material_archive_origins: materials.origins,
+        palette: materials.palette,
         morphs,
         follows,
         face: None,
