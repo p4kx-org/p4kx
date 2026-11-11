@@ -132,9 +132,13 @@ jobs:
       - name: Install the native software Vulkan driver
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1 libasound2t64 libx11-6 libxcursor1 libxi6 libxrandr2 libxkbcommon-x11-0 libegl1 xvfb
+      - name: Use native Metal for macOS graphical checks
+        if: runner.os == 'macOS'
+        shell: pwsh
+        run: 'Add-Content -LiteralPath $env:GITHUB_ENV -Value "WGPU_BACKEND=metal" -Encoding utf8NoBOM'
       - name: Tests with nextest, one native process per test
         env:
-          P4KX_REQUIRE_SOFTWARE_ADAPTER: '1'
+          P4KX_REQUIRE_RENDER_ADAPTER: '1'
           PARTITION: ${{ matrix.partition }}
           PARTITION_COUNT: ${{ inputs.count }}
         shell: pwsh
@@ -177,8 +181,21 @@ jobs:
         env:
           P4KX_REQUIRE_SOFTWARE_ADAPTER: '1'
         run: xvfb-run --auto-servernum cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --run-ignored only --no-tests fail -E 'test(the_window_starts_draws_frames_and_exits)'
+      - name: Native macOS window draws Metal frames and exits
+        id: window_macos
+        if: runner.os == 'macOS' && matrix.partition == 1
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --run-ignored only --no-tests fail -E 'test(the_window_starts_draws_frames_and_exits)'
+      - name: Draw and read a frame with the native Metal adapter
+        id: metal_adapter
+        if: runner.os == 'macOS' && matrix.partition == 1
+        env:
+          P4KX_REQUIRE_RENDER_ADAPTER: '1'
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --no-capture --no-tests fail -E 'test(the_metal_adapter_draws_and_reads_back_a_frame)'
       - name: Name the native software adapter
         id: adapter
+        if: runner.os == 'Windows' || runner.os == 'Linux'
         env:
           P4KX_REQUIRE_SOFTWARE_ADAPTER: '1'
         shell: pwsh
@@ -192,8 +209,9 @@ jobs:
           CLI_CONVERT_OUTCOME: ${{ steps.cli_convert.outcome }}
           MCP_TOOLS_OUTCOME: ${{ steps.mcp_tools.outcome }}
           MCP_READ_OUTCOME: ${{ steps.mcp_read.outcome }}
-          GUI_FRAMES_OUTCOME: ${{ runner.os == 'Windows' && steps.window_windows.outcome || steps.window_linux.outcome }}
+          GUI_FRAMES_OUTCOME: ${{ runner.os == 'Windows' && steps.window_windows.outcome || runner.os == 'Linux' && steps.window_linux.outcome || steps.window_macos.outcome }}
           SOFTWARE_ADAPTER_OUTCOME: ${{ steps.adapter.outcome }}
+          METAL_ADAPTER_OUTCOME: ${{ steps.metal_adapter.outcome }}
         run: .github/scripts/record-native-runtime.ps1 -Target $env:P4KX_TARGET -MetadataPath nextest-archive.json -OutputPath native-runtime.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: matrix.partition == 1

@@ -19,6 +19,9 @@ pub enum Adapters {
     Best,
     /// Only the software adapter (WARP, lavapipe), which gives a picture that does not depend on the graphics card.
     Software,
+    /// Only the Metal backend for native macOS rendering tests.
+    #[cfg(all(test, target_os = "macos"))]
+    Metal,
 }
 
 /// Why a picture could not be drawn.
@@ -124,6 +127,8 @@ pub struct Offscreen {
     gpu: Option<Gpu>,
     report: Arc<GpuReport>,
     adapter: String,
+    #[cfg(all(test, target_os = "macos"))]
+    backend: wgpu::Backend,
     software: bool,
 }
 
@@ -138,6 +143,8 @@ impl Offscreen {
         let instance = match adapters {
             Adapters::Best => any_instance(),
             Adapters::Software => software_instance(),
+            #[cfg(all(test, target_os = "macos"))]
+            Adapters::Metal => super::device::metal_instance(),
         };
         let adapter = request(&instance, adapters)?;
         let info = adapter.get_info();
@@ -166,6 +173,8 @@ impl Offscreen {
             }),
             report,
             adapter: format!("{} ({:?})", info.name, info.backend),
+            #[cfg(all(test, target_os = "macos"))]
+            backend: info.backend,
             software: info.device_type == wgpu::DeviceType::Cpu,
         })
     }
@@ -174,6 +183,11 @@ impl Offscreen {
     #[must_use]
     pub fn adapter_name(&self) -> &str {
         &self.adapter
+    }
+
+    #[cfg(all(test, target_os = "macos"))]
+    pub(super) const fn backend(&self) -> wgpu::Backend {
+        self.backend
     }
 
     /// Returns whether the adapter is a software one (WARP, lavapipe).
@@ -265,6 +279,8 @@ fn request(instance: &wgpu::Instance, adapters: Adapters) -> Result<wgpu::Adapte
     };
     match adapters {
         Adapters::Software => ask(instance, true)?,
+        #[cfg(all(test, target_os = "macos"))]
+        Adapters::Metal => ask(instance, false)?,
         Adapters::Best => match ask(instance, false)? {
             Ok(adapter) => Ok(adapter),
             Err(_) => ask(&software_instance(), true)?,

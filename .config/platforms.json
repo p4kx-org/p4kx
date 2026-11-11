@@ -72,6 +72,24 @@
       ],
       "pe_machine": null,
       "elf_machine": 183
+    },
+    {
+      "target": "aarch64-apple-darwin",
+      "os": "macos",
+      "arch": "arm64",
+      "runner": "macos-26",
+      "runner_os": "macOS",
+      "runner_arch": "ARM64",
+      "msi_arch": null,
+      "deb_arch": null,
+      "unix_arch": null,
+      "packages": [
+        "dmg"
+      ],
+      "pe_machine": null,
+      "elf_machine": null,
+      "mach_cpu_type": 16777228,
+      "deployment_target": "26.0"
     }
   ],
   "packages": {
@@ -80,6 +98,7 @@
     "tar-gz": ".tar.gz",
     "app-image": ".AppImage",
     "deb": ".deb",
-    "flatpak": ".flatpak"
+    "flatpak": ".flatpak",
+    "dmg": ".dmg"
   }
 }

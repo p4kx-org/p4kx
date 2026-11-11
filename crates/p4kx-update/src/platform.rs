@@ -14,6 +14,8 @@ pub enum OperatingSystem {
     Windows,
     /// Linux with the GNU ABI.
     Linux,
+    /// macOS on Apple Silicon.
+    Macos,
 }
 
 /// The architecture of the running application binary.
@@ -42,6 +44,8 @@ pub enum PackageKind {
     Deb,
     /// A Flatpak bundle.
     Flatpak,
+    /// A macOS disk image.
+    Dmg,
 }
 
 impl PackageKind {
@@ -55,6 +59,7 @@ impl PackageKind {
                     Self::TarGz | Self::AppImage | Self::Deb | Self::Flatpak,
                     OperatingSystem::Linux
                 )
+                | (Self::Dmg, OperatingSystem::Macos)
         )
     }
 }
@@ -76,6 +81,8 @@ impl Platform {
             OperatingSystem::Windows
         } else if cfg!(target_os = "linux") {
             OperatingSystem::Linux
+        } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+            OperatingSystem::Macos
         } else {
             return None;
         };
@@ -118,6 +125,10 @@ pub struct TargetDefinition {
     pub pe_machine: Option<u16>,
     /// The ELF `e_machine` value, when applicable.
     pub elf_machine: Option<u16>,
+    /// The Mach-O CPU type, when applicable.
+    pub mach_cpu_type: Option<u32>,
+    /// The macOS build deployment target, when applicable.
+    pub deployment_target: Option<String>,
 }
 
 impl TargetDefinition {
@@ -198,13 +209,15 @@ pub(crate) fn manifest() -> Result<Manifest, PlatformError> {
 
 pub(crate) fn parse_manifest(text: &str) -> Result<Manifest, PlatformError> {
     let manifest: Manifest = serde_json::from_str(text)?;
-    if manifest.version != 1 || manifest.targets.len() != 4 {
+    if manifest.version != 1 || manifest.targets.len() != 5 {
         return Err(PlatformError::Invalid(
-            "expected contract version 1 and four native targets",
+            "expected contract version 1 and five native targets",
         ));
     }
-    if manifest.packages.len() != 6 {
-        return Err(PlatformError::Invalid("six package suffixes are required"));
+    if manifest.packages.len() != 7 {
+        return Err(PlatformError::Invalid(
+            "seven package suffixes are required",
+        ));
     }
     let mut suffixes = BTreeSet::new();
     for suffix in manifest.packages.values() {
@@ -243,6 +256,7 @@ fn validate_target(row: &TargetDefinition) -> Result<(), PlatformError> {
     let abi = match row.os {
         OperatingSystem::Windows => "pc-windows-msvc",
         OperatingSystem::Linux => "unknown-linux-gnu",
+        OperatingSystem::Macos => "apple-darwin",
     };
     if row.target != format!("{rust_arch}-{abi}") {
         return Err(PlatformError::Invalid(
@@ -252,6 +266,7 @@ fn validate_target(row: &TargetDefinition) -> Result<(), PlatformError> {
     let package_count = match row.os {
         OperatingSystem::Windows => 2,
         OperatingSystem::Linux => 4,
+        OperatingSystem::Macos => 1,
     };
     if row.packages.len() != package_count
         || row.packages.iter().enumerate().any(|(index, package)| {
@@ -267,8 +282,13 @@ fn validate_target(row: &TargetDefinition) -> Result<(), PlatformError> {
             "required package formats are missing or duplicated",
         ));
     }
-    if row.runner.is_empty() {
-        return Err(PlatformError::Invalid("native runner label is empty"));
+    if row.runner.is_empty()
+        || !row
+            .runner
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"_.-".contains(&byte))
+    {
+        return Err(PlatformError::Invalid("native runner label is invalid"));
     }
     Ok(())
 }
@@ -287,6 +307,8 @@ fn validate_architecture_names(row: &TargetDefinition) -> Result<(), PlatformErr
                     && row.unix_arch.is_none()
                     && row.pe_machine == Some(pe)
                     && row.elf_machine.is_none()
+                    && row.mach_cpu_type.is_none()
+                    && row.deployment_target.is_none()
             }
             OperatingSystem::Linux => {
                 row.runner_os == "Linux"
@@ -295,6 +317,19 @@ fn validate_architecture_names(row: &TargetDefinition) -> Result<(), PlatformErr
                     && row.unix_arch.as_deref() == Some(unix)
                     && row.pe_machine.is_none()
                     && row.elf_machine == Some(elf)
+                    && row.mach_cpu_type.is_none()
+                    && row.deployment_target.is_none()
+            }
+            OperatingSystem::Macos => {
+                row.arch == Architecture::Arm64
+                    && row.runner_os == "macOS"
+                    && row.msi_arch.is_none()
+                    && row.deb_arch.is_none()
+                    && row.unix_arch.is_none()
+                    && row.pe_machine.is_none()
+                    && row.elf_machine.is_none()
+                    && row.mach_cpu_type == Some(0x0100_000c)
+                    && row.deployment_target.as_deref() == Some("26.0")
             }
         };
     if !valid {

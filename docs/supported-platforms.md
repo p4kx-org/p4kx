@@ -1,6 +1,6 @@
 # Native platforms and release verification
 
-The v0.5.0 contract requires native CLI, GUI and MCP releases. The table shows the targets in the current build and release matrix. The [macOS specification](macos-support.md) defines the additional Apple Silicon release requirement.
+The v0.5.0 contract requires native CLI, GUI and MCP releases. The table lists the required build and release targets. The [macOS specification](macos-support.md) defines Apple Silicon acceptance.
 [The platform contract](../.config/platforms.json) is authoritative for target identities,
 runner labels, package spellings and asset suffixes.
 
@@ -10,6 +10,7 @@ runner labels, package spellings and asset suffixes.
 | Windows | ARM64 | `aarch64-pc-windows-msvc` | `windows-11-arm` | MSI, portable ZIP |
 | Linux | AMD64 | `x86_64-unknown-linux-gnu` | `ubuntu-24.04` | tar.gz, AppImage, deb, Flatpak |
 | Linux | ARM64 | `aarch64-unknown-linux-gnu` | `ubuntu-24.04-arm` | tar.gz, AppImage, deb, Flatpak |
+| macOS 26+ | Apple Silicon | `aarch64-apple-darwin` | `macos-26` | DMG |
 
 Runner labels describe verification environments. A successful compile or an emulated executable
 does not establish native runtime support. Required application behavior is checked on a matching
@@ -18,20 +19,20 @@ wheels are separate from the native application matrix.
 
 ## Build and test contract
 
-The matrix job validates the four explicit rows and publishes them to lint, doctest, schema,
+The matrix job validates the five explicit rows and publishes them to lint, doctest, schema,
 concurrency and test jobs. Each job selects the exact compiler and nextest pins and an explicit
 native host toolchain. Native Windows linker variables include the complete target. Linux mold
 selects the running CPU's binary; the pinned nextest installer uses the runner architecture.
 
-Test producers build all three applications and native test binaries. PE/ELF machine fields,
+Test producers build all three applications and native test binaries. PE, ELF and Mach-O machine fields,
 compiler/nextest hosts, source commit, application version and SHA-256 digests identify the
 archive. The artifact and cache identities include the complete Rust target. Consumers validate
 the sidecar and archive hash before extracting or running tests.
 
 The partitioned synthetic suite retains nextest process isolation. Explicit smoke steps require
 non-empty selections for CLI Archive listing, extraction and conversion; MCP initialization,
-tool listing and a read-only request; GUI frames followed by exit; and software-adapter evidence.
-Linux uses native lavapipe under Xvfb. Actual step outcomes populate the native runtime artifact
+tool listing and a read-only request; and GUI frames followed by exit. Windows and Linux check a
+software adapter. Linux uses native lavapipe under Xvfb. macOS checks native Metal. Actual step outcomes populate the native runtime artifact
 only after successful execution.
 
 GUI and package smoke processes set an absolute `P4KX_FOLDERS_ROOT` to isolate settings, keys,
@@ -47,16 +48,16 @@ gate reconciles required device evidence; a synthetic runtime artifact alone is 
 
 ## Package identity and update links
 
-Each package includes `p4kx-distribution.json` beside the real application executables:
+Each package carries `p4kx-distribution.json` to identify its target and format.
 
 ```json
 {"target":"aarch64-unknown-linux-gnu","package":"app-image"}
 ```
 
-Package kinds are `msi`, `portable-zip`, `tar-gz`, `app-image`, `deb` and `flatpak`.
+Package kinds are `msi`, `portable-zip`, `tar-gz`, `app-image`, `deb`, `flatpak` and `dmg`.
 All three applications in one distribution use the same identity. Linux packages may keep real
 executables in a private application directory and expose symlinks on PATH; the identity belongs
-beside the real executables.
+beside the real executables. The relocatable macOS bundle places it in `Contents/Resources`.
 
 The update service bounds this optional metadata to 4 KiB and validates its target against the
 running binary's compile-time OS and CPU. Host emulation does not change the selected binary
@@ -69,7 +70,7 @@ MSI/portable names remain eligible for that target. Ambiguous, missing or malfor
 metadata selects the Release page. The check remains opt-in, anonymous and link-only.
 
 `Release.page` retains its Release-page meaning. `Release.asset` carries the optional compatible
-package, and `Release::link()` returns the selected link or page. The GUI uses that shared result.
+package, and `Release::link()` returns the selected link or page. The GUI, CLI and MCP use that shared result.
 
 ## Release preflight and evidence
 
@@ -80,17 +81,19 @@ source commit.
 
 Before checksums and release notes are assembled, `check-release-matrix.ps1` requires:
 
-- Twelve non-empty native package assets: four Windows packages and eight Linux packages.
-- Twelve CycloneDX SBOMs, one per target/application, with the actual version and explicit
+- Thirteen non-empty native packages, comprising four for Windows, eight for Linux and one DMG for macOS.
+- Fifteen CycloneDX SBOMs, one per target/application, with the actual version and explicit
   `p4kx:target` and `p4kx:binary` metadata properties.
-- Four native runtime artifacts identifying the same source commit and pinned tools, all three
+- Five native runtime artifacts identifying the same source commit and pinned tools, all three
   native application machine identities, and successful required smoke steps.
 
 The filenames are `P4KX-{version}-{target}-{binary}.cdx.json` and
 `P4KX-{version}-{target}-runtime.json`. Runtime artifacts state their `native-synthetic` scope
 and preserve device-verification states. A missing target/package/binary fails preflight.
-The top-level archive digest must match the actual portable ZIP on Windows or tar.gz on Linux.
-Each package's execution proof carries its own digest.
+The top-level archive digest must match the actual portable ZIP on Windows, tar.gz on Linux or DMG on macOS.
+Each package's execution proof carries its own digest. On macOS it includes the signed executable
+hashes, Mach-O deployment target and signing receipt for the final DMG. Tagged release preflight
+also requires device evidence for the exact DMG on macOS 26 and the current stable macOS release.
 Windows runtime evidence additionally covers both the portable ZIP and installed MSI payload,
 with package hashes and the exact release EXE hashes. Missing, skipped or mismatched packaged
 runtime evidence fails preflight. [Windows packages](windows-packages.md) describes lifecycle,
@@ -105,7 +108,7 @@ Flatpak additionally requires host Documents API 5 with `GetHostPaths`; an older
 service is a startup failure rather than a successful or skipped runtime check.
 Packaging checks, signatures, scans, provenance and the full export/device audit remain required
 parts of the final release gate. Tag publication requires a completed VirusTotal report for the
-exact SHA-256 of each of the twelve native packages. The assembly job compares the scan receipt
+exact SHA-256 of each of the thirteen native packages. The assembly job compares the scan receipt
 against the package bytes, source revision, version and workflow run. The receipt stays with the
 workflow evidence and the release notes link the reports. Pending, missing or failed reports
 prevent publication. Pull requests and operating-system-specific dry runs do not contact VirusTotal.

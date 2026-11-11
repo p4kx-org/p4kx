@@ -305,3 +305,10 @@ pub use test_key::{other_test_key, test_key};
 pub use timing::{BENCH_VAR, Timing, bench, bench_enabled, bench_once};
 pub use vorbis::{TestCodebook, TestVorbis};
 pub use wem::{TestCodec, TestWem, test_signal};
+
+/// Returns whether a synthetic graphics test requires an actual adapter.
+#[must_use]
+pub fn render_adapter_required() -> bool {
+    std::env::var_os("P4KX_REQUIRE_RENDER_ADAPTER").is_some()
+        || std::env::var_os("P4KX_REQUIRE_SOFTWARE_ADAPTER").is_some()
+}

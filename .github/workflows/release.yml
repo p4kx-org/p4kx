@@ -16,6 +16,7 @@ on:
       - "crates/p4kx/build.rs"
       - "crates/p4kx-testkit/examples/native_fixture.rs"
       - "packaging/linux/**"
+      - "packaging/macos/**"
       - "blender_addon/**"
   workflow_dispatch:
     inputs:
@@ -49,6 +50,7 @@ jobs:
       matrix: ${{ steps.platforms.outputs.matrix }}
       windows-matrix: ${{ steps.platforms.outputs.windows-matrix }}
       linux-matrix: ${{ steps.platforms.outputs.linux-matrix }}
+      macos-matrix: ${{ steps.platforms.outputs.macos-matrix }}
     defaults:
       run:
         shell: pwsh
@@ -132,9 +134,27 @@ jobs:
       version: ${{ needs.prepare.outputs.version }}
       matrix: ${{ needs.prepare.outputs.linux-matrix }}
 
+  macos:
+    name: Native macOS DMG and execution
+    if: github.event_name != 'workflow_dispatch' || (!inputs.windows-only && !inputs.linux-only)
+    needs: prepare
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-macos.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      matrix: ${{ needs.prepare.outputs.macos-matrix }}
+      dry-run: ${{ github.ref_type != 'tag' || github.event_name != 'push' }}
+    secrets:
+      macos-certificate-p12-base64: ${{ github.ref_type == 'tag' && github.event_name == 'push' && secrets.MACOS_CERTIFICATE_P12_BASE64 || '' }}
+      macos-certificate-password: ${{ github.ref_type == 'tag' && github.event_name == 'push' && secrets.MACOS_CERTIFICATE_PASSWORD || '' }}
+      macos-notary-key-base64: ${{ github.ref_type == 'tag' && github.event_name == 'push' && secrets.MACOS_NOTARY_KEY_BASE64 || '' }}
+      macos-notary-key-id: ${{ github.ref_type == 'tag' && github.event_name == 'push' && secrets.MACOS_NOTARY_KEY_ID || '' }}
+      macos-notary-issuer-id: ${{ github.ref_type == 'tag' && github.event_name == 'push' && secrets.MACOS_NOTARY_ISSUER_ID || '' }}
+
   scan:
     name: VirusTotal scan of package assets
-    needs: [prepare, windows, linux]
+    needs: [prepare, windows, linux, macos]
     if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && !inputs.linux-only && !inputs.windows-only)
     runs-on: ubuntu-24.04
     timeout-minutes: 150
@@ -149,7 +169,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: "{release-*-pc-windows-msvc,release-*-unknown-linux-gnu}"
+          pattern: "{release-*-pc-windows-msvc,release-*-unknown-linux-gnu,release-*-apple-darwin}"
           path: assets
           merge-multiple: true
       - name: Scan every required architecture-specific package
@@ -174,7 +194,7 @@ jobs:
 
   attest:
     name: Attest (${{ matrix.target }})
-    needs: [prepare, windows, linux]
+    needs: [prepare, windows, linux, macos]
     if: github.ref_type == 'tag'
     strategy:
       fail-fast: false
@@ -223,8 +243,8 @@ jobs:
 
   assemble:
     name: Complete matrix, hashes and release notes
-    needs: [prepare, windows, linux, scan, attest, attest-addon]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && (github.ref_type != 'tag' || (needs.scan.result == 'success' && needs.attest.result == 'success' && needs.attest-addon.result == 'success')) }}
+    needs: [prepare, windows, linux, macos, scan, attest, attest-addon]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && needs.macos.result == 'success' && (github.ref_type != 'tag' || (needs.scan.result == 'success' && needs.attest.result == 'success' && needs.attest-addon.result == 'success')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -238,7 +258,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: "{release-addon,release-*-pc-windows-msvc,release-*-unknown-linux-gnu,attestations-*}"
+          pattern: "{release-addon,release-*-pc-windows-msvc,release-*-unknown-linux-gnu,release-*-apple-darwin,attestations-*}"
           path: assets
           merge-multiple: true
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -251,7 +271,9 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           VERSION: ${{ needs.prepare.outputs.version }}
           SCAN_RESULT: ${{ needs.scan.result }}
+          MACOS_CURRENT_VERSION: ${{ vars.P4KX_MACOS_CURRENT_STABLE }}
         run: |
+          $deviceEvidence = Join-Path 'assets' "P4KX-$env:VERSION-aarch64-apple-darwin-device-evidence.json"
           if ($env:GITHUB_REF_TYPE -ceq 'tag') {
             . .github/scripts/release-scan-evidence.ps1
             Assert-P4kxReleaseScanEvidence -EvidencePath notes/virustotal-evidence.json -AssetDirectory assets -Version $env:VERSION -Revision $env:GITHUB_SHA -RunId $env:GITHUB_RUN_ID
@@ -262,7 +284,7 @@ jobs:
           }
           $scan = if (Test-Path notes/virustotal.md) { 'notes/virustotal.md' }
           $tagAttestations = $env:GITHUB_REF_TYPE -ceq 'tag'
-          .github/scripts/assemble-release.ps1 -AssetDirectory assets -NotesPath notes/release-notes.md -OutputNotesPath notes/final-notes.md -VirusTotalNotePath $scan -Repository $env:REPOSITORY -Version $env:VERSION -Revision $env:GITHUB_SHA -TagAttestations:$tagAttestations
+          .github/scripts/assemble-release.ps1 -AssetDirectory assets -NotesPath notes/release-notes.md -OutputNotesPath notes/final-notes.md -VirusTotalNotePath $scan -Repository $env:REPOSITORY -Version $env:VERSION -Revision $env:GITHUB_SHA -TagAttestations:$tagAttestations -RequireMacosDeviceEvidence:$tagAttestations -MacosCurrentVersion $env:MACOS_CURRENT_VERSION -MacosDeviceEvidencePath $deviceEvidence
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-assets

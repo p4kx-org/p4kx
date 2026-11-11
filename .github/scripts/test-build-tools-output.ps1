@@ -61,7 +61,7 @@ try {
         try { & $checker -Verify -Nextest -Target $platform.target | ForEach-Object { $emitted.Add($_) } }
         catch { $rejected = $true }
         [Environment]::SetEnvironmentVariable($name, $expected, 'Process')
-        if (-not $rejected -or @($emitted | Where-Object { $_ -cmatch '^(rust-version|nextest-version|rust-toolchain|target)=' }).Count -ne 0) {
+        if (-not $rejected -or @($emitted | Where-Object { $_ -cmatch '^(rust-version|nextest-version|rust-toolchain|target|cache-platform)=' }).Count -ne 0) {
             throw "Invalid $name was accepted or emitted canonical verified pins."
         }
     }

@@ -1,7 +1,8 @@
 # Profile, cache and data folders
 
 Without an override, Windows uses its known folders and Linux follows the XDG base directory
-variables. Settings and the stored Archive key live below the config folder in `P4KX`.
+variables. macOS uses `~/Library/Application Support/P4KX` for settings, the stored Archive key
+and application data, and `~/Library/Caches/P4KX` for the cache.
 Changing `APPDATA` or `USERPROFILE` does not replace Windows known-folder resolution.
 
 Set `P4KX_FOLDERS_ROOT` to an absolute directory before starting P4KX to isolate its application
@@ -14,7 +15,7 @@ folders on any supported OS and CPU:
 | Cache | `cache/P4KX` |
 | Application data | `data/P4KX` |
 
-The override takes precedence over Windows known folders and XDG variables. An explicitly
+The override takes precedence over the platform defaults. An explicitly
 empty or relative root provides no application folders; it never falls back to the real user
 profile. Unset the variable to restore normal platform defaults. The process fixes its profile
 location on first use, so set the variable before launching it.

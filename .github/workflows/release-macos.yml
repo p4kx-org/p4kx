@@ -1,0 +1,202 @@
+name: macOS release package
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      matrix:
+        required: true
+        type: string
+      dry-run:
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      macos-certificate-p12-base64:
+        required: false
+      macos-certificate-password:
+        required: false
+      macos-notary-key-base64:
+        required: false
+      macos-notary-key-id:
+        required: false
+      macos-notary-issuer-id:
+        required: false
+
+permissions: {}
+
+env:
+  P4KX_DMG_DRY_RUN: ${{ inputs.dry-run || github.event_name != 'push' || github.ref_type != 'tag' || github.repository != 'p4kx-org/p4kx' }}
+
+jobs:
+  build:
+    name: Build native macOS DMG (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.matrix) }}
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+      VERSION: ${{ inputs.version }}
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create a fresh native package task
+        run: |
+          . .github/scripts/native-package-task.ps1
+          $task = New-P4kxNativePackageTask -Directory $env:RUNNER_TEMP -RunId $env:GITHUB_RUN_ID -Attempt $env:GITHUB_RUN_ATTEMPT -Target $env:P4KX_TARGET -Role producer
+          "P4KX_PACKAGE_TASK=$task" >> $env:GITHUB_ENV
+      - uses: ./.github/actions/setup-rust
+        with:
+          target: ${{ matrix.target }}
+          cache-key: macos-release
+          cache-on-failure: "true"
+          nextest: "true"
+      - name: Verify bundle, signing and evidence contracts
+        run: |
+          .github/scripts/test-macos-bundle.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'bundle-contract')
+          .github/scripts/test-macos-signing-plan.ps1
+          .github/scripts/test-macos-package-evidence.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'evidence-contract')
+      - name: Build the three native release applications
+        run: |
+          cargo build --release --locked --target $env:P4KX_TARGET -p p4kx -p p4kx-gui -p p4kx-mcp
+          if ($LASTEXITCODE -ne 0) { throw 'Native macOS release build failed.' }
+          $fixture = Join-Path $env:P4KX_PACKAGE_TASK 'fixture'
+          cargo run --release --locked --target $env:P4KX_TARGET -p p4kx-testkit --example native_fixture -- $fixture
+          if ($LASTEXITCODE -ne 0) { throw 'Synthetic runtime fixture generation failed.' }
+      - name: Draw and read back a frame on native Metal
+        id: metal
+        env:
+          P4KX_REQUIRE_RENDER_ADAPTER: "1"
+        run: cargo nextest run --release --locked --target $env:P4KX_TARGET -p p4kx-render --lib --no-capture --no-tests fail -E 'test(the_metal_adapter_draws_and_reads_back_a_frame)'
+      - name: Prepare, sign and verify the native DMG
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ !inputs.dry-run && github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'p4kx-org/p4kx' && secrets.macos-certificate-p12-base64 || '' }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ !inputs.dry-run && github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'p4kx-org/p4kx' && secrets.macos-certificate-password || '' }}
+          MACOS_NOTARY_KEY_BASE64: ${{ !inputs.dry-run && github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'p4kx-org/p4kx' && secrets.macos-notary-key-base64 || '' }}
+          MACOS_NOTARY_KEY_ID: ${{ !inputs.dry-run && github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'p4kx-org/p4kx' && secrets.macos-notary-key-id || '' }}
+          MACOS_NOTARY_ISSUER_ID: ${{ !inputs.dry-run && github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'p4kx-org/p4kx' && secrets.macos-notary-issuer-id || '' }}
+        run: |
+          . .github/scripts/macos-ci-signing.ps1
+          $arguments = @{
+            Target = $env:P4KX_TARGET
+            Version = $env:VERSION
+            BinaryDirectory = "target/$env:P4KX_TARGET/release"
+            TaskDirectory = Join-Path $env:P4KX_PACKAGE_TASK 'dmg'
+            OutputDirectory = Join-Path $env:P4KX_PACKAGE_TASK 'package'
+          }
+          Invoke-P4kxMacDmgSigning -Arguments $arguments -CredentialDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'credentials') -DryRun:($env:P4KX_DMG_DRY_RUN -eq 'true')
+      - name: Install pinned Apple Silicon host SBOM tool
+        run: .github/scripts/install-macos-package-tools.ps1 -Target $env:P4KX_TARGET -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'tools')
+      - name: Produce three native application SBOMs
+        run: .github/scripts/build-target-sbom.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'package')
+      - name: Bind the final image and signed bundle executables to the actual build
+        env:
+          METAL_OUTCOME: ${{ steps.metal.outcome }}
+        run: |
+          . .github/scripts/platform-contract.ps1
+          . .github/scripts/macos-package-evidence.ps1
+          if ($env:METAL_OUTCOME -cne 'success') { throw 'Native Metal did not execute successfully.' }
+          $task = $env:P4KX_PACKAGE_TASK
+          $validation = Join-Path $task 'validation'
+          New-Item -ItemType Directory -Path $validation | Out-Null
+          $name = Get-P4kxAssetName -Target $env:P4KX_TARGET -Version $env:VERSION -Package dmg
+          $archive = Join-Path $task "package/$name"
+          $metadata = Join-Path $validation 'build.json'
+          $signing = Join-Path $validation 'signing.json'
+          Copy-Item -LiteralPath (Join-Path $task 'dmg/signing.json') -Destination $signing
+          .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -ArchivePath $archive -BinaryDirectory (Join-Path $task 'dmg/image/P4KX.app/Contents/MacOS') -MetadataPath $metadata
+          $build = Get-Content -LiteralPath $metadata -Raw | ConvertFrom-Json -AsHashtable
+          $build.signing_sha256 = (Get-FileHash -LiteralPath $signing -Algorithm SHA256).Hash.ToLowerInvariant()
+          $build.package_tools = Get-Content -LiteralPath (Join-Path $task 'tools/package-tools.json') -Raw | ConvertFrom-Json
+          $null = Read-P4kxMacSigningReceipt -Path $signing -Build $build -DryRun:($env:P4KX_DMG_DRY_RUN -eq 'true')
+          $build | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $metadata -Encoding utf8NoBOM
+          @{target=$build.target; revision=$build.revision; archive_sha256=$build.archive_sha256; outcome=$env:METAL_OUTCOME} |
+            ConvertTo-Json | Set-Content -LiteralPath (Join-Path $validation 'metal.json') -Encoding utf8NoBOM
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos-build-${{ matrix.target }}
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/package/*
+            ${{ env.P4KX_PACKAGE_TASK }}/fixture/*
+            ${{ env.P4KX_PACKAGE_TASK }}/validation/*.json
+          compression-level: 0
+          if-no-files-found: error
+
+  verify:
+    name: Mount and execute the native macOS DMG (${{ matrix.target }})
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.matrix) }}
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create a fresh native package verification task
+        run: |
+          . .github/scripts/native-package-task.ps1
+          $task = New-P4kxNativePackageTask -Directory $env:RUNNER_TEMP -RunId $env:GITHUB_RUN_ID -Attempt $env:GITHUB_RUN_ATTEMPT -Target $env:P4KX_TARGET -Role consumer
+          "P4KX_PACKAGE_TASK=$task" >> $env:GITHUB_ENV
+      - uses: ./.github/actions/install-rust
+        with:
+          target: ${{ matrix.target }}
+          nextest: "true"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: macos-build-${{ matrix.target }}
+          path: ${{ env.P4KX_PACKAGE_TASK }}/download
+      - name: Verify, mount read-only and run the relocated app bundle
+        run: |
+          . .github/scripts/platform-contract.ps1
+          $task = $env:P4KX_PACKAGE_TASK
+          $source = Join-Path $task 'download'
+          $name = Get-P4kxAssetName -Target $env:P4KX_TARGET -Version $env:VERSION -Package dmg
+          $arguments = @{
+            Target = $env:P4KX_TARGET
+            Version = $env:VERSION
+            Dmg = Join-Path $source "package/$name"
+            BuildMetadata = Join-Path $source 'validation/build.json'
+            SigningReceipt = Join-Path $source 'validation/signing.json'
+            MetalEvidence = Join-Path $source 'validation/metal.json'
+            FixtureDirectory = Join-Path $source 'fixture'
+            TaskDirectory = Join-Path $task 'package-check'
+            OutputPath = Join-Path $source "package/P4KX-$env:VERSION-$env:P4KX_TARGET-runtime.json"
+            DryRun = $env:P4KX_DMG_DRY_RUN -eq 'true'
+          }
+          .github/scripts/check-macos-package.ps1 @arguments
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: macos-package-logs-${{ matrix.target }}
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/package-check/**/*.log
+            ${{ env.P4KX_PACKAGE_TASK }}/package-check/**/runtime.json
+            ${{ env.P4KX_PACKAGE_TASK }}/download/validation/*.json
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ matrix.target }}
+          path: ${{ env.P4KX_PACKAGE_TASK }}/download/package/*
+          compression-level: 0
+          if-no-files-found: error

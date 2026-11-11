@@ -1,5 +1,9 @@
+. (Join-Path $PSScriptRoot 'macho-image.ps1')
+
 function Get-ImageMachine {
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Os)
+    if ($Os -ceq 'macos') { return (Read-P4kxMachOImage -Path $Path).machine }
+    if ($Os -cnotin @('windows', 'linux')) { throw "Unknown image operating system: $Os" }
     $stream = [System.IO.File]::OpenRead($Path)
     $reader = [System.IO.BinaryReader]::new($stream)
     try {

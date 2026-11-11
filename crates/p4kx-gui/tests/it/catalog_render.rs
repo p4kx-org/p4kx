@@ -5,7 +5,7 @@
 //! window, in both languages, rendered headless by `egui_kittest`.
 //!
 //! The tests need a graphics adapter, a software one is enough, and return early without one
-//! unless `P4KX_REQUIRE_SOFTWARE_ADAPTER` is set, which CI does. `P4KX_RENDER_DIR` names a folder
+//! unless `P4KX_REQUIRE_RENDER_ADAPTER` is set, which CI does. `P4KX_RENDER_DIR` names a folder
 //! the rendered windows are written to as PNG files.
 
 use crate::cataloging;
@@ -58,8 +58,8 @@ fn adapter() -> Option<RenderState> {
             .ok();
     if state.is_none() {
         assert!(
-            std::env::var_os("P4KX_REQUIRE_SOFTWARE_ADAPTER").is_none(),
-            "a software adapter is required"
+            !p4kx_testkit::render_adapter_required(),
+            "a graphics adapter is required"
         );
         eprintln!("no graphics adapter: the test checks nothing");
     }
@@ -120,7 +120,7 @@ fn the_summary_of_a_compressed_catalog_is_drawn_at_both_sizes_in_both_languages(
             })?;
             harness.run_steps(3);
 
-            let close = if tag == "en" { "Close" } else { "Schließen" };
+            let close = if tag == "en" { "Close" } else { "Schlie�en" };
             shoot(&mut harness, ("summary", tag, size), close)?;
             let sizes = if tag == "en" {
                 " compressed (of"
@@ -194,7 +194,7 @@ fn the_warnings_of_the_game_data_are_drawn_at_both_sizes_in_both_languages() -> 
             let (sentence, close) = if tag == "en" {
                 ("2 dismantle processes instead of one", "Close")
             } else {
-                ("2 Zerlegungsprozesse statt einem", "Schließen")
+                ("2 Zerlegungsprozesse statt einem", "Schlie�en")
             };
             harness.get_by_label_contains(sentence);
             shoot(&mut harness, ("warnings", tag, size), close)?;
@@ -224,7 +224,7 @@ fn normal_incomplete_publication_is_drawn_as_a_refusal_in_both_languages() -> Te
             let (sentence, close) = if tag == "en" {
                 ("No file was created or replaced.", "Close")
             } else {
-                ("Es wurde keine Datei erstellt oder ersetzt.", "Schließen")
+                ("Es wurde keine Datei erstellt oder ersetzt.", "Schlie�en")
             };
             harness.get_by_label_contains(sentence);
             shoot(&mut harness, ("incomplete-refusal", tag, size), close)?;
@@ -274,8 +274,8 @@ fn the_resource_kind_is_localized_and_visible_at_both_window_sizes() -> TestResu
                 ("Resource types: 1 written, 0 skipped, complete", "Close")
             } else {
                 (
-                    "Ressourcentypen: 1 geschrieben, 0 übersprungen, vollständig",
-                    "Schließen",
+                    "Ressourcentypen: 1 geschrieben, 0 �bersprungen, vollst�ndig",
+                    "Schlie�en",
                 )
             };
             harness.get_by_label(line).scroll_to_me();

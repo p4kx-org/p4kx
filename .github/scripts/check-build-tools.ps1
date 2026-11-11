@@ -1,7 +1,7 @@
 param(
     [switch]$Verify,
     [switch]$Nextest,
-    [ValidateSet('toolchain', 'linker')][string]$SelectEnvironment,
+    [ValidateSet('toolchain', 'linker', 'deployment')][string]$SelectEnvironment,
     [string]$Target
 )
 
@@ -23,7 +23,8 @@ if ($nextestVersion -cnotmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
 $platform = if ($Target) { Get-P4kxPlatform -Target $Target } else { Get-P4kxCurrentPlatform }
 Assert-P4kxNativeHost -Platform $platform
 $nativeToolchain = "$rustVersion-$($platform.target)"
-$outputs = @("rust-version=$rustVersion", "nextest-version=$nextestVersion", "rust-toolchain=$nativeToolchain", "target=$($platform.target)")
+$cachePlatform = if ($platform.deployment_target) { "$($platform.target)-min$($platform.deployment_target)" } else { $platform.target }
+$outputs = @("rust-version=$rustVersion", "nextest-version=$nextestVersion", "rust-toolchain=$nativeToolchain", "target=$($platform.target)", "cache-platform=$cachePlatform")
 
 if ($SelectEnvironment) {
     $SelectEnvironment = $SelectEnvironment.ToLowerInvariant()
@@ -34,11 +35,16 @@ if ($SelectEnvironment) {
     }
     $line = if ($SelectEnvironment -ceq 'toolchain') {
         "RUSTUP_TOOLCHAIN=$nativeToolchain"
+    } elseif ($SelectEnvironment -ceq 'deployment') {
+        if ($platform.os -cne 'macos') { throw 'A deployment target only applies to macOS.' }
+        "MACOSX_DEPLOYMENT_TARGET=$($platform.deployment_target)"
     } elseif ($platform.os -ceq 'windows') {
         $name = 'CARGO_TARGET_' + $platform.target.Replace('-', '_').ToUpperInvariant() + '_LINKER'
         "$name=rust-lld.exe"
-    } else {
+    } elseif ($platform.os -ceq 'linux') {
         'RUSTFLAGS=-Clink-arg=-fuse-ld=mold'
+    } else {
+        throw 'macOS uses the native Apple linker.'
     }
     if ($line.Contains("`n") -or $line.Contains("`r")) { throw 'A build environment setting must be one line.' }
     Add-Content -LiteralPath $env:GITHUB_ENV -Value $line -Encoding utf8NoBOM

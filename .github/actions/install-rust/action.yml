@@ -22,6 +22,9 @@ outputs:
   nextest-version:
     description: Exact nextest release
     value: ${{ steps.pins.outputs.nextest-version }}
+  cache-platform:
+    description: Native target and any deployment floor
+    value: ${{ steps.pins.outputs.cache-platform }}
 
 runs:
   using: composite
@@ -41,6 +44,12 @@ runs:
       env:
         NATIVE_TARGET: ${{ steps.pins.outputs.target }}
       run: .github/scripts/check-build-tools.ps1 -Target $env:NATIVE_TARGET -SelectEnvironment toolchain
+    - name: Set the native macOS deployment target
+      if: runner.os == 'macOS'
+      shell: pwsh
+      env:
+        NATIVE_TARGET: ${{ steps.pins.outputs.target }}
+      run: .github/scripts/check-build-tools.ps1 -Target $env:NATIVE_TARGET -SelectEnvironment deployment
     - name: Install cargo-nextest
       if: inputs.nextest == 'true'
       env:

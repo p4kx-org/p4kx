@@ -3,6 +3,7 @@
 
 mod about_json;
 mod markdown;
+mod source_notices;
 
 use std::fs;
 use std::path::Path;
@@ -135,7 +136,9 @@ fn generate(root: &Path) -> Result<String> {
         }
     });
     let _ignored = fs::remove_file(&target);
-    let generated = markdown::render(&about_json::parse(&json?)?);
+    let mut licences = about_json::parse(&json?)?;
+    source_notices::apply(&mut licences)?;
+    let generated = markdown::render(&licences);
     let unfilled = placeholders(&generated);
     if !unfilled.is_empty() {
         bail!(
@@ -162,12 +165,12 @@ fn native_targets(text: &str) -> Result<Vec<String>> {
                 .context("platform row has no target")
         })
         .collect::<Result<Vec<_>>>()?;
-    if targets.len() != 4
+    if targets.is_empty()
         || targets.iter().enumerate().any(|(index, target)| {
             target.is_empty() || targets.iter().take(index).any(|other| other == target)
         })
     {
-        bail!("notices require four unique native targets");
+        bail!("notices require distinct nonempty native targets");
     }
     Ok(targets)
 }
@@ -180,7 +183,13 @@ mod tests {
     fn notices_use_every_declared_native_target() {
         let contract = include_str!("../../.config/platforms.json");
         let targets = native_targets(contract).expect("valid native contract");
-        assert_eq!(targets.len(), 4);
+        assert_eq!(targets.len(), 5, "every required target is admitted");
+        assert!(
+            targets
+                .iter()
+                .any(|target| target == "aarch64-apple-darwin"),
+            "licence resolution includes the native macOS target"
+        );
         assert!(
             targets
                 .iter()
@@ -196,6 +205,10 @@ mod tests {
                 .is_err()
         );
         assert!(native_targets("{}").is_err());
+        assert!(
+            native_targets(r#"{"targets":[]}"#).is_err(),
+            "empty platform inventory"
+        );
     }
 
     #[test]

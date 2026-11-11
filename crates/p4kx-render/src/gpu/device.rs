@@ -67,6 +67,14 @@ pub(super) fn software_instance() -> wgpu::Instance {
     })
 }
 
+#[cfg(all(test, target_os = "macos"))]
+pub(super) fn metal_instance() -> wgpu::Instance {
+    wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::METAL,
+        ..wgpu::InstanceDescriptor::new_without_display_handle()
+    })
+}
+
 #[cfg(windows)]
 const SOFTWARE_BACKENDS: wgpu::Backends = wgpu::Backends::DX12;
 #[cfg(not(windows))]

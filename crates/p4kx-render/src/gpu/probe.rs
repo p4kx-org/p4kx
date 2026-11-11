@@ -7,7 +7,10 @@ use p4kx_testkit::watchdog::{Guard, arm};
 
 use super::{Adapters, Frame, Offscreen, OffscreenError, Picture};
 
-const REQUIRE: &str = "P4KX_REQUIRE_SOFTWARE_ADAPTER";
+#[cfg(target_os = "macos")]
+pub(super) const TEST_ADAPTERS: Adapters = Adapters::Metal;
+#[cfg(not(target_os = "macos"))]
+pub(super) const TEST_ADAPTERS: Adapters = Adapters::Software;
 
 /// An [`Offscreen`] opened by a watched test: the watchdog names the test and the phase it
 /// hangs in, and the phase is `teardown` while the device is dropped.
@@ -47,7 +50,7 @@ impl Drop for Probe {
 }
 
 /// Arms `test` and opens an offscreen renderer on `adapters`. Returns `None` with a printed
-/// reason when there is none, unless `P4KX_REQUIRE_SOFTWARE_ADAPTER` is set.
+/// reason when there is none and the test run permits an unavailable adapter.
 #[expect(
     clippy::print_stderr,
     reason = "tells the test run why a test checked nothing"
@@ -62,8 +65,8 @@ pub(super) fn open(test: &str, adapters: Adapters) -> Option<Probe> {
         }
         Err(error) => {
             assert!(
-                std::env::var_os(REQUIRE).is_none(),
-                "{test}: {REQUIRE} is set but there is no adapter: {error}"
+                !p4kx_testkit::render_adapter_required(),
+                "{test}: a graphics adapter is required: {error}"
             );
             eprintln!("{test}: no graphics adapter ({error}), nothing checked");
             None

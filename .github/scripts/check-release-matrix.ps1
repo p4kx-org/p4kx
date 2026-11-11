@@ -1,7 +1,10 @@
 param(
     [Parameter(Mandatory)][string]$AssetDirectory,
     [Parameter(Mandatory)][string]$Version,
-    [Parameter(Mandatory)][string]$Revision
+    [Parameter(Mandatory)][string]$Revision,
+    [switch]$RequireMacosDeviceEvidence,
+    [string]$MacosCurrentVersion,
+    [string]$MacosDeviceEvidencePath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -38,5 +41,14 @@ foreach ($row in $contract.targets) {
     Assert-P4kxArchiveEvidence -Metadata $runtime -Platform $row -Revision $Revision -Compiler $compiler -Nextest $nextest
     Assert-P4kxRuntimeEvidence -Metadata $runtime -Platform $row -Version $Version -Revision $Revision
     Assert-P4kxPackageRuntime $runtime $row $AssetDirectory $Version
+    if ($row.os -ceq 'macos' -and $RequireMacosDeviceEvidence) {
+        if (-not $MacosDeviceEvidencePath) { throw 'Native macOS device evidence is required for publication.' }
+        $deviceRuns = Get-Content -LiteralPath $MacosDeviceEvidencePath -Raw | ConvertFrom-Json -NoEnumerate
+        if ($deviceRuns -isnot [array]) { throw 'Native macOS device evidence must be a JSON array.' }
+        Assert-P4kxMacosReleaseDevices $runtime $row $MacosCurrentVersion $deviceRuns
+    }
 }
-Write-Output 'Complete release matrix verified: 12 packages, 12 target/binary SBOMs and four native runtime proofs.'
+$targetCount = @($contract.targets).Count
+$packageCount = @($contract.targets | ForEach-Object packages).Count
+$applicationCount = $targetCount * 3
+Write-Output "Complete release matrix verified: $packageCount packages, $applicationCount target/binary SBOMs and $targetCount native runtime proofs."

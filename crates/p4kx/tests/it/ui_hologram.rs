@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! `p4kx ui hologram` end to end over the synthetic ship of the testkit, drawn on the software
-//! adapter.
-//!
-//! The drawing tests need a software adapter (WARP on Windows, lavapipe on Linux) and return
-//! early with a printed reason without one, unless `P4KX_REQUIRE_SOFTWARE_ADAPTER` is set, as it
-//! is on CI.
+//! Draws the synthetic ship through the `p4kx ui hologram` command on a native graphics adapter.
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -36,15 +31,14 @@ fn hologram(archive: &Path, out: &Path, extra: &[&str], json: bool) -> Result<Ru
     if json {
         command.arg("--json");
     }
-    let output = command
+    command
         .args(["ui", "hologram"])
         .arg(archive)
-        .arg("TEST_Ship")
-        .arg("--software")
-        .arg("--out")
-        .arg(out)
-        .args(extra)
-        .output()?;
+        .arg("TEST_Ship");
+    if !cfg!(target_os = "macos") {
+        command.arg("--software");
+    }
+    let output = command.arg("--out").arg(out).args(extra).output()?;
     Ok(Run {
         stdout: String::from_utf8(output.stdout)?,
         stderr: String::from_utf8(output.stderr)?,
@@ -61,8 +55,8 @@ fn skip(test: &str, run: &Run) -> bool {
         return false;
     }
     assert!(
-        std::env::var_os("P4KX_REQUIRE_SOFTWARE_ADAPTER").is_none(),
-        "{test}: a software adapter is required: {}",
+        !p4kx_testkit::render_adapter_required(),
+        "{test}: a graphics adapter is required: {}",
         run.stderr
     );
     #[expect(
@@ -70,7 +64,7 @@ fn skip(test: &str, run: &Run) -> bool {
         reason = "tells the test run why a test checked nothing"
     )]
     {
-        eprintln!("{test}: no software adapter, nothing checked");
+        eprintln!("{test}: no graphics adapter, nothing checked");
     }
     true
 }

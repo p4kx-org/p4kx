@@ -18,8 +18,10 @@ foreach ($row in $contract.targets) {
 }
 Set-Content -LiteralPath (Join-Path $assets 'architecture-neutral-addon.zip') -Value 'outside the native scan matrix'
 $files = @(Get-P4kxReleaseScanAssets $assets $version | Select-Object -ExpandProperty FullName)
-if ($files.Count -ne 12 -or $files -contains (Join-Path $assets 'architecture-neutral-addon.zip')) {
-    throw 'The native scan matrix must contain exactly the twelve platform packages.'
+$dmg = Get-P4kxAssetName -Target aarch64-apple-darwin -Version $version -Package dmg
+if ($files.Count -ne 13 -or (Join-Path $assets $dmg) -cnotin $files -or
+    (Join-Path $assets 'architecture-neutral-addon.zip') -cin $files) {
+    throw 'The scan matrix must contain the thirteen native packages including the ARM64 DMG.'
 }
 $digests = @($files | ForEach-Object {
     (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()

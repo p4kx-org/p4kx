@@ -60,6 +60,10 @@ fn main() -> Result<()> {
         &title,
         options,
         Box::new(move |creation| {
+            #[cfg(target_os = "macos")]
+            if smoke.is_some() {
+                require_metal(creation)?;
+            }
             theme::apply(&creation.egui_ctx);
             frame::tint(creation);
             let mut model = model;
@@ -80,6 +84,22 @@ fn main() -> Result<()> {
         }),
     )
     .map_err(|error| anyhow!("cannot show the window: {error}"))
+}
+
+#[cfg(target_os = "macos")]
+fn require_metal(creation: &eframe::CreationContext<'_>) -> std::io::Result<()> {
+    use eframe::egui_wgpu::wgpu::Backend;
+
+    let backend = creation
+        .wgpu_render_state
+        .as_ref()
+        .map(|state| state.adapter.get_info().backend);
+    if backend != Some(Backend::Metal) {
+        return Err(std::io::Error::other(format!(
+            "the macOS GUI smoke requires an active Metal adapter, got {backend:?}"
+        )));
+    }
+    Ok(())
 }
 
 fn configured_model(

@@ -389,3 +389,19 @@ override-git-commit = "d0715d5b7cca72e228d6e6c4de154bd30dfdd06a"
 path = "intl_pluralrules/LICENSE-APACHE"
 license = "Apache-2.0"
 checksum = "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+
+[accesskit_macos.clarify]
+license = "Apache-2.0"
+
+[[accesskit_macos.clarify.git]]
+path = "LICENSE-APACHE"
+license = "Apache-2.0"
+checksum = "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+
+[objc-sys.clarify]
+license = "MIT"
+
+[[objc-sys.clarify.git]]
+path = "LICENSE.txt"
+license = "MIT"
+checksum = "e353f37b12aefbb9f9b29490e837cfee05d9bda70804b3562839a3285c1df1e5"

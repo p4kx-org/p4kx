@@ -47,7 +47,10 @@ param(
     [Parameter(Mandatory)][string]$Repository,
     [string]$Version,
     [string]$Revision,
-    [switch]$TagAttestations
+    [switch]$TagAttestations,
+    [switch]$RequireMacosDeviceEvidence,
+    [string]$MacosCurrentVersion,
+    [string]$MacosDeviceEvidencePath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -59,7 +62,29 @@ if (-not $Version) {
 if (-not $Revision) {
     $Revision = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (& git rev-parse HEAD).Trim() }
 }
-& (Join-Path $PSScriptRoot 'check-release-matrix.ps1') -AssetDirectory $AssetDirectory -Version $Version -Revision $Revision
+& (Join-Path $PSScriptRoot 'check-release-matrix.ps1') -AssetDirectory $AssetDirectory -Version $Version -Revision $Revision -RequireMacosDeviceEvidence:$RequireMacosDeviceEvidence -MacosCurrentVersion $MacosCurrentVersion -MacosDeviceEvidencePath $MacosDeviceEvidencePath
+
+$macosRuntimePath = Join-Path $AssetDirectory "P4KX-$Version-aarch64-apple-darwin-runtime.json"
+$macosRuntime = Get-Content -LiteralPath $macosRuntimePath -Raw | ConvertFrom-Json
+$signing = @($macosRuntime.package_smokes)[0].signing
+$macosDistribution = if ($signing.mode -ceq 'developer-id') {
+    "## macOS distribution" + [char]10 + [char]10 +
+        'The Apple Silicon DMG uses Developer ID signing and a validated stapled Apple notarization ticket.'
+} else {
+    $reason = switch -CaseSensitive ($signing.reason) {
+        'package-dry-run' { 'this was a package validation run' }
+        'developer-id-unavailable' { 'Developer ID was unavailable' }
+        'notarization-unavailable' { 'Apple notarization was unavailable' }
+        'developer-id-and-notarization-unavailable' { 'Developer ID and Apple notarization were unavailable' }
+    }
+    @"
+## macOS distribution
+
+The Apple Silicon DMG is ad-hoc signed because $reason. After attempting to open the
+installed P4KX app, use **System Settings → Privacy & Security → Open Anyway** if
+Gatekeeper requires approval. Follow [Apple’s instructions](https://support.apple.com/en-us/102445).
+"@
+}
 
 $sha256Name = 'SHA256SUMS.txt'
 $sha3Name = 'SHA3-512SUMS.txt'
@@ -144,6 +169,7 @@ $sections.Add((Get-Content -LiteralPath $NotesPath -Raw -Encoding utf8).TrimEnd(
 if ($VirusTotalNotePath -and (Test-Path -LiteralPath $VirusTotalNotePath -PathType Leaf)) {
     $sections.Add((Get-Content -LiteralPath $VirusTotalNotePath -Raw -Encoding utf8).TrimEnd())
 }
+$sections.Add($macosDistribution.TrimEnd())
 $sections.Add($provenance.TrimEnd())
 $sections.Add($checksums.TrimEnd())
 Set-Content -LiteralPath $OutputNotesPath -Value ($sections -join "`n`n") -Encoding utf8NoBOM

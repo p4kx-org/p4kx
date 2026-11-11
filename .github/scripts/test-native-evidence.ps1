@@ -7,15 +7,18 @@ $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Path $Directory -Force | Out-Null
 $contract = Get-P4kxPlatformContract
 $revision = 'a' * 40
+. (Join-Path $PSScriptRoot 'macho-test-image.ps1')
 
 foreach ($row in $contract.targets) {
     $bytes = [byte[]]::new(256)
-    $machine = if ($row.os -eq 'windows') { $row.pe_machine } else { $row.elf_machine }
+    $machine = Get-P4kxNativeMachine -Platform $row
     if ($row.os -eq 'windows') {
         [BitConverter]::GetBytes([uint16]0x5a4d).CopyTo($bytes, 0)
         [BitConverter]::GetBytes([uint32]128).CopyTo($bytes, 0x3c)
         [BitConverter]::GetBytes([uint32]0x00004550).CopyTo($bytes, 128)
         [BitConverter]::GetBytes([uint16]$machine).CopyTo($bytes, 132)
+    } elseif ($row.os -ceq 'macos') {
+        $bytes = New-P4kxMachOTestImage -Machine $machine
     } else {
         [BitConverter]::GetBytes([uint32]0x464c457f).CopyTo($bytes, 0)
         $bytes[4] = 2
@@ -25,6 +28,7 @@ foreach ($row in $contract.targets) {
     $path = Join-Path $Directory "$($row.target).bin"
     [IO.File]::WriteAllBytes($path, $bytes)
     if ((Get-ImageMachine -Path $path -Os $row.os) -ne $machine) { throw 'Machine identity mismatch.' }
+    if ($row.os -ceq 'macos') { Test-P4kxMachOImages -Directory $Directory -Platform $row }
     $bytes[0] = 0
     [IO.File]::WriteAllBytes($path, $bytes)
     $rejected = $false
@@ -51,6 +55,32 @@ foreach ($row in $contract.targets) {
         $rejected = $false
         try { Assert-P4kxArchiveEvidence -Metadata $changed -Platform $row -Revision $revision -Compiler '1.99.1' -Nextest '0.9.151' -ArchiveHash ('b' * 64) } catch { $rejected = $true }
         if (-not $rejected) { throw 'Mismatched native archive evidence was accepted.' }
+    }
+    if ($row.os -ceq 'macos') {
+        foreach ($mutation in @(
+            { param($m) $m.binaries[0].min_os = '26.1.0' },
+            { param($m) $m.binaries[0].cpu_subtype = 2 },
+            { param($m) $m.binaries[0].platform = 2 },
+            { param($m) $m.build_host.os_version = '15.7.1' },
+            { param($m) $m.build_host.architecture = 'x64' }
+        )) {
+            $changed = $baseline | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+            & $mutation $changed
+            $rejected = $false
+            try { Assert-P4kxArchiveEvidence -Metadata $changed -Platform $row -Revision $revision -Compiler '1.99.1' -Nextest '0.9.151' -ArchiveHash ('b' * 64) } catch { $rejected = $true }
+            if (-not $rejected) { throw 'Mismatched macOS host or Mach-O archive evidence was accepted.' }
+        }
+        foreach ($mutation in @(
+            { param($m) $m.runtime_host.os_build = 'unknown' },
+            { param($m) $m.runtime.metal_adapter = 'skipped' },
+            { param($m) $m.runtime.PSObject.Properties.Remove('metal_adapter') }
+        )) {
+            $changed = $baseline | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+            & $mutation $changed
+            $rejected = $false
+            try { Assert-P4kxRuntimeEvidence -Metadata $changed -Platform $row -Version '0.5.0' -Revision $revision } catch { $rejected = $true }
+            if (-not $rejected) { throw 'Incomplete macOS native runtime evidence was accepted.' }
+        }
     }
     $baseline.runtime.cli_convert = 'skipped'
     $rejected = $false

@@ -26,7 +26,7 @@ fn unsafe_versions_and_colliding_package_names_are_rejected()
 fn the_contract_contains_each_required_native_platform_once()
 -> Result<(), Box<dyn std::error::Error>> {
     let rows = supported_targets()?;
-    assert_eq!(rows.len(), 4);
+    assert_eq!(rows.len(), 5, "required native targets");
     for os in [OperatingSystem::Windows, OperatingSystem::Linux] {
         for arch in [Architecture::Amd64, Architecture::Arm64] {
             assert_eq!(
@@ -37,6 +37,17 @@ fn the_contract_contains_each_required_native_platform_once()
             );
         }
     }
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row.platform()
+                == Platform {
+                    os: OperatingSystem::Macos,
+                    arch: Architecture::Arm64
+                })
+            .count(),
+        1,
+        "one Apple Silicon macOS row"
+    );
     Ok(())
 }
 
@@ -81,13 +92,20 @@ fn missing_and_wrong_os_packages_are_rejected() -> Result<(), Box<dyn std::error
 #[test]
 fn the_running_target_uses_compile_time_architecture() {
     let current = Platform::current();
-    if cfg!(any(target_os = "windows", target_os = "linux"))
-        && cfg!(any(target_arch = "x86_64", target_arch = "aarch64"))
+    if cfg!(all(
+        any(target_os = "windows", target_os = "linux"),
+        any(target_arch = "x86_64", target_arch = "aarch64")
+    )) || cfg!(all(target_os = "macos", target_arch = "aarch64"))
     {
         let current = current.expect("supported compiled target");
         assert_eq!(
             current.os == OperatingSystem::Windows,
             cfg!(target_os = "windows")
+        );
+        assert_eq!(
+            current.os == OperatingSystem::Macos,
+            cfg!(target_os = "macos"),
+            "the compiled target determines macOS support"
         );
         assert_eq!(
             current.arch == Architecture::Arm64,
@@ -96,4 +114,58 @@ fn the_running_target_uses_compile_time_architecture() {
     } else {
         assert_eq!(current, None);
     }
+}
+
+#[test]
+fn macos_assets_and_binary_identity_follow_the_single_apple_silicon_row()
+-> Result<(), Box<dyn std::error::Error>> {
+    let macos = Platform {
+        os: OperatingSystem::Macos,
+        arch: Architecture::Arm64,
+    };
+    assert_eq!(
+        asset_filename("0.5.0", macos, PackageKind::Dmg)?.as_deref(),
+        Some("P4KX-0.5.0-aarch64-apple-darwin.dmg"),
+        "canonical Apple Silicon DMG asset"
+    );
+    assert_eq!(
+        asset_filename("0.5.0", macos, PackageKind::TarGz)?,
+        None,
+        "Linux package format is unavailable on macOS"
+    );
+    assert_eq!(
+        asset_filename(
+            "0.5.0",
+            Platform {
+                arch: Architecture::Amd64,
+                ..macos
+            },
+            PackageKind::Dmg
+        )?,
+        None,
+        "Intel macOS has no native package"
+    );
+    let source = include_str!("../../../.config/platforms.json");
+    for (field, wrong) in [
+        ("target", serde_json::json!("x86_64-apple-darwin")),
+        ("runner_os", serde_json::json!("Darwin")),
+        ("runner_arch", serde_json::json!("X64")),
+        ("mach_cpu_type", serde_json::json!(0x0100_0007)),
+        ("deployment_target", serde_json::json!("14.0")),
+        ("pe_machine", serde_json::json!(0xaa64)),
+    ] {
+        let mut changed: Value = serde_json::from_str(source)?;
+        let row = changed
+            .get_mut("targets")
+            .and_then(Value::as_array_mut)
+            .and_then(|rows| {
+                rows.iter_mut()
+                    .find(|row| row.get("os").and_then(Value::as_str) == Some("macos"))
+            })
+            .and_then(Value::as_object_mut)
+            .ok_or("missing macOS target row")?;
+        row.insert(field.to_owned(), wrong);
+        assert!(parse_manifest(&changed.to_string()).is_err(), "{field}");
+    }
+    Ok(())
 }

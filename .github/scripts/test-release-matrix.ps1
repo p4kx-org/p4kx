@@ -32,12 +32,18 @@ foreach ($row in $contract.targets) {
         $sbom | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Directory $name) -Encoding utf8NoBOM
     }
     $proof = New-P4kxTestEvidence -Platform $row -Version $version -Revision $revision -Compiler $compiler -Nextest $nextest
-    if ($row.os -in @('windows', 'linux')) {
+    if ($row.os -cin @('windows', 'linux', 'macos')) {
         $smokes = @(foreach ($package in $row.packages) {
             $asset = Get-P4kxAssetName -Target $row.target -Version $version -Package $package
             $smoke = [ordered]@{
                 target=$row.target; package=$package; binaries=$proof.binaries; runtime=$proof.runtime
                 archive_sha256=(Get-FileHash (Join-Path $Directory $asset) -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            if ($row.os -ceq 'macos') {
+                $smoke.signing = @{
+                    package='dmg'; mode='ad-hoc'; reason='developer-id-unavailable'
+                    signature='verified'; notarization='not-requested'; archive_sha256=$smoke.archive_sha256
+                }
             }
             if ($row.os -eq 'linux') {
                 $elf = @($proof.binaries | ConvertTo-Json -Depth 6 | ConvertFrom-Json)
@@ -61,7 +67,11 @@ foreach ($row in $contract.targets) {
             $smoke
         })
         $proof | Add-Member -NotePropertyName package_smokes -NotePropertyValue $smokes
-        $sourcePackage = if ($row.os -ceq 'windows') { 'portable-zip' } else { 'tar-gz' }
+        $sourcePackage = switch -CaseSensitive ($row.os) {
+            windows { 'portable-zip' }
+            linux { 'tar-gz' }
+            macos { 'dmg' }
+        }
         $proof.archive_sha256 = ($smokes | Where-Object package -CEQ $sourcePackage).archive_sha256
     }
     if ($row.os -ceq 'linux') {
@@ -116,6 +126,9 @@ $notesOutput = Join-Path $notesFixture 'notes.md'
 Set-Content -LiteralPath $notesInput -Value 'Synthetic release notes' -Encoding utf8NoBOM
 & (Join-Path $PSScriptRoot 'assemble-release.ps1') -AssetDirectory $notesAssets -NotesPath $notesInput -OutputNotesPath $notesOutput -Repository 'p4kx-org/p4kx' -Version $version -Revision $revision
 $notes = Get-Content -LiteralPath $notesOutput -Raw
+if ($notes -cnotmatch 'ad-hoc signed because Developer ID was unavailable' -or $notes -cnotmatch 'Open Anyway') {
+    throw 'Release notes omitted the macOS ad-hoc signing disclosure.'
+}
 if ($notes -cmatch 'gh attestation verify' -or
     $notes -cnotmatch '(?m)^This validation run did not generate Sigstore attestations\.\r?$') {
     throw 'Validation-only release notes claimed attestations that this run did not generate.'
@@ -125,7 +138,9 @@ foreach ($row in $contract.targets) {
     $original = Get-Content -LiteralPath $proofPath -Raw
     $changed = $original | ConvertFrom-Json
     $otherPackage = if ($row.os -ceq 'windows') { 'msi' } else { 'app-image' }
-    $otherDigest = ($changed.package_smokes | Where-Object package -CEQ $otherPackage).archive_sha256
+    $otherDigest = if ($row.os -ceq 'macos') { 'f' * 64 } else {
+        ($changed.package_smokes | Where-Object package -CEQ $otherPackage).archive_sha256
+    }
     if ($otherDigest -ceq $changed.archive_sha256) { throw 'Fixture package digests must differ.' }
     $changed.archive_sha256 = $otherDigest
     $changed | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath $proofPath -Encoding utf8NoBOM
@@ -203,8 +218,11 @@ if (-not $rejected) { throw 'An empty ARM64 package was accepted.' }
 $proofPath = Join-Path $Directory "P4KX-$version-$($row.target)-runtime.json"
 $proof = Get-Content -LiteralPath $proofPath -Raw | ConvertFrom-Json
 $proof.runtime.gui_frames = 'skipped'
-$proof | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $proofPath -Encoding utf8NoBOM
+$windowsFinal = Get-Content -LiteralPath $proofPath -Raw
+$proof | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath $proofPath -Encoding utf8NoBOM
 $rejected = $false
 try { & $validator -AssetDirectory $Directory -Version $version -Revision $revision | Out-Null } catch { $rejected = $true }
 if (-not $rejected) { throw 'A skipped ARM64 GUI runtime check was accepted.' }
+$windowsFinal | Set-Content -LiteralPath $proofPath -Encoding utf8NoBOM
+& (Join-Path $PSScriptRoot 'test-macos-release-evidence.ps1') -AssetDirectory $Directory -Version $version -Revision $revision
 Write-Output 'PASS: complete release matrix; missing/changed/skipped package evidence, empty ARM64 package and skipped GUI proof rejected.'

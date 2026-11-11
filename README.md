@@ -135,7 +135,8 @@ Windows packages target AMD64 (`x86_64-pc-windows-msvc`) and ARM64
   (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 Settings live in `%APPDATA%\P4KX`. The window can check GitHub once at start for a newer Release
-if you switch that on in the Help menu; it is off by default, and nothing else touches the network.
+if you switch that on in the Help menu. It is off by default. The CLI and MCP also offer explicit
+update checks.
 Both CPUs share one per-user MSI installation; an explicitly chosen same-version package
 replaces it. Settings and the stored Archive key survive uninstall. Older AMD64 releases keep
 their `-x86_64` names. [Windows packages](docs/windows-packages.md) defines supported-system
@@ -146,6 +147,12 @@ the GUI, CLI and MCP server. Native tar.gz/AppImage/deb require Ubuntu 24.04 / g
 Flatpak uses Freedesktop Platform 25.08 and additionally requires host Documents-portal API 5
 with authenticated host-path lookup. See [Linux packages](docs/linux-packages.md) for
 installation, AppImage CLI/MCP dispatch, sandbox grants, source notices and native verification.
+
+For macOS 26 or later on Apple Silicon, open `P4KX-<version>-aarch64-apple-darwin.dmg` and drag
+`P4KX.app` to Applications. Launch the window from Finder. With the app in Applications, run
+`/Applications/P4KX.app/Contents/MacOS/p4kx --help` in Terminal and point an MCP client to
+`/Applications/P4KX.app/Contents/MacOS/p4kx-mcp`. Use the corresponding path if you move the app.
+The Release notes identify the signing mode and any required first-launch approval.
 
 ## First run: the Archive key
 
@@ -198,8 +205,8 @@ P4KX only reads the game folders and refuses to write into a Star Citizen instal
 
 The repository selects an exact stable compiler in [rust-toolchain.toml](rust-toolchain.toml);
 rustup uses it automatically. The workspace minimum remains Rust 1.99.
-The native v0.5.0 target and verification contract covers Windows and Linux on AMD64 and ARM64;
-see [native platforms and release verification](docs/supported-platforms.md).
+The native v0.5.0 target and verification contract covers Windows and Linux on AMD64 and ARM64,
+and macOS 26 or later on Apple Silicon. See [native platforms and release verification](docs/supported-platforms.md).
 
 ```powershell
 cargo build --release

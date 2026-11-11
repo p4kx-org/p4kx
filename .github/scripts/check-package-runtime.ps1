@@ -5,12 +5,14 @@ param(
     [Parameter(Mandatory)][string]$OutputDirectory,
     [Parameter(Mandatory)][string]$Package,
     [hashtable]$Launchers,
-    [string]$ExpectedVersion
+    [string]$ExpectedVersion,
+    [string]$MacBundle,
+    [object[]]$ExpectedBinaries
 )
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
-. (Join-Path $PSScriptRoot 'binary-machine.ps1')
+. (Join-Path $PSScriptRoot 'native-application-binaries.ps1')
 . (Join-Path $PSScriptRoot 'package-mcp-smoke.ps1')
 . (Join-Path $PSScriptRoot 'package-launchers.ps1')
 $row = Get-P4kxPlatform -Target $Target
@@ -24,16 +26,24 @@ $directory = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $directory -Force | Out-Null
 $archive = (Resolve-Path (Join-Path $FixtureDirectory 'native-smoke.p4k')).Path
 $expected = Get-Content (Join-Path $FixtureDirectory 'hello.txt') -Raw -Encoding utf8
-$identity = Get-Content (Join-Path $BinaryDirectory 'p4kx-distribution.json') -Raw | ConvertFrom-Json
+$identityPath = if ($row.os -ceq 'macos') {
+    if (-not $MacBundle -or -not $ExpectedBinaries) { throw 'macOS smoke requires a bundle and its signed producer binary evidence.' }
+    . (Join-Path $PSScriptRoot 'macos-bundle.ps1')
+    $bundlePaths = Get-P4kxMacBundlePaths -Bundle $MacBundle
+    if ([IO.Path]::GetFullPath($bundlePaths.binaries) -cne [IO.Path]::GetFullPath($BinaryDirectory)) {
+        throw 'Binary directory does not belong to the macOS bundle.'
+    }
+    $bundlePaths.identity
+} else {
+    if ($MacBundle -or $ExpectedBinaries) { throw 'Mac bundle evidence is only used for macOS.' }
+    Join-Path $BinaryDirectory 'p4kx-distribution.json'
+}
+$identity = Get-Content -LiteralPath $identityPath -Raw | ConvertFrom-Json
 if ($identity.target -cne $Target -or $identity.package -cne $Package) { throw 'Packaged distribution identity differs.' }
-$binaries = @(foreach ($name in @('p4kx', 'p4kx-gui', 'p4kx-mcp')) {
-    $filename = if ($row.os -eq 'windows') { "$name.exe" } else { $name }
-    $file = (Resolve-Path (Join-Path $BinaryDirectory $filename)).Path
-    $machine = Get-ImageMachine -Path $file -Os $row.os
-    $required = if ($row.os -eq 'windows') { $row.pe_machine } else { $row.elf_machine }
-    if ($machine -ne $required) { throw "Packaged $name is not native $Target." }
-    [ordered]@{name=$name; machine=$machine; sha256=(Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()}
-})
+$binaries = @(Get-P4kxApplicationBinaryEvidence -Directory $BinaryDirectory -Platform $row)
+if ($row.os -ceq 'macos') {
+    Assert-P4kxMatchingApplicationBinaries -Actual $binaries -Expected $ExpectedBinaries -Platform $row
+}
 $commands = Get-P4kxPackageLaunchers -BinaryDirectory $BinaryDirectory -Os $row.os -Overrides $Launchers
 $cli = $commands['p4kx']
 $version = Invoke-P4kxPackageProcess $cli.executable (Get-P4kxPackageArguments $cli @('--version')) $directory (Join-Path $directory 'cli-version.log')
@@ -56,6 +66,7 @@ $window = $commands['p4kx-gui']
 $gui = New-P4kxPackageProcess $window.executable $window.prefix $directory
 try {
     $gui.StartInfo.Environment['P4KX_SMOKE_FRAMES'] = '3'
+    if ($row.os -ceq 'macos') { $gui.StartInfo.Environment['WGPU_BACKEND'] = 'metal' }
     [void]$gui.Start()
     $stdout = $gui.StandardOutput.ReadToEndAsync()
     $stderr = $gui.StandardError.ReadToEndAsync()

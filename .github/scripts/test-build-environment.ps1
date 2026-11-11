@@ -39,12 +39,18 @@ try {
         'x86_64-unknown-linux-gnu'='RUSTFLAGS=-Clink-arg=-fuse-ld=mold'
         'aarch64-unknown-linux-gnu'='RUSTFLAGS=-Clink-arg=-fuse-ld=mold'
     }
-    $expected = @{
-        toolchain=('RUSTUP_TOOLCHAIN=' + $native[0].Substring('rust-toolchain='.Length))
-        linker=$linkers[$platform.target]
+    $expected = @{ toolchain=('RUSTUP_TOOLCHAIN=' + $native[0].Substring('rust-toolchain='.Length)) }
+    if ($platform.os -ceq 'macos') {
+        $expected.deployment = "MACOSX_DEPLOYMENT_TARGET=$($platform.deployment_target)"
+        $modes = @('toolchain', 'ToolChain', 'deployment', 'DEPLOYMENT')
+        $unsupported = 'linker'
+    } else {
+        $expected.linker = $linkers[$platform.target]
+        $modes = @('toolchain', 'ToolChain', 'linker', 'LINKER')
+        $unsupported = 'deployment'
     }
     $env:GITHUB_ENV = $file
-    foreach ($mode in @('toolchain', 'linker', 'ToolChain', 'LINKER')) {
+    foreach ($mode in $modes) {
         [IO.File]::WriteAllText($file, $sentinel, [Text.UTF8Encoding]::new($false))
         $emitted = @(& $checker -Target $platform.target -SelectEnvironment $mode)
         $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($file))
@@ -60,6 +66,7 @@ try {
         @{Target='unknown-native-target';SelectEnvironment='toolchain'},
         @{Target=$foreign.target;SelectEnvironment='linker'},
         @{Target=$platform.target;SelectEnvironment="linker`nINJECTED=1"},
+        @{Target=$platform.target;SelectEnvironment=$unsupported},
         @{Target=$platform.target;SelectEnvironment='toolchain';Verify=$true},
         @{Target=$platform.target;SelectEnvironment='linker';Nextest=$true}
     )) {
@@ -73,4 +80,4 @@ try {
 finally {
     foreach ($name in $variables) { [Environment]::SetEnvironmentVariable($name, $original[$name], 'Process') }
 }
-'PASS: exact native toolchain/linker settings, append preservation, no output leakage and nine refused injection/host/mode/file requests.'
+'PASS: exact native toolchain and target-specific environment, append preservation and refused injection, host, mode and file requests.'

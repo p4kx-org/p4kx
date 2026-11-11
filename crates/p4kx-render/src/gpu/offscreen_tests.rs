@@ -3,15 +3,15 @@
 
 use std::sync::Arc;
 
-use super::probe::{self, Probe};
-use super::{Adapters, AssemblyDraw, Colours, Frame, Look, OffscreenError, Shading, Subject};
+use super::probe::{self, Probe, TEST_ADAPTERS};
+use super::{AssemblyDraw, Colours, Frame, Look, OffscreenError, Shading, Subject};
 use crate::assembly::synthetic::ship;
 use crate::{Camera, DrawList};
 
 const SIZE: [u32; 2] = [96, 64];
 
 pub(super) fn open(test: &str) -> Option<Probe> {
-    probe::open(test, Adapters::Software)
+    probe::open(test, TEST_ADAPTERS)
 }
 
 #[expect(
@@ -122,4 +122,29 @@ fn a_picture_writes_as_a_png_that_reads_back_the_same() {
     let info = reader.next_frame(&mut pixels);
     assert!(info.is_ok(), "decoded");
     assert_eq!(pixels, picture.rgba(), "the pixels survive");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+#[expect(
+    clippy::print_stderr,
+    reason = "records the Metal adapter identity in the native CI log"
+)]
+fn the_metal_adapter_draws_and_reads_back_a_frame() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(mut offscreen) = open("the_metal_adapter_draws_and_reads_back_a_frame") else {
+        return Ok(());
+    };
+    let picture = offscreen.draw(&frame(SIZE))?;
+    assert_eq!(
+        [picture.width(), picture.height()],
+        SIZE,
+        "Metal frame dimensions"
+    );
+    assert_eq!(
+        offscreen.backend(),
+        wgpu::Backend::Metal,
+        "native Metal backend"
+    );
+    eprintln!("Metal adapter: {}", offscreen.adapter_name());
+    Ok(())
 }
