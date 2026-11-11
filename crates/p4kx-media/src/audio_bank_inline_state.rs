@@ -4,8 +4,8 @@
 use std::io::{Read, Seek};
 
 use p4kx_extraction::bank::{
-    BankHircField, BankInlineStateRow, BankSoundStateRead, BankStateBinding, BankStateGroup,
-    StateProperties,
+    BankHircField, BankInlineStateRow, BankInlineStateRows, BankSoundStateRead, BankStateBinding,
+    BankStateGroup, StateProperties,
 };
 
 use crate::audio_bank_projection::BankProjection;
@@ -23,16 +23,37 @@ pub(crate) const GROUP_COUNT_NAMESPACE: &str = "audio-bank-hirc-inline-state-gro
 pub(crate) const GROUP_NAMESPACE: &str = "audio-bank-hirc-inline-state-group";
 pub(crate) const ENTRY_NAMESPACE: &str = "audio-bank-hirc-inline-state-entry";
 
+pub(crate) enum InlineStateRead<'input, R> {
+    Readable(BankInlineStateRows<'input, R>),
+    Absent,
+    Unavailable,
+}
+
+impl<'input, R> TryFrom<BankSoundStateRead<'input, R>> for InlineStateRead<'input, R> {
+    type Error = MediaError;
+
+    fn try_from(read: BankSoundStateRead<'input, R>) -> Result<Self, Self::Error> {
+        match read {
+            BankSoundStateRead::Readable(rows) => Ok(Self::Readable(rows)),
+            BankSoundStateRead::Absent => Ok(Self::Absent),
+            BankSoundStateRead::Unavailable(_) => Ok(Self::Unavailable),
+            _ => Err(MediaError::Contract(
+                "unexpected inline State disposition".into(),
+            )),
+        }
+    }
+}
+
 pub(crate) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,
     state: &StateProjection<'_>,
-    status: BankSoundStateRead<'_, R>,
+    status: InlineStateRead<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let version = state.version;
     let mut prepared = state.record(writer, None)?;
     let (record, rows) = match status {
-        BankSoundStateRead::Readable(rows) => {
+        InlineStateRead::Readable(rows) => {
             let extent = rows.range();
             state.sites.summary(&mut prepared, Some(extent), false)?;
             state.sites.range(&mut prepared, "checked_range", extent)?;
@@ -44,22 +65,17 @@ pub(crate) fn project<R: Read + Seek>(
                 Some(rows),
             )
         }
-        BankSoundStateRead::Absent => {
+        InlineStateRead::Absent => {
             state
                 .sites
                 .summary(&mut prepared, Some(&state.body_range), false)?;
             (InlineStateRecord::Absent { version }, None)
         }
-        BankSoundStateRead::Unavailable(_) => {
+        InlineStateRead::Unavailable => {
             state
                 .sites
                 .summary(&mut prepared, Some(&state.body_range), false)?;
             (InlineStateRecord::Unavailable { version }, None)
-        }
-        _ => {
-            return Err(MediaError::Contract(
-                "unexpected inline State disposition".into(),
-            ));
         }
     };
     prepared.finish().write(

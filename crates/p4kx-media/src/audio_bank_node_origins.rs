@@ -18,6 +18,7 @@ use crate::{MediaError, MediaWriter};
 pub(crate) enum NodeKind {
     State,
     Rtpc,
+    ActorMixer,
 }
 
 impl NodeKind {
@@ -25,6 +26,7 @@ impl NodeKind {
         match self {
             Self::State => "bnkHircState",
             Self::Rtpc => "bnkHircRtpc",
+            Self::ActorMixer => "bnkHircActorMixer",
         }
     }
 
@@ -32,6 +34,7 @@ impl NodeKind {
         match self {
             Self::State => "stateRowPosition",
             Self::Rtpc => "rtpcRowPosition",
+            Self::ActorMixer => "actorMixerRowPosition",
         }
     }
 
@@ -39,6 +42,7 @@ impl NodeKind {
         match self {
             Self::State => "stateExtent",
             Self::Rtpc => "rtpcExtent",
+            Self::ActorMixer => "actorMixerExtent",
         }
     }
 }

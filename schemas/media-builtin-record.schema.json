@@ -214,6 +214,167 @@
       ],
       "type": "object"
     },
+    "ActorMixerChildRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "child_id": {
+          "$ref": "#/$defs/BankField_uint32"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "ordinal",
+        "child_id"
+      ],
+      "type": "object"
+    },
+    "ActorMixerPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ActorMixerRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-actor-mixer",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ActorMixerChildRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-actor-mixer-child",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ActorMixerPayload"
+    },
+    "ActorMixerRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "checked_children": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "checked_children_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "checked_node_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "child_count": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effect_count": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "layout": {
+          "$ref": "#/$defs/HircActorMixerLayout"
+        },
+        "metadata_count": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pre_parent_word": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trailing_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "layout",
+        "version"
+      ],
+      "type": "object"
+    },
     "Algorithm": {
       "description": "Integrity algorithm, without conflating CRC checks with cryptographic hashes.",
       "oneOf": [
@@ -3270,7 +3431,7 @@
       ],
       "type": "object"
     },
-    "BankField": {
+    "BankField_uint16": {
       "additionalProperties": false,
       "properties": {
         "range": {
@@ -3289,7 +3450,7 @@
       ],
       "type": "object"
     },
-    "BankField2": {
+    "BankField_uint32": {
       "additionalProperties": false,
       "properties": {
         "range": {
@@ -3307,7 +3468,7 @@
       ],
       "type": "object"
     },
-    "BankField3": {
+    "BankField_uint8": {
       "additionalProperties": false,
       "properties": {
         "range": {
@@ -5504,6 +5665,14 @@
     "ForeignUnavailable": {
       "enum": [
         "incomplete-local-inventory"
+      ],
+      "type": "string"
+    },
+    "HircActorMixerLayout": {
+      "enum": [
+        "decoded",
+        "malformed",
+        "unsupported"
       ],
       "type": "string"
     },
@@ -8951,25 +9120,25 @@
       "additionalProperties": false,
       "properties": {
         "accumulation": {
-          "$ref": "#/$defs/BankField3"
+          "$ref": "#/$defs/BankField_uint8"
         },
         "curve_id": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         },
         "parameter_id": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         },
         "point_count": {
-          "$ref": "#/$defs/BankField"
+          "$ref": "#/$defs/BankField_uint16"
         },
         "rtpc_id": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         },
         "rtpc_type": {
-          "$ref": "#/$defs/BankField3"
+          "$ref": "#/$defs/BankField_uint8"
         },
         "scaling": {
-          "$ref": "#/$defs/BankField3"
+          "$ref": "#/$defs/BankField_uint8"
         }
       },
       "required": [
@@ -9035,6 +9204,57 @@
             "payload"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-actor-mixer-rtpc",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcCurveRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-actor-mixer-rtpc-curve",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcPointRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-actor-mixer-rtpc-point",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
         }
       ],
       "title": "RtpcPayload"
@@ -9043,7 +9263,7 @@
       "additionalProperties": false,
       "properties": {
         "from_bits": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         },
         "input": {
           "format": "float",
@@ -9053,7 +9273,7 @@
           ]
         },
         "interpolation": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         },
         "output": {
           "format": "float",
@@ -9063,7 +9283,7 @@
           ]
         },
         "to_bits": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         }
       },
       "required": [
@@ -9090,7 +9310,7 @@
               "$ref": "#/$defs/BankEntryRange"
             },
             "curve_count": {
-              "$ref": "#/$defs/BankField"
+              "$ref": "#/$defs/BankField_uint16"
             },
             "layout": {
               "const": "decoded",
@@ -9124,7 +9344,7 @@
               "$ref": "#/$defs/BankEntryRange"
             },
             "curve_count": {
-              "$ref": "#/$defs/BankField"
+              "$ref": "#/$defs/BankField_uint16"
             },
             "layout": {
               "const": "malformed",
@@ -10757,7 +10977,7 @@
               "type": "string"
             },
             "property_count": {
-              "$ref": "#/$defs/BankField"
+              "$ref": "#/$defs/BankField_uint16"
             },
             "trailing_range": {
               "$ref": "#/$defs/BankEntryRange"
@@ -10821,13 +11041,13 @@
       "additionalProperties": false,
       "properties": {
         "accumulation": {
-          "$ref": "#/$defs/BankField3"
+          "$ref": "#/$defs/BankField_uint8"
         },
         "in_db": {
-          "$ref": "#/$defs/BankField3"
+          "$ref": "#/$defs/BankField_uint8"
         },
         "property_id": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         }
       },
       "required": [
@@ -10841,7 +11061,7 @@
       "additionalProperties": false,
       "properties": {
         "count": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         }
       },
       "required": [
@@ -10856,10 +11076,10 @@
           "$ref": "#/$defs/BankEntryRange"
         },
         "property_count": {
-          "$ref": "#/$defs/BankField"
+          "$ref": "#/$defs/BankField_uint16"
         },
         "state_id": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         }
       },
       "required": [
@@ -10873,13 +11093,13 @@
       "additionalProperties": false,
       "properties": {
         "group_id": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         },
         "state_count": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         },
         "synchronization": {
-          "$ref": "#/$defs/BankField3"
+          "$ref": "#/$defs/BankField_uint8"
         }
       },
       "required": [
@@ -11051,7 +11271,7 @@
       "additionalProperties": false,
       "properties": {
         "property_id": {
-          "$ref": "#/$defs/BankField"
+          "$ref": "#/$defs/BankField_uint16"
         },
         "value": {
           "format": "float",
@@ -11061,7 +11281,7 @@
           ]
         },
         "value_bits": {
-          "$ref": "#/$defs/BankField2"
+          "$ref": "#/$defs/BankField_uint32"
         }
       },
       "required": [
@@ -19550,6 +19770,492 @@
                   "indices": {
                     "maxItems": 4,
                     "minItems": 4
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-actor-mixer-rtpc"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/RtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-actor-mixer-rtpc"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-actor-mixer-rtpc-curve"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/RtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-actor-mixer-rtpc-curve"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-actor-mixer-rtpc-point"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/RtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-actor-mixer-rtpc-point"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 4,
+                    "minItems": 4
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-actor-mixer"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ActorMixerPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-actor-mixer"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-actor-mixer-child"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ActorMixerPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-actor-mixer-child"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
                   }
                 }
               }

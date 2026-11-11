@@ -132,6 +132,7 @@ impl From<&Range<u64>> for BankEntryRange {
 
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "BankField_{T}")]
 pub(crate) struct BankField<T> {
     value: T,
     range: BankEntryRange,

@@ -10,11 +10,67 @@ use crate::audio_bank_payload::{BankEntryRange, BankField};
 #[serde(tag = "record_type", content = "payload", deny_unknown_fields)]
 pub(crate) enum RtpcPayload<'row> {
     #[serde(rename = "bank-hirc-sound-rtpc")]
-    Summary(&'row RtpcRecord),
+    SoundSummary(&'row RtpcRecord),
     #[serde(rename = "bank-hirc-sound-rtpc-curve")]
-    Curve(&'row RtpcCurveRecord),
+    SoundCurve(&'row RtpcCurveRecord),
     #[serde(rename = "bank-hirc-sound-rtpc-point")]
-    Point(&'row RtpcPointRecord),
+    SoundPoint(&'row RtpcPointRecord),
+    #[serde(rename = "bank-hirc-actor-mixer-rtpc")]
+    ActorMixerSummary(&'row RtpcRecord),
+    #[serde(rename = "bank-hirc-actor-mixer-rtpc-curve")]
+    ActorMixerCurve(&'row RtpcCurveRecord),
+    #[serde(rename = "bank-hirc-actor-mixer-rtpc-point")]
+    ActorMixerPoint(&'row RtpcPointRecord),
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum RtpcOwner {
+    Sound,
+    ActorMixer,
+}
+
+impl RtpcOwner {
+    pub(crate) const fn summary_namespace(self) -> &'static str {
+        match self {
+            Self::Sound => "audio-bank-hirc-sound-rtpc",
+            Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc",
+        }
+    }
+
+    pub(crate) const fn curve_namespace(self) -> &'static str {
+        match self {
+            Self::Sound => "audio-bank-hirc-sound-rtpc-curve",
+            Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc-curve",
+        }
+    }
+
+    pub(crate) const fn point_namespace(self) -> &'static str {
+        match self {
+            Self::Sound => "audio-bank-hirc-sound-rtpc-point",
+            Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc-point",
+        }
+    }
+
+    pub(crate) const fn summary(self, value: &RtpcRecord) -> RtpcPayload<'_> {
+        match self {
+            Self::Sound => RtpcPayload::SoundSummary(value),
+            Self::ActorMixer => RtpcPayload::ActorMixerSummary(value),
+        }
+    }
+
+    pub(crate) const fn curve(self, value: &RtpcCurveRecord) -> RtpcPayload<'_> {
+        match self {
+            Self::Sound => RtpcPayload::SoundCurve(value),
+            Self::ActorMixer => RtpcPayload::ActorMixerCurve(value),
+        }
+    }
+
+    pub(crate) const fn point(self, value: &RtpcPointRecord) -> RtpcPayload<'_> {
+        match self {
+            Self::Sound => RtpcPayload::SoundPoint(value),
+            Self::ActorMixer => RtpcPayload::ActorMixerPoint(value),
+        }
+    }
 }
 
 #[derive(Serialize, JsonSchema)]

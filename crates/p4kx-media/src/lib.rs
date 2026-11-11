@@ -22,6 +22,8 @@ mod archive_tables_read;
 mod artifact;
 mod artifact_extension;
 mod artifact_placement;
+mod audio_bank_actor_mixer;
+mod audio_bank_actor_mixer_payload;
 mod audio_bank_didx_index;
 mod audio_bank_failure;
 mod audio_bank_hirc;

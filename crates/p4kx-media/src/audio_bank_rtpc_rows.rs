@@ -7,32 +7,38 @@ use p4kx_extraction::bank::{BankRtpcCurve, BankRtpcPoint, BankRtpcRow, BankRtpcR
 
 use crate::audio_bank_node_origins::NodeSites;
 use crate::audio_bank_projection::BankProjection;
-use crate::audio_bank_rtpc_payload::{RtpcCurveRecord, RtpcPayload, RtpcPointRecord};
+use crate::audio_bank_rtpc_payload::{RtpcCurveRecord, RtpcOwner, RtpcPointRecord};
 use crate::origin_input::MediaOriginInput;
 use crate::{MediaError, MediaWriter, Status, Subresource};
-
-pub(crate) const CURVE_NAMESPACE: &str = "audio-bank-hirc-sound-rtpc-curve";
-pub(crate) const POINT_NAMESPACE: &str = "audio-bank-hirc-sound-rtpc-point";
 
 pub(super) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,
     sites: &NodeSites,
+    owner: RtpcOwner,
     rows: BankRtpcRows<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     for row in rows {
         match row.map_err(|cause| projection.replay_failure(cause))? {
             BankRtpcRow::Curve { ordinal, fields } => {
-                emit_curve(projection.input, sites, ordinal, &fields, writer)?;
+                emit_curve(projection.input, sites, owner, ordinal, &fields, writer)?;
             }
             BankRtpcRow::Point {
                 curve,
                 ordinal,
                 fields,
             } => {
-                emit_point(projection.input, sites, curve, ordinal, &fields, writer)?;
+                emit_point(
+                    projection.input,
+                    sites,
+                    owner,
+                    curve,
+                    ordinal,
+                    &fields,
+                    writer,
+                )?;
             }
-            _ => return Err(MediaError::Contract("unexpected Sound RTPC row".into())),
+            _ => return Err(MediaError::Contract("unexpected node RTPC row".into())),
         }
     }
     Ok(())
@@ -41,6 +47,7 @@ pub(super) fn project<R: Read + Seek>(
 fn emit_curve(
     input: &MediaOriginInput,
     sites: &NodeSites,
+    owner: RtpcOwner,
     ordinal: u16,
     fields: &BankRtpcCurve,
     writer: &mut MediaWriter<'_>,
@@ -77,9 +84,12 @@ fn emit_curve(
     let [section, object] = sites.indices();
     prepared.finish().write(
         writer,
-        &Subresource::new(CURVE_NAMESPACE, vec![section, object, u64::from(ordinal)]),
+        &Subresource::new(
+            owner.curve_namespace(),
+            vec![section, object, u64::from(ordinal)],
+        ),
         Status::Complete,
-        &RtpcPayload::Curve(&record),
+        &owner.curve(&record),
         &[],
     )
 }
@@ -87,6 +97,7 @@ fn emit_curve(
 fn emit_point(
     input: &MediaOriginInput,
     sites: &NodeSites,
+    owner: RtpcOwner,
     curve: u16,
     ordinal: u16,
     fields: &BankRtpcPoint,
@@ -124,11 +135,11 @@ fn emit_point(
     prepared.finish().write(
         writer,
         &Subresource::new(
-            POINT_NAMESPACE,
+            owner.point_namespace(),
             vec![section, object, u64::from(curve), u64::from(ordinal)],
         ),
         Status::Complete,
-        &RtpcPayload::Point(&record),
+        &owner.point(&record),
         &[],
     )
 }

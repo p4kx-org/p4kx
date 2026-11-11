@@ -40,13 +40,18 @@ and fallback selection.
 | `audio-bank-hirc-sound-rtpc-point` | `bank-hirc-sound-rtpc-point` | HIRC section, Sound object, curve and point ordinals |
 | `audio-bank-hirc-state` | `bank-hirc-state` | HIRC section and standalone State object ordinals |
 | `audio-bank-hirc-state-property` | `bank-hirc-state-property` | HIRC section, State object and property ordinals |
-| `audio-bank-hirc-inline-state` | `bank-hirc-inline-state` | HIRC section and Sound object ordinals |
-| `audio-bank-hirc-inline-state-binding-count` | `bank-hirc-inline-state-binding-count` | HIRC section and Sound object ordinals |
-| `audio-bank-hirc-inline-state-binding` | `bank-hirc-inline-state-binding` | HIRC section, Sound object and binding ordinals |
-| `audio-bank-hirc-inline-state-group-count` | `bank-hirc-inline-state-group-count` | HIRC section and Sound object ordinals |
-| `audio-bank-hirc-inline-state-group` | `bank-hirc-inline-state-group` | HIRC section, Sound object and group ordinals |
-| `audio-bank-hirc-inline-state-entry` | `bank-hirc-inline-state-entry` | HIRC section, Sound object, group and State ordinals |
-| `audio-bank-hirc-inline-state-property` | `bank-hirc-inline-state-property` | HIRC section, Sound object, group, State and property ordinals |
+| `audio-bank-hirc-inline-state` | `bank-hirc-inline-state` | HIRC section and owning HIRC object ordinals |
+| `audio-bank-hirc-inline-state-binding-count` | `bank-hirc-inline-state-binding-count` | HIRC section and owning HIRC object ordinals |
+| `audio-bank-hirc-inline-state-binding` | `bank-hirc-inline-state-binding` | HIRC section, owning HIRC object and binding ordinals |
+| `audio-bank-hirc-inline-state-group-count` | `bank-hirc-inline-state-group-count` | HIRC section and owning HIRC object ordinals |
+| `audio-bank-hirc-inline-state-group` | `bank-hirc-inline-state-group` | HIRC section, owning HIRC object and group ordinals |
+| `audio-bank-hirc-inline-state-entry` | `bank-hirc-inline-state-entry` | HIRC section, owning HIRC object, group and State ordinals |
+| `audio-bank-hirc-inline-state-property` | `bank-hirc-inline-state-property` | HIRC section, owning HIRC object, group, State and property ordinals |
+| `audio-bank-hirc-actor-mixer` | `bank-hirc-actor-mixer` | HIRC section and ActorMixer object ordinals |
+| `audio-bank-hirc-actor-mixer-child` | `bank-hirc-actor-mixer-child` | HIRC section, ActorMixer object and child ordinals |
+| `audio-bank-hirc-actor-mixer-rtpc` | `bank-hirc-actor-mixer-rtpc` | HIRC section and ActorMixer object ordinals |
+| `audio-bank-hirc-actor-mixer-rtpc-curve` | `bank-hirc-actor-mixer-rtpc-curve` | HIRC section, ActorMixer object and curve ordinals |
+| `audio-bank-hirc-actor-mixer-rtpc-point` | `bank-hirc-actor-mixer-rtpc-point` | HIRC section, ActorMixer object, curve and point ordinals |
 | `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
 | `audio-bank-music-segment` | `bank-music-segment` | HIRC section and segment object ordinals |
@@ -192,15 +197,15 @@ interpretation is null for non-finite words. Repeated and unknown IDs retain the
 Other standalone versions report `unsupported` and retain the original body. A malformed
 supported bundle reports `malformed` in diagnostics.
 
-Version 154 Sound inline State reports a checked State region when present. Binding and group
+Version 154 Sound and ActorMixer inline State reports a checked region when present. Binding and group
 counts have their own original variable-length field ranges. Ordered rows preserve authored
 binding IDs and raw flags, group IDs and synchronization bytes, State IDs and property
 bundles. A Sound with no node reports `absent`. A malformed earlier region reports
 `unavailable`. A checked State region remains available in diagnostics if a following
 Sound field is malformed. The separate Sound and raw object rows retain their own
-coverage. Inline State outside this Sound layout remains outside these typed rows.
+coverage. These inline State layouts are qualified to version 154.
 
-The version 154 Sound RTPC summary reports the original curve count, the checked curve count
+The version 154 Sound and ActorMixer RTPC summaries report the original curve count, the checked curve count
 and the exact admitted range. Each curve row retains its IDs, original type, accumulation and
 scaling bytes, and its original point count. Point rows preserve the input and output
 binary32 words, their finite numeric interpretations and the original interpolation word.
@@ -208,7 +213,15 @@ Repeated curve IDs and unknown numeric codes retain their physical ordinals. An 
 zero count describes a present empty chunk. A Sound without a node reports `absent`.
 If the count is unreadable, the summary reports `unavailable`. If a later curve is malformed,
 diagnostics retain the declared count and every complete earlier curve and point.
-The RTPC cursor reads only version 154 Sound node bytes within the checked extent.
+RTPC cursors read only version 154 node bytes within the checked extent.
+
+ActorMixer rows retain the v154 shared node parent and original node prefix fields, declared
+child count, checked child count and exact bank-relative extents. Each child retains its
+source position and original ID, including repeats. A child count beyond the original body
+marks the ActorMixer malformed, while complete child words and earlier State and RTPC
+observations remain available. Unsupported bank versions retain the original bank and
+an explicit unsupported layout. Child IDs are authored references. Their receipts use the
+owning bank bytes and do not attribute target payloads to the original word.
 
 Container rows preserve the version 154 Random, Sequence, Switch and Blend layout, original
 parent ID and declared child count. The Random/Sequence row carries the original mode byte.

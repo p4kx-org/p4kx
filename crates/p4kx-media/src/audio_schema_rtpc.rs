@@ -3,9 +3,7 @@
 
 use serde_json::Value;
 
-use crate::audio_bank_rtpc::RTPC_NAMESPACE;
-use crate::audio_bank_rtpc_payload::RtpcPayload;
-use crate::audio_bank_rtpc_rows::{CURVE_NAMESPACE, POINT_NAMESPACE};
+use crate::audio_bank_rtpc_payload::{RtpcOwner, RtpcPayload};
 use crate::{MediaError, schema_merge};
 
 use super::{Binding, StatusRule};
@@ -20,26 +18,47 @@ pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
     )
 }
 
-pub(super) const fn bindings() -> [Binding; 3] {
+pub(super) const fn bindings() -> [Binding; 6] {
     [
         Binding::exact(
             RTPC_PAYLOAD,
-            RTPC_NAMESPACE,
+            RtpcOwner::Sound.summary_namespace(),
             "bank-hirc-sound-rtpc",
             2,
             StatusRule::MalformedLayout,
         ),
         Binding::exact(
             RTPC_PAYLOAD,
-            CURVE_NAMESPACE,
+            RtpcOwner::Sound.curve_namespace(),
             "bank-hirc-sound-rtpc-curve",
             3,
             StatusRule::Complete,
         ),
         Binding::exact(
             RTPC_PAYLOAD,
-            POINT_NAMESPACE,
+            RtpcOwner::Sound.point_namespace(),
             "bank-hirc-sound-rtpc-point",
+            4,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::ActorMixer.summary_namespace(),
+            "bank-hirc-actor-mixer-rtpc",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::ActorMixer.curve_namespace(),
+            "bank-hirc-actor-mixer-rtpc-curve",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::ActorMixer.point_namespace(),
+            "bank-hirc-actor-mixer-rtpc-point",
             4,
             StatusRule::Complete,
         ),

@@ -10,16 +10,15 @@ use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_node_origins::{NodeKind, NodeSites};
 use crate::audio_bank_origins::BankOrigins;
 use crate::audio_bank_projection::BankProjection;
-use crate::audio_bank_rtpc_payload::{RtpcPayload, RtpcRecord};
+use crate::audio_bank_rtpc_payload::{RtpcOwner, RtpcRecord};
 use crate::audio_bank_rtpc_rows;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
-
-pub(crate) const RTPC_NAMESPACE: &str = "audio-bank-hirc-sound-rtpc";
 
 pub(crate) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,
     version: VersionSite,
     original: &BankHircObject,
+    owner: RtpcOwner,
     read: BankRtpcRead<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
@@ -34,13 +33,13 @@ pub(crate) fn project<R: Read + Seek>(
     };
     prepared.finish().write(
         writer,
-        &Subresource::new(RTPC_NAMESPACE, sites.indices().to_vec()),
+        &Subresource::new(owner.summary_namespace(), sites.indices().to_vec()),
         status,
-        &RtpcPayload::Summary(&observed.record),
+        &owner.summary(&observed.record),
         observed.issue.as_slice(),
     )?;
     if let Some(rows) = observed.rows {
-        audio_bank_rtpc_rows::project(projection, &sites, rows, writer)?;
+        audio_bank_rtpc_rows::project(projection, &sites, owner, rows, writer)?;
     }
     Ok(())
 }
@@ -69,7 +68,7 @@ fn observe<'input, R>(
         }
         _ => {
             return Err(MediaError::Contract(
-                "unexpected Sound RTPC disposition".into(),
+                "unexpected node RTPC disposition".into(),
             ));
         }
     };
