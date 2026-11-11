@@ -83,12 +83,28 @@ impl<'f> Scan<'_, '_, 'f> {
                 ledger,
             )?;
             *components = read.rows;
-            let legacy_health = read.legacy_health;
-            entity.stats = item_stats::read_with_health(tree, self.forge, trees, || legacy_health)
+            entity.stats = self
+                .item_stats(tree, trees, read.legacy_health, ledger)?
                 .map(Box::new);
             entity.variant_key = item_variant::key(tree, entity.stats.as_deref());
         }
         Ok(picked.map(|picked| picked.crafted(tree)))
+    }
+
+    fn item_stats(
+        &self,
+        tree: &RecordTree<'f>,
+        trees: &mut TreeBuilder<'f>,
+        health: Option<f32>,
+        ledger: &mut ExportLedger,
+    ) -> Result<Option<crate::contract_stats::ItemStats<'f>>, CatalogError> {
+        item_stats::read_with_sources(
+            tree,
+            self.forge,
+            trees,
+            || health,
+            |record, _| self.ammo.dependency(record, ledger),
+        )
     }
 
     fn definition_kind(

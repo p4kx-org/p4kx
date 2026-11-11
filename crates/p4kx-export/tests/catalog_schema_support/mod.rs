@@ -73,6 +73,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "shops": {"status": "complete"},
             "shopInventories": {"status": "complete"},
             "explosionDefinitions": {"status": "complete"},
+            "ammoDefinitions": {"status": "complete"},
             "factionReputations": {"status": "complete"},
             "reputationScopes": {"status": "complete"},
             "reputationStandings": {"status": "complete"},
@@ -150,6 +151,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
             "tags": tags::definitions(),
             "explosionDefinitions": absent_table(),
+            "ammoDefinitions": absent_table(),
             "shopInventories": {"availability": "absent", "meaning": "offlineDesignTime", "rows": []}},
         "configurations": {
             "blueprintTiers": blueprints::tiers(),

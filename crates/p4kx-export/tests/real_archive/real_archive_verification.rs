@@ -202,12 +202,14 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
     if !list(&catalog, Kind::BlueprintCategoryLists)?.is_empty()
         || !list(&catalog, Kind::GameplayProperties)?.is_empty()
         || !list(&catalog, Kind::ExplosionDefinitions)?.is_empty()
+        || !list(&catalog, Kind::AmmoDefinitions)?.is_empty()
     {
         let entry = DataForgeEntry::read(&archive)?;
         let forge = entry.open()?;
         definition_identity::check_original_lists(&catalog, &forge)?;
         definition_identity::check_original_properties(&catalog, &forge)?;
         definition_identity::check_original_explosions(&catalog, &forge)?;
+        definition_identity::check_original_ammo(&catalog, &forge)?;
     }
     assert_eq!(
         summary.size_warning(),

@@ -27,8 +27,14 @@ mod authored_link;
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;
 
+#[path = "ammo_definition.rs"]
+pub(crate) mod ammo_definition;
+#[path = "authored_ammo_inputs.rs"]
+mod authored_ammo_inputs;
 #[path = "authored_effect_resource.rs"]
 mod authored_effect_resource;
+#[path = "authored_projectile.rs"]
+mod authored_projectile;
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
 #[path = "catalog_explosives.rs"]

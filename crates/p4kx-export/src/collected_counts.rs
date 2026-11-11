@@ -19,6 +19,7 @@ impl Collected<'_> {
             Kind::BlueprintCategories => self.blueprint_categories.len(),
             Kind::BlueprintCategoryLists => self.blueprint_category_lists.len(),
             Kind::ExplosionDefinitions => self.explosion_definitions.len(),
+            Kind::AmmoDefinitions => self.ammo_definitions.len(),
             Kind::GameplayProperties => self.gameplay_properties.len(),
             Kind::QualityDistributions => self.quality.distributions.len(),
             Kind::QualityQuantizations => self.quality.quantizations.len(),

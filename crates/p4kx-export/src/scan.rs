@@ -35,6 +35,8 @@ const RESOURCE_TYPE: &str = "ResourceType";
 const CRAFTER_FIELD: &str = "Components";
 const CRAFTER_STRUCT: &str = "CrafterComponentParams";
 
+#[path = "scan_ammo.rs"]
+mod ammo;
 #[path = "scan_groups.rs"]
 mod groups;
 #[path = "scan_projection.rs"]
@@ -55,6 +57,7 @@ fn selects_group(record: &Record<'_>, filter: Option<&Filter>) -> bool {
 pub(crate) struct Scan<'o, 'a, 'f> {
     forge: &'f DataForge<'f>,
     ships: ShipPool<'f>,
+    ammo: ammo::AmmoReads<'a, 'f, 'f>,
     options: &'o CatalogOptions<'a>,
     texts: &'o Texts<'f>,
     projection: &'f CatalogProjection<'f, 'f>,
@@ -101,6 +104,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         let scan = Self {
             forge,
             ships: ShipPool::new(entities, files),
+            ammo: ammo::AmmoReads::new(projection.original(), options.filter, options.cancel),
             options,
             texts: projection.legacy_texts(),
             projection,
@@ -296,6 +300,23 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         };
         trace.selected(kind);
         capture.activate(kind)?;
+        self.project_selected(kind, trees, record, trace, ledger, entity_tags)
+    }
+
+    fn project_selected(
+        &self,
+        kind: Kind,
+        trees: &mut TreeBuilder<'f>,
+        record: &Record<'f>,
+        trace: &mut SourceTrace,
+        ledger: &mut ExportLedger,
+        entity_tags: &mut Option<crate::catalog_v3::tag_catalog::EntityTags<'f>>,
+    ) -> Result<Option<Picked<'f>>, ScanError> {
+        if kind == Kind::AmmoDefinitions {
+            let definition = self.ammo.selected(record, ledger)?;
+            trace.projecting();
+            return Ok(Some(Picked::AmmoDefinition(Box::new(definition))));
+        }
         let admission = RecordObservation::capture(self.projection.original(), record)?;
         let tree = trees.build(record)?;
         trace.projecting();

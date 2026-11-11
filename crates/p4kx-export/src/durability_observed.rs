@@ -19,6 +19,8 @@ use crate::{CatalogError, ExportAccountingError};
 mod links;
 #[path = "authored_owned_fields.rs"]
 mod owned_fields;
+#[path = "authored_unsigned_fields.rs"]
+mod unsigned;
 
 type Fact<'scope, 'read, 'source> = OriginalValueFact<'scope, 'read, 'source>;
 

@@ -10,6 +10,8 @@ impl Collected<'_> {
         self.order_failures();
         self.explosion_definitions
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
+        self.ammo_definitions
+            .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         sort_by_guid(&mut self.manufacturers, |entity| entity.guid);
         sort_by_guid(&mut self.items, |entity| entity.guid);
         sort_by_guid(&mut self.ships, |entity| entity.guid);

@@ -6,6 +6,7 @@ use p4kx_extraction::{Guid, RecordTree};
 use crate::Kind;
 use crate::blueprint_category::BlueprintCategory;
 use crate::catalog_read_failure::CatalogReadFailure;
+use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::contract::{
@@ -54,6 +55,7 @@ pub(crate) enum Picked<'f> {
     BlueprintCategoryList(PreparedBlueprintCategoryList<'f>),
     /// One original explosion definition.
     ExplosionDefinition(Box<PreparedExplosionDefinition<'f>>),
+    AmmoDefinition(Box<PreparedAmmoDefinition<'f>>),
     /// A starmap object.
     Starmap(StarmapObject<'f>),
     /// A mineable element.
@@ -126,6 +128,7 @@ impl<'f> Picked<'f> {
             | Kind::BlueprintCategories
             | Kind::BlueprintCategoryLists
             | Kind::ExplosionDefinitions
+            | Kind::AmmoDefinitions
             | Kind::GameplayProperties
             | Kind::QualityDistributions
             | Kind::QualityQuantizations

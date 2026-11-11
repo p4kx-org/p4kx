@@ -41,6 +41,7 @@ pub(crate) fn named_rows<'catalog>(
         Kind::ExplosionDefinitions => {
             checked_table(catalog, kind, "/definitions/explosionDefinitions")
         }
+        Kind::AmmoDefinitions => checked_table(catalog, kind, "/definitions/ammoDefinitions"),
         Kind::Contracts => checked_table(catalog, kind, "/projections/contracts"),
         Kind::ContractTemplates => checked_table(catalog, kind, "/definitions/contractTemplates"),
         Kind::MissionBrokerEntries => {
@@ -86,6 +87,7 @@ fn checked_table<'catalog>(
                 | Kind::BlueprintCategories
                 | Kind::BlueprintCategoryLists
                 | Kind::ExplosionDefinitions
+                | Kind::AmmoDefinitions
                 | Kind::GameplayProperties
                 | Kind::LootPoolFilters
         ) {
@@ -186,6 +188,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::BlueprintCategories
             | Kind::BlueprintCategoryLists
             | Kind::ExplosionDefinitions
+            | Kind::AmmoDefinitions
             | Kind::GameplayProperties
             | Kind::Manufacturers
             | Kind::Commodities

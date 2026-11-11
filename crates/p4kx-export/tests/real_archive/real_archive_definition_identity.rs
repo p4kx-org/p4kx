@@ -32,6 +32,7 @@ pub(super) fn check(catalog: &Value, kind: Kind) -> TestResult {
             Kind::BlueprintCategoryLists => source_type == "BlueprintCategoryDatabaseRecord",
             Kind::GameplayProperties => source_type == "CraftingGameplayPropertyDef",
             Kind::ExplosionDefinitions => source_type == "ExplosionRecord",
+            Kind::AmmoDefinitions => source_type == "AmmoParams",
             Kind::QualityQuantizations => source_type == "CraftingQualityQuantizationRecord",
             _ => false,
         };
@@ -61,11 +62,16 @@ pub(super) fn check_original_explosions(catalog: &Value, forge: &DataForge<'_>) 
     check_original(catalog, forge, Kind::ExplosionDefinitions)
 }
 
+pub(super) fn check_original_ammo(catalog: &Value, forge: &DataForge<'_>) -> TestResult {
+    check_original(catalog, forge, Kind::AmmoDefinitions)
+}
+
 fn check_original(catalog: &Value, forge: &DataForge<'_>, kind: Kind) -> TestResult {
     let expected_type = match kind {
         Kind::BlueprintCategoryLists => "BlueprintCategoryDatabaseRecord",
         Kind::GameplayProperties => "CraftingGameplayPropertyDef",
         Kind::ExplosionDefinitions => "ExplosionRecord",
+        Kind::AmmoDefinitions => "AmmoParams",
         _ => {
             return Err(
                 "original metadata check requires a declared physical source family".into(),

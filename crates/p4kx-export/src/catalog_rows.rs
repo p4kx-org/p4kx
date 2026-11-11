@@ -31,14 +31,7 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
             .map(|row| (row.source.physical.guid, row.source.physical.record_path)),
     );
     append_resources(&mut emitted, collected);
-    append(
-        &mut emitted,
-        Kind::ExplosionDefinitions,
-        collected
-            .explosion_definitions
-            .iter()
-            .map(|row| (row.physical_guid, row.physical_path)),
-    );
+    append_explosions_and_ammo(&mut emitted, collected);
     append(
         &mut emitted,
         Kind::Blueprints,
@@ -64,6 +57,25 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
         template_numbers: template_numbers(collected),
         recovery_numbers: Vec::new(),
     }
+}
+
+fn append_explosions_and_ammo(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
+    append(
+        emitted,
+        Kind::ExplosionDefinitions,
+        collected
+            .explosion_definitions
+            .iter()
+            .map(|row| (row.physical_guid, row.physical_path)),
+    );
+    append(
+        emitted,
+        Kind::AmmoDefinitions,
+        collected
+            .ammo_definitions
+            .iter()
+            .map(|row| (row.physical_guid, row.physical_path)),
+    );
 }
 
 fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
@@ -212,6 +224,12 @@ fn definition_number_groups<'rows>(
                 .explosion_definitions
                 .iter()
                 .map(|row| (Kind::ExplosionDefinitions, row.numbers.as_slice())),
+        )
+        .chain(
+            collected
+                .ammo_definitions
+                .iter()
+                .map(|row| (Kind::AmmoDefinitions, row.numbers.as_slice())),
         )
         .chain(
             collected

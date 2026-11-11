@@ -17,6 +17,7 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::ammo_definition;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
 use crate::mission_data::link_scenario_factions;
@@ -237,6 +238,7 @@ fn assemble<R>(
                 &forge,
                 collected.explosion_definitions,
             ),
+            ammo_definitions: ammo_definition::table(&forge, collected.ammo_definitions),
             contract_generators: CatalogTable::new(
                 &forge,
                 &["ContractGenerator"],

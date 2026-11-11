@@ -12,6 +12,7 @@ use crate::broker_entry::BrokerProjection;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
+use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::catalog_v3::catalog_item_components::ItemComponentRows;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
@@ -75,6 +76,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'f>>,
     pub(crate) blueprint_category_lists: Vec<PreparedBlueprintCategoryList<'f>>,
     pub(crate) explosion_definitions: Vec<PreparedExplosionDefinition<'f>>,
+    pub(crate) ammo_definitions: Vec<PreparedAmmoDefinition<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayPropertyDefinition<'f>>,
     pub(crate) quality: QualityRows<'f>,
     pub(crate) blueprint_pools: Vec<BlueprintPool<'f>>,
@@ -148,6 +150,10 @@ impl<'f> Collected<'f> {
         collected
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one initializer per collected dataset"
+    )]
     fn from_crafting(crafting: CraftingKinds<'f>) -> Self {
         Self {
             skipped: Self::crafting_skipped(&crafting),
@@ -166,6 +172,7 @@ impl<'f> Collected<'f> {
             blueprint_categories: Vec::new(),
             blueprint_category_lists: Vec::new(),
             explosion_definitions: Vec::new(),
+            ammo_definitions: Vec::new(),
             gameplay_properties: crafting.properties,
             quality: crafting.quality,
             blueprint_pools: crafting.pools,
@@ -211,8 +218,7 @@ impl<'f> Collected<'f> {
         }
     }
 
-    /// Files `pick` under its kind; the GUIDs of the skipped blueprint categories go to
-    /// `missing_categories`.
+    /// Collects a selected Record or records its skipped category GUID.
     fn take(&mut self, pick: Picked<'f>, missing_categories: &mut HashSet<Guid>) {
         match pick {
             Picked::Manufacturer(entity) => self.manufacturers.push(*entity),
@@ -245,6 +251,7 @@ impl<'f> Collected<'f> {
             Picked::BlueprintCategory(entity) => self.blueprint_categories.push(entity),
             Picked::BlueprintCategoryList(entity) => self.blueprint_category_lists.push(entity),
             Picked::ExplosionDefinition(entity) => self.explosion_definitions.push(*entity),
+            Picked::AmmoDefinition(entity) => self.ammo_definitions.push(*entity),
             Picked::Starmap(entity) => self.starmap_objects.push(entity),
             Picked::Mineable(entity) => self.mineable_elements.push(entity),
             Picked::Refining(entity) => self.refining_processes.push(entity),

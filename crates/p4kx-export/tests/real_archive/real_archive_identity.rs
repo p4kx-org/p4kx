@@ -28,6 +28,7 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
             Kind::BlueprintCategories
                 | Kind::GameplayProperties
                 | Kind::ExplosionDefinitions
+                | Kind::AmmoDefinitions
                 | Kind::QualityDistributions
                 | Kind::QualityQuantizations
         ) {

@@ -18,6 +18,8 @@ use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "catalog_ammo_definitions.rs"]
+mod ammo_definitions;
 #[path = "catalog_item_ammo_source.rs"]
 mod ammo_source;
 #[path = "catalog_durability.rs"]

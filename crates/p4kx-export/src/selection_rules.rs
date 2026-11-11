@@ -9,6 +9,10 @@ impl Kind {
     #[expect(clippy::too_many_lines, reason = "a table with one entry per kind")]
     pub(crate) const fn records(self) -> KindRule {
         match self {
+            Self::AmmoDefinitions => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::ammo_definition::SOURCE_TYPE,
+            },
             Self::ExplosionDefinitions => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::explosion_definition::SOURCE_TYPE,

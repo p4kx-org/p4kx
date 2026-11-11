@@ -64,6 +64,7 @@ pub(crate) struct EmittedNumber {
 struct RecordNumbers<'source> {
     named: BTreeMap<&'source str, &'source CapturedNumber>,
     original: BTreeMap<u64, &'source CapturedNumber>,
+    ammo_definition: bool,
 }
 
 /// Original numeric receipts indexed once by their admitted emitted physical Record.
@@ -73,59 +74,72 @@ pub(crate) struct NumberCaptures<'source> {
     recovery: BTreeMap<u32, BTreeMap<&'source str, &'source CapturedNumber>>,
 }
 
-impl<'source> NumberCaptures<'source> {
-    pub(crate) fn new(rows: Option<&'source CatalogRows>, targets: Option<&TargetIndex>) -> Self {
-        let mut records = BTreeMap::<u32, RecordNumbers<'source>>::new();
-        if let (Some(rows), Some(targets)) = (rows, targets) {
-            for number in &rows.numbers {
-                let actual = &number.value;
-                // Item component receipts come from the emitted component rows.
-                let emitted = match actual.occurrence {
-                    NumberOccurrence::ItemComponentValue { .. } => number.kind == Kind::Items,
-                    _ => targets
-                        .emitted
-                        .contains(&(number.kind, actual.record_index)),
-                };
-                if !emitted {
-                    continue;
+fn emitted_record_numbers<'source>(
+    sources: Option<(&'source CatalogRows, &TargetIndex)>,
+) -> BTreeMap<u32, RecordNumbers<'source>> {
+    let mut records = BTreeMap::<u32, RecordNumbers<'source>>::new();
+    if let Some((rows, targets)) = sources {
+        for number in &rows.numbers {
+            let actual = &number.value;
+            // Item component receipts come from the emitted component rows.
+            let emitted = match actual.occurrence {
+                NumberOccurrence::ItemComponentValue { .. } => number.kind == Kind::Items,
+                _ => targets
+                    .emitted
+                    .contains(&(number.kind, actual.record_index)),
+            };
+            if !emitted {
+                continue;
+            }
+            if number.kind == Kind::AmmoDefinitions {
+                records
+                    .entry(actual.record_index)
+                    .or_default()
+                    .ammo_definition = true;
+            }
+            if matches!(actual.occurrence, NumberOccurrence::TemplateValue { .. }) {
+                continue;
+            }
+            if matches!(actual.occurrence, NumberOccurrence::LootValue { .. })
+                && number.kind != Kind::LootPoolFilters
+            {
+                continue;
+            }
+            match actual.occurrence {
+                NumberOccurrence::NamedField => {
+                    records
+                        .entry(actual.record_index)
+                        .or_default()
+                        .named
+                        .entry(actual.field.as_str())
+                        .or_insert(actual);
                 }
-                if matches!(actual.occurrence, NumberOccurrence::TemplateValue { .. }) {
-                    continue;
-                }
-                if matches!(actual.occurrence, NumberOccurrence::LootValue { .. })
-                    && number.kind != Kind::LootPoolFilters
-                {
-                    continue;
-                }
-                match actual.occurrence {
-                    NumberOccurrence::NamedField => {
-                        records
-                            .entry(actual.record_index)
-                            .or_default()
-                            .named
-                            .entry(actual.field.as_str())
-                            .or_insert(actual);
+                NumberOccurrence::TemplateValue { .. } => {}
+                NumberOccurrence::LootValue { ordinal }
+                | NumberOccurrence::BlueprintValue { ordinal }
+                | NumberOccurrence::ItemComponentValue { ordinal }
+                | NumberOccurrence::AuthoredDefinitionValue { ordinal } => {
+                    if matches!(actual.occurrence, NumberOccurrence::BlueprintValue { .. })
+                        && number.kind != Kind::Blueprints
+                    {
+                        continue;
                     }
-                    NumberOccurrence::TemplateValue { .. } => {}
-                    NumberOccurrence::LootValue { ordinal }
-                    | NumberOccurrence::BlueprintValue { ordinal }
-                    | NumberOccurrence::ItemComponentValue { ordinal }
-                    | NumberOccurrence::AuthoredDefinitionValue { ordinal } => {
-                        if matches!(actual.occurrence, NumberOccurrence::BlueprintValue { .. })
-                            && number.kind != Kind::Blueprints
-                        {
-                            continue;
-                        }
-                        records
-                            .entry(actual.record_index)
-                            .or_default()
-                            .original
-                            .entry(ordinal)
-                            .or_insert(actual);
-                    }
+                    records
+                        .entry(actual.record_index)
+                        .or_default()
+                        .original
+                        .entry(ordinal)
+                        .or_insert(actual);
                 }
             }
         }
+    }
+    records
+}
+
+impl<'source> NumberCaptures<'source> {
+    pub(crate) fn new(rows: Option<&'source CatalogRows>, targets: Option<&TargetIndex>) -> Self {
+        let records = emitted_record_numbers(rows.zip(targets));
         Self {
             records,
             templates: rows
@@ -142,6 +156,14 @@ impl<'source> NumberCaptures<'source> {
         source: &SourceObservation,
     ) -> Result<Coverage<'_, 'source>, ExportAccountingError> {
         let mut coverage = self.for_record(source.record_index, source.kind);
+        if source.kind == Some(Kind::Items)
+            && source.role == ExportSourceRole::Dependency
+            && coverage
+                .available
+                .is_some_and(|numbers| numbers.ammo_definition)
+        {
+            coverage.kind = Some(Kind::AmmoDefinitions);
+        }
         if source.kind.is_none()
             && source.role == ExportSourceRole::Dependency
             && source.disposition == SourceDisposition::Projected
@@ -245,7 +267,11 @@ impl Coverage<'_, '_> {
         if matches!(
             self.kind,
             Some(
-                Kind::LootPoolFilters | Kind::Blueprints | Kind::Items | Kind::ExplosionDefinitions
+                Kind::LootPoolFilters
+                    | Kind::Blueprints
+                    | Kind::Items
+                    | Kind::ExplosionDefinitions
+                    | Kind::AmmoDefinitions
             )
         ) {
             return self.owned(required);
@@ -285,7 +311,7 @@ impl Coverage<'_, '_> {
                 NumberOccurrence::ItemComponentValue { ordinal },
                 ResourceNumberContract::Single,
             ),
-            Some(Kind::ExplosionDefinitions) => (
+            Some(Kind::ExplosionDefinitions | Kind::AmmoDefinitions) => (
                 NumberOccurrence::AuthoredDefinitionValue { ordinal },
                 ResourceNumberContract::Single,
             ),

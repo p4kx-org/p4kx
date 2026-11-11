@@ -140,6 +140,7 @@ fn origins<'source>(
                 | Kind::Blueprints
                 | Kind::LootPoolFilters
                 | Kind::ExplosionDefinitions
+                | Kind::AmmoDefinitions
                 | Kind::Tags
                 | Kind::Commodities
                 | Kind::ResourceTypes

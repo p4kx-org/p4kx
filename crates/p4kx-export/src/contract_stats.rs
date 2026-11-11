@@ -175,7 +175,7 @@ pub(crate) struct Spread {
 }
 
 /// The ammunition of a weapon.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct AmmoStats {
@@ -194,7 +194,7 @@ pub(crate) struct AmmoStats {
 }
 
 /// Damage by type, as the Archive states it.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct Damage {

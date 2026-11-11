@@ -69,6 +69,7 @@ fn expected_completeness() -> Value {
         "shops": {"status": "complete"},
         "shopInventories": {"status": "complete"},
         "explosionDefinitions": {"status": "complete"},
+        "ammoDefinitions": {"status": "complete"},
         "factionReputations": {"status": "complete"},
         "reputationScopes": {"status": "complete"},
         "reputationStandings": {"status": "complete"},

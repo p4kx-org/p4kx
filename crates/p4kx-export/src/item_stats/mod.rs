@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, RecordTree, TreeBuilder};
+use std::convert::Infallible;
+
+use p4kx_extraction::{DataForge, Record, RecordTree, TreeBuilder};
 
 use crate::catalog_v3::catalog_durability;
-use crate::contract_stats::ItemStats;
+use crate::contract_stats::{AmmoStats, ItemStats};
 use crate::record_fields::{component, structure, text};
 
 mod gear;
@@ -13,6 +15,8 @@ mod parts;
 mod resources;
 mod walk;
 mod weapon;
+
+pub(crate) use weapon::ammo;
 
 const POWER_PLANT: &str = "PowerPlant";
 const COOLER: &str = "Cooler";
@@ -29,21 +33,27 @@ pub(crate) fn read<'f>(
     forge: &'f DataForge<'f>,
     trees: &mut TreeBuilder<'f>,
 ) -> Option<ItemStats<'f>> {
-    read_with_health(tree, forge, trees, || {
-        catalog_durability::legacy_health(tree)
-    })
+    read_with_sources(
+        tree,
+        forge,
+        trees,
+        || catalog_durability::legacy_health(tree),
+        |record, trees| Ok::<_, Infallible>(trees.build(record).ok().map(|tree| ammo(&tree))),
+    )
+    .unwrap_or_else(|error| match error {})
 }
 
-pub(crate) fn read_with_health<'f>(
+pub(crate) fn read_with_sources<'f, E>(
     tree: &RecordTree<'f>,
     forge: &'f DataForge<'f>,
     trees: &mut TreeBuilder<'f>,
     health: impl FnOnce() -> Option<f32>,
-) -> Option<ItemStats<'f>> {
+    ammunition: impl FnOnce(&Record<'f>, &mut TreeBuilder<'f>) -> Result<Option<AmmoStats>, E>,
+) -> Result<Option<ItemStats<'f>>, E> {
     let attach = structure(component(tree, "SAttachableComponentParams"), "AttachDef");
     let kind = text(attach, "Type");
     let is = |name: &str| kind.is_some_and(|kind| kind.eq_ignore_ascii_case(name));
-    let weapon = weapon::weapon(tree, forge, trees);
+    let weapon = weapon::weapon(tree, forge, trees, ammunition)?;
     let shield = parts::shield(tree);
     let quantum_drive = parts::quantum_drive(tree);
     let resource_states = resources::states(tree);
@@ -71,9 +81,9 @@ pub(crate) fn read_with_health<'f>(
         && mining_laser.is_none()
         && mining_modifier.is_none()
     {
-        return None;
+        return Ok(None);
     }
-    Some(ItemStats {
+    Ok(Some(ItemStats {
         weapon,
         shield,
         quantum_drive,
@@ -89,5 +99,5 @@ pub(crate) fn read_with_health<'f>(
         mining_modifier,
         health: health(),
         resource_states,
-    })
+    }))
 }

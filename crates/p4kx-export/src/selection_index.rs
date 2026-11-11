@@ -60,6 +60,7 @@ impl Kind {
             Self::BlueprintCategoryLists => 50,
             Self::ShopInventories => 51,
             Self::ExplosionDefinitions => 52,
+            Self::AmmoDefinitions => 53,
         }
     }
 }

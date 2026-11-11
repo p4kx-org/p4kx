@@ -166,11 +166,13 @@ pub enum Kind {
     ShopInventories,
     /// Reusable physical `ExplosionRecord` definitions.
     ExplosionDefinitions,
+    /// Physical ammunition configurations.
+    AmmoDefinitions,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 53] = [
+    pub const ALL: [Self; 54] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -224,6 +226,7 @@ impl Kind {
         Self::BlueprintCategoryLists,
         Self::ShopInventories,
         Self::ExplosionDefinitions,
+        Self::AmmoDefinitions,
     ];
 
     /// Returns the stable kind identifier, independently of its canonical dataset path.
@@ -283,6 +286,7 @@ impl Kind {
             Self::BlueprintCategoryLists => "blueprintCategoryLists",
             Self::ShopInventories => "shopInventories",
             Self::ExplosionDefinitions => "explosionDefinitions",
+            Self::AmmoDefinitions => "ammoDefinitions",
         }
     }
 }

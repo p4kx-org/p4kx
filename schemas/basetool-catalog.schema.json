@@ -260,6 +260,30 @@
       ],
       "required": []
     },
+    "AdditionalProjectiles": {
+      "description": "An original additional-projectile definition link and launch inputs.",
+      "properties": {
+        "ammoRecord": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "amount": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "lifetimeRange": {
+          "$ref": "#/$defs/SourcedValueOfProjectileRange"
+        },
+        "spreadDegrees": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "ammoRecord",
+        "amount",
+        "lifetimeRange",
+        "spreadDegrees"
+      ],
+      "type": "object"
+    },
     "AiName": {
       "description": "The name an NPC gets (`MissionPropertyValue_AIName`): drawn at random or given.",
       "properties": {
@@ -328,6 +352,454 @@
         "randomLastName",
         "randomName",
         "randomNickName"
+      ],
+      "type": "object"
+    },
+    "AmmoBreakablePhysics": {
+      "description": "Original breakable physics parameters.",
+      "properties": {
+        "crackWeaken": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxBendTorque": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxPullForce": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxPushForce": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxShiftForce": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxSimultaneousCracks": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "maxTwistTorque": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "crackWeaken",
+        "maxBendTorque",
+        "maxPullForce",
+        "maxPushForce",
+        "maxShiftForce",
+        "maxSimultaneousCracks",
+        "maxTwistTorque"
+      ],
+      "type": "object"
+    },
+    "AmmoCollisionClass": {
+      "description": "Original collision classification and ignored class.",
+      "properties": {
+        "gameCollisionClass": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "gameIgnoreCollisionClass": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "gameCollisionClass",
+        "gameIgnoreCollisionClass"
+      ],
+      "type": "object"
+    },
+    "AmmoConversion": {
+      "description": "The authored conversion variant and its original quantity.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "standardCargoUnits": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "type": {
+              "const": "standard",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "standardCargoUnits"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "centiScu": {
+              "$ref": "#/$defs/SourcedValueOfint32"
+            },
+            "type": {
+              "const": "centi",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "centiScu"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "microScu": {
+              "$ref": "#/$defs/SourcedValueOfint32"
+            },
+            "type": {
+              "const": "micro",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "microScu"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "AmmoDefinition": {
+      "description": "One physical ammunition definition and its original configuration.",
+      "properties": {
+        "ammoCategory": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "bulletType": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "conversionRate": {
+          "$ref": "#/$defs/SourcedValueOfAmmoConversion"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "hitPoints": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "impactAiStimulusDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "impulseScale": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "inheritVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "lifetime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "noBulletHits": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "physicsControllerParams": {
+          "$ref": "#/$defs/SourcedValueOfAmmoPhysics"
+        },
+        "projectileLoopStart": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        },
+        "projectileLoopStop": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        },
+        "projectileParams": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredProjectile"
+        },
+        "quietRemoval": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "resourceType": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "ricochetSound": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        },
+        "shotsPerAudioLoop": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "showtime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "size": {
+          "$ref": "#/$defs/SourcedValueOfuint8"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "spawnType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "speed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "trailParticles": {
+          "$ref": "#/$defs/SourcedValueOfParticleResource"
+        },
+        "uiIconType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "useInConvergence": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "whizSound": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        },
+        "whizSoundDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "ammoCategory",
+        "bulletType",
+        "className",
+        "conversionRate",
+        "fileName",
+        "guid",
+        "hitPoints",
+        "impactAiStimulusDistance",
+        "impulseScale",
+        "inheritVelocity",
+        "lifetime",
+        "metadataTag",
+        "noBulletHits",
+        "physicsControllerParams",
+        "projectileLoopStart",
+        "projectileLoopStop",
+        "projectileParams",
+        "quietRemoval",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "resourceType",
+        "ricochetSound",
+        "shotsPerAudioLoop",
+        "showtime",
+        "size",
+        "sourceType",
+        "spawnType",
+        "speed",
+        "trailParticles",
+        "uiIconType",
+        "useInConvergence",
+        "whizSound",
+        "whizSoundDistance"
+      ],
+      "type": "object"
+    },
+    "AmmoParticlePhysics": {
+      "description": "Original particle dimensions, movement controls and collision inputs.",
+      "properties": {
+        "accThrust": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "aiNavigationType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "airResistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "constantOrientation": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "decoupleHeading": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "disableGravity": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "length": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "noImpulse": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "noPathAlignment": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "noRoll": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "noSelfCollision": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "noSpin": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "pierceability": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "radius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "rayCollision": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "resourceType": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "singleContact": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "surfaceIdName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "thickness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "traceable": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "accThrust",
+        "aiNavigationType",
+        "airResistance",
+        "constantOrientation",
+        "decoupleHeading",
+        "disableGravity",
+        "length",
+        "noImpulse",
+        "noPathAlignment",
+        "noRoll",
+        "noSelfCollision",
+        "noSpin",
+        "pierceability",
+        "radius",
+        "rayCollision",
+        "resourceType",
+        "singleContact",
+        "surfaceIdName",
+        "thickness",
+        "traceable"
+      ],
+      "type": "object"
+    },
+    "AmmoPenetration": {
+      "description": "Original penetration distance and radii.",
+      "properties": {
+        "basePenetrationDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "farRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "nearRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "basePenetrationDistance",
+        "farRadius",
+        "nearRadius"
+      ],
+      "type": "object"
+    },
+    "AmmoPhysics": {
+      "description": "The original physics controller wrapper and its owned `PhysType`.",
+      "properties": {
+        "physType": {
+          "$ref": "#/$defs/SourcedValueOfAmmoPhysicsType"
+        }
+      },
+      "required": [
+        "physType"
+      ],
+      "type": "object"
+    },
+    "AmmoPhysicsKind": {
+      "description": "The actual recognized physics controller subtype.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "particle",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/AmmoParticlePhysics"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "AmmoPhysicsType": {
+      "description": "Shared physics fields and the concrete controller branch.",
+      "properties": {
+        "breakableParams": {
+          "$ref": "#/$defs/SourcedValueOfAmmoBreakablePhysics"
+        },
+        "compoundingAllowed": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "gameCollisionClass": {
+          "$ref": "#/$defs/SourcedValueOfAmmoCollisionClass"
+        },
+        "kind": {
+          "$ref": "#/$defs/AmmoPhysicsKind"
+        },
+        "mass": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "spawnBoxScale": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "breakableParams",
+        "compoundingAllowed",
+        "gameCollisionClass",
+        "kind",
+        "mass",
+        "spawnBoxScale"
       ],
       "type": "object"
     },
@@ -692,6 +1164,26 @@
         }
       ],
       "required": []
+    },
+    "AuthoredProjectile": {
+      "description": "One original projectile occurrence with inherited configuration and a concrete branch.",
+      "properties": {
+        "detonationParams": {
+          "$ref": "#/$defs/SourcedValueOfProjectileDetonation"
+        },
+        "kind": {
+          "$ref": "#/$defs/ProjectileKind"
+        },
+        "proximityTriggerParams": {
+          "$ref": "#/$defs/SourcedValueOfProjectileProximity"
+        }
+      },
+      "required": [
+        "detonationParams",
+        "kind",
+        "proximityTriggerParams"
+      ],
+      "type": "object"
     },
     "AutoSpawnSettings": {
       "description": "The `AutoSpawnSettings` of an NPC option: how many NPCs spawn, where and with what.",
@@ -1945,6 +2437,158 @@
       ],
       "type": "object"
     },
+    "BulletDamageDrop": {
+      "description": "Three independently authored damage alternatives for falloff.",
+      "properties": {
+        "damageDropMinDamage": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredDamage"
+        },
+        "damageDropMinDistance": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredDamage"
+        },
+        "damageDropPerMeter": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredDamage"
+        }
+      },
+      "required": [
+        "damageDropMinDamage",
+        "damageDropMinDistance",
+        "damageDropPerMeter"
+      ],
+      "type": "object"
+    },
+    "BulletElectron": {
+      "description": "Original electron jump inputs.",
+      "properties": {
+        "jumpRange": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maximumJumps": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "residualChargeMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "jumpRange",
+        "maximumJumps",
+        "residualChargeMultiplier"
+      ],
+      "type": "object"
+    },
+    "BulletImpulseFalloff": {
+      "description": "Original impulse falloff inputs.",
+      "properties": {
+        "dropFalloff": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxFalloff": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "dropFalloff",
+        "maxFalloff",
+        "minDistance"
+      ],
+      "type": "object"
+    },
+    "BulletPierceability": {
+      "description": "Original pierceability falloff levels and thickness.",
+      "properties": {
+        "damageFalloffLevel1": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "damageFalloffLevel2": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "damageFalloffLevel3": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxPenetrationThickness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "damageFalloffLevel1",
+        "damageFalloffLevel2",
+        "damageFalloffLevel3",
+        "maxPenetrationThickness"
+      ],
+      "type": "object"
+    },
+    "BulletProjectile": {
+      "description": "Authored Bullet damage and gameplay behavior.",
+      "properties": {
+        "additionalProjectilesParams": {
+          "$ref": "#/$defs/SourcedValueOfAdditionalProjectiles"
+        },
+        "alternateVisualParams": {
+          "$ref": "#/$defs/SourcedValueOfProjectileVisual"
+        },
+        "damage": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredDamage"
+        },
+        "damageDropParams": {
+          "$ref": "#/$defs/SourcedValueOfBulletDamageDrop"
+        },
+        "electronParams": {
+          "$ref": "#/$defs/SourcedValueOfBulletElectron"
+        },
+        "hitBehaviors": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfProjectileHitBehavior"
+        },
+        "hitType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "ignitionChanceOverride": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "impactRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "impulseFalloffParams": {
+          "$ref": "#/$defs/SourcedValueOfBulletImpulseFalloff"
+        },
+        "keepAliveOnZeroDamage": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "minImpactRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "penetrationParams": {
+          "$ref": "#/$defs/SourcedValueOfAmmoPenetration"
+        },
+        "pierceabilityParams": {
+          "$ref": "#/$defs/SourcedValueOfBulletPierceability"
+        },
+        "visualParams": {
+          "$ref": "#/$defs/SourcedValueOfProjectileVisual"
+        }
+      },
+      "required": [
+        "additionalProjectilesParams",
+        "alternateVisualParams",
+        "damage",
+        "damageDropParams",
+        "electronParams",
+        "hitBehaviors",
+        "hitType",
+        "ignitionChanceOverride",
+        "impactRadius",
+        "impulseFalloffParams",
+        "keepAliveOnZeroDamage",
+        "minImpactRadius",
+        "penetrationParams",
+        "pierceabilityParams",
+        "visualParams"
+      ],
+      "type": "object"
+    },
     "CanonicalRecordHeader": {
       "description": "Independently sourced original metadata and stable convenience values of one physical Record.",
       "properties": {
@@ -2338,6 +2982,9 @@
     "CatalogDefinitions": {
       "description": "Canonical typed definitions with distinct physical identities and source scopes.",
       "properties": {
+        "ammoDefinitions": {
+          "$ref": "#/$defs/CatalogTableOfAmmoDefinition"
+        },
         "blueprintCategories": {
           "$ref": "#/$defs/CatalogTableOfBlueprintCategoryDefinition"
         },
@@ -2388,6 +3035,7 @@
         }
       },
       "required": [
+        "ammoDefinitions",
         "blueprintCategories",
         "blueprints",
         "commodities",
@@ -2517,6 +3165,25 @@
         "status",
         "targetRecordIndex",
         "targetType"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfAmmoDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/AmmoDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
       ],
       "type": "object"
     },
@@ -3891,6 +4558,10 @@
     "Completeness": {
       "description": "The completeness of every kind.",
       "properties": {
+        "ammoDefinitions": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The filtered physical `AmmoParams` selection."
+        },
         "blueprintCategories": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `blueprintCategories`."
@@ -4109,6 +4780,7 @@
         }
       },
       "required": [
+        "ammoDefinitions",
         "blueprintCategories",
         "blueprintCategoryLists",
         "blueprintPools",
@@ -4908,6 +5580,188 @@
       ],
       "type": "object"
     },
+    "CountermeasureChaff": {
+      "description": "Authored chaff timing, geometry and particle resources.",
+      "properties": {
+        "childExplosionParticles": {
+          "$ref": "#/$defs/SourcedValueOfParticleResource"
+        },
+        "endCrossSection": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "endDecibel": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "endElectromagnetic": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "endInfrared": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "explosionParticles": {
+          "$ref": "#/$defs/SourcedValueOfParticleResource"
+        },
+        "radiusRange": {
+          "$ref": "#/$defs/SourcedValueOfProjectileRange"
+        },
+        "startCrossSection": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "startDecibel": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "startElectromagnetic": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "startInfrared": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "volumeLifetime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "volumeParticles": {
+          "$ref": "#/$defs/SourcedValueOfParticleResource"
+        },
+        "volumeSpawnDelay": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "childExplosionParticles",
+        "endCrossSection",
+        "endDecibel",
+        "endElectromagnetic",
+        "endInfrared",
+        "explosionParticles",
+        "radiusRange",
+        "startCrossSection",
+        "startDecibel",
+        "startElectromagnetic",
+        "startInfrared",
+        "volumeLifetime",
+        "volumeParticles",
+        "volumeSpawnDelay"
+      ],
+      "type": "object"
+    },
+    "CountermeasureKind": {
+      "description": "The actual countermeasure alternative.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "chaff",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/CountermeasureChaff"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "flare",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/CountermeasureSignals"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "CountermeasureProjectile": {
+      "description": "Original Countermeasure type and audio trigger inputs.",
+      "properties": {
+        "explosionStartAudioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        },
+        "explosionStopAudioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        },
+        "trailStartAudioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        },
+        "trailStopAudioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfAudioResource"
+        },
+        "typeParams": {
+          "$ref": "#/$defs/SourcedValueOfCountermeasureKind"
+        }
+      },
+      "required": [
+        "explosionStartAudioTrigger",
+        "explosionStopAudioTrigger",
+        "trailStartAudioTrigger",
+        "trailStopAudioTrigger",
+        "typeParams"
+      ],
+      "type": "object"
+    },
+    "CountermeasureSignals": {
+      "description": "Original start and end signature values.",
+      "properties": {
+        "endCrossSection": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "endDecibel": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "endElectromagnetic": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "endInfrared": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "startCrossSection": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "startDecibel": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "startElectromagnetic": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "startInfrared": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "endCrossSection",
+        "endDecibel",
+        "endElectromagnetic",
+        "endInfrared",
+        "startCrossSection",
+        "startDecibel",
+        "startElectromagnetic",
+        "startInfrared"
+      ],
+      "type": "object"
+    },
     "Crafter": {
       "description": "A crafting station: an entity whose `Components` hold a `CrafterComponentParams`.",
       "properties": {
@@ -5243,6 +6097,34 @@
         "deformation",
         "temperature",
         "thickness"
+      ],
+      "type": "object"
+    },
+    "DamageOverTime": {
+      "description": "Original damage-over-time behavior inputs.",
+      "properties": {
+        "applyToHealthPool": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "damagePerSecond": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredDamage"
+        },
+        "damagePeriod": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "duration": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "ignoreShields": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "applyToHealthPool",
+        "damagePerSecond",
+        "damagePeriod",
+        "duration",
+        "ignoreShields"
       ],
       "type": "object"
     },
@@ -10878,6 +11760,10 @@
         {
           "description": "Reusable physical `ExplosionRecord` definitions.",
           "value": "explosionDefinitions"
+        },
+        {
+          "description": "Physical ammunition configurations.",
+          "value": "ammoDefinitions"
         }
       ]
     },
@@ -15327,6 +16213,338 @@
       "required": [
         "key",
         "translations"
+      ],
+      "type": "object"
+    },
+    "ProjectileBeamEffect": {
+      "description": "Original ordered Tachyon beam effect inputs.",
+      "properties": {
+        "endPointStrength": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "helper": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "killParticlesOnDeactivate": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "modifierSource": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "multiSplineOffset": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "particleAudioParams": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfProjectileParticleAudio"
+        },
+        "particleEffect": {
+          "$ref": "#/$defs/SourcedValueOfParticleResource"
+        },
+        "startPointStrength": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "thirdPersonParticleEffect": {
+          "$ref": "#/$defs/SourcedValueOfParticleResource"
+        },
+        "tintColor": {
+          "$ref": "#/$defs/SourcedValueOfProjectileTint"
+        },
+        "useMultiSpline": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "endPointStrength",
+        "helper",
+        "killParticlesOnDeactivate",
+        "modifierSource",
+        "multiSplineOffset",
+        "particleAudioParams",
+        "particleEffect",
+        "startPointStrength",
+        "thirdPersonParticleEffect",
+        "tintColor",
+        "useMultiSpline"
+      ],
+      "type": "object"
+    },
+    "ProjectileDetonation": {
+      "description": "Authored activation and explosion fields from the projectile base.",
+      "properties": {
+        "armTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "destructDelay": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "explodeOnExpire": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "explodeOnFinalImpact": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "explodeOnImpact": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "explodeOnTargetRange": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "explosionParams": {
+          "$ref": "#/$defs/SourcedValueOfExplosionParameters"
+        },
+        "safeDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "spawnedEntityParams": {
+          "$ref": "#/$defs/SourcedValueOfProjectileSpawnedEntity"
+        }
+      },
+      "required": [
+        "armTime",
+        "destructDelay",
+        "explodeOnExpire",
+        "explodeOnFinalImpact",
+        "explodeOnImpact",
+        "explodeOnTargetRange",
+        "explosionParams",
+        "safeDistance",
+        "spawnedEntityParams"
+      ],
+      "type": "object"
+    },
+    "ProjectileHitBehavior": {
+      "description": "The actual on-hit behavior type and its raw inputs.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "damageOverTime",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/DamageOverTime"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "ProjectileKind": {
+      "description": "Concrete behavior of the original projectile occurrence.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "bullet",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/BulletProjectile"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "tachyon",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/TachyonProjectile"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "countermeasure",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/CountermeasureProjectile"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "ProjectileMaterial": {
+      "description": "Original material resource path.",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "ProjectileParticleAudio": {
+      "description": "An authored subparticle path and audio Record link.",
+      "properties": {
+        "gpuParticleAudio": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "subParticlePath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "gpuParticleAudio",
+        "subParticlePath"
+      ],
+      "type": "object"
+    },
+    "ProjectileProximity": {
+      "description": "Original proximity trigger fields.",
+      "properties": {
+        "armTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "radius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "safeDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "armTime",
+        "radius",
+        "safeDistance"
+      ],
+      "type": "object"
+    },
+    "ProjectileRange": {
+      "description": "The two authored endpoints of a projectile range.",
+      "properties": {
+        "maximum": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minimum": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "maximum",
+        "minimum"
+      ],
+      "type": "object"
+    },
+    "ProjectileSpawnedEntity": {
+      "description": "Original collision-spawn Record link and one-shot flag.",
+      "properties": {
+        "entityToSpawnOnCollision": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "oneShot": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "entityToSpawnOnCollision",
+        "oneShot"
+      ],
+      "type": "object"
+    },
+    "ProjectileTint": {
+      "description": "The original three color channels.",
+      "properties": {
+        "b": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "g": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "r": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "b",
+        "g",
+        "r"
+      ],
+      "type": "object"
+    },
+    "ProjectileVisual": {
+      "description": "Original Bullet rendering and hit-effect inputs.",
+      "properties": {
+        "geometryRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "hitEffect": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "material": {
+          "$ref": "#/$defs/SourcedValueOfProjectileMaterial"
+        },
+        "maxLength": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "meshOffset": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "renderFrequency": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "renderProbability": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "geometryRadius",
+        "hitEffect",
+        "material",
+        "maxLength",
+        "meshOffset",
+        "renderFrequency",
+        "renderProbability"
       ],
       "type": "object"
     },
@@ -21304,6 +22522,916 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfAdditionalProjectiles": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AdditionalProjectiles"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAmmoBreakablePhysics": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AmmoBreakablePhysics"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAmmoCollisionClass": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AmmoCollisionClass"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAmmoConversion": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AmmoConversion"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAmmoPenetration": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AmmoPenetration"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAmmoPhysics": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AmmoPhysics"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAmmoPhysicsType": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AmmoPhysicsType"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_FixedReward": {
       "allOf": [
         {
@@ -24230,6 +26358,405 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfProjectileBeamEffect": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfProjectileBeamEffect"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfProjectileHitBehavior": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfProjectileHitBehavior"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfProjectileParticleAudio": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfProjectileParticleAudio"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfPropertyNameOverrideSource": {
       "allOf": [
         {
@@ -26086,6 +28613,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfAuthoredProjectile": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AuthoredProjectile"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfBlueprintDismantle": {
       "allOf": [
         {
@@ -26310,6 +28967,526 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/BlueprintResearchEnvelope"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfBulletDamageDrop": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/BulletDamageDrop"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfBulletElectron": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/BulletElectron"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfBulletImpulseFalloff": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/BulletImpulseFalloff"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfBulletPierceability": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/BulletPierceability"
               }
             }
           }
@@ -27220,6 +30397,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/CommoditySelection"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCountermeasureKind": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CountermeasureKind"
               }
             }
           }
@@ -34570,6 +37877,1306 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/PhysicalEntryRef"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfProjectileBeamEffect": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ProjectileBeamEffect"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfProjectileDetonation": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ProjectileDetonation"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfProjectileHitBehavior": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ProjectileHitBehavior"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfProjectileMaterial": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ProjectileMaterial"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfProjectileParticleAudio": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ProjectileParticleAudio"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfProjectileProximity": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ProjectileProximity"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfProjectileRange": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ProjectileRange"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfProjectileSpawnedEntity": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ProjectileSpawnedEntity"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfProjectileTint": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ProjectileTint"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfProjectileVisual": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ProjectileVisual"
               }
             }
           }
@@ -43485,6 +48092,42 @@
         "ignoreAttachableTags",
         "recordPath",
         "taggedConfigs"
+      ],
+      "type": "object"
+    },
+    "TachyonProjectile": {
+      "description": "Authored Tachyon damage, ranges and hit parameters.",
+      "properties": {
+        "beamEffects": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfProjectileBeamEffect"
+        },
+        "damage": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredDamage"
+        },
+        "fullDamageRange": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "hitEffect": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "hitType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "penetrationParams": {
+          "$ref": "#/$defs/SourcedValueOfAmmoPenetration"
+        },
+        "zeroDamageRange": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "beamEffects",
+        "damage",
+        "fullDamageRange",
+        "hitEffect",
+        "hitType",
+        "penetrationParams",
+        "zeroDamageRange"
       ],
       "type": "object"
     },
