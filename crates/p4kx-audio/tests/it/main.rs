@@ -44,4 +44,5 @@ mod wem;
 mod wem_annotations;
 mod wem_chunks;
 mod wem_source;
+mod wem_source_opus;
 mod wem_source_vorbis;

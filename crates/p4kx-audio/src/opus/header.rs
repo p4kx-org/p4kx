@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::layout::Layout;
-use super::ogg_read::OggPackets;
-use super::packets::Framing;
+use super::ogg_read::{OggPackets, PageSource};
+use super::packets::{Framing, PACKET_SIZE_LEN};
 use super::{OPUS_RATE, OpusError};
 use crate::loops::LOOP_COMMENTS;
 use crate::{ByteOrder, Loop};
@@ -12,21 +12,125 @@ use crate::{ByteOrder, Loop};
 pub(crate) const TAG_SWITCH: u16 = 0x3039;
 const TAG_OGG: u16 = 0x3040;
 const TAG_WWISE: u16 = 0x3041;
-const SWITCH_FMT_LEN: usize = 0x28;
 const WWISE_VERSION: u8 = 1;
 const OPUS_HEAD_LEN: usize = 19;
 const VENDOR: &[u8] = b"P4KX";
 
-/// What the `fmt` chunk, the `seek` chunk and an embedded `OpusHead` say about an Opus WEM.
-pub(crate) struct Header<'a> {
-    pub(crate) data: &'a [u8],
-    pub(crate) framing: Framing<'a>,
-    pub(crate) layout: Layout,
-    pub(crate) pre_skip: Option<u16>,
-    pub(crate) declared: Option<u64>,
-    pub(crate) head: Option<Vec<u8>>,
-    pub(crate) tags: Option<Vec<u8>>,
-    pub(crate) output_gain: i16,
+/// One original Opus declaration with source-specific packet storage.
+pub(super) struct Header<'a> {
+    pub(super) data: &'a [u8],
+    pub(super) framing: Framing<'a>,
+    pub(super) info: StreamHeader,
+}
+
+pub(super) struct StreamHeader {
+    pub(super) layout: Layout,
+    pub(super) pre_skip: Option<u16>,
+    pub(super) declared: Option<u64>,
+    pub(super) head: Option<Vec<u8>>,
+    pub(super) tags: Option<Vec<u8>>,
+    pub(super) output_gain: i16,
+}
+
+pub(super) enum Format {
+    Table { bytes: u64, info: StreamHeader },
+    Switch { prefix: u64, info: StreamHeader },
+    Ogg { declared: Option<u64> },
+}
+
+const OGG_FMT_PREFIX: usize = 0x1C;
+const WWISE_FMT_PREFIX: usize = 0x24;
+pub(super) const SWITCH_FMT_LEN: usize = 0x28;
+
+impl Format {
+    pub(super) const fn prefix_length(tag: u16) -> usize {
+        match tag {
+            TAG_WWISE => WWISE_FMT_PREFIX,
+            TAG_SWITCH => SWITCH_FMT_LEN,
+            _ => OGG_FMT_PREFIX,
+        }
+    }
+
+    pub(super) fn read(
+        order: ByteOrder,
+        fmt: &[u8],
+        fmt_len: u64,
+        seek_len: Option<u64>,
+        data_len: u64,
+        channels: u16,
+    ) -> Result<Self, OpusError> {
+        let fmt = Fmt { order, bytes: fmt };
+        let tag = fmt.u16_at(0).unwrap_or_default();
+        let unaligned = fmt.u16_at(0x0C) != Some(0) || fmt.u16_at(0x0E) != Some(0);
+        if unaligned && tag != TAG_SWITCH {
+            return Err(OpusError::InvalidHeader(
+                "an Opus fmt chunk declares a block alignment or sample size",
+            ));
+        }
+        match tag {
+            TAG_WWISE => Self::wwise(fmt, seek_len, channels),
+            TAG_SWITCH => Self::switch(fmt, fmt_len, data_len, channels),
+            TAG_OGG => Ok(Self::Ogg {
+                declared: fmt.u32_at(0x18).map(u64::from),
+            }),
+            _ => Err(OpusError::InvalidHeader("unknown Opus format tag")),
+        }
+    }
+
+    fn wwise(fmt: Fmt<'_>, seek_len: Option<u64>, channels: u16) -> Result<Self, OpusError> {
+        let byte = |offset: usize| fmt.bytes.get(offset).copied();
+        let (Some(layout), Some(count), Some(pre_skip), Some(version), Some(mapping)) = (
+            fmt.u32_at(0x14),
+            fmt.u32_at(0x1C),
+            fmt.u16_at(0x20),
+            byte(0x22),
+            byte(0x23),
+        ) else {
+            return Err(OpusError::InvalidHeader(
+                "the Wwise Opus fmt chunk is shorter than 36 bytes",
+            ));
+        };
+        if version != WWISE_VERSION {
+            return Err(OpusError::InvalidHeader("unknown Wwise Opus version"));
+        }
+        let bytes = u64::from(count) * PACKET_SIZE_LEN as u64;
+        if seek_len.is_none_or(|len| len < bytes) {
+            return Err(OpusError::InvalidHeader(
+                "the seek chunk holds fewer packet sizes than the fmt chunk counts",
+            ));
+        }
+        Ok(Self::Table {
+            bytes,
+            info: StreamHeader::framed(
+                Layout::wwise(channels, layout, mapping)?,
+                Some(pre_skip),
+                fmt.u32_at(0x18).map(u64::from),
+            ),
+        })
+    }
+
+    fn switch(fmt: Fmt<'_>, fmt_len: u64, data_len: u64, channels: u16) -> Result<Self, OpusError> {
+        let prefix = fmt
+            .u32_at(0x24)
+            .filter(|_| fmt_len == SWITCH_FMT_LEN as u64)
+            .map(u64::from)
+            .ok_or(OpusError::InvalidHeader(
+                "the Switch Opus fmt chunk is not 40 bytes",
+            ))?;
+        if prefix > data_len {
+            return Err(OpusError::InvalidHeader(
+                "the seek table is larger than the data",
+            ));
+        }
+        let declared = fmt
+            .u32_at(0x18)
+            .filter(|_| fmt.u32_at(4) == Some(OPUS_RATE))
+            .map(u64::from);
+        Ok(Self::Switch {
+            prefix,
+            info: StreamHeader::framed(Layout::wwise(channels, 0, 0)?, None, declared),
+        })
+    }
 }
 
 /// The `fmt` chunk of an Opus WEM in its byte order.
@@ -47,110 +151,74 @@ impl Fmt<'_> {
 }
 
 impl<'a> Header<'a> {
-    /// Reads the header of an Opus WEM whose `fmt`, `seek` and `data` chunks are given.
-    pub(crate) fn read(
+    pub(super) fn read(
         order: ByteOrder,
         fmt: &[u8],
         seek: Option<&'a [u8]>,
         data: &'a [u8],
         channels: u16,
     ) -> Result<Self, OpusError> {
-        let fmt = Fmt { order, bytes: fmt };
-        let tag = fmt.u16_at(0).unwrap_or_default();
-        let unaligned = fmt.u16_at(0x0C) != Some(0) || fmt.u16_at(0x0E) != Some(0);
-        if unaligned && tag != TAG_SWITCH {
-            return Err(OpusError::InvalidHeader(
-                "an Opus fmt chunk declares a block alignment or sample size",
-            ));
-        }
-        let header = match tag {
-            TAG_WWISE => Self::wwise(fmt, seek, data, channels),
-            TAG_SWITCH => Self::switch(fmt, data, channels),
-            TAG_OGG => Self::ogg(fmt, data, channels),
-            _ => Err(OpusError::InvalidHeader("unknown Opus format tag")),
-        }?;
-        if header.layout.mapping.len() != usize::from(channels) {
-            return Err(OpusError::InvalidHeader(
-                "the channel mapping does not cover the channels of the fmt chunk",
-            ));
-        }
-        Ok(header)
-    }
-
-    fn wwise(
-        fmt: Fmt<'_>,
-        seek: Option<&'a [u8]>,
-        data: &'a [u8],
-        channels: u16,
-    ) -> Result<Self, OpusError> {
-        let byte = |offset: usize| fmt.bytes.get(offset).copied();
-        let (Some(layout), Some(count), Some(pre_skip), Some(version), Some(mapping)) = (
-            fmt.u32_at(0x14),
-            fmt.u32_at(0x1C),
-            fmt.u16_at(0x20),
-            byte(0x22),
-            byte(0x23),
-        ) else {
-            return Err(OpusError::InvalidHeader(
-                "the Wwise Opus fmt chunk is shorter than 36 bytes",
-            ));
+        let config = Format::read(
+            order,
+            fmt,
+            fmt.len() as u64,
+            seek.map(|bytes| bytes.len() as u64),
+            data.len() as u64,
+            channels,
+        )?;
+        let (data, framing, info) = match config {
+            Format::Table { bytes, info } => {
+                let sizes = usize::try_from(bytes)
+                    .ok()
+                    .and_then(|len| seek?.get(..len))
+                    .ok_or(OpusError::InvalidHeader(
+                        "the seek chunk holds fewer packet sizes than the fmt chunk counts",
+                    ))?;
+                (data, Framing::Table(sizes), info)
+            }
+            Format::Switch { prefix, info } => {
+                let packets = usize::try_from(prefix)
+                    .ok()
+                    .and_then(|prefix| data.get(prefix..))
+                    .ok_or(OpusError::InvalidHeader(
+                        "the seek table is larger than the data",
+                    ))?;
+                (packets, Framing::Switch, info)
+            }
+            Format::Ogg { declared } => {
+                let info = StreamHeader::embedded(&mut OggPackets::new(data), channels, declared)?;
+                (data, Framing::Ogg, info)
+            }
         };
-        if version != WWISE_VERSION {
-            return Err(OpusError::InvalidHeader("unknown Wwise Opus version"));
-        }
-        let sizes = usize::try_from(count)
-            .ok()
-            .and_then(|count| count.checked_mul(2))
-            .and_then(|len| seek?.get(..len))
-            .ok_or(OpusError::InvalidHeader(
-                "the seek chunk holds fewer packet sizes than the fmt chunk counts",
-            ))?;
+        info.check_channels(channels)?;
         Ok(Self {
             data,
-            framing: Framing::Table(sizes),
-            layout: Layout::wwise(channels, layout, mapping)?,
-            pre_skip: Some(pre_skip),
-            declared: fmt.u32_at(0x18).map(u64::from),
-            head: None,
-            tags: None,
-            output_gain: 0,
+            framing,
+            info,
         })
     }
+}
 
-    fn switch(fmt: Fmt<'_>, data: &'a [u8], channels: u16) -> Result<Self, OpusError> {
-        let seek_len = fmt
-            .u32_at(0x24)
-            .filter(|_| fmt.bytes.len() == SWITCH_FMT_LEN)
-            .ok_or(OpusError::InvalidHeader(
-                "the Switch Opus fmt chunk is not 40 bytes",
-            ))?;
-        let data = usize::try_from(seek_len)
-            .ok()
-            .and_then(|len| data.get(len..))
-            .ok_or(OpusError::InvalidHeader(
-                "the seek table is larger than the data",
-            ))?;
-        let declared = fmt
-            .u32_at(0x18)
-            .filter(|_| fmt.u32_at(4) == Some(OPUS_RATE))
-            .map(u64::from);
-        Ok(Self {
-            data,
-            framing: Framing::Switch,
-            layout: Layout::wwise(channels, 0, 0)?,
-            pre_skip: None,
+impl StreamHeader {
+    const fn framed(layout: Layout, pre_skip: Option<u16>, declared: Option<u64>) -> Self {
+        Self {
+            layout,
+            pre_skip,
             declared,
             head: None,
             tags: None,
             output_gain: 0,
-        })
+        }
     }
 
-    fn ogg(fmt: Fmt<'_>, data: &'a [u8], channels: u16) -> Result<Self, OpusError> {
-        let mut packets = OggPackets::new(data);
+    pub(super) fn embedded<S: PageSource>(
+        packets: &mut OggPackets<S>,
+        channels: u16,
+        declared: Option<u64>,
+    ) -> Result<Self, S::Error> {
         let head = packets
-            .next_packet()
-            .ok_or(OpusError::InvalidOgg("the OpusHead packet is missing"))??
+            .next_packet()?
+            .ok_or(OpusError::InvalidOgg("the OpusHead packet is missing"))?
             .to_vec();
         let (pre_skip, layout) = read_head(&head, channels)?;
         let output_gain = head
@@ -158,22 +226,29 @@ impl<'a> Header<'a> {
             .and_then(<[u8]>::first_chunk::<2>)
             .map_or(0, |gain| i16::from_le_bytes(*gain));
         let tags = packets
-            .next_packet()
-            .ok_or(OpusError::InvalidOgg("the OpusTags packet is missing"))??
+            .next_packet()?
+            .ok_or(OpusError::InvalidOgg("the OpusTags packet is missing"))?
             .to_vec();
         if !tags.starts_with(b"OpusTags") {
-            return Err(OpusError::InvalidOgg("the OpusTags packet is missing"));
+            return Err(OpusError::InvalidOgg("the OpusTags packet is missing").into());
         }
         Ok(Self {
-            data,
-            framing: Framing::Ogg,
             layout,
             pre_skip: Some(pre_skip),
-            declared: fmt.u32_at(0x18).map(u64::from),
+            declared,
             head: Some(head),
             tags: Some(tags),
             output_gain,
         })
+    }
+
+    pub(super) fn check_channels(&self, channels: u16) -> Result<(), OpusError> {
+        if self.layout.mapping.len() != usize::from(channels) {
+            return Err(OpusError::InvalidHeader(
+                "the channel mapping does not cover the channels of the fmt chunk",
+            ));
+        }
+        Ok(())
     }
 }
 

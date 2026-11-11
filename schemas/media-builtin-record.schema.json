@@ -6251,6 +6251,44 @@
         }
       ]
     },
+    "OpusInputs": {
+      "additionalProperties": false,
+      "properties": {
+        "checked_data": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "embedded_headers": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "format": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "seek_table": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "format",
+        "seek_table",
+        "embedded_headers",
+        "checked_data"
+      ],
+      "type": "object"
+    },
     "OriginalIdentifier": {
       "$ref": "#/$defs/IdentifierValue",
       "description": "An unmodified source identifier with a distinct domain and integer width."
@@ -9419,11 +9457,11 @@
           "additionalProperties": false,
           "properties": {
             "actual_codec": {
+              "const": "pcm",
               "type": "string"
             },
             "actual_format": {
-              "const": "wav",
-              "type": "string"
+              "$ref": "#/$defs/WrittenWavFormat"
             },
             "artifact": {
               "$ref": "#/$defs/Artifact"
@@ -9457,8 +9495,8 @@
             }
           },
           "required": [
-            "actual_format",
             "actual_codec",
+            "actual_format",
             "artifact",
             "channels",
             "sample_rate",
@@ -9472,11 +9510,11 @@
           "additionalProperties": false,
           "properties": {
             "actual_codec": {
+              "const": "vorbis",
               "type": "string"
             },
             "actual_format": {
-              "const": "ogg",
-              "type": "string"
+              "$ref": "#/$defs/WrittenOggFormat"
             },
             "artifact": {
               "$ref": "#/$defs/Artifact"
@@ -9513,8 +9551,8 @@
             }
           },
           "required": [
-            "actual_format",
             "actual_codec",
+            "actual_format",
             "artifact",
             "channels",
             "sample_rate",
@@ -9524,8 +9562,77 @@
             "vorbis_inputs"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actual_codec": {
+              "const": "opus",
+              "type": "string"
+            },
+            "actual_format": {
+              "$ref": "#/$defs/WrittenOggFormat"
+            },
+            "artifact": {
+              "$ref": "#/$defs/Artifact"
+            },
+            "channels": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "loop_points": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/WemLoop"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "opus_inputs": {
+              "$ref": "#/$defs/OpusInputs"
+            },
+            "sample_count": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "sample_rate": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source_range": {
+              "$ref": "#/$defs/SourceRange"
+            }
+          },
+          "required": [
+            "actual_codec",
+            "actual_format",
+            "artifact",
+            "channels",
+            "sample_rate",
+            "sample_count",
+            "loop_points",
+            "source_range",
+            "opus_inputs"
+          ],
+          "type": "object"
         }
       ]
+    },
+    "WrittenOggFormat": {
+      "enum": [
+        "ogg"
+      ],
+      "type": "string"
+    },
+    "WrittenWavFormat": {
+      "enum": [
+        "wav"
+      ],
+      "type": "string"
     },
     "ZipHeaderInfo": {
       "description": "Lossless fixed ZIP directory words without interpreting their flags or host system.",

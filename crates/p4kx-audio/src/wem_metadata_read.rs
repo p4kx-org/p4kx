@@ -34,6 +34,7 @@ impl WemMetadata {
         let SelectedChunks {
             format,
             vorbis,
+            seek: _,
             sample,
             data,
         } = selected_chunks(input, header)?;
@@ -91,6 +92,7 @@ impl WemMetadata {
 pub(crate) struct SelectedChunks {
     pub(crate) format: WemSourceChunk,
     pub(crate) vorbis: Option<WemSourceChunk>,
+    pub(crate) seek: Option<WemSourceChunk>,
     sample: Option<WemSourceChunk>,
     data: WemSourceChunk,
 }
@@ -102,12 +104,14 @@ pub(crate) fn selected_chunks<I: ReadAt>(
     let mut directory = header.directory(TailPolicy::Legacy);
     let mut format = None;
     let mut vorbis = None;
+    let mut seek = None;
     let mut sample = None;
     let mut data = None;
     while let Some(chunk) = directory.next(input).transpose()? {
         match &chunk.id {
             b"fmt " => format = Some(chunk),
             b"vorb" => vorbis = Some(chunk),
+            b"seek" => seek = Some(chunk),
             b"smpl" => sample = Some(chunk),
             b"data" => {
                 data = Some(chunk);
@@ -119,6 +123,7 @@ pub(crate) fn selected_chunks<I: ReadAt>(
     Ok(SelectedChunks {
         format: format.ok_or(AudioError::MissingChunk("fmt "))?,
         vorbis,
+        seek,
         sample,
         data: data.ok_or(AudioError::MissingChunk("data"))?,
     })

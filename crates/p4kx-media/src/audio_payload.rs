@@ -101,19 +101,49 @@ pub(crate) enum ConversionOutcome {
 }
 
 #[derive(Serialize, JsonSchema)]
-#[serde(tag = "actual_format", rename_all = "kebab-case", deny_unknown_fields)]
+#[serde(tag = "actual_codec", rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) enum WrittenAudio {
-    Wav {
+    Pcm {
+        actual_format: WrittenWavFormat,
         #[serde(flatten)]
         signal: WrittenSignal,
         source_range: SourceRange,
     },
-    Ogg {
+    Vorbis {
+        actual_format: WrittenOggFormat,
         #[serde(flatten)]
         signal: WrittenSignal,
         source_range: SourceRange,
         vorbis_inputs: Box<VorbisInputs>,
     },
+    Opus {
+        actual_format: WrittenOggFormat,
+        #[serde(flatten)]
+        signal: WrittenSignal,
+        source_range: SourceRange,
+        opus_inputs: Box<OpusInputs>,
+    },
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum WrittenWavFormat {
+    Wav,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum WrittenOggFormat {
+    Ogg,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct OpusInputs {
+    pub(crate) format: SourceRange,
+    pub(crate) seek_table: Option<SourceRange>,
+    pub(crate) embedded_headers: Option<SourceRange>,
+    pub(crate) checked_data: SourceRange,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -127,7 +157,6 @@ pub(crate) struct VorbisInputs {
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct WrittenSignal {
-    pub(crate) actual_codec: &'static str,
     pub(crate) artifact: Artifact,
     pub(crate) channels: u16,
     pub(crate) sample_rate: u32,

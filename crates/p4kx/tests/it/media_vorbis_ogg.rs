@@ -3,26 +3,38 @@
 
 use std::fs;
 
-use p4kx_testkit::{ArchiveBuilder, TestEntry, TestVorbis};
+use p4kx_testkit::{ArchiveBuilder, TestEntry, TestOpus, TestOpusFraming, TestVorbis};
 use serde_json::Value;
 
 use super::{TestResult, audio_export, jsonl_rows, wem_conversion};
 
-const TONE: &str = "audio/vorbis.wem";
-
 #[test]
 fn media_cli_ogg_matches_standalone_vorbis() -> TestResult {
-    let folder = tempfile::tempdir()?;
-    let source = folder.path().join("Data.p4k");
     let original = TestVorbis::new(1, 24_000, &[false, true, true, false, false])
         .wem()
         .bytes();
+    assert_ogg_parity("audio/vorbis.wem", "vorbis", original)
+}
+
+#[test]
+fn media_cli_ogg_matches_standalone_opus() -> TestResult {
+    let original = TestOpus::new(TestOpusFraming::Wwise, 2, 9_600)
+        .declared_sample_count(960)
+        .wem()?
+        .smpl_loop(0, 1, 2)
+        .bytes();
+    assert_ogg_parity("audio/opus.wem", "opus", original)
+}
+
+fn assert_ogg_parity(entry: &str, codec: &str, original: Vec<u8>) -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let source = folder.path().join("Data.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::zstd(TONE, original).encrypted())
+        .entry(TestEntry::zstd(entry, original).encrypted())
         .write_to(&source)?;
 
     let output = folder.path().join("media");
-    audio_export(&source, &output, TONE)?
+    audio_export(&source, &output, entry)?
         .args(["--audio-format", "ogg"])
         .assert()
         .code(0);
@@ -37,7 +49,7 @@ fn media_cli_ogg_matches_standalone_vorbis() -> TestResult {
         conversions.next().is_none(),
         "one physical WEM was converted"
     );
-    let artifact = checked_artifact_path(mapping)?;
+    let artifact = checked_artifact_path(mapping, codec)?;
     let bytes = fs::read(directory.join(artifact))?;
     assert!(
         bytes.starts_with(b"OggS"),
@@ -48,7 +60,7 @@ fn media_cli_ogg_matches_standalone_vorbis() -> TestResult {
     p4kx_testkit::p4kx()?
         .args(["audio", "ogg"])
         .arg(&source)
-        .arg(TONE)
+        .arg(entry)
         .arg("--out")
         .arg(&standalone)
         .assert()
@@ -61,13 +73,16 @@ fn media_cli_ogg_matches_standalone_vorbis() -> TestResult {
     Ok(())
 }
 
-fn checked_artifact_path(mapping: &Value) -> TestResult<&str> {
+fn checked_artifact_path<'mapping>(
+    mapping: &'mapping Value,
+    codec: &str,
+) -> TestResult<&'mapping str> {
     for (path, expected) in [
         ("/data/payload/requested_format", "ogg"),
-        ("/data/payload/source_codec", "vorbis"),
+        ("/data/payload/source_codec", codec),
         ("/data/payload/outcome/type", "written"),
         ("/data/payload/outcome/payload/actual_format", "ogg"),
-        ("/data/payload/outcome/payload/actual_codec", "vorbis"),
+        ("/data/payload/outcome/payload/actual_codec", codec),
     ] {
         assert_eq!(
             mapping.pointer(path).and_then(Value::as_str),

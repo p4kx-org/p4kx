@@ -91,22 +91,26 @@ uses complete frames. IMA ADPCM also decodes a final block whose channel sub-blo
 original bytes. PTADPCM uses complete blocks. Unused tail bytes and extra chunks stay in the
 raw artifact.
 
-Request deterministic Ogg Vorbis artifacts from Wwise Vorbis with the following command.
+Request deterministic Ogg artifacts from Wwise Vorbis or Opus with the following command.
 
     p4kx media export ARCHIVE --out DIR --kind audio --audio-format ogg
 
-The provider uses the original Wwise configuration, setup packet and audio packets. The Ogg
-preserves the channel count, playback rate, checked frame count and applicable loop. The first
-`data` chunk bounds the packet walk. The same codebook selection and Ogg page writer serve
-standalone conversion and the Media provider.
+Vorbis uses the original Wwise configuration, setup packet and audio packets. Opus supports the
+Wwise seek-size table, Switch packet framing and embedded Ogg pages. The first `data` chunk bounds
+each packet walk. Both outputs preserve the channel count, playback rate, checked frame count and
+applicable loop. Opus applies the original pre-skip and trims at the checked final granule.
+Standalone conversion and the Media provider share each codec's packet interpretation and Ogg
+writer.
 
 The `audio-wem-conversion` and `audio-bank-wem-conversion` namespaces contain one
 `wem-conversion` record per eligible occurrence. The `written` outcome records the
 requested and actual formats, source codec, decoded dimensions and loop, original
-half-open range of consumed PCM frames, coded ADPCM blocks or Vorbis audio packets, and verified
-artifact path, length and SHA-256. Ogg rows add `vorbis_inputs` with the original average-byte-rate
-word, Vorbis configuration and size-prefixed setup packet ranges. Artifact origins retain those
-inputs and the original audio-packet ranges independently. Embedded
+half-open range of consumed PCM frames, coded ADPCM blocks or emitted Ogg packet data, and verified
+artifact path, length and SHA-256. Ogg Vorbis rows add `vorbis_inputs` with the original
+average-byte-rate word, configuration and size-prefixed setup packet ranges. Ogg Opus rows add
+`opus_inputs` with the selected format prefix, checked DATA range and any selected seek words or
+embedded header pages. The emitted Opus source range can end before the checked range after an
+authored sample trim. Artifact origins retain the selected inputs and ranges independently. Embedded
 ranges are absolute within the retained bank, with the DIDX section and triplet as
 subresource indices. Equal output bytes of the same format can share one file, while the conversion rows and
 artifact-manifest occurrences retain their own physical source uses and encryption markers.

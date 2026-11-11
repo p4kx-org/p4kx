@@ -412,7 +412,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   including typed Action, Event, Sound, container and music fields. Raw bytes and immediate
   field origins stay available.
   Use `--audio-format wav` to add 16-bit PCM WAV artifacts from PCM, IMA ADPCM and PTADPCM
-  WEMs. Use `--audio-format ogg` to add Ogg Vorbis artifacts from Wwise Vorbis WEMs. The default
+  WEMs. Use `--audio-format ogg` to add Ogg artifacts from Wwise Vorbis and Opus WEMs. The default
   `raw` retains metadata and source bytes. Unsupported codec conversions prevent complete publication.
   A diagnostic generation can retain the original source and conversion failure.
   A known kind without a provider

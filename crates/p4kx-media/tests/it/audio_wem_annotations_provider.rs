@@ -20,6 +20,8 @@ mod adpcm_conversion;
 mod embedded;
 #[path = "audio_wem_annotations_fixture.rs"]
 mod fixture;
+#[path = "audio_wem_opus_conversion.rs"]
+mod opus_conversion;
 #[path = "audio_wem_annotations_origins.rs"]
 mod origins;
 #[path = "audio_wem_pcm_conversion.rs"]

@@ -3,9 +3,11 @@
 
 use super::OpusError;
 use super::framing::{self, MAX_PACKET_LEN};
-use super::ogg_read::OggPackets;
+use super::ogg_read::{OggPackets, SlicePage};
+use super::stream::PacketSource;
 
-const SWITCH_HEADER_LEN: usize = 8;
+pub(super) const PACKET_SIZE_LEN: usize = size_of::<u16>();
+pub(super) const SWITCH_HEADER_LEN: usize = 8;
 
 /// Where the packets of an Opus WEM come from.
 #[derive(Clone, Copy)]
@@ -24,7 +26,7 @@ pub(crate) struct Packets<'a> {
     framing: Framing<'a>,
     offset: usize,
     sizes: &'a [u8],
-    ogg: Option<OggPackets<'a>>,
+    ogg: Option<OggPackets<SlicePage<'a>>>,
     index: u64,
 }
 
@@ -38,8 +40,8 @@ impl<'a> Packets<'a> {
             Framing::Ogg => {
                 let mut ogg = OggPackets::new(data);
                 for _ in 0..2 {
-                    ogg.next_packet()
-                        .ok_or(OpusError::InvalidOgg("the header packets are missing"))??;
+                    ogg.next_packet()?
+                        .ok_or(OpusError::InvalidOgg("the header packets are missing"))?;
                 }
                 (&[][..], Some(ogg))
             }
@@ -64,12 +66,12 @@ impl<'a> Packets<'a> {
         let index = self.index;
         let out_of_bounds = OpusError::PacketOutOfBounds { index };
         let packet = match self.framing {
-            Framing::Ogg => match self.ogg.as_mut()?.next_packet()? {
-                Ok(packet) => packet,
+            Framing::Ogg => match self.ogg.as_mut()?.next_packet() {
+                Ok(packet) => packet?,
                 Err(error) => return Some(Err(error)),
             },
             Framing::Table(_) => {
-                let (size, rest) = self.sizes.split_first_chunk::<2>()?;
+                let (size, rest) = self.sizes.split_first_chunk::<PACKET_SIZE_LEN>()?;
                 self.sizes = rest;
                 let len = usize::from(u16::from_le_bytes(*size));
                 let packet = self
@@ -89,10 +91,8 @@ impl<'a> Packets<'a> {
                     return None;
                 }
                 let start = self.offset.saturating_add(SWITCH_HEADER_LEN);
-                let packet = header
-                    .first_chunk::<4>()
-                    .and_then(|size| usize::try_from(u32::from_be_bytes(*size)).ok())
-                    .filter(|&len| len <= MAX_PACKET_LEN)
+                let packet = switch_size(header, index)
+                    .ok()
                     .and_then(|len| self.data.get(start..start.checked_add(len)?));
                 let Some(packet) = packet else {
                     self.offset = self.data.len();
@@ -105,6 +105,28 @@ impl<'a> Packets<'a> {
         self.index += 1;
         Some(Ok(packet))
     }
+}
+
+impl PacketSource for Packets<'_> {
+    type Error = OpusError;
+
+    fn read_packet(&mut self) -> Result<Option<&[u8]>, OpusError> {
+        self.next_packet().transpose()
+    }
+
+    fn checked_end(&self) -> u64 {
+        self.ogg
+            .as_ref()
+            .map_or(self.offset as u64, OggPackets::checked_end)
+    }
+}
+
+pub(super) fn switch_size(prefix: &[u8], index: u64) -> Result<usize, OpusError> {
+    prefix
+        .first_chunk::<4>()
+        .and_then(|size| usize::try_from(u32::from_be_bytes(*size)).ok())
+        .filter(|&len| len <= MAX_PACKET_LEN)
+        .ok_or(OpusError::PacketOutOfBounds { index })
 }
 
 /// Checks a multistream packet of `streams` streams and returns its samples per channel.

@@ -30,13 +30,13 @@ impl OpusStream<'_> {
     /// samples in the WEM's speaker order.
     fn write_pcm(&self, out: &mut impl Write) -> Result<(), AudioError> {
         let invalid = AudioError::InvalidOpus;
-        let mut decoders = Decoders::new(&self.layout).map_err(invalid)?;
+        let mut decoders = Decoders::new(&self.header.layout).map_err(invalid)?;
         let mut packets = self.packets().map_err(invalid)?;
-        let width = self.layout.decoded_channels();
-        let mut skip = usize::from(self.pre_skip);
-        let mut remaining = self.frames;
+        let width = self.header.layout.decoded_channels();
+        let mut skip = usize::from(self.count.pre_skip);
+        let mut remaining = self.count.frames;
         let mut bytes = Vec::new();
-        let gain = Gain::new(self.output_gain);
+        let gain = Gain::new(self.header.output_gain);
         while remaining > 0 {
             let index = packets.index();
             let Some(packet) = packets.next_packet() else {
@@ -52,7 +52,7 @@ impl OpusStream<'_> {
                 .map_or(frames - skipped, |left| left.min(frames - skipped));
             bytes.clear();
             for frame in decoded.chunks_exact(width).skip(skipped).take(take) {
-                for &channel in &self.layout.wav_order {
+                for &channel in &self.header.layout.wav_order {
                     let sample = if channel == SILENT {
                         0
                     } else {
@@ -66,8 +66,8 @@ impl OpusStream<'_> {
         }
         if remaining > 0 {
             return Err(invalid(OpusError::MissingSamples {
-                expected: self.frames,
-                decoded: self.frames - remaining,
+                expected: self.count.frames,
+                decoded: self.count.frames - remaining,
             }));
         }
         Ok(())

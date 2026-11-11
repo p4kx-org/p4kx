@@ -9,22 +9,22 @@ use p4kx_extraction::sound::{
     WemInspection, WemMetadata, WemOriginField, WemOriginPlan, WemReadError, WemVorbisRanges,
     WemVorbisWriteError,
 };
-use p4kx_extraction::{AudioError, DecimalU64, OggReport, SourceUseRole};
+use p4kx_extraction::{AudioError, Codec, SourceUseRole};
 
+use super::ogg_artifact::{self, OggArtifact, join};
 use super::{
-    ArtifactEvidence, CompletedConversion, ConversionOrigins, LOOP_POINTS, OUTCOME, SOURCE_RANGE,
-    WemProjection, capture_fields,
+    ArtifactEvidence, CompletedConversion, ConversionOrigins, SOURCE_RANGE, WemProjection,
+    capture_fields,
 };
-use crate::audio_payload::{VorbisInputs, WemLoop, WrittenAudio, WrittenSignal};
+use crate::audio_payload::{VorbisInputs, WrittenAudio, WrittenOggFormat};
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
-use crate::{Artifact, ArtifactExtension, MediaError, MediaWriter, error};
+use crate::{MediaError, MediaWriter, error};
 
 const INPUTS: &str = "/data/payload/outcome/payload/vorbis_inputs";
 
 pub(super) struct CompletedOgg {
-    artifact: Artifact,
-    report: OggReport,
+    output: OggArtifact,
     ranges: WemVorbisRanges,
     origins: VorbisOrigins,
 }
@@ -44,35 +44,15 @@ pub(super) fn convert<R: Read + Seek>(
     let ranges = conversion.ranges().clone();
     let frames = conversion.sample_count();
     let origins = VorbisOrigins::capture(projection, conversion.metadata(), &ranges, writer)?;
-    let manifest = origins.artifact.manifest(writer)?;
-    let mut report = None;
-    let artifact = writer.converted_artifact_with_origins(
-        ArtifactExtension::new("ogg")?,
-        &manifest,
-        |sink| {
-            let written = conversion.write(sink).map_err(|cause| match cause {
-                WemVorbisWriteError::Input(cause) => error::io(input, cause),
-                WemVorbisWriteError::Output(cause) => error::io(Path::new("Ogg encoder"), cause),
-                other => MediaError::Contract(other.to_string()),
-            })?;
-            if written.sample_count != frames {
-                return Err(MediaError::Contract(
-                    "Ogg replay produced a different sample count".into(),
-                ));
-            }
-            report = Some(written);
-            Ok(())
-        },
-    )?;
-    let report = report.ok_or_else(|| MediaError::Contract("missing Ogg write report".into()))?;
-    if artifact.size != report.size {
-        return Err(MediaError::Contract(
-            "Ogg report and verified artifact sizes differ".into(),
-        ));
-    }
+    let output = ogg_artifact::write(Codec::Vorbis, frames, &origins.artifact, writer, |sink| {
+        conversion.write(sink).map_err(|cause| match cause {
+            WemVorbisWriteError::Input(cause) => error::io(input, cause),
+            WemVorbisWriteError::Output(cause) => error::io(Path::new("Ogg encoder"), cause),
+            other => MediaError::Contract(other.to_string()),
+        })
+    })?;
     Ok(Ok(CompletedOgg {
-        artifact,
-        report,
+        output,
         ranges,
         origins,
     }))
@@ -92,18 +72,9 @@ impl CompletedConversion for CompletedOgg {
 impl CompletedOgg {
     fn payload(self, projection: &WemProjection<'_>) -> Result<WrittenAudio, MediaError> {
         let ranges = self.ranges;
-        Ok(WrittenAudio::Ogg {
-            signal: WrittenSignal {
-                actual_codec: self.report.codec.id(),
-                artifact: self.artifact,
-                channels: self.report.channels,
-                sample_rate: self.report.sample_rate,
-                sample_count: DecimalU64::new(self.report.sample_count),
-                loop_points: self
-                    .report
-                    .loop_points
-                    .map(|points| WemLoop::from_frames(points.start, points.end)),
-            },
+        Ok(WrittenAudio::Vorbis {
+            actual_format: WrittenOggFormat::Ogg,
+            signal: self.output.signal(),
             source_range: projection.range(ranges.audio_packets.start, ranges.audio_packets.end)?,
             vorbis_inputs: Box::new(VorbisInputs {
                 average_byte_rate: projection
@@ -116,21 +87,13 @@ impl CompletedOgg {
     }
 
     fn prove(&self, proof: &mut ConversionOrigins<'_, '_, '_, '_>) -> Result<(), MediaError> {
-        proof.common_success()?;
-        proof.field(
-            &format!("{OUTCOME}/payload/sample_count"),
-            self.origins.frames.clone(),
+        ogg_artifact::prove(
+            proof,
+            proof.combine([WemOriginField::Channels])?,
+            &self.origins.frames,
+            &self.origins.artifact,
+            self.output.report.loop_points.is_some(),
         )?;
-        proof.field(
-            LOOP_POINTS,
-            self.origins.with_fields(proof, [WemOriginField::Loop])?,
-        )?;
-        if self.report.loop_points.is_some() {
-            for (path, field) in super::LOOP_FIELDS {
-                let evidence = self.origins.with_fields(proof, [field])?;
-                proof.field(&format!("{LOOP_POINTS}/{path}"), evidence)?;
-            }
-        }
         proof.range_at(SOURCE_RANGE, &self.origins.audio)?;
         proof.field(
             INPUTS,
@@ -150,7 +113,7 @@ impl CompletedOgg {
         ] {
             proof.range_at(&format!("{INPUTS}/{field}"), origin)?;
         }
-        proof.artifact(&self.origins.artifact)
+        Ok(())
     }
 }
 
@@ -223,23 +186,4 @@ impl VorbisOrigins {
             writer,
         )
     }
-
-    fn with_fields(
-        &self,
-        proof: &ConversionOrigins<'_, '_, '_, '_>,
-        fields: impl IntoIterator<Item = WemOriginField>,
-    ) -> Result<OriginContributions, MediaError> {
-        join(proof.writer, [&proof.combine(fields)?, &self.frames])
-    }
-}
-
-fn join<'a>(
-    writer: &MediaWriter<'_>,
-    parts: impl IntoIterator<Item = &'a OriginContributions>,
-) -> Result<OriginContributions, MediaError> {
-    let mut capture = writer.capture_origins();
-    for part in parts {
-        capture.include(part, writer)?;
-    }
-    Ok(capture.finish())
 }

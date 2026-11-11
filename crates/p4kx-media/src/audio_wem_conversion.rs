@@ -13,7 +13,7 @@ use p4kx_extraction::{AudioError, Codec, DecimalU64, WavReport};
 use super::WemProjection;
 use crate::audio_payload::{
     AudioPayload, ConversionFailure, ConversionOutcome, EncodedAudioFormat, WemConversion, WemLoop,
-    WrittenAudio, WrittenSignal,
+    WrittenAudio, WrittenSignal, WrittenWavFormat,
 };
 use crate::audio_record_origins as origins;
 use crate::origin_contributions::OriginContributions;
@@ -24,6 +24,10 @@ use crate::{
 
 #[path = "audio_wem_conversion_evidence.rs"]
 mod evidence;
+#[path = "audio_wem_ogg_artifact.rs"]
+mod ogg_artifact;
+#[path = "audio_wem_opus.rs"]
+mod opus;
 #[path = "audio_wem_vorbis.rs"]
 mod vorbis;
 
@@ -54,6 +58,10 @@ pub(super) fn project<R: Read + Seek>(
                 Ok(conversion) => Ok(Completed::write(projection, conversion, writer)?),
                 Err(cause) => Err(cause),
             };
+            publish(projection, inspected.metadata(), format, converted, writer)
+        }
+        EncodedAudioFormat::Ogg if inspected.metadata().codec() == Codec::Opus => {
+            let converted = opus::convert(projection, inspected, writer)?;
             publish(projection, inspected.metadata(), format, converted, writer)
         }
         EncodedAudioFormat::Ogg => {
@@ -166,9 +174,9 @@ impl Completed {
     }
 
     fn payload(self, projection: &WemProjection<'_>) -> Result<WrittenAudio, MediaError> {
-        Ok(WrittenAudio::Wav {
+        Ok(WrittenAudio::Pcm {
+            actual_format: WrittenWavFormat::Wav,
             signal: WrittenSignal {
-                actual_codec: Codec::Pcm.id(),
                 artifact: self.artifact,
                 channels: self.report.channels,
                 sample_rate: self.report.sample_rate,
@@ -241,26 +249,21 @@ impl<'source, 'info, 'writer, 'run> ConversionOrigins<'source, 'info, 'writer, '
         origins::subtree(&mut self.prepared, path, evidence, self.writer)
     }
 
-    fn common_success(&mut self) -> Result<(), MediaError> {
+    fn common_success(&mut self, channels: OriginContributions) -> Result<(), MediaError> {
         let codec = self.combine([WemOriginField::Codec])?;
         self.field(OUTCOME, codec.clone())?;
         self.field(&format!("{OUTCOME}/type"), codec.clone())?;
         self.field(&format!("{OUTCOME}/payload/actual_format"), codec.clone())?;
         self.field(&format!("{OUTCOME}/payload/actual_codec"), codec)?;
-        for (field, origin) in [
-            ("channels", WemOriginField::Channels),
-            ("sample_rate", WemOriginField::SampleRate),
-        ] {
-            self.field(
-                &format!("{OUTCOME}/payload/{field}"),
-                self.combine([origin])?,
-            )?;
-        }
-        Ok(())
+        self.field(&format!("{OUTCOME}/payload/channels"), channels)?;
+        self.field(
+            &format!("{OUTCOME}/payload/sample_rate"),
+            self.combine([WemOriginField::SampleRate])?,
+        )
     }
 
     fn success(&mut self, completed: &Completed) -> Result<(), MediaError> {
-        self.common_success()?;
+        self.common_success(self.combine([WemOriginField::Channels])?)?;
         for (field, origin) in [
             ("sample_count", WemOriginField::SampleCount),
             ("loop_points", WemOriginField::Loop),
@@ -315,7 +318,9 @@ impl<'source, 'info, 'writer, 'run> ConversionOrigins<'source, 'info, 'writer, '
         let mut observed = self.combine(fields.iter().copied())?;
         if matches!(
             cause,
-            AudioError::InvalidVorbis(_) | AudioError::CodebooksRejected { .. }
+            AudioError::InvalidVorbis(_)
+                | AudioError::CodebooksRejected { .. }
+                | AudioError::InvalidOpus(_)
         ) {
             observed.complete = false;
         }
