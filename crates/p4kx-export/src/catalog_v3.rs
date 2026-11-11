@@ -15,6 +15,15 @@ pub(crate) mod blueprint_category_list;
 #[path = "blueprint_category_list_read.rs"]
 pub(crate) mod blueprint_category_list_read;
 
+#[path = "durability_damage.rs"]
+mod authored_damage;
+#[path = "authored_explosion.rs"]
+mod authored_explosion;
+#[path = "durability_observed.rs"]
+mod authored_fields;
+#[path = "durability_link.rs"]
+mod authored_link;
+
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
 #[path = "catalog_durability.rs"]

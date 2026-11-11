@@ -6,11 +6,16 @@ use std::cell::RefCell;
 use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value};
 
 use crate::catalog_number_capture::CapturedNumber;
-use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact, OriginalValuePart};
+use crate::catalog_read::original::{
+    OriginalDatum, OriginalFlowFields, OriginalValueFact, OriginalValuePart,
+};
 use crate::record_fields::number_value;
 use crate::resource_float::ResourceFloat32;
 use crate::source_fields::{FieldCapture, FieldError, FieldViolation};
 use crate::{CatalogError, ExportAccountingError};
+
+#[path = "authored_field_links.rs"]
+mod links;
 
 type Fact<'scope, 'read, 'source> = OriginalValueFact<'scope, 'read, 'source>;
 
@@ -94,14 +99,35 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         })
     }
 
+    pub(super) fn int32(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<i32>, CatalogError> {
+        self.scalar(name, "a nullable Int32", notes, |fact| {
+            Ok(match fact.value() {
+                Value::Int32(value) => Some(*value),
+                _ => None,
+            })
+        })
+    }
+
     pub(super) fn string(
         &self,
         name: &str,
         notes: &mut Vec<FieldError>,
     ) -> Result<SourcedValue<String>, CatalogError> {
+        Ok(self.borrowed_string(name, notes)?.map(str::to_owned))
+    }
+
+    pub(super) fn borrowed_string(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<&'source str>, CatalogError> {
         self.scalar(name, "a nullable String", notes, |fact| {
             Ok(match fact.value() {
-                Value::String(text) => Some((*text).to_owned()),
+                Value::String(text) => Some(*text),
                 _ => None,
             })
         })
@@ -215,23 +241,33 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
                     notes,
                 )?),
             ),
-            Value::Struct(source) => {
-                let path = self.originals.logical_path(fact)?;
-                let body = self.capture.unsupported_type(source, &path)?;
-                notes.push(
-                    FieldError::Unsupported {
-                        source_type: source.type_name().to_owned(),
-                        field: path,
-                    }
-                    .with_body(body),
-                );
-                (OriginalValuePart::ConcreteType, SourceValue::Unsupported)
-            }
+            Value::Struct(source) => (
+                OriginalValuePart::ConcreteType,
+                self.unsupported(fact, source, notes)?,
+            ),
             other => (
                 OriginalValuePart::Value,
                 self.failure(name, other, "a nullable Struct", notes)?,
             ),
         })
+    }
+
+    fn unsupported<T>(
+        &self,
+        fact: &Fact<'scope, 'read, 'source>,
+        source: &StructValue<'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourceValue<T>, CatalogError> {
+        let path = self.originals.logical_path(fact)?;
+        let body = self.capture.unsupported_type(source, &path)?;
+        notes.push(
+            FieldError::Unsupported {
+                source_type: source.type_name().to_owned(),
+                field: path,
+            }
+            .with_body(body),
+        );
+        Ok(SourceValue::Unsupported)
     }
 
     fn structure(&self) -> Result<&'read StructValue<'source>, CatalogError> {
@@ -274,10 +310,22 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         state: SourceValue<T>,
         role: SourceUseRole,
     ) -> Result<SourcedValue<T>, CatalogError> {
+        Ok(self
+            .field_datum(fact, part, state, role)?
+            .into_cell(self.originals.sources()))
+    }
+
+    fn field_datum<T>(
+        &self,
+        fact: &Fact<'scope, 'read, 'source>,
+        part: OriginalValuePart,
+        state: SourceValue<T>,
+        role: SourceUseRole,
+    ) -> Result<OriginalDatum<T>, CatalogError> {
         let mut cell = fact.bind(part, state, role, true)?;
         cell.contribute(self.kind()?);
         cell.contribute(fact.observe(OriginalValuePart::FieldName, SourceUseRole::Selector)?);
-        Ok(cell.into_cell(self.originals.sources()))
+        Ok(cell)
     }
 
     fn kind(&self) -> Result<SourceUse, CatalogError> {

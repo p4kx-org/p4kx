@@ -25,14 +25,20 @@ use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
 use crate::{CatalogError, ExportAccountingError};
 
+use super::{authored_damage as damage, authored_fields as observed, authored_link as link};
+
 #[path = "durability_degradation.rs"]
 mod degradation;
 #[path = "durability_distortion.rs"]
 mod distortion;
+#[path = "durability_event_actions.rs"]
+mod event_actions;
 #[path = "durability_health_fields.rs"]
 mod health_fields;
-#[path = "durability_observed.rs"]
-mod observed;
+#[path = "durability_initial_damage.rs"]
+mod initial_damage;
+#[path = "durability_lifecycle.rs"]
+mod lifecycle;
 #[path = "durability_resistance.rs"]
 mod resistance;
 #[path = "durability_wear.rs"]
@@ -98,11 +104,11 @@ impl ComponentOwner {
 /// One original Health component on a selected item.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Durability {
+pub(crate) struct Durability<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
-    fields: HealthFields,
+    fields: HealthFields<'source>,
 }
 
 /// One original degradation component on a selected item.
@@ -126,14 +132,14 @@ pub(crate) struct Distortion {
 }
 
 #[derive(Default)]
-pub(crate) struct DurabilityRows {
-    health: Vec<Durability>,
+pub(crate) struct DurabilityRows<'source> {
+    health: Vec<Durability<'source>>,
     degradation: Vec<Degradation>,
     distortion: Vec<Distortion>,
     pub(crate) numbers: Vec<CapturedNumber>,
 }
 
-impl DurabilityRows {
+impl DurabilityRows<'_> {
     pub(crate) fn extend(&mut self, other: Self) {
         self.health.extend(other.health);
         self.degradation.extend(other.degradation);
@@ -143,18 +149,18 @@ impl DurabilityRows {
 }
 
 #[derive(Default)]
-pub(crate) struct DurabilityRead {
-    pub(crate) rows: DurabilityRows,
+pub(crate) struct DurabilityRead<'source> {
+    pub(crate) rows: DurabilityRows<'source>,
     pub(crate) notes: Vec<FieldError>,
     pub(crate) legacy_health: Option<f32>,
 }
 
-impl DurabilityRead {
+impl<'source> DurabilityRead<'source> {
     fn push(
         &mut self,
         kind: Component,
         owner: ComponentOwner,
-        original: Observed<'_, '_, '_, '_>,
+        original: Observed<'_, '_, '_, 'source>,
     ) -> Result<(), CatalogError> {
         match kind {
             Component::Health => {
@@ -183,7 +189,7 @@ pub(crate) fn read<'source>(
     projection: &CatalogProjection<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
-) -> Result<DurabilityRead, CatalogError> {
+) -> Result<DurabilityRead<'source>, CatalogError> {
     let mut result = DurabilityRead::default();
     let Some(Value::Array(components)) = tree.field("Components") else {
         return Ok(result);
@@ -248,14 +254,17 @@ impl Component {
     }
 }
 
-pub(crate) struct DurabilityTables {
-    pub(crate) health: CatalogTable<Durability>,
+pub(crate) struct DurabilityTables<'source> {
+    pub(crate) health: CatalogTable<Durability<'source>>,
     pub(crate) degradation: CatalogTable<Degradation>,
     pub(crate) distortion: CatalogTable<Distortion>,
 }
 
 /// Orders each family by physical Record and original component slot.
-pub(crate) fn tables(forge: &DataForge<'_>, mut rows: DurabilityRows) -> DurabilityTables {
+pub(crate) fn tables<'source>(
+    forge: &DataForge<'_>,
+    mut rows: DurabilityRows<'source>,
+) -> DurabilityTables<'source> {
     rows.health.sort_by_key(|row| row.owner.key());
     rows.degradation.sort_by_key(|row| row.owner.key());
     rows.distortion.sort_by_key(|row| row.owner.key());

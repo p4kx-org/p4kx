@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashSet;
+
 use p4kx_extraction::{
-    DataType, Guid, Record, Reference, ReferenceOrigin, SourceUse, SourceUseRole, SourceValue,
+    DataForgeError, DataType, Guid, Record, Reference, ReferenceOrigin, SourceLocation, SourceUse,
+    SourceUseRole, SourceValue,
 };
 
 use super::original_instance_capture;
@@ -77,6 +80,63 @@ impl<'fact, 'scope, 'read, 'source> OriginalReferenceObservation<'fact, 'scope, 
             .observe(OriginalValuePart::Value, SourceUseRole::Selector)?;
         self.caller
             .original_record_path(self.admitted.origin, &selector)
+    }
+
+    /// Tests the admitted Record against the authored Reference target declaration.
+    /// The unconstrained target word contributes its declaration without testing ancestry.
+    pub(crate) fn matches_record_declaration(
+        &self,
+        selectors: &mut Vec<SourceUse>,
+        check_cancel: impl Fn() -> Result<(), CatalogError>,
+    ) -> Result<bool, CatalogError> {
+        let storage = self.caller.field().storage();
+        if storage.data_type() != DataType::Reference || self.is_instance() {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        let scope = self.caller.scope().dataforge();
+        selectors.push(
+            self.caller
+                .observe(OriginalValuePart::Target, SourceUseRole::Selector)?,
+        );
+        let expected = storage.target();
+        if expected == u16::MAX {
+            return Ok(true);
+        }
+        selectors.push(scope.at(
+            RecordHeaderField::SourceType.location(self.record_index()),
+            SourceUseRole::Selector,
+        )?);
+        let expected = u32::from(expected);
+        let mut current = self
+            .record()?
+            .struct_type()
+            .map_err(CatalogError::DataForge)?;
+        let start = current.index();
+        let mut seen = HashSet::new();
+        loop {
+            check_cancel()?;
+            let index = current.index();
+            if index == expected {
+                return Ok(true);
+            }
+            if !seen.insert(index) {
+                return Err(CatalogError::DataForge(DataForgeError::StructCycle {
+                    struct_index: start,
+                }));
+            }
+            selectors.push(scope.at(
+                SourceLocation::Subresource {
+                    namespace: "dataforgeStructDeclaration".to_owned(),
+                    indices: vec![u64::from(index)],
+                    field: "parent".to_owned(),
+                },
+                SourceUseRole::Selector,
+            )?);
+            let Some(parent) = current.parent() else {
+                return Ok(false);
+            };
+            current = parent;
+        }
     }
 
     pub(crate) fn capture(self) -> Result<OriginalReferenceCapture<'source>, CatalogError> {

@@ -11,7 +11,7 @@ use crate::{CatalogError, ExportAccountingError};
 use super::reference::{SourceRecordReference, SourceWeakReference, SourceWeakTarget};
 use super::value::SourcePayload;
 
-pub(super) fn read<'source>(
+pub(crate) fn read<'source>(
     observed: OriginalReferenceObservation<'_, '_, '_, 'source>,
     sources: &SourceUses,
 ) -> Result<SourcePayload<'source>, CatalogError> {

@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "catalog_durability_death_explosion.rs"]
+mod death_explosion;
+#[path = "catalog_durability_event_actions.rs"]
+mod event_actions;
 #[path = "catalog_durability_lifecycle.rs"]
 mod lifecycle;
+#[path = "catalog_durability_nested.rs"]
+mod nested;
 #[path = "catalog_durability_number_controls.rs"]
 mod number_controls;
+#[path = "catalog_durability_resistance_reference.rs"]
+mod resistance_reference;
 
 use p4kx_export::{CatalogError, CatalogPublicationMode, build_catalog};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
@@ -257,6 +265,10 @@ fn database(health_type: Option<TestType>) -> DataForgeBuilder {
         Some(health_type) => health.field("Health", health_type),
         None => health,
     };
+    database_with_health(health)
+}
+
+fn database_with_health(health: TestStruct) -> DataForgeBuilder {
     DataForgeBuilder::new()
         .version(8)
         .enumeration("FixtureItemType", ["Misc", "Shield"])

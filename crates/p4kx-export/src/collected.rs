@@ -61,7 +61,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) tags: crate::catalog_v3::tag_catalog::TagRows<'f>,
     pub(crate) manufacturers: Vec<Manufacturer<'f>>,
     pub(crate) items: Vec<Item<'f>>,
-    pub(crate) durability: crate::catalog_v3::catalog_durability::DurabilityRows,
+    pub(crate) durability: crate::catalog_v3::catalog_durability::DurabilityRows<'f>,
     pub(crate) ships: Vec<Ship<'f>>,
     pub(crate) commodities: Vec<Commodity<'f>>,
     pub(crate) blueprints: Vec<BlueprintRow<'f>>,

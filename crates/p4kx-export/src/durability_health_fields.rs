@@ -5,6 +5,7 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::lifecycle::Lifecycle;
 use super::observed::{Observed, ReadHealth};
 use super::resistance::DurabilityResistances;
 use crate::CatalogError;
@@ -16,7 +17,7 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct HealthFields {
+pub(crate) struct HealthFields<'source> {
     health: SourcedValue<ResourceFloat32>,
     damage_cap: SourcedValue<ResourceFloat32>,
     client_only: SourcedValue<bool>,
@@ -45,12 +46,14 @@ pub(crate) struct HealthFields {
     exploded_geometry_tag: SourcedValue<String>,
     debris_geometry_tag: SourcedValue<String>,
     explosion_bone: SourcedValue<String>,
-    damage_resistances: SourcedValue<DurabilityResistances>,
+    damage_resistances: SourcedValue<DurabilityResistances<'source>>,
+    #[serde(flatten)]
+    lifecycle: Lifecycle<'source>,
 }
 
-impl HealthFields {
+impl<'source> HealthFields<'source> {
     pub(super) fn read(
-        source: Observed<'_, '_, '_, '_>,
+        source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<(Self, Option<f32>), CatalogError> {
         let ReadHealth {
@@ -95,10 +98,11 @@ impl HealthFields {
                 explosion_bone: source.string("ExplosionBone", notes)?,
                 damage_resistances: source.owned(
                     "DamageResistances",
-                    &["DamageResistanceBase", "DamageResistance"],
+                    DurabilityResistances::TYPES,
                     notes,
                     DurabilityResistances::read,
                 )?,
+                lifecycle: Lifecycle::read(source, notes)?,
             },
             legacy_value,
         ))

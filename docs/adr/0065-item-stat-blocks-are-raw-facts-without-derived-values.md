@@ -76,3 +76,18 @@ values, if any, `p4kx` computes.
 - Nesting each value as `{value, source}`: rejected as in ADR-0063.
 - Exporting every component of the item as raw trees: rejected; that is the Record export, and
   the Basetool needs a stable typed shape, not the DataForge's.
+
+## Catalog schema 3 durability
+
+Schema 3 publishes item Health, Degradation and Distortion in independent configuration tables
+under ADR-0356. An owning item Record and its original component ordinal identify each row.
+The component model preserves repeated components and makes Health available on selected items
+without a specialist stat block. Every authored field follows ADR-0357. A separate row per
+physical component preserves these identities without duplicating the item or choosing one
+component to represent the others.
+
+The retained specialist projection obtains finite `stats.health` from the first original Health
+component. The independent durability rows retain exact Single bits and all selected component
+occurrences. Explosion payloads use the shared authored explosion model. Linked Records retain
+their own identity and scope. Item resource self-repair, vehicle hull health and vehicle armour
+tuning remain distinct source families.

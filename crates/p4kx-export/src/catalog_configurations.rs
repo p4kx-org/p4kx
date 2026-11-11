@@ -18,7 +18,7 @@ use crate::template_projection::TemplateProjection;
 pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) blueprint_tiers: CatalogTable<crate::blueprint_tier_contract::BlueprintTier>,
     pub(crate) contract_templates: CatalogTable<TemplateProjection<'source>>,
-    pub(crate) durability: CatalogTable<Durability>,
+    pub(crate) durability: CatalogTable<Durability<'source>>,
     pub(crate) degradation: CatalogTable<Degradation>,
     pub(crate) distortion: CatalogTable<Distortion>,
     pub(crate) mission_broker_entries: CatalogTable<BrokerProjection<'source>>,
