@@ -91,6 +91,28 @@ pub enum OriginOutputAddress {
         /// Exact field path.
         path: FieldPath,
     },
+    /// A field within the GLB JSON chunk.
+    GlbJsonField {
+        /// Exact JSON Pointer relative to the root of the JSON chunk.
+        path: FieldPath,
+    },
+    /// The bytes addressed by a buffer view in the GLB binary chunk.
+    GlbBinaryBytes {
+        /// Exact JSON Pointer to the buffer view.
+        #[schemars(schema_with = "glb_buffer_view_path")]
+        path: FieldPath,
+        /// First byte of the view, relative to the start of the artifact.
+        start: DecimalU64,
+        /// First byte past the view, relative to the start of the artifact.
+        end_exclusive: DecimalU64,
+    },
+}
+
+fn glb_buffer_view_path(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "pattern": r"^/bufferViews/(0|[1-9][0-9]*)$"
+    })
 }
 
 /// One JSONL row in a portable standalone source-origin companion.

@@ -121,7 +121,12 @@ unknown marker.
 `p4kx chf glb` writes a sibling `<output>.p4kx-origin.jsonl` companion. Its
 file binding records the final GLB basename, byte length and SHA-256. The
 opaque payload row links the character input and the model, rig, material,
-palette, texture and animation reads used by the written model.
+palette, texture and animation reads used by the written model. The same
+companion identifies glTF data in the JSON and binary chunks. A
+`glbJsonField` path is a JSON Pointer within the GLB JSON chunk. A
+`glbBinaryBytes` path identifies the written `/bufferViews/N` entry and
+provides its absolute, half-open byte range in the file, excluding alignment
+padding. Each addressed datum carries its own contributing source set.
 
 The `--json` report adds `originReceipt`, `fieldOrigins`, `provenance` and
 `textureImageOrigins`. Field origins use JSON Pointers into the report. The

@@ -19,6 +19,9 @@ use serde::Serialize;
 use crate::cli::ChfGlbArgs;
 use crate::file_receipt::FileReceipt;
 
+#[path = "chf_glb_artifact_origins.rs"]
+mod artifact;
+
 #[path = "chf_glb_part_origins.rs"]
 mod parts;
 
@@ -29,6 +32,7 @@ use parts::{Parts, image_material, rig};
 
 pub(super) struct Projection {
     payload: FieldOrigin,
+    artifact: artifact::Fields,
     fields: FieldOrigins,
     images: Vec<ImageOrigin>,
     inventory: SourceInventory,
@@ -60,7 +64,11 @@ impl Projection {
             writer,
             binding,
             &self.inventory,
-            [(&OriginOutputAddress::OpaquePayload, &self.payload)],
+            std::iter::once((&OriginOutputAddress::OpaquePayload, &self.payload)).chain(
+                self.artifact
+                    .iter()
+                    .map(|(address, origin)| (address, origin)),
+            ),
         )
     }
 
@@ -167,9 +175,11 @@ pub(super) fn project(
     ] {
         payload.extend(group);
     }
+    let artifact = artifact::fields(&uses, emission, &parts, &clips, &images.fields)?;
     let fields = report::fields(&uses, &character, &parts, &images.all, &clips.all, &payload)?;
     Ok(Projection {
         payload: payload.origin(&uses),
+        artifact,
         fields,
         images: images.fields,
         inventory: uses.freeze()?,
@@ -241,6 +251,7 @@ fn images(
 }
 
 struct Clips {
+    inputs: Vec<Contributors>,
     all: Vec<Contributors>,
     written: Contributors,
 }
@@ -253,18 +264,21 @@ fn animations(
     bones: &Contributors,
 ) -> Result<Clips> {
     let mut all = Vec::new();
+    let mut inputs = Vec::new();
     let mut written = Contributors::default();
     for (index, (source, result)) in prepared
         .input_indices()
         .zip(&summary.animations)
         .enumerate()
     {
-        let mut clip = Contributors::default();
-        clip.entry(
+        let mut input = Contributors::default();
+        input.entry(
             uses,
             found.archive_source(source),
             SourceUseRole::Conversion,
         )?;
+        let mut clip = Contributors::default();
+        clip.extend(&input);
         if let Some(source) = prepared.rig_read_for(index) {
             rig(uses, &mut clip, source)?;
         }
@@ -273,8 +287,13 @@ fn animations(
             written.extend(&clip);
         }
         all.push(clip);
+        inputs.push(input);
     }
-    Ok(Clips { all, written })
+    Ok(Clips {
+        inputs,
+        all,
+        written,
+    })
 }
 
 fn field(fields: &mut FieldOrigins, path: &str, origin: FieldOrigin) -> Result<()> {

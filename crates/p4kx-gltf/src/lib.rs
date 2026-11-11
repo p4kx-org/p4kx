@@ -52,6 +52,7 @@ mod morphs;
 mod nodes;
 mod package_support;
 mod rig;
+mod rig_addresses;
 mod rig_animation;
 mod rig_emission;
 mod rig_mount;
@@ -90,6 +91,7 @@ pub use rig::{
     RigPiece, write_rigged_glb, write_rigged_glb_animated, write_rigged_glb_animated_observed,
     write_rigged_glb_animated_with, write_rigged_glb_with,
 };
+pub use rig_addresses::{RiggedBufferSource, RiggedBufferView, RiggedJsonAddress};
 pub use rig_animation::{RigAnimation, SampledAnimation, SampledBone, SampledWeights};
 pub use rig_emission::{RiggedGlbEmission, RiggedPartEmission};
 pub use rig_mount::RigMount;

@@ -6,12 +6,18 @@ use std::io::{self, Write as _};
 use std::path::Path;
 
 use p4kx_extraction::OriginDigestWriter;
-use p4kx_testkit::{HEAD_VERTICES, MALE_RIG_HASH, head_entries, head_rig, test_key};
+use p4kx_testkit::gltf::mesh::Semantic;
+use p4kx_testkit::{HEAD_VERTICES, MALE_RIG_HASH, check_glb, head_entries, head_rig, test_key};
 use serde_json::Value;
 
 use super::{TestResult, archive, chf, glb, glb_with};
 
-fn check_receipt(out: &Path, report: &Value, expected: &Value) -> TestResult {
+fn check_receipt(
+    out: &Path,
+    report: &Value,
+    expected: &Value,
+    positions_encrypted: bool,
+) -> TestResult {
     let name = report
         .get("originReceipt")
         .and_then(Value::as_str)
@@ -67,6 +73,37 @@ fn check_receipt(out: &Path, report: &Value, expected: &Value) -> TestResult {
         Some("end"),
         "receipt has a footer"
     );
+    check_head_positions(&bytes, &rows, positions_encrypted)
+}
+
+fn check_head_positions(bytes: &[u8], rows: &[Value], encrypted: bool) -> TestResult {
+    let checked = check_glb(bytes)?;
+    let positions = checked
+        .document
+        .nodes()
+        .find(|node| node.name() == Some("head") && node.mesh().is_some())
+        .and_then(|node| node.mesh())
+        .and_then(|mesh| mesh.primitives().next())
+        .and_then(|primitive| primitive.get(&Semantic::Positions))
+        .ok_or("head positions")?;
+    let view = positions.view().ok_or("positions buffer view")?;
+    for (path, kind) in [
+        (format!("/bufferViews/{}", view.index()), "glbBinaryBytes"),
+        (format!("/accessors/{}", positions.index()), "glbJsonField"),
+    ] {
+        let row = rows
+            .iter()
+            .find(|row| {
+                row.pointer("/address/path").and_then(Value::as_str) == Some(path.as_str())
+                    && row.pointer("/address/type").and_then(Value::as_str) == Some(kind)
+            })
+            .ok_or("exact head positions origin")?;
+        assert_eq!(
+            row.get("containsEncryptedSource").and_then(Value::as_bool),
+            Some(encrypted),
+            "{kind} classifies only the selected head geometry source"
+        );
+    }
     Ok(())
 }
 
@@ -109,7 +146,7 @@ fn an_equal_byte_replacement_updates_the_glb_receipt_and_keeps_field_origins_dis
         true
     );
     assert!(report["fieldOrigins"]["/body"]["containsEncryptedSource"].is_null());
-    check_receipt(&out, &report, &Value::Bool(true))?;
+    check_receipt(&out, &report, &Value::Bool(true), true)?;
     let bytes = fs::read(&out)?;
 
     let plain_run = glb(&plain, &file, &out, true)?;
@@ -120,7 +157,7 @@ fn an_equal_byte_replacement_updates_the_glb_receipt_and_keeps_field_origins_dis
         report["fieldOrigins"]["/vertices"]["containsEncryptedSource"],
         false
     );
-    check_receipt(&out, &report, &Value::Null)?;
+    check_receipt(&out, &report, &Value::Null, false)?;
     Ok(())
 }
 

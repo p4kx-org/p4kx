@@ -11,7 +11,7 @@ use crate::GltfError;
 use crate::animations::AnimationPlan;
 use crate::document::{GENERATOR, NodeMeshes, push_accessor, push_images, push_meshes};
 use crate::glb::{GlbOptions, GlbSummary, MaterialMode};
-use crate::instance::{Instance, materials};
+use crate::instance::{Instance, MaterialIds, materials};
 use crate::layout::Layout;
 use crate::materials::MaterialPlan;
 use crate::morphs::MorphTarget;
@@ -228,7 +228,7 @@ fn document(
     instances: &[Instance<'_>],
     layout: &Layout<'_>,
     images: &TextureSet,
-) -> json::Root {
+) -> (json::Root, Vec<MaterialIds>) {
     let mut root = json::Root {
         asset: json::Asset {
             generator: Some(GENERATOR.to_owned()),
@@ -278,7 +278,7 @@ fn document(
         &[]
     };
     push_rig_nodes(&mut root, &models, bones, bind_accessor);
-    root
+    (root, ids)
 }
 
 /// Returns the models to write the nodes of: each piece with its meshes and skinned nodes.

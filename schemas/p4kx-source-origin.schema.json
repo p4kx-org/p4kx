@@ -364,6 +364,55 @@
             "path"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A field within the GLB JSON chunk.",
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/FieldPath",
+              "description": "Exact JSON Pointer relative to the root of the JSON chunk."
+            },
+            "type": {
+              "const": "glbJsonField",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The bytes addressed by a buffer view in the GLB binary chunk.",
+          "properties": {
+            "endExclusive": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte past the view, relative to the start of the artifact."
+            },
+            "path": {
+              "description": "Exact JSON Pointer to the buffer view.",
+              "pattern": "^/bufferViews/(0|[1-9][0-9]*)$",
+              "type": "string"
+            },
+            "start": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte of the view, relative to the start of the artifact."
+            },
+            "type": {
+              "const": "glbBinaryBytes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path",
+            "start",
+            "endExclusive"
+          ],
+          "type": "object"
         }
       ]
     },

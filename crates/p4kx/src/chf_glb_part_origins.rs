@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::BTreeMap;
+
 use anyhow::Result;
 use p4kx_assembly::{Armour, ArmourPart, PaletteRecords, RigArchiveRead};
 use p4kx_extraction::model::ModelFile;
@@ -30,6 +32,7 @@ pub(super) struct Part {
     pub(super) geometry: Contributors,
     pub(super) morphs: Contributors,
     pub(super) materials: Contributors,
+    pub(super) material_slots: BTreeMap<usize, Contributors>,
 }
 
 impl Parts {
@@ -107,7 +110,10 @@ impl Part {
                 }
             }
         }
-        found.materials = materials(uses, part, emitted, forge)?;
+        found.material_slots = materials(uses, part, emitted, forge)?;
+        for material in found.material_slots.values() {
+            found.materials.extend(material);
+        }
         Ok(found)
     }
 }
@@ -162,18 +168,20 @@ fn materials(
     part: &ArmourPart,
     emitted: &RiggedPartEmission,
     forge: &DataForgeOrigin,
-) -> Result<Contributors> {
-    let mut found = Contributors::default();
+) -> Result<BTreeMap<usize, Contributors>> {
+    let mut found = BTreeMap::new();
     let archive = part.material_archive_origins();
 
     for slot in emitted.material_slots() {
-        found.entry(uses, archive.library(), SourceUseRole::Conversion)?;
+        let mut source = Contributors::default();
+        source.entry(uses, archive.library(), SourceUseRole::Conversion)?;
         for layer in emitted.material_layers(slot) {
-            selected_layer(uses, &mut found, archive, slot, layer)?;
+            selected_layer(uses, &mut source, archive, slot, layer)?;
         }
         if let Some(records) = part.palette_records_for(slot) {
-            palette(uses, &mut found, forge, records)?;
+            palette(uses, &mut source, forge, records)?;
         }
+        found.insert(slot, source);
     }
     Ok(found)
 }

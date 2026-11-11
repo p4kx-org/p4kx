@@ -240,7 +240,7 @@ pub(crate) fn write_instances(
         drawn_nodes,
         images,
         &animation_plans,
-        total,
+        total.len,
     );
     summary.parts = instances.len();
     summary.lod_fallbacks = lod_fallbacks;
@@ -252,20 +252,24 @@ pub(crate) fn write_instances(
     Ok(summary)
 }
 
+pub(crate) struct WrittenGlb {
+    pub(crate) len: u64,
+    pub(crate) binary_start: Option<u64>,
+}
+
 pub(crate) fn write_file(
     root: &json::Root,
     layout: &Layout<'_>,
     images: &TextureSet,
     out: &mut impl Write,
-) -> Result<u64, GltfError> {
+) -> Result<WrittenGlb, GltfError> {
     let mut json = root.to_vec()?;
     json.resize(json.len().next_multiple_of(4), b' ');
     let json_len = json.len() as u64;
     let bin_len = layout.len;
-    let mut total = HEADER_LEN + CHUNK_HEADER_LEN + json_len;
-    if bin_len > 0 {
-        total += CHUNK_HEADER_LEN + bin_len;
-    }
+    let json_end = HEADER_LEN + CHUNK_HEADER_LEN + json_len;
+    let binary_start = (bin_len > 0).then_some(json_end + CHUNK_HEADER_LEN);
+    let total = binary_start.map_or(json_end, |start| start + bin_len);
     let too_large = || GltfError::TooLarge { len: total };
     let total_word = u32::try_from(total).map_err(|_| too_large())?;
     let json_word = u32::try_from(json_len).map_err(|_| too_large())?;
@@ -283,7 +287,10 @@ pub(crate) fn write_file(
         layout.write(out, &images.images)?;
     }
     out.flush()?;
-    Ok(total)
+    Ok(WrittenGlb {
+        len: total,
+        binary_start,
+    })
 }
 
 fn find_lod(model: &Model, level: u32) -> Result<&Lod, GltfError> {

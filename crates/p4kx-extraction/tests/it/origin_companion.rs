@@ -9,8 +9,8 @@ use std::path::Path;
 
 use p4kx_extraction::{
     DecimalU64, FieldPath, InputScope, OriginArtifactBinding, OriginArtifactName,
-    OriginCompanionRow, OriginDigestWriter, OriginOutputAddress, SourceInput, SourceLocation,
-    SourceUseRole, SourceUses, read_observed_file, write_origin_companion,
+    OriginCompanionRow, OriginDigestWriter, OriginOutputAddress, OriginXmlField, SourceInput,
+    SourceLocation, SourceUseRole, SourceUses, read_observed_file, write_origin_companion,
 };
 use serde_json::{Value, json};
 
@@ -163,4 +163,82 @@ fn text_fields_require_exact_decimal_ranges_and_a_logical_field() -> TestResult 
         "offsets use exact decimal strings"
     );
     Ok(())
+}
+
+#[test]
+fn glb_addresses_extend_the_canonical_schema_without_rejecting_older_addresses() -> TestResult {
+    let schema = schemars::schema_for!(OriginCompanionRow<'static>).to_value();
+    let validator = jsonschema::validator_for(&schema)?;
+    let uses = SourceUses::new();
+    let origin = uses.origin(&[], false);
+    for (address, expected) in glb_address_cases()? {
+        let row = serde_json::to_value(OriginCompanionRow::Field {
+            address: &address,
+            origin: &origin,
+        })?;
+        assert_eq!(
+            row.get("address"),
+            Some(&expected),
+            "canonical address wire form"
+        );
+        validator
+            .validate(&row)
+            .map_err(|error| error.to_string())?;
+        if matches!(address, OriginOutputAddress::GlbBinaryBytes { .. }) {
+            let mut bad = row;
+            bad["address"]["path"] = json!("/images/0");
+            assert!(
+                !validator.is_valid(&bad),
+                "a binary span must identify a buffer view"
+            );
+        }
+    }
+    Ok(())
+}
+
+fn glb_address_cases() -> Result<[(OriginOutputAddress, Value); 6], Box<dyn Error>> {
+    let start = DecimalU64::new(1024);
+    let end_exclusive = DecimalU64::new(1101);
+    let field = FieldPath::parse("/images/0/bufferView")?;
+    let view = FieldPath::parse("/bufferViews/0")?;
+    Ok([
+        (
+            OriginOutputAddress::OpaquePayload,
+            json!({"type":"opaquePayload"}),
+        ),
+        (
+            OriginOutputAddress::XmlBytes {
+                start,
+                end_exclusive,
+                field: OriginXmlField::Text,
+            },
+            json!({"type":"xmlBytes","start":"1024","endExclusive":"1101","field":"text"}),
+        ),
+        (
+            OriginOutputAddress::TextBytes {
+                start,
+                end_exclusive,
+                field: field.clone(),
+            },
+            json!({"type":"textBytes","start":"1024","endExclusive":"1101","field":"/images/0/bufferView"}),
+        ),
+        (
+            OriginOutputAddress::JsonField {
+                path: field.clone(),
+            },
+            json!({"type":"jsonField","path":"/images/0/bufferView"}),
+        ),
+        (
+            OriginOutputAddress::GlbJsonField { path: field },
+            json!({"type":"glbJsonField","path":"/images/0/bufferView"}),
+        ),
+        (
+            OriginOutputAddress::GlbBinaryBytes {
+                path: view,
+                start,
+                end_exclusive,
+            },
+            json!({"type":"glbBinaryBytes","path":"/bufferViews/0","start":"1024","endExclusive":"1101"}),
+        ),
+    ])
 }

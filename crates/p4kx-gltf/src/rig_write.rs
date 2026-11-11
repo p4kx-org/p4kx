@@ -12,6 +12,7 @@ use crate::animations::push_animations;
 use crate::glb::{GlbOptions, GlbSummary, MaterialMode, write_file};
 use crate::glb_plan::{summarise, texture_set};
 use crate::layout::{Layout, Rigging};
+use crate::rig_addresses::Addresses;
 use crate::rig_animation::RigAnimation;
 use crate::rig_emission::RiggedGlbEmission;
 use crate::skin::inverse_binds;
@@ -102,13 +103,14 @@ fn write_rigged<'m>(
         MaterialMode::Colours => TextureSet::default(),
     };
     layout.push_images(images.images.iter().map(|image| image.png.len() as u64));
-    let mut root = document(skeleton, pieces, &instances, &layout, &images);
+    let (mut root, materials) = document(skeleton, pieces, &instances, &layout, &images);
     if let Some(buffer) = root.buffers.first().map(|_| json::Index::new(0)) {
         push_animations(&mut root, buffer, &layout, &plans);
     }
     let total = write_file(&root, &layout, &images, out)?;
     if let Some(emission) = emission {
-        *emission = RiggedGlbEmission::of(&instances, &layout, &mut images);
+        let addresses = Addresses::of(&root, &layout, &instances, &materials, &plans, &total);
+        *emission = RiggedGlbEmission::of(&instances, &layout, &mut images, addresses);
     }
     let defaulted = instances
         .iter()
@@ -121,7 +123,7 @@ fn write_rigged<'m>(
         drawn_nodes,
         images,
         &plans,
-        total,
+        total.len,
     );
     summary.parts = instances.len();
     summary.lod_fallbacks = fallbacks;

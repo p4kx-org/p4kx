@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::instance::Instance;
 use crate::layout::Layout;
 use crate::materials::Slot;
+use crate::rig_addresses::{Addresses, RiggedBufferView, RiggedJsonAddress};
 use crate::shading::shaded_layers;
 use crate::texture_origins::{TextureMaterialSource, TextureReadUse};
 use crate::texture_plan::TextureSet;
@@ -102,6 +103,7 @@ pub struct RiggedGlbEmission {
     parts: Vec<RiggedPartEmission>,
     images: Vec<Vec<TextureReadUse>>,
     image_materials: Vec<Option<TextureMaterialSource>>,
+    addresses: Addresses,
 }
 
 impl RiggedGlbEmission {
@@ -109,6 +111,7 @@ impl RiggedGlbEmission {
         instances: &[Instance<'_>],
         layout: &Layout<'_>,
         textures: &mut TextureSet,
+        addresses: Addresses,
     ) -> Self {
         let mut parts = vec![RiggedPartEmission::default(); instances.len()];
         for mesh in &layout.meshes {
@@ -129,6 +132,7 @@ impl RiggedGlbEmission {
             parts,
             images: std::mem::take(&mut textures.image_sources),
             image_materials: std::mem::take(&mut textures.image_materials),
+            addresses,
         }
     }
 
@@ -141,6 +145,18 @@ impl RiggedGlbEmission {
     #[must_use]
     pub fn image_material(&self, image: usize) -> Option<&TextureMaterialSource> {
         self.image_materials.get(image)?.as_ref()
+    }
+
+    /// Returns the exact binary buffer views in their GLB document order.
+    #[must_use]
+    pub fn buffer_views(&self) -> &[RiggedBufferView] {
+        &self.addresses.views
+    }
+
+    /// Returns the authored GLB JSON values whose addresses the writer observed.
+    #[must_use]
+    pub fn json_addresses(&self) -> &[RiggedJsonAddress] {
+        &self.addresses.json
     }
 
     /// Returns the emission result for each supplied part, including those without geometry.
