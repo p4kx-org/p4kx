@@ -93,19 +93,43 @@ fn assert_artifact(catalog: &Value) -> TestResult {
         "original warning occurrence count"
     );
     let source = original_source(catalog)?;
-    let templates = diagnostics
-        .iter()
-        .find(|item| {
-            item.get("kind") == Some(&json!("contractTemplates"))
-                && item.get("warningCode") == Some(&json!("unknown_template_values"))
-        })
-        .ok_or("shared warning family status for Templates")?;
-    assert_eq!(
-        templates.get("examples"),
-        Some(&json!([])),
-        "the Broker field does not manufacture a Template occurrence"
+    assert!(
+        diagnostics.iter().all(|item| {
+            item.get("kind") != Some(&json!("contractTemplates"))
+                || item.get("warningCode") != Some(&json!("unknown_template_values"))
+        }),
+        "a Broker-only interpretation failure belongs only to the Broker diagnostic"
     );
+    assert_kind_health(health, "contractTemplates", "complete")?;
+    assert_kind_health(health, "missionBrokerEntries", "incomplete")?;
     warning_example(catalog, health, warning, source)
+}
+
+fn assert_kind_health(health: &Value, kind: &str, projection: &str) -> TestResult {
+    let kinds = health
+        .get("kinds")
+        .and_then(Value::as_array)
+        .ok_or("per-kind health")?;
+    let row = kinds
+        .iter()
+        .find(|row| row.get("kind") == Some(&json!(kind)))
+        .ok_or("selected kind health")?;
+    assert_eq!(
+        row.get("writtenRows"),
+        Some(&json!(1)),
+        "{kind} retained one actual row"
+    );
+    assert_eq!(
+        row.get("read"),
+        Some(&json!("complete")),
+        "{kind} original data was readable"
+    );
+    assert_eq!(
+        row.get("projection"),
+        Some(&json!(projection)),
+        "{kind} typed projection reflects its own observations"
+    );
+    Ok(())
 }
 
 fn original_source(catalog: &Value) -> Result<&Value, Box<dyn Error>> {
@@ -235,6 +259,13 @@ fn source() -> Vec<u8> {
                 ),
             ),
         )
+        .structure(TestStruct::new("ContractTemplate"))
+        .record(TestRecord::new(
+            0x1050,
+            "ContractTemplate",
+            "ContractTemplate.Complete",
+            "libs/foundry/records/missiontemplates/complete.xml",
+        ))
         .build()
 }
 

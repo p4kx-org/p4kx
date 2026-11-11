@@ -30,13 +30,15 @@ impl<'f> Collected<'f> {
         let UnknownVocabularyReport {
             count,
             details,
-            examples,
+            evidence,
         } = unknowns.into_report()?;
         if count > 0 {
-            self.warnings
-                .push(CraftingWarning::UnknownTemplateValues { count, details });
+            let warning = CraftingWarning::UnknownTemplateValues { count, details };
+            for diagnostic in evidence.into_diagnostics(warning.kind()) {
+                self.ledger.field_diagnostic(diagnostic);
+            }
+            self.warnings.push(warning);
         }
-        self.ledger.template_warning_examples.extend(examples);
         Ok(())
     }
 

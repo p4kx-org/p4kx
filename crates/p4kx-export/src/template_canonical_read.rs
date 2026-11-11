@@ -52,8 +52,8 @@ pub(crate) fn read<'source>(
     let mut references = RefCell::new(TemplateReferences::new(&fields));
     let owner = FlowOwnerKind::ContractTemplate;
     let plan = TemplatePlan::read(&fields, references.get_mut(), owner)?;
-    let members = TemplateMembers::new(&fields, plan.roots())?
-        .with_warning_capture(capture.example_body(), owner);
+    let members = TemplateMembers::new(&fields, plan.roots(), owner)?
+        .with_warning_capture(capture.example_body());
     let (flows, flow_links) =
         crate::template_flow_configuration_read::read(&members, &plan, owner)?;
     let (properties, property_links) =

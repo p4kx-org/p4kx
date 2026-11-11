@@ -8,9 +8,9 @@ use p4kx_extraction::{DecimalU64, Value};
 use crate::catalog_read::original::{
     ExampleBodyCapture, OriginalFlowFields, OriginalValueEdge, OriginalValueFact, OriginalValuePart,
 };
+use crate::health_diagnostic_observation::ExampleObservation;
 use crate::mission_flow_owner::FlowOwnerKind;
 use crate::source_value_catalog::SourceValueRef;
-use crate::template_issues::TemplateWarningExample;
 use crate::template_issues::Unknowns;
 use crate::template_source_refs::{PhysicalTemplateRef, SourceFieldRef};
 use crate::{CatalogError, ExportAccountingError};
@@ -22,18 +22,15 @@ pub(crate) struct TemplateMembers<'fields, 'scope, 'read, 'source> {
     values: Vec<&'fields OriginalValueFact<'scope, 'read, 'source>>,
     indices: HashMap<u64, SourceValueRef>,
     root_indices: HashMap<u64, DecimalU64>,
-    warning: Option<WarningCapture<'fields, 'scope, 'read, 'source>>,
-}
-
-struct WarningCapture<'fields, 'scope, 'read, 'source> {
-    body: &'fields ExampleBodyCapture<'scope, 'read, 'source>,
     owner: FlowOwnerKind,
+    warning: Option<&'fields ExampleBodyCapture<'scope, 'read, 'source>>,
 }
 
 impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 'source> {
     pub(crate) fn new(
         fields: &'fields OriginalFlowFields<'scope, 'read, 'source>,
         wanted: impl IntoIterator<Item = &'fields OriginalValueFact<'scope, 'read, 'source>>,
+        owner: FlowOwnerKind,
     ) -> Result<Self, CatalogError> {
         let mut starts = BTreeSet::new();
         for fact in wanted {
@@ -48,6 +45,7 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
             values: Vec::new(),
             indices: HashMap::new(),
             root_indices: HashMap::new(),
+            owner,
             warning: None,
         };
         let mut covered_until = 0;
@@ -99,9 +97,8 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
     pub(crate) const fn with_warning_capture(
         mut self,
         body: &'fields ExampleBodyCapture<'scope, 'read, 'source>,
-        owner: FlowOwnerKind,
     ) -> Self {
-        self.warning = Some(WarningCapture { body, owner });
+        self.warning = Some(body);
         self
     }
 
@@ -118,7 +115,7 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
         if value.is_empty() {
             return Ok(None);
         }
-        unknowns.parse(category, value, parse, || {
+        unknowns.parse(self.owner, category, value, parse, || {
             self.warning_example(fact, OriginalValuePart::Value)
         })
     }
@@ -133,7 +130,7 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
         let Value::Struct(value) = fact.value() else {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         };
-        unknowns.parse_type(category, value.type_name(), parse, || {
+        unknowns.parse_type(self.owner, category, value.type_name(), parse, || {
             self.warning_example(fact, OriginalValuePart::ConcreteType)
         })
     }
@@ -142,18 +139,15 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
         &self,
         fact: &OriginalValueFact<'scope, 'read, 'source>,
         part: OriginalValuePart,
-    ) -> Result<Option<TemplateWarningExample>, CatalogError> {
-        let Some(capture) = &self.warning else {
+    ) -> Result<Option<ExampleObservation>, CatalogError> {
+        let Some(capture) = self.warning else {
             return Ok(None);
         };
         let ancestors = self.fields.ancestors(fact)?;
         let path = self.fields.logical_path(fact)?;
-        Ok(Some(TemplateWarningExample {
-            owner: capture.owner,
-            example: capture
-                .body
-                .vocabulary_example(fact, &ancestors, &path, part)?,
-        }))
+        Ok(Some(
+            capture.vocabulary_example(fact, &ancestors, &path, part)?,
+        ))
     }
 
     pub(crate) fn physical(&self) -> PhysicalTemplateRef {

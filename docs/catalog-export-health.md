@@ -154,7 +154,9 @@ represented distinctly from an unreadable field. The field inspection
 does not follow References into other owners. A retained row can have a failed field or derived
 operation; it still counts as written while the relevant stage and diagnostics remain incomplete.
 
-Source warning diagnostics retain the established warning code and producer count. Diagnostic
+Source warning diagnostics retain the established warning code and producer count. Unsupported
+mission vocabulary counts only against the kind whose typed projection encountered it. The CLI
+warning retains the combined category counts across the two mission kinds. Diagnostic
 examples contain technical identity and field metadata rather than arbitrary game values or raw
 error messages. The eight-example limit does not truncate `failedRecords` or unresolved target
 identities.

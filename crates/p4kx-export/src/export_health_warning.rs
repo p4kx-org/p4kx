@@ -5,34 +5,45 @@ use crate::crafting_warning::CraftingWarning;
 use crate::export_diagnostic::{
     ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
 };
-use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
+use crate::health_diagnostic_observation::{
+    DiagnosticObservation as ExportDiagnostic, ExampleObservation,
+};
 use crate::selection::Kind;
-use crate::template_issues::TemplateWarningExamples;
 
 /// Maps the established source-warning vocabulary to its affected typed projections and units.
-pub(crate) fn diagnostics(
-    warning: &CraftingWarning,
-    examples: &TemplateWarningExamples,
-) -> Vec<ExportDiagnostic> {
+pub(crate) fn diagnostics(warning: &CraftingWarning) -> impl Iterator<Item = ExportDiagnostic> {
     let (kinds, unit, stage) = affected(warning);
-    kinds
-        .iter()
-        .map(|kind| ExportDiagnostic {
-            kind: Some(*kind),
+    kinds.iter().map(move |kind| {
+        source_warning(
+            *kind,
             stage,
-            code: ExportDiagnosticCode::SourceWarning,
-            severity: ExportDiagnosticSeverity::Warning,
-            source_role: None,
-            warning_code: Some(warning.kind().to_owned()),
-            count: warning.count().unwrap_or(1),
-            count_unit: unit,
-            examples: if matches!(warning, CraftingWarning::UnknownTemplateValues { .. }) {
-                examples.for_kind(*kind).to_vec()
-            } else {
-                Vec::new()
-            },
-        })
-        .collect()
+            warning.kind(),
+            warning.count().unwrap_or(1),
+            unit,
+            Vec::new(),
+        )
+    })
+}
+
+pub(crate) fn source_warning(
+    kind: Kind,
+    stage: ExportDiagnosticStage,
+    warning_code: &str,
+    count: usize,
+    count_unit: ExportDiagnosticUnit,
+    examples: Vec<ExampleObservation>,
+) -> ExportDiagnostic {
+    ExportDiagnostic {
+        kind: Some(kind),
+        stage,
+        code: ExportDiagnosticCode::SourceWarning,
+        severity: ExportDiagnosticSeverity::Warning,
+        source_role: None,
+        warning_code: Some(warning_code.to_owned()),
+        count,
+        count_unit,
+        examples,
+    }
 }
 
 const fn affected(
@@ -41,9 +52,9 @@ const fn affected(
     use ExportDiagnosticStage::{DerivedProjection, Projection, SourceRead};
     use ExportDiagnosticUnit::{ArchiveEntries, Occurrences, Records, Rows, Values};
     use Kind::{
-        BlueprintPools, Blueprints, ContractTemplates, DismantleProcesses, HarvestableLocations,
-        HarvestableProviderPresets, LootContainers, MineableEntities, MissionBrokerEntries, Paints,
-        Shops, StarmapObjects, SubHarvestableMultiConfigs,
+        BlueprintPools, Blueprints, DismantleProcesses, HarvestableLocations,
+        HarvestableProviderPresets, LootContainers, MineableEntities, Paints, Shops,
+        StarmapObjects, SubHarvestableMultiConfigs,
     };
 
     match warning {
@@ -86,10 +97,6 @@ const fn affected(
         CraftingWarning::UnknownScanSignatureSlot(_) => {
             (&[MineableEntities], Occurrences, Projection)
         }
-        CraftingWarning::UnknownTemplateValues { .. } => (
-            &[ContractTemplates, MissionBrokerEntries],
-            Values,
-            Projection,
-        ),
+        CraftingWarning::UnknownTemplateValues { .. } => (&[], Values, Projection),
     }
 }

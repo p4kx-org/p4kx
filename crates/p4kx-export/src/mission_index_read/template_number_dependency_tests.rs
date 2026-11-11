@@ -15,6 +15,7 @@ use crate::catalog_row::CatalogRows;
 use crate::catalog_target_index::TargetIndex;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{SourceDiagnosis, SourceDisposition, SourceObservation};
+use crate::mission_flow_owner::FlowOwnerKind;
 use crate::record_observation::RecordObservation;
 use crate::template_field_capture::TemplateFieldCapture;
 use crate::template_flow_plan::FlowPlan;
@@ -137,7 +138,7 @@ fn emission_kind<'scope, 'source>(
         .declarations
         .iter()
         .filter_map(|declaration| declaration.declaration);
-    let members = TemplateMembers::new(fields, roots)?;
+    let members = TemplateMembers::new(fields, roots, FlowOwnerKind::ContractTemplate)?;
     let admission = RecordObservation::capture(input, record)?;
     let capture = TemplateFieldCapture::new(fields, input, &admission)?;
     let mut references = TemplateReferences::new(fields);

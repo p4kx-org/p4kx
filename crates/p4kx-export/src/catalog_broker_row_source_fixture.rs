@@ -115,7 +115,7 @@ fn definition<'source>(
     let kind = FlowOwnerKind::MissionBrokerEntry;
     let mut references = TemplateReferences::new(fields);
     let plan = TemplatePlan::read(fields, &mut references, kind)?;
-    let members = TemplateMembers::new(fields, plan.roots())?;
+    let members = TemplateMembers::new(fields, plan.roots(), kind)?;
     let (_, flows) = crate::template_flow_configuration_read::read(&members, &plan, kind)?;
     let (_, properties) =
         crate::template_property_configuration_read::read(&members, &plan.objectives, kind)?;

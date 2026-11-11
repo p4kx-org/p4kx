@@ -7,6 +7,7 @@ use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestT
 use super::{FlowPlan, FlowRole};
 use crate::build::original_input::test_support::{self, TestResult};
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::mission_flow_owner::FlowOwnerKind;
 use crate::template_issues::Unknowns;
 
 #[test]
@@ -34,7 +35,11 @@ fn required_condition_precedes_action_even_when_original_fields_are_reversed() -
             .declarations
             .iter()
             .filter_map(|declaration| declaration.declaration);
-        let members = crate::template_source_members::TemplateMembers::new(&fields, roots)?;
+        let members = crate::template_source_members::TemplateMembers::new(
+            &fields,
+            roots,
+            FlowOwnerKind::ContractTemplate,
+        )?;
         let mut references = crate::template_reference_index::TemplateReferences::new(&fields);
         let admission = crate::record_observation::RecordObservation::capture(input, &record)?;
         let capture =

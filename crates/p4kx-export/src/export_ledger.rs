@@ -9,7 +9,6 @@ pub(crate) use crate::record_derived_observation::DerivedFailure;
 pub(crate) use crate::record_observation::SourceObservation;
 pub(crate) use crate::record_source_status::{SourceDiagnosis, SourceDisposition};
 use crate::selection::Kind;
-use crate::template_issues::TemplateWarningExamples;
 
 /// Root directory evidence that cannot establish a complete Archive inventory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -40,7 +39,7 @@ pub(crate) struct ExportLedger {
     pub(crate) sources: Vec<SourceObservation>,
     pub(crate) derived_failures: Vec<DerivedFailure>,
     pub(crate) field_diagnostics: Vec<ExportDiagnostic>,
-    pub(crate) template_warning_examples: TemplateWarningExamples,
+
     pub(crate) field_inspections: Vec<FieldInspection>,
     pub(crate) skipped_rows: Vec<(Kind, usize)>,
     pub(crate) catalog_rows: Option<CatalogRows>,
@@ -123,8 +122,7 @@ impl ExportLedger {
         self.sources.extend(other.sources);
         self.derived_failures.extend(other.derived_failures);
         self.field_diagnostics.extend(other.field_diagnostics);
-        self.template_warning_examples
-            .extend(other.template_warning_examples);
+
         self.field_inspections.extend(other.field_inspections);
         self.skipped_rows.extend(other.skipped_rows);
         self.excluded_catalog_rows

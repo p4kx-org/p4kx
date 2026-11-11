@@ -9,15 +9,17 @@ use p4kx_extraction::StructValue;
 use thiserror::Error;
 
 use crate::catalog_read::original::ExampleBodyReceipt;
+use crate::health_diagnostic_observation::ExampleObservation;
+use crate::mission_flow_owner::FlowOwnerKind;
 use crate::{CatalogError, ExportAccountingError};
 
 #[path = "template_error_description.rs"]
 mod description;
-#[path = "template_warning_examples.rs"]
-mod warning_examples;
+#[path = "template_warning_evidence.rs"]
+mod warning_evidence;
 
 pub(crate) use description::TemplateDescription;
-pub(crate) use warning_examples::{TemplateWarningExample, TemplateWarningExamples};
+use warning_evidence::TemplateWarningEvidence;
 
 /// A contract template whose structure the catalog does not follow to its end.
 #[derive(Debug, Error)]
@@ -69,36 +71,39 @@ pub(crate) struct Unknowns(Mutex<WarningState>);
 #[derive(Debug, Default)]
 struct WarningState {
     counts: BTreeMap<Cow<'static, str>, usize>,
-    examples: TemplateWarningExamples,
+    evidence: TemplateWarningEvidence,
 }
 
 pub(crate) struct UnknownVocabularyReport {
     pub(crate) count: usize,
     pub(crate) details: Vec<String>,
-    pub(crate) examples: TemplateWarningExamples,
+    pub(crate) evidence: TemplateWarningEvidence,
 }
 
 impl Unknowns {
     /// Interprets an authored value and counts an unsupported value by category.
     pub(crate) fn parse<T>(
         &self,
+        owner: FlowOwnerKind,
         category: &'static str,
         stored: &str,
         parse: impl FnOnce(&str) -> Option<T>,
-        example: impl FnOnce() -> Result<Option<TemplateWarningExample>, CatalogError>,
+        example: impl FnOnce() -> Result<Option<ExampleObservation>, CatalogError>,
     ) -> Result<Option<T>, CatalogError> {
-        self.parse_counted(stored, parse, || Cow::Borrowed(category), example)
+        self.parse_counted(owner, stored, parse, || Cow::Borrowed(category), example)
     }
 
     /// Interprets a declared source type and retains its technical name when unsupported.
     pub(crate) fn parse_type<T>(
         &self,
+        owner: FlowOwnerKind,
         category: &'static str,
         source_type: &str,
         parse: impl FnOnce(&str) -> Option<T>,
-        example: impl FnOnce() -> Result<Option<TemplateWarningExample>, CatalogError>,
+        example: impl FnOnce() -> Result<Option<ExampleObservation>, CatalogError>,
     ) -> Result<Option<T>, CatalogError> {
         self.parse_counted(
+            owner,
             source_type,
             parse,
             || Cow::Owned(format!("{category} {source_type}")),
@@ -108,10 +113,11 @@ impl Unknowns {
 
     fn parse_counted<T>(
         &self,
+        owner: FlowOwnerKind,
         stored: &str,
         parse: impl FnOnce(&str) -> Option<T>,
         label: impl FnOnce() -> Cow<'static, str>,
-        example: impl FnOnce() -> Result<Option<TemplateWarningExample>, CatalogError>,
+        example: impl FnOnce() -> Result<Option<ExampleObservation>, CatalogError>,
     ) -> Result<Option<T>, CatalogError> {
         let parsed = parse(stored);
         if parsed.is_none() {
@@ -121,16 +127,14 @@ impl Unknowns {
             *count = count
                 .checked_add(1)
                 .ok_or(ExportAccountingError::CounterOverflow)?;
-            if let Some(example) = example {
-                state.examples.retain(example)?;
-            }
+            state.evidence.observe(owner, example)?;
         }
         Ok(parsed)
     }
 
     /// Returns exact category counts and bounded original field examples.
     pub(crate) fn into_report(self) -> Result<UnknownVocabularyReport, CatalogError> {
-        let WarningState { counts, examples } = self
+        let WarningState { counts, evidence } = self
             .0
             .into_inner()
             .map_err(|_| ExportAccountingError::PoisonedEvidence)?;
@@ -146,7 +150,7 @@ impl Unknowns {
         Ok(UnknownVocabularyReport {
             count,
             details,
-            examples,
+            evidence,
         })
     }
 }
@@ -154,7 +158,48 @@ impl Unknowns {
 #[cfg(test)]
 mod tests {
     use super::Unknowns;
+    use crate::mission_flow_owner::FlowOwnerKind;
     use crate::{CatalogError, ExportAccountingError, export_evidence_lock};
+
+    #[test]
+    fn vocabulary_counts_do_not_require_a_retained_example() -> Result<(), CatalogError> {
+        use FlowOwnerKind::{ContractTemplate, MissionBrokerEntry};
+
+        let unknowns = Unknowns::default();
+        for owner in [MissionBrokerEntry, ContractTemplate, MissionBrokerEntry] {
+            assert_eq!(
+                unknowns.parse(owner, "category", "synthetic", |_| None::<()>, || Ok(None))?,
+                None,
+                "unsupported vocabulary leaves the typed value empty"
+            );
+        }
+        let report = unknowns.into_report()?;
+        assert_eq!(report.count, 3, "one build-wide compatibility count");
+        assert_eq!(
+            report.details,
+            ["category (3)"],
+            "one build-wide category count"
+        );
+        let diagnostics: Vec<_> = report.evidence.into_diagnostics("warning").collect();
+        assert_eq!(
+            diagnostics.len(),
+            2,
+            "one diagnostic per affected owner family"
+        );
+        for (diagnostic, owner, count) in [
+            (&diagnostics[0], ContractTemplate, 1),
+            (&diagnostics[1], MissionBrokerEntry, 2),
+        ] {
+            assert_eq!(
+                diagnostic.kind,
+                Some(owner.catalog_kind()),
+                "physical owner kind"
+            );
+            assert_eq!(diagnostic.count, count, "exact per-kind count");
+            assert!(diagnostic.examples.is_empty(), "no invented example");
+        }
+        Ok(())
+    }
 
     #[test]
     fn poisoned_warning_accounting_refuses_both_observation_and_finish() {
@@ -165,7 +210,13 @@ mod tests {
         );
         assert!(
             matches!(
-                unknowns.parse("category", "synthetic", |_| None::<()>, || Ok(None)),
+                unknowns.parse(
+                    FlowOwnerKind::ContractTemplate,
+                    "category",
+                    "synthetic",
+                    |_| None::<()>,
+                    || Ok(None)
+                ),
                 Err(CatalogError::Accounting(
                     ExportAccountingError::PoisonedEvidence
                 ))
