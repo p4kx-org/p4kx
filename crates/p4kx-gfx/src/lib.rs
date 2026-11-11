@@ -15,7 +15,7 @@
 //! `@key` texts. No system font is loaded.
 //!
 //! Every size is checked against the data left and the limits [`MAX_MOVIE_LEN`],
-//! [`MAX_BITMAP_PIXELS`], [`MAX_SHAPE_RECORDS`] and [`MAX_SPRITE_DEPTH`], a scene against
+//! [`MAX_BITMAP_PIXELS`] and [`MAX_SHAPE_RECORDS`], a scene against [`MAX_SPRITE_DEPTH`],
 //! [`MAX_SCENE_PLACEMENTS`], [`MAX_SCENE_PATHS`], [`MAX_SCENE_SEGMENTS`], [`MAX_SCENE_RECORDS`],
 //! [`MAX_SCENE_MASKS`], [`MAX_SCENE_GLYPHS`] and [`MAX_GRADIENT_STOPS`], the static texts of a
 //! movie against [`MAX_TEXT_GLYPHS`], a text field against [`MAX_TEXT_CHARS`], a canvas against [`MAX_CANVAS_SIDE`],
@@ -99,7 +99,7 @@ pub use scene::{
     Origin, Paint, PathCommand, Scene, SceneItem, SceneMask, ScenePath, ScenePoint, SceneShape,
     ShapeLayer, Spread, StrokeStyle,
 };
-pub use scene_report::{SkipReason, Skipped};
+pub use scene_report::{MAX_SPRITE_DEPTH, SkipReason, Skipped};
 pub use scene_text::MAX_SCENE_GLYPHS;
 pub use shape::{MAX_SHAPE_RECORDS, NewStyles, Shape, ShapeRecord, StyleChange};
 pub use style::{FillStyle, Gradient, GradientStop, LineStyle};
@@ -112,4 +112,3 @@ pub use text_loc::{Localised, localise_text};
 pub use timeline::{
     Export, ExporterInfo, FrameLabel, MAX_FRAME_BYTES, MAX_FRAME_PLACEMENTS, Sprite, Timeline,
 };
-pub use walker::MAX_SPRITE_DEPTH;

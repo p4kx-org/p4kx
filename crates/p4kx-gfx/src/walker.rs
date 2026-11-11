@@ -32,8 +32,33 @@ fn read_display_tag(tag: &Tag<'_>, display_list: &mut DisplayList) -> Result<(),
     Ok(())
 }
 
-/// The deepest nesting of sprites read; a sprite deeper than this is reported as a failure.
-pub const MAX_SPRITE_DEPTH: u32 = 16;
+struct TimelineScan<'movie> {
+    stream: TagStream<'movie>,
+    end: usize,
+    timeline: Timeline,
+    display_list: DisplayList,
+}
+
+impl<'movie> TimelineScan<'movie> {
+    fn new(data: &'movie [u8], base: usize) -> Self {
+        Self {
+            stream: TagStream::new(data, base),
+            end: base + data.len(),
+            timeline: Timeline::default(),
+            display_list: DisplayList::default(),
+        }
+    }
+
+    fn finish(mut self) -> Timeline {
+        self.timeline.finish(self.display_list);
+        self.timeline
+    }
+}
+
+struct SuspendedTimeline<'movie> {
+    sprite_index: usize,
+    parent: TimelineScan<'movie>,
+}
 
 /// Reads every tag of a movie and its sprites into [`Assets`].
 pub(crate) struct Walker<'a> {
@@ -66,7 +91,7 @@ impl<'a> Walker<'a> {
             frame_bytes: 0,
             frames_capped: false,
         };
-        walker.assets.timeline = walker.walk(data, base, 0);
+        walker.assets.timeline = walker.walk(data, base);
         walker.finish()
     }
 
@@ -113,35 +138,62 @@ impl<'a> Walker<'a> {
         self.assets
     }
 
-    fn walk(&mut self, data: &'a [u8], base: usize, depth: u32) -> Timeline {
-        let mut timeline = Timeline::default();
-        let mut display_list = DisplayList::default();
-        let mut stream = TagStream::new(data, base);
-        while let Some(next) = stream.next_tag() {
-            let tag = match next {
-                Ok(tag) => tag,
-                Err(error) => {
-                    let (code, offset) = match &error {
-                        GfxError::TagLength { code, offset, .. } => (*code, *offset),
-                        _ => (0, base + data.len()),
-                    };
-                    self.fail(code, offset, error);
-                    break;
+    fn walk(&mut self, data: &'a [u8], base: usize) -> Timeline {
+        let mut current = TimelineScan::new(data, base);
+        let mut parents: Vec<SuspendedTimeline<'a>> = Vec::new();
+        loop {
+            let Some(tag) = self.next_tag(&mut current) else {
+                let timeline = current.finish();
+                let Some(suspended) = parents.pop() else {
+                    return timeline;
+                };
+                if let Some(sprite) = self.assets.sprites.get_mut(suspended.sprite_index) {
+                    sprite.timeline = timeline;
                 }
+                current = suspended.parent;
+                continue;
             };
+
             *self.counts.entry(tag.code).or_default() += 1;
-            timeline.tag_count += 1;
-            if let Err(error) = self.read_tag(&tag, &mut timeline, depth) {
-                self.fail(tag.code, tag.offset, error);
-            } else if let Err(error) = read_display_tag(&tag, &mut display_list) {
-                self.fail(tag.code, tag.offset, error);
-            }
-            if tag.code == 1 {
-                self.end_frame(&mut timeline, &display_list, tag.offset);
+            current.timeline.tag_count += 1;
+            if tag.code == 39 {
+                match self.read_sprite(&tag) {
+                    Ok((sprite_index, child)) => parents.push(SuspendedTimeline {
+                        sprite_index,
+                        parent: std::mem::replace(&mut current, child),
+                    }),
+                    Err(error) => self.fail(tag.code, tag.offset, error),
+                }
+            } else {
+                self.update_timeline(&tag, &mut current);
             }
         }
-        timeline.finish(display_list);
-        timeline
+    }
+
+    fn next_tag(&mut self, current: &mut TimelineScan<'a>) -> Option<Tag<'a>> {
+        match current.stream.next_tag()? {
+            Ok(tag) => Some(tag),
+            Err(error) => {
+                let (code, offset) = match &error {
+                    GfxError::TagLength { code, offset, .. } => (*code, *offset),
+                    _ => (0, current.end),
+                };
+                self.fail(code, offset, error);
+                None
+            }
+        }
+    }
+
+    fn update_timeline(&mut self, tag: &Tag<'a>, current: &mut TimelineScan<'a>) {
+        let result = self
+            .read_tag(tag, &mut current.timeline)
+            .and_then(|()| read_display_tag(tag, &mut current.display_list));
+        if let Err(error) = result {
+            self.fail(tag.code, tag.offset, error);
+        }
+        if tag.code == 1 {
+            self.end_frame(&mut current.timeline, &current.display_list, tag.offset);
+        }
     }
 
     fn end_frame(&mut self, timeline: &mut Timeline, display_list: &DisplayList, offset: usize) {
@@ -183,12 +235,7 @@ impl<'a> Walker<'a> {
     }
 
     #[expect(clippy::too_many_lines, reason = "one arm per tag code")]
-    fn read_tag(
-        &mut self,
-        tag: &Tag<'a>,
-        timeline: &mut Timeline,
-        depth: u32,
-    ) -> Result<(), GfxError> {
+    fn read_tag(&mut self, tag: &Tag<'a>, timeline: &mut Timeline) -> Result<(), GfxError> {
         let assets = &mut self.assets;
         match tag.code {
             1 => timeline.frames += 1,
@@ -242,7 +289,6 @@ impl<'a> Walker<'a> {
             88 => self.font_names.push(read_font_name(tag)?),
             56 => assets.exports.extend(read_exports(tag)?),
             1000 => assets.exporter_info = Some(read_exporter_info(tag)?),
-            39 => self.read_sprite(tag, depth)?,
             9 => {
                 assets.background.get_or_insert(tag.reader().rgb()?);
             }
@@ -264,12 +310,7 @@ impl<'a> Walker<'a> {
         Ok(())
     }
 
-    fn read_sprite(&mut self, tag: &Tag<'a>, depth: u32) -> Result<(), GfxError> {
-        if depth >= MAX_SPRITE_DEPTH {
-            return Err(GfxError::SpriteDepth {
-                limit: MAX_SPRITE_DEPTH,
-            });
-        }
+    fn read_sprite(&mut self, tag: &Tag<'a>) -> Result<(usize, TimelineScan<'a>), GfxError> {
         let mut reader = tag.reader();
         let id = reader.u16()?;
         let frame_count = reader.u16()?;
@@ -280,10 +321,6 @@ impl<'a> Walker<'a> {
             frame_count,
             timeline: Timeline::default(),
         });
-        let timeline = self.walk(reader.rest(), base, depth + 1);
-        if let Some(sprite) = self.assets.sprites.get_mut(index) {
-            sprite.timeline = timeline;
-        }
-        Ok(())
+        Ok((index, TimelineScan::new(reader.rest(), base)))
     }
 }

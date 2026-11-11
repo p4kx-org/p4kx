@@ -3,7 +3,7 @@
 
 //! Fonts with their glyphs, codes and layout, and sprites with their nested timelines.
 
-use p4kx_gfx::{FontFormat, GfxError, MAX_SPRITE_DEPTH, Movie, Point, ShapeRecord};
+use p4kx_gfx::{FontFormat, Movie, Point, ShapeRecord};
 use p4kx_testkit::{
     TestGlyph, TestMovie, TestShape, TestShapeRecord, TestSignature, font_name_body, font3_body,
     place_object2_body, sprite_body,
@@ -172,23 +172,37 @@ fn a_sprite_reads_its_timeline_and_its_nested_definitions() {
 }
 
 #[test]
-fn sprites_nested_deeper_than_the_limit_are_failures() {
-    let depth = usize::try_from(MAX_SPRITE_DEPTH).expect("small") + 2;
-    let mut body = sprite_body(1, 1, &[]);
+fn deeply_nested_sprite_definitions_and_following_tags_are_all_read() {
+    let depth = 512_u16;
+    let mut body = sprite_body(1, 1, &[(43, b"leaf\0".to_vec()), (1, Vec::new())]);
     for id in 2..=depth {
-        body = sprite_body(u16::try_from(id).expect("small"), 1, &[(39, body)]);
+        body = sprite_body(id, 1, &[(39, body)]);
     }
-    let movie = parse(&TestMovie::new(TestSignature::Gfx).tag(39, &body));
-    let assets = movie.assets();
-    assert_eq!(
-        assets.sprites.len(),
-        usize::try_from(MAX_SPRITE_DEPTH).expect("small"),
-        "read up to the limit"
+    let movie = parse(
+        &TestMovie::new(TestSignature::Gfx)
+            .tag(39, &body)
+            .tag(43, b"after\0"),
     );
-    assert_eq!(assets.failures.len(), 1, "one failure");
+    let assets = movie.assets();
+    assert!(assets.failures.is_empty(), "{:?}", assets.failures);
     assert!(
-        matches!(assets.failures[0].error, GfxError::SpriteDepth { limit } if limit == MAX_SPRITE_DEPTH),
-        "{:?}",
-        assets.failures
+        assets
+            .sprites
+            .iter()
+            .map(|sprite| sprite.id)
+            .eq((1..=depth).rev()),
+        "every physical definition is retained in parent-first source order"
+    );
+    let leaf = assets.sprites.last().expect("nested leaf");
+    assert_eq!(leaf.timeline.frame_of("leaf"), Some(0));
+    assert_eq!(leaf.timeline.frames, 1);
+    assert_eq!(assets.timeline.frame_of("after"), Some(0));
+    assert_eq!(
+        assets
+            .tag_counts
+            .iter()
+            .find(|tag| tag.code == 39)
+            .map(|tag| tag.count),
+        Some(u32::from(depth))
     );
 }

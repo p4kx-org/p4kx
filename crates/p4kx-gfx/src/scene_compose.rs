@@ -12,14 +12,13 @@ use crate::scene::{
     Affine, MAX_SCENE_MASKS, MAX_SCENE_PATHS, MAX_SCENE_PLACEMENTS, MAX_SCENE_RECORDS,
     MAX_SCENE_SEGMENTS, Origin, Scene, SceneItem, SceneMask, SceneShape,
 };
-use crate::scene_report::{SkipReason, Skipped};
+use crate::scene_report::{MAX_SPRITE_DEPTH, SkipReason, Skipped};
 use crate::scene_shape::ShapeBuilder;
 use crate::scene_text::{MAX_SCENE_GLYPHS, TextState};
 use crate::shape::Shape;
 use crate::text::{EditText, StaticText};
 use crate::text_fonts::TextOptions;
 use crate::timeline::Sprite;
-use crate::walker::MAX_SPRITE_DEPTH;
 
 const TAG_DEFINE_BITS: u16 = 6;
 const TAG_DEFINE_FONT: u16 = 10;

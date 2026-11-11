@@ -11,7 +11,9 @@ use crate::scene::{
 use crate::scene_text::MAX_SCENE_GLYPHS;
 use crate::tag::tag_name;
 use crate::text_html::MAX_TEXT_CHARS;
-use crate::walker::MAX_SPRITE_DEPTH;
+
+/// The deepest nested sprite placement composed into a scene.
+pub const MAX_SPRITE_DEPTH: u32 = 16;
 
 /// An element of a frame that was skipped, or drawn without an effect it asks for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
