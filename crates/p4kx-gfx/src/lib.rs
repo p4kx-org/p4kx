@@ -23,6 +23,7 @@
 //! against [`MAX_SVG_BYTES`];
 //! corrupt input yields a [`GfxError`] or a skipped element, never a panic.
 
+mod asset_origins;
 mod assets;
 mod bitmap;
 mod embedded_png;
@@ -43,6 +44,7 @@ mod lossless;
 mod morph;
 mod morph_frame;
 mod movie;
+mod movie_source;
 mod place;
 mod raster;
 mod raster_budget;
@@ -75,6 +77,10 @@ mod text_loc;
 mod timeline;
 mod walker;
 
+pub use asset_origins::{
+    AssetOrigins, FailureOrigin, FontOrigins, LabelOrigin, SpanRun, SpanRuns, SpriteOrigins,
+    TimelineOrigins,
+};
 pub use assets::{Assets, OtherDefinition, TagCount, TagFailure, UnknownTag};
 pub use bitmap::{
     Bitmap, BitmapSource, EmbeddedFormat, ExternalImage, ImageFileFormat, Jpeg, Lossless, SubImage,
@@ -87,7 +93,8 @@ pub use header::{Compression, Header, MAX_MOVIE_LEN, Signature};
 pub use image::{MAX_BITMAP_PIXELS, RgbaImage};
 pub use import::{Import, ImportedAsset, MAX_IMPORTS, ScalingGrid, SymbolClass};
 pub use morph::MorphShape;
-pub use movie::Movie;
+pub use movie::{Movie, ObservedAssets};
+pub use movie_source::{MovieSource, MovieSpan, TagItemSite, TagSite};
 pub use place::{ColorTransform, Filter, FilterKind, Placement};
 pub use raster::{
     Background, CanvasSize, MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE, Raster, RasterOptions,

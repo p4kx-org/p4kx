@@ -138,6 +138,7 @@ mod test_build;
 mod texture;
 mod texture_image;
 mod ui;
+mod ui_asset_origins;
 mod ui_extract;
 mod ui_hologram;
 mod ui_json;

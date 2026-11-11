@@ -567,6 +567,12 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   tag code with its count (unknown tags kept and counted), and the shapes, morph shapes, bitmaps
   (lossless, JPEG, PNG, GFx external and sub-images), fonts and sprites with their IDs and export
   names; a tag that cannot be read is listed instead of failing the movie, with exit code 1.
+  With `--json`, `fieldOrigins` uses JSON Pointers into the report and `provenance` identifies the
+  selected movie and its actual contributors. Origins distinguish individual tag occurrences,
+  multi-item declarations, and the declarations used for each value. Original input coordinates
+  use `gfxMovieInput` ranges `[offset, length]`. A `gfxDecoded*` location addresses decoded movie
+  bytes and links to the original compressed input used. Authored external paths are sourced to
+  the movie declaration. For standalone files, Archive encryption lineage is unknown.
   `p4kx ui extract <archive> <entry> --out <folder>` writes every bitmap as `bitmap_<id>.png`
   and every shape as `shape_<id>.json` (morph shapes as `morph_shape_<id>.json`) in twips as the
   movie stores them; an external image is decoded from the DDS texture it names next to the

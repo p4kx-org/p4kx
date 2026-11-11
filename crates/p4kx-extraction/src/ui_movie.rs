@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use p4kx_archive::Archive;
+use p4kx_archive::{Archive, ObservedEntry};
 use p4kx_gfx::Movie;
 use p4kx_localization::Language;
 use rayon::prelude::*;
@@ -17,7 +17,7 @@ use crate::entry_path::same_entry_path;
 use crate::output_file::read_error;
 use crate::sound::read_capped;
 use crate::source_protection::SourceProtection;
-use crate::{ConversionError, UnknownEntries};
+use crate::{ConversionError, FileStamp, ObservedFileOrigin, SourceInput, UnknownEntries};
 
 /// The largest GFx or SWF file read into memory, far above the largest movie of a real Archive.
 pub const MAX_UI_MOVIE_LEN: u64 = 64 << 20;
@@ -40,6 +40,13 @@ pub struct UiMovie<'a> {
     movie: Movie,
     texts: Option<LocalizationEntry>,
     font_language: Option<Language>,
+    original: Option<OriginalMovie<'a>>,
+}
+
+#[derive(Debug)]
+enum OriginalMovie<'a> {
+    Archive(ObservedEntry<'a>),
+    File(ObservedFileOrigin),
 }
 
 impl<'a> UiMovie<'a> {
@@ -68,7 +75,9 @@ impl<'a> UiMovie<'a> {
                     source,
                 }
             })?;
-        Self::parse(name, Origin::Entry(archive), bytes, protection)
+        let mut movie = Self::parse(name, Origin::Entry(archive), bytes, protection)?;
+        movie.original = archive.observed_entry(entry).map(OriginalMovie::Archive);
+        Ok(movie)
     }
 
     /// Reads and parses the movie file at `path`; its external images are looked up on disk
@@ -81,7 +90,20 @@ impl<'a> UiMovie<'a> {
     /// [`ConversionError::UiMovie`] when it is no valid movie, and another [`ConversionError`]
     /// when it cannot be read.
     pub fn from_file(path: &Path) -> Result<Self, ConversionError> {
-        let file = File::open(path).map_err(|source| {
+        Self::read_file(path, false)
+    }
+
+    /// Reads a standalone movie and retains an observation of the original opened file.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of a standalone movie read or its source observation.
+    pub fn from_file_observed(path: &Path) -> Result<Self, ConversionError> {
+        Self::read_file(path, true)
+    }
+
+    fn read_file(path: &Path, observe: bool) -> Result<Self, ConversionError> {
+        let mut file = File::open(path).map_err(|source| {
             if source.kind() == io::ErrorKind::NotFound {
                 ConversionError::NoSuchFile {
                     path: path.to_path_buf(),
@@ -90,18 +112,27 @@ impl<'a> UiMovie<'a> {
                 read_error(path, source)
             }
         })?;
-        let len = file
-            .metadata()
-            .map_err(|source| read_error(path, source))?
-            .len();
-        let bytes =
-            read_capped(file, len, MAX_UI_MOVIE_LEN).map_err(|source| read_error(path, source))?;
-        Self::parse(
+        let metadata = file.metadata().map_err(|source| read_error(path, source))?;
+        let bytes = read_capped(&mut file, metadata.len(), MAX_UI_MOVIE_LEN)
+            .map_err(|source| read_error(path, source))?;
+        let byte_length = bytes.as_ref().map_or(0, Vec::len);
+        let mut movie = Self::parse(
             path.display().to_string(),
             Origin::File(path.to_path_buf()),
             bytes,
             SourceProtection::new(None),
-        )
+        )?;
+        if observe {
+            movie.original = ObservedFileOrigin::of_read(
+                path,
+                &file,
+                FileStamp::from_metadata(&metadata),
+                byte_length,
+            )
+            .map_err(|source| read_error(path, source))?
+            .map(OriginalMovie::File);
+        }
+        Ok(movie)
     }
 
     fn parse(
@@ -124,6 +155,7 @@ impl<'a> UiMovie<'a> {
                 movie,
                 texts: None,
                 font_language: None,
+                original: None,
             }),
             Err(source) => Err(ConversionError::UiMovie {
                 movie: name,
@@ -184,6 +216,16 @@ impl<'a> UiMovie<'a> {
     #[must_use]
     pub const fn movie(&self) -> &Movie {
         &self.movie
+    }
+
+    /// Returns the original selected input observed when this movie was read.
+    #[must_use]
+    pub const fn source_input(&self) -> Option<SourceInput<'_>> {
+        match &self.original {
+            Some(OriginalMovie::Archive(entry)) => Some(SourceInput::ArchiveView(*entry)),
+            Some(OriginalMovie::File(file)) => Some(SourceInput::File(file)),
+            None => None,
+        }
     }
 
     /// Returns where the movie was read from.
