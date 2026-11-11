@@ -82,8 +82,7 @@ fn settings_file(args: &ChannelsArgs) -> Result<PathBuf> {
 
 fn list(args: &ChannelsArgs, settings_file: &Path, as_json: bool) -> Result<()> {
     let settings = Settings::load(settings_file)?;
-    let mut recipe =
-        SearchRecipe::standard().with_manual(settings.channels.folders, settings.channels.archives);
+    let mut recipe = SearchRecipe::standard();
     if let Some(path) = &args.default_library {
         recipe = recipe.with_default_library(path.clone());
     }
@@ -91,7 +90,8 @@ fn list(args: &ChannelsArgs, settings_file: &Path, as_json: bool) -> Result<()> 
         recipe = recipe.with_launcher(path.clone());
     }
     let (channels, _patches) =
-        crate::launcher_discovery::reported(recipe.snapshot().detect())?.into_parts();
+        crate::launcher_discovery::reported(recipe.snapshot_with_settings(&settings).detect())?
+            .into_parts();
     if as_json {
         json::print(&ChannelsJson {
             channels: channels

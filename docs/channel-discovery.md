@@ -21,6 +21,21 @@ are not searched on macOS. SearchRecipe::with_wine_locations supplies explicit d
 without reading the host environment for an otherwise explicit recipe. Discovery does not
 read CrossOver preferences or registries.
 
+To save configured roots, add them to the active profile's settings.toml.
+
+~~~toml
+[wine]
+prefixes = ["/Volumes/Games/Wine/StarCitizen"]
+crossover_bottle_roots = ["/Volumes/Games/CrossOver/Bottles"]
+~~~
+
+The first list names individual prefixes. The second names folders containing bottles. Entries
+are considered in order within each list and must be absolute. The GUI reads the saved profile
+on Finder launch. CLI and MCP discovery, patch lookups and installation protection use the
+same source rules. Changes made outside the GUI take effect on its next launch. The public-patch
+log-folder override remains exclusive to the existing standard patch lookup. Profile paths are
+listed in [Profile folders](profile-folders.md).
+
 No recursive home search takes place. Empty/relative environment inputs are ignored. A directory component first requires its exact spelling. If absent, only a unique ASCII-case match is accepted; ambiguous siblings produce a typed diagnostic. Returned host paths preserve the actual directory spelling. Symlink aliases of a discovered prefix are deduplicated by resolved identity, retaining the first priority.
 
 The native launcher comes first, then prefixes in discovery order and users in sorted directory order. Only `log.log` and `log.old.log` are opened below each resolved `drive_c/users/<user>/AppData/Roaming/rsilauncher/logs`. Wine drive-letter libraries are interpreted in their original prefix, through `drive_c` or `dosdevices/<letter>:`. Drive-relative paths such as `C:Games` and paths containing `..` are refused; a bare `C:` retains the drive-root representation. UNC/device paths and unknown non-C drive mappings are not interpreted. Known non-C bases must remain absolute in their observed prefix namespace or have an explicitly observed absolute resolution; a Windows drive-prefix join cannot escape into a drive-relative host path.
@@ -70,11 +85,29 @@ MCP reuses a public-patch cache only after complete discovery and a complete sca
 
 Residual metadata limitation: rewriting the same file identity while preserving both its length and modification timestamp cannot be detected reliably by this stamp. Fresh scans detect size/time changes during their read; complete-cache reuse does not hash whole log contents. This bound avoids unbounded extra content passes.
 
+## macOS process and write protection
+
+The Guard checks the native process list for the original image name of StarCitizen.exe.
+The macOS process listing reads the first command argument, which Wine uses for the guest
+image. An RSI launcher, unrelated guest or CrossOver application does not prove that the game
+is running. An unreadable process listing, including a hidden Wine image, keeps the status
+unavailable and uses the existing warning. Protection of installed folders and selected
+Archives also applies while the game is stopped.
+
+The Guard uses the existing filesystem identity and resolved path for installed folders.
+An alternative spelling on a case-insensitive volume stays protected. Distinct folders on a
+case-sensitive volume retain their separate identities. Writing through an existing symbolic
+link or a hard link to the selected Archive is refused. See [Apple's path guidance](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/AccessingFilesAndDirectories/AccessingFilesAndDirectories.html).
+
 ## Validation and platforms
 
 Synthetic tests own their directories, logs/configurations and injected filesystem. They cover candidate families, multi-library VDF, exact/unique/ambiguous case, duplicate prefixes and physical logs, A/C/A precedence, Wine interpretation, work cuts, real read errors, cache creation/removal/replacement/retry and monotone protection. Frontend tests exercise the same measured reports used by the product. They never require installed game data or credentials.
 
-The implementation uses portable Rust and the existing native target matrix: Windows and Linux on AMD64 and ARM64. Linux packages retain Ubuntu 24.04 / glibc 2.39 as minimum; Flatpak additionally requires Documents API 5. Those platform contracts do not change through discovery. Source-only preparation is not evidence of native execution; release acceptance still requires the repository's native four-target checks and applicable device tests.
+The target matrix covers Windows and Linux on AMD64 and ARM64, plus Apple Silicon on macOS.
+Linux packages retain Ubuntu 24.04 / glibc 2.39 as minimum. Flatpak additionally requires
+Documents API 5. macOS acceptance includes actual Wine and CrossOver game-process observations,
+and protected-path checks on case-sensitive and case-insensitive APFS and external volumes.
+See [Native macOS support](macos-support.md).
 
 ## Format references
 

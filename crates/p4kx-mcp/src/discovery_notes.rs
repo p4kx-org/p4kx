@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::collections::BTreeSet;
 
 use p4kx_channels::DiscoveryIssue;
+use p4kx_settings::SettingsError;
 
 const NOTICE_BYTES: usize = 16 << 10;
 
@@ -56,6 +57,11 @@ pub(crate) fn remember(issues: &[DiscoveryIssue]) {
             pending.note(format!("Launcher discovery incomplete: {issue}"));
         }
     });
+}
+
+pub(crate) fn remember_settings(error: &SettingsError) {
+    PENDING
+        .with_borrow_mut(|pending| pending.note(format!("Launcher discovery incomplete: {error}")));
 }
 
 pub(crate) fn take() -> Vec<String> {

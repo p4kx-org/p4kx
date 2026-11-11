@@ -58,7 +58,7 @@ impl PrefixSeeds {
 
 pub(crate) fn seeds(environment: &WineEnvironment) -> PrefixSeeds {
     let mut seeds = PrefixSeeds::default();
-    prefix_seed_walk::walk(environment, |kind, path| {
+    prefix_seed_walk::walk(environment, None, |kind, path| {
         let paths = match kind {
             SeedKind::Direct => &mut seeds.direct,
             SeedKind::Steam => &mut seeds.steam_roots,

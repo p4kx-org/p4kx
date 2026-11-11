@@ -37,8 +37,14 @@ impl ChannelList {
     /// Detects Channels with an owned recipe and the supplied manual entries.
     #[must_use]
     pub fn from_recipe(recipe: SearchRecipe, manual: ManualChannels) -> Self {
+        Self::from_shared_recipe(Arc::new(recipe.with_manual(Vec::new(), Vec::new())), manual)
+    }
+
+    /// Detects Channels using the same captured recipe as installation protection.
+    #[must_use]
+    pub fn from_shared_recipe(recipe: Arc<SearchRecipe>, manual: ManualChannels) -> Self {
         let mut list = Self {
-            recipe: Arc::new(recipe.with_manual(Vec::new(), Vec::new())),
+            recipe,
             manual,
             added: ManualChannels::default(),
             detected: Vec::new(),

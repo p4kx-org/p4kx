@@ -3,6 +3,8 @@
 
 use std::path::{Path, PathBuf};
 
+use p4kx_settings::WineLocations;
+
 use crate::wine::WineEnvironment;
 use crate::wine_environment::PrefixDefaults;
 
@@ -18,7 +20,13 @@ pub(crate) enum SeedKind {
     Games,
 }
 
-pub(crate) fn walk(environment: &WineEnvironment, mut visit: impl FnMut(SeedKind, &Path) -> bool) {
+pub(crate) fn walk(
+    environment: &WineEnvironment,
+    saved: Option<&WineLocations>,
+    mut visit: impl FnMut(SeedKind, &Path) -> bool,
+) {
+    let empty = WineLocations::default();
+    let saved = saved.unwrap_or(&empty);
     let home = environment
         .home
         .as_deref()
@@ -28,20 +36,28 @@ pub(crate) fn walk(environment: &WineEnvironment, mut visit: impl FnMut(SeedKind
     {
         return;
     }
-    if !explicit(&mut visit, SeedKind::Direct, &environment.wine_prefixes) {
+    if !explicit(&mut visit, SeedKind::Direct, &environment.wine_prefixes)
+        || !explicit(&mut visit, SeedKind::Direct, &saved.prefixes)
+    {
         return;
     }
     if environment.defaults == PrefixDefaults::MacOs {
-        macos(&mut visit, home, &environment.crossover_bottle_roots);
+        macos(
+            &mut visit,
+            home,
+            &environment.crossover_bottle_roots,
+            &saved.crossover_bottle_roots,
+        );
         return;
     }
-    unix(&mut visit, home, environment);
+    unix(&mut visit, home, environment, &saved.crossover_bottle_roots);
 }
 
 fn unix(
     visit: &mut impl FnMut(SeedKind, &Path) -> bool,
     home: Option<&Path>,
     environment: &WineEnvironment,
+    saved_bottles: &[PathBuf],
 ) {
     if let Some(home) = home
         && !candidate(visit, SeedKind::Direct, &home.join("Games/star-citizen"))
@@ -80,7 +96,8 @@ fn unix(
         visit,
         SeedKind::CrossOver,
         &environment.crossover_bottle_roots,
-    ) {
+    ) || !explicit(visit, SeedKind::CrossOver, saved_bottles)
+    {
         return;
     }
     if let Some(home) = home {
@@ -99,13 +116,16 @@ fn macos(
     visit: &mut impl FnMut(SeedKind, &Path) -> bool,
     home: Option<&Path>,
     configured_bottles: &[PathBuf],
+    saved_bottles: &[PathBuf],
 ) {
     if let Some(home) = home
         && !candidate(visit, SeedKind::Direct, &home.join(".wine"))
     {
         return;
     }
-    if !explicit(visit, SeedKind::CrossOver, configured_bottles) {
+    if !explicit(visit, SeedKind::CrossOver, configured_bottles)
+        || !explicit(visit, SeedKind::CrossOver, saved_bottles)
+    {
         return;
     }
     if let Some(home) = home

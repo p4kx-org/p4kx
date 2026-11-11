@@ -14,8 +14,7 @@ use p4kx_extraction::{
     archive_error_in,
 };
 use p4kx_settings::{
-    ChosenKey, KEY_VARIABLE, KeyChoiceError, KeySource, KeyStore, KeyText, Settings, choose_key,
-    default_settings_file,
+    ChosenKey, KEY_VARIABLE, KeyChoiceError, KeySource, KeyStore, KeyText, choose_key,
 };
 use serde::Serialize;
 use thiserror::Error;
@@ -249,13 +248,11 @@ fn open_unkeyed(path: &Path) -> Result<Archive, ArchiveError> {
 }
 
 fn installed_archives() -> Result<Vec<PathBuf>> {
-    let settings = default_settings_file()
-        .and_then(|file| Settings::load(&file).ok())
-        .unwrap_or_default();
-    let recipe =
-        SearchRecipe::standard().with_manual(settings.channels.folders, settings.channels.archives);
+    let settings = crate::launcher_discovery::profile_settings();
+    let recipe = SearchRecipe::standard();
     let (channels, _patches) =
-        crate::launcher_discovery::reported(recipe.snapshot().detect())?.into_parts();
+        crate::launcher_discovery::reported(recipe.snapshot_with_settings(&settings).detect())?
+            .into_parts();
     Ok(channels
         .iter()
         .map(|channel| channel.archive().to_path_buf())

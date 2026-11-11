@@ -6,7 +6,7 @@
 use std::error::Error;
 use std::fs;
 
-use p4kx_guard::{Installation, any_game_process, game_is_running, is_game_process};
+use p4kx_guard::{Installation, any_game_process, game_process_status, is_game_process};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -302,13 +302,20 @@ fn notices_a_running_game_from_the_process_list() -> TestResult {
             .spawn()?,
     );
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-    let mut seen = game_is_running();
-    while !seen && std::time::Instant::now() < deadline {
+    let seen = loop {
+        if matches!(game_process_status(), Ok(true)) {
+            break true;
+        }
+        if std::time::Instant::now() >= deadline {
+            break false;
+        }
         std::thread::sleep(std::time::Duration::from_millis(50));
-        seen = game_is_running();
-    }
+    };
     drop(game);
-    assert!(seen, "the fake game is in the process list");
+    assert!(
+        seen,
+        "the native observer identifies the running synthetic executable"
+    );
     Ok(())
 }
 

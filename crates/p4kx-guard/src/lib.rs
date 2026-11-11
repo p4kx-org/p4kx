@@ -72,8 +72,8 @@ pub use process::{
     process_count_lists_game, qprocess_lists_game,
 };
 pub use registry::{
-    ensure_writable, protect, protect_archive_folder, protect_archive_folder_report,
-    protect_libraries, protect_libraries_report, protect_manual,
+    configure_library_discovery, ensure_writable, protect, protect_archive_folder,
+    protect_archive_folder_report, protect_libraries, protect_libraries_report, protect_manual,
 };
 pub use runtime_prerequisite::{
     RuntimeEnvironment, RuntimePrerequisiteError, check_runtime_environment,

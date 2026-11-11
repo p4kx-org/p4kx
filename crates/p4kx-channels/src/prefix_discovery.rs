@@ -4,6 +4,8 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use p4kx_settings::WineLocations;
+
 use crate::discovery_context::DiscoveryContext;
 use crate::discovery_limits::{DiscoveryLimit, DiscoveryLimits};
 use crate::discovery_report::DiscoveryReport;
@@ -19,18 +21,19 @@ pub(crate) fn discover<F: PrefixFileSystem>(
     limits: DiscoveryLimits,
 ) -> DiscoveryReport<Vec<PathBuf>> {
     let mut context = DiscoveryContext::new(fs, limits);
-    let prefixes = discover_in(environment, &mut context);
+    let prefixes = discover_in(environment, None, &mut context);
     DiscoveryReport::new(prefixes, context.issues)
 }
 
 pub(crate) fn discover_in<F: PrefixFileSystem>(
     environment: &WineEnvironment,
+    saved: Option<&WineLocations>,
     context: &mut DiscoveryContext<'_, F>,
 ) -> Vec<PathBuf> {
     let mut found = Prefixes::default();
     let mut libraries = Libraries::default();
     let mut seen = HashSet::new();
-    prefix_seed_walk::walk(environment, |kind, path| {
+    prefix_seed_walk::walk(environment, saved, |kind, path| {
         if context.budget.exhausted() {
             return false;
         }

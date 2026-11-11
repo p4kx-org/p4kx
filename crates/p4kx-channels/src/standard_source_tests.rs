@@ -56,7 +56,7 @@ fn standard_selection_uses_native_wine_user_and_old_current_priority_without_hos
 -> TestResult {
     let temporary = tempfile::tempdir()?;
     let recipe = sources(temporary.path())?;
-    let report = super::standard_sources(None, || recipe);
+    let report = super::standard_sources(None, || recipe.snapshot());
     assert!(
         report.is_complete(),
         "explicit synthetic standard inputs scan completely: {:?}",
@@ -98,7 +98,7 @@ fn an_explicit_standard_log_override_is_exclusive_and_does_not_construct_the_rec
     let constructed = Cell::new(false);
     let report = super::standard_sources(Some(&override_folder), || {
         constructed.set(true);
-        recipe
+        recipe.snapshot()
     });
     assert!(
         report.is_complete(),

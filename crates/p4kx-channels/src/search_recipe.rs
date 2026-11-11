@@ -4,6 +4,8 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+use p4kx_settings::{Settings, WineLocations};
+
 use crate::detect::SearchPaths;
 use crate::discovery_context::DiscoveryContext;
 use crate::discovery_limits::{DiscoveryLimit, DiscoveryLimits};
@@ -106,7 +108,7 @@ impl SearchRecipe {
     #[must_use]
     pub fn refresh_with<F: PrefixFileSystem>(&self, fs: &F) -> DiscoveryReport<SearchPaths> {
         let mut context = DiscoveryContext::new(fs, self.limits);
-        let paths = self.paths(&mut context, None);
+        let paths = self.paths(&mut context, None, None);
         DiscoveryReport::new(paths, context.issues)
     }
 
@@ -123,22 +125,39 @@ impl SearchRecipe {
         folders: &[PathBuf],
         archives: &[PathBuf],
     ) -> LauncherSnapshot {
-        self.snapshot_in(&NativePrefixFileSystem, Some((folders, archives)))
+        self.snapshot_in(&NativePrefixFileSystem, Some((folders, archives)), None)
+    }
+
+    /// Opens current sources with the profile's saved manual and Wine locations.
+    #[must_use]
+    pub fn snapshot_with_settings(&self, settings: &Settings) -> LauncherSnapshot {
+        self.snapshot_in(
+            &NativePrefixFileSystem,
+            Some((&settings.channels.folders, &settings.channels.archives)),
+            Some(&settings.wine),
+        )
+    }
+
+    /// Opens current sources with saved Wine locations and the recipe's manual inputs.
+    #[must_use]
+    pub fn snapshot_with_saved_wine(&self, wine: &WineLocations) -> LauncherSnapshot {
+        self.snapshot_in(&NativePrefixFileSystem, None, Some(wine))
     }
 
     /// Opens a source snapshot after injected prefix and source-location discovery.
     #[must_use]
     pub fn snapshot_with<F: PrefixFileSystem>(&self, fs: &F) -> LauncherSnapshot {
-        self.snapshot_in(fs, None)
+        self.snapshot_in(fs, None, None)
     }
 
     fn snapshot_in<F: PrefixFileSystem>(
         &self,
         fs: &F,
         manual: Option<(&[PathBuf], &[PathBuf])>,
+        wine: Option<&WineLocations>,
     ) -> LauncherSnapshot {
         let mut context = DiscoveryContext::new(fs, self.limits);
-        let paths = self.paths(&mut context, manual);
+        let paths = self.paths(&mut context, manual, wine);
         LauncherSnapshot::build(paths, context)
     }
 
@@ -146,12 +165,18 @@ impl SearchRecipe {
         &self,
         context: &mut DiscoveryContext<'_, F>,
         manual: Option<(&[PathBuf], &[PathBuf])>,
+        wine: Option<&WineLocations>,
     ) -> SearchPaths {
         let (folders, archives) =
             manual.unwrap_or((&self.base.manual_folders, &self.base.manual_archives));
         let mut paths = bounded_manual_paths(&self.base, context, folders, archives);
-        if let Some(environment) = &self.environment {
-            for prefix in prefix_discovery::discover_in(environment, context) {
+        let explicit = WineEnvironment::new(None, None);
+        let environment = self.environment.as_ref().or_else(|| {
+            wine.filter(|locations| !locations.is_empty())
+                .map(|_| &explicit)
+        });
+        if let Some(environment) = environment {
+            for prefix in prefix_discovery::discover_in(environment, wine, context) {
                 if !paths.wine_prefixes.contains(&prefix) {
                     paths.wine_prefixes.push(prefix);
                 }

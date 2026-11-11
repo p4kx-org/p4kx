@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock, PoisonError, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError, RwLock};
 
 use p4kx_channels::{DiscoveryIssue, SearchRecipe};
 
@@ -18,7 +18,15 @@ const EXTRA_FOLDERS_VARIABLE: &str = "P4KX_PROTECT_FOLDERS";
 
 static PROTECTED: RwLock<Installation> = RwLock::new(Installation::new());
 static LIBRARIES: Mutex<LibraryProtectionCache> = Mutex::new(LibraryProtectionCache::new());
-static RECIPE: OnceLock<SearchRecipe> = OnceLock::new();
+static STANDARD_RECIPE: OnceLock<SearchRecipe> = OnceLock::new();
+static CONFIGURED_RECIPE: RwLock<Option<Arc<SearchRecipe>>> = RwLock::new(None);
+
+/// Shares the active profile's Channel search with installation protection.
+pub fn configure_library_discovery(recipe: Arc<SearchRecipe>) {
+    *CONFIGURED_RECIPE
+        .write()
+        .unwrap_or_else(PoisonError::into_inner) = Some(recipe);
+}
 
 /// Protects `folder` and everything below it for the rest of the process.
 pub fn protect(folder: &Path) {
@@ -40,7 +48,14 @@ pub fn protect_libraries() {
 /// Protects discovered Library folders and returns incomplete-discovery diagnostics.
 #[must_use]
 pub fn protect_libraries_report() -> Vec<DiscoveryIssue> {
-    let snapshot = RECIPE.get_or_init(SearchRecipe::standard).snapshot();
+    let configured = CONFIGURED_RECIPE
+        .read()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
+    let recipe = configured
+        .as_deref()
+        .unwrap_or_else(|| STANDARD_RECIPE.get_or_init(SearchRecipe::standard));
+    let snapshot = recipe.snapshot();
     let issues = LIBRARIES
         .lock()
         .unwrap_or_else(PoisonError::into_inner)

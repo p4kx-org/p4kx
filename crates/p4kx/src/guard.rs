@@ -2,17 +2,16 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
-use std::sync::{Mutex, Once, PoisonError};
+use std::path::Path;
+use std::sync::{Arc, Mutex, Once, PoisonError};
 use std::thread::{self, JoinHandle};
 
+use p4kx_channels::SearchRecipe;
 use p4kx_extraction::{
     ConversionError, ExtractionError, QueryExportError, WriteProtectionError, WriteRefused,
-    game_is_running, protect_archive_folder_report, protect_libraries_report, protect_manual,
+    configure_library_discovery, game_is_running, protect_archive_folder_report,
+    protect_libraries_report, protect_manual,
 };
-use p4kx_settings::{Settings, default_settings_file};
-
-const CONFIG_DIR_VARIABLE: &str = "P4KX_CONFIG_DIR";
 
 const GAME_CHECK_VARIABLE: &str = "P4KX_GAME_CHECK";
 
@@ -50,14 +49,13 @@ fn look_for_game() -> bool {
 /// Protects the Library folders and the folders and Archives added by hand to the settings, which
 /// `P4KX_CONFIG_DIR` can point to another folder.
 pub(crate) fn protect_installations() {
+    let settings = crate::launcher_discovery::profile_settings();
+    let recipe = SearchRecipe::standard()
+        .with_wine_locations(settings.wine.prefixes, settings.wine.crossover_bottle_roots);
+    configure_library_discovery(Arc::new(recipe));
     let issues = protect_libraries_report();
     let _warning_delivery = crate::launcher_discovery::report(&issues);
-    let file = std::env::var_os(CONFIG_DIR_VARIABLE)
-        .map(|dir| PathBuf::from(dir).join("settings.toml"))
-        .or_else(default_settings_file);
-    if let Some(settings) = file.and_then(|file| Settings::load(&file).ok()) {
-        protect_manual(&settings.channels.folders, &settings.channels.archives);
-    }
+    protect_manual(&settings.channels.folders, &settings.channels.archives);
 }
 
 /// Starts looking for the running game in the background, so that the first Archive opened does

@@ -15,6 +15,7 @@ mod queries;
 mod recent;
 mod settings;
 mod ui_render;
+mod wine_locations;
 
 pub use assembly_export::AssemblyExportSettings;
 pub use key_choice::{ChosenKey, KeyChoiceError, KeySource, choose_key};
@@ -35,3 +36,4 @@ pub use ui_render::{
     MAX_VARIABLES_BYTES, UiRenderBackground, UiRenderFormat, UiRenderPower, UiRenderSettings,
     UiRenderSize, bound_variables,
 };
+pub use wine_locations::WineLocations;

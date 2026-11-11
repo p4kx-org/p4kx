@@ -9,6 +9,7 @@ use thiserror::Error;
 
 use crate::locations::create_private_folder;
 use crate::profile::profile_folder;
+use crate::wine_locations::WineLocations;
 use crate::{
     AssemblyExportSettings, ModelExportSettings, RecentArchives, SavedQueries, UiRenderSettings,
 };
@@ -46,6 +47,9 @@ pub struct Settings {
     pub recent: RecentArchives,
     /// The manually added Channel sources.
     pub channels: ManualChannels,
+    /// Explicit Wine prefixes and `CrossOver` bottle roots.
+    #[serde(skip_serializing_if = "WineLocations::is_empty")]
+    pub wine: WineLocations,
     /// The last position and size of the main window, or `None` for the default placement.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window: Option<WindowGeometry>,

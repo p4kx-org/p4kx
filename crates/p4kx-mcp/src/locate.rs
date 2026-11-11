@@ -5,7 +5,7 @@ use std::path::{Component, Path, PathBuf, Prefix};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use p4kx_channels::{Channel, PublicPatches, SearchRecipe};
-use p4kx_settings::Settings;
+use p4kx_settings::{Settings, SettingsError};
 
 use crate::discovery_notes;
 use crate::error::{ToolError, capped};
@@ -73,13 +73,8 @@ impl Locations {
 
     /// Returns detected Channels and reports incomplete discovery alongside the result.
     pub(crate) fn channels(&self) -> Result<Vec<Channel>, ToolError> {
-        let settings = match &self.settings_file {
-            Some(file) => Settings::load(file)?,
-            None => Settings::default(),
-        };
-        let snapshot = self
-            .recipe
-            .snapshot_with_manual(&settings.channels.folders, &settings.channels.archives);
+        let settings = self.settings()?;
+        let snapshot = self.recipe.snapshot_with_settings(&settings);
         let report = snapshot.detect();
         discovery_notes::remember(report.issues());
         let complete = report.is_complete();
@@ -93,11 +88,26 @@ impl Locations {
 
     /// Returns patches from the current source set, reusing only a complete unchanged scan.
     pub(crate) fn public_patches(&self) -> Arc<PublicPatches> {
-        let snapshot = self.recipe.snapshot();
+        let settings = match self.settings() {
+            Ok(settings) => settings,
+            Err(error) => {
+                discovery_notes::remember_settings(&error);
+                let report = self.recipe.snapshot().read_patches();
+                discovery_notes::remember(report.issues());
+                return Arc::new(report.into_value());
+            }
+        };
+        let snapshot = self.recipe.snapshot_with_settings(&settings);
         self.patches
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .read(&snapshot)
+    }
+
+    fn settings(&self) -> Result<Settings, SettingsError> {
+        self.settings_file
+            .as_deref()
+            .map_or_else(|| Ok(Settings::default()), Settings::load)
     }
 
     /// Returns the Archive path `text` names: a detected Channel by name, ignoring ASCII case,

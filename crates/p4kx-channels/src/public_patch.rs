@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use p4kx_archive::Build;
+use p4kx_settings::WineLocations;
 
 use crate::discovery_limits::DiscoveryLimits;
 use crate::discovery_report::DiscoveryReport;
@@ -51,7 +52,16 @@ impl PublicPatches {
     #[must_use]
     pub fn standard_report() -> DiscoveryReport<Self> {
         let folder = std::env::var_os("P4KX_LAUNCHER_LOGS").map(PathBuf::from);
-        standard_sources(folder.as_deref(), SearchRecipe::standard)
+        standard_sources(folder.as_deref(), || SearchRecipe::standard().snapshot())
+    }
+
+    /// Reads public patches from the active profile's saved Wine locations and standard sources.
+    #[must_use]
+    pub fn standard_report_with_saved_wine(wine: &WineLocations) -> DiscoveryReport<Self> {
+        let folder = std::env::var_os("P4KX_LAUNCHER_LOGS").map(PathBuf::from);
+        standard_sources(folder.as_deref(), || {
+            SearchRecipe::standard().snapshot_with_saved_wine(wine)
+        })
     }
 
     /// Reads the snapshot's exact opened log sources in their original occurrence order.
@@ -167,12 +177,12 @@ impl PublicPatches {
 
 fn standard_sources(
     override_folder: Option<&Path>,
-    recipe: impl FnOnce() -> SearchRecipe,
+    snapshot: impl FnOnce() -> LauncherSnapshot,
 ) -> DiscoveryReport<PublicPatches> {
     if let Some(folder) = override_folder {
         return LauncherSnapshot::log_folder(folder, DiscoveryLimits::default()).read_patches();
     }
-    recipe().snapshot().read_patches()
+    snapshot().read_patches()
 }
 
 #[cfg(test)]

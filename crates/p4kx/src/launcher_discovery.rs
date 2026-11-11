@@ -2,12 +2,25 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::{self, Write};
+use std::path::PathBuf;
 
 use p4kx_channels::{DiscoveryIssue, DiscoveryReport, PublicPatches};
+use p4kx_settings::{Settings, default_settings_file};
 
 /// Reads public patches after reporting incomplete launcher discovery on stderr.
 pub(crate) fn patches() -> io::Result<PublicPatches> {
-    reported(PublicPatches::standard_report())
+    reported(PublicPatches::standard_report_with_saved_wine(
+        &profile_settings().wine,
+    ))
+}
+
+/// Loads the current CLI profile or the default source settings.
+pub(crate) fn profile_settings() -> Settings {
+    let file = std::env::var_os("P4KX_CONFIG_DIR")
+        .map(|dir| PathBuf::from(dir).join("settings.toml"))
+        .or_else(default_settings_file);
+    file.and_then(|file| Settings::load(&file).ok())
+        .unwrap_or_default()
 }
 
 /// Returns usable discovery data after delivering its technical warnings.

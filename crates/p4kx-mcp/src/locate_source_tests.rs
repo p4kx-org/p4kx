@@ -6,6 +6,8 @@ use std::io::Write;
 use std::sync::Arc;
 
 use p4kx_channels::{SearchPaths, SearchRecipe};
+use p4kx_settings::{Settings, WineLocations};
+use p4kx_testkit::write_build_manifest;
 
 use super::Locations;
 use crate::discovery_notes;
@@ -215,6 +217,62 @@ fn appending_a_new_patch_line_refreshes_the_same_locations_instance() -> TestRes
     assert!(
         !Arc::ptr_eq(&before, &after),
         "append invalidates the complete cached map"
+    );
+    Ok(())
+}
+
+#[test]
+fn saved_cross_over_roots_are_shared_by_channels_and_the_patch_cache() -> TestResult {
+    discovery_notes::clear();
+    let fixture = Fixture::new()?;
+    let bottle = fixture.prefix("bottles/Shared")?;
+    let log = Fixture::log(&bottle, "Pilot")?;
+    fixture::patch(&log, "4.4.1")?;
+    let live = bottle.join("drive_c/Program Files/Roberts Space Industries/StarCitizen/LIVE");
+    fs::create_dir_all(&live)?;
+    fs::write(live.join("Data.p4k"), [])?;
+    write_build_manifest(
+        &live,
+        "sc-alpha-4.4.0",
+        "4.4.0.0",
+        "10000001",
+        "synthetic-build",
+    )?;
+    let file = fixture.path().join("settings.toml");
+    let settings = Settings {
+        wine: WineLocations::new(Vec::new(), vec![fixture.path().join("bottles")]),
+        ..Settings::default()
+    };
+    settings.save(&file)?;
+    let locations = Locations::with_recipe(Fixture::explicit(Vec::new()), Some(file.clone()));
+
+    let channels = locations.channels()?;
+    let [channel] = channels.as_slice() else {
+        return Err("one saved-root Channel".into());
+    };
+    assert!(
+        channel.build().and_then(|build| build.public_patch()) == Some("4.4.1"),
+        "the Channel joins the patch from its admitted bottle"
+    );
+    let complete = locations.public_patches();
+    fixture::assert_patch(&complete, Some("4.4.1"));
+
+    fs::write(&file, "[wine")?;
+    assert!(
+        locations.channels().is_err(),
+        "the Channel settings error remains explicit"
+    );
+    let partial = locations.public_patches();
+    fixture::assert_patch(&partial, None);
+    assert!(
+        !discovery_notes::take().is_empty(),
+        "a malformed profile prevents complete patch-source evidence"
+    );
+
+    settings.save(&file)?;
+    assert!(
+        Arc::ptr_eq(&complete, &locations.public_patches()),
+        "the optional fallback was not admitted as a replacement complete cache entry"
     );
     Ok(())
 }

@@ -6,8 +6,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
+use p4kx_channels::SearchRecipe;
 use p4kx_gui::smoke::Frames;
 use p4kx_gui::{
     App, ChannelList, Language, Model, PrerequisiteNotice, ProtectionText, RecordTextChoice, Text,
@@ -44,13 +46,20 @@ fn main() -> Result<()> {
         return Ok(());
     }
     let runtime = check_runtime()?;
-    let protection_issues = p4kx_extraction::protect_libraries_report();
     let settings_file = default_settings_file();
-    let settings = settings_file
+    let mut settings = settings_file
         .as_deref()
         .and_then(|file| Settings::load(file).ok())
         .unwrap_or_default();
-    let mut model = configured_model(&settings, protection_issues);
+    let wine = std::mem::take(&mut settings.wine);
+    let recipe = Arc::new(
+        SearchRecipe::standard().with_wine_locations(wine.prefixes, wine.crossover_bottle_roots),
+    );
+    p4kx_extraction::configure_library_discovery(Arc::clone(&recipe));
+    let protection_issues = p4kx_extraction::protect_libraries_report();
+    let channels = ChannelList::from_shared_recipe(recipe, settings.channels.clone())
+        .with_startup_issues(protection_issues);
+    let mut model = configured_model(&settings, channels);
     set_up_key(&mut model);
     let title = model.texts().get(Text::AppTitle);
     let options = window::native_options(window::viewport(settings.window, &title));
@@ -102,14 +111,9 @@ fn require_metal(creation: &eframe::CreationContext<'_>) -> std::io::Result<()> 
     Ok(())
 }
 
-fn configured_model(
-    settings: &Settings,
-    protection_issues: Vec<p4kx_channels::DiscoveryIssue>,
-) -> Model {
+fn configured_model(settings: &Settings, channels: ChannelList) -> Model {
     let mut model = Model::new(Language::resolve(settings.language.as_deref()));
-    model.set_channels(
-        ChannelList::standard(settings.channels.clone()).with_startup_issues(protection_issues),
-    );
+    model.set_channels(channels);
     model.set_recent(settings.recent.clone());
     model.set_extraction_folder(settings.extraction_folder.clone());
     model.set_extraction_conversion(settings.extraction_conversion);

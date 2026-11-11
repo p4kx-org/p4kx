@@ -8,6 +8,7 @@ use std::fs;
 use std::path::Path;
 
 use p4kx_channels::{SearchPaths, SearchRecipe};
+use p4kx_settings::{Settings, WineLocations};
 use p4kx_testkit::write_build_manifest;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -99,4 +100,50 @@ fn check_channels(snapshot: &p4kx_channels::LauncherSnapshot, live: &Path, ptu: 
         Some("5.0.0"),
         "the same scan resolves the patch"
     );
+}
+
+#[test]
+fn the_saved_profile_roots_refresh_the_same_explicit_recipe() -> TestResult {
+    let temporary = tempfile::tempdir()?;
+    let file = temporary.path().join("settings.toml");
+    let recipe = SearchRecipe::explicit(SearchPaths::default());
+    let unset = Settings::load(&file)?;
+    assert!(
+        unset.wine.is_empty(),
+        "an older or missing profile defaults to no saved sources"
+    );
+    let before = recipe.snapshot_with_settings(&unset);
+
+    let first = temporary.path().join("one");
+    let second = temporary.path().join("two");
+    let explicit = temporary.path().join("configured-wine");
+    let original = first.join("Bottle");
+    let replacement = second.join("Replacement");
+    for path in [&explicit, &original, &replacement] {
+        fs::create_dir_all(path.join("drive_c"))?;
+    }
+    let mut settings = Settings {
+        wine: WineLocations::new(vec![explicit.clone()], vec![first]),
+        ..Settings::default()
+    };
+    settings.save(&file)?;
+    let current = recipe.snapshot_with_settings(&Settings::load(&file)?);
+    assert_eq!(
+        current.paths().wine_prefixes.as_slice(),
+        [explicit.clone(), original],
+        "the persisted profile contributes the explicit prefix and existing bottle"
+    );
+    settings.wine.crossover_bottle_roots = vec![second];
+    settings.save(&file)?;
+    let refreshed = recipe.snapshot_with_settings(&Settings::load(&file)?);
+    assert_eq!(
+        refreshed.paths().wine_prefixes.as_slice(),
+        [explicit, replacement],
+        "changing the saved bottle root replaces its source without resetting the recipe"
+    );
+    assert!(
+        current.stamp() != before.stamp() && refreshed.stamp() != current.stamp(),
+        "current source stamps reflect the actual saved root topology"
+    );
+    Ok(())
 }
