@@ -7,7 +7,7 @@ acceptance. Delivery requires the evidence below.
 ## Supported target
 
 - Ship `p4kx` (CLI), `p4kx-gui` (GUI) and `p4kx-mcp` (stdio) for Apple Silicon,
-  `aarch64-apple-darwin`, with macOS 15 Sequoia as the minimum. Declare the deployment target in
+  `aarch64-apple-darwin`, with macOS 26 Tahoe as the minimum. Declare the deployment target in
   the build and the minimum OS in the app bundle. Verify the actual packaged Mach-O architecture
   and deployment target for every shipped executable and any bundled libraries.
 - Exercise the v0.5.0 workflows on the minimum OS and the current stable macOS release. P4KX

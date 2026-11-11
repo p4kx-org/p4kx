@@ -29,7 +29,7 @@ below are the plan of 0.4.0; the later releases only follow their GitHub milesto
 |---|---|
 | Purpose | End-user tool first; the core is a library so Exports for other tools need no rework |
 | Front-ends | `p4kx` (CLI), `p4kx-gui` ("P4KX", egui/eframe), `p4kx-mcp` (MCP server, stdio, read-only) |
-| Platforms | Windows is shipped. v0.5.0 requires native Windows and Linux on AMD64 and ARM64, plus [macOS 15+ on Apple Silicon](macos-support.md) |
+| Platforms | Windows is shipped. v0.5.0 requires native Windows and Linux on AMD64 and ARM64, plus [macOS 26+ on Apple Silicon](macos-support.md) |
 | Distribution | Portable ZIP and MSI (WiX Toolset 7, per-user install to `%LOCALAPPDATA%`, no admin rights, Start menu entry, stable UpgradeCode) from M1 |
 | Licence | `MIT OR Apache-2.0`; the repository `p4kx-org/p4kx` is public |
 | UI languages | German (`de-DE`) and British English (`en-GB`) via Fluent, chosen from the system locale, switchable |
