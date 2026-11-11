@@ -215,3 +215,6 @@ fn additional_declared_search_fields_are_not_silently_discarded() -> TestResult 
     );
     Ok(())
 }
+
+#[path = "mission_values_auto_layout.rs"]
+mod auto_layout;

@@ -9,6 +9,8 @@ use serde_json::{Value, json};
 mod canonical_auto;
 #[path = "mission_values_investigation.rs"]
 mod investigation;
+#[path = "mission_values_schema_boundary.rs"]
+mod schema_boundary;
 
 use crate::mission_values_fixture::{self as fixture, Owner, TestResult};
 
@@ -47,7 +49,7 @@ fn auto_properties() -> Vec<TestValue> {
         fixture::property(
             variable,
             TestInstance::new("MissionPropertyValue_AutoSpawns")
-                .value("autoSpawns", TestValue::Reference(fixture::TARGET))
+                .value("autoSpawns", TestValue::Reference(fixture::AUTO_TARGET))
                 .value("searchOptions", fixture::object(options)),
         )
     })
@@ -144,7 +146,7 @@ fn auto_spawns_preserves_exact_reference_identities_and_populated_negative_tags(
             .value("closetPositiveTags", fixture::object(fixture::tags()))
             .value("closetNegativeTags", fixture::object(negative));
         let source = TestInstance::new("MissionPropertyValue_AutoSpawns")
-            .value("autoSpawns", TestValue::Reference(fixture::TARGET))
+            .value("autoSpawns", TestValue::Reference(fixture::AUTO_TARGET))
             .value("searchOptions", fixture::object(options));
         let document = fixture::build(
             &fixture::database(vec![fixture::property("Raw", source)], owner),
@@ -156,7 +158,19 @@ fn auto_spawns_preserves_exact_reference_identities_and_populated_negative_tags(
         }
         let source = fixture::generator_value(&document, "Raw")?;
         let index = 1;
-        verify_definition_identity(fixture::field(source, "/autoSpawns")?, true, index)?;
+        let auto = fixture::field(source, "/autoSpawns")?;
+        for (path, expected) in [
+            ("/guid", json!("79000000-0000-4000-8000-000000000007")),
+            ("/status", json!("present")),
+            ("/targetRecordIndex", json!(2)),
+            ("/targetType", json!("AutoSpawns")),
+        ] {
+            assert_eq!(
+                fixture::field(auto, path)?,
+                &expected,
+                "actual AutoSpawns target {path}"
+            );
+        }
         let options = fixture::field(source, "/searchOptions")?;
         verify_definition_identity(
             fixture::field(options, "/closetPositiveTags/tags/0")?,

@@ -1,9 +1,14 @@
 # Typed mission property values
 
-Catalog schema 3 uses the same `PropertyValue` reader for objective, template, broker and
-Generator source-set properties. Values describe authored configuration. They do not select
-runtime spawns, evaluate clues or compute final race results. Unsupported concrete variants,
-additional unrepresented fields and malformed present payloads remain explicit source failures.
+Generator properties use the tagged `PropertyValue` in
+`missionPropertySets[].properties[].value`. Template and Broker properties retain their original
+fields and ordered child values in `definitions.contractTemplates` and
+`definitions.missionBrokerEntries`. Their `configurations` rows carry property bindings and
+`valueMeanings`, while `configurations.missionProperties` links to the physical source declarations.
+See [mission source and context](catalog-template-source.md) for the original value coordinates.
+
+These fields describe authored configuration. Unsupported concrete variants, additional
+unrepresented fields and malformed present payloads remain explicit source failures.
 
 `DefinitionReference` retains `guid`, `targetRecordIndex`, `recordPath`, `targetType` and
 `status` (`present`, `dangling` or `unexpectedTargetType`). A dangling target retains its original

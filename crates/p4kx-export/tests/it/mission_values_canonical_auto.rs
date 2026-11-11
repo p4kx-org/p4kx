@@ -10,6 +10,8 @@ use crate::mission_values_fixture::{Owner, TestResult};
 const TARGET: &str = "79000000-0000-4000-8000-000000000001";
 const MISSING: &str = "79000000-0000-4000-8000-000000000002";
 const TARGET_INDEX: u32 = 2;
+const AUTO_TARGET: &str = "79000000-0000-4000-8000-000000000007";
+const AUTO_TARGET_INDEX: u32 = 3;
 
 pub(super) fn variants(catalog: &Value, owner: Owner) -> TestResult {
     let base = owner.property(catalog, "Base")?;
@@ -22,8 +24,8 @@ pub(super) fn variants(catalog: &Value, owner: Owner) -> TestResult {
     );
     source::reference(
         base.field(base.node, "autoSpawns")?,
-        TARGET,
-        Some(TARGET_INDEX),
+        AUTO_TARGET,
+        Some(AUTO_TARGET_INDEX),
     )?;
     let entity = owner.property(catalog, "Entity")?;
     let options = entity.field(entity.node, "searchOptions")?;
@@ -80,14 +82,14 @@ pub(super) fn identities(catalog: &Value, owner: Owner) -> TestResult {
     let property = owner.property(catalog, "Raw")?;
     property.kind("autoSpawns")?;
     let target = property.field(property.node, "autoSpawns")?;
-    source::reference(target, TARGET, Some(TARGET_INDEX))?;
+    source::reference(target, AUTO_TARGET, Some(AUTO_TARGET_INDEX))?;
     assert_eq!(
         raw::present(
             source::scalar(target, "recordReference")?
                 .get("targetType")
                 .ok_or("actual independently sourced target type")?
         )?,
-        &json!("Definition"),
+        &json!("AutoSpawns"),
         "technical target metadata is retained"
     );
     let options = property.field(property.node, "searchOptions")?;

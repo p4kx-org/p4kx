@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Field, SourceScope, SourceUses, StructValue, Value};
+use p4kx_extraction::{DataType, Field, SourceScope, SourceUses, StructValue, Value};
 
 use super::reads::FieldReads;
 use super::reference_shape::{self, ReferenceShape};
@@ -14,6 +14,13 @@ use crate::record_read::ReadError;
 /// The existing original frame receiving actual borrowed fields and guard failures.
 pub(crate) trait FieldCapture<'source> {
     fn check_parent(&self, parent: &StructValue<'source>) -> Result<(), CatalogError>;
+    fn check_declared_target(
+        &self,
+        parent: &StructValue<'source>,
+        path: &str,
+        declaration: &Field<'source>,
+        expected: &str,
+    ) -> Result<(), ReadError>;
     fn check_context(
         &self,
         sources: &SourceUses,
@@ -198,6 +205,31 @@ impl<'capture, 'scope, 'source> FieldChecks<'capture, 'scope, 'source> {
         ))
     }
 
+    /// Checks the actual storage and optional nominal target of a declared source field.
+    pub(crate) fn check_storage(
+        &self,
+        name: &str,
+        data_type: DataType,
+        array: bool,
+        target: Option<&str>,
+    ) -> Result<(), ReadError> {
+        let Some(declaration) = self
+            .source
+            .fields()
+            .iter()
+            .find(|field| field.name() == name)
+        else {
+            return Ok(());
+        };
+        let storage = declaration.storage();
+        if storage.data_type() != data_type || storage.is_array() != array {
+            return Err(self.unsupported(declaration));
+        }
+        if let (Some(capture), Some(target)) = (self.capture, target) {
+            capture.check_declared_target(self.source, self.path, declaration, target)?;
+        }
+        Ok(())
+    }
     pub(crate) fn check(&self, known: &[&str]) -> Result<(), ReadError> {
         for declaration in self.source.fields() {
             if !known.contains(&declaration.name()) {

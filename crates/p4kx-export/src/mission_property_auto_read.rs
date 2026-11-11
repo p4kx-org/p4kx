@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::StructValue;
+use p4kx_extraction::{DataType, StructValue};
 
 use crate::mission_property_auto::{AutoSpawns, SpawnClosetSearchOptions};
 use crate::mission_property_source;
@@ -17,17 +17,34 @@ fn fields<'capture, 'view, 'source>(
     Ok(fields)
 }
 
+fn auto_reference<'view, 'source>(
+    fields: &FieldChecks<'_, 'view, 'source>,
+) -> Result<Option<ReferenceShape<'view, 'source>>, ReadError> {
+    let target = fields.reference_view("autoSpawns")?;
+    fields.check_storage("autoSpawns", DataType::Reference, false, Some("AutoSpawns"))?;
+    Ok(target)
+}
+
+fn search_options<'view, 'source>(
+    fields: &FieldChecks<'_, 'view, 'source>,
+) -> Result<Option<&'view StructValue<'source>>, ReadError> {
+    let value = fields.structure("searchOptions")?;
+    fields.check_storage(
+        "searchOptions",
+        DataType::StrongPointer,
+        false,
+        Some("SpawnClosetSearchOptionsBase"),
+    )?;
+    Ok(value)
+}
 pub(crate) fn read<'source>(
     source: &StructValue<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<AutoSpawns, ReadError> {
     let fields = fields(source, capture)?;
     Ok(AutoSpawns {
-        auto_spawns: fields
-            .reference_view("autoSpawns")?
-            .map(ReferenceShape::into_owned),
-        search_options: fields
-            .structure("searchOptions")?
+        auto_spawns: auto_reference(&fields)?.map(ReferenceShape::into_owned),
+        search_options: search_options(&fields)?
             .map(|source| search(source, capture))
             .transpose()?,
     })
@@ -52,8 +69,8 @@ fn validate_context<'source>(
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<(), ReadError> {
     let fields = fields(source, capture)?;
-    fields.reference_shape("autoSpawns")?;
-    if let Some(source) = fields.structure("searchOptions")? {
+    auto_reference(&fields)?;
+    if let Some(source) = search_options(&fields)? {
         let view = SearchView::read(source, capture)?;
         match view.kind {
             SearchKind::Base => {}
@@ -111,6 +128,7 @@ enum SearchKind {
 
 struct SearchView<'capture, 'view, 'source> {
     fields: FieldChecks<'capture, 'view, 'source>,
+    capture: Option<&'capture dyn FieldCapture<'source>>,
     kind: SearchKind,
 }
 
@@ -138,19 +156,49 @@ impl<'capture, 'view, 'source> SearchView<'capture, 'view, 'source> {
         };
         let fields = FieldChecks::for_context(source, "searchOptions", capture)?;
         fields.check(known)?;
-        Ok(Self { fields, kind })
+        Ok(Self {
+            fields,
+            capture,
+            kind,
+        })
     }
 
     fn entity(&self) -> Result<Option<ReferenceShape<'view, 'source>>, ReadError> {
-        self.fields.reference_view("entityDeclaration")
+        let target = self.fields.reference_view("entityDeclaration")?;
+        self.fields.check_storage(
+            "entityDeclaration",
+            DataType::Reference,
+            false,
+            Some("LocationEntityDeclaration"),
+        )?;
+        Ok(target)
     }
 
     fn positive(&self) -> Result<Option<&'view StructValue<'source>>, ReadError> {
-        self.fields.structure("closetPositiveTags")
+        self.closet_tags("closetPositiveTags", "searchOptions.closetPositiveTags")
     }
 
     fn negative(&self) -> Result<Option<&'view StructValue<'source>>, ReadError> {
-        self.fields.structure("closetNegativeTags")
+        self.closet_tags("closetNegativeTags", "searchOptions.closetNegativeTags")
+    }
+
+    fn closet_tags(
+        &self,
+        name: &str,
+        path: &'static str,
+    ) -> Result<Option<&'view StructValue<'source>>, ReadError> {
+        let list = self.fields.structure(name)?;
+        self.fields
+            .check_storage(name, DataType::Class, false, Some("TagList"))?;
+        if let Some(source) = list {
+            if source.type_name() != "TagList" {
+                return Err(source_fields::unknown_struct(source, path, self.capture));
+            }
+            let fields = FieldChecks::for_context(source, path, self.capture)?;
+            fields.array("tags")?;
+            fields.check_storage("tags", DataType::Reference, true, None)?;
+        }
+        Ok(list)
     }
 }
 

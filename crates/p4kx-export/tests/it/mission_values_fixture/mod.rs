@@ -17,9 +17,11 @@ use std::error::Error;
 use std::time::UNIX_EPOCH;
 
 pub(crate) use investigation::investigation;
+pub(crate) use schema::AutoLayout;
 pub(crate) type TestResult = Result<(), Box<dyn Error>>;
 pub(crate) const TARGET: u128 = 0x7900_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const MISSING: u128 = TARGET + 1;
+pub(crate) const AUTO_TARGET: u128 = TARGET + 6;
 
 #[derive(Clone, Copy)]
 pub(crate) enum Owner {
@@ -81,7 +83,18 @@ pub(crate) fn tags() -> TestInstance {
 }
 
 pub(crate) fn database(properties: Vec<TestValue>, owner: Owner) -> DataForgeBuilder {
-    let mut builder = schema::add(scoped_fixture::schema(DataForgeBuilder::new().version(8)));
+    database_with(properties, owner, AutoLayout::Authored)
+}
+
+pub(crate) fn database_with(
+    properties: Vec<TestValue>,
+    owner: Owner,
+    layout: AutoLayout,
+) -> DataForgeBuilder {
+    let mut builder = schema::add(
+        scoped_fixture::schema(DataForgeBuilder::new().version(8)),
+        layout,
+    );
     let generator = match owner {
         Owner::Generator => mission_property_sets_fixture::generator(std::array::from_fn(|_| {
             mission_property_sets_fixture::parameters(properties.clone())
@@ -111,12 +124,20 @@ pub(crate) fn database(properties: Vec<TestValue>, owner: Owner) -> DataForgeBui
             linked_generator("missionBrokerEntry", scoped_fixture::BROKER)
         }
     };
-    builder.record(generator).record(TestRecord::new(
-        TARGET,
-        "Definition",
-        "Definition.Target",
-        "synthetic/definition.xml",
-    ))
+    builder
+        .record(generator)
+        .record(TestRecord::new(
+            TARGET,
+            "Definition",
+            "Definition.Target",
+            "synthetic/definition.xml",
+        ))
+        .record(TestRecord::new(
+            AUTO_TARGET,
+            "AutoSpawns",
+            "AutoSpawns.Target",
+            "synthetic/auto-spawns.xml",
+        ))
 }
 
 fn linked_generator(field: &str, target: u128) -> TestRecord {

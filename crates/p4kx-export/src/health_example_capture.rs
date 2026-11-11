@@ -3,7 +3,9 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::{Guid, SourceUseRole, SourceValue, StructValue, Value};
+use p4kx_extraction::{
+    Guid, InputScope, SourceUse, SourceUseRole, SourceValue, StructValue, Value,
+};
 
 use super::health_example_body::ExampleBodyReceipt;
 use super::health_reference_receipt::{ReferenceDatum, ReferenceFrame, ReferenceUse};
@@ -15,9 +17,10 @@ use crate::{CatalogError, ExportAccountingError, HealthText};
 
 /// The actual guard operation producing a field diagnostic.
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum FieldFailureKind {
+pub(crate) enum FieldFailureKind<'selection> {
     Invalid,
     Unsupported,
+    NominalDeclaration(&'selection [SourceUse; 5]),
 }
 
 /// A same-read source frame borrowed by observed guards before errors become owned text.
@@ -142,7 +145,7 @@ impl<'scope, 'read, 'source> ExampleBodyCapture<'scope, 'read, 'source> {
         fact: &'fact OriginalValueFact<'scope, 'read, 'source>,
         ancestors: &'fact [&'fact OriginalValueFact<'scope, 'read, 'source>],
         field_text: &str,
-        kind: FieldFailureKind,
+        kind: FieldFailureKind<'_>,
     ) -> Result<ExampleBodyReceipt, CatalogError> {
         self.field_body(parent, fact, ancestors, field_text, kind, || {
             Ok(ReferenceDatum::absent())
@@ -172,12 +175,12 @@ impl<'scope, 'read, 'source> ExampleBodyCapture<'scope, 'read, 'source> {
         fact: &'fact OriginalValueFact<'scope, 'read, 'source>,
         ancestors: &'fact [&'fact OriginalValueFact<'scope, 'read, 'source>],
         field_text: &str,
-        kind: FieldFailureKind,
+        kind: FieldFailureKind<'_>,
         target: impl FnOnce() -> Result<ReferenceDatum<Guid>, CatalogError>,
     ) -> Result<ExampleBodyReceipt, CatalogError> {
         self.check_fact(fact)?;
         let parent_site = super::health_value_chain::parent(parent, fact, ancestors)?;
-        if matches!(kind, FieldFailureKind::Unsupported)
+        if !matches!(kind, FieldFailureKind::Invalid)
             && !matches!(fact.edge(), OriginalValueEdge::Field { .. })
         {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
@@ -187,9 +190,13 @@ impl<'scope, 'read, 'source> ExampleBodyCapture<'scope, 'read, 'source> {
             |parent| parent.location(OriginalValuePart::ConcreteType),
         );
         let target = target()?;
+        let mut field = self.path_datum(fact, ancestors, field_text)?;
+        if let FieldFailureKind::NominalDeclaration(selectors) = kind {
+            self.retain_declaration_selectors(selectors, &mut field)?;
+        }
         Ok(ExampleBodyReceipt::captured(
             Arc::clone(&self.frame),
-            self.path_datum(fact, ancestors, field_text)?,
+            field,
             ReferenceDatum::captured(
                 SourceValue::Present(self.texts.retain_text(parent.type_name())?.text().clone()),
                 vec![ReferenceUse::captured(owner, SourceUseRole::Selector)],
@@ -197,6 +204,38 @@ impl<'scope, 'read, 'source> ExampleBodyCapture<'scope, 'read, 'source> {
             target,
         ))
     }
+    fn retain_declaration_selectors(
+        &self,
+        selectors: &[SourceUse; 5],
+        field: &mut ReferenceDatum<HealthText>,
+    ) -> Result<(), ExportAccountingError> {
+        if !self
+            .original_scope
+            .sources()
+            .origin(selectors, true)
+            .source_set_complete()
+        {
+            return Err(ExportAccountingError::ConflictingSourceDatum);
+        }
+        for selector in selectors {
+            let original = selector.description();
+            if original.source() != self.original_scope.dataforge().source_ref()
+                || original.scope() != InputScope::Payload
+            {
+                return Err(ExportAccountingError::ConflictingSourceDatum);
+            }
+            match original.role() {
+                SourceUseRole::Selector => field.contribute(ReferenceUse::captured(
+                    original.location().clone(),
+                    original.role(),
+                )),
+                SourceUseRole::Attempted => {}
+                _ => return Err(ExportAccountingError::ConflictingSourceDatum),
+            }
+        }
+        Ok(())
+    }
+
     fn path_datum(
         &self,
         fact: &OriginalValueFact<'scope, 'read, 'source>,

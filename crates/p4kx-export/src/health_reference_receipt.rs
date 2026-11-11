@@ -139,6 +139,10 @@ impl<T> ReferenceDatum<T> {
         &self.value
     }
 
+    pub(super) fn contribute(&mut self, input: ReferenceUse) {
+        self.inputs.push(input);
+    }
+
     pub(super) fn merge(&mut self, other: Self) -> Result<(), ExportAccountingError>
     where
         T: PartialEq,

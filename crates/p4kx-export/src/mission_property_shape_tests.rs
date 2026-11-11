@@ -42,13 +42,23 @@ fn source(
 fn auto_shapes_accept_genuine_unresolved_references_without_target_materialization() -> TestResult {
     let kind = "MissionPropertyValue_AutoSpawns";
     let child = "SpawnClosetSearchOptions_EntityDeclaration";
+    let search_base = "SpawnClosetSearchOptionsBase";
     let builder = DataForgeBuilder::new()
+        .structure(TestStruct::new("AutoSpawns"))
+        .structure(TestStruct::new("LocationEntityDeclaration"))
+        .structure(TestStruct::new(search_base))
         .structure(
             TestStruct::new(kind)
-                .field("autoSpawns", TestType::Reference)
-                .field("searchOptions", TestType::StrongPointer(child.to_owned())),
+                .field("autoSpawns", TestType::ReferenceTo("AutoSpawns".to_owned()))
+                .field(
+                    "searchOptions",
+                    TestType::StrongPointer(search_base.to_owned()),
+                ),
         )
-        .structure(TestStruct::new(child).field("entityDeclaration", TestType::Reference));
+        .structure(TestStruct::new(child).parent(search_base).field(
+            "entityDeclaration",
+            TestType::ReferenceTo("LocationEntityDeclaration".to_owned()),
+        ));
     let record = TestRecord::new(0x8811, kind, "Source", "source.xml")
         .value("autoSpawns", TestValue::Reference(0x8821))
         .value(

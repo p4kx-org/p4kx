@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{SourceScope, SourceUses, StructValue, Value};
+use p4kx_extraction::{Field, SourceScope, SourceUses, StructValue, Value};
 
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::{
     ExampleBodyCapture, ExampleBodyReceipt, FieldFailureKind, OriginalFlowFields,
 };
 use crate::record_observation::RecordObservation;
+use crate::record_read::ReadError;
 use crate::source_fields::{FieldCapture, FieldViolation};
 use crate::{CatalogError, ExportAccountingError};
 
 /// The same original frame receiving authored field positions and failed Template guards.
 pub(crate) struct TemplateFieldCapture<'fields, 'scope, 'read, 'source> {
     fields: &'fields OriginalFlowFields<'scope, 'read, 'source>,
+    input: &'scope OriginalCatalogInput<'scope, 'scope>,
     body: ExampleBodyCapture<'scope, 'read, 'source>,
 }
 
@@ -25,6 +27,7 @@ impl<'fields, 'scope, 'read, 'source> TemplateFieldCapture<'fields, 'scope, 'rea
     ) -> Result<Self, CatalogError> {
         Ok(Self {
             fields,
+            input,
             body: fields.body_capture(input, admission)?,
         })
     }
@@ -40,6 +43,37 @@ impl<'source> FieldCapture<'source> for TemplateFieldCapture<'_, '_, '_, 'source
         Ok(())
     }
 
+    fn check_declared_target(
+        &self,
+        parent: &StructValue<'source>,
+        path: &str,
+        declaration: &Field<'source>,
+        expected: &str,
+    ) -> Result<(), ReadError> {
+        let owner = self.fields.owner_of(parent)?;
+        let (_, fact) = self
+            .fields
+            .field(owner, declaration.name())?
+            .ok_or_else(|| CatalogError::from(ExportAccountingError::ConflictingSourceDatum))?;
+        if !std::ptr::eq(fact.field(), declaration) {
+            return Err(CatalogError::from(ExportAccountingError::ConflictingSourceDatum).into());
+        }
+        let (target, selectors) = fact.observe_declared_target(self.input)?;
+        if target == Ok(expected) {
+            return Ok(());
+        }
+        let violation =
+            FieldViolation::rejected_declaration(parent, path, declaration, target.err());
+        let ancestors = self.fields.ancestors(fact)?;
+        let body = self.body.field_fact(
+            parent,
+            fact,
+            &ancestors,
+            &violation.field_text(),
+            FieldFailureKind::NominalDeclaration(&selectors),
+        )?;
+        Err(Box::new(violation.into_error().with_body(body)))
+    }
     fn check_context(
         &self,
         sources: &SourceUses,

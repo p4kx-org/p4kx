@@ -9,6 +9,7 @@ mod catalog_v3_consumer;
 mod catalog_v3_loot_consumer_tests;
 mod catalog_v3_mission_definition_tests;
 mod real_archive;
+mod real_archive_auto_spawns;
 mod real_archive_blueprints;
 mod real_archive_broker_entries;
 mod real_archive_canonical_texts;

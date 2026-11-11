@@ -3,6 +3,61 @@
 
 use p4kx_testkit::{DataForgeBuilder, TestStruct, TestType};
 
+#[derive(Clone, Copy)]
+pub(crate) enum AutoLayout {
+    Authored,
+    WrongAutoTarget,
+    WrongSearchTarget,
+    InlineSearch,
+    WrongClosetType,
+    WrongTagArray,
+    WrongEntityTarget,
+}
+
+impl AutoLayout {
+    fn auto_target(self) -> TestType {
+        reference(if matches!(self, Self::WrongAutoTarget) {
+            "Definition"
+        } else {
+            "AutoSpawns"
+        })
+    }
+
+    fn search(self) -> TestType {
+        match self {
+            Self::WrongSearchTarget => pointer("Definition"),
+            Self::InlineSearch => class("SpawnClosetSearchOptions_Tags"),
+            _ => pointer("SpawnClosetSearchOptionsBase"),
+        }
+    }
+
+    fn positive(self) -> TestType {
+        class(if matches!(self, Self::WrongClosetType) {
+            "LookalikeTagList"
+        } else {
+            "TagList"
+        })
+    }
+
+    fn tags(self) -> TestType {
+        match self {
+            Self::WrongTagArray => class("LookalikeTagList"),
+            _ => TestType::Reference,
+        }
+    }
+
+    fn entity(self) -> TestType {
+        reference(if matches!(self, Self::WrongEntityTarget) {
+            "Definition"
+        } else {
+            "LocationEntityDeclaration"
+        })
+    }
+}
+
+fn reference(name: &str) -> TestType {
+    TestType::ReferenceTo(name.to_owned())
+}
 fn class(name: &str) -> TestType {
     TestType::Class(name.to_owned())
 }
@@ -16,14 +71,14 @@ fn value(name: &str) -> TestStruct {
     TestStruct::new(format!("MissionPropertyValue_{name}")).parent("BaseMissionPropertyValue")
 }
 
-pub(super) fn add(builder: DataForgeBuilder) -> DataForgeBuilder {
-    [options(), auto(), investigation(), other()]
+pub(super) fn add(builder: DataForgeBuilder, layout: AutoLayout) -> DataForgeBuilder {
+    [options(layout), auto(layout), investigation(), other()]
         .into_iter()
         .flatten()
         .fold(builder, DataForgeBuilder::structure)
 }
 
-fn options() -> Vec<TestStruct> {
+fn options(layout: AutoLayout) -> Vec<TestStruct> {
     let mut types = vec![
         TestStruct::new("BaseMissionPropertyValueOption")
             .field("textId", TestType::Locale)
@@ -33,7 +88,7 @@ fn options() -> Vec<TestStruct> {
         TestStruct::new("DependentMissionProperty")
             .field("property", weak("MissionProperty"))
             .array("values", weak("BaseMissionPropertyValueOption")),
-        TestStruct::new("TagList").array("tags", TestType::Reference),
+        TestStruct::new("TagList").array("tags", layout.tags()),
     ];
     for (kind, number) in [
         ("StringHash", TestType::String),
@@ -65,19 +120,22 @@ fn options() -> Vec<TestStruct> {
     types
 }
 
-fn auto() -> Vec<TestStruct> {
+fn auto(layout: AutoLayout) -> Vec<TestStruct> {
     vec![
         TestStruct::new("Definition"),
+        TestStruct::new("AutoSpawns"),
+        TestStruct::new("LocationEntityDeclaration"),
+        TestStruct::new("LookalikeTagList").array("tags", TestType::Reference),
         value("AutoSpawns")
-            .field("autoSpawns", TestType::Reference)
-            .field("searchOptions", pointer("SpawnClosetSearchOptionsBase")),
+            .field("autoSpawns", layout.auto_target())
+            .field("searchOptions", layout.search()),
         TestStruct::new("SpawnClosetSearchOptionsBase"),
         TestStruct::new("SpawnClosetSearchOptions_EntityDeclaration")
             .parent("SpawnClosetSearchOptionsBase")
-            .field("entityDeclaration", TestType::Reference),
+            .field("entityDeclaration", layout.entity()),
         TestStruct::new("SpawnClosetSearchOptions_Tags")
             .parent("SpawnClosetSearchOptionsBase")
-            .field("closetPositiveTags", class("TagList"))
+            .field("closetPositiveTags", layout.positive())
             .field("closetNegativeTags", class("TagList")),
         TestStruct::new("SpawnClosetSearchOptions_Unknown").parent("SpawnClosetSearchOptionsBase"),
     ]
