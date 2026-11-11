@@ -39,6 +39,7 @@ acceptance. Delivery requires the evidence below.
   Command-key shortcuts, system clipboard, Metal rendering and CoreAudio playback (start, seek
   and stop). Cover absent audio devices, cancelled dialogs, permission denial, Unicode paths,
   case-sensitive and case-insensitive APFS, and Archives on external volumes.
+  Follow the [macOS desktop verification](macos-desktop-verification.md) procedure.
 
 ## DMG, signing and updates
 

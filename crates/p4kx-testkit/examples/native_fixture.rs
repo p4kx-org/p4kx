@@ -6,7 +6,13 @@
 use std::error::Error;
 use std::path::PathBuf;
 
-use p4kx_testkit::{ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, TestElement, TestEntry};
+use p4kx_testkit::{
+    ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, TestCodec, TestElement, TestEntry, TestWem,
+    test_signal,
+};
+
+const SAMPLE_RATE: u32 = 48_000;
+const TONE_SECONDS: u32 = 8;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let directory = std::env::args_os()
@@ -30,5 +36,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .entry(TestEntry::zstd("Data/smoke.xml", xml))
         .write_to(directory.join("native-smoke.p4k"))?;
     std::fs::write(directory.join("hello.txt"), text)?;
+    let samples = test_signal(SAMPLE_RATE * TONE_SECONDS, 1);
+    let tone = TestWem::pcm(TestCodec::WwisePcm, 1, SAMPLE_RATE, &samples).bytes();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/Sounds/tone.wem", tone))
+        .entry(TestEntry::stored(
+            "Data/readme.txt",
+            "Synthetic playback control",
+        ))
+        .write_to(directory.join("native-desktop-audio.p4k"))?;
     Ok(())
 }

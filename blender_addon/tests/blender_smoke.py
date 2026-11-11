@@ -9,21 +9,43 @@ Run with ``blender --background --factory-startup --python blender_smoke.py`` or
 
 from __future__ import annotations
 
+import os
+import platform
 import sys
 import tempfile
+from importlib import import_module
 from pathlib import Path
+from types import ModuleType
 
 import bpy
 import addon_utils
 from mathutils import Vector
 
 HERE = Path(__file__).resolve().parent
-sys.path[:0] = [str(HERE), str(HERE.parent)]
+INSTALLED_ROOT = os.environ.get("P4KX_TEST_INSTALLED_BLENDER_ROOT")
+ADDON = "bl_ext.user_default.p4kx_importer" if INSTALLED_ROOT else "p4kx_importer"
+sys.path.insert(0, str(HERE))
+if not INSTALLED_ROOT:
+    sys.path.insert(1, str(HERE.parent))
 
 import synthetic  # noqa: E402
 import synthetic_character  # noqa: E402
 import synthetic_materials  # noqa: E402
-from p4kx_importer import importer, lights, package, register, unregister  # noqa: E402
+
+
+def addon_module(name: str) -> ModuleType:
+    """Imports a module from the selected add-on."""
+    return import_module(f"{ADDON}.{name}")
+
+
+extension = import_module(ADDON)
+importer = addon_module("importer")
+lights = addon_module("lights")
+package = addon_module("package")
+glass_tint = addon_module("glass_tint")
+materials = addon_module("materials")
+material_graph = addon_module("material_graph")
+material_model = addon_module("material_model")
 
 
 def check(condition: bool, message: str) -> None:
@@ -186,8 +208,22 @@ def check_character(folder: Path, base_colour: tuple[float, ...]) -> None:
     check(prop.parent is hero, "the prop is below the Character")
 
 
+def check_installed_extension() -> None:
+    """Verifies the host and the enabled add-on before changing the fixture scene."""
+    if not INSTALLED_ROOT:
+        return
+    check(platform.system() == "Darwin" and platform.machine() == "arm64", "native Apple Silicon Blender")
+    check(bpy.app.version[:2] == (5, 2) and bpy.app.version_cycle == "release", "Blender 5.2 LTS")
+    check(all(addon_utils.check(ADDON)), "installed add-on was enabled by Blender")
+    root = Path(INSTALLED_ROOT).resolve(strict=True)
+    location = Path(extension.__file__).resolve(strict=True)
+    check(location.is_relative_to(root), "loaded module belongs to the isolated extension installation")
+    print(f"native Blender {bpy.app.version_string} on arm64, extension installed and enabled")
+
+
 def main() -> None:
     """Runs the import and the checks."""
+    check_installed_extension()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     addon_utils.enable("io_scene_gltf2", default_set=False)
     with tempfile.TemporaryDirectory() as folder:
@@ -242,7 +278,7 @@ def main() -> None:
 
         bpy.ops.wm.read_factory_settings(use_empty=True)
         addon_utils.enable("io_scene_gltf2", default_set=False)
-        register()
+        extension.register()
         status = bpy.ops.import_scene.p4kx_package(filepath=str(scene))
         check(status == {"FINISHED"}, f"operator: {status}")
         check(len([o for o in bpy.data.objects if o.type == "MESH"]) == 2, "operator import")
@@ -255,7 +291,7 @@ def main() -> None:
             check("Update the P4KX Blender add-on" in str(error), f"message: {error}")
         else:
             check(False, "a newer package must be refused")
-        unregister()
+        extension.unregister()
 
         check_layered_material(Path(folder) / "layered")
         check_glass_tint()
@@ -265,16 +301,12 @@ def main() -> None:
 
 def check_glass_tint() -> None:
     """Checks the vertex-colour tint of glass: kept with colours, plain without, kept by the drop."""
-    from p4kx_importer import glass_tint, materials
-    from p4kx_importer.material_graph import BuildContext, build_graph
-    from p4kx_importer.material_model import parse_materials
-
     bpy.ops.wm.read_factory_settings(use_empty=True)
     raw = synthetic_materials.description(
         "x0001", "GlassPBR", gen_mask=["PER_VERTEX_TINT"], diffuse=[0.5, 0.25, 1.0]
     )
-    descriptions = parse_materials([raw], [])
-    spec = build_graph(descriptions["x0001"], BuildContext(descriptions, None, {}))
+    descriptions = material_model.parse_materials([raw], [])
+    spec = material_graph.build_graph(descriptions["x0001"], material_graph.BuildContext(descriptions, None, {}))
 
     images = materials.ImageCache(package.parse_manifest(synthetic.manifest(), Path(".")))
 
