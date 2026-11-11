@@ -295,17 +295,14 @@ pub(super) struct Export<'a, 'archive> {
 
 pub(super) fn publish(
     args: &ChfGlbArgs,
-    archive: &Path,
     write_guard: &ArchiveWriteProtection,
     cancel: &CancelToken,
     export: &Export<'_, '_>,
 ) -> Result<(GlbSummary, Projection, String)> {
-    let receipt_protection =
-        ArchiveWriteProtection::for_sources(&[&args.file, archive], cancel.flag())?;
     let receipt = FileReceipt::new_with_cancel(
         &args.out,
         Some(write_guard),
-        Some(&receipt_protection),
+        Some(write_guard),
         cancel.clone(),
     )?;
     let (summary, projection) = receipt

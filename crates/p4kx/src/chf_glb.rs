@@ -12,7 +12,8 @@ use p4kx_assembly::{
     character_animations_with_archive_sources,
 };
 use p4kx_extraction::{
-    AnimationSet, DataForgeEntry, GlbOptions, GlbSummary, MaterialMode, is_same_file,
+    AnimationSet, ArchiveWriteProtection, DataForgeEntry, GlbOptions, GlbSummary, MaterialMode,
+    is_same_file,
 };
 use thiserror::Error;
 
@@ -113,7 +114,8 @@ pub(crate) fn run(args: &ChfGlbArgs, as_json: bool) -> Result<()> {
     })?;
     let archive = crate::key::open(&args.archive)?;
     let cancel = crate::extract::cancel_on_interrupt()?;
-    let write_guard = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let sources = [archive.path(), args.file.as_path()];
+    let write_guard = ArchiveWriteProtection::for_sources(&sources, cancel.flag())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let mut resolver = LoadoutResolver::new(&forge);
@@ -141,8 +143,7 @@ pub(crate) fn run(args: &ChfGlbArgs, as_json: bool) -> Result<()> {
         input: &input,
         forge: entry.origin(),
     };
-    let (summary, projection, receipt) =
-        origin::publish(args, archive.path(), &write_guard, &cancel, &export)?;
+    let (summary, projection, receipt) = origin::publish(args, &write_guard, &cancel, &export)?;
 
     if as_json {
         let outcome = Outcome {

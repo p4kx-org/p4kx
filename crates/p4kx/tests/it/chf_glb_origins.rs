@@ -145,3 +145,27 @@ fn an_invalid_chf_preserves_the_previous_glb_and_its_exact_receipt() -> TestResu
     assert_eq!(fs::read(receipt)?, original);
     Ok(())
 }
+
+#[test]
+fn the_glb_and_its_receipt_cannot_replace_the_chf_input_or_an_alias() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let rig = head_rig(HEAD_VERTICES, MALE_RIG_HASH).build();
+    let archive = archive(directory.path(), head_entries(Some(rig)))?;
+    let file = chf(directory.path(), "character.chf", Some((MALE_RIG_HASH, 2)))?;
+    let alias = directory.path().join("alias.glb");
+    let output = directory.path().join("character.glb");
+    let receipt = directory.path().join("character.glb.p4kx-origin.jsonl");
+    fs::hard_link(&file, &alias)?;
+    fs::hard_link(&file, &receipt)?;
+    let original = fs::read(&file)?;
+
+    for target in [&file, &alias, &output] {
+        let run = glb(&archive, &file, target, true)?;
+        assert_eq!(run.code, Some(2), "{}: {}", target.display(), run.stderr);
+        assert_eq!(fs::read(&file)?, original);
+        assert_eq!(fs::read(&alias)?, original);
+        assert_eq!(fs::read(&receipt)?, original);
+        assert!(!output.exists());
+    }
+    Ok(())
+}
