@@ -26,6 +26,8 @@ mod origins;
 mod pcm_conversion;
 #[path = "audio_wem_annotations_values.rs"]
 mod values;
+#[path = "audio_wem_vorbis_conversion.rs"]
+mod vorbis_conversion;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 

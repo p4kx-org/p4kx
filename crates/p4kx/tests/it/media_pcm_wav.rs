@@ -4,12 +4,11 @@
 use std::fs;
 use std::path::Path;
 
-use assert_cmd::Command;
 use p4kx_extraction::{ByteOrder, Codec, Wem};
 use p4kx_testkit::{ArchiveBuilder, TestCodec, TestEntry, TestWem};
 use serde_json::{Value, json};
 
-use super::TestResult;
+use super::{TestResult, audio_export as export, jsonl_rows as rows, wem_conversion as conversion};
 
 const TONE: &str = "audio/tone.wem";
 const UNSUPPORTED: &str = "audio/compressed.wem";
@@ -55,17 +54,6 @@ fn media_cli_wav_is_explicit_sourced_and_atomic() -> TestResult {
         .assert()
         .code(0);
     verify_wav_and_failed_replacement(&source, &output, &original)
-}
-
-fn export(source: &Path, output: &Path, filter: &str) -> TestResult<Command> {
-    let mut command = p4kx_testkit::p4kx()?;
-    command
-        .args(["media", "export"])
-        .arg(source)
-        .arg("--out")
-        .arg(output)
-        .args(["--kind", "audio", "--filter", filter, "--json"]);
-    Ok(command)
 }
 
 fn verify_wav_and_failed_replacement(source: &Path, output: &Path, original: &[u8]) -> TestResult {
@@ -230,15 +218,4 @@ fn verify_failure(source: &Path, output: &Path) -> TestResult {
         "original codec refusal is durable"
     );
     Ok(())
-}
-
-fn conversion(row: &Value) -> bool {
-    row.pointer("/data/record_type").and_then(Value::as_str) == Some("wem-conversion")
-}
-
-fn rows(path: &Path) -> TestResult<Vec<Value>> {
-    fs::read_to_string(path)?
-        .lines()
-        .map(|line| serde_json::from_str(line).map_err(Into::into))
-        .collect()
 }

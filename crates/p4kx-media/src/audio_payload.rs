@@ -85,6 +85,7 @@ pub(crate) struct WemConversion {
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum EncodedAudioFormat {
     Wav,
+    Ogg,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -95,17 +96,39 @@ pub(crate) enum EncodedAudioFormat {
     deny_unknown_fields
 )]
 pub(crate) enum ConversionOutcome {
-    Written(WrittenWav),
+    Written(WrittenAudio),
     Failed(ConversionFailure),
 }
 
 #[derive(Serialize, JsonSchema)]
+#[serde(tag = "actual_format", rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) enum WrittenAudio {
+    Wav {
+        #[serde(flatten)]
+        signal: WrittenSignal,
+        source_range: SourceRange,
+    },
+    Ogg {
+        #[serde(flatten)]
+        signal: WrittenSignal,
+        source_range: SourceRange,
+        vorbis_inputs: Box<VorbisInputs>,
+    },
+}
+
+#[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct WrittenWav {
-    pub(crate) actual_format: EncodedAudioFormat,
+pub(crate) struct VorbisInputs {
+    pub(crate) average_byte_rate: SourceRange,
+    pub(crate) header: SourceRange,
+    pub(crate) setup_packet: SourceRange,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WrittenSignal {
     pub(crate) actual_codec: &'static str,
     pub(crate) artifact: Artifact,
-    pub(crate) source_range: SourceRange,
     pub(crate) channels: u16,
     pub(crate) sample_rate: u32,
     pub(crate) sample_count: DecimalU64,

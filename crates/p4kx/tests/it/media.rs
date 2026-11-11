@@ -2,14 +2,41 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fs;
+use std::path::Path;
 
+use assert_cmd::Command;
 use p4kx_testkit::{ArchiveBuilder, TestCodec, TestEntry, TestWem};
 use predicates::prelude::predicate;
+use serde_json::Value;
 
 #[path = "media_pcm_wav.rs"]
 mod pcm_wav;
+#[path = "media_vorbis_ogg.rs"]
+mod vorbis_ogg;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+fn audio_export(source: &Path, output: &Path, filter: &str) -> TestResult<Command> {
+    let mut command = p4kx_testkit::p4kx()?;
+    command
+        .args(["media", "export"])
+        .arg(source)
+        .arg("--out")
+        .arg(output)
+        .args(["--kind", "audio", "--filter", filter, "--json"]);
+    Ok(command)
+}
+
+fn wem_conversion(row: &Value) -> bool {
+    row.pointer("/data/record_type").and_then(Value::as_str) == Some("wem-conversion")
+}
+
+fn jsonl_rows(path: &Path) -> TestResult<Vec<Value>> {
+    fs::read_to_string(path)?
+        .lines()
+        .map(|line| serde_json::from_str(line).map_err(Into::into))
+        .collect()
+}
 
 #[test]
 fn media_export_runs_the_permanent_provider_and_emits_the_1_0_contract() -> TestResult {
@@ -29,17 +56,16 @@ fn media_export_runs_the_permanent_provider_and_emits_the_1_0_contract() -> Test
         .assert()
         .code(0)
         .stdout(predicate::str::contains("\"format_version\":\"1.0\""));
-    let index: serde_json::Value =
-        serde_json::from_slice(&fs::read(output.join("media-index.json"))?)?;
+    let index: Value = serde_json::from_slice(&fs::read(output.join("media-index.json"))?)?;
     assert_eq!(
-        index.pointer("/format").and_then(serde_json::Value::as_str),
+        index.pointer("/format").and_then(Value::as_str),
         Some("p4kx-media"),
         "the CLI writes the versioned media envelope"
     );
     assert_eq!(
         index
             .pointer("/source_entries/written")
-            .and_then(serde_json::Value::as_u64),
+            .and_then(Value::as_u64),
         Some(2),
         "duplicate source paths retain two physical Entries"
     );
@@ -131,7 +157,7 @@ fn media_schemas_are_valid_json() -> TestResult {
             .get_output()
             .stdout
             .clone();
-        let schema: serde_json::Value = serde_json::from_slice(&result)?;
+        let schema: Value = serde_json::from_slice(&result)?;
         jsonschema::validator_for(&schema)?;
     }
     Ok(())
@@ -192,18 +218,17 @@ fn media_cli_audio_emits_typed_wem_summary_and_directory() -> TestResult {
         .get_output()
         .stdout
         .clone();
-    let validator =
-        jsonschema::validator_for(&serde_json::from_slice::<serde_json::Value>(&schema)?)?;
+    let validator = jsonschema::validator_for(&serde_json::from_slice::<Value>(&schema)?)?;
     let stream = fs::read_to_string(output.join(&index.artifact_base).join("audio.jsonl"))?;
     let mut types = Vec::new();
     for line in stream.lines() {
-        let row: serde_json::Value = serde_json::from_str(line)?;
+        let row: Value = serde_json::from_str(line)?;
         validator
             .validate(&row)
             .map_err(|error| error.to_string())?;
         let record_type = row
             .pointer("/data/record_type")
-            .and_then(serde_json::Value::as_str)
+            .and_then(Value::as_str)
             .ok_or("built-in Audio record discriminator")?;
         types.push(record_type.to_owned());
     }

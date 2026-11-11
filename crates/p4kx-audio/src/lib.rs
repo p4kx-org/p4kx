@@ -126,7 +126,9 @@ pub use ogg::OggWriter;
 pub use opus::OpusError;
 pub use riff::{ByteOrder, WemSourceChunk};
 pub use soundbank::{BankHeader, EmbeddedWem, Section, Soundbank};
-pub use vorbis::{Codebooks, OggReport, VorbisError};
+pub use vorbis::{
+    Codebooks, OggReport, VorbisError, WemVorbisOgg, WemVorbisRanges, WemVorbisWriteError,
+};
 pub use wav::WavReport;
 pub use wem::{Wem, WemChunk};
 pub use wem_cue::{WemCue, WemCuePoint};

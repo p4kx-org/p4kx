@@ -77,7 +77,7 @@ retained BNK Entry. Counts and trailing lengths describe the individual WEM. In 
 receipts, WEM coordinates follow the two DIDX ordinals and keep their original WEM-local
 interpretation. Separate receipts identify the actual triplet, DATA extent and RIFF selection.
 
-## Optional WAV output
+## Optional WAV and Ogg output
 
 By default, the Audio provider retains the original bytes and writes the metadata above.
 Request 16-bit PCM WAV output with the following command.
@@ -91,16 +91,27 @@ uses complete frames. IMA ADPCM also decodes a final block whose channel sub-blo
 original bytes. PTADPCM uses complete blocks. Unused tail bytes and extra chunks stay in the
 raw artifact.
 
+Request deterministic Ogg Vorbis artifacts from Wwise Vorbis with the following command.
+
+    p4kx media export ARCHIVE --out DIR --kind audio --audio-format ogg
+
+The provider uses the original Wwise configuration, setup packet and audio packets. The Ogg
+preserves the channel count, playback rate, checked frame count and applicable loop. The first
+`data` chunk bounds the packet walk. The same codebook selection and Ogg page writer serve
+standalone conversion and the Media provider.
+
 The `audio-wem-conversion` and `audio-bank-wem-conversion` namespaces contain one
 `wem-conversion` record per eligible occurrence. The `written` outcome records the
 requested and actual formats, source codec, decoded dimensions and loop, original
-half-open range of consumed PCM frames or coded ADPCM blocks, and verified artifact path,
-length and SHA-256. Embedded
+half-open range of consumed PCM frames, coded ADPCM blocks or Vorbis audio packets, and verified
+artifact path, length and SHA-256. Ogg rows add `vorbis_inputs` with the original average-byte-rate
+word, Vorbis configuration and size-prefixed setup packet ranges. Artifact origins retain those
+inputs and the original audio-packet ranges independently. Embedded
 ranges are absolute within the retained bank, with the DIDX section and triplet as
-subresource indices. Equal WAV bytes can share one file, while the conversion rows and
+subresource indices. Equal output bytes of the same format can share one file, while the conversion rows and
 artifact-manifest occurrences retain their own physical source uses and encryption markers.
 
-A complete WEM outside the provider's WAV codec coverage receives an `unsupported-codec` conversion
+A complete WEM outside the requested format's codec coverage receives an `unsupported-codec` conversion
 outcome. Normal export reports projection loss. A diagnostic generation retains the
 original source and the failure. Prefetch and opaque media retain their raw metadata.
 

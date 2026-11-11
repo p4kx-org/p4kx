@@ -88,14 +88,14 @@ impl WemMetadata {
     }
 }
 
-struct SelectedChunks {
-    format: WemSourceChunk,
-    vorbis: Option<WemSourceChunk>,
+pub(crate) struct SelectedChunks {
+    pub(crate) format: WemSourceChunk,
+    pub(crate) vorbis: Option<WemSourceChunk>,
     sample: Option<WemSourceChunk>,
     data: WemSourceChunk,
 }
 
-fn selected_chunks<I: ReadAt>(
+pub(crate) fn selected_chunks<I: ReadAt>(
     input: &mut I,
     header: RiffHeader,
 ) -> Result<SelectedChunks, I::Error> {

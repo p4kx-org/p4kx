@@ -3068,7 +3068,7 @@
           "additionalProperties": false,
           "properties": {
             "payload": {
-              "$ref": "#/$defs/WrittenWav"
+              "$ref": "#/$defs/WrittenAudio"
             },
             "type": {
               "const": "written",
@@ -3516,7 +3516,8 @@
     },
     "EncodedAudioFormat": {
       "enum": [
-        "wav"
+        "wav",
+        "ogg"
       ],
       "type": "string"
     },
@@ -9037,6 +9038,26 @@
         }
       ]
     },
+    "VorbisInputs": {
+      "additionalProperties": false,
+      "properties": {
+        "average_byte_rate": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "header": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "setup_packet": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "average_byte_rate",
+        "header",
+        "setup_packet"
+      ],
+      "type": "object"
+    },
     "WemChunk": {
       "additionalProperties": false,
       "properties": {
@@ -9392,57 +9413,119 @@
       ],
       "type": "string"
     },
-    "WrittenWav": {
-      "additionalProperties": false,
-      "properties": {
-        "actual_codec": {
-          "type": "string"
-        },
-        "actual_format": {
-          "$ref": "#/$defs/EncodedAudioFormat"
-        },
-        "artifact": {
-          "$ref": "#/$defs/Artifact"
-        },
-        "channels": {
-          "format": "uint16",
-          "maximum": 65535,
-          "minimum": 0,
-          "type": "integer"
-        },
-        "loop_points": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/WemLoop"
+    "WrittenAudio": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actual_codec": {
+              "type": "string"
             },
-            {
-              "type": "null"
+            "actual_format": {
+              "const": "wav",
+              "type": "string"
+            },
+            "artifact": {
+              "$ref": "#/$defs/Artifact"
+            },
+            "channels": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "loop_points": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/WemLoop"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sample_count": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "sample_rate": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source_range": {
+              "$ref": "#/$defs/SourceRange"
             }
-          ]
+          },
+          "required": [
+            "actual_format",
+            "actual_codec",
+            "artifact",
+            "channels",
+            "sample_rate",
+            "sample_count",
+            "loop_points",
+            "source_range"
+          ],
+          "type": "object"
         },
-        "sample_count": {
-          "$ref": "#/$defs/DecimalU64"
-        },
-        "sample_rate": {
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "source_range": {
-          "$ref": "#/$defs/SourceRange"
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actual_codec": {
+              "type": "string"
+            },
+            "actual_format": {
+              "const": "ogg",
+              "type": "string"
+            },
+            "artifact": {
+              "$ref": "#/$defs/Artifact"
+            },
+            "channels": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "loop_points": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/WemLoop"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sample_count": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "sample_rate": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source_range": {
+              "$ref": "#/$defs/SourceRange"
+            },
+            "vorbis_inputs": {
+              "$ref": "#/$defs/VorbisInputs"
+            }
+          },
+          "required": [
+            "actual_format",
+            "actual_codec",
+            "artifact",
+            "channels",
+            "sample_rate",
+            "sample_count",
+            "loop_points",
+            "source_range",
+            "vorbis_inputs"
+          ],
+          "type": "object"
         }
-      },
-      "required": [
-        "actual_format",
-        "actual_codec",
-        "artifact",
-        "source_range",
-        "channels",
-        "sample_rate",
-        "sample_count",
-        "loop_points"
-      ],
-      "type": "object"
+      ]
     },
     "ZipHeaderInfo": {
       "description": "Lossless fixed ZIP directory words without interpreting their flags or host system.",

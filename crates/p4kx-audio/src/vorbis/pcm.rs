@@ -16,7 +16,7 @@ impl<B: AsRef<[u8]>> Wem<B> {
     /// Rebuilds a Wwise Vorbis sound, decodes it and writes it as a 16-bit PCM WAV to `out`.
     pub(crate) fn write_vorbis_wav(&self, out: &mut impl Write) -> Result<WavReport, AudioError> {
         let sound = self.rebuild_vorbis()?;
-        let (header, report) = self.decoded_wav_header(sound.sample_count)?;
+        let (header, report) = self.decoded_wav_header(sound.headers.sample_count)?;
         out.write_all(&header).map_err(AudioError::Write)?;
         sound.write_pcm(usize::from(self.channels()).max(1), out)?;
         Ok(report)
@@ -27,12 +27,12 @@ impl RebuiltSound<'_> {
     /// Decodes the audio packets and writes the sample count's frames of interleaved
     /// little-endian 16-bit samples.
     fn write_pcm(&self, channels: usize, out: &mut impl Write) -> Result<(), AudioError> {
-        let decoder = &self.decoder;
-        let mut audio = self.stream.audio(&self.setup);
+        let decoder = &self.headers.decoder;
+        let mut audio = self.stream.audio(&self.headers.setup);
         let mut window = PreviousWindowRight::new();
         let mut packet = Vec::new();
         let mut bytes = Vec::new();
-        let mut remaining = self.sample_count;
+        let mut remaining = self.headers.sample_count;
         while remaining > 0
             && let Some(rebuilt) = audio.next_into(&mut packet)
         {
@@ -59,8 +59,8 @@ impl RebuiltSound<'_> {
         }
         if remaining > 0 {
             return Err(AudioError::InvalidVorbis(VorbisError::MissingSamples {
-                expected: self.sample_count,
-                decoded: self.sample_count - remaining,
+                expected: self.headers.sample_count,
+                decoded: self.headers.sample_count - remaining,
             }));
         }
         Ok(())

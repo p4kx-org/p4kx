@@ -11,7 +11,8 @@ use p4kx_extraction::{
 
 use crate::audio_bank_media_origins::EmbeddedWemOrigins;
 use crate::audio_payload::{
-    AudioPayload, WemChunk, WemDuration, WemHeader, WemLoop, WemOpaqueClass, WemPhase,
+    AudioPayload, EncodedAudioFormat, WemChunk, WemDuration, WemHeader, WemLoop, WemOpaqueClass,
+    WemPhase,
 };
 use crate::audio_record_origins as origins;
 use crate::audio_wem_annotation;
@@ -72,8 +73,13 @@ pub(crate) fn project<R: Read + Seek>(
     match source.inspect() {
         Ok(mut inspected) => {
             projection.header(inspected.metadata(), riff_end, writer)?;
-            if writer.audio_output == AudioOutput::Wav {
-                conversion::wav(projection, &mut inspected, writer)?;
+            let format = match writer.audio_output {
+                AudioOutput::Raw => None,
+                AudioOutput::Wav => Some(EncodedAudioFormat::Wav),
+                AudioOutput::Ogg => Some(EncodedAudioFormat::Ogg),
+            };
+            if let Some(format) = format {
+                conversion::project(projection, &mut inspected, format, writer)?;
             }
         }
         Err(cause) => projection.read_failure(WemPhase::Summary, cause, writer)?,

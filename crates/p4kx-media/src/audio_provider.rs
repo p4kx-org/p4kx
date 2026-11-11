@@ -65,6 +65,10 @@ fn field_groups() -> Vec<FieldGroup> {
                 "adpcm-wav-conversion",
                 "Requested WAV output from IMA ADPCM and PTADPCM, with exact consumed coded blocks and verified artifact mappings.",
             ),
+            FieldGroup::new(
+                "vorbis-ogg-conversion",
+                "Requested Ogg output from Wwise Vorbis, with original packet extents and verified artifact mappings.",
+            ),
             FieldGroup::new_with_unsupported_projection(
                 "compressed-audio-conversion",
                 "Other encoded WEM payloads remain available through exact retained ranges.",

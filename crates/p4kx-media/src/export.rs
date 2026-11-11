@@ -19,6 +19,8 @@ pub enum AudioOutput {
     Raw,
     /// Writes 16-bit PCM WAV from PCM, IMA ADPCM or PTADPCM WEM data.
     Wav,
+    /// Rebuilds Ogg Vorbis from supported Wwise Vorbis packets.
+    Ogg,
 }
 
 /// Settings of one media generation.
