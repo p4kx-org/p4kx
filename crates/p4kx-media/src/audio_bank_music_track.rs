@@ -6,6 +6,7 @@ use std::io::{Read, Seek};
 use p4kx_extraction::bank::{BankHircMusicTrack, BankMusicTrackRead, BankMusicTrackRow};
 
 use crate::audio_bank_inventory::VersionSite;
+use crate::audio_bank_music_track_controls;
 use crate::audio_bank_projection::BankProjection;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status};
 
@@ -28,7 +29,7 @@ pub(crate) const SWITCH_MEMBER: &str = "audio-bank-music-track-switch-member";
 pub(crate) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,
     version: VersionSite,
-    track: BankHircMusicTrack<'_, R>,
+    mut track: BankHircMusicTrack<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let sites = TrackSites::new(&track.object, version, &track.fields);
@@ -43,11 +44,11 @@ pub(crate) fn project<R: Read + Seek>(
             &data,
             issue.as_slice(),
         )?;
-    for row in track.rows {
+    for row in &mut track.rows {
         let row = row.map_err(|cause| projection.replay_failure(cause))?;
         emit(projection, &sites, row, writer)?;
     }
-    Ok(())
+    audio_bank_music_track_controls::project(projection, version, &mut track, writer)
 }
 
 fn emit(

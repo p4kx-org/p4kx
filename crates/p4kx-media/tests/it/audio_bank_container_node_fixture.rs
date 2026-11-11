@@ -28,21 +28,25 @@ pub(crate) fn source(
     version: u32,
     continuation: &[u8],
 ) -> TestResult<Vec<u8>> {
+    let mut body = plain_node()?;
+    body.extend(continuation);
+    Ok(bank(version, TestHircObject::raw(type_byte, id, body)))
+}
+
+pub(crate) fn plain_node() -> TestResult<Vec<u8>> {
     const PLAIN_NODE_BYTES: usize = 31;
     let original = bank(
         154,
-        TestHircObject::actor_mixer(id, &[], TestNodeBase::Plain),
+        TestHircObject::actor_mixer(1, &[], TestNodeBase::Plain),
     );
     let parsed = Soundbank::parse(&original)?;
     let object = parsed.objects().first().ok_or("original synthetic node")?;
     let original_body = parsed.object_body(object);
     let start = size_of::<u32>();
-    let mut body = original_body
+    Ok(original_body
         .get(start..start + PLAIN_NODE_BYTES)
         .ok_or("original synthetic NodeBase")?
-        .to_vec();
-    body.extend(continuation);
-    Ok(bank(version, TestHircObject::raw(type_byte, id, body)))
+        .to_vec())
 }
 
 pub(crate) fn layout(record: &MediaRecord, expected: &str, status: Status) {

@@ -20,6 +20,7 @@ mod audio_bank_hirc_sound_provider;
 mod audio_bank_music_playlist_provider;
 mod audio_bank_music_segment_provider;
 mod audio_bank_music_switch_provider;
+mod audio_bank_music_track_controls_provider;
 mod audio_bank_music_track_provider;
 mod audio_bank_node_fx_provider;
 mod audio_bank_node_positioning_provider;

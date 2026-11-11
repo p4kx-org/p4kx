@@ -8,10 +8,11 @@
 //! `HIRC` objects and the WEMs they embed.
 
 mod adpcm;
-mod bank_blend_point_rows;
 mod bank_blend_rows;
 mod bank_error;
+mod bank_graph_point_rows;
 mod bank_inline_state_rows;
+mod bank_music_track_automation_rows;
 mod bank_node_fx_slots;
 mod bank_node_property_rows;
 mod bank_object_fields;
@@ -35,6 +36,7 @@ mod bank_stid;
 mod bank_structure;
 mod bank_switch_configuration_rows;
 mod bank_switch_group_rows;
+mod bank_table_rows;
 mod codec;
 mod error;
 mod hirc;
@@ -53,6 +55,8 @@ mod hirc_music_segment;
 mod hirc_music_switch;
 mod hirc_music_switch_traversal;
 mod hirc_music_track;
+mod hirc_music_track_automation;
+mod hirc_music_track_transition;
 mod hirc_music_transition;
 mod hirc_node;
 mod hirc_node_aux;
@@ -89,12 +93,18 @@ mod wem_source;
 mod wem_text;
 mod wwise_id;
 
-pub use bank_blend_point_rows::{BankBlendPoint, BankBlendPointRows};
 pub use bank_blend_rows::{
     BankBlendAssociation, BankBlendAssociations, BankBlendLayer, BankBlendLayers,
 };
 pub use bank_error::{BankError, BankWarning, SectionId};
+pub use bank_graph_point_rows::{
+    BankGraphPoint, BankGraphPoint as BankBlendPoint, BankGraphPointRows,
+    BankGraphPointRows as BankBlendPointRows,
+};
 pub use bank_inline_state_rows::{BankInlineStateRow, BankInlineStateRows};
+pub use bank_music_track_automation_rows::{
+    BankMusicTrackAutomation, BankMusicTrackAutomationRows,
+};
 pub use bank_node_fx_slots::{BankNodeFxSlot, BankNodeFxSlots};
 pub use bank_node_property_rows::{
     BankNodePropertyRow, BankNodePropertyRows, BankNodePropertyValue,
@@ -167,6 +177,10 @@ pub use hirc_music_track::{
     BankMusicTrackClip, BankMusicTrackFields, BankMusicTrackRow, BankMusicTrackSource,
     BankMusicTrackSwitchFields,
 };
+pub use hirc_music_track_automation::{
+    BankTrackAutomationExtent, BankTrackAutomationFields, BankTrackAutomationPoints,
+};
+pub use hirc_music_track_transition::{BankMusicTrackFadeFields, BankMusicTrackTransitionFields};
 pub use hirc_music_transition::BankMusicTransitionFields;
 pub use hirc_node::{BankNodeParentFields, Container, ContainerKind};
 pub use hirc_node_aux::{BankNodeAuxFields, BankNodeUserAuxBuses};

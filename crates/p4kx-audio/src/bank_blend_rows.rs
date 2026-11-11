@@ -4,19 +4,17 @@
 use std::io::{Read, Seek};
 use std::ops::Range;
 
-use crate::bank_blend_point_rows::BankBlendPointRows;
-use crate::bank_object_fields::{BankHircField, ObjectFields, SeekObjectFields};
+use crate::bank_graph_point_rows::BankGraphPointRows;
 use crate::bank_rtpc_rows::BankRtpcRows;
+use crate::bank_table_rows::BankTableRows;
 use crate::hirc_blend_container::{
     self, BankBlendAssociationFields, BankBlendExtent, BankBlendLayerFields,
 };
 use crate::read_at::SeekSource;
 use crate::{BankError, BankReadError};
 
-const ID_LEN: u64 = size_of::<u32>() as u64;
-
 /// Sequential cursor over the checked physical Blend Layers.
-pub struct BankBlendLayers<'input, R>(TableRows<'input, R>);
+pub struct BankBlendLayers<'input, R>(BankTableRows<'input, R>);
 
 /// One original Layer with its owner-bound nested cursors.
 #[non_exhaustive]
@@ -39,7 +37,12 @@ impl<'input, R> BankBlendLayers<'input, R> {
         stopped: &'input mut bool,
         extent: &BankBlendExtent,
     ) -> Self {
-        Self(TableRows::new(source, stopped, extent))
+        Self(BankTableRows::new(
+            source,
+            stopped,
+            &extent.checked_range,
+            extent.declared_count.value,
+        ))
     }
 }
 
@@ -77,16 +80,17 @@ impl<R> BankBlendLayer<'_, R> {
     /// Borrows the checked original child associations.
     pub fn associations(&mut self) -> Option<BankBlendAssociations<'_, R>> {
         let extent = self.fields.associations.as_ref()?;
-        Some(BankBlendAssociations(TableRows::new(
+        Some(BankBlendAssociations(BankTableRows::new(
             self.source,
             self.stopped,
-            extent,
+            &extent.checked_range,
+            extent.declared_count.value,
         )))
     }
 }
 
 /// Sequential cursor over the checked child associations within one Layer.
-pub struct BankBlendAssociations<'input, R>(TableRows<'input, R>);
+pub struct BankBlendAssociations<'input, R>(BankTableRows<'input, R>);
 
 /// One original child association and its owner-bound point cursor.
 #[non_exhaustive]
@@ -131,75 +135,13 @@ impl<R: Read + Seek> BankBlendAssociations<'_, R> {
 
 impl<R> BankBlendAssociation<'_, R> {
     /// Borrows the checked original graph points in source order.
-    pub fn points(&mut self) -> Option<BankBlendPointRows<'_, R>> {
+    pub fn points(&mut self) -> Option<BankGraphPointRows<'_, R>> {
         let extent = self.fields.points.as_ref()?;
-        Some(BankBlendPointRows::new(self.source, self.stopped, extent))
-    }
-}
-
-struct TableRows<'input, R> {
-    source: &'input mut SeekSource<R>,
-    stopped: &'input mut bool,
-    range: Range<u64>,
-    ordinals: Range<u32>,
-}
-
-struct Row<T> {
-    ordinal: u32,
-    fields: T,
-    checked_range: Range<u64>,
-    issue: Option<BankError>,
-}
-
-impl<'input, R> TableRows<'input, R> {
-    const fn new(
-        source: &'input mut SeekSource<R>,
-        stopped: &'input mut bool,
-        extent: &BankBlendExtent,
-    ) -> Self {
-        let range = &extent.checked_range;
-        Self {
-            source,
-            stopped,
-            range: range.start..range.end,
-            ordinals: 0..extent.declared_count.value,
-        }
-    }
-}
-
-impl<R: Read + Seek> TableRows<'_, R> {
-    fn read<T>(
-        &mut self,
-        scan: impl FnOnce(
-            &mut SeekObjectFields<'_, R>,
-            BankHircField<u32>,
-        ) -> (T, Result<(), BankReadError>),
-    ) -> Result<Option<Row<T>>, BankReadError> {
-        let start = self.range.start;
-        let available = self.range.end - start;
-        if *self.stopped || available < ID_LEN {
-            return Ok(None);
-        }
-        let Some(ordinal) = self.ordinals.next() else {
-            return Ok(None);
-        };
-        let mut input = SeekObjectFields::after_id(self.source, start, available, 0);
-        let id = input.read_u32().inspect_err(|_| *self.stopped = true)?;
-        let (fields, result) = scan(&mut input, id);
-        let (end, issue) = match result {
-            Ok(()) => (input.offset(), None),
-            Err(BankReadError::Format(error)) => (self.range.end, Some(error)),
-            Err(error) => {
-                *self.stopped = true;
-                return Err(error);
-            }
-        };
-        self.range.start = end;
-        Ok(Some(Row {
-            ordinal,
-            fields,
-            checked_range: start..end,
-            issue,
-        }))
+        Some(BankGraphPointRows::new(
+            self.source,
+            self.stopped,
+            &extent.checked_range,
+            extent.declared_count.value,
+        ))
     }
 }

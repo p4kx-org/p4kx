@@ -88,6 +88,9 @@ and fallback selection.
 | `audio-bank-music-track-source` | `bank-music-track-source` | HIRC section and track and source ordinals |
 | `audio-bank-music-track-clip` | `bank-music-track-clip` | HIRC section and track and clip ordinals |
 | `audio-bank-music-track-switch-member` | `bank-music-track-switch-member` | HIRC section and track and switch-member ordinals |
+| `audio-bank-music-track-controls` | `bank-music-track-controls` | HIRC section and track object ordinals |
+| `audio-bank-music-track-automation` | `bank-music-track-automation` | HIRC section, track object and automation ordinals |
+| `audio-bank-music-track-automation-point` | `bank-music-track-automation-point` | HIRC section, track object, automation and point ordinals |
 | `audio-bank-music-playlist` | `bank-music-playlist` | HIRC section and playlist object ordinals |
 | `audio-bank-music-playlist-child` | `bank-music-playlist-child` | HIRC section and playlist and child ordinals |
 | `audio-bank-music-playlist-stinger` | `bank-music-playlist-stinger` | HIRC section and playlist and stinger ordinals |
@@ -372,6 +375,14 @@ the original plug-in ID, storage code, cache ID, in-memory size and flags. Check
 parameter, automation and switch transition ranges refer to the retained bank. Clip times
 carry their original IEEE-754 words and a finite JSON value when available. A malformed tail
 keeps the preceding complete rows. Other layouts retain the physical HIRC object.
+
+Version-154 MusicTrack controls include the original flags, subtrack count when
+clips are present, signed look-ahead and Switch fade, sync and cue words. The
+automation and point rows preserve the authored clip indices, unknown type and
+interpolation codes, original binary32 bits and finite interpretations. Each
+list has an original count and checked extent. Readable prefixes survive
+truncation in both transition and graph rows. Clip indices remain authored
+positions. Field receipts identify exact bytes in the owning bank.
 
 Version 154 MusicPlaylist rows retain the music node, ordered children and stingers, and
 items in their original order. Each item preserves its original segment and item IDs,

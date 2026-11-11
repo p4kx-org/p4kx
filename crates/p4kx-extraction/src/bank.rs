@@ -38,6 +38,11 @@ pub use p4kx_audio::{
     BankBlendLayers, BankBlendPoint, BankBlendPointRows,
 };
 pub use p4kx_audio::{
+    BankGraphPoint, BankGraphPointRows, BankMusicTrackAutomation, BankMusicTrackAutomationRows,
+    BankMusicTrackFadeFields, BankMusicTrackTransitionFields, BankTrackAutomationExtent,
+    BankTrackAutomationFields, BankTrackAutomationPoints,
+};
+pub use p4kx_audio::{
     BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistItem,
     BankMusicPlaylistRead, BankMusicPlaylistRow, BankMusicPlaylistRows, BankMusicTransitionFields,
     MusicPlayMode,

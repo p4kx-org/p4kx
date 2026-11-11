@@ -6,17 +6,16 @@ use std::ops::Range;
 
 use crate::BankReadError;
 use crate::bank_object_fields::{BankHircField, ObjectFields, SeekObjectFields};
-use crate::hirc_blend_container::BankBlendExtent;
 use crate::hirc_rtpc::{self, CURVE_POINT_LEN};
 use crate::read_at::SeekSource;
 
 const WORD_LEN: u64 = size_of::<u32>() as u64;
 
-/// One original crossfade graph point with its checked word prefix.
+/// One original graph point with its checked word prefix.
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct BankBlendPoint {
-    /// Zero-based ordinal in the authored crossfade graph.
+pub struct BankGraphPoint {
+    /// Zero-based ordinal in the authored graph.
     pub ordinal: u32,
     /// Original binary32 input word.
     pub from_bits: BankHircField<u32>,
@@ -28,30 +27,30 @@ pub struct BankBlendPoint {
     pub checked_range: Range<u64>,
 }
 
-/// Fixed-memory cursor over checked crossfade graph points.
-pub struct BankBlendPointRows<'input, R> {
+/// Fixed-memory cursor over checked graph points.
+pub struct BankGraphPointRows<'input, R> {
     input: SeekObjectFields<'input, R>,
     ordinals: Range<u32>,
     stopped: &'input mut bool,
 }
 
-impl<'input, R> BankBlendPointRows<'input, R> {
+impl<'input, R> BankGraphPointRows<'input, R> {
     pub(crate) const fn new(
         input: &'input mut SeekSource<R>,
         stopped: &'input mut bool,
-        extent: &BankBlendExtent,
+        range: &Range<u64>,
+        count: u32,
     ) -> Self {
-        let range = &extent.checked_range;
         Self {
             input: SeekObjectFields::after_id(input, range.start, range.end - range.start, 0),
-            ordinals: 0..extent.declared_count.value,
+            ordinals: 0..count,
             stopped,
         }
     }
 }
 
-impl<R: Read + Seek> Iterator for BankBlendPointRows<'_, R> {
-    type Item = Result<BankBlendPoint, BankReadError>;
+impl<R: Read + Seek> Iterator for BankGraphPointRows<'_, R> {
+    type Item = Result<BankGraphPoint, BankReadError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if *self.stopped || self.input.remaining_bytes() < WORD_LEN {
@@ -66,8 +65,8 @@ impl<R: Read + Seek> Iterator for BankBlendPointRows<'_, R> {
     }
 }
 
-impl<R: Read + Seek> BankBlendPointRows<'_, R> {
-    fn read(&mut self, ordinal: u32) -> Result<BankBlendPoint, BankReadError> {
+impl<R: Read + Seek> BankGraphPointRows<'_, R> {
+    fn read(&mut self, ordinal: u32) -> Result<BankGraphPoint, BankReadError> {
         let start = self.input.offset();
         let available = self.input.remaining_bytes().min(CURVE_POINT_LEN as u64);
         let (from_bits, to_bits, interpolation) = if available == CURVE_POINT_LEN as u64 {
@@ -84,7 +83,7 @@ impl<R: Read + Seek> BankBlendPointRows<'_, R> {
                 .transpose()?;
             (from_bits, to_bits, None)
         };
-        Ok(BankBlendPoint {
+        Ok(BankGraphPoint {
             ordinal,
             from_bits,
             to_bits,

@@ -8,7 +8,9 @@ use crate::bank_object_fields::{BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
 use crate::hirc_music::{MusicTrack, MusicTrackKind, MusicTrackSwitch};
 use crate::hirc_music_segment;
-use crate::hirc_node::{self, BankNodeParentFields, ID_LEN};
+use crate::hirc_music_track_automation::{self, BankTrackAutomationExtent};
+use crate::hirc_music_track_transition::{self, BankMusicTrackTransitionFields};
+use crate::hirc_node::{self, BankNodeParentFields};
 
 #[path = "hirc_music_track_rows.rs"]
 mod rows;
@@ -16,8 +18,6 @@ mod rows;
 pub use rows::{BankMusicTrackClip, BankMusicTrackSource};
 pub(crate) use rows::{clip, source};
 
-const AUTOMATION_POINT_LEN: usize = 12;
-const SWITCH_TRANSITION_LEN: u64 = 32;
 const SWITCH_TRACK: u8 = 3;
 
 /// Original header fields read while locating `MusicTrack` rows.
@@ -28,10 +28,20 @@ pub struct BankMusicTrackFields {
     pub source_count: Option<BankHircField<u32>>,
     /// Original clip count.
     pub clip_count: Option<BankHircField<u32>>,
+    /// Start of the original control continuation after sources.
+    pub controls_start: Option<u64>,
+    /// Original track flags, including unknown bits.
+    pub flags: Option<BankHircField<u8>>,
+    /// Original subtrack count when the clip list is nonempty.
+    pub subtrack_count: Option<BankHircField<u32>>,
+    /// Original signed look-ahead bits, including explicit zero.
+    pub look_ahead_bits: Option<BankHircField<u32>>,
     /// Original automation count.
     pub automation_count: Option<BankHircField<u32>>,
     /// Checked opaque automation extent.
     pub automation_range: Option<Range<u64>>,
+    /// Checked original automation table including a partial row prefix.
+    pub automation_extent: Option<BankTrackAutomationExtent>,
     /// Original parent and preceding node selectors.
     pub parent: BankNodeParentFields,
     /// Traversed node prefix.
@@ -64,6 +74,8 @@ pub struct BankMusicTrackSwitchFields {
     pub member_count: Option<BankHircField<u32>>,
     /// Checked opaque transition extent.
     pub transition_range: Option<Range<u64>>,
+    /// Original transition words and their checked prefix when reached.
+    pub transition: Option<BankMusicTrackTransitionFields>,
 }
 
 /// One ordered original row of a physical `MusicTrack`.
@@ -146,17 +158,9 @@ pub(crate) fn read<F: ObjectFields>(
             value: source(version, input)?,
         });
     }
-    input.read_u8()?;
-    let clips = count(input, &mut fields.clip_count)?;
-    for ordinal in 0..clips {
-        emit(BankMusicTrackRow::Clip {
-            ordinal,
-            value: clip(version, input)?,
-        });
-    }
-    if clips > 0 {
-        input.read_u32()?;
-    }
+    fields.controls_start = Some(input.offset());
+    fields.flags = Some(input.read_u8()?);
+    read_clips(version, input, fields, &mut emit)?;
     automations(input, fields)?;
     let start = input.offset();
     let parent = hirc_node::read_base(input, &mut fields.parent);
@@ -171,13 +175,32 @@ pub(crate) fn read<F: ObjectFields>(
     } else {
         None
     };
-    input.scalar(i32::from_le_bytes)?;
+    fields.look_ahead_bits = Some(input.read_u32()?);
     hirc_music_segment::finish(input)?;
     Ok(TrackHeader {
         parent,
         kind,
         switch,
     })
+}
+
+fn read_clips<F: ObjectFields>(
+    version: u32,
+    input: &mut F,
+    fields: &mut BankMusicTrackFields,
+    emit: &mut impl FnMut(BankMusicTrackRow),
+) -> Result<(), F::Error> {
+    let clips = count(input, &mut fields.clip_count)?;
+    for ordinal in 0..clips {
+        emit(BankMusicTrackRow::Clip {
+            ordinal,
+            value: clip(version, input)?,
+        });
+    }
+    if clips > 0 {
+        fields.subtrack_count = Some(input.read_u32()?);
+    }
+    Ok(())
 }
 
 fn count<F: ObjectFields>(
@@ -195,14 +218,12 @@ fn automations<F: ObjectFields>(
     fields: &mut BankMusicTrackFields,
 ) -> Result<(), F::Error> {
     let count = count(input, &mut fields.automation_count)?;
-    let start = input.offset();
-    for _ in 0..count {
-        input.skip_bytes((2 * ID_LEN) as u64)?;
-        let points = input.read_u32()?.value;
-        hirc_node::skip_items(input, points, AUTOMATION_POINT_LEN)?;
+    let (extent, result) = hirc_music_track_automation::scan(input, count);
+    if extent.is_complete() {
+        fields.automation_range = Some(extent.checked_range.clone());
     }
-    fields.automation_range = Some(start..input.offset());
-    Ok(())
+    fields.automation_extent = Some(extent);
+    result
 }
 
 fn read_switch<F: ObjectFields>(
@@ -224,7 +245,10 @@ fn read_switch<F: ObjectFields>(
         });
     }
     let start = input.offset();
-    input.skip_bytes(SWITCH_TRANSITION_LEN)?;
+    let transition = fields
+        .transition
+        .insert(BankMusicTrackTransitionFields::default());
+    hirc_music_track_transition::read(input, transition)?;
     fields.transition_range = Some(start..input.offset());
     Ok(SwitchHeader {
         group_type,

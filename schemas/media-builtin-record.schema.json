@@ -9887,6 +9887,113 @@
         }
       ]
     },
+    "NodeDeclaration_TrackControlObservations": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/TrackControlObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/TrackControlObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "absent",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "NodePlaybackPayload": {
       "oneOf": [
         {
@@ -14611,6 +14718,174 @@
       ],
       "type": "string"
     },
+    "TrackAutomationCoverage": {
+      "enum": [
+        "complete",
+        "truncated"
+      ],
+      "type": "string"
+    },
+    "TrackAutomationPoint": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "$ref": "#/$defs/TrackAutomationWord"
+            },
+            "interpolation": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "to": {
+              "$ref": "#/$defs/TrackAutomationWord"
+            }
+          },
+          "required": [
+            "layout",
+            "from",
+            "to",
+            "interpolation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "$ref": "#/$defs/TrackAutomationWord"
+            },
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "to": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TrackAutomationWord"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "layout",
+            "from"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TrackAutomationRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "automation_type": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "clip_index": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "points": {
+              "$ref": "#/$defs/TrackAutomationTable"
+            }
+          },
+          "required": [
+            "layout",
+            "clip_index",
+            "automation_type",
+            "points"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "automation_type": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BankField_uint32"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "clip_index": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "points": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TrackAutomationTable"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "layout",
+            "clip_index"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TrackAutomationTable": {
+      "additionalProperties": false,
+      "properties": {
+        "checked_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "coverage": {
+          "$ref": "#/$defs/TrackAutomationCoverage"
+        },
+        "declared_count": {
+          "$ref": "#/$defs/BankField_uint32"
+        }
+      },
+      "required": [
+        "declared_count",
+        "checked_range",
+        "coverage"
+      ],
+      "type": "object"
+    },
+    "TrackAutomationWord": {
+      "additionalProperties": false,
+      "properties": {
+        "bits": {
+          "$ref": "#/$defs/BankField_uint32"
+        },
+        "finite_value": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "bits"
+      ],
+      "type": "object"
+    },
     "TrackClipRecord": {
       "additionalProperties": false,
       "properties": {
@@ -14662,6 +14937,154 @@
         "source_duration",
         "clip_range"
       ],
+      "type": "object"
+    },
+    "TrackControlObservations": {
+      "additionalProperties": false,
+      "properties": {
+        "automation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackAutomationTable"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flags": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "look_ahead": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackSignedWord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subtrack_count": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackTransition"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "TrackControlPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/NodeDeclaration_TrackControlObservations"
+            },
+            "record_type": {
+              "const": "bank-music-track-controls",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackAutomationRecord"
+            },
+            "record_type": {
+              "const": "bank-music-track-automation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackAutomationPoint"
+            },
+            "record_type": {
+              "const": "bank-music-track-automation-point",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "TrackControlPayload"
+    },
+    "TrackFade": {
+      "additionalProperties": false,
+      "properties": {
+        "curve": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "offset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackSignedWord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "time": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackSignedWord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
       "type": "object"
     },
     "TrackKind": {
@@ -14770,6 +15193,23 @@
         "kind_code",
         "kind",
         "switch"
+      ],
+      "type": "object"
+    },
+    "TrackSignedWord": {
+      "additionalProperties": false,
+      "properties": {
+        "bits": {
+          "$ref": "#/$defs/BankField_uint32"
+        },
+        "signed_value": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bits",
+        "signed_value"
       ],
       "type": "object"
     },
@@ -14950,6 +15390,52 @@
         "value_id",
         "value_id_range"
       ],
+      "type": "object"
+    },
+    "TrackTransition": {
+      "additionalProperties": false,
+      "properties": {
+        "cue_filter_hash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "destination": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackFade"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackFade"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sync_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
       "type": "object"
     },
     "TransitionWord": {
@@ -26149,6 +26635,384 @@
                   "indices": {
                     "maxItems": 5,
                     "minItems": 5
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-track-controls"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/TrackControlPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-track-controls"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-track-automation"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/TrackControlPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-track-automation"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-track-automation-point"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/TrackControlPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-track-automation-point"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 4,
+                    "minItems": 4
                   }
                 }
               }

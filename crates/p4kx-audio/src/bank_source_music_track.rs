@@ -4,6 +4,7 @@
 use std::io::{Read, Seek};
 use std::ops::Range;
 
+use crate::bank_music_track_automation_rows::BankMusicTrackAutomationRows;
 use crate::bank_object_fields::{ObjectFields, SeekObjectFields};
 use crate::bank_structure::OBJECT_ID_LEN;
 use crate::hirc::CONTAINER_VERSION;
@@ -22,6 +23,20 @@ pub struct BankHircMusicTrack<'input, R> {
     pub fields: BankMusicTrackFields,
     /// Fixed-memory replay of admitted rows in physical order.
     pub rows: BankMusicTrackRows<'input, R>,
+}
+
+impl<R> BankHircMusicTrack<'_, R> {
+    /// Borrows checked original automation rows in physical order.
+    pub fn automations(&mut self) -> Option<BankMusicTrackAutomationRows<'_, R>> {
+        let extent = self.fields.automation_extent.as_ref()?;
+        let count = self.fields.automation_count.as_ref()?.value;
+        Some(BankMusicTrackAutomationRows::new(
+            self.rows.input,
+            self.rows.stopped,
+            &extent.checked_range,
+            count,
+        ))
+    }
 }
 
 /// Interpretation status of a physical `MusicTrack`.

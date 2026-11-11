@@ -29,6 +29,7 @@ pub(crate) enum NodeKind {
     RandomSequence,
     SwitchContainer,
     BlendContainer,
+    MusicTrackControls,
 }
 
 impl NodeKind {
@@ -46,6 +47,7 @@ impl NodeKind {
             Self::RandomSequence => "bnkHircRandomSequence",
             Self::SwitchContainer => "bnkHircSwitchContainer",
             Self::BlendContainer => "bnkHircBlendContainer",
+            Self::MusicTrackControls => "bnkMusicTrackControls",
         }
     }
 
@@ -63,6 +65,7 @@ impl NodeKind {
             Self::RandomSequence => "randomSequencePlaylistPosition",
             Self::SwitchContainer => "switchContainerPosition",
             Self::BlendContainer => "blendContainerPosition",
+            Self::MusicTrackControls => "musicTrackAutomationPosition",
         }
     }
 
@@ -80,6 +83,7 @@ impl NodeKind {
             Self::RandomSequence => "randomSequenceExtent",
             Self::SwitchContainer => "switchContainerExtent",
             Self::BlendContainer => "blendContainerExtent",
+            Self::MusicTrackControls => "musicTrackControlsExtent",
         }
     }
 }

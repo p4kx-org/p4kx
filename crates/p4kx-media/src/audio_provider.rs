@@ -211,7 +211,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-music-track-fields",
-            "Original MusicTrack sources, clips, kind and switch members with exact source ranges.",
+            "Original MusicTrack sources, clips, kind, switch members, automation points, flags, subtrack count, Switch fades and look-ahead with exact source ranges.",
         ),
         FieldGroup::new(
             "bank-sound-fields",
