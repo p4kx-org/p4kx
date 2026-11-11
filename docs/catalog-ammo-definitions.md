@@ -13,6 +13,9 @@ independently of the number of selected rows.
 | Source | Schema v3 projection |
 | --- | --- |
 | `AmmoParams` | Spawn type, size, category and UI icon. Hit points, lifetime, showtime, inherited velocity, bullet type, speed, impulse scale, hit/removal/convergence flags, the resource Reference and audio/particle fields |
+| `AmmoParams.displayName` | Public localized name with the original locale and independent translation receipts |
+| `AmmoParams.geometryTransformParams` | Authored initial/random angles, rotation rate, random rotation and scale range |
+| `AmmoParams.lightPoolParams` | Authored flare asset name and scale, RGB, radius, attenuation and multipliers, flags and animation inputs |
 | `AmmoParams.projectileParams` | Shared detonation and proximity configurations beside the `kind.type` union `base`, `bullet`, `tachyon` or `countermeasure` |
 | `BulletProjectileParams` | Per-channel damage and falloff, impact radii, ignition and keep-alive flags, impulse falloff, penetration, pierceability and electron settings. Authored visual, extra-projectile and ordered hit-behavior inputs |
 | `TachyonProjectileParams` | Hit type/effect, per-channel damage, full- and zero-damage ranges, penetration and ordered beam effects |

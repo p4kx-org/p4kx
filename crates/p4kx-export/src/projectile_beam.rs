@@ -9,6 +9,7 @@ use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_v3::authored_effect_resource::ParticleResource;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::authored_rgb::AuthoredRgb;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -28,7 +29,7 @@ pub(crate) struct ProjectileBeamEffect<'source> {
     use_multi_spline: SourcedValue<bool>,
     multi_spline_offset: SourcedValue<ResourceFloat32>,
     modifier_source: SourcedValue<String>,
-    tint_color: SourcedValue<ProjectileTint>,
+    tint_color: SourcedValue<AuthoredRgb>,
     particle_audio_params: SourcedValue<Vec<SourcedValue<ProjectileParticleAudio<'source>>>>,
 }
 
@@ -57,36 +58,13 @@ impl<'source> ProjectileBeamEffect<'source> {
             use_multi_spline: source.boolean("useMultiSpline", notes)?,
             multi_spline_offset: source.single("multiSplineOffset", notes)?,
             modifier_source: source.enumeration("modifierSource", notes)?,
-            tint_color: source.owned("tintColor", &["RGB"], notes, ProjectileTint::read)?,
+            tint_color: source.owned("tintColor", &["RGB"], notes, AuthoredRgb::read)?,
             particle_audio_params: source.class_array(
                 "particleAudioParams",
                 &["SBeamParticleAudioParams"],
                 notes,
                 ProjectileParticleAudio::read,
             )?,
-        })
-    }
-}
-
-/// The original three color channels.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct ProjectileTint {
-    r: SourcedValue<ResourceFloat32>,
-    g: SourcedValue<ResourceFloat32>,
-    b: SourcedValue<ResourceFloat32>,
-}
-
-impl ProjectileTint {
-    pub(super) fn read(
-        source: Observed<'_, '_, '_, '_>,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<Self, CatalogError> {
-        Ok(Self {
-            r: source.single("r", notes)?,
-            g: source.single("g", notes)?,
-            b: source.single("b", notes)?,
         })
     }
 }

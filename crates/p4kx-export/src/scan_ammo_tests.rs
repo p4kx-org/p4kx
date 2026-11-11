@@ -15,10 +15,10 @@ use crate::scan_health::ScanError;
 
 #[test]
 fn ammo_memo_materializes_one_genuine_physical_tree_across_roles() -> TestResult {
-    test_support::with_input(&bytes(), |forge, input| {
+    test_support::with_projection(&bytes(), |forge, projection| {
         let first = forge.record(0).ok_or("first physical definition")?;
         let second = forge.record(1).ok_or("second physical definition")?;
-        let reads = AmmoReads::new(input, None, None);
+        let reads = AmmoReads::new(projection, None, None);
         let mut dependency = ExportLedger::default();
         let compatibility = reads
             .dependency(&first, &mut dependency)?
@@ -65,11 +65,11 @@ fn ammo_memo_materializes_one_genuine_physical_tree_across_roles() -> TestResult
 
 #[test]
 fn ammo_memo_preserves_filtered_dependency_and_caches_actual_read_failure() -> TestResult {
-    test_support::with_input(&bytes(), |forge, input| {
+    test_support::with_projection(&bytes(), |forge, projection| {
         let filtered = forge.record(0).ok_or("filtered original Ammo")?;
         let malformed = forge.record(2).ok_or("malformed original Ammo")?;
         let filter = Filter::parse("*/selected_*")?;
-        let reads = AmmoReads::new(input, Some(&filter), None);
+        let reads = AmmoReads::new(projection, Some(&filter), None);
         let mut ledger = ExportLedger::default();
         let compatibility = reads
             .dependency(&filtered, &mut ledger)?

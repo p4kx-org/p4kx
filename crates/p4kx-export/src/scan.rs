@@ -104,7 +104,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         let scan = Self {
             forge,
             ships: ShipPool::new(entities, files),
-            ammo: ammo::AmmoReads::new(projection.original(), options.filter, options.cancel),
+            ammo: ammo::AmmoReads::new(projection, options.filter, options.cancel),
             options,
             texts: projection.legacy_texts(),
             projection,

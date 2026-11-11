@@ -598,8 +598,14 @@
         "conversionRate": {
           "$ref": "#/$defs/SourcedValueOfAmmoConversion"
         },
+        "displayName": {
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+        },
         "fileName": {
           "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "geometryTransformParams": {
+          "$ref": "#/$defs/SourcedValueOfAmmoGeometryTransform"
         },
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -618,6 +624,9 @@
         },
         "lifetime": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "lightPoolParams": {
+          "$ref": "#/$defs/SourcedValueOfAmmoLight"
         },
         "metadataTag": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -694,13 +703,16 @@
         "bulletType",
         "className",
         "conversionRate",
+        "displayName",
         "fileName",
+        "geometryTransformParams",
         "guid",
         "hitPoints",
         "impactAiStimulusDistance",
         "impulseScale",
         "inheritVelocity",
         "lifetime",
+        "lightPoolParams",
         "metadataTag",
         "noBulletHits",
         "physicsControllerParams",
@@ -739,6 +751,98 @@
       "required": [
         "forceWeaponController",
         "fragment"
+      ],
+      "type": "object"
+    },
+    "AmmoGeometryTransform": {
+      "description": "Original angle, rotation and scale words in the geometry transform.",
+      "properties": {
+        "initAngles": {
+          "$ref": "#/$defs/SourcedValueOfDamageVector"
+        },
+        "randomAngles": {
+          "$ref": "#/$defs/SourcedValueOfDamageVector"
+        },
+        "randomRotation": {
+          "$ref": "#/$defs/SourcedValueOfDamageVector"
+        },
+        "randomScale": {
+          "$ref": "#/$defs/SourcedValueOfProjectileRange"
+        },
+        "rotationRate": {
+          "$ref": "#/$defs/SourcedValueOfDamageVector"
+        }
+      },
+      "required": [
+        "initAngles",
+        "randomAngles",
+        "randomRotation",
+        "randomScale",
+        "rotationRate"
+      ],
+      "type": "object"
+    },
+    "AmmoLight": {
+      "description": "Original light pool fields of the Ammo definition.",
+      "properties": {
+        "animPhase": {
+          "$ref": "#/$defs/SourcedValueOfuint8"
+        },
+        "animSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "attenuationBulbSize": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "autoClip": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "diffuseColor": {
+          "$ref": "#/$defs/SourcedValueOfProjectileTint"
+        },
+        "diffuseMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "fake": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "flareLensOpticsFrustumAngle": {
+          "$ref": "#/$defs/SourcedValueOfuint8"
+        },
+        "flareName": {
+          "$ref": "#/$defs/SourcedValueOfSourceText"
+        },
+        "flareScale": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "radius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "rampTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "specularMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "style": {
+          "$ref": "#/$defs/SourcedValueOfuint8"
+        }
+      },
+      "required": [
+        "animPhase",
+        "animSpeed",
+        "attenuationBulbSize",
+        "autoClip",
+        "diffuseColor",
+        "diffuseMultiplier",
+        "fake",
+        "flareLensOpticsFrustumAngle",
+        "flareName",
+        "flareScale",
+        "radius",
+        "rampTime",
+        "specularMultiplier",
+        "style"
       ],
       "type": "object"
     },
@@ -23389,6 +23493,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/AmmoFragment"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAmmoGeometryTransform": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AmmoGeometryTransform"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAmmoLight": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AmmoLight"
               }
             }
           }

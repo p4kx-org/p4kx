@@ -76,6 +76,23 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         })
     }
 
+    /// Retains the exact authored Locale occurrence in the public short-name domain.
+    pub(crate) fn public_name_fact(
+        &self,
+        fact: &crate::catalog_read::original::OriginalValueFact<'_, '_, 'source>,
+    ) -> Result<PublicNameRef, CatalogError> {
+        use crate::catalog_read::original::OriginalValuePart;
+        use p4kx_extraction::Value;
+        fact.check_input(self.original)?;
+        let &Value::Locale(key) = fact.value() else {
+            return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
+        };
+        let payload = fact.observe(OriginalValuePart::Value, SourceUseRole::Payload)?;
+        let selector = fact.observe(OriginalValuePart::Value, SourceUseRole::Selector)?;
+        self.register_uses(Domain::PublicName, key, payload, selector)?;
+        Ok(PublicNameRef(identifier(Domain::PublicName, key)))
+    }
+
     pub(crate) fn description(
         &self,
         key: SourcedValue<&'source str>,

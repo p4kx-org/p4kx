@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use p4kx_extraction::{CancelToken, DataForgeError, Filter, Record, RecordTree};
 
-use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::ammo_definition::{self, PreparedAmmoDefinition};
 use crate::contract_stats::AmmoStats;
 use crate::entity_selection::{self, Selected};
@@ -22,7 +22,7 @@ use crate::{CatalogError, ExportAccountingError, Kind, item_stats};
 
 /// Retains one admitted Ammo read per demanded physical Record during a catalog scan.
 pub(super) struct AmmoReads<'options, 'input, 'source> {
-    input: &'input OriginalCatalogInput<'input, 'source>,
+    projection: &'input CatalogProjection<'input, 'source>,
     filter: Option<&'options Filter>,
     cancel: Option<&'options CancelToken>,
     slots: Mutex<HashMap<u32, Arc<AmmoSlot<'source>>>>,
@@ -59,12 +59,12 @@ struct SelectedAmmo<'source> {
 
 impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
     pub(super) fn new(
-        input: &'input OriginalCatalogInput<'input, 'source>,
+        projection: &'input CatalogProjection<'input, 'source>,
         filter: Option<&'options Filter>,
         cancel: Option<&'options CancelToken>,
     ) -> Self {
         Self {
-            input,
+            projection,
             filter,
             cancel,
             slots: Mutex::new(HashMap::new()),
@@ -134,7 +134,7 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
     where
         E: From<CatalogError>,
     {
-        let admission = RecordObservation::capture(self.input, record)?;
+        let admission = RecordObservation::capture(self.projection.original(), record)?;
         let slot = {
             let mut slots = export_evidence_lock::lock(&self.slots).map_err(CatalogError::from)?;
             Arc::clone(slots.entry(record.index()).or_default())
@@ -161,7 +161,7 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
     ) -> Result<ReadableAmmo<'source>, CatalogError> {
         let compatibility = item_stats::ammo(tree);
         let mut inspected = crate::export_field_walk::inspect_observed(
-            Some(self.input),
+            Some(self.projection.original()),
             tree,
             admission,
             None,
@@ -190,7 +190,8 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
         tree: &RecordTree<'source>,
         admission: &RecordObservation<'_, 'source>,
     ) -> Result<SelectedAmmo<'source>, CatalogError> {
-        let (definition, notes) = ammo_definition::read(self.input, tree, admission, self.cancel)?;
+        let (definition, notes) =
+            ammo_definition::read(self.projection, tree, admission, self.cancel)?;
         let mut projection = ExportLedger::default();
         crate::source_projection_notes::record(
             Kind::AmmoDefinitions,

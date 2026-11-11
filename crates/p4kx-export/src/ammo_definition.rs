@@ -7,11 +7,12 @@ use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::ammo_presentation::AmmoPresentation;
 use super::authored_ammo_inputs::AuthoredAmmoInputs;
 use super::authored_fields::Observed;
-use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
+use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
 use crate::record_observation::RecordObservation;
@@ -31,6 +32,8 @@ pub(crate) struct AmmoDefinition<'source> {
     source: CanonicalRecordHeader<'source>,
     #[serde(flatten)]
     inputs: AuthoredAmmoInputs<'source>,
+    #[serde(flatten)]
+    presentation: AmmoPresentation<'source>,
 }
 
 pub(crate) struct PreparedAmmoDefinition<'source> {
@@ -43,11 +46,12 @@ pub(crate) struct PreparedAmmoDefinition<'source> {
 
 /// Projects typed inputs from the same admitted tree used by the legacy view.
 pub(crate) fn read<'source>(
-    input: &OriginalCatalogInput<'_, 'source>,
+    projection: &CatalogProjection<'_, 'source>,
     tree: &RecordTree<'source>,
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<(PreparedAmmoDefinition<'source>, Vec<FieldError>), CatalogError> {
+    let input = projection.original();
     let scope = input.record_scope(admission.record(), tree)?;
     if tree.type_name() != SOURCE_TYPE {
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
@@ -56,15 +60,15 @@ pub(crate) fn read<'source>(
     let capture = TemplateFieldCapture::new(&originals, input, admission)?;
     let numbers = RefCell::new(Vec::new());
     let mut notes = Vec::new();
-    let inputs = AuthoredAmmoInputs::read(
-        Observed::definition(&originals, input, &capture, &numbers),
-        &mut notes,
-    )?;
+    let observed = Observed::definition(&originals, input, &capture, &numbers);
+    let inputs = AuthoredAmmoInputs::read(observed, &mut notes)?;
+    let presentation = AmmoPresentation::read(observed, projection, &mut notes)?;
     Ok((
         PreparedAmmoDefinition {
             definition: AmmoDefinition {
                 source: CanonicalRecordHeader::read(tree, input.origins())?,
                 inputs,
+                presentation,
             },
             physical_guid: tree.guid(),
             physical_index: tree.record_index(),

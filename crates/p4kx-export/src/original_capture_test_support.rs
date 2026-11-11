@@ -10,6 +10,7 @@ use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use super::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_projection::CatalogProjection;
 use crate::texts::TextSources;
 
 pub(crate) type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -17,6 +18,31 @@ pub(crate) type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 pub(crate) fn with_input(
     bytes: &[u8],
     check: impl FnOnce(&DataForge<'_>, &OriginalCatalogInput<'_, '_>) -> TestResult,
+) -> TestResult {
+    with_sources(bytes, |forge, input, _| check(forge, input))
+}
+
+pub(crate) fn with_projection(
+    bytes: &[u8],
+    check: impl for<'source, 'context> FnOnce(
+        &'source DataForge<'source>,
+        &CatalogProjection<'context, 'source>,
+    ) -> TestResult,
+) -> TestResult {
+    with_sources(bytes, |forge, input, sources| {
+        let texts = crate::texts::Texts::parse(sources)?;
+        let projection = CatalogProjection::new(&texts, input);
+        check(forge, &projection)
+    })
+}
+
+fn with_sources(
+    bytes: &[u8],
+    check: impl for<'context> FnOnce(
+        &'context DataForge<'context>,
+        &'context OriginalCatalogInput<'context, 'context>,
+        &'context TextSources,
+    ) -> TestResult,
 ) -> TestResult {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("original-input.p4k");
@@ -29,7 +55,7 @@ pub(crate) fn with_input(
     let texts = TextSources::read(&archive)?;
     let origins = CatalogOrigins::new(&archive, &entry, &texts)?;
     let input = OriginalCatalogInput::new(&forge, &origins);
-    check(&forge, &input)
+    check(&forge, &input, &texts)
 }
 
 pub(crate) fn with_shared_inventory_inputs(

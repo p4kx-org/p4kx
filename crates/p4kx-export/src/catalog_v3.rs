@@ -29,12 +29,16 @@ pub(crate) mod explosion_definition;
 
 #[path = "ammo_definition.rs"]
 pub(crate) mod ammo_definition;
+#[path = "ammo_presentation.rs"]
+mod ammo_presentation;
 #[path = "authored_ammo_inputs.rs"]
 mod authored_ammo_inputs;
 #[path = "authored_effect_resource.rs"]
 mod authored_effect_resource;
 #[path = "authored_projectile.rs"]
 mod authored_projectile;
+#[path = "authored_rgb.rs"]
+mod authored_rgb;
 #[path = "catalog_ammo_bindings.rs"]
 pub(crate) mod catalog_ammo_bindings;
 #[path = "catalog_ammo_containers.rs"]
@@ -53,6 +57,8 @@ mod catalog_weapon_magazine_slots;
 mod item_component_owner;
 #[path = "ordnance_fields.rs"]
 mod ordnance_fields;
+#[path = "projectile_range.rs"]
+mod projectile_range;
 #[path = "sensor_mine.rs"]
 mod sensor_mine;
 

@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::projectile_range as range;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
@@ -20,8 +21,6 @@ mod countermeasure;
 mod detonation;
 #[path = "projectile_penetration.rs"]
 mod penetration;
-#[path = "projectile_range.rs"]
-mod range;
 #[path = "projectile_tachyon.rs"]
 mod tachyon;
 #[path = "projectile_visual.rs"]
