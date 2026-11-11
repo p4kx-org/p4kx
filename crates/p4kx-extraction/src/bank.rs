@@ -25,7 +25,11 @@ pub use p4kx_audio::{
     BankStidName, ContainerKind, MediaStorage, MusicTrackKind, SoundSource, StateObject,
     StateProperties, StateProperty,
 };
-pub use p4kx_audio::{BankActorMixerFields, BankHircActorMixer, BankHircSoundNode};
+pub use p4kx_audio::{
+    BankActorMixerFields, BankHircActorMixer, BankHircSoundNode, BankNodePropertyExtent,
+    BankNodePropertyExtents, BankNodePropertyKind, BankNodePropertyRow, BankNodePropertyRows,
+    BankNodePropertyValue,
+};
 pub use p4kx_audio::{
     BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistItem,
     BankMusicPlaylistRead, BankMusicPlaylistRow, BankMusicPlaylistRows, BankMusicTransitionFields,

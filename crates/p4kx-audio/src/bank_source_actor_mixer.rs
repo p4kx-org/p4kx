@@ -4,11 +4,13 @@
 use std::io::{Read, Seek};
 
 use crate::bank_inline_state_rows::BankInlineStateRows;
+use crate::bank_node_property_rows::BankNodePropertyRows;
 use crate::bank_object_fields::{ObjectFields, SeekObjectFields};
 use crate::bank_rtpc_rows::BankRtpcRows;
 use crate::bank_source_container::{self, BankContainerChildren, BankContainerRead};
 use crate::bank_structure::OBJECT_ID_LEN;
 use crate::hirc_actor_mixer::{self, BankActorMixerFields};
+use crate::hirc_node_property::BankNodePropertyKind;
 use crate::read_at::SeekSource;
 use crate::{BankError, BankHircObject, BankReadError, HircKind};
 
@@ -38,6 +40,17 @@ impl<R> BankHircActorMixer<'_, R> {
     #[must_use]
     pub const fn fields(&self) -> &BankActorMixerFields {
         &self.fields
+    }
+
+    /// Borrows the original property list when its count was read.
+    pub fn properties(
+        &mut self,
+        kind: BankNodePropertyKind,
+    ) -> Option<BankNodePropertyRows<'_, R>> {
+        self.fields
+            .properties
+            .get(kind)
+            .map(|extent| BankNodePropertyRows::new(self.input, extent))
     }
 
     /// Borrows the original State chunk when its whole extent was checked.

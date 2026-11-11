@@ -5,6 +5,7 @@ use std::ops::Range;
 
 use crate::bank_object_fields::{self, BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
+use crate::hirc_node_property::{self, BankNodePropertyExtents};
 use crate::hirc_node_state;
 use crate::hirc_rtpc::{self, BankRtpcExtent};
 
@@ -62,31 +63,43 @@ pub struct BankNodeParentFields {
     pub effect_count: Option<BankHircField<u8>>,
     /// Original metadata effect count when readable.
     pub metadata_count: Option<BankHircField<u8>>,
-    /// Original word immediately before the parent ID.
+    /// Original override bus ID immediately before the parent ID.
     pub pre_parent_word: Option<BankHircField<u32>>,
     /// Original parent ID, including zero, when readable.
     pub parent_id: Option<BankHircField<u32>>,
+}
+
+impl BankNodeParentFields {
+    /// Returns the original override bus ID, including explicit zero.
+    #[must_use]
+    pub const fn override_bus_id(&self) -> Option<&BankHircField<u32>> {
+        self.pre_parent_word.as_ref()
+    }
 }
 
 pub(crate) fn read_base<F: ObjectFields>(
     fields: &mut F,
     observed: &mut BankNodeParentFields,
 ) -> Result<u32, F::Error> {
-    read_base_observed(fields, observed, &mut None, &mut None)
+    read_base_observed(
+        fields,
+        observed,
+        &mut BankNodePropertyExtents::default(),
+        &mut None,
+        &mut None,
+    )
 }
 
 pub(crate) fn read_base_observed<F: ObjectFields>(
     fields: &mut F,
     observed: &mut BankNodeParentFields,
+    properties: &mut BankNodePropertyExtents,
     state: &mut Option<Range<u64>>,
     rtpc: &mut Option<BankRtpcExtent>,
 ) -> Result<u32, F::Error> {
     let parent = read_parent(fields, observed)?;
     fields.read_array::<1>()?;
-    let props = fields.read_u8()?.value;
-    skip_items(fields, u32::from(props), PROP_LEN)?;
-    let ranged = fields.read_u8()?.value;
-    skip_items(fields, u32::from(ranged), RANGED_PROP_LEN)?;
+    hirc_node_property::scan(fields, properties)?;
     skip_positioning(fields)?;
     if fields.read_u8()?.value & HAS_AUX != 0 {
         fields.skip_bytes(AUX_BUSES_LEN as u64)?;

@@ -6,6 +6,7 @@ use std::ops::Range;
 use crate::bank_object_fields::{BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
 use crate::hirc_node::{self, BankNodeParentFields, ID_LEN};
+use crate::hirc_node_property::BankNodePropertyExtents;
 use crate::hirc_rtpc::BankRtpcExtent;
 use crate::{BankError, SectionId};
 
@@ -33,6 +34,8 @@ pub struct ActorMixer {
 pub struct BankActorMixerFields {
     /// The original fields observed while reading the shared node base.
     pub node: BankNodeParentFields,
+    /// Original property and ranged modifier extents when their counts were read.
+    pub properties: BankNodePropertyExtents,
     /// Traversed node prefix, including checked opaque bytes.
     pub node_range: Option<Range<u64>>,
     /// Complete checked extent of the inline State chunk, when available.
@@ -63,6 +66,7 @@ pub(crate) fn head<F: ObjectFields>(
     let parent = hirc_node::read_base_observed(
         fields,
         &mut observed.node,
+        &mut observed.properties,
         &mut observed.state_chunk,
         &mut observed.rtpc_chunk,
     );

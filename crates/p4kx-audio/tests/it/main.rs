@@ -15,6 +15,8 @@ mod bnk_inline_state;
 mod bnk_inline_state_fixture;
 mod bnk_layout;
 mod bnk_music;
+mod bnk_node_properties;
+mod bnk_node_property_fixture;
 mod bnk_quirks;
 mod bnk_rtpc;
 mod bnk_sound_layout;
