@@ -12,6 +12,9 @@ use crate::catalog_read::original::OriginalFlowFields;
 use crate::record_observation::RecordObservation;
 use crate::template_field_capture::TemplateFieldCapture;
 
+#[path = "ammo_scalar_storage_tests.rs"]
+mod scalar_storage;
+
 const BASE_CARGO_UNIT: &str = "SBaseCargoUnit";
 const STANDARD_CARGO_UNIT: &str = "SStandardCargoUnit";
 const CENTI_CARGO_UNIT: &str = "SCentiCargoUnit";

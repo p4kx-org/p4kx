@@ -20,7 +20,10 @@ independently of the number of selected rows.
 | `physicsControllerParams.PhysType` | Shared authored physics fields and the concrete `base` or `particle` branch, with particle dimensions, pierceability, drag and collision/gravity flags |
 | `AmmoParams.conversionRate` | `base` has no quantity. `standard` retains `standardCargoUnits` as a Single, while `centi` and `micro` retain the signed `centiScu` and `microScu` quantities in their respective source units |
 
-The original struct selects each branch. Damage channels remain separate.
+The original struct selects each branch. The declarations for
+`projectileParams`, `conversionRate` and `physicsControllerParams` must
+hold a scalar StrongPointer. The source receipts include the declared
+storage used to accept or reject each field. Damage channels remain separate.
 The export preserves ordered arrays, original number widths, and the units
 specified by the source, such as degrees in `spreadDegrees` and damage
 per metre in `damageDropPerMeter`. It keeps the three cargo-unit scales

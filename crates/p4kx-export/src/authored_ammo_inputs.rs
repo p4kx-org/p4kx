@@ -71,14 +71,14 @@ impl<'source> AuthoredAmmoInputs<'source> {
             no_bullet_hits: source.boolean("noBulletHits", notes)?,
             quiet_removal: source.boolean("quietRemoval", notes)?,
             resource_type: source.record_link("resourceType", notes)?,
-            conversion_rate: source.owned(
+            conversion_rate: source.strong_pointer(
                 "conversionRate",
                 AmmoConversion::TYPES,
                 notes,
                 AmmoConversion::read,
             )?,
             use_in_convergence: source.boolean("useInConvergence", notes)?,
-            physics_controller_params: source.owned(
+            physics_controller_params: source.strong_pointer(
                 "physicsControllerParams",
                 &["SEntityPhysicsControllerParams"],
                 notes,

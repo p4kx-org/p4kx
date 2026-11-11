@@ -53,7 +53,7 @@ impl<'source> AuthoredProjectile<'source> {
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<SourcedValue<Self>, CatalogError> {
-        source.owned("projectileParams", TYPES, notes, Self::read)
+        source.strong_pointer("projectileParams", TYPES, notes, Self::read)
     }
 
     fn read(
