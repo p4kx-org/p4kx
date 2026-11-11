@@ -74,3 +74,18 @@ retains its Reference status when the definition is excluded by the filter.
 Each slot requires a scalar Reference declared for `AmmoParams`. The source
 diagnostic preserves an incompatible declaration independently of a
 correctly declared Reference with a missing or differently typed target.
+
+A `weaponMagazineSlots` declaration identifies each physical
+`SCItemWeaponComponentParams` by the same owner and component ordinal.
+Its `ammoContainerRecord` retains the authored primary magazine
+Reference. Each original `secondaryAmmoContainers` element carries its own
+magazine Reference and authored condition in stored order, including repeated
+targets. The physical target index identifies the magazine Item independently
+of the export filter. Its authored containers have their own component
+ordinals in `configurations.ammoContainers`.
+
+`shouldIgnorePrimaryAmmoContainer` retains the original Bool, including false.
+Each available condition carries its exact StrongPointer declaration and
+original subtree in a local `roots` and `values` arena. Condition values keep
+their original provenance and text classifications. This declaration records
+the source slots and condition inputs for consumers to interpret.

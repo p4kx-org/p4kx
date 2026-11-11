@@ -3,7 +3,7 @@
 
 use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue};
 
-use super::{OriginalDatum, OriginalValueFact, OriginalValuePart, OriginalValueSite};
+use super::{OriginalDatum, OriginalValueFact, OriginalValuePart};
 use crate::{CatalogError, ExportAccountingError};
 
 impl OriginalValueFact<'_, '_, '_> {
@@ -35,19 +35,6 @@ impl OriginalValueFact<'_, '_, '_> {
         role: SourceUseRole,
     ) -> Result<SourceUse, CatalogError> {
         Ok(self.scope().dataforge().at(self.location(part), role)?)
-    }
-}
-
-impl OriginalValueSite<'_, '_, '_, '_> {
-    /// Binds a value through the fact minted from this exact original visit.
-    pub(crate) fn bind<T>(
-        &self,
-        part: OriginalValuePart,
-        value: SourceValue<T>,
-        role: SourceUseRole,
-        complete: bool,
-    ) -> Result<OriginalDatum<T>, CatalogError> {
-        self.fact().bind(part, value, role, complete)
     }
 }
 

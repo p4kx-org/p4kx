@@ -7,7 +7,8 @@ use serde::Serialize;
 
 use super::ammo_definition;
 use super::authored_fields::Observed;
-use super::catalog_ammo_containers::SOURCE_TYPE;
+use super::catalog_ammo_containers;
+use super::catalog_weapon_magazine_slots::{self, WeaponMagazineSlots};
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
@@ -23,6 +24,9 @@ use crate::source_value_catalog::SourceRecordReference;
 pub(crate) enum AmmoBinding<'source> {
     ContainerSlots {
         value: Box<ContainerAmmoSlots<'source>>,
+    },
+    WeaponMagazineSlots {
+        value: Box<WeaponMagazineSlots<'source>>,
     },
 }
 
@@ -52,6 +56,7 @@ impl<'source> AmmoBinding<'source> {
     const fn owner(&self) -> &ComponentOwner {
         match self {
             Self::ContainerSlots { value } => &value.owner,
+            Self::WeaponMagazineSlots { value } => value.owner(),
         }
     }
 }
@@ -74,5 +79,12 @@ pub(super) fn table<'source>(
     mut rows: Vec<AmmoBinding<'source>>,
 ) -> CatalogTable<AmmoBinding<'source>> {
     rows.sort_by_key(|row| row.owner().key());
-    CatalogTable::new(forge, &[SOURCE_TYPE], rows)
+    CatalogTable::new(
+        forge,
+        &[
+            catalog_ammo_containers::SOURCE_TYPE,
+            catalog_weapon_magazine_slots::SOURCE_TYPE,
+        ],
+        rows,
+    )
 }

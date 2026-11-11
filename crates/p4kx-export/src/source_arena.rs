@@ -6,8 +6,8 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::catalog_read::original::{
-    OriginalFlowFields, OriginalRecordScope, OriginalValueEdge, OriginalValueEvent,
-    OriginalValueSite,
+    OriginalContainerKind, OriginalFlowFields, OriginalRecordScope, OriginalValueEdge,
+    OriginalValueEvent, OriginalValueFact, OriginalValueSite,
 };
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, ExportAccountingError};
@@ -29,6 +29,7 @@ struct SourceArena<'source> {
     values: Vec<ReservedValue<'source>>,
     open: Vec<SourceContainer<'source>>,
     next_ordinal: u64,
+    selected_root: Option<u64>,
 }
 
 /// The complete root fields and flat values of one physical original owner.
@@ -76,6 +77,34 @@ pub(crate) fn read_indexed<'scope, 'read, 'source>(
     })
 }
 
+/// Retains one original field's complete value subtree with arena-local links.
+pub(crate) fn read_subtree<'scope, 'read, 'source>(
+    fields: &OriginalFlowFields<'scope, 'read, 'source>,
+    root: &OriginalValueFact<'scope, 'read, 'source>,
+    mut retain: impl FnMut(&OriginalValueFact<'scope, 'read, 'source>) -> Result<(), CatalogError>,
+) -> Result<SourceArenaOutput<'source>, CatalogError> {
+    let span = fields.span(root)?;
+    if !matches!(root.edge(), OriginalValueEdge::Field { .. }) {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    }
+    let mut arena = SourceArena {
+        next_ordinal: root.ordinal(),
+        selected_root: Some(root.ordinal()),
+        ..SourceArena::default()
+    };
+    let facts = fields
+        .facts()
+        .get(span)
+        .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+    for fact in facts {
+        fields.check_cancel()?;
+        arena.close_to_parent(fact.parent_ordinal(), fields.sources())?;
+        arena.visit(fact, fields.sources(), || retain(fact))?;
+    }
+    arena.close_to_parent(None, fields.sources())?;
+    arena.finish()
+}
+
 impl<'source> SourceArena<'source> {
     fn event<'scope, 'read>(
         &mut self,
@@ -84,38 +113,66 @@ impl<'source> SourceArena<'source> {
         scalar: &mut impl FnMut(&OriginalValueSite<'_, 'scope, 'read, 'source>),
     ) -> Result<(), CatalogError> {
         match event {
-            OriginalValueEvent::Value(site) => self.visit(site, sources, scalar),
-            OriginalValueEvent::EndContainer { ordinal, kind } => {
-                let container = self
-                    .open
-                    .pop()
-                    .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-                if container.ordinal != *ordinal {
-                    return Err(ExportAccountingError::ConflictingSourceDatum.into());
-                }
-                let index = container.index;
-                let value = container.finish(*kind, sources)?;
-                let slot = self
-                    .values
-                    .get_mut(index)
-                    .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-                if slot.ordinal != *ordinal || slot.value.is_some() {
-                    return Err(ExportAccountingError::ConflictingSourceDatum.into());
-                }
-                slot.value = Some(value);
+            OriginalValueEvent::Value(site) => self.visit(&site.fact(), sources, || {
+                scalar(site);
                 Ok(())
+            }),
+            OriginalValueEvent::EndContainer { ordinal, kind } => {
+                self.close(*ordinal, *kind, sources)
             }
         }
     }
 
-    fn visit<'scope, 'read>(
+    fn close(
         &mut self,
-        site: &OriginalValueSite<'_, 'scope, 'read, 'source>,
+        ordinal: u64,
+        kind: OriginalContainerKind,
         sources: &SourceUses,
-        scalar: &mut impl FnMut(&OriginalValueSite<'_, 'scope, 'read, 'source>),
     ) -> Result<(), CatalogError> {
-        if site.ordinal() != self.next_ordinal
-            || site.parent_ordinal() != self.open.last().map(|container| container.ordinal)
+        let container = self
+            .open
+            .pop()
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        if container.ordinal != ordinal {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        let index = container.index;
+        let value = container.finish(kind, sources)?;
+        let slot = self
+            .values
+            .get_mut(index)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        if slot.ordinal != ordinal || slot.value.is_some() {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        slot.value = Some(value);
+        Ok(())
+    }
+
+    fn close_to_parent(
+        &mut self,
+        parent: Option<u64>,
+        sources: &SourceUses,
+    ) -> Result<(), CatalogError> {
+        while let Some(container) = self.open.last() {
+            if Some(container.ordinal) == parent {
+                break;
+            }
+            self.close(container.ordinal, container.kind(), sources)?;
+        }
+        Ok(())
+    }
+
+    fn visit(
+        &mut self,
+        fact: &OriginalValueFact<'_, '_, 'source>,
+        sources: &SourceUses,
+        scalar: impl FnOnce() -> Result<(), CatalogError>,
+    ) -> Result<(), CatalogError> {
+        let root = self.selected_root == Some(fact.ordinal());
+        if fact.ordinal() != self.next_ordinal
+            || (!root
+                && fact.parent_ordinal() != self.open.last().map(|container| container.ordinal))
         {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
@@ -129,18 +186,18 @@ impl<'source> SourceArena<'source> {
         let value = SourceValueRef {
             value_index: DecimalU64::new(value_index),
         };
-        self.attach(site, value, sources)?;
-        if let Some(container) = SourceContainer::read(site, index, sources)? {
+        self.attach(fact, value, sources)?;
+        if let Some(container) = SourceContainer::read(fact, index, sources)? {
             self.values.push(ReservedValue {
-                ordinal: site.ordinal(),
+                ordinal: fact.ordinal(),
                 value: None,
             });
             self.open.push(container);
         } else {
-            scalar(site);
+            scalar()?;
             self.values.push(ReservedValue {
-                ordinal: site.ordinal(),
-                value: Some(scalar_read::read(&site.fact(), sources)?),
+                ordinal: fact.ordinal(),
+                value: Some(scalar_read::read(fact, sources)?),
             });
         }
         Ok(())
@@ -148,22 +205,21 @@ impl<'source> SourceArena<'source> {
 
     fn attach(
         &mut self,
-        site: &OriginalValueSite<'_, '_, '_, 'source>,
+        fact: &OriginalValueFact<'_, '_, 'source>,
         value: SourceValueRef,
         sources: &SourceUses,
     ) -> Result<(), CatalogError> {
-        let field = match site.edge() {
-            OriginalValueEdge::Field { .. } => {
-                Some(field_read::read(&site.fact(), value, sources)?)
-            }
+        let field = match fact.edge() {
+            OriginalValueEdge::Field { .. } => Some(field_read::read(fact, value, sources)?),
             OriginalValueEdge::Element { .. } => None,
         };
         if let Some(parent) = self.open.last_mut() {
-            return parent.push(site.edge(), value, field);
+            return parent.push(fact.edge(), value, field);
         }
-        match (site.edge(), field) {
-            (OriginalValueEdge::Field { ordinal }, Some(field))
-                if u64::try_from(self.fields.len()).ok() == Some(ordinal) =>
+        let ordinal = u64::try_from(self.fields.len()).ok();
+        match (fact.edge(), field) {
+            (OriginalValueEdge::Field { ordinal: original }, Some(field))
+                if self.selected_root == Some(fact.ordinal()) || ordinal == Some(original) =>
             {
                 self.fields.push(field);
             }

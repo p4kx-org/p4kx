@@ -10,6 +10,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_ammo_definitions_fixture.rs"]
 mod fixture;
+#[path = "catalog_weapon_magazine_slots.rs"]
+mod weapon_magazine_slots;
 
 const PATH: &str = "/definitions/ammoDefinitions";
 const NONFINITE_IMPACT_RADIUS: f32 = f32::from_bits(0x7fc0_1234);

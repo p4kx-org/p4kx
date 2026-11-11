@@ -11,6 +11,7 @@ use super::catalog_ammo_containers::{self, AmmoContainer};
 use super::catalog_durability::{self, DurabilityComponent, DurabilityRows, DurabilityTables};
 use super::catalog_explosives::{self, Explosive, ExplosiveComponent};
 use super::catalog_hacking_chips::{self, HackingChip, HackingComponent};
+use super::catalog_weapon_magazine_slots::{self, WeaponMagazineSlots};
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_number_capture::CapturedNumber;
@@ -101,6 +102,17 @@ impl<'source> ItemComponentsRead<'source> {
                     &mut self.notes,
                 )?);
             }
+            Component::WeaponMagazine => {
+                self.rows
+                    .ammo_bindings
+                    .push(AmmoBinding::WeaponMagazineSlots {
+                        value: Box::new(WeaponMagazineSlots::read(
+                            owner,
+                            observed,
+                            &mut self.notes,
+                        )?),
+                    });
+            }
             Component::Hacking(kind) => {
                 self.rows.hacking_chips.push(HackingChip::read(
                     kind,
@@ -120,6 +132,7 @@ enum Component {
     Explosive(ExplosiveComponent),
     Hacking(HackingComponent),
     AmmoContainer,
+    WeaponMagazine,
 }
 
 impl Component {
@@ -128,8 +141,12 @@ impl Component {
             return None;
         };
         let name = source.type_name();
-        if name == catalog_ammo_containers::SOURCE_TYPE {
-            return Some((value, Self::AmmoContainer));
+        match name {
+            catalog_ammo_containers::SOURCE_TYPE => return Some((value, Self::AmmoContainer)),
+            catalog_weapon_magazine_slots::SOURCE_TYPE => {
+                return Some((value, Self::WeaponMagazine));
+            }
+            _ => {}
         }
         let kind = DurabilityComponent::of(name)
             .map(Self::Durability)

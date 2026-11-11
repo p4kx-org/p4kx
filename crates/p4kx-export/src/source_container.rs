@@ -4,7 +4,7 @@
 use p4kx_extraction::{SourceUseRole, SourceUses, SourceValue, SourcedValue, Value};
 
 use crate::catalog_read::original::{
-    OriginalContainerKind, OriginalDatum, OriginalValueEdge, OriginalValuePart, OriginalValueSite,
+    OriginalContainerKind, OriginalDatum, OriginalValueEdge, OriginalValueFact, OriginalValuePart,
 };
 use crate::{CatalogError, ExportAccountingError};
 
@@ -30,13 +30,13 @@ enum Contents<'source> {
 
 impl<'source> SourceContainer<'source> {
     pub(super) fn read(
-        site: &OriginalValueSite<'_, '_, '_, 'source>,
+        fact: &OriginalValueFact<'_, '_, 'source>,
         index: usize,
         sources: &SourceUses,
     ) -> Result<Option<Self>, CatalogError> {
-        let contents = match site.value() {
+        let contents = match fact.value() {
             Value::Struct(source) => Contents::Struct {
-                source_type: site
+                source_type: fact
                     .bind(
                         OriginalValuePart::ConcreteType,
                         SourceValue::Present(source.type_name()),
@@ -52,9 +52,9 @@ impl<'source> SourceContainer<'source> {
             _ => return Ok(None),
         };
         Ok(Some(Self {
-            ordinal: site.ordinal(),
+            ordinal: fact.ordinal(),
             index,
-            original: site.bind(
+            original: fact.bind(
                 OriginalValuePart::Value,
                 SourceValue::Present(()),
                 SourceUseRole::Payload,
@@ -84,6 +84,13 @@ impl<'source> SourceContainer<'source> {
             _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
         }
         Ok(())
+    }
+
+    pub(super) const fn kind(&self) -> OriginalContainerKind {
+        match self.contents {
+            Contents::Struct { .. } => OriginalContainerKind::Struct,
+            Contents::Array { .. } => OriginalContainerKind::Array,
+        }
     }
 
     pub(super) fn finish(

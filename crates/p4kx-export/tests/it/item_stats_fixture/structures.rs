@@ -38,7 +38,10 @@ fn weapons(loop_shape: TestStruct) -> Vec<TestStruct> {
         TestStruct::new("SItemDefinition").field("Type", TestType::Enum("EItemType".to_owned())),
         component("SCItemWeaponComponentParams")
             .array("fireActions", pointer("SWeaponActionParams"))
-            .field("ammoContainerRecord", TestType::Reference),
+            .field(
+                "ammoContainerRecord",
+                TestType::ReferenceTo("EntityClassDefinition".to_owned()),
+            ),
         TestStruct::new("SWeaponActionParams"),
         TestStruct::new("SWeaponActionFireRapidParams")
             .parent("SWeaponActionParams")

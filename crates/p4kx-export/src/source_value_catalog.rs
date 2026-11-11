@@ -33,7 +33,9 @@ mod text;
 #[path = "source_value.rs"]
 mod value;
 
-pub(crate) use arena::{SourceArenaOutput, read as read_arena, read_indexed as read_indexed_arena};
+pub(crate) use arena::{
+    SourceArenaOutput, read as read_arena, read_indexed as read_indexed_arena, read_subtree,
+};
 pub(crate) use field::SourceField;
 pub(crate) use field_read::read as read_field;
 pub(crate) use reference::{SourceRecordReference, SourceWeakReference};

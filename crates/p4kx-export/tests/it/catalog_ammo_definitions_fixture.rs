@@ -11,7 +11,7 @@ const MAGAZINE: u128 = 0x8124;
 
 pub(super) fn database(impact: f32) -> DataForgeBuilder {
     let builder = ammo_types(DataForgeBuilder::new().version(8));
-    item_types(builder)
+    item_types(builder, weapon_type())
         .record(
             ammo(BULLET, "fixture_bullet")
                 .value("speed", TestValue::Single(12.5))
@@ -83,7 +83,7 @@ fn ammo_types(builder: DataForgeBuilder) -> DataForgeBuilder {
         )
 }
 
-fn item_types(builder: DataForgeBuilder) -> DataForgeBuilder {
+fn item_types(builder: DataForgeBuilder, weapon: TestStruct) -> DataForgeBuilder {
     builder
         .enumeration("FixtureItemType", ["WeaponGun"])
         .structure(
@@ -99,10 +99,7 @@ fn item_types(builder: DataForgeBuilder) -> DataForgeBuilder {
             TestStruct::new("SItemDefinition")
                 .field("Type", TestType::Enum("FixtureItemType".to_owned())),
         )
-        .structure(
-            component("SCItemWeaponComponentParams")
-                .field("ammoContainerRecord", reference("EntityClassDefinition")),
-        )
+        .structure(weapon)
         .structure(
             component("SAmmoContainerComponentParams")
                 .field("ammoParamsRecord", reference("AmmoParams"))
@@ -135,6 +132,11 @@ fn item(guid: u128, name: &str, extra: Vec<TestValue>) -> TestRecord {
     .value("Components", TestValue::Array(components))
 }
 
+fn weapon_type() -> TestStruct {
+    component("SCItemWeaponComponentParams")
+        .field("ammoContainerRecord", reference("EntityClassDefinition"))
+}
+
 fn weapon(magazine: Option<u128>) -> TestValue {
     let source = TestInstance::new("SCItemWeaponComponentParams");
     node(match magazine {
@@ -165,4 +167,162 @@ fn reference(name: &str) -> TestType {
 
 const fn node(value: TestInstance) -> TestValue {
     TestValue::Struct(value)
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum MagazineCase {
+    Resolved,
+    BadLinks,
+}
+
+pub(super) const PRIMARY_MAGAZINE: u128 = MAGAZINE;
+pub(super) const SECONDARY_MAGAZINE: u128 = 0x8125;
+pub(super) const MISSING_MAGAZINE: u128 = 0x8126;
+
+pub(super) fn magazine_database(case: MagazineCase) -> DataForgeBuilder {
+    magazine_records(magazine_builder(), secondary_magazines(case))
+}
+
+pub(super) fn heat_magazine_database(raw_value: f32) -> DataForgeBuilder {
+    let builder = magazine_builder()
+        .enumeration("EComparisonMode", ["Equal"])
+        .structure(
+            TestStruct::new("SFloatNumberComparer")
+                .field("mode", TestType::Enum("EComparisonMode".to_owned()))
+                .field("value", TestType::Single),
+        )
+        .structure(
+            TestStruct::new("SWeaponConditionHeatLevel")
+                .parent("SWeaponConditionBase")
+                .field(
+                    "comparer",
+                    TestType::Class("SFloatNumberComparer".to_owned()),
+                ),
+        )
+        .structure(
+            TestStruct::new("SWeaponConditionAll")
+                .parent("SWeaponConditionBase")
+                .array("conditions", pointer("SWeaponConditionBase")),
+        );
+    let heat = node(
+        TestInstance::new("SWeaponConditionHeatLevel").value(
+            "comparer",
+            node(
+                TestInstance::new("SFloatNumberComparer")
+                    .value("mode", TestValue::text("Equal"))
+                    .value("value", TestValue::Single(raw_value)),
+            ),
+        ),
+    );
+    let all = TestInstance::new("SWeaponConditionAll").value(
+        "conditions",
+        TestValue::Array(vec![
+            heat,
+            node(TestInstance::new("SWeaponConditionIsHeldEntity")),
+        ]),
+    );
+    magazine_records(
+        builder,
+        vec![secondary(Some(SECONDARY_MAGAZINE), Some(all))],
+    )
+}
+
+fn magazine_builder() -> DataForgeBuilder {
+    let builder = ammo_types(DataForgeBuilder::new().version(8));
+    let weapon = weapon_type()
+        .array(
+            "secondaryAmmoContainers",
+            TestType::Class("SSecondaryAmmoContainerParams".to_owned()),
+        )
+        .field("ShouldIgnorePrimaryAmmoContainer", TestType::Bool);
+    item_types(builder, weapon)
+        .structure(
+            TestStruct::new("SSecondaryAmmoContainerParams")
+                .field("condition", pointer("SWeaponConditionBase"))
+                .field("ammoContainerRecord", reference("EntityClassDefinition")),
+        )
+        .structure(TestStruct::new("SWeaponConditionBase"))
+        .structure(
+            TestStruct::new("SWeaponConditionTargetingFire")
+                .parent("SWeaponConditionBase")
+                .field("comparer", TestType::Bool),
+        )
+        .structure(TestStruct::new("SWeaponConditionIsHeldEntity").parent("SWeaponConditionBase"))
+}
+
+fn magazine_records(builder: DataForgeBuilder, secondaries: Vec<TestValue>) -> DataForgeBuilder {
+    builder
+        .record(ammo(BULLET, "fixture_bullet").value("speed", TestValue::Single(12.5)))
+        .record(ammo(TACHYON, "fixture_tachyon").value("speed", TestValue::Single(26.0)))
+        .record(item(
+            DIRECT,
+            "fixture_direct",
+            vec![
+                weapon_with_magazines(MAGAZINE, true, Vec::new()),
+                container(200),
+            ],
+        ))
+        .record(item(
+            PERSONAL,
+            "fixture_personal",
+            vec![weapon_with_magazines(MAGAZINE, false, secondaries)],
+        ))
+        .record(item(MAGAZINE, "fixture_magazine", vec![container(30)]))
+        .record(item(
+            SECONDARY_MAGAZINE,
+            "fixture_secondary_magazine",
+            vec![container(27)],
+        ))
+}
+
+fn weapon_with_magazines(
+    primary: u128,
+    ignore_primary: bool,
+    secondaries: Vec<TestValue>,
+) -> TestValue {
+    node(
+        TestInstance::new("SCItemWeaponComponentParams")
+            .value("ammoContainerRecord", TestValue::Reference(primary))
+            .value(
+                "ShouldIgnorePrimaryAmmoContainer",
+                TestValue::Bool(ignore_primary),
+            )
+            .value("secondaryAmmoContainers", TestValue::Array(secondaries)),
+    )
+}
+
+fn secondary_magazines(case: MagazineCase) -> Vec<TestValue> {
+    let (first, second, third) = match case {
+        MagazineCase::Resolved => (
+            Some(SECONDARY_MAGAZINE),
+            Some(SECONDARY_MAGAZINE),
+            Some(MAGAZINE),
+        ),
+        MagazineCase::BadLinks => (Some(MISSING_MAGAZINE), Some(TACHYON), None),
+    };
+    vec![
+        secondary(
+            first,
+            Some(
+                TestInstance::new("SWeaponConditionTargetingFire")
+                    .value("comparer", TestValue::Bool(false)),
+            ),
+        ),
+        secondary(
+            second,
+            Some(TestInstance::new("SWeaponConditionIsHeldEntity")),
+        ),
+        secondary(third, None),
+    ]
+}
+
+fn secondary(magazine: Option<u128>, condition: Option<TestInstance>) -> TestValue {
+    let mut source = TestInstance::new("SSecondaryAmmoContainerParams");
+    if let Some(guid) = magazine {
+        source = source.value("ammoContainerRecord", TestValue::Reference(guid));
+    }
+    if let Some(condition) = condition {
+        source = source.value("condition", node(condition));
+    }
+    node(source)
 }

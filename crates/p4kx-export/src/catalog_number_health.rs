@@ -83,7 +83,8 @@ fn emitted_record_numbers<'source>(
             let actual = &number.value;
             // Item component receipts come from the emitted component rows.
             let emitted = match actual.occurrence {
-                NumberOccurrence::ItemComponentValue { .. } => number.kind == Kind::Items,
+                NumberOccurrence::ItemComponentValue { .. }
+                | NumberOccurrence::ItemComponentRawValue { .. } => number.kind == Kind::Items,
                 _ => targets
                     .emitted
                     .contains(&(number.kind, actual.record_index)),
@@ -118,6 +119,7 @@ fn emitted_record_numbers<'source>(
                 NumberOccurrence::LootValue { ordinal }
                 | NumberOccurrence::BlueprintValue { ordinal }
                 | NumberOccurrence::ItemComponentValue { ordinal }
+                | NumberOccurrence::ItemComponentRawValue { ordinal }
                 | NumberOccurrence::AuthoredDefinitionValue { ordinal } => {
                     if matches!(actual.occurrence, NumberOccurrence::BlueprintValue { .. })
                         && number.kind != Kind::Blueprints
@@ -307,6 +309,17 @@ impl Coverage<'_, '_> {
                 NumberOccurrence::BlueprintValue { ordinal },
                 ResourceNumberContract::Number,
             ),
+            Some(Kind::Items)
+                if matches!(
+                    actual.occurrence,
+                    NumberOccurrence::ItemComponentRawValue { .. }
+                ) =>
+            {
+                (
+                    NumberOccurrence::ItemComponentRawValue { ordinal },
+                    ResourceNumberContract::Number,
+                )
+            }
             Some(Kind::Items) => (
                 NumberOccurrence::ItemComponentValue { ordinal },
                 ResourceNumberContract::Single,

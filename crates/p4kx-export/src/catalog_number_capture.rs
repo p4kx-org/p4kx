@@ -35,6 +35,7 @@ pub(crate) enum NumberOccurrence {
     BlueprintValue { ordinal: u64 },
     TemplateValue { ordinal: u64 },
     ItemComponentValue { ordinal: u64 },
+    ItemComponentRawValue { ordinal: u64 },
     AuthoredDefinitionValue { ordinal: u64 },
 }
 
@@ -66,21 +67,58 @@ impl CapturedNumber {
         let Some(token @ FloatToken::Single(_)) = FloatToken::read(fact.value()) else {
             return Ok(None);
         };
-        Ok(Some(Self {
-            record_index: originals.record_index(),
-            occurrence: match owner {
-                AuthoredNumberOwner::ItemComponent => NumberOccurrence::ItemComponentValue {
-                    ordinal: fact.ordinal(),
-                },
-                AuthoredNumberOwner::Definition => NumberOccurrence::AuthoredDefinitionValue {
-                    ordinal: fact.ordinal(),
-                },
+        let ordinal = fact.ordinal();
+        let occurrence = match owner {
+            AuthoredNumberOwner::ItemComponent => NumberOccurrence::ItemComponentValue { ordinal },
+            AuthoredNumberOwner::Definition => {
+                NumberOccurrence::AuthoredDefinitionValue { ordinal }
+            }
+        };
+        Self::authored(
+            originals,
+            fact,
+            occurrence,
+            token,
+            ResourceNumberContract::Single,
+        )
+        .map(Some)
+    }
+
+    /// Retains an exact nonfinite scalar emitted inside an original component value subtree.
+    pub(crate) fn item_component_raw<'scope, 'read, 'source>(
+        originals: &OriginalFlowFields<'scope, 'read, 'source>,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+    ) -> Result<Option<Self>, CatalogError> {
+        let Some(token) = FloatToken::read(fact.value()) else {
+            return Ok(None);
+        };
+        Self::authored(
+            originals,
+            fact,
+            NumberOccurrence::ItemComponentRawValue {
+                ordinal: fact.ordinal(),
             },
+            token,
+            ResourceNumberContract::Number,
+        )
+        .map(Some)
+    }
+
+    fn authored<'scope, 'read, 'source>(
+        originals: &OriginalFlowFields<'scope, 'read, 'source>,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+        occurrence: NumberOccurrence,
+        token: FloatToken,
+        contract: ResourceNumberContract,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self {
+            record_index: originals.record_index(),
+            occurrence,
             field: originals.logical_path(fact)?,
             token,
             source_type: fact.owner_type().to_owned(),
-            contract: ResourceNumberContract::Single,
-        }))
+            contract,
+        })
     }
 }
 
