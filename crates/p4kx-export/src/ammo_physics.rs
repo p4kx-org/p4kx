@@ -94,7 +94,7 @@ pub(crate) struct AmmoPhysicsBase {
 }
 
 impl AmmoPhysicsBase {
-    pub(super) fn read(
+    pub(in crate::catalog_v3) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {

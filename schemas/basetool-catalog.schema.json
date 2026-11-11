@@ -604,6 +604,9 @@
         "fileName": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
+        "geometryResourceParams": {
+          "$ref": "#/$defs/SourcedValueOfAmmoGeometryResource"
+        },
         "geometryTransformParams": {
           "$ref": "#/$defs/SourcedValueOfAmmoGeometryTransform"
         },
@@ -708,6 +711,7 @@
         "conversionRate",
         "displayName",
         "fileName",
+        "geometryResourceParams",
         "geometryTransformParams",
         "guid",
         "hitPoints",
@@ -755,6 +759,60 @@
       "required": [
         "forceWeaponController",
         "fragment"
+      ],
+      "type": "object"
+    },
+    "AmmoGeometryResource": {
+      "description": "Authored geometry and material roots and their separate local node arrays.",
+      "properties": {
+        "cacheResources": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "geometry": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "geometryNodes": {
+          "items": {
+            "$ref": "#/$defs/GeometryNode"
+          },
+          "type": "array"
+        },
+        "inheritMaterialFromSpawnHost": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "inheritModelTagFromHost": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "material": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "materialNodes": {
+          "items": {
+            "$ref": "#/$defs/MaterialNode"
+          },
+          "type": "array"
+        },
+        "meshSetup": {
+          "$ref": "#/$defs/SourcedValueOfGeometryMeshSetup"
+        },
+        "modelTag": {
+          "$ref": "#/$defs/SourcedValueOfGeometryModelTag"
+        },
+        "rootOverridePaint": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "cacheResources",
+        "geometry",
+        "geometryNodes",
+        "inheritMaterialFromSpawnHost",
+        "inheritModelTagFromHost",
+        "material",
+        "materialNodes",
+        "meshSetup",
+        "modelTag",
+        "rootOverridePaint"
       ],
       "type": "object"
     },
@@ -10052,6 +10110,508 @@
       ],
       "type": "object"
     },
+    "GeometryAsset": {
+      "description": "The exact authored path of a geometry or material asset.",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "GeometryData": {
+      "description": "Original asset paths, simulation link, paint and render settings.",
+      "properties": {
+        "attachFlags": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "bboxJoint": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "bboxRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "damage": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "deformerType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "dirt": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "enableDecalProjection": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "geometry": {
+          "$ref": "#/$defs/SourcedValueOfGeometryAsset"
+        },
+        "interference": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "lodRatio": {
+          "$ref": "#/$defs/SourcedValueOfuint8"
+        },
+        "material": {
+          "$ref": "#/$defs/SourcedValueOfGeometryAsset"
+        },
+        "materialAttachments": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "modifiersPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "palette": {
+          "$ref": "#/$defs/SourcedValueOfGeometryPalette"
+        },
+        "protosBShapeExclude": {
+          "$ref": "#/$defs/SourcedValueOfuint16"
+        },
+        "proxyCdfPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "renderLayer": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "simulationGeometry": {
+          "$ref": "#/$defs/SourcedValueOfGeometrySimulation"
+        },
+        "slot": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sunShadowMode": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "viewDistRatio": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "visAreaMode": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "visFp": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "visSecondaryViews": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "visShadow": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "visTp": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "wear": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "wrinkleMap": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "attachFlags",
+        "bboxJoint",
+        "bboxRadius",
+        "damage",
+        "deformerType",
+        "dirt",
+        "enableDecalProjection",
+        "geometry",
+        "interference",
+        "lodRatio",
+        "material",
+        "materialAttachments",
+        "modifiersPath",
+        "palette",
+        "protosBShapeExclude",
+        "proxyCdfPath",
+        "renderLayer",
+        "simulationGeometry",
+        "slot",
+        "sunShadowMode",
+        "viewDistRatio",
+        "visAreaMode",
+        "visFp",
+        "visSecondaryViews",
+        "visShadow",
+        "visTp",
+        "wear",
+        "wrinkleMap"
+      ],
+      "type": "object"
+    },
+    "GeometryMeshSetup": {
+      "description": "Authored visibility tags selected by the mesh setup.",
+      "properties": {
+        "visibilityTags": {
+          "$ref": "#/$defs/SourcedValueOfGeometryTagList"
+        }
+      },
+      "required": [
+        "visibilityTags"
+      ],
+      "type": "object"
+    },
+    "GeometryModelTag": {
+      "description": "An original model-tag declaration.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "tag": {
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+            },
+            "type": {
+              "const": "actor",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "tag"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "tag": {
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+            },
+            "type": {
+              "const": "prop",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "tag"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "tag": {
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+            },
+            "type": {
+              "const": "asteroid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "tag"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "GeometryNode": {
+      "description": "A geometry node with local child indices in `geometryNodes`.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SourcedValueOfGeometryData"
+        },
+        "scaleMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "subGeometry": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfuint32"
+        },
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "data",
+        "scaleMultiplier",
+        "subGeometry",
+        "tags"
+      ],
+      "type": "object"
+    },
+    "GeometryPalette": {
+      "description": "An authored palette Reference and its optional local override.",
+      "properties": {
+        "childPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "rootRecord": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "swizzleOverride": {
+          "$ref": "#/$defs/SourcedValueOfGeometryPaletteSwizzle"
+        }
+      },
+      "required": [
+        "childPath",
+        "rootRecord",
+        "swizzleOverride"
+      ],
+      "type": "object"
+    },
+    "GeometryPaletteSwizzle": {
+      "description": "The three stored palette-channel selectors.",
+      "properties": {
+        "primary": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "secondary": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "tertiary": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        }
+      },
+      "required": [
+        "primary",
+        "secondary",
+        "tertiary"
+      ],
+      "type": "object"
+    },
+    "GeometrySimulation": {
+      "description": "Original soft-body geometry asset and simulation settings.",
+      "properties": {
+        "geometry": {
+          "$ref": "#/$defs/SourcedValueOfGeometryAsset"
+        },
+        "simulationParams": {
+          "$ref": "#/$defs/SourcedValueOfGeometrySimulationParams"
+        }
+      },
+      "required": [
+        "geometry",
+        "simulationParams"
+      ],
+      "type": "object"
+    },
+    "GeometrySimulationParams": {
+      "description": "Stored soft-body controller values without unit conversions.",
+      "properties": {
+        "airResistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "attachmentInfluence": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "bendingStiffness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "bindingOffset": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "breakableParams": {
+          "$ref": "#/$defs/SourcedValueOfAmmoBreakablePhysics"
+        },
+        "collisionGap": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "collisionThicknessFactor": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "compoundingAllowed": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "compressStiffness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "cosseratBendXStiffness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "cosseratBendYStiffness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "cosseratShearXStiffness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "cosseratShearYStiffness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "cosseratStretchStiffness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "cosseratTwistingStiffness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "damping": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "drag": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "dynamicFriction": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "enableCollisions": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enableFriction": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enableSelfCollision": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enforceAttachment": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enforceBending": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enforceCosseratBendTwist": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enforceCosseratStretchShear": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enforceLength": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enforceMaxDisplacement": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enforceTetraVol": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "fixedStep": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "gameCollisionClass": {
+          "$ref": "#/$defs/SourcedValueOfAmmoCollisionClass"
+        },
+        "gridDim": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "iterations": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "lift": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "mass": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxDisplacementInfluence": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxDisplacementRestrictToPositiveHemisphere": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "maxStretchAttach": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "normalizeParticleSize": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "relativeDeltaScale": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "spawnBoxScale": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "staticFriction": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "stretchStiffness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "substepMode": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "tetraVolStiffness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "totalMass": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "visualBindingMode": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "waterResistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "windVariance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "airResistance",
+        "attachmentInfluence",
+        "bendingStiffness",
+        "bindingOffset",
+        "breakableParams",
+        "collisionGap",
+        "collisionThicknessFactor",
+        "compoundingAllowed",
+        "compressStiffness",
+        "cosseratBendXStiffness",
+        "cosseratBendYStiffness",
+        "cosseratShearXStiffness",
+        "cosseratShearYStiffness",
+        "cosseratStretchStiffness",
+        "cosseratTwistingStiffness",
+        "damping",
+        "drag",
+        "dynamicFriction",
+        "enableCollisions",
+        "enableFriction",
+        "enableSelfCollision",
+        "enforceAttachment",
+        "enforceBending",
+        "enforceCosseratBendTwist",
+        "enforceCosseratStretchShear",
+        "enforceLength",
+        "enforceMaxDisplacement",
+        "enforceTetraVol",
+        "fixedStep",
+        "gameCollisionClass",
+        "gridDim",
+        "iterations",
+        "lift",
+        "mass",
+        "maxDisplacementInfluence",
+        "maxDisplacementRestrictToPositiveHemisphere",
+        "maxStretchAttach",
+        "normalizeParticleSize",
+        "relativeDeltaScale",
+        "spawnBoxScale",
+        "staticFriction",
+        "stretchStiffness",
+        "substepMode",
+        "tetraVolStiffness",
+        "totalMass",
+        "visualBindingMode",
+        "waterResistance",
+        "windVariance"
+      ],
+      "type": "object"
+    },
+    "GeometryTagList": {
+      "description": "The ordered original tag Reference slots.",
+      "properties": {
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "tags"
+      ],
+      "type": "object"
+    },
     "GiverFaction": {
       "description": "The faction a contract is stated for, with the place that states it.",
       "properties": {
@@ -14067,6 +14627,30 @@
       "required": [
         "effectName",
         "libraryName"
+      ],
+      "type": "object"
+    },
+    "MaterialNode": {
+      "description": "A material node with local variant indices in `materialNodes`.",
+      "properties": {
+        "material": {
+          "$ref": "#/$defs/SourcedValueOfGeometryAsset"
+        },
+        "materialVariants": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfuint32"
+        },
+        "palette": {
+          "$ref": "#/$defs/SourcedValueOfGeometryPalette"
+        },
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "material",
+        "materialVariants",
+        "palette",
+        "tags"
       ],
       "type": "object"
     },
@@ -24178,6 +24762,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/AmmoFragment"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAmmoGeometryResource": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AmmoGeometryResource"
               }
             }
           }
@@ -36802,6 +37516,1176 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/GasMass"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGeometryAsset": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GeometryAsset"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGeometryData": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GeometryData"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGeometryMeshSetup": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GeometryMeshSetup"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGeometryModelTag": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GeometryModelTag"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGeometryPalette": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GeometryPalette"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGeometryPaletteSwizzle": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GeometryPaletteSwizzle"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGeometrySimulation": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GeometrySimulation"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGeometrySimulationParams": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GeometrySimulationParams"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGeometryTagList": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GeometryTagList"
               }
             }
           }

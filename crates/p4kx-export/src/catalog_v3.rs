@@ -23,6 +23,8 @@ mod authored_explosion;
 mod authored_fields;
 #[path = "durability_link.rs"]
 mod authored_link;
+#[path = "authored_nodes.rs"]
+mod authored_nodes;
 
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;

@@ -14,6 +14,7 @@ independently of the number of selected rows.
 | --- | --- |
 | `AmmoParams` | Spawn type, size, category and UI icon. Hit points, lifetime, showtime, inherited velocity, bullet type, speed, impulse scale, hit/removal/convergence flags, the resource Reference and audio/particle fields |
 | `AmmoParams.displayName` | Public localized name with the original locale and independent translation receipts |
+| `AmmoParams.geometryResourceParams` | Separate geometry and material node arenas, authored model and material paths, model and visibility tags, palettes, stored rendering flags and soft-body settings |
 | `AmmoParams.geometryTransformParams` | Authored initial/random angles, rotation rate, random rotation and scale range |
 | `AmmoParams.lightPoolParams` | Authored flare asset name and scale, RGB, radius, attenuation and multipliers, flags and animation inputs |
 | `AmmoParams.radarObjectParams` | `radarParams` carries original contact, signature and audio parameters, typed scan values, and ordered Reference slots |
@@ -43,6 +44,13 @@ zero and false stay present. Absent, null, unreadable, unsupported and
 invalid inputs keep distinct states. Record References preserve actual
 target identity and resolution state separately from whether the target is
 included by the export filter.
+
+The sourced `geometry` and `material` values index their respective `geometryNodes` and
+`materialNodes` arrays. Indices follow breadth-first discovery. The ordered `subGeometry` and
+`materialVariants` entries retain each original slot, including duplicates and empty arrays.
+Asset paths preserve original spelling and case. Numeric geometry and simulation inputs keep
+their stored widths and raw float words. The authored `enforceCosseratStrechShear` field is
+exported as `enforceCosseratStretchShear`.
 
 ## Existing weapon view
 

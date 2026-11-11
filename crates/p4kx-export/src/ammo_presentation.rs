@@ -14,20 +14,24 @@ use crate::catalog_text_contract::PublicNameRef;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
+#[path = "ammo_geometry_resource.rs"]
+mod geometry_resource;
 #[path = "ammo_light.rs"]
 mod light;
 #[path = "ammo_radar.rs"]
 mod radar;
 
+use geometry_resource::AmmoGeometryResource;
 use light::AmmoLight;
 use radar::AmmoRadar;
 
-/// Original localized short name, transform, light and radar configuration.
+/// Original localized short name, geometry, light and radar configuration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct AmmoPresentation<'source> {
     display_name: SourcedValue<PublicNameRef>,
+    geometry_resource_params: SourcedValue<AmmoGeometryResource<'source>>,
     geometry_transform_params: SourcedValue<AmmoGeometryTransform>,
     light_pool_params: SourcedValue<AmmoLight<'source>>,
     radar_params: SourcedValue<AmmoRadar<'source>>,
@@ -41,6 +45,13 @@ impl<'source> AmmoPresentation<'source> {
     ) -> Result<Self, CatalogError> {
         Ok(Self {
             display_name: source.public_name("displayName", projection, notes)?,
+            geometry_resource_params: source.strong_pointer_to(
+                "geometryResourceParams",
+                geometry_resource::SOURCE_TYPE,
+                &[geometry_resource::SOURCE_TYPE],
+                notes,
+                AmmoGeometryResource::read,
+            )?,
             geometry_transform_params: source.strong_pointer(
                 "geometryTransformParams",
                 &["GeometryTransformParams"],

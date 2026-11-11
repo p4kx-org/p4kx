@@ -9,6 +9,7 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::GameTextRef;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::authored_nodes::AuthoredNodes;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -18,7 +19,7 @@ use crate::{CatalogError, ExportAccountingError};
 #[path = "ammo_radar_scan_value.rs"]
 mod values;
 
-use values::{SCAN_VALUE_TYPES, ScanValue, ValueQueue};
+use values::{SCAN_VALUE_TYPES, ScanValue};
 
 const SCAN_DATA_TYPES: &[&str] = &[
     "ScanCustomData",
@@ -41,14 +42,16 @@ impl<'source> EmbeddedScanInfo<'source> {
         projection: &CatalogProjection<'_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
-        let mut queue = ValueQueue::default();
+        let mut queue = AuthoredNodes::default();
         let scan_procedures = source.class_array_to(
             "scanProcedures",
             "CustomScanProcedureParams",
             notes,
             |source, notes| ScanProcedure::read(source, projection, &mut queue, notes),
         )?;
-        let values = queue.read(projection, notes)?;
+        let values = queue.read(notes, |source, pending, notes| {
+            ScanValue::read(source, pending, projection, notes)
+        })?;
         Ok(Self {
             scan_procedures,
             values,
@@ -77,7 +80,7 @@ impl<'source> ScanProcedure<'source> {
     fn read<'reader, 'scope, 'read>(
         source: Observed<'reader, 'scope, 'read, 'source>,
         projection: &CatalogProjection<'_, 'source>,
-        queue: &mut ValueQueue<'reader, 'scope, 'read, 'source>,
+        queue: &mut AuthoredNodes<'reader, 'scope, 'read, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
@@ -115,7 +118,7 @@ impl<'source> ScanDatum<'source> {
     fn read<'reader, 'scope, 'read>(
         source: Observed<'reader, 'scope, 'read, 'source>,
         projection: &CatalogProjection<'_, 'source>,
-        queue: &mut ValueQueue<'reader, 'scope, 'read, 'source>,
+        queue: &mut AuthoredNodes<'reader, 'scope, 'read, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         let common = ScanDatumFields {
@@ -205,7 +208,7 @@ pub(crate) struct TagValue<'source> {
 impl<'source> TagValue<'source> {
     fn read<'reader, 'scope, 'read>(
         source: Observed<'reader, 'scope, 'read, 'source>,
-        queue: &mut ValueQueue<'reader, 'scope, 'read, 'source>,
+        queue: &mut AuthoredNodes<'reader, 'scope, 'read, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         Ok(Self {

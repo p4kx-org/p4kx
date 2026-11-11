@@ -22,6 +22,7 @@ mod physics;
 
 use conversion::AmmoConversion;
 use physics::AmmoPhysics;
+pub(super) use physics::AmmoPhysicsBase;
 
 /// Gameplay and audio fields of one admitted Ammo definition.
 #[derive(Debug, Serialize, JsonSchema)]

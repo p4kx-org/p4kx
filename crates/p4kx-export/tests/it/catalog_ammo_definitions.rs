@@ -10,8 +10,11 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_ammo_definitions_fixture.rs"]
 mod fixture;
+#[path = "catalog_ammo_geometry.rs"]
+mod geometry;
 #[path = "catalog_ammo_radar_declaration.rs"]
 mod radar_declaration;
+
 #[path = "catalog_weapon_magazine_slots.rs"]
 mod weapon_magazine_slots;
 

@@ -21,6 +21,19 @@ impl Observed<'_, '_, '_, '_> {
         })
     }
 
+    pub(in crate::catalog_v3) fn uint16(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<u16>, CatalogError> {
+        self.scalar(name, "a nullable UInt16", notes, |fact| {
+            Ok(match fact.value() {
+                Value::UInt16(value) => Some(*value),
+                _ => None,
+            })
+        })
+    }
+
     pub(in crate::catalog_v3) fn uint32(
         &self,
         name: &str,
