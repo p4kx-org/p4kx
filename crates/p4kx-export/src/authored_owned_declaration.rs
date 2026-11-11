@@ -66,8 +66,24 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         let (declared, declaration) = self
             .input
             .declared_struct_name(fact.field().storage().target(), SourceUseRole::Selector)?;
-        let (part, state) = match declared {
-            Some(name) if expected.contains(&name) => read(notes)?,
+        let selectors = [
+            self.kind()?,
+            fact.observe(OriginalValuePart::FieldName, SourceUseRole::Selector)?,
+            fact.observe(OriginalValuePart::DataType, SourceUseRole::Selector)?,
+            fact.observe(OriginalValuePart::IsArray, SourceUseRole::Selector)?,
+            fact.observe(OriginalValuePart::Target, SourceUseRole::Selector)?,
+            declaration,
+        ];
+        let sources = self.originals.sources();
+        match declared {
+            Some(name) if expected.contains(&name) => {
+                let (part, state) = read(notes)?;
+                let mut value = fact.bind(part, state, SourceUseRole::Selector, true)?;
+                for selector in selectors {
+                    value.contribute(selector);
+                }
+                Ok(value.into_cell(sources))
+            }
             other => {
                 self.unsupported_declaration(fact, notes)?;
                 let state = if other.is_some() {
@@ -75,22 +91,9 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
                 } else {
                     SourceValue::Unreadable
                 };
-                (OriginalValuePart::Value, state)
+                Ok(sources.value(state, &selectors, other.is_some()))
             }
-        };
-        let inputs = [
-            self.kind()?,
-            fact.observe(part, SourceUseRole::Selector)?,
-            fact.observe(OriginalValuePart::FieldName, SourceUseRole::Selector)?,
-            fact.observe(OriginalValuePart::DataType, SourceUseRole::Selector)?,
-            fact.observe(OriginalValuePart::IsArray, SourceUseRole::Selector)?,
-            fact.observe(OriginalValuePart::Target, SourceUseRole::Selector)?,
-            declaration,
-        ];
-        Ok(self
-            .originals
-            .sources()
-            .value(state, &inputs, declared.is_some()))
+        }
     }
 
     fn unsupported_declaration(

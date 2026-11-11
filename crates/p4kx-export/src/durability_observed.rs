@@ -15,6 +15,8 @@ use crate::resource_float::ResourceFloat32;
 use crate::source_fields::{FieldCapture, FieldError, FieldViolation};
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "authored_array.rs"]
+mod array;
 #[path = "authored_field_links.rs"]
 mod links;
 #[path = "authored_owned_fields.rs"]
@@ -104,16 +106,23 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         self.scalar(name, "a nullable Single", notes, |fact| {
             let value = fact.value();
             observed(value);
-            let Value::Single(number) = value else {
-                return Ok(None);
-            };
-            if let Some(number) =
-                CapturedNumber::authored_single(self.originals, fact, self.number_owner)?
-            {
-                self.numbers.borrow_mut().push(number);
-            }
-            Ok(Some(ResourceFloat32::new(*number)))
+            self.original_single(fact)
         })
+    }
+
+    fn original_single(
+        &self,
+        fact: &Fact<'scope, 'read, 'source>,
+    ) -> Result<Option<ResourceFloat32>, CatalogError> {
+        let Value::Single(number) = fact.value() else {
+            return Ok(None);
+        };
+        if let Some(number) =
+            CapturedNumber::authored_single(self.originals, fact, self.number_owner)?
+        {
+            self.numbers.borrow_mut().push(number);
+        }
+        Ok(Some(ResourceFloat32::new(*number)))
     }
 
     pub(super) fn boolean(
@@ -174,6 +183,10 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
                 _ => None,
             })
         })
+    }
+
+    pub(super) fn check_cancel(&self) -> Result<(), CatalogError> {
+        self.originals.check_cancel()
     }
 
     pub(super) fn source_type(&self) -> Result<&'source str, CatalogError> {

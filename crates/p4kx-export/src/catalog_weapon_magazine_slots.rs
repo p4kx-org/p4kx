@@ -9,11 +9,12 @@ use super::authored_fields::Observed;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
+use crate::item_stats::PRIMARY_MAGAZINE_FIELD;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 
-pub(super) const SOURCE_TYPE: &str = "SCItemWeaponComponentParams";
+pub(super) use crate::item_stats::WEAPON_COMPONENT as SOURCE_TYPE;
 const MAGAZINE_TARGET: &str = "EntityClassDefinition";
 const SECONDARY_SLOT: &str = "SSecondaryAmmoContainerParams";
 const CONDITION_BASE: &str = "SWeaponConditionBase";
@@ -40,7 +41,7 @@ impl<'source> WeaponMagazineSlots<'source> {
         Ok(Self {
             owner,
             ammo_container_record: source.record_link_to(
-                "ammoContainerRecord",
+                PRIMARY_MAGAZINE_FIELD,
                 MAGAZINE_TARGET,
                 notes,
             )?,
@@ -77,7 +78,7 @@ impl<'source> SecondaryMagazine<'source> {
     ) -> Result<Self, CatalogError> {
         Ok(Self {
             ammo_container_record: source.record_link_to(
-                "ammoContainerRecord",
+                PRIMARY_MAGAZINE_FIELD,
                 MAGAZINE_TARGET,
                 notes,
             )?,

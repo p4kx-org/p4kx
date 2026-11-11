@@ -14,7 +14,7 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceText;
 
-pub(super) const SOURCE_TYPE: &str = "SAmmoContainerComponentParams";
+pub(super) use crate::item_stats::AMMO_CONTAINER as SOURCE_TYPE;
 const FRAGMENT: &str = "SFragmentParams";
 const HIDE_ATTACHMENT: &str = "SHideAmmoAttachmentParams";
 const ATTACHABLE_ENTITY: &str = "SAttachableEntityParams";

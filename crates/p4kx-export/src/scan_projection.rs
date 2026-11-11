@@ -4,7 +4,7 @@
 use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
 use super::Scan;
-use crate::catalog_v3::catalog_item_components;
+use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
 use crate::commodity_resource::{self, CommodityResource};
 use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
 use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDiagnosis};
@@ -17,7 +17,7 @@ use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
 use crate::source_fields::FieldError;
 use crate::starmap::starmap_object;
-use crate::{CatalogError, Kind, item_stats, item_variant};
+use crate::{CatalogError, ExportAccountingError, Kind, item_stats, item_variant};
 
 struct ResourceRead<'source> {
     record: Record<'source>,
@@ -68,42 +68,66 @@ impl<'f> Scan<'_, '_, 'f> {
             entity, components, ..
         }) = &mut picked
         {
-            let read = catalog_item_components::read(
-                tree,
-                self.projection,
-                admission,
-                self.options.cancel,
-            )?;
-            crate::source_projection_notes::record(
-                Kind::Items,
-                ExportSourceRole::Selected,
-                admission,
-                tree,
-                read.notes,
-                ledger,
-            )?;
+            let (read, stats) = self.item_components(tree, trees, admission, ledger)?;
             *components = read.rows;
-            entity.stats = self
-                .item_stats(tree, trees, read.legacy_health, ledger)?
-                .map(Box::new);
+            entity.stats = stats.map(Box::new);
             entity.variant_key = item_variant::key(tree, entity.stats.as_deref());
         }
         Ok(picked.map(|picked| picked.crafted(tree)))
     }
 
-    fn item_stats(
+    fn item_components(
         &self,
         tree: &RecordTree<'f>,
         trees: &mut TreeBuilder<'f>,
-        health: Option<f32>,
+        admission: &RecordObservation<'_, 'f>,
         ledger: &mut ExportLedger,
-    ) -> Result<Option<crate::contract_stats::ItemStats<'f>>, CatalogError> {
-        item_stats::read_with_sources(
+    ) -> Result<
+        (
+            ItemComponentsRead<'f>,
+            Option<crate::contract_stats::ItemStats<'f>>,
+        ),
+        CatalogError,
+    > {
+        let cancel = self.options.cancel;
+        catalog_item_components::read(
             tree,
-            self.forge,
-            trees,
-            || health,
-            |record, _| self.ammo.dependency(record, ledger),
+            self.projection,
+            admission,
+            cancel,
+            |originals, read| {
+                crate::source_projection_notes::record(
+                    Kind::Items,
+                    ExportSourceRole::Selected,
+                    admission,
+                    tree,
+                    std::mem::take(&mut read.notes),
+                    ledger,
+                )?;
+                let health = read.legacy_health;
+                item_stats::read_with_sources(
+                    tree,
+                    self.forge,
+                    trees,
+                    || health,
+                    |record, _| self.ammo.dependency(record, ledger),
+                    |observed| {
+                        let fields =
+                            originals.ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+                        if let Some(row) = resolution::read(
+                            self.projection.original(),
+                            admission.record(),
+                            tree,
+                            fields,
+                            observed,
+                            cancel,
+                        )? {
+                            read.rows.magazine_resolutions.push(row);
+                        }
+                        Ok(())
+                    },
+                )
+            },
         )
     }
 
@@ -328,7 +352,7 @@ impl<'f> Scan<'_, '_, 'f> {
             return Ok(None);
         };
         let record = self.forge.record(index).ok_or(CatalogError::Accounting(
-            crate::ExportAccountingError::MissingPhysicalReferenceTarget { index },
+            ExportAccountingError::MissingPhysicalReferenceTarget { index },
         ))?;
         match trees.build(&record) {
             Ok(tree) => {

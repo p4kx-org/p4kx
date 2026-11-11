@@ -16,6 +16,7 @@ independently of the number of selected rows.
 | `AmmoParams.displayName` | Public localized name with the original locale and independent translation receipts |
 | `AmmoParams.geometryTransformParams` | Authored initial/random angles, rotation rate, random rotation and scale range |
 | `AmmoParams.lightPoolParams` | Authored flare asset name and scale, RGB, radius, attenuation and multipliers, flags and animation inputs |
+| `AmmoParams.radarObjectParams` | `radarParams` carries original contact, signature and audio parameters, typed scan values, and ordered Reference slots |
 | `AmmoParams.projectileParams` | Shared detonation and proximity configurations beside the `kind.type` union `base`, `bullet`, `tachyon` or `countermeasure` |
 | `BulletProjectileParams` | Per-channel damage and falloff, impact radii, ignition and keep-alive flags, impulse falloff, penetration, pierceability and electron settings. Authored visual, extra-projectile and ordered hit-behavior inputs |
 | `TachyonProjectileParams` | Hit type/effect, per-channel damage, full- and zero-damage ranges, penetration and ordered beam effects |
@@ -92,3 +93,16 @@ Each available condition carries its exact StrongPointer declaration and
 original subtree in a local `roots` and `values` arena. Condition values keep
 their original provenance and text classifications. This declaration records
 the source slots and condition inputs for consumers to interpret.
+
+`projections.weaponMagazineResolutions` records the primary route actually
+consulted by the existing weapon view. The row identifies the first
+applicable weapon component by physical owner and slot. An own container
+records its original component ordinal. A linked route records the actual
+magazine Record index and, when selected, that container's component ordinal.
+The same target body supplies the legacy capacity and ammunition.
+
+A readable target with no container, a target whose component selection
+is indeterminate, and an unreadable target body have distinct outcomes.
+The unreadable result retains the original magazine header identity and
+the source-read failure code. The consulted dependency is visible in the
+health report even if the catalog selection excludes its own Item row.

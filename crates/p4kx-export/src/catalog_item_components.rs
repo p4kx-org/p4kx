@@ -22,6 +22,11 @@ use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
 
+#[path = "catalog_weapon_magazine_resolution.rs"]
+pub(crate) mod resolution;
+
+use self::resolution::WeaponMagazineResolution;
+
 #[derive(Default)]
 pub(crate) struct ItemComponentRows<'source> {
     pub(crate) durability: DurabilityRows<'source>,
@@ -29,6 +34,7 @@ pub(crate) struct ItemComponentRows<'source> {
     pub(crate) hacking_chips: Vec<HackingChip<'source>>,
     pub(crate) ammo_containers: Vec<AmmoContainer<'source>>,
     pub(crate) ammo_bindings: Vec<AmmoBinding<'source>>,
+    pub(crate) magazine_resolutions: Vec<WeaponMagazineResolution>,
     pub(crate) numbers: Vec<CapturedNumber>,
 }
 
@@ -39,6 +45,7 @@ impl<'source> ItemComponentRows<'source> {
         self.hacking_chips.extend(other.hacking_chips);
         self.ammo_containers.extend(other.ammo_containers);
         self.ammo_bindings.extend(other.ammo_bindings);
+        self.magazine_resolutions.extend(other.magazine_resolutions);
         self.numbers.extend(other.numbers);
     }
 
@@ -49,6 +56,7 @@ impl<'source> ItemComponentRows<'source> {
             hacking_chips: catalog_hacking_chips::table(forge, self.hacking_chips),
             ammo_containers: catalog_ammo_containers::table(forge, self.ammo_containers),
             ammo_bindings: catalog_ammo_bindings::table(forge, self.ammo_bindings),
+            magazine_resolutions: resolution::table(forge, self.magazine_resolutions),
         }
     }
 }
@@ -59,6 +67,7 @@ pub(crate) struct ItemComponentTables<'source> {
     pub(crate) hacking_chips: CatalogTable<HackingChip<'source>>,
     pub(crate) ammo_containers: CatalogTable<AmmoContainer<'source>>,
     pub(crate) ammo_bindings: CatalogTable<AmmoBinding<'source>>,
+    pub(crate) magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
 }
 
 #[derive(Default)]
@@ -157,19 +166,25 @@ impl Component {
 }
 
 /// Reads each recognized physical component occurrence using its own admitted Record tree.
-pub(crate) fn read<'source>(
+pub(crate) fn read<'source, T>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
-) -> Result<ItemComponentsRead<'source>, CatalogError> {
+    project: impl FnOnce(
+        Option<&OriginalFlowFields<'_, '_, 'source>>,
+        &mut ItemComponentsRead<'source>,
+    ) -> Result<T, CatalogError>,
+) -> Result<(ItemComponentsRead<'source>, T), CatalogError> {
     let mut result = ItemComponentsRead::default();
-    let Some(Value::Array(components)) = tree.field("Components") else {
-        return Ok(result);
+    let components = match tree.field("Components") {
+        Some(Value::Array(components)) => components.as_ref(),
+        _ => &[],
     };
     let mut components = components.iter().filter_map(Component::of).peekable();
     if components.peek().is_none() {
-        return Ok(result);
+        let projected = project(None, &mut result)?;
+        return Ok((result, projected));
     }
     let input = projection.original();
     let scope = input.record_scope(admission.record(), tree)?;
@@ -188,5 +203,6 @@ pub(crate) fn read<'source>(
         result.push(kind, owner, observed)?;
     }
     result.rows.numbers = numbers.into_inner();
-    Ok(result)
+    let projected = project(Some(&originals), &mut result)?;
+    Ok((result, projected))
 }

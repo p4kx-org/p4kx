@@ -11,16 +11,23 @@ use crate::source_fields::FieldError;
 #[path = "authored_owned_declaration.rs"]
 mod declaration;
 
-enum DeclarationCheck {
+enum DeclarationCheck<'types> {
     EmptyOnly,
-    All,
+    Always(&'types [&'types str]),
 }
 
-impl DeclarationCheck {
-    fn includes(self, value: &Value<'_>) -> bool {
+impl<'types> DeclarationCheck<'types> {
+    fn targets(
+        self,
+        value: &Value<'_>,
+        concrete: &'types [&'types str],
+    ) -> Option<&'types [&'types str]> {
         match self {
-            Self::EmptyOnly => matches!(value, Value::Array(values) if values.is_empty()),
-            Self::All => true,
+            Self::EmptyOnly if matches!(value, Value::Array(values) if values.is_empty()) => {
+                Some(concrete)
+            }
+            Self::EmptyOnly => None,
+            Self::Always(declared) => Some(declared),
         }
     }
 }
@@ -82,6 +89,28 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         self.typed_owned(name, expected, OwnedStorage::StrongPointer, notes, decode)
     }
 
+    pub(in crate::catalog_v3) fn strong_pointer_to<T>(
+        &self,
+        name: &str,
+        target: &str,
+        concrete: &[&str],
+        notes: &mut Vec<FieldError>,
+        decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
+            return self.absent();
+        };
+        let storage = fact.field().storage();
+        if storage.data_type() != DataType::StrongPointer || storage.is_array() {
+            let state =
+                self.failure(name, fact.value(), "a nullable scalar StrongPointer", notes)?;
+            return self.bind_storage(fact, state);
+        }
+        self.read_declared_owned(fact, &[target], notes, |notes| {
+            self.owned_state(name, fact, concrete, notes, decode)
+        })
+    }
+
     fn typed_owned<T>(
         &self,
         name: &str,
@@ -132,7 +161,14 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         notes: &mut Vec<FieldError>,
         decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
-        self.read_class_array(name, types, DeclarationCheck::EmptyOnly, notes, decode)
+        self.read_owned_array(
+            name,
+            types,
+            OwnedStorage::Class,
+            DeclarationCheck::EmptyOnly,
+            notes,
+            decode,
+        )
     }
 
     pub(in crate::catalog_v3) fn class_array_to<T>(
@@ -142,27 +178,57 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         notes: &mut Vec<FieldError>,
         decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
-        self.read_class_array(name, &[target], DeclarationCheck::All, notes, decode)
+        self.read_owned_array(
+            name,
+            &[target],
+            OwnedStorage::Class,
+            DeclarationCheck::Always(&[target]),
+            notes,
+            decode,
+        )
     }
 
-    fn read_class_array<T>(
+    pub(in crate::catalog_v3) fn strong_pointer_array_to<T>(
+        &self,
+        name: &str,
+        target: &str,
+        concrete: &[&str],
+        notes: &mut Vec<FieldError>,
+        decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
+        self.read_owned_array(
+            name,
+            concrete,
+            OwnedStorage::StrongPointer,
+            DeclarationCheck::Always(&[target]),
+            notes,
+            decode,
+        )
+    }
+
+    fn read_owned_array<T>(
         &self,
         name: &str,
         types: &[&str],
-        check: DeclarationCheck,
+        storage: OwnedStorage,
+        check: DeclarationCheck<'_>,
         notes: &mut Vec<FieldError>,
         decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
         let Some((_, fact)) = self.originals.field(self.owner, name)? else {
             return self.absent();
         };
-        let storage = fact.field().storage();
-        if storage.data_type() != DataType::Class || !storage.is_array() {
-            let state = self.failure(name, fact.value(), "a nullable Class array", notes)?;
+        let declaration = fact.field().storage();
+        if declaration.data_type() != storage.data_type() || !declaration.is_array() {
+            let expected = match storage {
+                OwnedStorage::Class => "a nullable Class array",
+                OwnedStorage::StrongPointer => "a nullable StrongPointer array",
+            };
+            let state = self.failure(name, fact.value(), expected, notes)?;
             return self.bind_storage(fact, state);
         }
-        if check.includes(fact.value()) {
-            return self.read_declared_owned(fact, types, notes, |notes| {
+        if let Some(declared_types) = check.targets(fact.value(), types) {
+            return self.read_declared_owned(fact, declared_types, notes, |notes| {
                 let state = self.array_state(name, fact, types, notes, decode)?;
                 Ok((OriginalValuePart::Value, state))
             });
@@ -171,7 +237,7 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         self.bind_storage(fact, state)
     }
 
-    fn bind_storage<T>(
+    pub(super) fn bind_storage<T>(
         &self,
         fact: &Fact<'scope, 'read, 'source>,
         state: SourceValue<T>,
@@ -196,23 +262,19 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         notes: &mut Vec<FieldError>,
         mut decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
     ) -> Result<SourceValue<Vec<SourcedValue<T>>>, CatalogError> {
-        Ok(match fact.value() {
-            Value::Null => SourceValue::Null,
-            Value::Array(values) => {
-                let mut rows = Vec::with_capacity(values.len());
-                for (index, original) in values.iter().enumerate() {
-                    let element = self.originals.fact(original)?;
-                    let path = format!("{name}[{index}]");
-                    let (part, state) =
-                        self.owned_state(&path, element, types, notes, &mut decode)?;
-                    let mut cell = element.bind(part, state, SourceUseRole::Selector, true)?;
-                    cell.contribute(self.kind()?);
-                    rows.push(cell.into_cell(self.originals.sources()));
-                }
-                SourceValue::Present(rows)
-            }
-            value => self.failure(name, value, "a nullable Array", notes)?,
-        })
+        self.array_elements(
+            fact,
+            name,
+            "a nullable Array",
+            notes,
+            |index, element, notes| {
+                let path = format!("{name}[{index}]");
+                let (part, state) = self.owned_state(&path, element, types, notes, &mut decode)?;
+                let mut cell = element.bind(part, state, SourceUseRole::Selector, true)?;
+                cell.contribute(self.kind()?);
+                Ok(cell.into_cell(self.originals.sources()))
+            },
+        )
     }
 
     fn owned_state<T>(

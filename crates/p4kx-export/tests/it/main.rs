@@ -32,6 +32,7 @@ mod canonical_header;
 mod canonical_header_fixture;
 mod canonical_header_origin;
 mod catalog_ammo_presentation;
+mod catalog_ammo_radar;
 mod catalog_broker_entries;
 mod catalog_commodity;
 mod catalog_compression;

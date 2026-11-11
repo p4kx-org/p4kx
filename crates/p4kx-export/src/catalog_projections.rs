@@ -11,6 +11,8 @@ use crate::mission_titles::MissionTitles;
 use crate::quality_catalog::contract::QualityQuantizationResources;
 use crate::schema_fields::every_field_required;
 
+use super::catalog_item_components::resolution::WeaponMagazineResolution;
+
 /// Explicit choices and derived values, separate from authored definitions.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -26,6 +28,7 @@ pub(crate) struct CatalogProjections<'source> {
     pub(crate) quality_quantization_resources: CatalogTable<QualityQuantizationResources>,
     pub(crate) tag_paths: CatalogTable<super::tag_catalog::TagPath>,
     pub(crate) commodity_presentation: CatalogTable<CommodityPresentation>,
+    pub(crate) weapon_magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
     pub(crate) resource_group_parents:
         CatalogTable<super::resource_group_catalog::ResourceGroupParent>,
 }

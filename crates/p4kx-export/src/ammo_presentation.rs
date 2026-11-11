@@ -16,10 +16,13 @@ use crate::source_fields::FieldError;
 
 #[path = "ammo_light.rs"]
 mod light;
+#[path = "ammo_radar.rs"]
+mod radar;
 
 use light::AmmoLight;
+use radar::AmmoRadar;
 
-/// Original localized short name, transform and light configuration.
+/// Original localized short name, transform, light and radar configuration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
@@ -27,6 +30,7 @@ pub(crate) struct AmmoPresentation<'source> {
     display_name: SourcedValue<PublicNameRef>,
     geometry_transform_params: SourcedValue<AmmoGeometryTransform>,
     light_pool_params: SourcedValue<AmmoLight<'source>>,
+    radar_params: SourcedValue<AmmoRadar<'source>>,
 }
 
 impl<'source> AmmoPresentation<'source> {
@@ -48,6 +52,13 @@ impl<'source> AmmoPresentation<'source> {
                 &["PooledLightData"],
                 notes,
                 AmmoLight::read,
+            )?,
+            radar_params: source.strong_pointer_to(
+                "radarObjectParams",
+                "SSCSignatureSystemParams",
+                &["SSCSignatureSystemParams"],
+                notes,
+                |source, notes| AmmoRadar::read(source, projection, notes),
             )?,
         })
     }

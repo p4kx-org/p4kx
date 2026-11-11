@@ -16,7 +16,9 @@ mod resources;
 mod walk;
 mod weapon;
 
-pub(crate) use weapon::ammo;
+pub(crate) use weapon::{
+    AMMO_CONTAINER, MagazineRead, MagazineRoute, PRIMARY_MAGAZINE_FIELD, WEAPON_COMPONENT, ammo,
+};
 
 const POWER_PLANT: &str = "PowerPlant";
 const COOLER: &str = "Cooler";
@@ -39,6 +41,7 @@ pub(crate) fn read<'f>(
         trees,
         || catalog_durability::legacy_health(tree),
         |record, trees| Ok::<_, Infallible>(trees.build(record).ok().map(|tree| ammo(&tree))),
+        |_| Ok(()),
     )
     .unwrap_or_else(|error| match error {})
 }
@@ -49,11 +52,12 @@ pub(crate) fn read_with_sources<'f, E>(
     trees: &mut TreeBuilder<'f>,
     health: impl FnOnce() -> Option<f32>,
     ammunition: impl FnOnce(&Record<'f>, &mut TreeBuilder<'f>) -> Result<Option<AmmoStats>, E>,
+    observe_magazine: impl FnOnce(MagazineRead<'_, 'f>) -> Result<(), E>,
 ) -> Result<Option<ItemStats<'f>>, E> {
     let attach = structure(component(tree, "SAttachableComponentParams"), "AttachDef");
     let kind = text(attach, "Type");
     let is = |name: &str| kind.is_some_and(|kind| kind.eq_ignore_ascii_case(name));
-    let weapon = weapon::weapon(tree, forge, trees, ammunition)?;
+    let weapon = weapon::weapon(tree, forge, trees, ammunition, observe_magazine)?;
     let shield = parts::shield(tree);
     let quantum_drive = parts::quantum_drive(tree);
     let resource_states = resources::states(tree);

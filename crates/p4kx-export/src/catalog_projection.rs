@@ -81,6 +81,23 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         &self,
         fact: &crate::catalog_read::original::OriginalValueFact<'_, '_, 'source>,
     ) -> Result<PublicNameRef, CatalogError> {
+        self.locale_fact(Domain::PublicName, fact)
+            .map(PublicNameRef)
+    }
+
+    /// Retains an authored Locale occurrence in the protected text domain.
+    pub(crate) fn protected_locale_fact(
+        &self,
+        fact: &crate::catalog_read::original::OriginalValueFact<'_, '_, 'source>,
+    ) -> Result<GameTextRef, CatalogError> {
+        self.locale_fact(Domain::GameText, fact).map(GameTextRef)
+    }
+
+    fn locale_fact(
+        &self,
+        domain: Domain,
+        fact: &crate::catalog_read::original::OriginalValueFact<'_, '_, 'source>,
+    ) -> Result<String, CatalogError> {
         use crate::catalog_read::original::OriginalValuePart;
         use p4kx_extraction::Value;
         fact.check_input(self.original)?;
@@ -89,8 +106,8 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         };
         let payload = fact.observe(OriginalValuePart::Value, SourceUseRole::Payload)?;
         let selector = fact.observe(OriginalValuePart::Value, SourceUseRole::Selector)?;
-        self.register_uses(Domain::PublicName, key, payload, selector)?;
-        Ok(PublicNameRef(identifier(Domain::PublicName, key)))
+        self.register_uses(domain, key, payload, selector)?;
+        Ok(identifier(domain, key))
     }
 
     pub(crate) fn description(

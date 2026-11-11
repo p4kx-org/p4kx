@@ -301,6 +301,7 @@ fn assemble<R>(
                 collected.quality.inverse,
             ),
             resource_group_parents: group_tables.parents,
+            weapon_magazine_resolutions: components.magazine_resolutions,
             tag_paths: CatalogTable::new(&forge, &["Tag"], collected.tags.paths),
             commodity_presentation,
         },

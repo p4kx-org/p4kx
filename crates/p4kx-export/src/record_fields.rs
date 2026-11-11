@@ -31,11 +31,19 @@ pub(crate) fn component<'t, 'f>(
     tree: &'t RecordTree<'f>,
     type_name: &str,
 ) -> Option<&'t StructValue<'f>> {
+    component_occurrence(tree, type_name).map(|(_, fields)| fields)
+}
+
+/// Returns the first matching Components value together with its actual owned fields.
+pub(crate) fn component_occurrence<'read, 'source>(
+    tree: &'read RecordTree<'source>,
+    type_name: &str,
+) -> Option<(&'read Value<'source>, &'read StructValue<'source>)> {
     let Some(Value::Array(components)) = tree.field("Components") else {
         return None;
     };
     components.iter().find_map(|component| match component {
-        Value::Struct(value) if value.type_name() == type_name => Some(value),
+        Value::Struct(fields) if fields.type_name() == type_name => Some((component, fields)),
         _ => None,
     })
 }

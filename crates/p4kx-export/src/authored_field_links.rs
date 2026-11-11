@@ -13,6 +13,15 @@ use crate::source_fields::{FieldError, FieldViolation};
 use crate::source_value_catalog::{SourcePayload, SourceRecordReference, read_reference_payload};
 use crate::{CatalogError, ExportAccountingError};
 
+pub(in crate::catalog_v3) type ReferenceCell<'source> =
+    SourcedValue<Box<SourceRecordReference<'source>>>;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ReferenceCardinality {
+    Scalar,
+    Array,
+}
+
 impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
     pub(in crate::catalog_v3) fn link(
         &self,
@@ -65,10 +74,59 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         )
     }
 
+    pub(in crate::catalog_v3) fn record_link_array_to(
+        &self,
+        name: &str,
+        target_type: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<Vec<ReferenceCell<'source>>>, CatalogError> {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
+            return self.absent();
+        };
+        let mut selectors = Vec::new();
+        if let Some(rejected) = self.reject_reference_declaration(
+            fact,
+            target_type,
+            ReferenceCardinality::Array,
+            notes,
+            &mut selectors,
+        )? {
+            return Ok(rejected);
+        }
+        let state = self.array_elements(
+            fact,
+            name,
+            "a nullable Reference array",
+            notes,
+            |index, element, notes| self.record_link_element(name, index, element, notes),
+        )?;
+        self.bind_link(fact, OriginalValuePart::Value, state, selectors)
+    }
+
+    fn record_link_element(
+        &self,
+        name: &str,
+        index: usize,
+        fact: &Fact<'scope, 'read, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<ReferenceCell<'source>, CatalogError> {
+        let mut selectors = Vec::new();
+        let decoded = self.decode_record_link(fact, self.originals.sources(), &mut selectors)?;
+        let (part, state) = self.link_state(
+            &format!("{name}[{index}]"),
+            fact,
+            decoded,
+            "a nullable Reference",
+            notes,
+        )?;
+        self.bind_link(fact, part, state, selectors)
+    }
+
     fn reject_reference_declaration<T>(
         &self,
         fact: &Fact<'scope, 'read, 'source>,
         expected_type: &str,
+        cardinality: ReferenceCardinality,
         notes: &mut Vec<FieldError>,
         selectors: &mut Vec<SourceUse>,
     ) -> Result<Option<SourcedValue<T>>, CatalogError> {
@@ -77,7 +135,9 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
             selectors.push(fact.observe(part, SourceUseRole::Selector)?);
         }
         let mut complete = true;
-        if storage.data_type() == DataType::Reference && !storage.is_array() {
+        if storage.data_type() == DataType::Reference
+            && storage.is_array() == (cardinality == ReferenceCardinality::Array)
+        {
             selectors.push(fact.observe(OriginalValuePart::Target, SourceUseRole::Selector)?);
             if storage.target() != u16::MAX {
                 fact.check_input(self.input)?;
@@ -161,27 +221,52 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         };
         let mut selectors = Vec::new();
         if let Some(expected_type) = expected_type
-            && let Some(rejected) =
-                self.reject_reference_declaration(fact, expected_type, notes, &mut selectors)?
+            && let Some(rejected) = self.reject_reference_declaration(
+                fact,
+                expected_type,
+                ReferenceCardinality::Scalar,
+                notes,
+                &mut selectors,
+            )?
         {
             return Ok(rejected);
         }
-        let (part, state) =
-            if let Some((part, target)) = decode(fact, self.originals.sources(), &mut selectors)? {
-                (part, SourceValue::Present(target))
-            } else {
-                match fact.value() {
-                    Value::Null => (OriginalValuePart::Value, SourceValue::Null),
-                    Value::Struct(source) => (
-                        OriginalValuePart::ConcreteType,
-                        self.unsupported(fact, source, notes)?,
-                    ),
-                    other => (
-                        OriginalValuePart::Value,
-                        self.failure(name, other, expected, notes)?,
-                    ),
-                }
-            };
+        let decoded = decode(fact, self.originals.sources(), &mut selectors)?;
+        let (part, state) = self.link_state(name, fact, decoded, expected, notes)?;
+        self.bind_link(fact, part, state, selectors)
+    }
+
+    fn link_state<T>(
+        &self,
+        name: &str,
+        fact: &Fact<'scope, 'read, 'source>,
+        decoded: Option<(OriginalValuePart, T)>,
+        expected: &'static str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<(OriginalValuePart, SourceValue<T>), CatalogError> {
+        Ok(match decoded {
+            Some((part, target)) => (part, SourceValue::Present(target)),
+            None => match fact.value() {
+                Value::Null => (OriginalValuePart::Value, SourceValue::Null),
+                Value::Struct(source) => (
+                    OriginalValuePart::ConcreteType,
+                    self.unsupported(fact, source, notes)?,
+                ),
+                other => (
+                    OriginalValuePart::Value,
+                    self.failure(name, other, expected, notes)?,
+                ),
+            },
+        })
+    }
+
+    fn bind_link<T>(
+        &self,
+        fact: &Fact<'scope, 'read, 'source>,
+        part: OriginalValuePart,
+        state: SourceValue<T>,
+        selectors: Vec<SourceUse>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
         let mut cell = self.field_datum(fact, part, state, SourceUseRole::Selector)?;
         for selector in selectors {
             cell.contribute(selector);

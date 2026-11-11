@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, Record, RecordTree, StructValue, TreeBuilder, Value};
+use p4kx_extraction::{
+    DataForge, DataForgeError, Record, RecordTree, StructValue, TreeBuilder, Value,
+};
 
 use super::parts::damage;
 use super::walk::owner_of;
 use crate::contract_stats::{AmmoStats, FireAction, Spread, WeaponStats};
-use crate::record_fields::{component, elements, integer, number, reference, structure, text};
+use crate::record_fields::{
+    component_occurrence, elements, integer, number, record_reference, reference, structure, text,
+};
 
 const SEQUENCE_ENTRIES: &str = "sequenceEntries";
 const PARALLEL_ACTIONS: &str = "weaponActions";
@@ -81,7 +85,32 @@ pub(crate) fn ammo(tree: &RecordTree<'_>) -> AmmoStats {
     }
 }
 
-const CONTAINER: &str = "SAmmoContainerComponentParams";
+pub(crate) const AMMO_CONTAINER: &str = "SAmmoContainerComponentParams";
+pub(crate) const WEAPON_COMPONENT: &str = "SCItemWeaponComponentParams";
+pub(crate) const PRIMARY_MAGAZINE_FIELD: &str = "ammoContainerRecord";
+
+/// The original occurrences and read result used by the legacy primary selection.
+pub(crate) struct MagazineRead<'read, 'source> {
+    weapon: &'read Value<'source>,
+    route: MagazineRoute<'read, 'source>,
+}
+
+impl<'read, 'source> MagazineRead<'read, 'source> {
+    pub(crate) const fn into_parts(self) -> (&'read Value<'source>, MagazineRoute<'read, 'source>) {
+        (self.weapon, self.route)
+    }
+}
+
+/// The actual on-weapon container or the one attempted target body.
+pub(crate) enum MagazineRoute<'read, 'source> {
+    Own(&'read Value<'source>),
+    Linked {
+        caller: &'read Value<'source>,
+        record: Record<'source>,
+        tree: Result<&'read RecordTree<'source>, &'read DataForgeError>,
+        container: Option<&'read Value<'source>>,
+    },
+}
 
 /// Returns the tree of the Record `reference` links to when it has the struct `type_name` and can
 /// be built.
@@ -129,8 +158,9 @@ pub(super) fn weapon<'f, E>(
     forge: &'f DataForge<'f>,
     trees: &mut TreeBuilder<'f>,
     ammunition: impl FnOnce(&Record<'f>, &mut TreeBuilder<'f>) -> Result<Option<AmmoStats>, E>,
+    observe_magazine: impl FnOnce(MagazineRead<'_, 'f>) -> Result<(), E>,
 ) -> Result<Option<WeaponStats<'f>>, E> {
-    let Some(weapon) = component(tree, "SCItemWeaponComponentParams") else {
+    let Some((occurrence, weapon)) = component_occurrence(tree, WEAPON_COMPONENT) else {
         return Ok(None);
     };
     let mut fire_actions = Vec::new();
@@ -139,27 +169,60 @@ pub(super) fn weapon<'f, E>(
             collect(action, &mut fire_actions);
         }
     }
-    let (ammo_capacity, ammo) = if let Some(container) = component(tree, CONTAINER) {
-        loaded(Some(container), forge, trees, ammunition)?
-    } else {
-        let magazine = linked(
-            reference(Some(weapon), "ammoContainerRecord"),
-            ENTITY,
-            forge,
-            trees,
-        );
-        loaded(
-            magazine
-                .as_ref()
-                .and_then(|magazine| component(magazine, CONTAINER)),
-            forge,
-            trees,
-            ammunition,
-        )?
-    };
+    let (ammo_capacity, ammo) =
+        if let Some((original, container)) = component_occurrence(tree, AMMO_CONTAINER) {
+            observe_magazine(MagazineRead {
+                weapon: occurrence,
+                route: MagazineRoute::Own(original),
+            })?;
+            loaded(Some(container), forge, trees, ammunition)?
+        } else {
+            linked_ammo(
+                (occurrence, weapon),
+                forge,
+                trees,
+                ammunition,
+                observe_magazine,
+            )?
+        };
     Ok(Some(WeaponStats {
         fire_actions,
         ammo_capacity,
         ammo,
     }))
+}
+
+fn linked_ammo<'f, E>(
+    (occurrence, weapon): (&Value<'f>, &StructValue<'f>),
+    forge: &'f DataForge<'f>,
+    trees: &mut TreeBuilder<'f>,
+    ammunition: impl FnOnce(&Record<'f>, &mut TreeBuilder<'f>) -> Result<Option<AmmoStats>, E>,
+    observe: impl FnOnce(MagazineRead<'_, 'f>) -> Result<(), E>,
+) -> Result<(Option<i64>, Option<AmmoStats>), E> {
+    let Some(caller) = weapon.field(PRIMARY_MAGAZINE_FIELD) else {
+        return Ok((None, None));
+    };
+    let Some(record) = linked_record(record_reference(caller), ENTITY, forge) else {
+        return Ok((None, None));
+    };
+    let read = trees.build(&record);
+    let container = read
+        .as_ref()
+        .ok()
+        .and_then(|tree| component_occurrence(tree, AMMO_CONTAINER));
+    observe(MagazineRead {
+        weapon: occurrence,
+        route: MagazineRoute::Linked {
+            caller,
+            record,
+            tree: read.as_ref(),
+            container: container.map(|(value, _)| value),
+        },
+    })?;
+    loaded(
+        container.map(|(_, fields)| fields),
+        forge,
+        trees,
+        ammunition,
+    )
 }

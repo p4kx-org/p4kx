@@ -180,7 +180,30 @@ pub(super) const SECONDARY_MAGAZINE: u128 = 0x8125;
 pub(super) const MISSING_MAGAZINE: u128 = 0x8126;
 
 pub(super) fn magazine_database(case: MagazineCase) -> DataForgeBuilder {
-    magazine_records(magazine_builder(), secondary_magazines(case))
+    magazine_records(
+        magazine_builder(),
+        MAGAZINE,
+        secondary_magazines(case),
+        vec![container(30)],
+    )
+}
+
+pub(super) fn empty_primary_magazine_database() -> DataForgeBuilder {
+    magazine_records(
+        magazine_builder(),
+        MAGAZINE,
+        secondary_magazines(MagazineCase::Resolved),
+        Vec::new(),
+    )
+}
+
+pub(super) fn self_linked_magazine_database() -> DataForgeBuilder {
+    magazine_records(
+        magazine_builder(),
+        PERSONAL,
+        secondary_magazines(MagazineCase::Resolved),
+        vec![container(30)],
+    )
 }
 
 pub(super) fn heat_magazine_database(raw_value: f32) -> DataForgeBuilder {
@@ -223,7 +246,9 @@ pub(super) fn heat_magazine_database(raw_value: f32) -> DataForgeBuilder {
     );
     magazine_records(
         builder,
+        MAGAZINE,
         vec![secondary(Some(SECONDARY_MAGAZINE), Some(all))],
+        vec![container(30)],
     )
 }
 
@@ -250,7 +275,12 @@ fn magazine_builder() -> DataForgeBuilder {
         .structure(TestStruct::new("SWeaponConditionIsHeldEntity").parent("SWeaponConditionBase"))
 }
 
-fn magazine_records(builder: DataForgeBuilder, secondaries: Vec<TestValue>) -> DataForgeBuilder {
+fn magazine_records(
+    builder: DataForgeBuilder,
+    primary_link: u128,
+    secondaries: Vec<TestValue>,
+    primary_components: Vec<TestValue>,
+) -> DataForgeBuilder {
     builder
         .record(ammo(BULLET, "fixture_bullet").value("speed", TestValue::Single(12.5)))
         .record(ammo(TACHYON, "fixture_tachyon").value("speed", TestValue::Single(26.0)))
@@ -265,9 +295,9 @@ fn magazine_records(builder: DataForgeBuilder, secondaries: Vec<TestValue>) -> D
         .record(item(
             PERSONAL,
             "fixture_personal",
-            vec![weapon_with_magazines(MAGAZINE, false, secondaries)],
+            vec![weapon_with_magazines(primary_link, false, secondaries)],
         ))
-        .record(item(MAGAZINE, "fixture_magazine", vec![container(30)]))
+        .record(item(MAGAZINE, "fixture_magazine", primary_components))
         .record(item(
             SECONDARY_MAGAZINE,
             "fixture_secondary_magazine",
