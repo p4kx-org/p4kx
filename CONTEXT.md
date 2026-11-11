@@ -708,8 +708,8 @@ The set of Entries and Records that were added, removed or changed between two A
 _Avoid_: diff (fine in code), delta
 
 **Release**:
-A published version of P4KX itself: a `v*` tag with its portable ZIP, its MSI and its
-notes from `CHANGELOG.md`.
+A published version of P4KX itself, identified by a `v*` tag and accompanied by packages
+for the supported platforms and notes from `CHANGELOG.md`.
 _Avoid_: build (a Build is a game version), update
 
 **Update check**:

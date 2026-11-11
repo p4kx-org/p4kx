@@ -1,5 +1,8 @@
 # ADR-0343: One native platform contract and target-bound runtime evidence
 
+The [v0.5.0 macOS specification](../macos-support.md) extends this decision with an Apple
+Silicon target, Mach-O evidence and the corresponding package, SBOM and runtime requirements.
+
 ## Decision
 
 `.config/platforms.json` declares exactly four native Windows/Linux AMD64/ARM64 targets and the

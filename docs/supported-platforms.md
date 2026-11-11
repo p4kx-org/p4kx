@@ -1,6 +1,6 @@
 # Native platforms and release verification
 
-The v0.5.0 contract requires CLI, GUI and MCP releases for each of these native targets.
+The v0.5.0 contract requires native CLI, GUI and MCP releases. The table shows the targets in the current build and release matrix. The [macOS specification](macos-support.md) defines the additional Apple Silicon release requirement.
 [The platform contract](../.config/platforms.json) is authoritative for target identities,
 runner labels, package spellings and asset suffixes.
 
