@@ -46,7 +46,7 @@ runs faster with cargo-nextest: `cargo nextest run --workspace --locked`, then
 --locked` stays valid. `rust-toolchain.toml` pins the compiler; `.config/nextest-version`
 pins cargo-nextest. `.github/scripts/check-build-tools.ps1 -Verify -Nextest` checks installed
 releases, and `cargo xtask toolchain` checks repository pin consistency.
-`.config/platforms.json` owns the four native targets and package suffixes. CI and packaging use
+`.config/platforms.json` owns the native target matrix and package suffixes. CI and packaging use
 its common helpers; `docs/supported-platforms.md` defines target-bound archive/runtime evidence
 and the strict release preflight.
 Native GUI or package checks set an absolute `P4KX_FOLDERS_ROOT`; read `docs/profile-folders.md`
@@ -132,8 +132,8 @@ a new test file goes into `tests/it/` and `main.rs` gets its `mod` line.
 - The look follows the P4KX theme strictly: dark only, Lato only (ADR-0006). See "GUI design
   (hard rule)" below.
 - The window opens Direct3D 12 first on Windows and falls back to the default wgpu backends;
-  `WGPU_BACKEND` overrides it, and the GUI's headless tests open only the software backend
-  (ADR-0317).
+  `WGPU_BACKEND` overrides it (ADR-0317). For GUI render tests, follow the native adapter
+  requirements in [docs/supported-platforms.md](docs/supported-platforms.md).
 - Source files stay below about 400 lines; split by responsibility before that.
 - One canonical Record tree serialised to XML and JSON; References are links, never embedded
   (ADR-0004).
