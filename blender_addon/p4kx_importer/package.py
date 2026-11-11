@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from itertools import chain
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,8 @@ from .manifest_fields import (
 )
 from .material_model import MaterialDesc, Palette, parse_materials, parse_palettes
 from .node_model import Node, parse_nodes
+from .package_paths import require_exact_asset_case
+from .package_paths import resolve_file as resolve_file
 from .rig_model import Rig, RigError, parse_rig
 
 FORMAT_NAME = "p4kx-blender-package"
@@ -106,7 +109,10 @@ def load_package(location: Path) -> Package:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, RecursionError, ValueError) as error:
         raise PackageError(f"{MANIFEST_NAME} is not valid JSON: {error}") from error
-    return parse_manifest(data, manifest_path.parent)
+    package = parse_manifest(data, manifest_path.parent)
+    assets = chain(package.meshes.values(), package.textures.values())
+    require_exact_asset_case(package.root, (asset.file for asset in assets))
+    return package
 
 
 def parse_manifest(data: object, root: Path) -> Package:
@@ -132,15 +138,6 @@ def parse_manifest(data: object, root: Path) -> Package:
         material_descriptions=parse_materials(manifest.get("materials"), warnings),
         palettes=parse_palettes(manifest.get("palettes"), warnings),
     )
-
-
-def resolve_file(root: Path, relative: str) -> Path:
-    """Returns the absolute path of a package file, refusing anything outside ``root``."""
-    base = root.resolve()
-    path = (base / relative).resolve()
-    if not path.is_relative_to(base):
-        raise PackageError(f"File {relative!r} lies outside the package folder.")
-    return path
 
 
 def check_glb(path: Path) -> None:

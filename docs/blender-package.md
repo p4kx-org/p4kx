@@ -75,6 +75,10 @@ rules below apply to it as well.
   is still there. A second Ctrl+C ends the process at once and can leave the temporary folder
   behind.
 
+Mesh and texture paths use forward slashes and match the case of every directory and file in
+the package. The add-on reports the expected and actual spelling when an existing asset path
+has different case, including on case-insensitive filesystems.
+
 ## `scene.json`
 
 All lengths are metres, all transforms are relative to the parent node. Writers add fields in

@@ -39,6 +39,34 @@ def test_loads_from_folder_and_from_scene_json(tmp_path: Path) -> None:
     assert package.load_package(scene).root == tmp_path
 
 
+@pytest.mark.parametrize(
+    ("original", "renamed"),
+    [
+        ("meshes", "Meshes"),
+        ("meshes/m0001.glb", "meshes/M0001.glb"),
+        ("textures", "Textures"),
+        ("textures/t0001.png", "textures/T0001.png"),
+    ],
+)
+def test_load_package_requires_exact_asset_path_case(tmp_path: Path, original: str, renamed: str) -> None:
+    scene = write_package(tmp_path)
+    source = tmp_path / original
+    intermediate = source.rename(source.with_name("renaming"))
+    intermediate.rename(tmp_path / renamed)
+
+    with pytest.raises(PackageError, match="exact case") as error:
+        package.load_package(scene)
+
+    assert Path(original).name in str(error.value)
+    assert Path(renamed).name in str(error.value)
+
+
+def test_load_package_keeps_references_to_missing_assets(tmp_path: Path) -> None:
+    scene = write_package(tmp_path)
+    (tmp_path / "textures/t0001.png").unlink()
+    assert package.load_package(scene).textures["t0001"].file == "textures/t0001.png"
+
+
 def test_a_higher_major_version_is_refused_with_an_update_message() -> None:
     with pytest.raises(PackageTooNewError, match="Update the P4KX Blender add-on"):
         parse(manifest(version="2.0"))
