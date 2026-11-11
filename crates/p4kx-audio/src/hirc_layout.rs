@@ -9,7 +9,7 @@ use crate::{BankError, HircKind, HircObject, HircValue, SoundSource};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HircLayout {
     /// The fields of the type were read; containers and music objects must also use the whole
-    /// body, a Sound, Action or Event is not checked for bytes after its fields.
+    /// body. State objects report the remaining body range.
     Decoded,
     /// The reader has no decoder for the type, so the body is kept raw.
     Undecoded,
@@ -23,7 +23,8 @@ pub enum HircLayout {
 pub(crate) const fn has_decoder(kind: HircKind) -> bool {
     matches!(
         kind,
-        HircKind::Sound
+        HircKind::State
+            | HircKind::Sound
             | HircKind::Action
             | HircKind::Event
             | HircKind::RandomSequenceContainer

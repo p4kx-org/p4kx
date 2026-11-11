@@ -24,6 +24,7 @@ mod bnk_source_music_switch;
 mod bnk_source_music_track;
 mod bnk_source_sound;
 mod bnk_source_stid;
+mod bnk_state;
 mod bnk_versions;
 mod codec_tag_2;
 mod loops;

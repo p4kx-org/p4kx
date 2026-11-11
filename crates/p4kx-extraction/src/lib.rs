@@ -70,7 +70,6 @@ mod folder_source;
 mod guard_cancellation;
 pub mod hirc_select;
 pub mod hirc_view;
-mod hirc_view_build;
 mod loaded_dataforge;
 mod localization;
 mod localization_set;

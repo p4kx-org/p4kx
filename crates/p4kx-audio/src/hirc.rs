@@ -15,6 +15,7 @@ use crate::hirc_music_parse;
 use crate::hirc_music_track;
 use crate::hirc_node::Container;
 use crate::hirc_source;
+use crate::hirc_state::{self, StateObject};
 use crate::{BankError, SectionId};
 
 const LAST_SOUND_WITHOUT_CACHE_ID_VERSION: u32 = 150;
@@ -199,6 +200,8 @@ impl SoundSource {
 /// What this reader decodes from the body of a `HIRC` object.
 #[derive(Debug, Clone, PartialEq)]
 pub enum HircValue {
+    /// A standalone State's original property bundle.
+    State(Box<StateObject>),
     /// A Sound object's media source, from bank version 150 on.
     Sound(SoundSource),
     /// An Action object's type and target.
@@ -267,12 +270,14 @@ pub(crate) fn parse(version: u32, body: &[u8], base: usize) -> Result<Hirc, Bank
         let object = body.get(range.clone()).unwrap_or_default();
         let mut fields = SectionReader::new(SectionId::HIRC, object);
         let id = fields.u32()?;
-        let value = value(kind, version, &mut fields).unwrap_or_else(HircValue::Malformed);
+        let bank_offset = base + range.start;
+        let value = value(kind, version, &mut fields, bank_offset as u64)
+            .unwrap_or_else(HircValue::Malformed);
         objects.push(HircObject {
             kind,
             id,
             value,
-            body: base + range.start..base + range.end,
+            body: bank_offset..base + range.end,
         });
     }
     Ok(Hirc {
@@ -293,25 +298,20 @@ pub(crate) const fn has_unknown_layout(kind: HircKind, version: u32) -> bool {
     version > LAST_KNOWN_VERSION && has_decoder(kind)
 }
 
-/// Decodes the fields of an object after its ID.
-///
-/// The layouts known are those of bank versions up to 154: a Sound from version 150 (plug-in ID,
-/// storage byte, source ID, with a `cacheID` after the source ID from version 151, then the
-/// in-memory media size), an Action and an Event from version 49 (an Event counts its actions in
-/// 4 bytes up to version 122, in a variable-length integer after), a random, sequence, switch or
-/// blend container and a music segment, track, switch or playlist in version 154 only. The body
-/// of such an object in a bank above version 154, whose layouts changed, is kept raw with
-/// [`BankError::UnsupportedObjectLayout`]; below its first version it is kept raw without a
-/// reason. Other objects are never decoded.
+/// Decodes the version-qualified fields after an object's ID.
 fn value(
     kind: HircKind,
     version: u32,
     fields: &mut SectionReader<'_>,
+    bank_offset: u64,
 ) -> Result<HircValue, BankError> {
     if has_unknown_layout(kind, version) {
         return Err(BankError::UnsupportedObjectLayout { kind, version });
     }
     Ok(match kind {
+        HircKind::State if hirc_state::supports_standalone(version) => {
+            HircValue::State(Box::new(hirc_state::read_object(fields, bank_offset)?))
+        }
         HircKind::Sound if hirc_source::has_sound_layout(version) => {
             HircValue::Sound(hirc_source::sound(version, fields)?)
         }

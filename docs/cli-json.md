@@ -1669,7 +1669,8 @@ the reader decodes them: `decoded` (the fields of the type were read; containers
 body, a sound, action or event is not checked for bytes after its fields), `undecoded` (a type the
 reader has no decoder for, e.g. actor-mixers, buses and states; the body is skipped),
 `unsupported` (a decoded type in a bank version whose layout is not known: Sound below version 150,
-containers and music objects below 154, any decoded type above 154) and `malformed` (the body does
+standalone State outside versions 128–145, containers and music objects below 154, or any
+decoded type above 154) and `malformed` (the body does
 not hold the fields of its type). `matched` counts the objects that pass `--type` and `--id`;
 `objects` holds `limit` of them from `offset` on, in bank order, and `next_offset` is where the
 next page starts, `null` on the last. A bank without a `HIRC` section has `total` 0.
@@ -1686,6 +1687,11 @@ a container, the tracks of a segment, the segments of a playlist and, for a musi
 IDs of its sources. `detail` depends on the type and is `null` for an event (its actions are the
 children) and for undecoded, unsupported and malformed objects:
 
+- `state`: standalone State versions 128 through 145 expose `property_count`, `count_range`,
+  ordered `properties`, `consumed_range` and `trailing_range`. A property has its original RTPC
+  parameter `id`, binary32 `value_bits`, and `value`, which is null for nonfinite values.
+  Its `id_range` and `value_range` identify the original words. Ranges are half-open
+  bank-relative offsets written as unsigned decimal strings.
 - `sound`: `plugin_id`, `storage` (`embedded`, `prefetch-streamed`, `streamed` or `other`),
   `source_id` (the WEM ID), `in_memory_size`, `language_specific`, `source_plugin` (a plug-in
   generates the sound, no WEM holds it).

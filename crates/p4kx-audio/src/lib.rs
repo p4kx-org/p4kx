@@ -44,6 +44,7 @@ mod hirc_music_transition;
 mod hirc_node;
 mod hirc_plugin;
 mod hirc_source;
+mod hirc_state;
 mod ima;
 mod loops;
 mod media_class;
@@ -75,7 +76,8 @@ pub use bank_source_container::{
 pub use bank_source_didx::{BankDidx, BankDidxEntry, BankMediaInfo};
 pub use bank_source_event::{BankEvent, BankEventAction, BankEventRead, BankHircEvent};
 pub use bank_source_hirc::{
-    BankActionRead, BankHirc, BankHircAction, BankHircObject, BankHircSemantic,
+    BankActionRead, BankHirc, BankHircAction, BankHircObject, BankHircSemantic, BankHircState,
+    BankStateRead,
 };
 pub use bank_source_music_playlist::{
     BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistRead,
@@ -120,6 +122,7 @@ pub use hirc_source::{
     BankMediaSourceFields, BankSoundContinuation, BankSoundFields, BankSoundNodeBase,
     BankSoundNodeFields,
 };
+pub use hirc_state::{StateObject, StateProperties, StateProperty};
 pub use loops::Loop;
 pub use media_class::{BankDeclaredLengthSource, BankMediaClassSource, MediaClass};
 pub use ogg::OggWriter;

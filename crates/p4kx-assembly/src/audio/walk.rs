@@ -174,7 +174,9 @@ impl<'i> Walk<'_, 'i> {
                 }
             }
             HircValue::Sound(source) => self.sound(*source),
-            HircValue::Malformed(error) => self.broke(BreakReason::Malformed(error.clone())),
+            HircValue::Malformed(error) if object.kind != HircKind::State => {
+                self.broke(BreakReason::Malformed(error.clone()));
+            }
             HircValue::Raw
                 if matches!(
                     object.kind,
@@ -192,7 +194,9 @@ impl<'i> Walk<'_, 'i> {
                     version: self.current.bank.header().version,
                 });
             }
-            HircValue::Raw => self.broke(BreakReason::Unsupported),
+            HircValue::State(_) | HircValue::Malformed(_) | HircValue::Raw => {
+                self.broke(BreakReason::Unsupported);
+            }
         }
     }
 

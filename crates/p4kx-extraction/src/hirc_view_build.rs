@@ -9,6 +9,7 @@ use p4kx_audio::{
     MusicStinger, MusicSwitch, MusicTrack, MusicTrackKind, MusicTrackSwitch, SoundSource,
 };
 
+use super::state as hirc_view_state;
 use crate::hirc_view::{
     ActionDetail, ClipView, ContainerDetail, Detail, ItemView, MarkerView, PlaylistDetail,
     SegmentDetail, SoundDetail, StingerView, SwitchDetail, TrackDetail, TrackSwitchView,
@@ -18,6 +19,7 @@ use crate::hirc_view::{
 /// malformed one.
 pub(crate) fn detail(value: &HircValue) -> Option<Detail<'_>> {
     Some(match value {
+        HircValue::State(state) => Detail::State(hirc_view_state::detail(state)),
         HircValue::Sound(source) => Detail::Sound(sound(source)),
         HircValue::Action(action) => Detail::Action(ActionDetail {
             action_type: action.action_type,

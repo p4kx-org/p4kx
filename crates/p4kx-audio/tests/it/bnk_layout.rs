@@ -185,42 +185,37 @@ fn a_decoder_exists_for_exactly_the_kinds_the_reader_decodes() -> TestResult {
         TestHircObject::music_switch(9, &[7], 1, &[7]),
         TestHircObject::music_playlist(10, &[7]),
     ];
-    let undecoded: Vec<TestHircObject> = (1_u8..=22)
+    let standalone_state = TestHircObject::raw(1, 11, [0; 2]);
+    let undecoded: Vec<TestHircObject> = (2_u8..=22)
         .filter(|byte| ![2, 3, 4, 5, 6, 9, 10, 11, 12, 13].contains(byte))
         .zip(100_u32..)
         .map(|(byte, id)| TestHircObject::raw(byte, id, [0; 8]))
         .collect();
-    assert_eq!(undecoded.len(), 12, "the kinds without a decoder");
+    assert_eq!(undecoded.len(), 11, "the kinds without a decoder");
     let bank = |version: u32| {
         decoded
             .iter()
+            .chain(std::iter::once(&standalone_state))
             .chain(&undecoded)
             .cloned()
             .fold(TestBank::new(1).version(version), TestBank::object)
     };
 
-    let current = layouts(&bank(154))?;
-    let newer = layouts(&bank(160))?;
-
-    assert!(
-        current[..10]
-            .iter()
-            .all(|layout| *layout == HircLayout::Decoded)
-    );
-    assert!(
-        newer[..10]
-            .iter()
-            .all(|layout| *layout == HircLayout::Unsupported)
-    );
-    assert!(
-        current[10..]
-            .iter()
-            .all(|layout| *layout == HircLayout::Undecoded)
-    );
-    assert!(
-        newer[10..]
-            .iter()
-            .all(|layout| *layout == HircLayout::Undecoded)
+    for (version, known) in [(154, HircLayout::Decoded), (160, HircLayout::Unsupported)] {
+        let mut expected = vec![known; decoded.len()];
+        expected.push(HircLayout::Unsupported);
+        expected.extend([HircLayout::Undecoded; 11]);
+        assert_eq!(
+            layouts(&bank(version))?,
+            expected,
+            "State and raw kinds in v{version}"
+        );
+    }
+    let older_state = TestBank::new(1).version(145).object(standalone_state);
+    assert_eq!(
+        layouts(&older_state)?,
+        [HircLayout::Decoded],
+        "empty standalone State v145"
     );
     Ok(())
 }

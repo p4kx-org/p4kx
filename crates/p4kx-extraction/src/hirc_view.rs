@@ -8,7 +8,13 @@ use p4kx_audio::{HircKind, HircLayout, HircObject, MusicGroupKind, MusicPlayMode
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
-use crate::hirc_view_build::detail;
+#[path = "hirc_view_build.rs"]
+mod build;
+#[path = "hirc_view_state.rs"]
+mod state;
+
+use self::build::detail;
+pub use self::state::{StateDetail, StatePropertyView, StateRange};
 
 /// One `HIRC` object.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -42,6 +48,8 @@ pub struct ObjectView<'a> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum Detail<'a> {
+    /// A standalone State.
+    State(StateDetail),
     /// A Sound.
     Sound(SoundDetail),
     /// An Action.
