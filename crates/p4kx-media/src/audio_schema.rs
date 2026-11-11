@@ -14,14 +14,12 @@ use crate::audio_bank_payload::BankPayload;
 use crate::audio_bank_projection::{HEADER_NAMESPACE, SECTION_NAMESPACE};
 use crate::audio_bank_stid::{NAME_NAMESPACE, STID_NAMESPACE, STID_TAIL_NAMESPACE};
 use crate::audio_bank_stid_payload::BankStidPayload;
+use crate::audio_loose_inventory::{self, LooseInventoryPayload};
 use crate::audio_payload::AudioPayload;
 use crate::audio_schema_status::StatusRule;
 use crate::audio_source_language::{self, AudioSourceLanguage};
-use crate::audio_wem_annotation::FAILURE_NAMESPACE as ANNOTATION_FAILURE;
 use crate::audio_wem_annotation_payload::AnnotationPayload;
-use crate::audio_wem_cue::{CUE_NAMESPACE, POINT_NAMESPACE, TAIL_NAMESPACE};
 use crate::audio_wem_diagnostic::OPAQUE_NAMESPACE;
-use crate::audio_wem_list::{ITEM_NAMESPACE, LIST_NAMESPACE};
 use crate::audio_wem_projection::{EMBEDDED_INDEX_COUNT, embedded_namespace};
 use crate::{MediaError, schema_merge};
 
@@ -30,6 +28,7 @@ mod music;
 #[path = "audio_schema_wem.rs"]
 mod wem;
 
+const LOOSE_INVENTORY: &str = "LooseInventoryPayload";
 const SOURCE_LANGUAGE: &str = "AudioSourceLanguage";
 const WEM_PAYLOAD: &str = "AudioPayload";
 const ANNOTATION_PAYLOAD: &str = "AnnotationPayload";
@@ -156,6 +155,11 @@ fn insert_audio_payloads(base: &mut Value) -> Result<(), MediaError> {
         SOURCE_LANGUAGE,
         schema_merge::serialized_payload::<AudioSourceLanguage<'static>>(),
     )?;
+    schema_merge::insert_payload(
+        base,
+        LOOSE_INVENTORY,
+        schema_merge::serialized_payload::<LooseInventoryPayload<'static>>(),
+    )?;
     music::insert_payload(base)
 }
 
@@ -173,19 +177,20 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         wem::bindings()
             .iter()
             .chain(std::iter::once(&SOURCE_LANGUAGE_BINDING))
+            .chain(loose_bindings().iter())
             .chain(bank_bindings().iter())
             .chain(hirc_bindings().iter())
             .chain(music::bindings().iter())
             .chain(std::iter::once(&BANK_FAILURE_BINDING))
             .chain(stid_bindings().iter())
             .chain(event_bindings().iter())
-            .chain(annotation_bindings().iter())
+            .chain(wem::annotation_bindings().iter())
             .map(Binding::constraint),
     );
     for binding in wem::bindings()
         .into_iter()
         .filter(|binding| binding.namespace != OPAQUE_NAMESPACE)
-        .chain(annotation_bindings())
+        .chain(wem::annotation_bindings())
     {
         constraints.push(binding.embedded_constraint()?);
     }
@@ -261,6 +266,25 @@ const fn hirc_bindings() -> [Binding; 4] {
             "bank-hirc-container-child",
             3,
             StatusRule::Complete,
+        ),
+    ]
+}
+
+const fn loose_bindings() -> [Binding; 2] {
+    [
+        Binding::exact(
+            LOOSE_INVENTORY,
+            audio_loose_inventory::CANDIDATE_NAMESPACE,
+            audio_loose_inventory::CANDIDATE_RECORD,
+            1,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            LOOSE_INVENTORY,
+            audio_loose_inventory::INVENTORY_NAMESPACE,
+            audio_loose_inventory::INVENTORY_RECORD,
+            0,
+            StatusRule::LooseInventory,
         ),
     ]
 }
@@ -344,53 +368,6 @@ const fn stid_bindings() -> [Binding; 3] {
             "bank-stid-tail",
             1,
             StatusRule::Complete,
-        ),
-    ]
-}
-
-const fn annotation_bindings() -> [Binding; 6] {
-    [
-        Binding::exact(
-            ANNOTATION_PAYLOAD,
-            CUE_NAMESPACE,
-            "wem-cue",
-            1,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            ANNOTATION_PAYLOAD,
-            POINT_NAMESPACE,
-            "wem-cue-point",
-            2,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            ANNOTATION_PAYLOAD,
-            TAIL_NAMESPACE,
-            "wem-cue-tail",
-            1,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            ANNOTATION_PAYLOAD,
-            LIST_NAMESPACE,
-            "wem-list",
-            1,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            ANNOTATION_PAYLOAD,
-            ITEM_NAMESPACE,
-            "wem-list-item",
-            2,
-            StatusRule::ShortListItem,
-        ),
-        Binding::exact(
-            ANNOTATION_PAYLOAD,
-            ANNOTATION_FAILURE,
-            "wem-annotation-failure",
-            1,
-            StatusRule::Failed,
         ),
     ]
 }

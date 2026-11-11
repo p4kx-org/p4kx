@@ -3,7 +3,8 @@
 
 use std::cell::Cell;
 
-use p4kx_extraction::{Entry, TextureMemberCandidate};
+use p4kx_extraction::sound::wwise_path::{self, LooseName};
+use p4kx_extraction::{Archive, Entry, TextureMemberCandidate};
 
 use crate::directory_index::{self, DirectoryIndex};
 use crate::directory_inputs::DirectoryInputs;
@@ -16,6 +17,15 @@ use crate::{
     Reference, ReferenceCandidate, ReferenceResolution, ReferenceTarget, ReferenceUnavailable,
     Source, Verification,
 };
+
+#[derive(Clone, Copy)]
+pub(crate) struct LooseWemCandidate<'a> {
+    pub(crate) archive: &'a Archive,
+    pub(crate) entry: &'a Entry,
+    pub(crate) name: LooseName<'a>,
+    pub(crate) selection: CandidateState,
+    pub(crate) key_required: bool,
+}
 
 /// Source-bound candidate identities without opening or decoding target Entries.
 pub struct DirectoryLookup<'a> {
@@ -233,6 +243,41 @@ impl<'a> DirectoryLookup<'a> {
         Ok(self.index.inventory())
     }
 
+    pub(crate) fn visit_loose_wems(
+        &self,
+        writer: &mut MediaWriter<'_>,
+        mut visit: impl FnMut(LooseWemCandidate<'_>, &mut MediaWriter<'_>) -> Result<(), MediaError>,
+    ) -> Result<CandidateInventory, MediaError> {
+        let work = LookupWork {
+            checkpoint: writer.checkpoint,
+            limits: writer.limits(),
+            current: self.work,
+            source_allowance: self.allowance(writer.limits().sources),
+        };
+        let inventory = self.index.scan_inventory(&work)?;
+        let archive = self.index.archive;
+        let has_key = archive.has_key();
+        let requested = writer.has_kind(MediaKind::Audio);
+        for entry in archive.entries() {
+            work.charge(1)?;
+            let Some(name) = wwise_path::loose_name(entry.path()) else {
+                continue;
+            };
+            visit(
+                LooseWemCandidate {
+                    archive,
+                    entry,
+                    name,
+                    selection: self.candidate_state(entry, requested),
+                    key_required: entry.is_encrypted() && !has_key,
+                },
+                writer,
+            )?;
+        }
+        work.charge(0)?;
+        Ok(inventory)
+    }
+
     fn allowance(&self, limit: u64) -> u64 {
         self.inputs.map_or(self.source_allowance, |inputs| {
             inputs.source_allowance(limit)
@@ -245,7 +290,21 @@ impl<'a> DirectoryLookup<'a> {
         kind: Option<MediaKind>,
         requested: bool,
     ) -> ReferenceCandidate {
-        let state = if self.index.archive.raw_path(entry.index()).is_some() {
+        let state = self.candidate_state(entry, requested);
+        let target = ReferenceTarget {
+            root: self.root.clone(),
+            source: Identity::Entry {
+                containers: self.chain.to_vec(),
+                entry: source::identity(self.index.archive, entry),
+            },
+            kind,
+            subresource: None,
+        };
+        ReferenceCandidate::new(target, state)
+    }
+
+    fn candidate_state(&self, entry: &Entry, requested: bool) -> CandidateState {
+        if self.index.archive.raw_path(entry.index()).is_some() {
             CandidateState::Unavailable {
                 reason: ReferenceUnavailable::UnsupportedLayout,
             }
@@ -259,17 +318,7 @@ impl<'a> DirectoryLookup<'a> {
             }
         } else {
             CandidateState::Selected
-        };
-        let target = ReferenceTarget {
-            root: self.root.clone(),
-            source: Identity::Entry {
-                containers: self.chain.to_vec(),
-                entry: source::identity(self.index.archive, entry),
-            },
-            kind,
-            subresource: None,
-        };
-        ReferenceCandidate::new(target, state)
+        }
     }
 
     pub(crate) fn owning_source(&self, size: u64) -> Source {

@@ -49,6 +49,7 @@ mod audio_bank_stid;
 mod audio_bank_stid_origins;
 mod audio_bank_stid_payload;
 mod audio_chunk_origins;
+mod audio_loose_inventory;
 mod audio_payload;
 mod audio_provider;
 mod audio_record_origins;

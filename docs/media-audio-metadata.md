@@ -22,6 +22,31 @@ constraints in `p4kx media schema --record`.
 | `audio-wem-opaque` | `wem-opaque` | One raw PLUG or MIDI occurrence with its recognized class |
 | `audio-wem-failure` | `wem-failure` | Structural failure at the RIFF header, summary or directory phase |
 
+## Physical loose WEM inventory
+
+Every opened Archive directory has an `audio-loose-wem-inventory` closure. Its
+`data.payload.observed_candidates` is an unsigned decimal string. Each recognized numeric
+loose WEM path emits one `audio-loose-wem-candidate` row in directory order. The row is
+keyed by the owning `source.root` and `source.identity`, and by the numeric
+`data.payload.media_id`. Its only subresource index is the candidate's physical leaf
+Entry index. The `data.payload.entry` identifies that leaf. For a nested scope, the
+owning source's containing Entries followed by its own Entry give the leaf's full
+container chain. Repeated paths and Short IDs keep separate physical rows.
+
+`placement` records a neutral path, the original language folder, or unavailable
+placement for a lossy path. `selection` records the candidate's export selection
+separately. `payload_access` is `key-required` when an encrypted candidate has no
+configured key in the observed scope, or `not-inspected`. Candidate rows never open
+the target payload. Selected WEM metadata and the source manifest carry any retained
+raw artifact. These directory rows describe the inventory independently of a
+requested language or a fallback decision.
+
+A scope with `candidates_complete: true` and no matching Short ID establishes absence
+in that owning Archive. A recovered directory emits a partial closure in diagnostic
+output. An unopened directory has no closure. Excluding a container leaves its scope
+unavailable. Source, work and output budgets still apply to the whole generation.
+A budget failure leaves the last complete generation available.
+
 ## Summary and original directory
 
 The summary uses the last `fmt `, `vorb` and `smpl` before the first `data` as applicable

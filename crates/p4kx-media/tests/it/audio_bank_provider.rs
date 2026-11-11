@@ -105,8 +105,8 @@ fn repeated_unique_data_sections_are_retained_and_references_stay_ambiguous() ->
         "only the diagnostic index is published"
     );
     let raw = records
-        .first()
-        .and_then(|row| row.source.raw.as_ref())
+        .iter()
+        .find_map(|row| row.source.raw.as_ref())
         .ok_or("retained duplicate bank")?;
     assert_eq!(
         fs::read(directory.join(&index.artifact_base).join(&raw.path))?,

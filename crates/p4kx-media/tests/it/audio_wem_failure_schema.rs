@@ -88,8 +88,18 @@ fn require_projection_loss(error: &MediaError) {
     );
 }
 
+fn retained_audio_rows(
+    output: &Path,
+    index: &Index,
+) -> Result<Vec<MediaRecord>, Box<dyn std::error::Error>> {
+    Ok(support::records(output, index, AUDIO_STREAM)?
+        .into_iter()
+        .filter(|row| row.source.raw.is_some())
+        .collect())
+}
+
 fn require_retained_tail(generation: &Path, index: &Index, malformed: &[u8]) -> TestResult {
-    let rows = support::records(generation, index, AUDIO_STREAM)?;
+    let rows = retained_audio_rows(generation, index)?;
     let [header, format, data, failure] = rows.as_slice() else {
         return Err(
             "the valid header and two directory rows precede the exact tail failure".into(),
@@ -141,7 +151,7 @@ fn opaque_plugin_and_midi_wems_retain_raw_without_a_fake_riff_summary() -> TestR
     )?;
     let output = fixture.path().join("out");
     let index = support::published(p4kx_media::export(&archive, &output, &audio_options())?)?;
-    let records = support::records(&output, &index, AUDIO_STREAM)?;
+    let records = retained_audio_rows(&output, &index)?;
     let validator = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
     assert_eq!(
         records.len(),

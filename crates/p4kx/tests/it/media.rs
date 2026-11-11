@@ -198,7 +198,10 @@ fn media_cli_audio_emits_typed_wem_summary_and_directory() -> TestResult {
     let source = folder.path().join("Data.p4k");
     let wem = TestWem::pcm(TestCodec::Pcm, 1, 22_050, &[0, 1]).bytes();
     ArchiveBuilder::new()
-        .entry(TestEntry::stored("Audio/fixture.wem", wem))
+        .entry(TestEntry::stored(
+            "Data/Sounds/wwise/Media/French/42.wem",
+            wem,
+        ))
         .write_to(&source)?;
     let output = folder.path().join("media");
     p4kx_testkit::p4kx()?
@@ -234,8 +237,15 @@ fn media_cli_audio_emits_typed_wem_summary_and_directory() -> TestResult {
     }
     assert_eq!(
         types,
-        ["wem", "wem-chunk", "wem-chunk"],
-        "format and sample-data chunks follow the WEM header"
+        [
+            "loose-wem-candidate",
+            "loose-wem-inventory",
+            "source-language",
+            "wem",
+            "wem-chunk",
+            "wem-chunk",
+        ],
+        "physical inventory and language precede the selected WEM and its original chunks"
     );
     Ok(())
 }

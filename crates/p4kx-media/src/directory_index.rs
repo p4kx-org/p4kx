@@ -66,6 +66,41 @@ impl<'a> DirectoryIndex<'a> {
             .ok_or_else(|| MediaError::Contract("texture member keys were not initialized".into()))
     }
 
+    pub(crate) fn scan_inventory(
+        &self,
+        work: &LookupWork<'_>,
+    ) -> Result<CandidateInventory, MediaError> {
+        self.scan_count(work)?;
+        if self.registered_entries.get().is_some() {
+            return Ok(self.inventory());
+        }
+        self.inspect_inventory(work)
+    }
+
+    fn scan_count(&self, work: &LookupWork<'_>) -> Result<u64, MediaError> {
+        let count = u64::try_from(self.archive.entries().len())
+            .map_err(|_| MediaError::Contract("source Entry count exceeds u64".into()))?;
+        if count > work.source_allowance {
+            return Err(MediaError::Limit {
+                budget: "sources",
+                limit: work.limits.sources,
+            });
+        }
+        Ok(count)
+    }
+
+    fn inspect_inventory(&self, work: &LookupWork<'_>) -> Result<CandidateInventory, MediaError> {
+        for (_, issue) in self.archive.issues() {
+            work.charge(1)?;
+            if issue.is_archive_wide() {
+                return Ok(CandidateInventory::Unavailable(
+                    ReferenceUnavailable::IncompleteInventory,
+                ));
+            }
+        }
+        Ok(CandidateInventory::Complete)
+    }
+
     fn initialize<T>(
         &self,
         slot: &OnceCell<T>,
@@ -93,10 +128,9 @@ impl<'a> DirectoryIndex<'a> {
         if self.registered_entries.get().is_some() {
             return Ok(None);
         }
-        let count = u64::try_from(self.archive.entries().len())
-            .map_err(|_| MediaError::Contract("source Entry count exceeds u64".into()))?;
+        let count = self.scan_count(work)?;
         let available = work.limits.sources.saturating_sub(self.live_entries.get());
-        if count > work.source_allowance || count > available {
+        if count > available {
             return Err(MediaError::Limit {
                 budget: "sources",
                 limit: work.limits.sources,
@@ -107,15 +141,7 @@ impl<'a> DirectoryIndex<'a> {
             .get()
             .checked_add(count)
             .ok_or_else(|| MediaError::Contract("indexed Entry count exceeds u64".into()))?;
-        let mut inventory = CandidateInventory::Complete;
-        for (_, issue) in self.archive.issues() {
-            work.charge(1)?;
-            if issue.is_archive_wide() {
-                inventory =
-                    CandidateInventory::Unavailable(ReferenceUnavailable::IncompleteInventory);
-                break;
-            }
-        }
+        let inventory = self.inspect_inventory(work)?;
         Ok(Some(Registration {
             entries: count,
             live_after,

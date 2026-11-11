@@ -117,8 +117,8 @@ fn malformed_cue_and_short_list_item_retain_valid_siblings_in_diagnostics() -> T
     check_damaged(&rows)?;
     check_schema(&rows)?;
     let raw = rows
-        .first()
-        .and_then(|record| record.source.raw.as_ref())
+        .iter()
+        .find_map(|record| record.source.raw.as_ref())
         .ok_or("exact retained malformed WEM")?;
     assert_eq!(
         fs::read(directory.join(&raw.path))?,

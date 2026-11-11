@@ -17,6 +17,9 @@ mod bank;
 #[path = "audio_container_accounting.rs"]
 mod container;
 
+#[path = "audio_loose_accounting.rs"]
+mod loose;
+
 const MAX_SAMPLE_BYTES: u64 = 8 << 20;
 const MAX_PROBES_PER_KIND: usize = 32;
 
@@ -31,6 +34,41 @@ fn original_audio_directories_and_retained_ranges_reconcile()
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn original_hirc_containers_and_children_reconcile() -> Result<(), privacy::VerificationFailure> {
     privacy::redact(verify_archives(verify_archive_containers))
+}
+
+#[test]
+fn directory_candidates_leave_exact_selected_payload_accounting_intact()
+-> Result<(), privacy::VerificationFailure> {
+    privacy::redact(verify_synthetic_accounting())
+}
+
+fn verify_synthetic_accounting() -> TestResult {
+    use p4kx_testkit::{ArchiveBuilder, TestCodec, TestEntry, TestWem};
+
+    const SELECTED: &str = "Data/Sounds/wwise/Media/17.wem";
+    const FILTERED: &str = "Data/Sounds/wwise/German/Media/17.wem";
+
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("Data.p4k");
+    let original = TestWem::pcm(TestCodec::Pcm, 1, 22_050, &[0, 1, 2]).bytes();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(SELECTED, original.as_slice()))
+        .entry(TestEntry::stored(FILTERED, b"filtered payload"))
+        .entry(TestEntry::stored(FILTERED, b"duplicate filtered payload"))
+        .entry(TestEntry::stored("excluded.socpak", b"unopened directory"))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
+    verify_sample(
+        &archive,
+        Sample {
+            filter: Filter::parse(SELECTED)?,
+            entry_index: 0,
+            original,
+        },
+        &schema,
+        verify_wem,
+    )
 }
 
 fn verify_archives(verify_archive: impl Fn(&Path) -> TestResult) -> TestResult {
@@ -114,13 +152,14 @@ fn verify_sample<T>(
     else {
         return Err("one selected audio Entry must publish completely".into());
     };
-    let rows = records(output.path(), &index, &sample.original, sample.entry_index)?;
-    for row in &rows {
-        require(
-            schema.is_valid(&serde_json::to_value(row)?),
-            "built-in audio schema",
-        )?;
-    }
+    let rows = records(
+        output.path(),
+        &index,
+        &sample.original,
+        sample.entry_index,
+        archive,
+        schema,
+    )?;
     let result = compare(&sample.original, &rows)?;
     output.close()?;
     Ok(result)
@@ -181,6 +220,8 @@ fn records(
     index: &Index,
     original: &[u8],
     ordinal: usize,
+    archive: &Archive,
+    schema: &jsonschema::Validator,
 ) -> TestResult<Vec<MediaRecord>> {
     require(index.source_entries.written == 1, "one retained root Entry")?;
     let base = output.join(&index.artifact_base);
@@ -189,10 +230,24 @@ fn records(
         .iter()
         .find(|kind| kind.provider.kind == MediaKind::Audio)
         .ok_or("audio index kind")?;
-    let rows = BufReader::new(File::open(base.join(&kind.artifact.path))?)
-        .lines()
-        .map(|line| Ok(serde_json::from_str::<MediaRecord>(&line?)?))
-        .collect::<TestResult<Vec<_>>>()?;
+    let mut inventory = loose::RootInventory::new(archive, ordinal);
+    let mut selected = Vec::new();
+    for line in BufReader::new(File::open(base.join(&kind.artifact.path))?).lines() {
+        let row: MediaRecord = serde_json::from_str(&line?)?;
+        require(
+            schema.is_valid(&serde_json::to_value(&row)?),
+            "built-in audio schema",
+        )?;
+        if !inventory.accepts(&row)? {
+            selected.push(row);
+        }
+    }
+    inventory.finish()?;
+    selected_raw(&base, &selected, original, ordinal)?;
+    Ok(selected)
+}
+
+fn selected_raw(base: &Path, rows: &[MediaRecord], original: &[u8], ordinal: usize) -> TestResult {
     let raw = rows
         .first()
         .and_then(|row| row.source.raw.as_ref())
@@ -201,19 +256,19 @@ fn records(
         fs::read(base.join(&raw.path))? == original,
         "exact retained audio bytes",
     )?;
-    for row in &rows {
+    for row in rows {
         let original_identity = matches!(&row.source.identity, Identity::Entry { entry, containers }
             if entry.entry_index == ordinal && containers.is_empty());
         require(
             original_identity && row.source.raw.as_ref() == Some(raw),
-            "physical occurrence on every audio row",
+            "physical occurrence on every selected audio row",
         )?;
         require(
             row.status == Status::Complete,
             "complete projection on every selected row",
         )?;
     }
-    Ok(rows)
+    Ok(())
 }
 
 fn verify_wem(original: &[u8], rows: &[MediaRecord]) -> TestResult {

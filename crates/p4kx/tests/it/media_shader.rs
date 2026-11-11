@@ -180,12 +180,39 @@ fn omission_selects_all_registered_providers() -> TestResult {
         "default material provider emits no invented row for a shader-only fixture"
     );
     let audio = output.join(&index.artifact_base).join("audio.jsonl");
-    assert_eq!(
-        fs::read(audio)?,
-        b"",
-        "default Audio emits no invented row for a shader-only fixture"
-    );
+    verify_empty_audio_inventories(&audio)
+}
 
+fn verify_empty_audio_inventories(audio: &Path) -> TestResult {
+    let rows = fs::read_to_string(audio)?
+        .lines()
+        .map(serde_json::from_str::<MediaRecord>)
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        rows.len(),
+        2,
+        "root and nested shader-only directories each close their Audio inventory"
+    );
+    for row in rows {
+        assert_eq!(
+            row.subresource.namespace, "audio-loose-wem-inventory",
+            "empty directories emit only inventory rows"
+        );
+        assert_eq!(
+            row.data
+                .pointer("/payload/observed_candidates")
+                .and_then(Value::as_str),
+            Some("0"),
+            "no loose WEM candidates in the shader-only fixture"
+        );
+        assert_eq!(
+            row.data
+                .pointer("/payload/candidates_complete")
+                .and_then(Value::as_bool),
+            Some(true),
+            "the original directory was fully observed"
+        );
+    }
     Ok(())
 }
 

@@ -4,12 +4,14 @@
 use p4kx_extraction::sound::wwise_path;
 
 use crate::audio_bank_source;
+use crate::audio_loose_inventory;
 use crate::audio_source_language;
 use crate::audio_wem_projection::{self, WemProjection};
 use crate::origin_contract::OriginProfile;
 use crate::required_reader::RequiredReader;
 use crate::{
-    Capability, FieldGroup, MediaError, MediaKind, MediaWriter, Projection, Provider, SourceContext,
+    Capability, DirectoryContext, FieldGroup, MediaError, MediaKind, MediaWriter, Projection,
+    Provider, SourceContext,
 };
 
 pub(crate) struct AudioProvider;
@@ -24,6 +26,14 @@ impl Provider for AudioProvider {
         );
         capability.field_groups = field_groups();
         capability
+    }
+
+    fn directory(
+        &self,
+        context: &mut DirectoryContext<'_, '_, '_>,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        audio_loose_inventory::project(context, writer)
     }
 
     fn source(
@@ -68,6 +78,10 @@ fn field_groups() -> Vec<FieldGroup> {
         .into_iter()
         .chain(bank_field_groups())
         .chain([
+            FieldGroup::new(
+                "loose-wem-inventory",
+                "Complete physical numeric loose WEM candidates by owning Archive directory, with original language placement and selection.",
+            ),
             FieldGroup::new(
                 "source-language",
                 "Physical Wwise language-folder placement from selected BNK and loose WEM directory paths.",

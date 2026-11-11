@@ -2654,6 +2654,61 @@
         }
       ]
     },
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "description": "A physical container Entry in the ordered path from the root Archive.",
+          "properties": {
+            "entry_index": {
+              "description": "Zero-based directory index in the immediately enclosing Archive.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "path": {
+              "description": "Reader-exposed display path, whose separators may already be normalised.",
+              "type": "string"
+            },
+            "raw_path_hex": {
+              "description": "Original non-UTF-8 path bytes when the display path is lossy.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "entry_index",
+            "path",
+            "raw_path_hex"
+          ],
+          "type": "object"
+        },
+        "media_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload_access": {
+          "$ref": "#/$defs/PayloadAccess"
+        },
+        "placement": {
+          "$ref": "#/$defs/Placement"
+        },
+        "selection": {
+          "$ref": "#/$defs/CandidateState"
+        }
+      },
+      "required": [
+        "entry",
+        "media_id",
+        "placement",
+        "selection",
+        "payload_access"
+      ],
+      "type": "object"
+    },
     "CandidateRecord": {
       "additionalProperties": false,
       "properties": {
@@ -4207,6 +4262,22 @@
         }
       ]
     },
+    "Inventory": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates_complete": {
+          "type": "boolean"
+        },
+        "observed_candidates": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "observed_candidates",
+        "candidates_complete"
+      ],
+      "type": "object"
+    },
     "ListContent": {
       "oneOf": [
         {
@@ -4379,6 +4450,45 @@
         "content"
       ],
       "type": "object"
+    },
+    "LooseInventoryPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/Candidate"
+            },
+            "record_type": {
+              "const": "loose-wem-candidate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/Inventory"
+            },
+            "record_type": {
+              "const": "loose-wem-inventory",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "LooseInventoryPayload"
     },
     "MaterialAttributeInfo": {
       "description": "One original attribute and its independent semantic/lexical values.",
@@ -6390,6 +6500,60 @@
     "OriginalIdentifier": {
       "$ref": "#/$defs/IdentifierValue",
       "description": "An unmodified source identifier with a distinct domain and integer width."
+    },
+    "PayloadAccess": {
+      "enum": [
+        "key-required",
+        "not-inspected"
+      ],
+      "type": "string"
+    },
+    "Placement": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "neutral",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "folder": {
+              "type": "string"
+            },
+            "type": {
+              "const": "language",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "folder"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "PlayBankPrefix": {
       "additionalProperties": false,
@@ -12715,6 +12879,210 @@
               },
               "status": {
                 "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-loose-wem-candidate"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LooseInventoryPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "loose-wem-candidate"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-loose-wem-inventory"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LooseInventoryPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "loose-wem-inventory"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 0,
+                    "minItems": 0
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "candidates_complete": {
+                          "const": false
+                        }
+                      },
+                      "required": [
+                        "candidates_complete"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
               }
             }
           }
