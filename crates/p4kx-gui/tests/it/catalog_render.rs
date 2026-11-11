@@ -120,7 +120,7 @@ fn the_summary_of_a_compressed_catalog_is_drawn_at_both_sizes_in_both_languages(
             })?;
             harness.run_steps(3);
 
-            let close = if tag == "en" { "Close" } else { "Schlie�en" };
+            let close = if tag == "en" { "Close" } else { "Schließen" };
             shoot(&mut harness, ("summary", tag, size), close)?;
             let sizes = if tag == "en" {
                 " compressed (of"
@@ -194,7 +194,7 @@ fn the_warnings_of_the_game_data_are_drawn_at_both_sizes_in_both_languages() -> 
             let (sentence, close) = if tag == "en" {
                 ("2 dismantle processes instead of one", "Close")
             } else {
-                ("2 Zerlegungsprozesse statt einem", "Schlie�en")
+                ("2 Zerlegungsprozesse statt einem", "Schließen")
             };
             harness.get_by_label_contains(sentence);
             shoot(&mut harness, ("warnings", tag, size), close)?;
@@ -224,7 +224,7 @@ fn normal_incomplete_publication_is_drawn_as_a_refusal_in_both_languages() -> Te
             let (sentence, close) = if tag == "en" {
                 ("No file was created or replaced.", "Close")
             } else {
-                ("Es wurde keine Datei erstellt oder ersetzt.", "Schlie�en")
+                ("Es wurde keine Datei erstellt oder ersetzt.", "Schließen")
             };
             harness.get_by_label_contains(sentence);
             shoot(&mut harness, ("incomplete-refusal", tag, size), close)?;
@@ -274,8 +274,8 @@ fn the_resource_kind_is_localized_and_visible_at_both_window_sizes() -> TestResu
                 ("Resource types: 1 written, 0 skipped, complete", "Close")
             } else {
                 (
-                    "Ressourcentypen: 1 geschrieben, 0 �bersprungen, vollst�ndig",
-                    "Schlie�en",
+                    "Ressourcentypen: 1 geschrieben, 0 übersprungen, vollständig",
+                    "Schließen",
                 )
             };
             harness.get_by_label(line).scroll_to_me();

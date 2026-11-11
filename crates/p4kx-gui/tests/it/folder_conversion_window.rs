@@ -94,7 +94,7 @@ fn the_archive_menu_asks_for_the_input_folder() {
         .get_by_role_and_label(Role::Button, "Archive")
         .click();
     harness.run_quiet();
-    harness.get_by_label("Convert folder.").click();
+    harness.get_by_label("Convert folder…").click();
     harness.run_quiet();
 
     assert_eq!(harness.state().dialog, Some(Dialog::ConversionInput));
@@ -185,7 +185,7 @@ fn adapter() -> Option<RenderState> {
 fn the_summary_is_drawn_in_both_languages() -> TestResult {
     for (language, tag, close) in [
         (Language::BritishEnglish, "en", "Close"),
-        (Language::German, "de", "Schlie�en"),
+        (Language::German, "de", "Schließen"),
     ] {
         let Some(state) = adapter() else {
             return Ok(());
