@@ -104,8 +104,8 @@ pub(super) fn entry(text: &str) -> egui::RichText {
 }
 
 /// Returns a dropdown entry with its shortcut hint right-aligned in the muted tint.
-fn shortcut_entry(texts: &Texts, text: Text, hint: Text) -> Button<'static> {
-    let hint = egui::RichText::new(texts.get(hint))
+fn shortcut_entry(texts: &Texts, text: Text, hint: String) -> Button<'static> {
+    let hint = egui::RichText::new(hint)
         .font(font(FS_XS, Weight::Regular))
         .color(palette::GRAY_2_TEXT);
     Button::new(entry(&texts.get(text))).shortcut_text(hint)
@@ -210,7 +210,7 @@ fn archive_menu(ui: &mut Ui, model: &Model, requests: &mut Requests) -> Option<P
             }
         });
         ui.separator();
-        let reload = shortcut_entry(texts, Text::ActionReload, Text::ShortcutReload);
+        let reload = shortcut_entry(texts, Text::ActionReload, texts.get(Text::ShortcutReload));
         if ui
             .add_enabled(shortcuts::reload_enabled(model), reload)
             .clicked()
@@ -220,7 +220,9 @@ fn archive_menu(ui: &mut Ui, model: &Model, requests: &mut Requests) -> Option<P
         let extract = shortcut_entry(
             texts,
             ExtractionText::ActionSelected.into(),
-            Text::ShortcutExtractSelected,
+            shortcuts::command_hint(ui, shortcuts::EXTRACT_SELECTED, || {
+                texts.get(Text::ShortcutExtractSelected)
+            }),
         );
         if ui
             .add_enabled(shortcuts::extract_selected_enabled(model), extract)

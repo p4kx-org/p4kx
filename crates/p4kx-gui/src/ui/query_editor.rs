@@ -18,6 +18,7 @@ use crate::theme::desktop::{
 };
 use crate::theme::palette;
 use crate::theme::tokens::{FS_BODY, Weight, font};
+use crate::ui::shortcuts::RUN_QUERY;
 use crate::widgets::field;
 use crate::widgets::frames::px;
 use crate::widgets::text::plain;
@@ -27,7 +28,7 @@ use crate::widgets::text::plain;
 pub(super) struct Edited {
     /// The text changed by typing.
     pub(super) changed: bool,
-    /// Ctrl+Enter asked to run the Query.
+    /// The run shortcut asked to run the Query.
     pub(super) submitted: bool,
     /// Ctrl+Space asked for the names at the cursor.
     pub(super) asked: bool,
@@ -60,7 +61,7 @@ pub(super) fn popup_id() -> Id {
 }
 
 /// Shows the Query editor, a `textarea` labelled by `label`, with the bytes `mark` of the text
-/// underlined as an error; Ctrl+Enter submits instead of breaking the line. While the
+/// underlined as an error; the run shortcut submits the Query. While the
 /// completion list is open, the arrow keys move in it, Enter and Tab accept and Escape closes
 /// it.
 pub(super) fn show(
@@ -105,8 +106,7 @@ pub(super) fn show(
     }
 }
 
-/// Takes Ctrl+Enter, Ctrl+Space and the keys of the open completion list before the editor
-/// sees them; returns whether Ctrl+Enter and Ctrl+Space were pressed.
+/// Returns whether the run and completion shortcuts were pressed, consuming handled keys.
 fn keys(ui: &Ui, completion: &mut CompletionState, text: &mut String) -> (bool, bool) {
     if !ui.memory(|memory| memory.has_focus(editor_id())) {
         return (false, false);
@@ -114,7 +114,7 @@ fn keys(ui: &Ui, completion: &mut CompletionState, text: &mut String) -> (bool, 
     let open = completion.shown().is_some();
     let (mut submitted, mut asked, mut accepted) = (false, false, None);
     ui.input_mut(|input| {
-        submitted = input.consume_key(Modifiers::COMMAND, Key::Enter);
+        submitted = input.consume_shortcut(&RUN_QUERY);
         asked = input.consume_key(Modifiers::COMMAND, Key::Space);
         if open {
             accepted = popup_keys(input, completion, text);

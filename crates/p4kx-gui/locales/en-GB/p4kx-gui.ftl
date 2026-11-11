@@ -270,7 +270,8 @@ query-archive-changed = The Archive changed on disk. Reload it to run Queries.
 query-invalid = Line { $line }, column { $column }: { $reason }
 query-empty-title = No Archive open
 query-empty-hint = Open an Archive to run Queries over its DataForge.
-query-prompt = Write a Query and run it with Ctrl+Enter, e.g. from AmmoParams select speed where speed >= 1500
+query-prompt = Write a Query and run it with { $shortcut }, e.g. from AmmoParams select speed where speed >= 1500
+query-run-shortcut = Ctrl+Enter
 query-no-rows = No Record matches the Query.
 query-rows =
     { $count ->

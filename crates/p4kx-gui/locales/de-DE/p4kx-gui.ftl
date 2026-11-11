@@ -270,7 +270,8 @@ query-archive-changed = Das Archiv wurde auf der Festplatte geändert. Laden Sie
 query-invalid = Zeile { $line }, Spalte { $column }: { $reason }
 query-empty-title = Kein Archiv geöffnet
 query-empty-hint = Öffnen Sie ein Archiv, um Abfragen über sein DataForge auszuführen.
-query-prompt = Schreiben Sie eine Abfrage und führen Sie sie mit Strg+Enter aus, z. B. from AmmoParams select speed where speed >= 1500
+query-prompt = Schreiben Sie eine Abfrage und führen Sie sie mit { $shortcut } aus, z. B. from AmmoParams select speed where speed >= 1500
+query-run-shortcut = Strg+Enter
 query-no-rows = Kein Record passt zur Abfrage.
 query-rows =
     { $count ->
