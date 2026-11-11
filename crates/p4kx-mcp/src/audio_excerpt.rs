@@ -6,8 +6,9 @@ use std::time::Duration;
 use p4kx_extraction::AudioError;
 
 use crate::archives::Opened;
+use crate::audio_excerpt_origin::{ExcerptFieldOrigins, ExcerptPcm};
 use crate::audio_params::ExcerptParams;
-use crate::audio_wem::{Candidate, Facts, Held, audio_error, candidates, read};
+use crate::audio_wem_input::{Candidate, Facts, Held, ParsedWem, audio_error, candidates, read};
 use crate::audio_wem_shapes::ExcerptResult;
 use crate::audio_window::Window;
 use crate::error::ToolError;
@@ -67,6 +68,7 @@ fn seconds_of(frames: u64, rate: u32) -> f64 {
 struct Ask {
     start: Duration,
     requested: Duration,
+    id_from_path: bool,
 }
 
 /// Decodes the WEM `params` names and returns an excerpt of it as a WAV.
@@ -77,6 +79,7 @@ pub(crate) fn excerpt(
     let ask = Ask {
         start: seconds("start_seconds", params.start_seconds, Duration::ZERO)?,
         requested: seconds("duration_seconds", params.duration_seconds, DEFAULT_EXCERPT)?,
+        id_from_path: params.wem_id.is_none(),
     };
     let (id, places) = candidates(opened, params.wem_id, params.path.as_deref())?;
     let mut prefetched = false;
@@ -146,62 +149,81 @@ fn decode(
     id: Option<u32>,
     ask: Ask,
 ) -> Result<Option<(ExcerptResult, Vec<u8>)>, ToolError> {
-    read(opened, place, |held| {
-        let wem = match held {
-            Held::Parsed(wem) => wem,
-            Held::Prefetch => return Ok(None),
-            Held::Unreadable(error) => return Err(audio_error(&place.location.path, error)),
-        };
-        let name = &place.location.path;
-        let facts = wem.facts();
-        let rate = facts.sample_rate;
-        let known = facts.sample_count;
-        let Plan {
-            first,
-            wanted,
-            requested,
-            frame_bytes,
-        } = plan(&facts, ask)?;
-        let window = Window::new(
-            first * frame_bytes,
-            (first + wanted) * frame_bytes,
-            MAX_DECODED_BYTES - MAX_HEAD_LEN,
-            known.is_some(),
-        );
-        let kept = wem.window(name, window, MAX_DECODED_BYTES)?;
-        let got = kept.pcm.len() as u64 / frame_bytes;
-        let seen = kept.seen / frame_bytes;
-        let total = known.map_or(seen, |count| count.max(seen));
-        if total == 0 {
-            return Err(ToolError::EmptySound);
-        }
-        if first >= total || (got == 0 && wanted > 0) {
-            return Err(ToolError::ExcerptStart {
-                seconds: seconds_of(total, rate),
-            });
-        }
-        let wav = assemble(&kept.format, &kept.pcm).map_err(|error| audio_error(name, error))?;
-        if wav.len() > MAX_EXCERPT_BYTES {
-            return Err(audio_error(name, AudioError::WavTooLarge));
-        }
-        let result = ExcerptResult {
-            archive: opened.archive().path().display().to_string(),
-            wem_id: id,
-            source: place.location.clone(),
-            codec: facts.codec,
-            mime_type: "audio/wav",
-            channels: facts.channels,
-            sample_rate: rate,
-            sound_seconds: seconds_of(total, rate),
-            start_seconds: seconds_of(first, rate),
-            duration_seconds: seconds_of(got, rate),
-            frames: got,
-            bytes: wav.len(),
-            max_bytes: MAX_EXCERPT_BYTES,
-            truncated: got < requested,
-        };
-        Ok(Some((result, wav)))
+    read(opened, place, |held| match held {
+        Held::Parsed(wem) => decode_wem(opened, place, id, ask, &wem).map(Some),
+        Held::Prefetch => Ok(None),
+        Held::Unreadable(error) => Err(audio_error(&place.location.path, error)),
     })
+}
+
+fn decode_wem(
+    opened: &Opened,
+    place: &Candidate,
+    id: Option<u32>,
+    ask: Ask,
+    wem: &ParsedWem<'_>,
+) -> Result<(ExcerptResult, Vec<u8>), ToolError> {
+    let name = &place.location.path;
+    let facts = wem.wem.facts();
+    let rate = facts.sample_rate;
+    let plan = plan(&facts, ask)?;
+    let pcm_start = plan.first * plan.frame_bytes;
+    let window = Window::new(
+        pcm_start,
+        (plan.first + plan.wanted) * plan.frame_bytes,
+        MAX_DECODED_BYTES - MAX_HEAD_LEN,
+        facts.sample_count.is_some(),
+    );
+    let kept = wem.wem.window(name, window, MAX_DECODED_BYTES)?;
+    let got = kept.pcm.len() as u64 / plan.frame_bytes;
+    let seen = kept.seen / plan.frame_bytes;
+    let total = total_frames(&facts, &plan, got, seen)?;
+
+    let wav = assemble(&kept.format, &kept.pcm).map_err(|error| audio_error(name, error))?;
+    if wav.len() > MAX_EXCERPT_BYTES {
+        return Err(audio_error(name, AudioError::WavTooLarge));
+    }
+    let (field_origins, provenance) = ExcerptFieldOrigins::capture(
+        wem,
+        ask.id_from_path,
+        ExcerptPcm {
+            retained: pcm_start..pcm_start + kept.pcm.len() as u64,
+            observed_len: kept.seen,
+        },
+    )
+    .map_err(ToolError::EntryEvidence)?;
+    let result = ExcerptResult {
+        field_origins,
+        provenance,
+        archive: opened.archive().path().display().to_string(),
+        wem_id: id,
+        source: place.location.clone(),
+        codec: facts.codec,
+        mime_type: "audio/wav",
+        channels: facts.channels,
+        sample_rate: rate,
+        sound_seconds: seconds_of(total, rate),
+        start_seconds: seconds_of(plan.first, rate),
+        duration_seconds: seconds_of(got, rate),
+        frames: got,
+        bytes: wav.len(),
+        max_bytes: MAX_EXCERPT_BYTES,
+        truncated: got < plan.requested,
+    };
+    Ok((result, wav))
+}
+
+fn total_frames(facts: &Facts, plan: &Plan, kept: u64, seen: u64) -> Result<u64, ToolError> {
+    let total = facts.sample_count.map_or(seen, |count| count.max(seen));
+    if total == 0 {
+        return Err(ToolError::EmptySound);
+    }
+    if plan.first >= total || (kept == 0 && plan.wanted > 0) {
+        return Err(ToolError::ExcerptStart {
+            seconds: seconds_of(total, facts.sample_rate),
+        });
+    }
+    Ok(total)
 }
 
 #[cfg(test)]

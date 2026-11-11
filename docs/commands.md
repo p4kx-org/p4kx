@@ -841,6 +841,12 @@ carry `ddsMipPayload` coordinates `[level, offset, length, stride, count]` for t
 byte spans. A single selected cubemap face contributes only its own color and alpha mip bytes.
 Offsets are relative to the uncompressed Entry. Stored path lookups use Archive directory metadata.
 
+For `get_audio_excerpt`, `fieldOrigins` addresses the structured metadata and the WAV data at
+`/content/1/data`. A PCM excerpt identifies the retained samples by their original half-open byte
+range in the decoded WEM. Other decoders identify the selected encoded data chunk.
+Embedded WEM coordinates begin with the ID, DATA-relative offset and size of the selected media
+in the original soundbank. The WAV bytes and existing playback-window fields keep their format.
+
 For `read_entry_text`, `fieldOrigins` identifies the inputs of each result field. UTF-8 pages keep
 their original decoded Entry byte range after the byte order mark and character alignment.
 UTF-16 and CryXml use the original converter input, while result offsets count UTF-8 bytes.

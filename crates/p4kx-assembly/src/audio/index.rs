@@ -11,7 +11,7 @@ use p4kx_extraction::sound::wwise_path;
 
 use super::index_read::{BankRead, DefinitionRead, read_definitions, read_soundbanks};
 use super::language::SOUND_FOLDER;
-use super::media::{Limits, LooseMedia, WemSource};
+use super::media::{BankPath, Limits, LooseMedia, WemSource};
 use super::read::{folded_order, has_extension, starts_with_folder};
 use super::{
     AtlTrigger, AudioFileError, AudioIssue, DEFAULT_LANGUAGE, IndexedSoundbank, MAX_AUDIO_TRIGGERS,
@@ -92,7 +92,10 @@ impl AudioIndex {
         index.add_soundbanks(&bank_entries, soundbanks);
         let (loose, failures) = LooseMedia::collect(
             wem_entries.iter().copied(),
-            bank_entries.iter().map(|(_, entry)| entry.path()),
+            bank_entries.iter().map(|&(position, entry)| BankPath {
+                path: entry.path(),
+                entry: position,
+            }),
             Limits::DEFAULT,
         );
         index.loose = loose;
@@ -270,6 +273,12 @@ impl AudioIndex {
     #[must_use]
     pub fn language(&self, name: &str) -> Option<&str> {
         self.loose.language_of(name)
+    }
+
+    /// Returns the original Entry supplying the displayed spelling of a language folder.
+    #[must_use]
+    pub fn language_entry_position(&self, name: &str) -> Option<usize> {
+        self.loose.language_entry_position(name)
     }
 
     /// Returns the language folder `English(US)`, the game's default, or the first language folder

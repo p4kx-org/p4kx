@@ -77,16 +77,39 @@ impl Sound {
         })
     }
 
+    /// Reads the exact Archive Entry position and retains its original physical source.
+    ///
+    /// # Errors
+    /// Returns the read and format errors of [`Self::from_archive`].
+    pub fn from_archive_position_observed(
+        archive: &Archive,
+        position: usize,
+    ) -> Result<Self, ConversionError> {
+        let entry = archive
+            .entries()
+            .get(position)
+            .ok_or_else(|| UnknownEntries(vec![format!("Entry position {position}")]))?;
+        let original = archive.entry_origin(entry).map(SoundInput::Archive);
+        Self::read_entry(archive, entry, original)
+    }
+
     fn read_archive(
         archive: &Archive,
         path: &str,
         observe: impl FnOnce(&Entry) -> Option<SoundInput>,
     ) -> Result<Self, ConversionError> {
-        let protection = SourceProtection::new(Some(archive.path()));
         let entry =
             find_entry(archive, path).ok_or_else(|| UnknownEntries(vec![path.to_owned()]))?;
+        Self::read_entry(archive, entry, observe(entry))
+    }
+
+    fn read_entry(
+        archive: &Archive,
+        entry: &Entry,
+        original: Option<SoundInput>,
+    ) -> Result<Self, ConversionError> {
+        let protection = SourceProtection::new(Some(archive.path()));
         let name = entry.path().to_owned();
-        let original = observe(entry);
         let reader = archive.open_entry(entry)?;
         let bytes =
             read_capped(reader, entry.uncompressed_size(), MAX_SOUND_LEN).map_err(|source| {

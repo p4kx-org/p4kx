@@ -7,7 +7,7 @@ use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use p4kx_archive::Archive;
+use p4kx_archive::{Archive, Entry, EntryOrigin};
 use p4kx_audio::{AudioError, EmbeddedWem, MediaClass, Soundbank};
 pub use p4kx_audio::{
     BankActionFields, BankActionRead, BankContainerChild, BankContainerChildren,
@@ -131,6 +131,7 @@ pub struct Bank {
     protection: SourceProtection,
     name: String,
     soundbank: Soundbank<Vec<u8>>,
+    archive_origin: Option<EntryOrigin>,
 }
 
 impl Bank {
@@ -144,9 +145,32 @@ impl Bank {
     /// [`ConversionError::Soundbank`] when it is no valid soundbank, and another
     /// [`ConversionError`] when it cannot be read.
     pub fn from_archive(archive: &Archive, path: &str) -> Result<Self, ConversionError> {
-        let protection = SourceProtection::new(Some(archive.path()));
         let entry =
             find_entry(archive, path).ok_or_else(|| UnknownEntries(vec![path.to_owned()]))?;
+        Self::read_entry(archive, entry, None)
+    }
+
+    /// Reads the exact Archive Entry position and retains its original physical source.
+    ///
+    /// # Errors
+    /// Returns the read and format errors of [`Self::from_archive`].
+    pub fn from_archive_position_observed(
+        archive: &Archive,
+        position: usize,
+    ) -> Result<Self, ConversionError> {
+        let entry = archive
+            .entries()
+            .get(position)
+            .ok_or_else(|| UnknownEntries(vec![format!("Entry position {position}")]))?;
+        Self::read_entry(archive, entry, archive.entry_origin(entry))
+    }
+
+    fn read_entry(
+        archive: &Archive,
+        entry: &Entry,
+        archive_origin: Option<EntryOrigin>,
+    ) -> Result<Self, ConversionError> {
+        let protection = SourceProtection::new(Some(archive.path()));
         let name = entry.path().to_owned();
         let reader = archive.open_entry(entry)?;
         let bytes = read_capped(reader, entry.uncompressed_size(), MAX_SOUNDBANK_LEN).map_err(
@@ -155,7 +179,7 @@ impl Bank {
                 source,
             },
         )?;
-        Self::parse(name, bytes, protection)
+        Self::parse(name, bytes, protection, archive_origin)
     }
 
     /// Reads and parses the soundbank file at `path`.
@@ -186,6 +210,7 @@ impl Bank {
             path.display().to_string(),
             bytes,
             SourceProtection::new(None),
+            None,
         )
     }
 
@@ -193,6 +218,7 @@ impl Bank {
         name: String,
         bytes: Option<Vec<u8>>,
         protection: SourceProtection,
+        archive_origin: Option<EntryOrigin>,
     ) -> Result<Self, ConversionError> {
         let Some(bytes) = bytes else {
             return Err(ConversionError::SoundTooLarge {
@@ -205,6 +231,7 @@ impl Bank {
                 protection,
                 name,
                 soundbank,
+                archive_origin,
             }),
             Err(source) => Err(ConversionError::Soundbank { bank: name, source }),
         }
@@ -214,6 +241,12 @@ impl Bank {
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Returns the original Entry of an observed Archive read.
+    #[must_use]
+    pub const fn archive_origin(&self) -> Option<&EntryOrigin> {
+        self.archive_origin.as_ref()
     }
 
     /// Returns the parsed soundbank.

@@ -12,6 +12,7 @@ mod audio;
 mod audio_candidate_assertions;
 mod audio_candidate_fixture;
 mod audio_complete_candidates;
+mod audio_excerpt_origins;
 mod audio_followups;
 mod audio_limits;
 mod audio_objects;
