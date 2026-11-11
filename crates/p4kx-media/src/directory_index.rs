@@ -2,10 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::cell::{Cell, OnceCell};
+use std::collections::{HashMap, TryReserveError};
 
 use p4kx_extraction::{
-    Archive, PathIndex, PathIndexBuildError, PathKeys, TextureMemberIndex, TextureMemberKeys,
+    Archive, Entry, PathIndex, PathIndexBuildError, PathKeys, TextureMemberIndex, TextureMemberKeys,
 };
+
+use p4kx_extraction::sound::wwise_path;
 
 use crate::lookup_work::LookupWork;
 use crate::{CandidateInventory, MediaError, ReferenceUnavailable};
@@ -14,6 +17,7 @@ pub(crate) struct DirectoryIndex<'a> {
     pub(crate) archive: &'a Archive,
     keys: OnceCell<PathKeys>,
     members: OnceCell<TextureMemberKeys>,
+    loose_wems: OnceCell<LooseWemKeys>,
     live_entries: &'a Cell<u64>,
     registered_entries: Cell<Option<u64>>,
     inventory: Cell<CandidateInventory>,
@@ -31,6 +35,7 @@ impl<'a> DirectoryIndex<'a> {
             archive,
             keys: OnceCell::new(),
             members: OnceCell::new(),
+            loose_wems: OnceCell::new(),
             live_entries,
             registered_entries: Cell::new(None),
             inventory: Cell::new(CandidateInventory::Unavailable(
@@ -64,6 +69,27 @@ impl<'a> DirectoryIndex<'a> {
             .get()
             .map(|keys| keys.index(self.archive))
             .ok_or_else(|| MediaError::Contract("texture member keys were not initialized".into()))
+    }
+
+    pub(crate) fn loose_wems(
+        &self,
+        media_id: u32,
+        work: &LookupWork<'_>,
+    ) -> Result<LooseWemMatches<'_>, MediaError> {
+        self.initialize(&self.loose_wems, work, || {
+            LooseWemKeys::read(self.archive, work)
+        })?;
+        let keys = self
+            .loose_wems
+            .get()
+            .ok_or_else(|| MediaError::Contract("loose WEM keys were not initialized".into()))?;
+        let positions = keys.positions.get(&media_id).map_or(&[][..], Vec::as_slice);
+        work.charge(1 + positions.len() as u64)?;
+        Ok(LooseWemMatches {
+            archive: self.archive,
+            positions,
+            inventory: self.inventory(),
+        })
     }
 
     pub(crate) fn scan_inventory(
@@ -147,6 +173,56 @@ impl<'a> DirectoryIndex<'a> {
             live_after,
             inventory,
         }))
+    }
+}
+
+struct LooseWemKeys {
+    positions: HashMap<u32, Vec<usize>>,
+}
+
+impl LooseWemKeys {
+    fn read(archive: &Archive, work: &LookupWork<'_>) -> Result<Self, MediaError> {
+        let mut positions = HashMap::<u32, Vec<usize>>::new();
+        for (position, entry) in archive.entries().iter().enumerate() {
+            work.charge(1)?;
+            let Some(name) = wwise_path::loose_name(entry.path()) else {
+                continue;
+            };
+            positions
+                .try_reserve(1)
+                .map_err(|error| loose_allocation(&error))?;
+            let group = positions.entry(name.id).or_default();
+            group
+                .try_reserve(1)
+                .map_err(|error| loose_allocation(&error))?;
+            group.push(position);
+        }
+        Ok(Self { positions })
+    }
+}
+
+fn loose_allocation(error: &TryReserveError) -> MediaError {
+    MediaError::Contract(format!("cannot allocate the loose WEM index: {error}"))
+}
+
+pub(crate) struct LooseWemMatches<'scope> {
+    pub(crate) archive: &'scope Archive,
+    positions: &'scope [usize],
+    pub(crate) inventory: CandidateInventory,
+}
+
+impl<'scope> LooseWemMatches<'scope> {
+    pub(crate) const fn count(&self) -> usize {
+        self.positions.len()
+    }
+
+    pub(crate) fn entries(&self) -> impl Iterator<Item = Result<&'scope Entry, MediaError>> + '_ {
+        self.positions.iter().map(|&position| {
+            self.archive
+                .entries()
+                .get(position)
+                .ok_or_else(|| MediaError::Contract("indexed loose WEM Entry disappeared".into()))
+        })
     }
 }
 

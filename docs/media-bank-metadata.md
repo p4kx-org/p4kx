@@ -28,6 +28,8 @@ and fallback selection.
 | `audio-bank-hirc-sound` | `bank-hirc-sound` | HIRC section and Sound object ordinals |
 | `audio-bank-hirc-sound-media-resolution` | `bank-hirc-sound-media-resolution` | HIRC section and Sound object ordinals |
 | `audio-bank-hirc-sound-media-candidate` | `bank-hirc-sound-media-candidate` | HIRC section, Sound object and candidate ordinals |
+| `audio-bank-hirc-sound-loose-wem-resolution` | `bank-hirc-sound-loose-wem-resolution` | Physical loose WEM candidates in the Sound's owning Archive |
+| `audio-bank-hirc-sound-loose-wem-candidate` | `bank-hirc-sound-loose-wem-candidate` | Physical Entry ordinal of one canonical loose WEM observation |
 | `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
 | `audio-bank-music-segment` | `bank-music-segment` | HIRC section and segment object ordinals |
@@ -110,6 +112,22 @@ links to an `audio-bank-media` record by section and triplet ordinal. Repeated I
 every occurrence in physical order. An incomplete DIDX inventory reports `unavailable` and
 retains the observed candidate prefix. The linked DIDX row describes DATA availability and
 prefetch extent. A resolved DIDX identity alone makes no claim about media readability.
+
+Decoded Sound sources with streamed or prefetch-streamed storage link to each numeric loose WEM
+with the authored media ID in the same opened Archive. Prefetch-streamed Sound also keeps its
+independent DIDX reference to the embedded prefix. The loose summary reports `resolved` for one
+physical match, `missing` for none and `ambiguous` for multiple matches in a complete inventory.
+A recovered directory reports `unavailable` with the observed candidates and an
+`incomplete-inventory` reason.
+
+The decimal-string candidate key is `target_entry_index`. Join it to the `audio-loose-wem-candidate` row with
+the same root and that physical Entry index. The Sound bank's ordered container chain identifies
+the owning directory. An empty chain joins the root inventory. For a nested chain, its final
+Entry identifies the inventory source and the preceding Entries identify its containing chain.
+Candidate rows preserve directory order and duplicate paths. The inventory row provides original
+path and language placement, export selection and payload access. The reference describes
+physical candidates. A playback choice depends on the selected language and fallback rule.
+
 
 Container rows preserve the version 154 Random, Sequence, Switch and Blend layout, original
 parent ID and declared child count. The Random/Sequence row carries the original mode byte.

@@ -7,7 +7,8 @@ use p4kx_extraction::{BankHeader, DecimalU64};
 use crate::audio_bank_payload::{BankEntryRange, BankHeaderRecord, BankPayload, BankSectionRecord};
 use crate::origin_input::MediaOriginInput;
 use crate::{
-    MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource, audio_bank_origins,
+    DirectoryLookup, MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource,
+    audio_bank_origins,
 };
 
 pub(crate) const HEADER_NAMESPACE: &str = "audio-bank";
@@ -17,6 +18,7 @@ pub(crate) struct BankProjection<'source> {
     pub(crate) input: &'source MediaOriginInput,
     pub(crate) path: &'source str,
     pub(crate) length: u64,
+    pub(crate) directory: &'source DirectoryLookup<'source>,
 }
 
 impl BankProjection<'_> {

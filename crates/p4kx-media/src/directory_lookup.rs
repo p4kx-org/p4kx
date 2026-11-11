@@ -6,7 +6,7 @@ use std::cell::Cell;
 use p4kx_extraction::sound::wwise_path::{self, LooseName};
 use p4kx_extraction::{Archive, Entry, TextureMemberCandidate};
 
-use crate::directory_index::{self, DirectoryIndex};
+use crate::directory_index::{self, DirectoryIndex, LooseWemMatches};
 use crate::directory_inputs::DirectoryInputs;
 use crate::lookup_work::LookupWork;
 use crate::source;
@@ -241,6 +241,20 @@ impl<'a> DirectoryLookup<'a> {
         }
         work.charge(0)?;
         Ok(self.index.inventory())
+    }
+
+    pub(crate) fn find_loose_wems(
+        &self,
+        media_id: u32,
+        writer: &MediaWriter<'_>,
+    ) -> Result<LooseWemMatches<'_>, MediaError> {
+        let work = LookupWork {
+            checkpoint: writer.checkpoint,
+            limits: writer.limits(),
+            current: self.work,
+            source_allowance: self.allowance(writer.limits().sources),
+        };
+        self.index.loose_wems(media_id, &work)
     }
 
     pub(crate) fn visit_loose_wems(

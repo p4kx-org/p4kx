@@ -11,6 +11,9 @@ use crate::audio_bank_sound_payload::SoundRecord;
 use crate::audio_bank_sound_reference;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
+#[path = "audio_bank_sound_loose.rs"]
+pub(crate) mod loose;
+
 pub(crate) use crate::audio_bank_sound_payload::SoundPayload;
 
 pub(crate) const NAMESPACE: &str = "audio-bank-hirc-sound";
@@ -65,5 +68,6 @@ pub(crate) fn project(
         &SoundPayload::BankHircSound(record),
         issue.as_slice(),
     )?;
-    audio_bank_sound_reference::project(projection, version, sound, didx, writer)
+    audio_bank_sound_reference::project(projection, version, sound, didx, writer)?;
+    loose::project(projection, version, sound, writer)
 }

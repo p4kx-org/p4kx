@@ -10,6 +10,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::MediaError;
+use crate::audio_bank_hirc_sound::loose::{LooseWemLink, LooseWemResolution};
 use crate::audio_bank_payload::BankEntryRange;
 use crate::audio_bank_sound_reference::{SoundMediaCandidate, SoundMediaResolution};
 
@@ -26,6 +27,10 @@ pub(crate) enum SoundPayload {
     Resolution(SoundMediaResolution),
     #[serde(rename = "bank-hirc-sound-media-candidate")]
     Candidate(SoundMediaCandidate),
+    #[serde(rename = "bank-hirc-sound-loose-wem-resolution")]
+    LooseResolution(LooseWemResolution),
+    #[serde(rename = "bank-hirc-sound-loose-wem-candidate")]
+    LooseCandidate(LooseWemLink),
 }
 
 #[derive(Serialize, JsonSchema)]

@@ -10,12 +10,15 @@ use crate::audio_bank_failure::BankPhase;
 use crate::audio_bank_inventory::BankInventory;
 use crate::audio_bank_projection::BankProjection;
 use crate::origin_input::MediaOriginInput;
-use crate::{MediaError, MediaWriter, audio_bank_hirc, audio_bank_media, audio_bank_stid};
+use crate::{
+    DirectoryLookup, MediaError, MediaWriter, audio_bank_hirc, audio_bank_media, audio_bank_stid,
+};
 
 pub(crate) fn project<R: Read + Seek>(
     input: &MediaOriginInput,
     path: &str,
     length: u64,
+    directory_lookup: &DirectoryLookup<'_>,
     reader: R,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
@@ -23,6 +26,7 @@ pub(crate) fn project<R: Read + Seek>(
         input,
         path,
         length,
+        directory: directory_lookup,
     };
     let mut source = match BankSource::open(reader, length) {
         Ok(source) => source,

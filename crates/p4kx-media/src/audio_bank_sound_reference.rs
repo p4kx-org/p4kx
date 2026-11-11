@@ -9,6 +9,7 @@ use serde::Serialize;
 use crate::audio_bank_didx_index::DidxIndex;
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_projection::BankProjection;
+use crate::audio_bank_sound_origins::SoundSites;
 use crate::audio_bank_sound_payload::SoundPayload;
 use crate::bank_candidate_index::Resolution;
 use crate::{MediaError, MediaWriter, Status, Subresource};
@@ -57,31 +58,35 @@ pub(crate) fn project(
     let candidates = didx.candidates(source.source_id);
     let count = candidates.len() as u64;
     let complete = didx.is_complete();
-    let sites = origins::SoundReferenceSites::new(sound, version);
-    sites.summary(projection.input, complete, writer)?.write(
-        writer,
-        &Subresource::new(RESOLUTION_NAMESPACE, indices.to_vec()),
-        Status::Complete,
-        &SoundPayload::Resolution(SoundMediaResolution {
-            resolution: didx.resolution(count),
-            observed_candidates: DecimalU64::new(count),
-            candidates_complete: complete,
-        }),
-        &[],
-    )?;
-    for (ordinal, target) in candidates.iter().enumerate() {
-        let mut position = indices.to_vec();
-        position.push(ordinal as u64);
-        sites.candidate(projection.input, target, writer)?.write(
+    let sites = SoundSites::new(sound, version);
+    sites
+        .didx_summary(projection.input, complete, writer)?
+        .write(
             writer,
-            &Subresource::new(CANDIDATE_NAMESPACE, position),
+            &Subresource::new(RESOLUTION_NAMESPACE, indices.to_vec()),
             Status::Complete,
-            &SoundPayload::Candidate(SoundMediaCandidate {
-                target_section_ordinal: DecimalU64::new(target.section),
-                target_triplet_ordinal: DecimalU64::new(target.triplet),
+            &SoundPayload::Resolution(SoundMediaResolution {
+                resolution: didx.resolution(count),
+                observed_candidates: DecimalU64::new(count),
+                candidates_complete: complete,
             }),
             &[],
         )?;
+    for (ordinal, target) in candidates.iter().enumerate() {
+        let mut position = indices.to_vec();
+        position.push(ordinal as u64);
+        sites
+            .didx_candidate(projection.input, target, writer)?
+            .write(
+                writer,
+                &Subresource::new(CANDIDATE_NAMESPACE, position),
+                Status::Complete,
+                &SoundPayload::Candidate(SoundMediaCandidate {
+                    target_section_ordinal: DecimalU64::new(target.section),
+                    target_triplet_ordinal: DecimalU64::new(target.triplet),
+                }),
+                &[],
+            )?;
     }
     Ok(())
 }

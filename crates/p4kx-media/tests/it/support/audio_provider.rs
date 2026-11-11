@@ -75,12 +75,10 @@ impl Origins {
         );
         let mut used = Vec::new();
         for reference in refs {
-            let observation = self
-                .uses
-                .iter()
-                .find(|row| row.get("id") == Some(reference))
-                .ok_or("source-use row")?;
-            let source = self.physical(observation.get("source").ok_or("source-use owner")?)?;
+            let PhysicalUse {
+                observation,
+                source,
+            } = self.physical_use(reference)?;
             assert_eq!(
                 source.pointer("/path/value"),
                 Some(&json!(owner.path)),
@@ -100,6 +98,19 @@ impl Origins {
             used.push(observation);
         }
         Ok(used)
+    }
+
+    pub(crate) fn physical_use(&self, reference: &Value) -> TestResult<PhysicalUse<'_>> {
+        let observation = self
+            .uses
+            .iter()
+            .find(|row| row.get("id") == Some(reference))
+            .ok_or("source-use row")?;
+        let source = self.physical(observation.get("source").ok_or("source-use owner")?)?;
+        Ok(PhysicalUse {
+            observation,
+            source,
+        })
     }
 
     fn check_parent(&self, source: &Value, owner: Owner) -> TestResult {
@@ -145,6 +156,11 @@ pub(crate) fn read_rows<T: DeserializeOwned>(path: PathBuf) -> TestResult<Vec<T>
         .lines()
         .map(|line| serde_json::from_str(line).map_err(Into::into))
         .collect()
+}
+
+pub(crate) struct PhysicalUse<'a> {
+    pub(crate) observation: &'a Value,
+    pub(crate) source: &'a Value,
 }
 
 #[derive(Clone, Copy)]

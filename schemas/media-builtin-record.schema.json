@@ -4490,6 +4490,55 @@
       ],
       "title": "LooseInventoryPayload"
     },
+    "LooseWemLink": {
+      "additionalProperties": false,
+      "properties": {
+        "target_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "target_entry_index"
+      ],
+      "type": "object"
+    },
+    "LooseWemResolution": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates_complete": {
+          "type": "boolean"
+        },
+        "media_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "observed_candidates": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "resolution": {
+          "$ref": "#/$defs/Resolution"
+        },
+        "unavailable_reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReferenceUnavailable"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "media_id",
+        "resolution",
+        "observed_candidates",
+        "candidates_complete",
+        "unavailable_reason"
+      ],
+      "type": "object"
+    },
     "MaterialAttributeInfo": {
       "description": "One original attribute and its independent semantic/lexical values.",
       "properties": {
@@ -8444,6 +8493,40 @@
             },
             "record_type": {
               "const": "bank-hirc-sound-media-candidate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/LooseWemResolution"
+            },
+            "record_type": {
+              "const": "bank-hirc-sound-loose-wem-resolution",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/LooseWemLink"
+            },
+            "record_type": {
+              "const": "bank-hirc-sound-loose-wem-candidate",
               "type": "string"
             }
           },
@@ -14064,6 +14147,162 @@
                     "properties": {
                       "record_type": {
                         "const": "bank-hirc-sound-media-candidate"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-sound-loose-wem-resolution"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/SoundPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-sound-loose-wem-resolution"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-sound-loose-wem-candidate"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/SoundPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-sound-loose-wem-candidate"
                       }
                     },
                     "required": [

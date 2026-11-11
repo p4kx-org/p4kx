@@ -29,6 +29,17 @@ pub(crate) enum Resolution {
     Unavailable,
 }
 
+impl Resolution {
+    pub(crate) const fn from_inventory(complete: bool, matches: u64) -> Self {
+        match (complete, matches) {
+            (false, _) => Self::Unavailable,
+            (true, 0) => Self::Missing,
+            (true, 1) => Self::Resolved,
+            (true, _) => Self::Ambiguous,
+        }
+    }
+}
+
 impl<T> Default for BankCandidateIndex<T> {
     fn default() -> Self {
         Self {
@@ -75,12 +86,7 @@ impl<T> BankCandidateIndex<T> {
     }
 
     pub(crate) const fn resolution(&self, matches: u64) -> Resolution {
-        match (self.is_complete(), matches) {
-            (false, _) => Resolution::Unavailable,
-            (true, 0) => Resolution::Missing,
-            (true, 1) => Resolution::Resolved,
-            (true, _) => Resolution::Ambiguous,
-        }
+        Resolution::from_inventory(self.is_complete(), matches)
     }
 
     pub(crate) fn candidates(&self, id: u32) -> &[T] {

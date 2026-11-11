@@ -5,14 +5,13 @@ use serde_json::Value;
 
 use crate::audio_bank_failure::FAILURE_NAMESPACE as BANK_FAILURE;
 use crate::audio_bank_hirc::{HIRC_NAMESPACE, OBJECT_NAMESPACE};
-use crate::audio_bank_hirc_action::{self, ActionPayload};
-use crate::audio_bank_hirc_container::{self, ContainerPayload};
+use crate::audio_bank_hirc_action::ActionPayload;
+use crate::audio_bank_hirc_container::ContainerPayload;
 use crate::audio_bank_hirc_event::{self, EventPayload};
-use crate::audio_bank_hirc_sound::{self, SoundPayload};
+use crate::audio_bank_hirc_sound::SoundPayload;
 use crate::audio_bank_media::MEDIA_NAMESPACE;
 use crate::audio_bank_payload::BankPayload;
 use crate::audio_bank_projection::{HEADER_NAMESPACE, SECTION_NAMESPACE};
-use crate::audio_bank_sound_reference;
 use crate::audio_bank_stid::{NAME_NAMESPACE, STID_NAMESPACE, STID_TAIL_NAMESPACE};
 use crate::audio_bank_stid_payload::BankStidPayload;
 use crate::audio_loose_inventory::{self, LooseInventoryPayload};
@@ -24,6 +23,8 @@ use crate::audio_wem_diagnostic::OPAQUE_NAMESPACE;
 use crate::audio_wem_projection::{EMBEDDED_INDEX_COUNT, embedded_namespace};
 use crate::{MediaError, schema_merge};
 
+#[path = "audio_schema_hirc.rs"]
+mod hirc;
 #[path = "audio_schema_music.rs"]
 mod music;
 #[path = "audio_schema_wem.rs"]
@@ -180,7 +181,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             .chain(std::iter::once(&SOURCE_LANGUAGE_BINDING))
             .chain(loose_bindings().iter())
             .chain(bank_bindings().iter())
-            .chain(hirc_bindings().iter())
+            .chain(hirc::bindings().iter())
             .chain(music::bindings().iter())
             .chain(std::iter::once(&BANK_FAILURE_BINDING))
             .chain(stid_bindings().iter())
@@ -233,53 +234,6 @@ const fn bank_bindings() -> [Binding; 5] {
             HIRC_NAMESPACE,
             "bank-hirc",
             1,
-            StatusRule::Complete,
-        ),
-    ]
-}
-
-const fn hirc_bindings() -> [Binding; 6] {
-    [
-        Binding::exact(
-            ACTION_PAYLOAD,
-            audio_bank_hirc_action::NAMESPACE,
-            "bank-hirc-action",
-            2,
-            StatusRule::MalformedLayout,
-        ),
-        Binding::exact(
-            SOUND_PAYLOAD,
-            audio_bank_hirc_sound::NAMESPACE,
-            "bank-hirc-sound",
-            2,
-            StatusRule::MalformedLayout,
-        ),
-        Binding::exact(
-            SOUND_PAYLOAD,
-            audio_bank_sound_reference::RESOLUTION_NAMESPACE,
-            "bank-hirc-sound-media-resolution",
-            2,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            SOUND_PAYLOAD,
-            audio_bank_sound_reference::CANDIDATE_NAMESPACE,
-            "bank-hirc-sound-media-candidate",
-            3,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            CONTAINER_PAYLOAD,
-            audio_bank_hirc_container::NAMESPACE,
-            "bank-hirc-container",
-            2,
-            StatusRule::MalformedLayout,
-        ),
-        Binding::exact(
-            CONTAINER_PAYLOAD,
-            audio_bank_hirc_container::CHILD_NAMESPACE,
-            "bank-hirc-container-child",
-            3,
             StatusRule::Complete,
         ),
     ]

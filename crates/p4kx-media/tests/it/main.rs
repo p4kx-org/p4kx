@@ -17,6 +17,7 @@ mod audio_bank_music_switch_provider;
 mod audio_bank_music_track_provider;
 mod audio_bank_provider;
 mod audio_bank_sound_candidate_provider;
+mod audio_bank_sound_loose_provider;
 mod audio_bank_stid_provider;
 mod audio_loose_inventory;
 mod audio_provider_sources;

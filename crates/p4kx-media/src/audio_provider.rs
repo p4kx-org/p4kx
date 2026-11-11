@@ -63,7 +63,9 @@ impl Provider for AudioProvider {
         )?;
         let size = context.source.size;
         match kind {
-            AudioSource::Bank => audio_bank_source::project(&input, path, size, reader, writer)?,
+            AudioSource::Bank => {
+                audio_bank_source::project(&input, path, size, context.directory, reader, writer)?;
+            }
             AudioSource::Wem => {
                 let projection = WemProjection::new(&input, path, size);
                 audio_wem_projection::project(&projection, reader, writer)?;
@@ -187,7 +189,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-sound-fields",
-            "Original HIRC Sound source and node fields with exact receipts and physical DIDX candidates for embedded and prefetch media.",
+            "Original HIRC Sound source and node fields, physical DIDX candidates for embedded and prefetch media, and owning-directory loose WEM references for streamed and prefetch media.",
         ),
         FieldGroup::new(
             "bank-name-index",
