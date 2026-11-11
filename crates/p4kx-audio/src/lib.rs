@@ -18,6 +18,7 @@ mod bank_source_didx;
 mod bank_source_event;
 mod bank_source_hirc;
 mod bank_source_music_segment;
+mod bank_source_music_track;
 mod bank_source_sound;
 mod bank_stid;
 mod bank_structure;
@@ -32,6 +33,7 @@ mod hirc_music;
 mod hirc_music_node;
 mod hirc_music_parse;
 mod hirc_music_segment;
+mod hirc_music_track;
 mod hirc_node;
 mod hirc_plugin;
 mod hirc_source;
@@ -72,6 +74,7 @@ pub use bank_source_music_segment::{
     BankHircMusicSegment, BankMusicMarker, BankMusicSegmentRead, BankMusicSegmentRow,
     BankMusicSegmentRows,
 };
+pub use bank_source_music_track::{BankHircMusicTrack, BankMusicTrackRead, BankMusicTrackRows};
 pub use bank_source_sound::{BankHircSound, BankSoundRead};
 pub use bank_stid::{BankStid, BankStidName};
 pub use codec::Codec;
@@ -90,9 +93,14 @@ pub use hirc_music::{
 };
 pub use hirc_music_node::{BankMusicNodeFields, BankMusicStinger};
 pub use hirc_music_segment::BankMusicSegmentFields;
+pub use hirc_music_track::{
+    BankMusicTrackClip, BankMusicTrackFields, BankMusicTrackRow, BankMusicTrackSource,
+    BankMusicTrackSwitchFields,
+};
 pub use hirc_node::{BankNodeParentFields, Container, ContainerKind};
 pub use hirc_source::{
-    BankSoundContinuation, BankSoundFields, BankSoundNodeBase, BankSoundNodeFields,
+    BankMediaSourceFields, BankSoundContinuation, BankSoundFields, BankSoundNodeBase,
+    BankSoundNodeFields,
 };
 pub use loops::Loop;
 pub use media_class::{BankDeclaredLengthSource, BankMediaClassSource, MediaClass};

@@ -19,6 +19,7 @@ mod bnk_source_action;
 mod bnk_source_container;
 mod bnk_source_event;
 mod bnk_source_music_segment;
+mod bnk_source_music_track;
 mod bnk_source_sound;
 mod bnk_source_stid;
 mod bnk_versions;

@@ -11,7 +11,6 @@ use p4kx_extraction::bank::{
 
 use crate::audio_bank_failure::BankPhase;
 use crate::audio_bank_inventory::VersionSite;
-use crate::audio_bank_music_segment;
 use crate::audio_bank_payload::{BankEntryRange, BankHircRecord, BankObjectRecord, BankPayload};
 use crate::audio_bank_projection::BankProjection;
 use crate::{
@@ -19,6 +18,7 @@ use crate::{
     audio_bank_hirc_container, audio_bank_hirc_event, audio_bank_hirc_origins,
     audio_bank_hirc_sound,
 };
+use crate::{audio_bank_music_segment, audio_bank_music_track};
 
 pub(crate) const HIRC_NAMESPACE: &str = "audio-bank-hirc";
 pub(crate) const OBJECT_NAMESPACE: &str = "audio-bank-object";
@@ -89,6 +89,9 @@ fn emit_semantic<R: Read + Seek>(
         }
         (BankHircSemantic::MusicSegment(segment), Some(version)) => {
             audio_bank_music_segment::project(projection, version, *segment, writer)
+        }
+        (BankHircSemantic::MusicTrack(track), Some(version)) => {
+            audio_bank_music_track::project(projection, version, *track, writer)
         }
         (BankHircSemantic::Event(event), Some(version)) => {
             audio_bank_hirc_event::project(projection, version, event, writer)

@@ -90,6 +90,14 @@ extent of the original scheduling bytes after the IDs. Marker names carry their 
 original NUL position and UTF-8 status. A malformed name keeps the earlier fully read rows
 and the original segment remains available through the retained bank.
 
+Version 154 MusicTrack rows carry the authored parent, list counts, raw track kind byte,
+interpreted kind, and switch or state group when present. Separate rows preserve ordered
+source occurrences, clips and switch members, including repeated IDs. Source rows retain
+the original plug-in ID, storage code, cache ID, in-memory size and flags. Checked plug-in
+parameter, automation and switch transition ranges refer to the retained bank. Clip times
+carry their original IEEE-754 words and a finite JSON value when available. A malformed tail
+keeps the preceding complete rows. Other layouts retain the physical HIRC object.
+
 STID header rows retain the authored string type and name count. Each name row carries its
 original ID and byte count, exact header and name ranges, original bytes and UTF-8 result.
 Repeated IDs and empty names retain their ordinals. Valid UTF-8 preserves whitespace and NUL

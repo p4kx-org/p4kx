@@ -56,14 +56,6 @@ impl<'a> SectionReader<'a> {
         Ok(self.body.get(range).unwrap_or_default())
     }
 
-    pub(crate) fn f64(&mut self) -> Result<f64, BankError> {
-        Ok(f64::from_le_bytes(self.array()?))
-    }
-
-    pub(crate) fn i32(&mut self) -> Result<i32, BankError> {
-        Ok(i32::from_le_bytes(self.array()?))
-    }
-
     pub(crate) fn i16(&mut self) -> Result<i16, BankError> {
         Ok(i16::from_le_bytes(self.array()?))
     }

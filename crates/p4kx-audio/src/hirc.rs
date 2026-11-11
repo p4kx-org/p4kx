@@ -12,6 +12,7 @@ use crate::hirc_event;
 use crate::hirc_layout::has_decoder;
 use crate::hirc_music::{MusicPlaylist, MusicSegment, MusicSwitch, MusicTrack};
 use crate::hirc_music_parse;
+use crate::hirc_music_track;
 use crate::hirc_node::Container;
 use crate::hirc_source;
 use crate::{BankError, SectionId};
@@ -327,7 +328,7 @@ fn value(
             HircValue::MusicSegment(Box::new(hirc_music_parse::segment(fields)?))
         }
         HircKind::MusicTrack if version == CONTAINER_VERSION => {
-            HircValue::MusicTrack(Box::new(hirc_music_parse::track(version, fields)?))
+            HircValue::MusicTrack(Box::new(hirc_music_track::track(version, fields)?))
         }
         HircKind::MusicSwitch if version == CONTAINER_VERSION => {
             HircValue::MusicSwitch(Box::new(hirc_music_parse::switch(fields)?))

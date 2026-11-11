@@ -5813,6 +5813,79 @@
       ],
       "type": "object"
     },
+    "MusicTrackPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackRecord"
+            },
+            "record_type": {
+              "const": "bank-music-track",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackSourceRecord"
+            },
+            "record_type": {
+              "const": "bank-music-track-source",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackClipRecord"
+            },
+            "record_type": {
+              "const": "bank-music-track-clip",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackSwitchMember"
+            },
+            "record_type": {
+              "const": "bank-music-track-switch-member",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "MusicTrackPayload"
+    },
     "NodeBase": {
       "additionalProperties": false,
       "properties": {
@@ -7877,6 +7950,347 @@
         "invalid"
       ],
       "type": "string"
+    },
+    "TrackClipRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "begin_trim": {
+          "$ref": "#/$defs/MusicFloat"
+        },
+        "cache_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "clip_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "end_trim": {
+          "$ref": "#/$defs/MusicFloat"
+        },
+        "event_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "play_at": {
+          "$ref": "#/$defs/MusicFloat"
+        },
+        "source_duration": {
+          "$ref": "#/$defs/MusicFloat"
+        },
+        "source_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ordinal",
+        "source_id",
+        "cache_id",
+        "event_id",
+        "play_at",
+        "begin_trim",
+        "end_trim",
+        "source_duration",
+        "clip_range"
+      ],
+      "type": "object"
+    },
+    "TrackKind": {
+      "enum": [
+        "normal",
+        "random",
+        "sequence",
+        "switch",
+        "other"
+      ],
+      "type": "string"
+    },
+    "TrackLayout": {
+      "enum": [
+        "decoded",
+        "malformed",
+        "unsupported"
+      ],
+      "type": "string"
+    },
+    "TrackRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "automation_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "automation_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clip_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind_code": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "layout": {
+          "$ref": "#/$defs/TrackLayout"
+        },
+        "parent_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "switch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackSwitch"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "layout",
+        "source_count",
+        "clip_count",
+        "automation_count",
+        "automation_range",
+        "parent_id",
+        "kind_code",
+        "kind",
+        "switch"
+      ],
+      "type": "object"
+    },
+    "TrackSourceRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "external_source": {
+          "type": "boolean"
+        },
+        "has_media_file": {
+          "type": "boolean"
+        },
+        "in_memory_size": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "language_specific": {
+          "type": "boolean"
+        },
+        "midi": {
+          "type": "boolean"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "plugin_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "plugin_parameter_length": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "plugin_parameters_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_bits": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_plugin": {
+          "type": "boolean"
+        },
+        "source_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "storage": {
+          "$ref": "#/$defs/Storage"
+        },
+        "storage_code": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ordinal",
+        "plugin_id",
+        "storage_code",
+        "storage",
+        "source_id",
+        "cache_id",
+        "in_memory_size",
+        "source_bits",
+        "language_specific",
+        "source_plugin",
+        "external_source",
+        "midi",
+        "has_media_file",
+        "plugin_parameter_length",
+        "plugin_parameters_range",
+        "source_range"
+      ],
+      "type": "object"
+    },
+    "TrackSwitch": {
+      "additionalProperties": false,
+      "properties": {
+        "default_switch": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "group_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "group_type": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "member_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "transition_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "group_type",
+        "group_id",
+        "default_switch",
+        "member_count",
+        "transition_range"
+      ],
+      "type": "object"
+    },
+    "TrackSwitchMember": {
+      "additionalProperties": false,
+      "properties": {
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "value_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "value_id_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        }
+      },
+      "required": [
+        "ordinal",
+        "value_id",
+        "value_id_range"
+      ],
+      "type": "object"
     },
     "Verification": {
       "description": "Comparison against available source-declared integrity, independent of hash computation.",
@@ -12439,6 +12853,366 @@
                     "properties": {
                       "record_type": {
                         "const": "bank-music-segment-marker"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-track"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicTrackPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-track"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-track-source"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicTrackPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-track-source"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-track-clip"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicTrackPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-track-clip"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-track-switch-member"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicTrackPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-track-switch-member"
                       }
                     },
                     "required": [

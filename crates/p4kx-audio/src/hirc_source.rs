@@ -12,6 +12,30 @@ use crate::{BankError, SectionId};
 const FIRST_SOUND_VERSION: u32 = 150;
 const NODE_BASE_VERSION: u32 = 154;
 
+/// Original scalar reads shared by Sound and `MusicTrack` media sources.
+#[derive(Debug, Default)]
+#[non_exhaustive]
+pub struct BankMediaSourceFields {
+    /// Original plug-in ID.
+    pub plugin_id: Option<BankHircField<u32>>,
+    /// Original storage byte.
+    pub storage_code: Option<BankHircField<u8>>,
+    /// Original media source ID.
+    pub source_id: Option<BankHircField<u32>>,
+    /// Original cache ID when present.
+    pub cache_id: Option<BankHircField<u32>>,
+    /// Original in-memory size.
+    pub in_memory_size: Option<BankHircField<u32>>,
+    /// Original source flags.
+    pub source_bits: Option<BankHircField<u8>>,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum SourceFlags {
+    Optional,
+    Required,
+}
+
 /// Original scalar and range reads made while interpreting one Sound object.
 #[derive(Debug, Default)]
 #[non_exhaustive]
@@ -88,7 +112,15 @@ pub(crate) fn read<F: ObjectFields>(
     fields: &mut F,
     observed: &mut BankSoundFields,
 ) -> Result<SoundSource, F::Error> {
-    let mut source = read_source(version, fields, observed)?;
+    let mut original = BankMediaSourceFields::default();
+    let source = read_source(version, fields, &mut original, SourceFlags::Optional);
+    observed.plugin_id = original.plugin_id;
+    observed.storage_code = original.storage_code;
+    observed.source_id = original.source_id;
+    observed.cache_id = original.cache_id;
+    observed.in_memory_size = original.in_memory_size;
+    observed.source_bits = original.source_bits;
+    let mut source = source?;
     observed.continuation = if version != NODE_BASE_VERSION {
         BankSoundContinuation::Opaque {
             range: remainder(fields),
@@ -106,10 +138,11 @@ pub(crate) fn read<F: ObjectFields>(
     Ok(source)
 }
 
-fn read_source<F: ObjectFields>(
+pub(crate) fn read_source<F: ObjectFields>(
     version: u32,
     fields: &mut F,
-    observed: &mut BankSoundFields,
+    observed: &mut BankMediaSourceFields,
+    flags: SourceFlags,
 ) -> Result<SoundSource, F::Error> {
     let plugin = fields.read_u32()?;
     let plugin_id = plugin.value;
@@ -126,7 +159,7 @@ fn read_source<F: ObjectFields>(
     let size = fields.read_u32()?;
     let in_memory_size = size.value;
     observed.in_memory_size = Some(size);
-    let source_bits = if fields.remaining_bytes() > 0 {
+    let source_bits = if matches!(flags, SourceFlags::Required) || fields.remaining_bytes() > 0 {
         let bits = fields.read_u8()?;
         let value = bits.value;
         observed.source_bits = Some(bits);
@@ -150,12 +183,11 @@ fn read_node<F: ObjectFields>(
     observed: &mut BankSoundNodeFields,
 ) -> Result<u32, F::Error> {
     if source_plugin {
-        let length = fields.read_u32()?;
-        let size = u64::from(length.value);
-        observed.plugin_parameter_length = Some(length);
-        let start = fields.offset();
-        fields.skip_bytes(size)?;
-        observed.plugin_parameters = Some(start..fields.offset());
+        read_parameters(
+            fields,
+            &mut observed.plugin_parameter_length,
+            &mut observed.plugin_parameters,
+        )?;
     }
     let start = fields.offset();
     let mut parent_fields = BankNodeParentFields::default();
@@ -172,6 +204,20 @@ fn read_node<F: ObjectFields>(
         );
     }
     Ok(parent_id)
+}
+
+pub(crate) fn read_parameters<F: ObjectFields>(
+    fields: &mut F,
+    parameter_length: &mut Option<BankHircField<u32>>,
+    parameters: &mut Option<Range<u64>>,
+) -> Result<(), F::Error> {
+    let length = fields.read_u32()?;
+    let size = u64::from(length.value);
+    *parameter_length = Some(length);
+    let start = fields.offset();
+    fields.skip_bytes(size)?;
+    *parameters = Some(start..fields.offset());
+    Ok(())
 }
 
 fn remainder<F: ObjectFields>(fields: &F) -> Range<u64> {

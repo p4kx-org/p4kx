@@ -8,6 +8,7 @@ use p4kx_extraction::bank::{BankHircField, BankMusicSegmentFields};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::audio_bank_music_value::MusicFloat;
 use crate::audio_bank_payload::BankEntryRange;
 
 #[derive(Serialize, JsonSchema)]
@@ -50,31 +51,6 @@ pub(crate) struct SegmentRecord {
     stinger_count: Option<u32>,
     duration: Option<MusicFloat>,
     marker_count: Option<u32>,
-}
-
-#[derive(Serialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct MusicFloat {
-    raw_bits: String,
-    finite: Option<f64>,
-}
-
-impl MusicFloat {
-    fn from_f32(bits: u32) -> Self {
-        let number = f32::from_bits(bits);
-        Self {
-            raw_bits: format!("{bits:08x}"),
-            finite: number.is_finite().then_some(f64::from(number)),
-        }
-    }
-
-    fn from_f64(bits: u64) -> Self {
-        let number = f64::from_bits(bits);
-        Self {
-            raw_bits: format!("{bits:016x}"),
-            finite: number.is_finite().then_some(number),
-        }
-    }
 }
 
 impl SegmentRecord {

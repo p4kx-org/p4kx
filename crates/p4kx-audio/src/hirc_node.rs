@@ -64,11 +64,6 @@ pub struct BankNodeParentFields {
     pub parent_id: Option<BankHircField<u32>>,
 }
 
-/// Traverses a node base and returns its parent ID.
-pub(crate) fn node_base(fields: &mut SectionReader<'_>) -> Result<u32, BankError> {
-    read_base(fields, &mut BankNodeParentFields::default())
-}
-
 pub(crate) fn read_base<F: ObjectFields>(
     fields: &mut F,
     observed: &mut BankNodeParentFields,
@@ -156,12 +151,6 @@ pub(crate) fn skip_rtpcs<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error
         skip_items(fields, u32::from(points), CURVE_POINT_LEN)?;
     }
     Ok(())
-}
-
-pub(crate) fn children(fields: &mut SectionReader<'_>) -> Result<Vec<u32>, BankError> {
-    let count = fields.u32()?;
-    checked_child_bytes(count, fields.remaining_bytes())?;
-    read_children(fields, count)
 }
 
 pub(crate) fn checked_child_bytes(count: u32, available: u64) -> Result<u64, BankError> {

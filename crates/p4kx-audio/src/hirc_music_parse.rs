@@ -2,30 +2,21 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::bank_reader::SectionReader;
-use crate::hirc::{self, MediaStorage, SoundSource};
 use crate::hirc_music::{
-    MusicClip, MusicMarker, MusicNode, MusicPlaylist, MusicPlaylistItem, MusicSegment,
-    MusicStinger, MusicSwitch, MusicTrack, MusicTrackKind, MusicTrackSwitch,
+    MusicMarker, MusicNode, MusicPlaylist, MusicPlaylistItem, MusicSegment, MusicStinger,
+    MusicSwitch,
 };
 use crate::hirc_music_node::{self, BankMusicNodeFields, STINGER_LEN};
 use crate::hirc_music_segment::{self, BankMusicSegmentFields, finish};
-use crate::hirc_node::{self, ID_LEN, children, skip_items};
+use crate::hirc_node::{self, ID_LEN, skip_items};
 use crate::{BankError, SectionId};
 
-const CLIP_LEN: usize = 16 + 32;
-const CLIP_WITHOUT_CACHE_ID_LEN: usize = CLIP_LEN - ID_LEN;
-const SOURCE_LEN: usize = 4 + 1 + 4 + 4 + 4 + 1;
-const AUTOMATION_POINT_LEN: usize = 12;
-const SWITCH_TRANSITION_LEN: usize = 32;
 const RULE_SOURCE_LEN: usize = 21;
 const RULE_DESTINATION_LEN: usize = 26;
 const RULE_OBJECT_LEN: usize = 30;
 const MIN_RULE_LEN: usize = 2 * ID_LEN + RULE_SOURCE_LEN + RULE_DESTINATION_LEN + 1;
 const TREE_NODE_LEN: usize = 12;
 const PLAYLIST_ITEM_LEN: usize = 30;
-const SOURCE_PLUGIN_TYPE: u32 = 2;
-const PLUGIN_TYPE_MASK: u32 = 0x0F;
-const SWITCH_TRACK: u8 = 3;
 
 pub(crate) fn segment(fields: &mut SectionReader<'_>) -> Result<MusicSegment, BankError> {
     let node = node(fields)?;
@@ -47,113 +38,6 @@ pub(crate) fn segment(fields: &mut SectionReader<'_>) -> Result<MusicSegment, Ba
         duration,
         markers,
     })
-}
-
-fn sources(version: u32, fields: &mut SectionReader<'_>) -> Result<Vec<SoundSource>, BankError> {
-    let count = fields.u32()?;
-    let mut sources = Vec::with_capacity(capacity(fields, count, SOURCE_LEN));
-    for _ in 0..count {
-        let plugin_id = fields.u32()?;
-        let storage = MediaStorage::from_byte(fields.u8()?);
-        let source_id = fields.u32()?;
-        if hirc::has_cache_id(version) {
-            fields.u32()?;
-        }
-        let in_memory_size = fields.u32()?;
-        let source_bits = fields.u8()?;
-        if plugin_id & PLUGIN_TYPE_MASK == SOURCE_PLUGIN_TYPE {
-            let len = usize::try_from(fields.u32()?).unwrap_or(usize::MAX);
-            fields.skip(len)?;
-        }
-        sources.push(SoundSource {
-            plugin_id,
-            storage,
-            source_id,
-            in_memory_size,
-            source_bits,
-            parent_id: None,
-        });
-    }
-    Ok(sources)
-}
-
-fn track_switch(fields: &mut SectionReader<'_>) -> Result<MusicTrackSwitch, BankError> {
-    let group_type = fields.u8()?;
-    let group_id = fields.u32()?;
-    let default_switch = fields.u32()?;
-    let switches = children(fields)?;
-    fields.skip(SWITCH_TRANSITION_LEN)?;
-    Ok(MusicTrackSwitch {
-        group_type,
-        group_id,
-        default_switch,
-        switches,
-    })
-}
-
-pub(crate) fn track(version: u32, fields: &mut SectionReader<'_>) -> Result<MusicTrack, BankError> {
-    let sources = sources(version, fields)?;
-    fields.u8()?;
-    let clips = clips(version, fields)?;
-    let automations = fields.u32()?;
-    for _ in 0..automations {
-        fields.skip(2 * ID_LEN)?;
-        let points = fields.u32()?;
-        skip_items(fields, points, AUTOMATION_POINT_LEN)?;
-    }
-    let parent_id = hirc_node::node_base(fields)?;
-    let kind = match fields.u8()? {
-        0 => MusicTrackKind::Normal,
-        1 => MusicTrackKind::Random,
-        2 => MusicTrackKind::Sequence,
-        SWITCH_TRACK => MusicTrackKind::Switch,
-        other => MusicTrackKind::Other(other),
-    };
-    let switch = if kind == MusicTrackKind::Switch {
-        Some(track_switch(fields)?)
-    } else {
-        None
-    };
-    fields.i32()?;
-    finish(fields)?;
-    Ok(MusicTrack {
-        parent_id,
-        sources,
-        clips,
-        kind,
-        switch,
-    })
-}
-
-fn clips(version: u32, fields: &mut SectionReader<'_>) -> Result<Vec<MusicClip>, BankError> {
-    let count = fields.u32()?;
-    let cache_id = hirc::has_cache_id(version);
-    let len = if cache_id {
-        CLIP_LEN
-    } else {
-        CLIP_WITHOUT_CACHE_ID_LEN
-    };
-    let mut clips = Vec::with_capacity(capacity(fields, count, len));
-    for _ in 0..count {
-        fields.u32()?;
-        let source_id = fields.u32()?;
-        if cache_id {
-            fields.u32()?;
-        }
-        let event_id = fields.u32()?;
-        clips.push(MusicClip {
-            source_id,
-            event_id,
-            play_at: fields.f64()?,
-            begin_trim: fields.f64()?,
-            end_trim: fields.f64()?,
-            source_duration: fields.f64()?,
-        });
-    }
-    if count > 0 {
-        fields.u32()?;
-    }
-    Ok(clips)
 }
 
 pub(crate) fn switch(fields: &mut SectionReader<'_>) -> Result<MusicSwitch, BankError> {

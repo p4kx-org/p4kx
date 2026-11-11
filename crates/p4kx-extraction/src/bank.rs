@@ -13,14 +13,16 @@ pub use p4kx_audio::{
     BankActionFields, BankActionRead, BankContainerChild, BankContainerChildren,
     BankContainerFields, BankContainerRead, BankDeclaredLengthSource, BankDidx, BankDidxEntry,
     BankEvent, BankEventAction, BankEventCountEncoding, BankEventRead, BankHirc, BankHircAction,
-    BankHircContainer, BankHircEvent, BankHircField, BankHircMusicSegment, BankHircObject,
-    BankHircSemantic, BankHircSound, BankMediaClassSource, BankMediaInfo, BankMusicMarker,
-    BankMusicNodeFields, BankMusicSegmentFields, BankMusicSegmentRead, BankMusicSegmentRow,
-    BankMusicSegmentRows, BankMusicStinger, BankNodeParentFields, BankObservedHeader,
-    BankPlayBankDecision, BankPlayBankFields, BankReadError, BankSectionCursor,
+    BankHircContainer, BankHircEvent, BankHircField, BankHircMusicSegment, BankHircMusicTrack,
+    BankHircObject, BankHircSemantic, BankHircSound, BankMediaClassSource, BankMediaInfo,
+    BankMediaSourceFields, BankMusicMarker, BankMusicNodeFields, BankMusicSegmentFields,
+    BankMusicSegmentRead, BankMusicSegmentRow, BankMusicSegmentRows, BankMusicStinger,
+    BankMusicTrackClip, BankMusicTrackFields, BankMusicTrackRead, BankMusicTrackRow,
+    BankMusicTrackRows, BankMusicTrackSource, BankMusicTrackSwitchFields, BankNodeParentFields,
+    BankObservedHeader, BankPlayBankDecision, BankPlayBankFields, BankReadError, BankSectionCursor,
     BankSoundContinuation, BankSoundFields, BankSoundNodeBase, BankSoundNodeFields, BankSoundRead,
     BankSource, BankSourceSection, BankStid, BankStidName, ContainerKind, MediaStorage,
-    SoundSource,
+    MusicTrackKind, SoundSource,
 };
 use rayon::prelude::*;
 

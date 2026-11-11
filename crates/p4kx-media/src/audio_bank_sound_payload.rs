@@ -63,11 +63,22 @@ pub(crate) struct SourceRecord {
 
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
-enum Storage {
+pub(crate) enum Storage {
     Embedded,
     PrefetchStreamed,
     Streamed,
     Other,
+}
+
+impl From<MediaStorage> for Storage {
+    fn from(value: MediaStorage) -> Self {
+        match value {
+            MediaStorage::Embedded => Self::Embedded,
+            MediaStorage::PrefetchStreamed => Self::PrefetchStreamed,
+            MediaStorage::Streamed => Self::Streamed,
+            MediaStorage::Other(_) => Self::Other,
+        }
+    }
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -123,12 +134,7 @@ impl SoundRecord {
             source: SourceRecord {
                 plugin_id: source.plugin_id,
                 storage_code,
-                storage: match source.storage {
-                    MediaStorage::Embedded => Storage::Embedded,
-                    MediaStorage::PrefetchStreamed => Storage::PrefetchStreamed,
-                    MediaStorage::Streamed => Storage::Streamed,
-                    MediaStorage::Other(_) => Storage::Other,
-                },
+                storage: Storage::from(source.storage),
                 source_id: source.source_id,
                 cache_id: fields.cache_id.as_ref().map(|field| field.value),
                 in_memory_size: source.in_memory_size,
