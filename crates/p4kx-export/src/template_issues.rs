@@ -9,10 +9,15 @@ use p4kx_extraction::StructValue;
 use thiserror::Error;
 
 use crate::catalog_read::original::ExampleBodyReceipt;
+use crate::{CatalogError, ExportAccountingError};
 
 #[path = "template_error_description.rs"]
 mod description;
+#[path = "template_warning_examples.rs"]
+mod warning_examples;
+
 pub(crate) use description::TemplateDescription;
+pub(crate) use warning_examples::{TemplateWarningExample, TemplateWarningExamples};
 
 /// A contract template whose structure the catalog does not follow to its end.
 #[derive(Debug, Error)]
@@ -59,17 +64,30 @@ impl TemplateError {
 
 /// Counts unsupported vocabulary by technical category.
 #[derive(Debug, Default)]
-pub(crate) struct Unknowns(Mutex<BTreeMap<Cow<'static, str>, usize>>);
+pub(crate) struct Unknowns(Mutex<WarningState>);
+
+#[derive(Debug, Default)]
+struct WarningState {
+    counts: BTreeMap<Cow<'static, str>, usize>,
+    examples: TemplateWarningExamples,
+}
+
+pub(crate) struct UnknownVocabularyReport {
+    pub(crate) count: usize,
+    pub(crate) details: Vec<String>,
+    pub(crate) examples: TemplateWarningExamples,
+}
 
 impl Unknowns {
     /// Interprets an authored value and counts an unsupported value by category.
     pub(crate) fn parse<T>(
         &self,
         category: &'static str,
-        stored: Option<&str>,
+        stored: &str,
         parse: impl FnOnce(&str) -> Option<T>,
-    ) -> Option<T> {
-        self.parse_counted(stored?, parse, || Cow::Borrowed(category))
+        example: impl FnOnce() -> Result<Option<TemplateWarningExample>, CatalogError>,
+    ) -> Result<Option<T>, CatalogError> {
+        self.parse_counted(stored, parse, || Cow::Borrowed(category), example)
     }
 
     /// Interprets a declared source type and retains its technical name when unsupported.
@@ -78,10 +96,14 @@ impl Unknowns {
         category: &'static str,
         source_type: &str,
         parse: impl FnOnce(&str) -> Option<T>,
-    ) -> Option<T> {
-        self.parse_counted(source_type, parse, || {
-            Cow::Owned(format!("{category} {source_type}"))
-        })
+        example: impl FnOnce() -> Result<Option<TemplateWarningExample>, CatalogError>,
+    ) -> Result<Option<T>, CatalogError> {
+        self.parse_counted(
+            source_type,
+            parse,
+            || Cow::Owned(format!("{category} {source_type}")),
+            example,
+        )
     }
 
     fn parse_counted<T>(
@@ -89,28 +111,75 @@ impl Unknowns {
         stored: &str,
         parse: impl FnOnce(&str) -> Option<T>,
         label: impl FnOnce() -> Cow<'static, str>,
-    ) -> Option<T> {
+        example: impl FnOnce() -> Result<Option<TemplateWarningExample>, CatalogError>,
+    ) -> Result<Option<T>, CatalogError> {
         let parsed = parse(stored);
-        if parsed.is_none()
-            && let Ok(mut counts) = self.0.lock()
-        {
-            let count = counts.entry(label()).or_insert(0);
-            *count = count.saturating_add(1);
+        if parsed.is_none() {
+            let example = example()?;
+            let mut state = crate::export_evidence_lock::lock(&self.0)?;
+            let count = state.counts.entry(label()).or_insert(0);
+            *count = count
+                .checked_add(1)
+                .ok_or(ExportAccountingError::CounterOverflow)?;
+            if let Some(example) = example {
+                state.examples.retain(example)?;
+            }
         }
-        parsed
+        Ok(parsed)
     }
 
-    /// Returns the total count and ordered counts by technical category.
-    pub(crate) fn into_details(self) -> (usize, Vec<String>) {
-        let counts = self.0.into_inner().unwrap_or_default();
-        let total = counts
-            .values()
-            .copied()
-            .fold(0_usize, usize::saturating_add);
+    /// Returns exact category counts and bounded original field examples.
+    pub(crate) fn into_report(self) -> Result<UnknownVocabularyReport, CatalogError> {
+        let WarningState { counts, examples } = self
+            .0
+            .into_inner()
+            .map_err(|_| ExportAccountingError::PoisonedEvidence)?;
+        let count = counts.values().try_fold(0_usize, |total, count| {
+            total
+                .checked_add(*count)
+                .ok_or(ExportAccountingError::CounterOverflow)
+        })?;
         let details = counts
             .into_iter()
             .map(|(name, count)| format!("{name} ({count})"))
             .collect();
-        (total, details)
+        Ok(UnknownVocabularyReport {
+            count,
+            details,
+            examples,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Unknowns;
+    use crate::{CatalogError, ExportAccountingError, export_evidence_lock};
+
+    #[test]
+    fn poisoned_warning_accounting_refuses_both_observation_and_finish() {
+        let unknowns = Unknowns::default();
+        assert!(
+            export_evidence_lock::poison(&unknowns.0),
+            "the actual warning lock is poisoned"
+        );
+        assert!(
+            matches!(
+                unknowns.parse("category", "synthetic", |_| None::<()>, || Ok(None)),
+                Err(CatalogError::Accounting(
+                    ExportAccountingError::PoisonedEvidence
+                ))
+            ),
+            "a rejected warning observation cannot report success"
+        );
+        assert!(
+            matches!(
+                unknowns.into_report(),
+                Err(CatalogError::Accounting(
+                    ExportAccountingError::PoisonedEvidence
+                ))
+            ),
+            "a poisoned warning collector cannot silently produce an empty report"
+        );
     }
 }

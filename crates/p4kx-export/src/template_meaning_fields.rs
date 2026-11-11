@@ -9,37 +9,34 @@ use crate::template_action_meaning::ProbabilityInterpretation;
 use crate::template_issues::Unknowns;
 use crate::template_objective::ObjectiveState;
 use crate::template_source_meaning::{NoteInterpretation, StateInterpretation};
+use crate::template_source_members::TemplateMembers;
 
 pub(crate) fn state<'scope, 'read, 'source>(
-    fields: &OriginalFlowFields<'scope, 'read, 'source>,
+    members: &TemplateMembers<'_, 'scope, 'read, 'source>,
     parent: &OriginalValueFact<'scope, 'read, 'source>,
     name: &str,
     unknowns: Option<&Unknowns>,
 ) -> Result<StateInterpretation, CatalogError> {
-    Ok(
-        match fields
-            .field(Some(parent), name)?
-            .map(|(_, fact)| fact.value())
-        {
-            None => StateInterpretation::Absent,
-            Some(Value::Null) => StateInterpretation::Null,
-            Some(Value::Error(_)) => StateInterpretation::Unreadable,
-            Some(Value::String(value) | Value::Enum(value)) => {
-                let parsed = if value.is_empty() {
-                    None
-                } else {
-                    unknowns.map_or_else(
-                        || ObjectiveState::parse(value),
-                        |unknowns| unknowns.parse("flow state", Some(value), ObjectiveState::parse),
-                    )
-                };
-                parsed.map_or(StateInterpretation::Unknown, |state| {
-                    StateInterpretation::Known { state }
-                })
-            }
-            _ => StateInterpretation::WrongShape,
-        },
-    )
+    let Some((_, fact)) = members.fields().field(Some(parent), name)? else {
+        return Ok(StateInterpretation::Absent);
+    };
+    Ok(match fact.value() {
+        Value::Null => StateInterpretation::Null,
+        Value::Error(_) => StateInterpretation::Unreadable,
+        Value::String(value) | Value::Enum(value) => {
+            let parsed = match unknowns {
+                Some(unknowns) => {
+                    members.parse_warning(unknowns, "flow state", fact, ObjectiveState::parse)?
+                }
+                None if value.is_empty() => None,
+                None => ObjectiveState::parse(value),
+            };
+            parsed.map_or(StateInterpretation::Unknown, |state| {
+                StateInterpretation::Known { state }
+            })
+        }
+        _ => StateInterpretation::WrongShape,
+    })
 }
 
 pub(crate) fn note<'scope, 'read, 'source>(

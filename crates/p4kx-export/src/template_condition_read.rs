@@ -22,7 +22,7 @@ pub(crate) fn read<'fields, 'scope, 'read, 'source>(
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
     };
     let fields = members.fields();
-    let state = || template_meaning_fields::state(fields, fact, "tokenState", unknowns);
+    let state = || template_meaning_fields::state(members, fact, "tokenState", unknowns);
     let state_field = || crate::template_field_binding::read(fields, fact, "tokenState");
     Ok(
         match source

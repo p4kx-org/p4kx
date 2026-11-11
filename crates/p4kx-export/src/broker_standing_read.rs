@@ -127,7 +127,12 @@ fn comparison<'scope, 'read, 'source>(
     let (value, role, complete) = match fact.value() {
         Value::Error(_) => (SourceValue::Unreadable, SourceUseRole::Attempted, false),
         Value::String(text) | Value::Enum(text) if !text.is_empty() => (
-            SourceValue::Present(unknowns.parse("comparison", Some(text), Comparison::parse)),
+            SourceValue::Present(members.parse_warning(
+                unknowns,
+                "comparison",
+                fact,
+                Comparison::parse,
+            )?),
             SourceUseRole::Payload,
             true,
         ),

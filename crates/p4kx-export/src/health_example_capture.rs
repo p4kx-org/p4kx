@@ -11,6 +11,7 @@ use super::health_example_body::ExampleBodyReceipt;
 use super::health_reference_receipt::{ReferenceDatum, ReferenceFrame, ReferenceUse};
 use super::{OriginalRecordScope, OriginalValueEdge, OriginalValueFact, OriginalValuePart};
 use crate::build::original_input::OriginalCatalogInput;
+use crate::health_diagnostic_observation::ExampleObservation;
 use crate::record_header_field::RecordHeaderField;
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, ExportAccountingError, HealthText};
@@ -51,6 +52,54 @@ impl<'scope, 'read, 'source> ExampleBodyCapture<'scope, 'read, 'source> {
             return Err(ExportAccountingError::ConflictingSourceDatum);
         }
         self.frame.check_scope(fact.scope())
+    }
+
+    pub(crate) fn vocabulary_example(
+        &self,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+        ancestors: &[&OriginalValueFact<'scope, 'read, 'source>],
+        path: &str,
+        part: OriginalValuePart,
+    ) -> Result<ExampleObservation, CatalogError> {
+        self.check_fact(fact)?;
+        super::health_value_chain::check(fact, ancestors)?;
+        let (source_type, location) = match (part, fact.value()) {
+            (OriginalValuePart::Value, Value::String(value) | Value::Enum(value))
+                if !value.is_empty() =>
+            {
+                (
+                    self.record_type_datum()?,
+                    fact.location(OriginalValuePart::Value),
+                )
+            }
+            (OriginalValuePart::ConcreteType, Value::Struct(value)) => (
+                ReferenceDatum::captured(
+                    SourceValue::Present(HealthText::new(value.type_name())),
+                    vec![ReferenceUse::captured(
+                        fact.location(OriginalValuePart::ConcreteType),
+                        SourceUseRole::Selector,
+                    )],
+                ),
+                fact.location(OriginalValuePart::ConcreteType),
+            ),
+            _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+        };
+        let mut inputs = path_inputs(fact, ancestors);
+        inputs.push(ReferenceUse::captured(location, SourceUseRole::Selector));
+        let body = ExampleBodyReceipt::captured(
+            Arc::clone(&self.frame),
+            ReferenceDatum::captured(SourceValue::Present(HealthText::new(path)), inputs),
+            source_type,
+            ReferenceDatum::absent(),
+        );
+        let (field, source_type, _) = body.description()?;
+        Ok(ExampleObservation::captured(
+            self.frame.subject().clone(),
+            field.as_deref(),
+            source_type.as_deref(),
+            None,
+            body,
+        )?)
     }
 
     pub(crate) fn type_fact<'fact>(
@@ -242,14 +291,9 @@ impl<'scope, 'read, 'source> ExampleBodyCapture<'scope, 'read, 'source> {
         ancestors: &[&OriginalValueFact<'scope, 'read, 'source>],
         field_text: &str,
     ) -> Result<ReferenceDatum<HealthText>, CatalogError> {
-        let mut inputs = Vec::new();
-        for ancestor in ancestors {
-            add_path(&mut inputs, ancestor);
-        }
-        add_path(&mut inputs, fact);
         Ok(ReferenceDatum::captured(
             SourceValue::Present(self.texts.retain_text(field_text)?.text().clone()),
-            inputs,
+            path_inputs(fact, ancestors),
         ))
     }
 
@@ -263,6 +307,18 @@ impl<'scope, 'read, 'source> ExampleBodyCapture<'scope, 'read, 'source> {
             )],
         ))
     }
+}
+
+fn path_inputs(
+    fact: &OriginalValueFact<'_, '_, '_>,
+    ancestors: &[&OriginalValueFact<'_, '_, '_>],
+) -> Vec<ReferenceUse> {
+    let mut inputs = Vec::new();
+    for ancestor in ancestors {
+        add_path(&mut inputs, ancestor);
+    }
+    add_path(&mut inputs, fact);
+    inputs
 }
 
 fn add_path(inputs: &mut Vec<ReferenceUse>, fact: &OriginalValueFact<'_, '_, '_>) {

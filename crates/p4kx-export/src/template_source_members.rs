@@ -3,10 +3,15 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use p4kx_extraction::DecimalU64;
+use p4kx_extraction::{DecimalU64, Value};
 
-use crate::catalog_read::original::{OriginalFlowFields, OriginalValueEdge, OriginalValueFact};
+use crate::catalog_read::original::{
+    ExampleBodyCapture, OriginalFlowFields, OriginalValueEdge, OriginalValueFact, OriginalValuePart,
+};
+use crate::mission_flow_owner::FlowOwnerKind;
 use crate::source_value_catalog::SourceValueRef;
+use crate::template_issues::TemplateWarningExample;
+use crate::template_issues::Unknowns;
 use crate::template_source_refs::{PhysicalTemplateRef, SourceFieldRef};
 use crate::{CatalogError, ExportAccountingError};
 
@@ -17,6 +22,12 @@ pub(crate) struct TemplateMembers<'fields, 'scope, 'read, 'source> {
     values: Vec<&'fields OriginalValueFact<'scope, 'read, 'source>>,
     indices: HashMap<u64, SourceValueRef>,
     root_indices: HashMap<u64, DecimalU64>,
+    warning: Option<WarningCapture<'fields, 'scope, 'read, 'source>>,
+}
+
+struct WarningCapture<'fields, 'scope, 'read, 'source> {
+    body: &'fields ExampleBodyCapture<'scope, 'read, 'source>,
+    owner: FlowOwnerKind,
 }
 
 impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 'source> {
@@ -37,6 +48,7 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
             values: Vec::new(),
             indices: HashMap::new(),
             root_indices: HashMap::new(),
+            warning: None,
         };
         let mut covered_until = 0;
         for start in starts {
@@ -82,6 +94,66 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
             }
         }
         Ok(result)
+    }
+
+    pub(crate) const fn with_warning_capture(
+        mut self,
+        body: &'fields ExampleBodyCapture<'scope, 'read, 'source>,
+        owner: FlowOwnerKind,
+    ) -> Self {
+        self.warning = Some(WarningCapture { body, owner });
+        self
+    }
+
+    pub(crate) fn parse_warning<T>(
+        &self,
+        unknowns: &Unknowns,
+        category: &'static str,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+        parse: impl FnOnce(&str) -> Option<T>,
+    ) -> Result<Option<T>, CatalogError> {
+        let (Value::String(value) | Value::Enum(value)) = fact.value() else {
+            return Ok(None);
+        };
+        if value.is_empty() {
+            return Ok(None);
+        }
+        unknowns.parse(category, value, parse, || {
+            self.warning_example(fact, OriginalValuePart::Value)
+        })
+    }
+
+    pub(crate) fn parse_type_warning<T>(
+        &self,
+        unknowns: &Unknowns,
+        category: &'static str,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+        parse: impl FnOnce(&str) -> Option<T>,
+    ) -> Result<Option<T>, CatalogError> {
+        let Value::Struct(value) = fact.value() else {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        };
+        unknowns.parse_type(category, value.type_name(), parse, || {
+            self.warning_example(fact, OriginalValuePart::ConcreteType)
+        })
+    }
+
+    fn warning_example(
+        &self,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+        part: OriginalValuePart,
+    ) -> Result<Option<TemplateWarningExample>, CatalogError> {
+        let Some(capture) = &self.warning else {
+            return Ok(None);
+        };
+        let ancestors = self.fields.ancestors(fact)?;
+        let path = self.fields.logical_path(fact)?;
+        Ok(Some(TemplateWarningExample {
+            owner: capture.owner,
+            example: capture
+                .body
+                .vocabulary_example(fact, &ancestors, &path, part)?,
+        }))
     }
 
     pub(crate) fn physical(&self) -> PhysicalTemplateRef {

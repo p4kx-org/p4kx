@@ -14,6 +14,8 @@ use p4kx_testkit::{
 };
 use serde_json::{Value, json};
 
+use super::catalog_health_origins::retained_health_text;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const SOURCE_VALUE: &str = "synthetic_private_mission_value_341";
@@ -56,6 +58,10 @@ fn unknown_vocabulary_remains_sourced_in_the_file_and_out_of_warning_messages() 
     );
     let catalog: Value = serde_json::from_slice(&fs::read(&destination)?)?;
     assert_artifact(&catalog)?;
+    let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
+    validator
+        .validate(&catalog)
+        .map_err(|error| error.to_string())?;
     Ok(())
 }
 
@@ -86,6 +92,23 @@ fn assert_artifact(catalog: &Value) -> TestResult {
         Some(&json!(1)),
         "original warning occurrence count"
     );
+    let source = original_source(catalog)?;
+    let templates = diagnostics
+        .iter()
+        .find(|item| {
+            item.get("kind") == Some(&json!("contractTemplates"))
+                && item.get("warningCode") == Some(&json!("unknown_template_values"))
+        })
+        .ok_or("shared warning family status for Templates")?;
+    assert_eq!(
+        templates.get("examples"),
+        Some(&json!([])),
+        "the Broker field does not manufacture a Template occurrence"
+    );
+    warning_example(catalog, health, warning, source)
+}
+
+fn original_source(catalog: &Value) -> Result<&Value, Box<dyn Error>> {
     let values = catalog
         .pointer("/definitions/missionBrokerEntries/rows/0/source/values")
         .and_then(Value::as_array)
@@ -116,7 +139,75 @@ fn assert_artifact(catalog: &Value) -> TestResult {
             .is_some_and(|uses| !uses.is_empty()),
         "the encrypted datum retains its exact source-use references"
     );
+    Ok(source)
+}
+
+fn warning_example(catalog: &Value, health: &Value, warning: &Value, source: &Value) -> TestResult {
+    let examples = warning
+        .get("examples")
+        .and_then(Value::as_array)
+        .ok_or("warning examples")?;
+    let [example] = examples.as_slice() else {
+        return Err("exactly one source-bound Broker warning sample".into());
+    };
+    let field = example.get("field").ok_or("warning field carrier")?;
+    assert_eq!(
+        retained_health_text(health, field)?,
+        "missionDeadline.missionResultAfterTimerEnd",
+        "only the technical field path is displayed"
+    );
+    assert_eq!(
+        field.get("containsEncryptedSource"),
+        Some(&json!(true)),
+        "direct warning field origin"
+    );
+    assert_eq!(
+        field.get("sourceSetComplete"),
+        Some(&json!(true)),
+        "exact source fact is known"
+    );
+    let original = contributions(catalog, source)?
+        .into_iter()
+        .find(|used| {
+            used.get("role") == Some(&json!("payload"))
+                && used.pointer("/location/namespace") == Some(&json!("dataforgeValue"))
+                && used.pointer("/location/field") == Some(&json!("$value"))
+        })
+        .ok_or("original authored payload contribution")?;
+    let matches = contributions(catalog, field)?.into_iter().any(|used| {
+        used.get("source") == original.get("source")
+            && used.get("scope") == Some(&json!("payload"))
+            && used.get("location") == original.get("location")
+            && used.get("role") == Some(&json!("selector"))
+    });
+    assert!(
+        matches,
+        "warning selects the exact original value at the same physical source location"
+    );
     Ok(())
+}
+
+fn contributions<'catalog>(
+    catalog: &'catalog Value,
+    datum: &Value,
+) -> Result<Vec<&'catalog Value>, Box<dyn Error>> {
+    let references = datum
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("datum use references")?;
+    let inventory = catalog
+        .pointer("/provenance/uses")
+        .and_then(Value::as_array)
+        .ok_or("original uses inventory")?;
+    references
+        .iter()
+        .map(|id| {
+            inventory
+                .iter()
+                .find(|used| used.get("id") == Some(id))
+                .ok_or_else(|| "referenced original use".into())
+        })
+        .collect()
 }
 
 fn source() -> Vec<u8> {

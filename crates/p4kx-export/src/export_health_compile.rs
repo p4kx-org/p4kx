@@ -80,11 +80,9 @@ impl Evidence {
                 .filter(|kind| incomplete_inventories.contains(&kind.index()))
                 .map(incomplete_inventory),
         );
-        diagnostics.extend(
-            warnings
-                .iter()
-                .flat_map(crate::export_health_warning::diagnostics),
-        );
+        diagnostics.extend(warnings.iter().flat_map(|warning| {
+            crate::export_health_warning::diagnostics(warning, &ledger.template_warning_examples)
+        }));
         validate_failures(failures, &failed)?;
         order_failures(&mut failed)?;
         Ok(Self {

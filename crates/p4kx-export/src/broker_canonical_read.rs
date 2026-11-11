@@ -66,7 +66,8 @@ pub(crate) fn read<'source>(
     let capture = TemplateFieldCapture::new(&fields, input, &admission)?;
     let mut references = RefCell::new(TemplateReferences::new(&fields));
     let plan = TemplatePlan::read(&fields, references.get_mut(), FAMILY)?;
-    let members = TemplateMembers::new(&fields, plan.roots())?;
+    let members = TemplateMembers::new(&fields, plan.roots())?
+        .with_warning_capture(capture.example_body(), FAMILY);
     let environment = ContextSources {
         tags: sources.tags,
         tree,

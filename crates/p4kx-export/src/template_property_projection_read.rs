@@ -28,16 +28,7 @@ fn one<'fields, 'scope, 'read, 'source>(
     unknowns: &Unknowns,
 ) -> Result<TemplatePropertyProjection, CatalogError> {
     let fields = members.fields();
-    let Value::Struct(source) = property.property.value() else {
-        return Err(ExportAccountingError::ConflictingSourceDatum.into());
-    };
-    let kind = property.objective.and_then(|_| {
-        unknowns.parse_type(
-            "objective property",
-            source.type_name(),
-            PropertyKind::parse,
-        )
-    });
+    let kind = property_kind(members, property, unknowns)?;
     let value_kind = property
         .value
         .map(|fact| match fact.value() {
@@ -86,4 +77,24 @@ fn one<'fields, 'scope, 'read, 'source>(
             None
         },
     })
+}
+
+fn property_kind<'fields, 'scope, 'read, 'source>(
+    members: &TemplateMembers<'fields, 'scope, 'read, 'source>,
+    property: &SelectedProperty<'fields, 'scope, 'read, 'source>,
+    unknowns: &Unknowns,
+) -> Result<Option<PropertyKind>, CatalogError> {
+    if !matches!(property.property.value(), Value::Struct(_)) {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    }
+    if property.objective.is_some() {
+        members.parse_type_warning(
+            unknowns,
+            "objective property",
+            property.property,
+            PropertyKind::parse,
+        )
+    } else {
+        Ok(None)
+    }
 }

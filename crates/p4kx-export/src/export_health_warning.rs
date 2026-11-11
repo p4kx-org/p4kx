@@ -7,9 +7,13 @@ use crate::export_diagnostic::{
 };
 use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
 use crate::selection::Kind;
+use crate::template_issues::TemplateWarningExamples;
 
 /// Maps the established source-warning vocabulary to its affected typed projections and units.
-pub(crate) fn diagnostics(warning: &CraftingWarning) -> Vec<ExportDiagnostic> {
+pub(crate) fn diagnostics(
+    warning: &CraftingWarning,
+    examples: &TemplateWarningExamples,
+) -> Vec<ExportDiagnostic> {
     let (kinds, unit, stage) = affected(warning);
     kinds
         .iter()
@@ -22,7 +26,11 @@ pub(crate) fn diagnostics(warning: &CraftingWarning) -> Vec<ExportDiagnostic> {
             warning_code: Some(warning.kind().to_owned()),
             count: warning.count().unwrap_or(1),
             count_unit: unit,
-            examples: Vec::new(),
+            examples: if matches!(warning, CraftingWarning::UnknownTemplateValues { .. }) {
+                examples.for_kind(*kind).to_vec()
+            } else {
+                Vec::new()
+            },
         })
         .collect()
 }

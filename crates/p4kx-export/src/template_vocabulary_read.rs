@@ -142,34 +142,30 @@ impl<'fields, 'scope, 'read, 'source> VocabularyReader<'_, 'fields, 'scope, 'rea
         let Some((_, fact)) = self.members.fields().field(Some(parent), name)? else {
             return Ok(());
         };
-        let text = match fact.value() {
-            Value::String(value) | Value::Enum(value) if !value.is_empty() => Some(*value),
-            _ => None,
-        };
         let meaning = match vocabulary {
             Vocabulary::State => TemplateVocabulary::ObjectiveState {
-                value: self.unknowns.parse(what, text, ObjectiveState::parse),
+                value: self.parse(what, fact, ObjectiveState::parse)?,
             },
             Vocabulary::Category => TemplateVocabulary::ObjectiveCategory {
-                value: self.unknowns.parse(what, text, ObjectiveCategory::parse),
+                value: self.parse(what, fact, ObjectiveCategory::parse)?,
             },
             Vocabulary::Timing => TemplateVocabulary::CommsTiming {
-                value: self.unknowns.parse(what, text, CommsTiming::parse),
+                value: self.parse(what, fact, CommsTiming::parse)?,
             },
             Vocabulary::End => TemplateVocabulary::EndReason {
-                value: self.unknowns.parse(what, text, EndReason::parse),
+                value: self.parse(what, fact, EndReason::parse)?,
             },
             Vocabulary::Reaction => TemplateVocabulary::Reaction {
-                value: self.unknowns.parse(what, text, Reaction::parse),
+                value: self.parse(what, fact, Reaction::parse)?,
             },
             Vocabulary::License => TemplateVocabulary::LicenseType {
-                value: self.unknowns.parse(what, text, LicenseType::parse),
+                value: self.parse(what, fact, LicenseType::parse)?,
             },
             Vocabulary::Month => TemplateVocabulary::Month {
-                value: self.unknowns.parse(what, text, Month::parse),
+                value: self.parse(what, fact, Month::parse)?,
             },
             Vocabulary::RepeatType => TemplateVocabulary::RepeatType {
-                value: self.unknowns.parse(what, text, RepeatType::parse),
+                value: self.parse(what, fact, RepeatType::parse)?,
             },
         };
         let readable = !matches!(fact.value(), Value::Error(_));
@@ -194,6 +190,16 @@ impl<'fields, 'scope, 'read, 'source> VocabularyReader<'_, 'fields, 'scope, 'rea
             meaning: value.into_cell(self.members.fields().sources()),
         });
         Ok(())
+    }
+
+    fn parse<T>(
+        &self,
+        category: &'static str,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+        parse: impl FnOnce(&str) -> Option<T>,
+    ) -> Result<Option<T>, CatalogError> {
+        self.members
+            .parse_warning(self.unknowns, category, fact, parse)
     }
 
     fn display(

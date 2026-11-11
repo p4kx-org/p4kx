@@ -23,7 +23,7 @@ pub(crate) fn action<'fields, 'scope, 'read, 'source>(
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
     };
     let fields = members.fields();
-    let state = || template_meaning_fields::state(fields, fact, "toState", unknowns);
+    let state = || template_meaning_fields::state(members, fact, "toState", unknowns);
     let state_field = || crate::template_field_binding::read(fields, fact, "toState");
     Ok(match ActionLayout::of(source.type_name()) {
         ActionLayout::StateChange => ActionMeaning::StateChange {

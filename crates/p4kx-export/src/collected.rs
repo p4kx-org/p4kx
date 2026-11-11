@@ -42,19 +42,19 @@ use crate::paint_port::VehicleFacts;
 use crate::picked::Picked;
 use crate::playability::PlayabilitySummary;
 use crate::quality_catalog::QualityRows;
-use crate::record_read::KindRead;
 use crate::shop_inventories::ShopInventoryTable;
 use crate::shop_inventory_resolution::ShopInventoryResolution;
 use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 use crate::spawn_pools::SpawnPools;
 use crate::template_definition::TemplateDefinition;
-use crate::template_issues::Unknowns;
 use crate::template_rows::TemplateConfigurations;
 use crate::texts::Texts;
 use crate::{ItemClassSummary, Kind, KindSummary};
 
 #[path = "collected_counts.rs"]
 mod counts;
+#[path = "collected_missions.rs"]
+mod missions;
 #[path = "collected_order.rs"]
 mod order;
 
@@ -335,44 +335,6 @@ impl<'f> Collected<'f> {
         self.contract_entity_spawns = pools.entities.into_values().collect();
         self.contract_location_queries = pools.locations.into_values().collect();
         self.add_failures(templates.failures);
-    }
-
-    /// Stores the contract templates, counts the ones left out as `skipped`, adds the failures and
-    /// warns of the stored names `unknowns` counted.
-    pub(crate) fn add_contract_templates(
-        &mut self,
-        templates: KindRead<'f, TemplateDefinition<'f>>,
-        configurations: TemplateConfigurations<'f>,
-        unknowns: Unknowns,
-    ) {
-        self.ledger.merge(templates.ledger);
-        self.contract_templates = templates.items;
-        self.template_configurations = configurations;
-        if let Some(slot) = self.skipped.get_mut(Kind::ContractTemplates.index()) {
-            *slot = templates.skipped;
-        }
-        self.add_failures(templates.failures);
-        let (count, details) = unknowns.into_details();
-        if count > 0 {
-            self.warnings
-                .push(CraftingWarning::UnknownTemplateValues { count, details });
-        }
-    }
-
-    /// Stores the mission broker entries, counts the ones left out as `skipped` and adds the
-    /// failures.
-    pub(crate) fn add_broker_entries(
-        &mut self,
-        entries: KindRead<'f, BrokerProjection<'f>>,
-        definitions: Vec<BrokerDefinition<'f>>,
-    ) {
-        self.ledger.merge(entries.ledger);
-        self.broker_projections = entries.items;
-        self.broker_definitions = definitions;
-        if let Some(slot) = self.skipped.get_mut(Kind::MissionBrokerEntries.index()) {
-            *slot = entries.skipped;
-        }
-        self.add_failures(entries.failures);
     }
 
     /// Adds `failures` and orders all of them by the text of the GUID, one per Record.
