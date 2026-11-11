@@ -157,7 +157,7 @@ def render(path: Path, low: Vector, high: Vector) -> None:
     require(path.is_file() and path.stat().st_size > 1024, "the fixed-camera render was not written")
 
 
-def verify(folder: Path, case: str, expected_meshes: int) -> dict[str, object]:
+def verify(folder: Path, case: str, expected_meshes: int, *, render_image: bool = True) -> dict[str, object]:
     """Imports an actual exported fixture and verifies its scene and material bindings."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     addon_utils.enable("io_scene_gltf2", default_set=False)
@@ -186,12 +186,21 @@ def verify(folder: Path, case: str, expected_meshes: int) -> dict[str, object]:
     }
     for actual, expected in zip((low, high), expected_bounds[case]):
         require((actual - Vector(expected)).length < 1e-4, "authored mesh bounds differ")
-    render(folder.parent / f"{case}-consumer.png", low, high)
+    if render_image:
+        render(folder.parent / f"{case}-consumer.png", low, high)
     return {
         "case": case, "objects": result.objects, "instances": result.instances,
         "mesh_assets": result.meshes, "mesh_data": len(meshes), "image_files": sum(image.source == "FILE" for image in bpy.data.images),
         "source_warnings": list(before), "bounds_min": list(low), "bounds_max": list(high),
     }
+
+
+def verify_packages(root: Path, *, render_images: bool = True) -> list[dict[str, object]]:
+    """Checks both authored cases with the same scene expectations."""
+    return [
+        verify(root / "assembly", "assembly", 3, render_image=render_images),
+        verify(root / "livery", "livery", 4, render_image=render_images),
+    ]
 
 
 def main() -> None:
@@ -200,7 +209,7 @@ def main() -> None:
     require(len(arguments) == 1, "provide the absolute package root")
     root = Path(arguments[0])
     require(root.is_absolute(), "package root must be absolute")
-    cases = [verify(root / "assembly", "assembly", 3), verify(root / "livery", "livery", 4)]
+    cases = verify_packages(root)
     report = {"blender": bpy.app.version_string, "cases": cases}
     (root / "consumer-report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print("Rust-exported synthetic package consumer verification passed")

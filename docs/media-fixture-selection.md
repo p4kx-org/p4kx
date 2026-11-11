@@ -135,3 +135,37 @@ shader inputs; rendered pixel colour is not a source-fidelity assertion.
 
 This check covers synthetic unrigged geometry, materials and one texture path. It does not prove
 installed LIVE/PTU coverage, Character rigs, animation, audio, other CPUs or in-game appearance.
+
+## Native package exchange in CI
+
+The focused job builds the native P4KX CLI on each row of the
+[platform contract](supported-platforms.md). It generates the assembly and livery packages twice
+with `blender_consumer_fixture` and `p4kx entity package`, compares the complete path and byte
+inventory, then validates the actual manifests against the Blender package schema. The uploaded
+artifact contains only the two packages and a receipt for the source revision, workflow run,
+native target, exporter digest and every file digest.
+
+Every add-on row downloads all five producer artifacts from that workflow run. Its native Python
+process runs the pure add-on tests, checks the exact artifact receipts, validates asset references
+with the add-on and compares the decoded scene manifests across targets. This exercises Windows
+packages on both Linux CPUs and Linux packages on both Windows CPUs. The native Rust filesystem
+tests in the same CI matrix cover the export transaction, including occupied destinations,
+missing parents, directory replacement and cleanup.
+
+Windows AMD64/ARM64, Ubuntu 24.04 AMD64 and macOS ARM64 use the upstream Python 3.13 wheels for
+Blender 5.2.3 and 5.3.0. Both run the existing headless synthetic smoke and import the actual
+exchanged packages to check authored geometry, transforms and material bindings. The CI import
+omits the optional CPU renders used for interactive visual review. [Blender 5.2.3 wheel files](https://pypi.org/project/bpy/5.2.3/#files) · [Blender 5.3.0 wheel files](https://pypi.org/project/bpy/5.3.0/#files)
+
+The Ubuntu 24.04 ARM64 row runs the native P4KX producer and pure Python validation directly.
+Its native Blender 5.2 headless check runs separately in a pinned ARM64 Debian container using
+Blender `5.2.2+dfsg-1`. Debian supplies the required newer glibc and runtime libraries. The
+container verifies the host, daemon, image and Python architecture and mounts the exchanged
+packages read-only. It uses a dated, signed APT snapshot for build reproducibility. Docker and
+Blender are CI consumer dependencies. [Debian ARM64 Blender](https://packages.debian.org/sid/arm64/graphics/blender) · [Debian Snapshot](https://snapshot.debian.org/archive/debian/20261104T000000Z/) · [Docker Official Debian image](https://hub.docker.com/_/debian)
+
+The supported upstream wheels and standalone release files do not include Linux ARM64, and the
+Ubuntu 24.04 ARM64 Blender package is 4.0.2. The Flathub package currently targets x86_64.
+The Debian check supplies ARM64 Blender 5.2 evidence in that userland. A native Blender 5.3
+consumer on Linux ARM64 and a supported native Blender runtime directly on Ubuntu 24.04 ARM64
+remain outside this CI coverage. [Ubuntu ARM64 package](https://packages.ubuntu.com/noble/arm64/blender) · [Blender 5.3 release files](https://download.blender.org/release/Blender5.3/) · [Flathub architecture manifest](https://github.com/flathub/org.blender.Blender/blob/master/flathub.json)

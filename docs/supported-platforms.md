@@ -15,7 +15,8 @@ runner labels, package spellings and asset suffixes.
 Runner labels describe verification environments. A successful compile or an emulated executable
 does not establish native runtime support. Required application behavior is checked on a matching
 OS and CPU. The architecture-neutral Blender add-on ZIP and the availability of third-party bpy
-wheels are separate from the native application matrix.
+wheels are separate from the native application matrix. [Blender package exchange](media-fixture-selection.md#native-package-exchange-in-ci)
+lists the native consumer environments and the Linux ARM64 Blender version boundary.
 
 ## Build and test contract
 

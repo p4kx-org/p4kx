@@ -164,8 +164,22 @@ jobs:
           nextest: "true"
       - name: Comparison report schema is current
         run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-comparison --test report_schema
+      - name: Export deterministic native Blender fixtures
+        run: .github/scripts/export-blender-fixture.ps1 -Target $env:P4KX_TARGET -Directory (Join-Path $env:RUNNER_TEMP 'p4kx-blender-fixtures') -RunId $env:GITHUB_RUN_ID
       - name: Blender package schema is current
         run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-blender --test schema
+      - name: Native Blender fixtures match the package schema
+        env:
+          P4KX_BLENDER_FIXTURES: ${{ runner.temp }}/p4kx-blender-fixtures/artifact/packages
+        run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-blender --test portable_fixture_schema --run-ignored only --no-tests fail
+      - name: Upload native Blender fixtures
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: p4kx-blender-package-${{ matrix.target }}
+          path: ${{ runner.temp }}/p4kx-blender-fixtures/artifact
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
       - name: Record JSON schema matches the export
         run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-export --test record_json_schema
       - name: Basetool catalog schema is current
@@ -193,16 +207,20 @@ jobs:
         run: df -h /
 
   blender-addon:
-    name: Blender add-on (${{ matrix.os }}, ${{ matrix.bpy }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    name: Blender add-on (${{ matrix.target }})
+    needs: [platforms, focused]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+      P4KX_PLATFORM_MATRIX: ${{ needs.platforms.outputs.matrix }}
+      PYTHONDONTWRITEBYTECODE: "1"
     strategy:
       fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
-        bpy: ["5.2.3", "5.3.0"]
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
     defaults:
       run:
+        shell: pwsh
         working-directory: blender_addon
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -211,21 +229,43 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
+          architecture: ${{ matrix.arch == 'arm64' && 'arm64' || 'x64' }}
           cache: pip
           cache-dependency-path: blender_addon/requirements-ci.txt
-      - name: Install system libraries of the bpy module
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgl1 libxi6 libxrender1 libsm6 libxxf86vm1 libxfixes3 libxkbcommon0
-        working-directory: .
-      - name: Install pytest and Blender as a Python module
-        shell: pwsh
-        env:
-          P4KX_TEST_BPY_VERSION: ${{ matrix.bpy }}
-        run: python -m pip install -r requirements-ci.txt "bpy==$env:P4KX_TEST_BPY_VERSION"
+      - name: Select the native package exchange directory
+        run: |
+          $exchange = Join-Path $env:RUNNER_TEMP 'p4kx-blender-exchange'
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value "P4KX_BLENDER_EXCHANGE=$exchange" -Encoding utf8NoBOM
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: p4kx-blender-package-*
+          path: ${{ env.P4KX_BLENDER_EXCHANGE }}
+          merge-multiple: false
+      - name: Install pytest
+        run: python -m pip install -r requirements-ci.txt
       - name: Add-on tests without Blender
         run: python -m pytest
-      - name: Import a synthetic package in headless Blender
-        run: python tests/blender_smoke.py
+      - name: Validate the actual packages from every native producer
+        run: python tests/verify_portable_packages.py $env:P4KX_BLENDER_EXCHANGE --target $env:P4KX_TARGET
+      - name: Install system libraries of the bpy module
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libxi6 libxrender1 libsm6 libxxf86vm1 libxfixes3 libxkbcommon0
+      - name: Import synthetic packages in native Blender 5.2 and 5.3
+        if: matrix.os != 'linux' || matrix.arch != 'arm64'
+        run: |
+          foreach ($version in '5.2.3', '5.3.0') {
+            python -m pip install --only-binary=bpy "bpy==$version"
+            if ($LASTEXITCODE -ne 0) { throw "Native bpy $version could not be installed." }
+            python tests/blender_smoke.py
+            if ($LASTEXITCODE -ne 0) { throw "Blender $version synthetic smoke test failed." }
+            python tests/verify_portable_packages.py $env:P4KX_BLENDER_EXCHANGE --target $env:P4KX_TARGET --bpy-version $version
+            if ($LASTEXITCODE -ne 0) { throw "Blender $version native package exchange failed." }
+          }
+
+      - name: Import the exchanged packages in native Debian ARM64 Blender 5.2
+        if: matrix.os == 'linux' && matrix.arch == 'arm64'
+        working-directory: .
+        run: .github/scripts/verify-arm64-blender.ps1 -Target $env:P4KX_TARGET -ArtifactDirectory $env:P4KX_BLENDER_EXCHANGE -BuildDirectory (Join-Path $env:RUNNER_TEMP 'p4kx-blender-arm64')
 
   glb-validator:
     name: Khronos glTF-Validator
