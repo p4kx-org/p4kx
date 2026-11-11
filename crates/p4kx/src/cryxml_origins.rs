@@ -4,11 +4,11 @@
 use std::io::{self, Write};
 
 use anyhow::Result;
-use p4kx_extraction::cryxml::{Xml, XmlFieldKind, XmlWriteField};
+use p4kx_extraction::cryxml::{Xml, XmlWriteField};
 use p4kx_extraction::{
     DecimalU64, FieldOrigin, FieldOrigins, FieldPath, InputScope, ObservedFileRead,
-    OriginArtifactBinding, OriginOutputAddress, OriginXmlField, SourceInput, SourceInventory,
-    SourceLocation, SourceScope, SourceUseRole, SourceUses, write_origin_companion,
+    OriginArtifactBinding, OriginOutputAddress, SourceInput, SourceInventory, SourceLocation,
+    SourceScope, SourceUseRole, SourceUses, write_origin_companion,
 };
 
 pub(crate) struct CryXmlOrigins {
@@ -105,49 +105,17 @@ impl CryXmlOrigins {
         &self,
         field: &XmlWriteField,
     ) -> io::Result<(OriginOutputAddress, FieldOrigin)> {
-        let node = u64::from(field.node_index());
-        let kind = field.kind();
-        let (xml_field, source_field) = match kind {
-            XmlFieldKind::ElementName => (OriginXmlField::ElementName, "name"),
-            XmlFieldKind::ClosingElementName => (OriginXmlField::ClosingElementName, "name"),
-            XmlFieldKind::AttributeName => (OriginXmlField::AttributeName, "name"),
-            XmlFieldKind::AttributeValue => (OriginXmlField::AttributeValue, "value"),
-            XmlFieldKind::Text => (OriginXmlField::Text, "text"),
-            _ => return Err(io::Error::other("unknown XML writer field category")),
-        };
-        let (namespace, indices) = field.attribute_index().map_or_else(
-            || ("cryxmlNode", vec![node]),
-            |attribute| ("cryxmlAttribute", vec![node, u64::from(attribute)]),
-        );
-        let value = self
+        let captured = self
             .payload
-            .at(
-                location(namespace, indices, source_field),
-                SourceUseRole::Conversion,
-            )
-            .map_err(io::Error::other)?;
-        let origin = match field.preceding_names() {
-            Some(names) => {
-                let selector = self
-                    .payload
-                    .at(
-                        location(
-                            "cryxmlAttributeNames",
-                            vec![node, u64::from(names.start), u64::from(names.end)],
-                            "suffixSelection",
-                        ),
-                        SourceUseRole::Selector,
-                    )
-                    .map_err(io::Error::other)?;
-                self.uses.origin(&[value, selector], self.complete)
-            }
-            None => self.uses.origin(&[value], self.complete),
-        };
+            .cryxml_field(field)
+            .map_err(io::Error::other)?
+            .ok_or_else(|| io::Error::other("unknown XML writer field category"))?;
+        let origin = self.uses.origin(&captured.uses, self.complete);
         let range = field.range();
         let address = OriginOutputAddress::XmlBytes {
             start: DecimalU64::new(range.start),
             end_exclusive: DecimalU64::new(range.end),
-            field: xml_field,
+            field: captured.field,
         };
         Ok((address, origin))
     }

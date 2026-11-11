@@ -841,6 +841,11 @@ carry `ddsMipPayload` coordinates `[level, offset, length, stride, count]` for t
 byte spans. A single selected cubemap face contributes only its own color and alpha mip bytes.
 Offsets are relative to the uncompressed Entry. Stored path lookups use Archive directory metadata.
 
+For `read_entry_text`, `fieldOrigins` identifies the inputs of each result field. UTF-8 pages keep
+their original decoded Entry byte range after the byte order mark and character alignment.
+UTF-16 and CryXml use the original converter input, while result offsets count UTF-8 bytes.
+CryXml pages also identify the original node or attribute fields intersecting the returned text.
+
 For `read_entry_bytes`, each `fieldOrigins` key addresses the complete MCP tool result.
 The `archiveEntryDecodedBytes` coordinates on `/structuredContent/data` give the half-open
 byte range `[start, endExclusive)` before base64 encoding. The path and Entry size use Archive

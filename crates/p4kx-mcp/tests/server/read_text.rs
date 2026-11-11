@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_testkit::{CryXmlByteOrder, CryXmlSignature, TestElement, TestEntry};
+use p4kx_testkit::{CryXmlByteOrder, CryXmlSignature, TestContainer, TestElement, TestEntry};
 use serde_json::{Value, json};
 
 use crate::support::{Install, Server, TestResult};
@@ -141,5 +141,163 @@ fn a_cryxml_too_large_to_decode_points_to_the_bytes_tool() -> TestResult {
         bytes["data"], "AA==",
         "the last byte through the bytes tool"
     );
+    Ok(())
+}
+
+#[test]
+fn an_encrypted_utf8_page_identifies_the_selected_original_bytes_after_bom_and_alignment()
+-> TestResult {
+    let path = "page.txt";
+    let entry = TestEntry::deflated(path, "\u{feff}AäBCDEF".as_bytes().to_vec()).encrypted();
+    let install = Install::new(vec![entry])?;
+    let mut server = install.serve(&["--archive", "LIVE"])?;
+    let result = server.ok(
+        "read_entry_text",
+        &json!({"path": path, "offset": 2, "max_bytes": 4}),
+    )?;
+    assert_eq!(result["text"], "BCDE");
+    assert_eq!(result["offset"], 3);
+    assert_eq!(result["next_offset"], 7);
+    let fields = &result["fieldOrigins"];
+    assert_eq!(
+        fields["/structuredContent/text"]["containsEncryptedSource"],
+        true
+    );
+    assert_eq!(
+        fields["/structuredContent/path"]["containsEncryptedSource"],
+        false
+    );
+    assert_eq!(
+        fields["/structuredContent/max_bytes"]["containsEncryptedSource"],
+        false
+    );
+    assert!(has_text_range(&result, "utf8Text", "6", "10"));
+    assert!(has_text_range(&result, "characterBoundaries", "5", "10"));
+    Ok(())
+}
+
+#[test]
+fn transcoded_utf16_addresses_the_original_units_even_when_the_utf8_window_is_shorter() -> TestResult
+{
+    let path = "utf16.txt";
+    let mut bytes = vec![0xff, 0xfe];
+    for unit in "A😀Z".encode_utf16() {
+        bytes.extend(unit.to_le_bytes());
+    }
+    let install = Install::new(vec![TestEntry::deflated(path, bytes).encrypted()])?;
+    let mut server = install.serve(&["--archive", "LIVE"])?;
+    let result = server.ok(
+        "read_entry_text",
+        &json!({"path": path, "offset": 2, "max_bytes": 4}),
+    )?;
+    assert_eq!(result["text"], "Z");
+    assert_eq!(result["offset"], 5);
+    assert_eq!(result["size"], 6);
+    let fields = &result["fieldOrigins"];
+    assert_eq!(
+        fields["/structuredContent/text"]["containsEncryptedSource"],
+        true
+    );
+    assert!(fields.get("/structuredContent/next_offset").is_none());
+    assert!(has_text_range(&result, "transcodeInput", "0", "10"));
+    Ok(())
+}
+
+fn has_text_range(result: &Value, field: &str, start: &str, end: &str) -> bool {
+    let Some(refs) = result
+        .pointer("/fieldOrigins/~1structuredContent~1text/sourceUsesRefs")
+        .and_then(Value::as_array)
+    else {
+        return false;
+    };
+    result
+        .pointer("/provenance/uses")
+        .and_then(Value::as_array)
+        .is_some_and(|uses| {
+            uses.iter().any(|usage| {
+                usage.get("id").is_some_and(|id| refs.contains(id))
+                    && usage.pointer("/location/namespace")
+                        == Some(&json!("archiveEntryDecodedBytes"))
+                    && usage.pointer("/location/field") == Some(&json!(field))
+                    && usage.pointer("/location/indices") == Some(&json!([start, end]))
+            })
+        })
+}
+
+#[test]
+fn cryxml_text_retains_the_original_attribute_from_the_page_and_its_encrypted_container()
+-> TestResult {
+    let original = TestElement::new("Node")
+        .attribute("first", "match")
+        .attribute("second", "extra")
+        .to_cryxml(CryXmlSignature::CryXmlB, CryXmlByteOrder::Little);
+    let container = TestContainer::new()
+        .entry(TestEntry::stored("node.xml", original))
+        .build();
+    let install = Install::new(vec![TestEntry::zstd("outer.socpak", container).encrypted()])?;
+    let mut server = install.serve(&["--archive", "LIVE"])?;
+    let path = "outer.socpak::node.xml";
+    let prefix = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Node first=\"";
+    let result = server.ok(
+        "read_entry_text",
+        &json!({"path": path, "offset": prefix.len(), "max_bytes": 5}),
+    )?;
+    assert_eq!(result["text"], "match");
+    let fields = &result["fieldOrigins"];
+    for field in ["path", "text", "size"] {
+        let origin = &fields[format!("/structuredContent/{field}")];
+        assert_eq!(origin["containsEncryptedSource"], true, "{field}");
+        assert_eq!(origin["sourceSetComplete"], true, "{field}");
+    }
+    let refs = fields["/structuredContent/text"]["sourceUsesRefs"]
+        .as_array()
+        .ok_or("retained source uses")?;
+    let attrs: Vec<_> = result["provenance"]["uses"]
+        .as_array()
+        .ok_or("source inventory")?
+        .iter()
+        .filter(|entry| {
+            refs.contains(&entry["id"]) && entry["location"]["namespace"] == "cryxmlAttribute"
+        })
+        .collect();
+    assert_eq!(attrs.len(), 1, "the other attribute is outside the page");
+    assert_eq!(attrs[0]["location"]["field"], "value");
+    assert_eq!(attrs[0]["location"]["indices"], json!(["0", "0"]));
+    Ok(())
+}
+
+#[test]
+fn the_text_origin_schema_has_exact_pointers_and_preserves_unknown_payload_origin() -> TestResult {
+    let path = "unknown.txt";
+    let entry = TestEntry::deflated(path, b"page".to_vec())
+        .encrypted()
+        .with_encryption_field(7);
+    let install = Install::new(vec![entry])?;
+    let mut server = install.serve(&["--archive", "LIVE"])?;
+    let tools = server.tools()?;
+    let tool = tools
+        .iter()
+        .find(|tool| tool["name"] == "read_entry_text")
+        .ok_or("text tool")?;
+    let schema = &tool["outputSchema"];
+    let fields = &schema["$defs"]["TextFieldOrigins"];
+    assert_eq!(fields["additionalProperties"], false);
+    assert!(schema["properties"]["provenance"].is_object());
+    let required = fields["required"]
+        .as_array()
+        .ok_or("required field origins")?;
+    assert!(required.contains(&json!("/structuredContent/text")));
+    assert!(!required.contains(&json!("/structuredContent/next_offset")));
+
+    let response = server.call("read_entry_text", &json!({"path": path}))?;
+    let result = &response["structuredContent"];
+    assert_eq!(result["text"], "page");
+    let origins = result["fieldOrigins"].as_object().ok_or("field origins")?;
+    for pointer in origins.keys() {
+        assert!(response.pointer(pointer).is_some(), "{pointer}");
+    }
+    let text = &origins["/structuredContent/text"];
+    assert_eq!(text.get("containsEncryptedSource"), Some(&Value::Null));
+    assert_eq!(text["sourceSetComplete"], true);
     Ok(())
 }

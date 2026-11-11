@@ -32,6 +32,7 @@ mod coverage_entries;
 mod coverage_forge;
 mod coverage_objects;
 mod coverage_run;
+mod cryxml_field_uses;
 mod dataforge;
 mod dataforge_convert;
 mod dataforge_file;
@@ -51,6 +52,7 @@ mod entry_metadata_info;
 mod entry_path;
 mod entry_payload;
 mod entry_record_format_info;
+mod entry_text;
 mod entry_tree;
 mod exclusion;
 mod extract;
@@ -205,6 +207,7 @@ pub use coverage::{
     ComponentCoverage, CoverageReport, EntryCoverage, ObjectCoverage, ReferenceError,
     ReferenceItem, ReferenceKind, ReferenceList, SampleExport, TypeCoverage,
 };
+pub use cryxml_field_uses::CryXmlFieldUses;
 pub use dataforge::{DATAFORGE_ENTRIES, DataForgeEntry, DataForgeLoadError, MAX_DATAFORGE_SIZE};
 pub use dataforge_file::is_dataforge_file;
 pub use dataforge_file_origin::DataForgeFileOrigin;
@@ -216,13 +219,14 @@ pub use dds_source_info::{
 };
 pub use decimal_u64::DecimalU64;
 pub use disk_textures::DiskTextures;
-pub use entry_content::{
-    EntryBytes, EntryReadError, EntryText, MIN_TEXT_LEN, TextEncoding, find_entry, read_bytes,
-    read_text,
-};
+pub use entry_content::{EntryBytes, EntryReadError, find_entry, read_bytes};
 pub use entry_metadata_info::{DosCalendarInfo, DosTimestampInfo, EntryMetadataInfo};
 pub use entry_payload::extract_entry_payload;
 pub use entry_record_format_info::EntryRecordFormatInfo;
+pub use entry_text::{
+    EntryText, MIN_TEXT_LEN, ObservedEntryText, TextEncoding, TextReadEvidence, read_text,
+    read_text_observed,
+};
 pub use entry_tree::{EntryTree, Folder, FolderId};
 pub use exclusion::{Exclusion, LeftOut, MAX_EXCLUSIONS};
 pub use extract::extract;

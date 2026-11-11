@@ -212,6 +212,11 @@ pub(crate) struct TextResult {
     pub(crate) length: usize,
     /// The text read.
     pub(crate) text: String,
+    /// Original inputs of each structured result field.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: crate::content_text_origin::TextFieldOrigins,
+    /// Physical sources and decoded Entry ranges used by the response.
+    pub(crate) provenance: p4kx_extraction::SourceInventory,
     /// Whether more text follows.
     pub(crate) more: bool,
     /// The offset to continue at; absent at the end.
