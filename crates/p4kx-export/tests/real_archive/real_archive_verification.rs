@@ -9,6 +9,9 @@
 #[path = "real_archive_definition_identity.rs"]
 mod definition_identity;
 
+#[path = "real_archive_ammo_projection.rs"]
+mod ammo_projection;
+
 #[path = "real_archive_identity.rs"]
 mod identity;
 pub(crate) use identity::check_unique_guids;
