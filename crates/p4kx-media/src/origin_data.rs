@@ -145,6 +145,10 @@ fn audio_independent(pointer: &str) -> bool {
         "content/payload/utf8_input_range",
         "data/range",
         "trailing_range",
+        "continuation/opaque_range",
+        "continuation/plugin_parameters_range",
+        "continuation/node_base/consumed_range",
+        "continuation/node_base/trailing_range",
     ]
     .into_iter()
     .any(|range| {

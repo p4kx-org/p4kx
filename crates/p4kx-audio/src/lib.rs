@@ -16,6 +16,7 @@ mod bank_source;
 mod bank_source_didx;
 mod bank_source_event;
 mod bank_source_hirc;
+mod bank_source_sound;
 mod bank_stid;
 mod bank_structure;
 mod codec;
@@ -59,6 +60,7 @@ pub use bank_source_event::{BankEvent, BankEventAction, BankEventRead, BankHircE
 pub use bank_source_hirc::{
     BankActionRead, BankHirc, BankHircAction, BankHircObject, BankHircSemantic,
 };
+pub use bank_source_sound::{BankHircSound, BankSoundRead};
 pub use bank_stid::{BankStid, BankStidName};
 pub use codec::Codec;
 pub use error::AudioError;
@@ -73,7 +75,10 @@ pub use hirc_music::{
     MusicPlaylistItem, MusicSegment, MusicStinger, MusicSwitch, MusicTrack, MusicTrackKind,
     MusicTrackSwitch,
 };
-pub use hirc_node::{Container, ContainerKind};
+pub use hirc_node::{BankNodeParentFields, Container, ContainerKind};
+pub use hirc_source::{
+    BankSoundContinuation, BankSoundFields, BankSoundNodeBase, BankSoundNodeFields,
+};
 pub use loops::Loop;
 pub use media_class::{BankDeclaredLengthSource, BankMediaClassSource, MediaClass};
 pub use ogg::OggWriter;

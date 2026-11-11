@@ -13,13 +13,12 @@ use super::support;
 
 #[path = "audio_bank_hirc_action_fixture.rs"]
 mod fixture;
-#[path = "audio_bank_hirc_action_origins.rs"]
-mod origins;
+use super::audio_bank_hirc_action_origins as origins;
 #[path = "audio_bank_hirc_action_partial.rs"]
 mod partial;
 
 use self::fixture::{Fixture, PLAY, Play, STOP, TARGET_ID};
-use self::origins::{Origins, has_exact, has_field};
+use origins::{Origins, has_exact, has_field};
 
 type ActionTestResult<T = ()> = Result<T, Box<dyn Error>>;
 

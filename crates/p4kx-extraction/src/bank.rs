@@ -12,9 +12,11 @@ use p4kx_audio::{AudioError, EmbeddedWem, MediaClass, Soundbank};
 pub use p4kx_audio::{
     BankActionFields, BankActionRead, BankDeclaredLengthSource, BankDidx, BankDidxEntry, BankEvent,
     BankEventAction, BankEventCountEncoding, BankEventRead, BankHirc, BankHircAction,
-    BankHircEvent, BankHircField, BankHircObject, BankHircSemantic, BankMediaClassSource,
-    BankMediaInfo, BankObservedHeader, BankPlayBankDecision, BankPlayBankFields, BankReadError,
-    BankSectionCursor, BankSource, BankSourceSection, BankStid, BankStidName,
+    BankHircEvent, BankHircField, BankHircObject, BankHircSemantic, BankHircSound,
+    BankMediaClassSource, BankMediaInfo, BankNodeParentFields, BankObservedHeader,
+    BankPlayBankDecision, BankPlayBankFields, BankReadError, BankSectionCursor,
+    BankSoundContinuation, BankSoundFields, BankSoundNodeBase, BankSoundNodeFields, BankSoundRead,
+    BankSource, BankSourceSection, BankStid, BankStidName, MediaStorage, SoundSource,
 };
 use rayon::prelude::*;
 

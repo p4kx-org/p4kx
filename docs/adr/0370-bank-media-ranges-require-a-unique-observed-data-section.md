@@ -11,7 +11,7 @@ byte ranges remain absolute in the retained Entry. Embedded subresource identity
 original DIDX section and triplet positions. Each value carries the actual DATA selection and
 WEM read evidence. Prefetched and opaque ranges remain represented by the DIDX metadata.
 
-A uniquely observed bank header selects the HIRC layout. Action and Event interpretation uses
+A uniquely observed bank header selects the HIRC layout. Action, Event and Sound interpretation uses
 the same versioned field readers as the existing slice decoder. Media emits physical envelopes
 and typed records, preserving original order, readable prefixes and residual bytes. An unknown
 layout retains the raw envelope and records its coverage explicitly.

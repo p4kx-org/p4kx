@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::error::Error;
 use std::fs;
 use std::ops::Range;
 use std::path::Path;
 
 use serde_json::{Value, json};
 
-use super::ActionTestResult;
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 pub(super) struct Origins {
     fields: Vec<Value>,
@@ -16,7 +17,7 @@ pub(super) struct Origins {
 }
 
 impl Origins {
-    pub(super) fn read(base: &Path) -> ActionTestResult<Self> {
+    pub(super) fn read(base: &Path) -> TestResult<Self> {
         Ok(Self {
             fields: rows(base, "field-origins.jsonl")?,
             uses: rows(base, "origin-uses.jsonl")?,
@@ -24,12 +25,7 @@ impl Origins {
         })
     }
 
-    pub(super) fn uses(
-        &self,
-        record: usize,
-        owner: usize,
-        path: &str,
-    ) -> ActionTestResult<Vec<&Value>> {
+    pub(super) fn uses(&self, record: usize, owner: usize, path: &str) -> TestResult<Vec<&Value>> {
         let ordinal = record.to_string();
         let field = self
             .fields
@@ -61,7 +57,7 @@ impl Origins {
             .collect()
     }
 
-    fn find_use(&self, reference: &Value, owner: usize) -> ActionTestResult<&Value> {
+    fn find_use(&self, reference: &Value, owner: usize) -> TestResult<&Value> {
         let source_use = self
             .uses
             .iter()
@@ -98,7 +94,7 @@ pub(super) fn has_field(uses: &[&Value], name: &str) -> bool {
         .any(|used| used.pointer("/location/field").and_then(Value::as_str) == Some(name))
 }
 
-fn rows(directory: &Path, file: &str) -> ActionTestResult<Vec<Value>> {
+fn rows(directory: &Path, file: &str) -> TestResult<Vec<Value>> {
     fs::read_to_string(directory.join(file))?
         .lines()
         .map(|line| serde_json::from_str(line).map_err(Into::into))

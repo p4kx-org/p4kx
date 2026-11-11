@@ -53,7 +53,18 @@ impl Provider for AudioProvider {
 }
 
 fn field_groups() -> Vec<FieldGroup> {
-    vec![
+    wem_field_groups()
+        .into_iter()
+        .chain(bank_field_groups())
+        .chain([FieldGroup::new_with_unsupported_projection(
+            "audio-conversion",
+            "No WAV or OGG conversion is performed.",
+        )])
+        .collect()
+}
+
+fn wem_field_groups() -> [FieldGroup; 5] {
+    [
         FieldGroup::new(
             "wem-summary",
             "RIFF/RIFX byte order, original fmt, frame count, duration and first fitting forward loop.",
@@ -74,6 +85,11 @@ fn field_groups() -> Vec<FieldGroup> {
             "wem-chunk-content",
             "Opaque RIFF bodies, text regions with original encoding declarations and encoded samples remain available in retained ranges.",
         ),
+    ]
+}
+
+fn bank_field_groups() -> [FieldGroup; 9] {
+    [
         FieldGroup::new(
             "bank-directory",
             "Original physical section order, raw ranges, BKHD values and recognized duplicate diagnostics.",
@@ -95,6 +111,10 @@ fn field_groups() -> Vec<FieldGroup> {
             "HIRC Event count encoding and original words, ordered action IDs, and exact residual ranges.",
         ),
         FieldGroup::new(
+            "bank-sound-fields",
+            "Original HIRC Sound source, storage, cache and flag fields, source plug-in extents and node parent with exact receipts.",
+        ),
+        FieldGroup::new(
             "bank-name-index",
             "Original STID header and names, exact bytes, UTF-8 interpretation and residual ranges.",
         ),
@@ -105,10 +125,6 @@ fn field_groups() -> Vec<FieldGroup> {
         FieldGroup::new_with_unsupported_projection(
             "bank-payload-content",
             "Other HIRC fields and prefetched or opaque media remain available through exact retained ranges.",
-        ),
-        FieldGroup::new_with_unsupported_projection(
-            "audio-conversion",
-            "No WAV or OGG conversion is performed.",
         ),
     ]
 }

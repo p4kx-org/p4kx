@@ -2775,6 +2775,97 @@
       ],
       "type": "object"
     },
+    "Continuation": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unreached",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "opaque",
+              "type": "string"
+            },
+            "opaque_range": {
+              "$ref": "#/$defs/BankEntryRange"
+            }
+          },
+          "required": [
+            "kind",
+            "opaque_range"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "absent",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "node",
+              "type": "string"
+            },
+            "node_base": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NodeBase"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "plugin_parameter_length": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "plugin_parameters_range": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BankEntryRange"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "plugin_parameter_length",
+            "plugin_parameters_range",
+            "node_base"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "CountEncoding": {
       "enum": [
         "fixed-u32",
@@ -5247,6 +5338,67 @@
         }
       ]
     },
+    "NodeBase": {
+      "additionalProperties": false,
+      "properties": {
+        "consumed_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "effect_count": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "metadata_count": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "parent_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pre_parent_word": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "trailing_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "effect_count",
+        "metadata_count",
+        "pre_parent_word",
+        "parent_id",
+        "consumed_range",
+        "trailing_range"
+      ],
+      "type": "object"
+    },
     "NotSelectedReason": {
       "description": "Why an existing target was outside the selected projection scope.",
       "oneOf": [
@@ -6771,6 +6923,95 @@
       "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|1844674407370955[0-0][0-9]{3}|18446744073709551[0-5][0-9]{2}|184467440737095516[0-0][0-9]{1}|1844674407370955161[0-4][0-9]{0}|18446744073709551615)$",
       "type": "string"
     },
+    "SoundPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SoundRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-sound",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "SoundPayload"
+    },
+    "SoundRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "continuation": {
+              "$ref": "#/$defs/Continuation"
+            },
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "source": {
+              "$ref": "#/$defs/SourceRecord"
+            }
+          },
+          "required": [
+            "layout",
+            "source",
+            "continuation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "continuation": {
+              "$ref": "#/$defs/Continuation"
+            },
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "source": {
+              "$ref": "#/$defs/SourcePrefix"
+            }
+          },
+          "required": [
+            "layout",
+            "source",
+            "continuation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "continuation": {
+              "type": "null"
+            },
+            "layout": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "source": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "layout",
+            "source",
+            "continuation"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "Source": {
       "description": "Provenance shared by records from one physical input.",
       "properties": {
@@ -6823,6 +7064,70 @@
       ],
       "type": "object"
     },
+    "SourcePrefix": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "in_memory_size": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "plugin_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source_bits": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "storage_code": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "plugin_id",
+        "storage_code",
+        "source_id",
+        "cache_id",
+        "in_memory_size",
+        "source_bits"
+      ],
+      "type": "object"
+    },
     "SourceRange": {
       "description": "A half-open byte range with an explicit origin.",
       "properties": {
@@ -6850,6 +7155,82 @@
       ],
       "type": "object"
     },
+    "SourceRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "external_source": {
+          "type": "boolean"
+        },
+        "has_media_file": {
+          "type": "boolean"
+        },
+        "in_memory_size": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "language_specific": {
+          "type": "boolean"
+        },
+        "midi": {
+          "type": "boolean"
+        },
+        "plugin_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_bits": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_plugin": {
+          "type": "boolean"
+        },
+        "storage": {
+          "$ref": "#/$defs/Storage"
+        },
+        "storage_code": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "plugin_id",
+        "storage_code",
+        "storage",
+        "source_id",
+        "cache_id",
+        "in_memory_size",
+        "source_bits",
+        "language_specific",
+        "source_plugin",
+        "external_source",
+        "midi",
+        "has_media_file"
+      ],
+      "type": "object"
+    },
     "Status": {
       "description": "Terminal projection status of one record.",
       "oneOf": [
@@ -6869,6 +7250,15 @@
           "type": "string"
         }
       ]
+    },
+    "Storage": {
+      "enum": [
+        "embedded",
+        "prefetch-streamed",
+        "streamed",
+        "other"
+      ],
+      "type": "string"
     },
     "Subresource": {
       "description": "Source-local identity of a metadata object or ordered subresource.",
@@ -10519,6 +10909,132 @@
                     "properties": {
                       "record_type": {
                         "const": "bank-hirc-action"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-sound"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/SoundPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-sound"
                       }
                     },
                     "required": [

@@ -7,9 +7,11 @@ use std::ops::Range;
 use crate::bank_object_fields::SeekObjectFields;
 use crate::bank_reader::SectionReader;
 use crate::bank_source_event;
+use crate::bank_source_sound::{self, BankHircSound};
 use crate::bank_structure::{HircEnvelope, OBJECT_HEADER_LEN, OBJECT_ID_LEN};
 use crate::hirc;
 use crate::hirc_action;
+use crate::hirc_source;
 use crate::read_at::SeekSource;
 use crate::{
     ActionTarget, BankActionFields, BankError, BankHircEvent, BankObservedHeader, BankReadError,
@@ -131,6 +133,8 @@ pub enum BankHircSemantic<'input, R> {
     Action(BankHircAction),
     /// Owner-bound Event interpretation.
     Event(BankHircEvent<'input, R>),
+    /// Owner-bound Sound interpretation.
+    Sound(Box<BankHircSound>),
 }
 
 impl<R> BankHircSemantic<'_, R> {
@@ -141,6 +145,7 @@ impl<R> BankHircSemantic<'_, R> {
             Self::Raw(object) => object,
             Self::Action(action) => &action.object,
             Self::Event(event) => &event.object,
+            Self::Sound(sound) => &sound.object,
         }
     }
 }
@@ -232,7 +237,7 @@ impl<R: Read + Seek> BankHirc<'_, R> {
         Some(result)
     }
 
-    /// Reads the next physical occurrence and its supported Action or Event fields.
+    /// Reads the next physical occurrence and its supported semantic fields.
     ///
     /// The applicable BKHD observation must belong to this source.
     pub fn next_semantic(
@@ -255,6 +260,10 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                 );
             }
             HircKind::Action => self.action(object, version).map(BankHircSemantic::Action),
+            HircKind::Sound if hirc_source::has_sound_layout(version) => {
+                bank_source_sound::observe(self.input, object, version)
+                    .map(|sound| BankHircSemantic::Sound(Box::new(sound)))
+            }
             _ => Ok(BankHircSemantic::Raw(object)),
         };
         if result.is_err() {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::bank_object_fields;
+use crate::bank_object_fields::{self, BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
 use crate::{BankError, HircKind, SectionId};
 
@@ -110,74 +110,109 @@ pub(crate) fn container(
     })
 }
 
-/// Skips the node base parameters of a sound or container and returns its parent ID.
-pub(crate) fn node_base(fields: &mut SectionReader<'_>) -> Result<u32, BankError> {
-    fields.u8()?;
-    let effects = fields.u8()?;
-    if effects > 0 {
-        fields.u8()?;
-        skip_items(fields, u32::from(effects), FX_LEN)?;
-    }
-    fields.u8()?;
-    let metadata = fields.u8()?;
-    skip_items(fields, u32::from(metadata), METADATA_FX_LEN)?;
-    fields.u32()?;
-    let parent_id = fields.u32()?;
-    fields.u8()?;
-    let props = fields.u8()?;
-    skip_items(fields, u32::from(props), PROP_LEN)?;
-    let ranged = fields.u8()?;
-    skip_items(fields, u32::from(ranged), RANGED_PROP_LEN)?;
-    skip_positioning(fields)?;
-    if fields.u8()? & HAS_AUX != 0 {
-        fields.skip(AUX_BUSES_LEN)?;
-    }
-    fields.u32()?;
-    fields.skip(ADVANCED_SETTINGS_LEN)?;
-    skip_states(fields)?;
-    skip_rtpcs(fields)?;
-    Ok(parent_id)
+/// Original words that locate and supply the parent in a node base.
+#[derive(Debug, Default)]
+#[non_exhaustive]
+pub struct BankNodeParentFields {
+    /// Original effect count when readable.
+    pub effect_count: Option<BankHircField<u8>>,
+    /// Original metadata effect count when readable.
+    pub metadata_count: Option<BankHircField<u8>>,
+    /// Original word immediately before the parent ID.
+    pub pre_parent_word: Option<BankHircField<u32>>,
+    /// Original parent ID, including zero, when readable.
+    pub parent_id: Option<BankHircField<u32>>,
 }
 
-fn skip_positioning(fields: &mut SectionReader<'_>) -> Result<(), BankError> {
-    let bits = fields.u8()?;
+/// Traverses a node base and returns its parent ID.
+pub(crate) fn node_base(fields: &mut SectionReader<'_>) -> Result<u32, BankError> {
+    read_base(fields, &mut BankNodeParentFields::default())
+}
+
+pub(crate) fn read_base<F: ObjectFields>(
+    fields: &mut F,
+    observed: &mut BankNodeParentFields,
+) -> Result<u32, F::Error> {
+    let parent = read_parent(fields, observed)?;
+    fields.read_array::<1>()?;
+    let props = fields.read_u8()?.value;
+    skip_items(fields, u32::from(props), PROP_LEN)?;
+    let ranged = fields.read_u8()?.value;
+    skip_items(fields, u32::from(ranged), RANGED_PROP_LEN)?;
+    skip_positioning(fields)?;
+    if fields.read_u8()?.value & HAS_AUX != 0 {
+        fields.skip_bytes(AUX_BUSES_LEN as u64)?;
+    }
+    fields.read_array::<4>()?;
+    fields.skip_bytes(ADVANCED_SETTINGS_LEN as u64)?;
+    skip_states(fields)?;
+    skip_rtpcs(fields)?;
+    Ok(parent)
+}
+
+fn read_parent<F: ObjectFields>(
+    fields: &mut F,
+    observed: &mut BankNodeParentFields,
+) -> Result<u32, F::Error> {
+    fields.read_array::<1>()?;
+    let effects = fields.read_u8()?;
+    let count = u32::from(effects.value);
+    observed.effect_count = Some(effects);
+    if count > 0 {
+        fields.read_array::<1>()?;
+        skip_items(fields, count, FX_LEN)?;
+    }
+    fields.read_array::<1>()?;
+    let metadata = fields.read_u8()?;
+    let count = u32::from(metadata.value);
+    observed.metadata_count = Some(metadata);
+    skip_items(fields, count, METADATA_FX_LEN)?;
+    observed.pre_parent_word = Some(fields.read_u32()?);
+    let parent = fields.read_u32()?;
+    let id = parent.value;
+    observed.parent_id = Some(parent);
+    Ok(id)
+}
+
+fn skip_positioning<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
+    let bits = fields.read_u8()?.value;
     if bits & HAS_POSITIONING == 0 || bits & HAS_3D == 0 {
         return Ok(());
     }
-    fields.u8()?;
+    fields.read_array::<1>()?;
     if (bits >> POSITION_TYPE_SHIFT) & POSITION_TYPE_MASK == 0 {
         return Ok(());
     }
-    fields.skip(PATH_HEADER_LEN)?;
-    let vertices = fields.u32()?;
+    fields.skip_bytes(PATH_HEADER_LEN as u64)?;
+    let vertices = fields.read_u32()?.value;
     skip_items(fields, vertices, VERTEX_LEN)?;
-    let items = fields.u32()?;
+    let items = fields.read_u32()?.value;
     skip_items(fields, items, PATH_ITEM_LEN)?;
     skip_items(fields, items, AUTOMATION_LEN)
 }
 
-fn skip_states(fields: &mut SectionReader<'_>) -> Result<(), BankError> {
-    for _ in 0..fields.variable_length()? {
-        fields.variable_length()?;
-        fields.skip(2)?;
+fn skip_states<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
+    for _ in 0..fields.read_variable_length(SectionId::HIRC)?.value {
+        fields.read_variable_length(SectionId::HIRC)?;
+        fields.skip_bytes(2)?;
     }
-    for _ in 0..fields.variable_length()? {
-        fields.skip(ID_LEN + 1)?;
-        for _ in 0..fields.variable_length()? {
-            fields.u32()?;
-            let values = fields.u16()?;
+    for _ in 0..fields.read_variable_length(SectionId::HIRC)?.value {
+        fields.skip_bytes((ID_LEN + 1) as u64)?;
+        for _ in 0..fields.read_variable_length(SectionId::HIRC)?.value {
+            fields.read_array::<4>()?;
+            let values = fields.read_u16()?.value;
             skip_items(fields, u32::from(values), STATE_VALUE_LEN)?;
         }
     }
     Ok(())
 }
 
-fn skip_rtpcs(fields: &mut SectionReader<'_>) -> Result<(), BankError> {
-    for _ in 0..fields.u16()? {
-        fields.skip(ID_LEN + 2)?;
-        fields.variable_length()?;
-        fields.skip(ID_LEN + 1)?;
-        let points = fields.u16()?;
+fn skip_rtpcs<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
+    for _ in 0..fields.read_u16()?.value {
+        fields.skip_bytes((ID_LEN + 2) as u64)?;
+        fields.read_variable_length(SectionId::HIRC)?;
+        fields.skip_bytes((ID_LEN + 1) as u64)?;
+        let points = fields.read_u16()?.value;
         skip_items(fields, u32::from(points), CURVE_POINT_LEN)?;
     }
     Ok(())
@@ -221,12 +256,10 @@ pub(crate) fn children(fields: &mut SectionReader<'_>) -> Result<Vec<u32>, BankE
     Ok(children)
 }
 
-pub(crate) fn skip_items(
-    fields: &mut SectionReader<'_>,
+pub(crate) fn skip_items<F: ObjectFields>(
+    fields: &mut F,
     count: u32,
     len: usize,
-) -> Result<(), BankError> {
-    fields
-        .skip(bank_object_fields::item_bytes(count, len)?)
-        .map(|_| ())
+) -> Result<(), F::Error> {
+    fields.skip_bytes(bank_object_fields::item_bytes(count, len)? as u64)
 }

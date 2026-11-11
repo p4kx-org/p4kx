@@ -39,13 +39,6 @@ impl<'a> SectionReader<'a> {
         Ok(u32::from_le_bytes(self.array()?))
     }
 
-    /// Reads a Wwise variable-length integer: 7 bits per byte, most significant first, the high
-    /// bit set on every byte but the last.
-    pub(crate) fn variable_length(&mut self) -> Result<u32, BankError> {
-        self.read_variable_length(self.section)
-            .map(|field| field.value)
-    }
-
     /// Skips `len` bytes and returns their range in the body.
     pub(crate) fn skip(&mut self, len: usize) -> Result<std::ops::Range<usize>, BankError> {
         let start = self.position;

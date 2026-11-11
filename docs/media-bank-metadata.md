@@ -15,6 +15,7 @@ Short IDs and display paths may repeat. The source's exact verified bytes are in
 | `audio-bank-hirc-event` | `bank-hirc-event` | HIRC section and Event object ordinals |
 | `audio-bank-hirc-event-action` | `bank-hirc-event-action` | HIRC section, Event object and action ordinals |
 | `audio-bank-hirc-event-tail` | `bank-hirc-event-tail` | HIRC section and Event object ordinals |
+| `audio-bank-hirc-sound` | `bank-hirc-sound` | HIRC section and Sound object ordinals |
 | `audio-bank-hirc` | `bank-hirc` | HIRC section ordinal |
 | `audio-bank-stid` | `bank-stid` | STID section ordinal |
 | `audio-bank-name` | `bank-name` | STID section and name ordinals |
@@ -54,6 +55,16 @@ Each action ID is emitted in original order with its exact word range, including
 A complete Event emits the exact residual body range. Diagnostic Event rows preserve readable
 count fields and the actual count-prefix range. An unsupported layout retains its original body
 and reports the version-dependent status explicitly.
+
+Sound rows preserve the original plug-in ID, storage code, source ID, in-memory size and
+source flag byte when present. Versions 151 through 154 also preserve the original cache ID.
+Storage, playback and language flags retain the original words behind their interpretations.
+Versions 150 through 153 expose the opaque range after the source fields. The optional
+version 154 node retains its original parent ID, including zero, the original routing
+counts and the word immediately before the parent. An admitted source plug-in block retains
+its declared length and exact raw parameter range. A malformed Sound contributes its
+successfully read fields and checked ranges to diagnostic output. An unsupported version
+retains the original body and reports its layout explicitly.
 
 STID header rows retain the authored string type and name count. Each name row carries its
 original ID and byte count, exact header and name ranges, original bytes and UTF-8 result.

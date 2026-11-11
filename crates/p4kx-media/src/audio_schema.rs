@@ -7,12 +7,14 @@ use crate::audio_bank_failure::FAILURE_NAMESPACE as BANK_FAILURE;
 use crate::audio_bank_hirc::{HIRC_NAMESPACE, OBJECT_NAMESPACE};
 use crate::audio_bank_hirc_action::{self, ActionPayload};
 use crate::audio_bank_hirc_event::{self, EventPayload};
+use crate::audio_bank_hirc_sound::{self, SoundPayload};
 use crate::audio_bank_media::MEDIA_NAMESPACE;
 use crate::audio_bank_payload::BankPayload;
 use crate::audio_bank_projection::{HEADER_NAMESPACE, SECTION_NAMESPACE};
 use crate::audio_bank_stid::{NAME_NAMESPACE, STID_NAMESPACE, STID_TAIL_NAMESPACE};
 use crate::audio_bank_stid_payload::BankStidPayload;
 use crate::audio_payload::AudioPayload;
+use crate::audio_schema_status::StatusRule;
 use crate::audio_wem_annotation::FAILURE_NAMESPACE as ANNOTATION_FAILURE;
 use crate::audio_wem_annotation_payload::AnnotationPayload;
 use crate::audio_wem_cue::{CUE_NAMESPACE, POINT_NAMESPACE, TAIL_NAMESPACE};
@@ -21,24 +23,15 @@ use crate::audio_wem_list::{ITEM_NAMESPACE, LIST_NAMESPACE};
 use crate::audio_wem_projection::{
     CHUNK_NAMESPACE, EMBEDDED_INDEX_COUNT, WEM_NAMESPACE, embedded_namespace,
 };
-use crate::{MediaError, Status, schema_merge};
+use crate::{MediaError, schema_merge};
 
 const WEM_PAYLOAD: &str = "AudioPayload";
 const ANNOTATION_PAYLOAD: &str = "AnnotationPayload";
 const BANK_PAYLOAD: &str = "BankPayload";
 const ACTION_PAYLOAD: &str = "ActionPayload";
 const EVENT_PAYLOAD: &str = "EventPayload";
+const SOUND_PAYLOAD: &str = "SoundPayload";
 const STID_PAYLOAD: &str = "BankStidPayload";
-
-#[derive(Clone, Copy)]
-enum StatusRule {
-    Complete,
-    Failed,
-    DuplicateSection,
-    MediaRange,
-    MalformedLayout,
-    ShortListItem,
-}
 
 struct Binding {
     schema: &'static str,
@@ -141,6 +134,11 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         EVENT_PAYLOAD,
         schema_merge::serialized_payload::<EventPayload>(),
     )?;
+    schema_merge::insert_payload(
+        &mut base,
+        SOUND_PAYLOAD,
+        schema_merge::serialized_payload::<SoundPayload>(),
+    )?;
     let root = base
         .as_object_mut()
         .ok_or_else(|| MediaError::Contract("audio record schema is not an object".into()))?;
@@ -195,7 +193,7 @@ const fn wem_bindings() -> [Binding; 4] {
     ]
 }
 
-const fn bank_bindings() -> [Binding; 7] {
+const fn bank_bindings() -> [Binding; 8] {
     [
         Binding::exact(
             BANK_PAYLOAD,
@@ -236,6 +234,13 @@ const fn bank_bindings() -> [Binding; 7] {
             ACTION_PAYLOAD,
             audio_bank_hirc_action::NAMESPACE,
             "bank-hirc-action",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            SOUND_PAYLOAD,
+            audio_bank_hirc_sound::NAMESPACE,
+            "bank-hirc-sound",
             2,
             StatusRule::MalformedLayout,
         ),
@@ -347,56 +352,4 @@ const fn annotation_bindings() -> [Binding; 6] {
             StatusRule::Failed,
         ),
     ]
-}
-
-impl StatusRule {
-    fn schema(self) -> Value {
-        match self {
-            Self::Complete => status_schema(Status::Complete),
-            Self::Failed => status_schema(Status::Failed),
-            Self::DuplicateSection => partial_if(
-                &["data", "payload", "duplicate_unique"],
-                &serde_json::json!(true),
-            ),
-            Self::MediaRange => partial_if(
-                &["data", "payload", "data", "status"],
-                &serde_json::json!("outside-data"),
-            ),
-            Self::MalformedLayout => partial_if(
-                &["data", "payload", "layout"],
-                &serde_json::json!("malformed"),
-            ),
-            Self::ShortListItem => partial_if(
-                &["data", "payload", "content", "type"],
-                &serde_json::json!("malformed"),
-            ),
-        }
-    }
-}
-
-fn partial_if(path: &[&str], value: &Value) -> Value {
-    let predicate = path.iter().rev().fold(
-        serde_json::json!({"const":value}),
-        |property, name| serde_json::json!({"properties":{(*name):property},"required":[name]}),
-    );
-    serde_json::json!({
-        "if": predicate,
-        "then": status_schema(Status::Partial),
-        "else": status_schema(Status::Complete)
-    })
-}
-
-fn status_schema(status: Status) -> Value {
-    let issues = match status {
-        Status::Failed => {
-            serde_json::json!({"contains":{"properties":{"severity":{"const":"error"}},"required":["severity"]}})
-        }
-        Status::Partial => {
-            serde_json::json!({"contains":{"properties":{"severity":{"enum":["warning","error"]}},"required":["severity"]}})
-        }
-        Status::Complete => {
-            serde_json::json!({"items":{"properties":{"severity":{"const":"info"}},"required":["severity"]}})
-        }
-    };
-    serde_json::json!({"properties":{"status":{"const":status},"issues":issues}})
 }

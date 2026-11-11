@@ -17,6 +17,7 @@ mod bnk_sound_layout;
 mod bnk_source;
 mod bnk_source_action;
 mod bnk_source_event;
+mod bnk_source_sound;
 mod bnk_source_stid;
 mod bnk_versions;
 mod codec_tag_2;
