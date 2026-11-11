@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use crate::bank_object_fields::{self, BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
+use crate::hirc_node_state;
 use crate::{BankError, SectionId};
 
 pub(crate) const ID_LEN: usize = 4;
@@ -15,7 +18,6 @@ const PATH_ITEM_LEN: usize = 8;
 const AUTOMATION_LEN: usize = 12;
 const AUX_BUSES_LEN: usize = 16;
 const ADVANCED_SETTINGS_LEN: usize = 6;
-const STATE_VALUE_LEN: usize = 6;
 pub(crate) const CURVE_POINT_LEN: usize = 12;
 const PATH_HEADER_LEN: usize = 1 + 4;
 const HAS_POSITIONING: u8 = 0b0000_0001;
@@ -68,6 +70,14 @@ pub(crate) fn read_base<F: ObjectFields>(
     fields: &mut F,
     observed: &mut BankNodeParentFields,
 ) -> Result<u32, F::Error> {
+    read_base_with_state(fields, observed, &mut None)
+}
+
+pub(crate) fn read_base_with_state<F: ObjectFields>(
+    fields: &mut F,
+    observed: &mut BankNodeParentFields,
+    state: &mut Option<Range<u64>>,
+) -> Result<u32, F::Error> {
     let parent = read_parent(fields, observed)?;
     fields.read_array::<1>()?;
     let props = fields.read_u8()?.value;
@@ -80,7 +90,7 @@ pub(crate) fn read_base<F: ObjectFields>(
     }
     fields.read_array::<4>()?;
     fields.skip_bytes(ADVANCED_SETTINGS_LEN as u64)?;
-    skip_states(fields)?;
+    *state = Some(hirc_node_state::skip(fields)?);
     skip_rtpcs(fields)?;
     Ok(parent)
 }
@@ -124,22 +134,6 @@ fn skip_positioning<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
     let items = fields.read_u32()?.value;
     skip_items(fields, items, PATH_ITEM_LEN)?;
     skip_items(fields, items, AUTOMATION_LEN)
-}
-
-fn skip_states<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
-    for _ in 0..fields.read_variable_length(SectionId::HIRC)?.value {
-        fields.read_variable_length(SectionId::HIRC)?;
-        fields.skip_bytes(2)?;
-    }
-    for _ in 0..fields.read_variable_length(SectionId::HIRC)?.value {
-        fields.skip_bytes((ID_LEN + 1) as u64)?;
-        for _ in 0..fields.read_variable_length(SectionId::HIRC)?.value {
-            fields.read_array::<4>()?;
-            let values = fields.read_u16()?.value;
-            skip_items(fields, u32::from(values), STATE_VALUE_LEN)?;
-        }
-    }
-    Ok(())
 }
 
 pub(crate) fn skip_rtpcs<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {

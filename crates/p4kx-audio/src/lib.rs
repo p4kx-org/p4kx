@@ -9,6 +9,7 @@
 
 mod adpcm;
 mod bank_error;
+mod bank_inline_state_rows;
 mod bank_object_fields;
 mod bank_parse;
 mod bank_reader;
@@ -42,6 +43,7 @@ mod hirc_music_switch_traversal;
 mod hirc_music_track;
 mod hirc_music_transition;
 mod hirc_node;
+mod hirc_node_state;
 mod hirc_plugin;
 mod hirc_source;
 mod hirc_state;
@@ -66,6 +68,7 @@ mod wem_source;
 mod wem_text;
 
 pub use bank_error::{BankError, BankWarning, SectionId};
+pub use bank_inline_state_rows::{BankInlineStateRow, BankInlineStateRows};
 pub use bank_object_fields::BankHircField;
 pub use bank_source::{
     BankObservedHeader, BankReadError, BankSectionCursor, BankSource, BankSourceSection,
@@ -76,8 +79,8 @@ pub use bank_source_container::{
 pub use bank_source_didx::{BankDidx, BankDidxEntry, BankMediaInfo};
 pub use bank_source_event::{BankEvent, BankEventAction, BankEventRead, BankHircEvent};
 pub use bank_source_hirc::{
-    BankActionRead, BankHirc, BankHircAction, BankHircObject, BankHircSemantic, BankHircState,
-    BankStateRead,
+    BankActionRead, BankHirc, BankHircAction, BankHircObject, BankHircSemantic,
+    BankHircSoundStates, BankHircState, BankSoundStateRead, BankStateRead,
 };
 pub use bank_source_music_playlist::{
     BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistRead,
@@ -118,6 +121,7 @@ pub use hirc_music_track::{
 };
 pub use hirc_music_transition::BankMusicTransitionFields;
 pub use hirc_node::{BankNodeParentFields, Container, ContainerKind};
+pub use hirc_node_state::{BankStateBinding, BankStateGroup};
 pub use hirc_source::{
     BankMediaSourceFields, BankSoundContinuation, BankSoundFields, BankSoundNodeBase,
     BankSoundNodeFields,

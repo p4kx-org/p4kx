@@ -10,7 +10,7 @@ use crate::hirc_node::{self, BankNodeParentFields};
 use crate::{BankError, SectionId};
 
 const FIRST_SOUND_VERSION: u32 = 150;
-const NODE_BASE_VERSION: u32 = 154;
+pub(crate) const NODE_BASE_VERSION: u32 = 154;
 
 /// Original scalar reads shared by Sound and `MusicTrack` media sources.
 #[derive(Debug, Default)]
@@ -94,6 +94,8 @@ pub struct BankSoundNodeFields {
 pub struct BankSoundNodeBase {
     /// Original parent fields read by the node base parser.
     pub fields: BankNodeParentFields,
+    /// Checked original inline State extent when its full layout was readable.
+    pub state_chunk: Option<Range<u64>>,
     /// Consumed node base bytes, including its checked opaque regions.
     pub consumed: Range<u64>,
     /// Residual bytes after a complete node traversal, including an empty range.
@@ -191,9 +193,11 @@ fn read_node<F: ObjectFields>(
     }
     let start = fields.offset();
     let mut parent_fields = BankNodeParentFields::default();
-    let parent = hirc_node::read_base(fields, &mut parent_fields);
+    let mut state_chunk = None;
+    let parent = hirc_node::read_base_with_state(fields, &mut parent_fields, &mut state_chunk);
     observed.base = Some(BankSoundNodeBase {
         fields: parent_fields,
+        state_chunk,
         consumed: start..fields.offset(),
         trailing: parent.is_ok().then(|| remainder(fields)),
     });

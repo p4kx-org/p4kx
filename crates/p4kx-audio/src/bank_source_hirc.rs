@@ -17,9 +17,12 @@ use crate::{
 
 #[path = "bank_source_hirc_semantic.rs"]
 mod semantic;
+#[path = "bank_source_sound_states.rs"]
+mod sound_states;
 #[path = "bank_source_state.rs"]
 mod state;
 pub use self::semantic::BankHircSemantic;
+pub use self::sound_states::{BankHircSoundStates, BankSoundStateRead};
 pub use self::state::{BankHircState, BankStateRead};
 
 const COUNT_LEN: u64 = size_of::<u32>() as u64;

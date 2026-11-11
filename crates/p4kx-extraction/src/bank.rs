@@ -35,6 +35,10 @@ pub use p4kx_audio::{
     BankMusicSwitchNode, BankMusicSwitchRead, BankMusicSwitchRow, BankMusicSwitchRows,
     BankMusicSwitchTarget,
 };
+pub use p4kx_audio::{
+    BankHircSoundStates, BankInlineStateRow, BankInlineStateRows, BankSoundStateRead,
+    BankStateBinding, BankStateGroup,
+};
 use rayon::prelude::*;
 
 use crate::entry_content::find_entry;

@@ -102,6 +102,15 @@ pub(crate) fn read_object<F: ObjectFields>(
     })
 }
 
+pub(crate) fn skip_properties<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
+    let count = fields.read_u16()?.value;
+    fields.skip_bytes(property_bytes(count))
+}
+
+const fn property_bytes(count: u16) -> u64 {
+    (count as u64) * (ID_BYTES + VALUE_BYTES)
+}
+
 pub(crate) fn read_properties<F: ObjectFields>(
     fields: &mut F,
     bank_offset: u64,
@@ -109,7 +118,7 @@ pub(crate) fn read_properties<F: ObjectFields>(
     let mut count = fields.read_u16()?;
     count.range.start += bank_offset;
     count.range.end += bank_offset;
-    let needed = u64::from(count.value) * (ID_BYTES + VALUE_BYTES);
+    let needed = property_bytes(count.value);
     let available = fields.remaining_bytes();
     if needed > available {
         return Err(BankError::truncated(
