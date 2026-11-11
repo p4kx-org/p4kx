@@ -4,11 +4,11 @@
 use std::io::{Read, Seek};
 use std::ops::Range;
 
-use p4kx_extraction::DecimalU64;
 use p4kx_extraction::bank::{
     BankContainerChildren, BankContainerFields, BankContainerRead, BankHircContainerNode,
     ContainerKind,
 };
+use p4kx_extraction::{DecimalU64, HircKind};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -17,6 +17,7 @@ use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_payload::BankEntryRange;
 use crate::audio_bank_projection::BankProjection;
 use crate::audio_bank_random_sequence;
+use crate::audio_bank_switch_container;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
 #[path = "audio_bank_hirc_container_origins.rs"]
@@ -94,7 +95,15 @@ pub(crate) fn project<R: Read + Seek>(
     )?;
     children(projection, &sites, container.children(), writer)?;
     audio_bank_container_node::project(projection, version, &mut container, writer)?;
-    audio_bank_random_sequence::project(projection, version, &mut container, writer)
+    match container.object().kind(version.version) {
+        HircKind::RandomSequenceContainer => {
+            audio_bank_random_sequence::project(projection, version, &mut container, writer)
+        }
+        HircKind::SwitchContainer => {
+            audio_bank_switch_container::project(projection, version, &mut container, writer)
+        }
+        _ => Ok(()),
+    }
 }
 
 fn header(

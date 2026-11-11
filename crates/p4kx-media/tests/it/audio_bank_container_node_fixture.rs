@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, HircLayout, OpenOptions};
-use p4kx_media::{ExportOutcome, MediaRecord};
-use p4kx_testkit::{ArchiveBuilder, TestBank, TestEntry, TestHircObject, test_key};
+use p4kx_extraction::{Archive, HircLayout, OpenOptions, Soundbank};
+use p4kx_media::{ExportOutcome, MediaRecord, Status};
+use p4kx_testkit::{ArchiveBuilder, TestBank, TestEntry, TestHircObject, TestNodeBase, test_key};
 use serde_json::{Value, json};
 
 use super::super::audio_bank_state_provider::{
@@ -20,6 +20,43 @@ pub(crate) fn bank(version: u32, container: TestHircObject) -> Vec<u8> {
         .object(container)
         .object(TestHircObject::event(1, &[]))
         .bytes()
+}
+
+pub(crate) fn source(
+    type_byte: u8,
+    id: u32,
+    version: u32,
+    continuation: &[u8],
+) -> TestResult<Vec<u8>> {
+    const PLAIN_NODE_BYTES: usize = 31;
+    let original = bank(
+        154,
+        TestHircObject::actor_mixer(id, &[], TestNodeBase::Plain),
+    );
+    let parsed = Soundbank::parse(&original)?;
+    let object = parsed.objects().first().ok_or("original synthetic node")?;
+    let original_body = parsed.object_body(object);
+    let start = size_of::<u32>();
+    let mut body = original_body
+        .get(start..start + PLAIN_NODE_BYTES)
+        .ok_or("original synthetic NodeBase")?
+        .to_vec();
+    body.extend(continuation);
+    Ok(bank(version, TestHircObject::raw(type_byte, id, body)))
+}
+
+pub(crate) fn layout(record: &MediaRecord, expected: &str, status: Status) {
+    assert_eq!(
+        record.status, status,
+        "separate original coverage for {}",
+        record.subresource.namespace
+    );
+    assert_eq!(
+        record.data.pointer("/payload/layout"),
+        Some(&json!(expected)),
+        "original layout for {}",
+        record.subresource.namespace
+    );
 }
 
 pub(crate) fn export(
@@ -131,6 +168,27 @@ impl Evidence<'_> {
             position,
             &format!("/data/payload/{field}"),
             "conversion",
+            label,
+            span,
+        )
+    }
+
+    pub(crate) fn index(
+        &self,
+        row_position: usize,
+        index: u8,
+        selector: &MediaRecord,
+        field: &str,
+        label: &str,
+    ) -> TestResult {
+        let span = selector
+            .data
+            .pointer(&format!("/payload/{field}/range"))
+            .ok_or("original index selector span")?;
+        self.receipt(
+            row_position,
+            &format!("/subresource/indices/{index}"),
+            "selector",
             label,
             span,
         )

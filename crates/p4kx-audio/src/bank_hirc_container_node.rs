@@ -9,6 +9,8 @@ use crate::bank_node_property_rows::BankNodePropertyRows;
 use crate::bank_positioning_rows::BankPositioningRows;
 use crate::bank_random_sequence_rows::BankRandomSequenceRows;
 use crate::bank_rtpc_rows::BankRtpcRows;
+use crate::bank_switch_configuration_rows::BankSwitchConfigurationRows;
+use crate::bank_switch_group_rows::BankSwitchGroupRows;
 use crate::hirc_container::{BankContainerFields, Layout};
 use crate::hirc_node_aux::{self, BankNodeUserAuxBuses};
 use crate::hirc_node_fx::BankNodeFxKind;
@@ -65,6 +67,28 @@ impl<R> BankHircContainerNode<'_, R> {
         Some(BankRandomSequenceRows::new(
             self.input,
             playlist.checked_range.clone(),
+        ))
+    }
+
+    /// Borrows checked original Switch membership groups and members.
+    pub fn switch_groups(&mut self) -> Option<BankSwitchGroupRows<'_, R>> {
+        let extent = self.observation.fields.switch.as_ref()?.groups.as_ref()?;
+        Some(BankSwitchGroupRows::new(self.input, self.stopped, extent))
+    }
+
+    /// Borrows checked original per-child Switch configurations.
+    pub fn switch_configurations(&mut self) -> Option<BankSwitchConfigurationRows<'_, R>> {
+        let extent = self
+            .observation
+            .fields
+            .switch
+            .as_ref()?
+            .configurations
+            .as_ref()?;
+        Some(BankSwitchConfigurationRows::new(
+            self.input,
+            self.stopped,
+            extent,
         ))
     }
 

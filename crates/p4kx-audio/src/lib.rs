@@ -31,6 +31,8 @@ mod bank_source_music_track;
 mod bank_source_sound;
 mod bank_stid;
 mod bank_structure;
+mod bank_switch_configuration_rows;
+mod bank_switch_group_rows;
 mod codec;
 mod error;
 mod hirc;
@@ -62,6 +64,7 @@ mod hirc_random_sequence;
 mod hirc_rtpc;
 mod hirc_source;
 mod hirc_state;
+mod hirc_switch_container;
 mod ima;
 mod loops;
 mod media_class;
@@ -125,6 +128,10 @@ pub use bank_source_music_switch::{
 pub use bank_source_music_track::{BankHircMusicTrack, BankMusicTrackRead, BankMusicTrackRows};
 pub use bank_source_sound::{BankHircSound, BankSoundRead};
 pub use bank_stid::{BankStid, BankStidName};
+pub use bank_switch_configuration_rows::{BankSwitchConfiguration, BankSwitchConfigurationRows};
+pub use bank_switch_group_rows::{
+    BankSwitchGroup, BankSwitchGroupRows, BankSwitchMember, BankSwitchMembership,
+};
 pub use codec::Codec;
 pub use error::AudioError;
 pub use hirc::{HircKind, HircObject, HircValue, MediaStorage, SoundSource};
@@ -170,6 +177,7 @@ pub use hirc_source::{
     BankSoundNodeFields,
 };
 pub use hirc_state::{StateObject, StateProperties, StateProperty};
+pub use hirc_switch_container::{BankSwitchContainerFields, BankSwitchExtent};
 pub use loops::Loop;
 pub use media_class::{BankDeclaredLengthSource, BankMediaClassSource, MediaClass};
 pub use ogg::OggWriter;

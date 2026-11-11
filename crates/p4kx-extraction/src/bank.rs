@@ -59,6 +59,10 @@ pub use p4kx_audio::{
     BankRandomSequenceFields, BankRandomSequenceItem, BankRandomSequencePlaylist,
     BankRandomSequenceRows,
 };
+pub use p4kx_audio::{
+    BankSwitchConfiguration, BankSwitchConfigurationRows, BankSwitchContainerFields,
+    BankSwitchExtent, BankSwitchGroup, BankSwitchGroupRows, BankSwitchMember, BankSwitchMembership,
+};
 use rayon::prelude::*;
 
 use crate::entry_content::find_entry;

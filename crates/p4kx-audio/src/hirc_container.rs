@@ -5,16 +5,13 @@ use std::ops::Range;
 
 use crate::bank_object_fields::ObjectFields;
 use crate::bank_reader::SectionReader;
-use crate::hirc_node::{
-    self, BankNodeParentFields, CURVE_POINT_LEN, Container, ContainerKind, ID_LEN,
-};
+use crate::hirc_node::{self, BankNodeParentFields, CURVE_POINT_LEN, Container, ContainerKind};
 use crate::hirc_node_parameters::BankNodeParameters;
 use crate::hirc_random_sequence::{self, BankRandomSequenceFields};
+use crate::hirc_switch_container::{self, BankSwitchContainerFields};
 use crate::{BankError, BankHircField, HircKind, SectionId};
 
 const SEQUENCE_MODE: u8 = 1;
-const SWITCH_GROUP_LEN: u64 = 10;
-const SWITCH_PARAMETERS_LEN: usize = 13;
 const LAYER_ASSOCIATION_LEN: u64 = 5;
 
 /// Original fields and checked extents of one container body.
@@ -31,6 +28,8 @@ pub struct BankContainerFields {
     pub mode: Option<BankHircField<u8>>,
     /// Original Random/Sequence decision fields when reached.
     pub random_sequence: Option<BankRandomSequenceFields>,
+    /// Original Switch decision fields when reached.
+    pub switch: Option<BankSwitchContainerFields>,
     /// The decoded container kind when selected.
     pub kind: Option<ContainerKind>,
     /// Original child count when readable.
@@ -115,7 +114,10 @@ fn container_kind<F: ObjectFields>(
 ) -> Result<ContainerKind, F::Error> {
     let kind = match layout {
         Layout::Switch => {
-            fields.skip_bytes(SWITCH_GROUP_LEN)?;
+            let decisions = observed
+                .switch
+                .insert(BankSwitchContainerFields::new(fields.offset()));
+            hirc_switch_container::header(fields, decisions)?;
             ContainerKind::Switch
         }
         Layout::Blend => ContainerKind::Blend,
@@ -148,7 +150,15 @@ pub(crate) fn tail<F: ObjectFields>(
     let start = fields.offset();
     observed.suffix = Some(start..start + fields.remaining_bytes());
     match layout {
-        Layout::Switch => switch_tail(fields)?,
+        Layout::Switch => {
+            let decisions = observed.switch.as_mut().ok_or_else(|| {
+                BankError::invalid(
+                    SectionId::HIRC,
+                    "Switch tables precede their decision header",
+                )
+            })?;
+            hirc_switch_container::tables(fields, decisions)?;
+        }
         Layout::Blend => blend_tail(fields)?,
         Layout::RandomSequence => {
             let decisions = observed.random_sequence.as_mut().ok_or_else(|| {
@@ -166,16 +176,6 @@ pub(crate) fn tail<F: ObjectFields>(
         );
     }
     Ok(())
-}
-
-fn switch_tail<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {
-    for _ in 0..fields.read_u32()?.value {
-        fields.read_array::<4>()?;
-        let count = fields.read_u32()?.value;
-        hirc_node::skip_items(fields, count, ID_LEN)?;
-    }
-    let count = fields.read_u32()?.value;
-    hirc_node::skip_items(fields, count, SWITCH_PARAMETERS_LEN)
 }
 
 fn blend_tail<F: ObjectFields>(fields: &mut F) -> Result<(), F::Error> {

@@ -27,6 +27,7 @@ pub(crate) enum NodeKind {
     AdvancedSettings,
     ActionProperties,
     RandomSequence,
+    SwitchContainer,
 }
 
 impl NodeKind {
@@ -42,6 +43,7 @@ impl NodeKind {
             Self::AdvancedSettings => "bnkHircNodeAdvancedSettings",
             Self::ActionProperties => "bnkHircActionProperties",
             Self::RandomSequence => "bnkHircRandomSequence",
+            Self::SwitchContainer => "bnkHircSwitchContainer",
         }
     }
 
@@ -57,6 +59,7 @@ impl NodeKind {
             Self::AdvancedSettings => "nodeAdvancedRowPosition",
             Self::ActionProperties => "actionPropertyPosition",
             Self::RandomSequence => "randomSequencePlaylistPosition",
+            Self::SwitchContainer => "switchContainerPosition",
         }
     }
 
@@ -72,6 +75,7 @@ impl NodeKind {
             Self::AdvancedSettings => "nodeAdvancedExtent",
             Self::ActionProperties => "actionPropertyExtent",
             Self::RandomSequence => "randomSequenceExtent",
+            Self::SwitchContainer => "switchContainerExtent",
         }
     }
 }
@@ -119,6 +123,17 @@ impl NodeSites {
         let object = prepared.capture([self.object.route()])?;
         prepared.field("/subresource/indices/1", object)?;
         Ok(prepared)
+    }
+
+    pub(crate) fn index(
+        &self,
+        prepared: &mut BankOrigins<'_, '_, '_>,
+        index: u8,
+        range: &Range<u64>,
+        label: &'static str,
+    ) -> Result<(), MediaError> {
+        let receipt = self.observed(prepared, range, label, SourceUseRole::Selector)?;
+        prepared.field(&format!("/subresource/indices/{index}"), receipt)
     }
 
     pub(crate) fn summary(

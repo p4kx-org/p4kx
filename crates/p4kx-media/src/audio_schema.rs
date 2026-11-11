@@ -45,6 +45,8 @@ mod random_sequence;
 mod rtpc;
 #[path = "audio_schema_state.rs"]
 mod state;
+#[path = "audio_schema_switch_container.rs"]
+mod switch_container;
 #[path = "audio_schema_wem.rs"]
 mod wem;
 
@@ -180,6 +182,11 @@ fn insert_audio_payloads(base: &mut Value) -> Result<(), MediaError> {
         LOOSE_INVENTORY,
         schema_merge::serialized_payload::<LooseInventoryPayload<'static>>(),
     )?;
+    insert_hirc_field_payloads(base)?;
+    foreign::insert_payload(base)
+}
+
+fn insert_hirc_field_payloads(base: &mut Value) -> Result<(), MediaError> {
     music::insert_payload(base)?;
     state::insert_payload(base)?;
     rtpc::insert_payload(base)?;
@@ -189,7 +196,7 @@ fn insert_audio_payloads(base: &mut Value) -> Result<(), MediaError> {
     node_playback::insert_payload(base)?;
     action_properties::insert_payload(base)?;
     random_sequence::insert_payload(base)?;
-    foreign::insert_payload(base)
+    switch_container::insert_payload(base)
 }
 
 pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
@@ -218,6 +225,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             .chain(node_playback::bindings().iter())
             .chain(action_properties::bindings().iter())
             .chain(random_sequence::bindings().iter())
+            .chain(switch_container::bindings().iter())
             .chain(foreign::bindings().iter())
             .chain(std::iter::once(&BANK_FAILURE_BINDING))
             .chain(stid_bindings().iter())

@@ -31,6 +31,7 @@ mod audio_bank_sound_candidate_provider;
 mod audio_bank_sound_loose_provider;
 mod audio_bank_state_provider;
 mod audio_bank_stid_provider;
+mod audio_bank_switch_container_provider;
 mod audio_control_coverage;
 mod audio_control_graph;
 mod audio_control_path;

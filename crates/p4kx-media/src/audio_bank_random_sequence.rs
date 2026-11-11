@@ -3,12 +3,11 @@
 
 use std::io::{Read, Seek};
 
-use p4kx_extraction::HircKind;
 use p4kx_extraction::bank::{
-    BankContainerRead, BankHircContainerNode, BankHircField, BankHircObject,
-    BankRandomSequenceFields,
+    BankHircContainerNode, BankHircField, BankHircObject, BankRandomSequenceFields,
 };
 
+use crate::audio_bank_container_node;
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_node_declarations::{Coverage, Declarations, Disposition};
 use crate::audio_bank_node_origins::{NodeKind, NodeSites};
@@ -26,21 +25,8 @@ pub(crate) fn project<R: Read + Seek>(
     container: &mut BankHircContainerNode<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let original = container.object();
-    if original.kind(version.version) != HircKind::RandomSequenceContainer {
-        return Ok(());
-    }
-    let declarations = Declarations::new(projection, original, version);
-    let disposition = match container.status() {
-        BankContainerRead::Decoded => Disposition::Observed(None),
-        BankContainerRead::Malformed(error) => Disposition::Observed(Some(error)),
-        BankContainerRead::Unsupported(_) => Disposition::Unsupported,
-        _ => {
-            return Err(MediaError::Contract(
-                "unexpected Random/Sequence disposition".into(),
-            ));
-        }
-    };
+    let declarations = Declarations::new(projection, container.object(), version);
+    let disposition = audio_bank_container_node::disposition(container.status())?;
     let fields = container.fields();
     summary(
         &declarations,
@@ -61,11 +47,8 @@ pub(crate) fn unsupported(
     original: &BankHircObject,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    if original.kind(version.version) == HircKind::RandomSequenceContainer {
-        let declarations = Declarations::new(projection, original, version);
-        summary(&declarations, Disposition::Unsupported, None, None, writer)?;
-    }
-    Ok(())
+    let declarations = Declarations::new(projection, original, version);
+    summary(&declarations, Disposition::Unsupported, None, None, writer)
 }
 
 fn summary(

@@ -9276,6 +9276,113 @@
         }
       ]
     },
+    "NodeDeclaration_SwitchContainerObservations": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/SwitchContainerObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/SwitchContainerObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "absent",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "NodePlaybackPayload": {
       "oneOf": [
         {
@@ -13344,6 +13451,267 @@
       ],
       "type": "object"
     },
+    "SwitchConfigurationRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "child_id": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "fade_in": {
+              "$ref": "#/$defs/SwitchFadeWord"
+            },
+            "fade_out": {
+              "$ref": "#/$defs/SwitchFadeWord"
+            },
+            "flags": {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "reference_resolution": {
+              "$ref": "#/$defs/NodeReferenceStatus"
+            }
+          },
+          "required": [
+            "layout",
+            "child_id",
+            "flags",
+            "fade_out",
+            "fade_in",
+            "reference_resolution"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "child_id": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "fade_in": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SwitchFadeWord"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "fade_out": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SwitchFadeWord"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "flags": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BankField_uint8"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "reference_resolution": {
+              "$ref": "#/$defs/NodeReferenceStatus"
+            }
+          },
+          "required": [
+            "layout",
+            "child_id",
+            "reference_resolution"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "SwitchContainerObservations": {
+      "additionalProperties": false,
+      "properties": {
+        "configurations": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SwitchTable"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "continuous_validation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "default_value_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "group_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SwitchGroupKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "group_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groups": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SwitchTable"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "SwitchContainerPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/NodeDeclaration_SwitchContainerObservations"
+            },
+            "record_type": {
+              "const": "bank-hirc-switch-container",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SwitchMembershipGroupRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-switch-membership-group",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SwitchMemberRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-switch-membership",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SwitchConfigurationRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-switch-child-configuration",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "SwitchContainerPayload"
+    },
+    "SwitchFadeWord": {
+      "additionalProperties": false,
+      "properties": {
+        "bits": {
+          "$ref": "#/$defs/BankField_uint32"
+        },
+        "signed_value": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bits",
+        "signed_value"
+      ],
+      "type": "object"
+    },
+    "SwitchGroupKind": {
+      "enum": [
+        "switch",
+        "state"
+      ],
+      "type": "string"
+    },
     "SwitchGroupRecord": {
       "additionalProperties": false,
       "properties": {
@@ -13379,6 +13747,88 @@
         "unsupported"
       ],
       "type": "string"
+    },
+    "SwitchMemberRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "child_id": {
+          "$ref": "#/$defs/BankField_uint32"
+        },
+        "reference_resolution": {
+          "$ref": "#/$defs/NodeReferenceStatus"
+        }
+      },
+      "required": [
+        "child_id",
+        "reference_resolution"
+      ],
+      "type": "object"
+    },
+    "SwitchMembershipGroupRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "member_count": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "members_range": {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            "value_id": {
+              "$ref": "#/$defs/BankField_uint32"
+            }
+          },
+          "required": [
+            "layout",
+            "value_id",
+            "member_count",
+            "members_range"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "member_count": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BankField_uint32"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "members_range": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BankEntryRange"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "value_id": {
+              "$ref": "#/$defs/BankField_uint32"
+            }
+          },
+          "required": [
+            "layout",
+            "value_id"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "SwitchNodeRecord": {
       "additionalProperties": false,
@@ -13582,6 +14032,33 @@
         "tree_range"
       ],
       "type": "object"
+    },
+    "SwitchTable": {
+      "additionalProperties": false,
+      "properties": {
+        "checked_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "coverage": {
+          "$ref": "#/$defs/SwitchTableCoverage"
+        },
+        "declared_count": {
+          "$ref": "#/$defs/BankField_uint32"
+        }
+      },
+      "required": [
+        "declared_count",
+        "checked_range",
+        "coverage"
+      ],
+      "type": "object"
+    },
+    "SwitchTableCoverage": {
+      "enum": [
+        "complete",
+        "truncated"
+      ],
+      "type": "string"
     },
     "SwitchTargetRecord": {
       "additionalProperties": false,
@@ -23913,6 +24390,462 @@
                     "properties": {
                       "record_type": {
                         "const": "bank-hirc-random-sequence-playlist-item"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-switch-container"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/SwitchContainerPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-switch-container"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-switch-membership-group"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/SwitchContainerPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-switch-membership-group"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-switch-membership"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/SwitchContainerPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-switch-membership"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 4,
+                    "minItems": 4
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-switch-child-configuration"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/SwitchContainerPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-switch-child-configuration"
                       }
                     },
                     "required": [

@@ -66,6 +66,10 @@ and fallback selection.
 | `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
 | `audio-bank-hirc-random-sequence` | `bank-hirc-random-sequence` | HIRC section and Random/Sequence object ordinals |
 | `audio-bank-hirc-random-sequence-playlist-item` | `bank-hirc-random-sequence-playlist-item` | HIRC section, Random/Sequence object and playlist item ordinals |
+| `audio-bank-hirc-switch-container` | `bank-hirc-switch-container` | HIRC section and Switch object ordinals |
+| `audio-bank-hirc-switch-membership-group` | `bank-hirc-switch-membership-group` | HIRC section, Switch object and membership group ordinals |
+| `audio-bank-hirc-switch-membership` | `bank-hirc-switch-membership` | HIRC section, Switch object, membership group and member ordinals |
+| `audio-bank-hirc-switch-child-configuration` | `bank-hirc-switch-child-configuration` | HIRC section, Switch object and child configuration ordinals |
 | `audio-bank-hirc-container-rtpc` | `bank-hirc-container-rtpc` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-rtpc-curve` | `bank-hirc-container-rtpc-curve` | HIRC section, container object and curve ordinals |
 | `audio-bank-hirc-container-rtpc-point` | `bank-hirc-container-rtpc-point` | HIRC section, container object, curve and point ordinals |
@@ -264,6 +268,16 @@ item with a full play ID retains its ID and has a malformed layout. The summary
 reports unsupported versions and preserves the readable decision prefix when a
 supported body is truncated. Each original field and numeric conversion refers
 to its checked physical bytes in the owning bank.
+
+Version-154 Switch summaries preserve the original group code and ID,
+default value ID, continuous-validation byte and both original table counts,
+checked ranges and independent completion states. Known group codes identify Switch and State. Membership
+groups preserve their authored order, value IDs and checked member lists.
+Per-child configuration rows preserve flags, signed fade words and original
+bits, in their authored order. Repeated IDs and zero values remain present.
+Each checked member and configuration uses its owning bank for field origins.
+A truncated table retains its checked rows and readable field prefixes. Child
+references carry unchecked resolution, independent of the original child list.
 
 Version-154 Sound, ActorMixer and container node property summaries include the original override bus
 and direct parent words and the checked property and ranged modifier lists. Explicit zero

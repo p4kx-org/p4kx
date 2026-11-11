@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{HircLayout, Soundbank};
+use p4kx_extraction::HircLayout;
 use p4kx_media::{MediaRecord, Status};
-use p4kx_testkit::{TestContainerKind, TestHircObject, TestNodeBase};
 use serde_json::json;
 
-use super::audio_bank_container_node_provider::fixture::{Evidence, bank, export};
+use super::audio_bank_container_node_provider::fixture::{Evidence, export, layout, source};
 use super::audio_bank_state_provider::row;
 use super::support::audio_provider::TestResult;
 
 const OBJECT_ID: u32 = 0xF551_2015;
 const CHILD_A: u32 = 0xA011_2233;
 const CHILD_B: u32 = 0xB022_3344;
-const PLAIN_NODE_BYTES: usize = 31;
+const RANDOM_SEQUENCE_TYPE: u8 = 5;
 const SUMMARY: &str = "audio-bank-hirc-random-sequence";
 const ITEM: &str = "audio-bank-hirc-random-sequence-playlist-item";
 const CONTAINER: &str = "audio-bank-hirc-container";
@@ -28,7 +27,7 @@ fn v154_sequence_preserves_timing_flags_and_ordered_signed_weights() -> TestResu
         tail.extend(id.to_le_bytes());
         tail.extend(weight.to_le_bytes());
     }
-    let bytes = source(154, &tail)?;
+    let bytes = source(RANDOM_SEQUENCE_TYPE, OBJECT_ID, 154, &tail)?;
     export(&bytes, true, HircLayout::Decoded, |rows, evidence| {
         let summary = row(rows, SUMMARY, &[1, 0])?;
         layout(summary.1, "decoded", Status::Complete);
@@ -154,7 +153,7 @@ fn maximal_authored_playlist_count_preserves_only_the_physical_prefix() -> TestR
     tail.extend(u16::MAX.to_le_bytes());
     tail.extend(CHILD_A.to_le_bytes());
     tail.extend([0xFE, 0xFF]);
-    let bytes = source(154, &tail)?;
+    let bytes = source(RANDOM_SEQUENCE_TYPE, OBJECT_ID, 154, &tail)?;
     export(&bytes, false, HircLayout::Malformed, |rows, evidence| {
         let summary = row(rows, SUMMARY, &[1, 0])?;
         layout(summary.1, "malformed", Status::Partial);
@@ -186,7 +185,7 @@ fn maximal_authored_playlist_count_preserves_only_the_physical_prefix() -> TestR
 
 #[test]
 fn short_decision_header_keeps_the_original_loop_prefix() -> TestResult {
-    let bytes = source(154, &[3, 0, 0xAF])?;
+    let bytes = source(RANDOM_SEQUENCE_TYPE, OBJECT_ID, 154, &[3, 0, 0xAF])?;
     export(&bytes, true, HircLayout::Malformed, |rows, evidence| {
         let summary = row(rows, SUMMARY, &[1, 0])?;
         layout(summary.1, "malformed", Status::Partial);
@@ -219,7 +218,7 @@ fn empty_playlist_and_unsupported_container_version_are_explicit() -> TestResult
         (154, HircLayout::Decoded, "decoded"),
         (153, HircLayout::Unsupported, "unsupported"),
     ] {
-        let bytes = source(version, &tail)?;
+        let bytes = source(RANDOM_SEQUENCE_TYPE, OBJECT_ID, version, &tail)?;
         export(&bytes, false, status, |rows, evidence| {
             let summary = row(rows, SUMMARY, &[1, 0])?;
             layout(summary.1, expected, Status::Complete);
@@ -260,43 +259,4 @@ fn heading() -> Vec<u8> {
     tail.extend([0xFE, 0xFD, 1, 0xE7]);
     tail.extend([2, CHILD_A, CHILD_B].into_iter().flat_map(u32::to_le_bytes));
     tail
-}
-
-fn source(version: u32, decision: &[u8]) -> TestResult<Vec<u8>> {
-    let original = bank(
-        154,
-        TestHircObject::container(
-            TestContainerKind::Sequence,
-            OBJECT_ID,
-            &[],
-            TestNodeBase::Plain,
-        ),
-    );
-    let parsed = Soundbank::parse(&original)?;
-    let object = parsed
-        .objects()
-        .first()
-        .ok_or("original synthetic container")?;
-    let original_body = parsed.object_body(object);
-    let start = size_of::<u32>();
-    let mut body = original_body
-        .get(start..start + PLAIN_NODE_BYTES)
-        .ok_or("original synthetic NodeBase")?
-        .to_vec();
-    body.extend(decision);
-    Ok(bank(version, TestHircObject::raw(5, OBJECT_ID, body)))
-}
-
-fn layout(record: &MediaRecord, expected: &str, status: Status) {
-    assert_eq!(
-        record.status, status,
-        "separate original coverage for {}",
-        record.subresource.namespace
-    );
-    assert_eq!(
-        record.data.pointer("/payload/layout"),
-        Some(&json!(expected)),
-        "original layout for {}",
-        record.subresource.namespace
-    );
 }
