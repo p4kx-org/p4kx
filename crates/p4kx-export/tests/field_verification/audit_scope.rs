@@ -34,9 +34,14 @@ pub(crate) fn kinds(inventory: &Inventory) -> super::Result<Vec<Kind>> {
 pub(crate) fn from_names<'a>(names: impl IntoIterator<Item = &'a str>) -> super::Result<Vec<Kind>> {
     let mut selected = Vec::new();
     for name in names {
+        let source_kind = if name == super::coverage::SHIELD_GENERATORS {
+            Kind::Items.name()
+        } else {
+            name
+        };
         let kind = Kind::ALL
             .into_iter()
-            .find(|kind| kind.name() == name)
+            .find(|kind| kind.name() == source_kind)
             .ok_or_else(|| {
                 Error::new(
                     ErrorKind::Mapping,

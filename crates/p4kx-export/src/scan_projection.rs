@@ -6,6 +6,7 @@ use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 use super::Scan;
 use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
 use crate::commodity_resource::{self, CommodityResource};
+use crate::contract_stats::ItemStats;
 use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
 use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDiagnosis};
 use crate::harvest_config::multi_config;
@@ -70,8 +71,8 @@ impl<'f> Scan<'_, '_, 'f> {
         {
             let (read, stats) = self.item_components(tree, trees, admission, ledger)?;
             *components = read.rows;
-            entity.stats = stats.map(Box::new);
-            entity.variant_key = item_variant::key(tree, entity.stats.as_deref());
+            entity.variant_key = item_variant::key(tree, stats.as_ref());
+            entity.stats = stats.and_then(ItemStats::into_published).map(Box::new);
         }
         Ok(picked.map(|picked| picked.crafted(tree)))
     }
@@ -82,13 +83,7 @@ impl<'f> Scan<'_, '_, 'f> {
         trees: &mut TreeBuilder<'f>,
         admission: &RecordObservation<'_, 'f>,
         ledger: &mut ExportLedger,
-    ) -> Result<
-        (
-            ItemComponentsRead<'f>,
-            Option<crate::contract_stats::ItemStats<'f>>,
-        ),
-        CatalogError,
-    > {
+    ) -> Result<(ItemComponentsRead<'f>, Option<ItemStats<'f>>), CatalogError> {
         let cancel = self.options.cancel;
         catalog_item_components::read(
             tree,

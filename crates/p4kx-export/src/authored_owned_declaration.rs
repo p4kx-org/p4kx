@@ -16,7 +16,73 @@ use crate::{CatalogError, ExportAccountingError};
 #[path = "authored_owned_family.rs"]
 mod family;
 
-impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
+#[derive(Clone, Copy)]
+enum ClassShape {
+    Scalar,
+    Array,
+}
+
+impl ClassShape {
+    const fn description(self) -> &'static str {
+        match self {
+            Self::Scalar => "a nullable scalar Class",
+            Self::Array => "a nullable Class array",
+        }
+    }
+}
+
+impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> {
+    pub(in crate::catalog_v3) fn declared_class<T>(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+        decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        self.read_class(name, ClassShape::Scalar, notes, |fact, expected, notes| {
+            self.owned_state(name, fact, expected, notes, decode)
+        })
+    }
+
+    pub(in crate::catalog_v3) fn declared_class_array<T>(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+        decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
+        self.read_class(name, ClassShape::Array, notes, |fact, expected, notes| {
+            let state = self.array_state(name, fact, expected, notes, decode)?;
+            Ok((OriginalValuePart::Value, state))
+        })
+    }
+
+    fn read_class<T>(
+        &self,
+        name: &str,
+        shape: ClassShape,
+        notes: &mut Vec<FieldError>,
+        read: impl FnOnce(
+            &'reader Fact<'scope, 'read, 'source>,
+            &[&str],
+            &mut Vec<FieldError>,
+        ) -> Result<(OriginalValuePart, SourceValue<T>), CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
+            return self.absent();
+        };
+        let storage = fact.field().storage();
+        if storage.data_type() != DataType::Class
+            || storage.is_array() != matches!(shape, ClassShape::Array)
+        {
+            let state = self.failure(name, fact.value(), shape.description(), notes)?;
+            return self.bind_storage(fact, state);
+        }
+        let declared = fact.observe_declared_target(self.input)?;
+        let target = declared.0.as_ref().ok().copied();
+        self.read_declared_value(fact, target.as_slice(), declared, notes, |notes| {
+            let (part, state) = read(fact, target.as_slice(), notes)?;
+            fact.bind(part, state, SourceUseRole::Selector, true)
+        })
+    }
     /// Retains the actual contents of a scalar `StrongPointer` to the declared base.
     pub(in crate::catalog_v3) fn raw_strong_pointer_to(
         &self,

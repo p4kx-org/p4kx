@@ -209,6 +209,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `configurations.weaponActions` | Physical weapon component owners, ordered authored action slots, stored launcher selectors and independent heat fields. [Authored weapon actions and launchers](catalog-ammo-definitions.md#authored-weapon-actions-and-launchers) |
 | `definitions.blueprints` | Physical Blueprint Records and their complete original value arenas in GUID order |
 | `configurations.durability`, `configurations.degradation`, `configurations.distortion` | Original item component occurrences, raw values and provenance. [Item durability](catalog-durability.md) |
+| `configurations.shieldGenerators` | Original shield generator component occurrences, typed values and provenance. [Shield generators](catalog-shield-generators.md) |
 | `configurations.explosives` | Original sensor mine triggers and explosive ordnance settings by physical Item and component position. [Explosive components](catalog-explosives.md) |
 | `configurations.hackingChips` | Original chip charge counts and ordered removable modifier declarations by physical Item and component slot. [Hacking chips](catalog-hacking-chips.md) |
 | `configurations.blueprintTiers` | Every interpreted tier with cost relationships, normalized values and Research |
@@ -377,7 +378,7 @@ An item takes its fields from the components of its `EntityClassDefinition`:
 | `itemClass` | `Civilian`, `Competition`, `Industrial`, `Military` or `Stealth`, or `null` |
 | `playability` | `player`, `mission` or `special`, or `null`; see "Playability" below |
 | `variantOf` | The `guid` of the base of the item's variant group, `null` for a base and an ungrouped item; see "Variant groups" below |
-| `stats` | The typed stat blocks of a weapon, shield, quantum drive, power plant, cooler, missile, suit armour, clothing, radar, tractor beam, attachment modifier, mining laser or mining module and gadget, `null` for any other item; see "Item stats" below |
+| `stats` | Item stat blocks, health and resource states. See "Item stats" below. |
 
 `itemClass` takes the options of the DataForge enum `EItemClass` (without `UNDEFINED`). No
 DataForge field carries it: it is read from the first line of the English `description` that
@@ -436,10 +437,10 @@ those parts too. No value is below 1 or above 7.
 
 `stats` holds raw facts of the Archive and no derived value (ADR-0065): every number is the stored
 field in the stored unit, `p4kx` computes no damage per second, no cycle time, no acceleration and
-no fuel rate. The Basetool owns those formulas. `stats` is `null` unless the item has at least one
-of the thirteen blocks; every block is `null` when the item does not have it, and a field inside a
-present block is `null` when the Archive does not state it, never 0. None of the fields is a game
-text. The additions are additive (ADR-0054); `kind` of a fire mode and
+no fuel rate. The Basetool owns those formulas. `stats` is present for items with any block below
+and for shield generators with health or resource states. Absent blocks and unstated fields
+are `null`. Shield generator fields are in [`configurations.shieldGenerators`](catalog-shield-generators.md).
+The `kind` of a fire mode and
 `trackingSignalType` are closed sets that the schema keeps as strings. The blocks `armor`,
 `clothing`, `radar`, `tractorBeam` and `weaponModifier` and the fire-mode field `damagePerSecond`
 follow ADR-0072; the blocks `miningLaser` and `miningModifier` and the fire-mode fields `hitType`,
@@ -454,7 +455,6 @@ proof that an unexamined source field is absent.
 | Block | Present when | Fields and sources |
 |-------|--------------|--------------------|
 | `weapon` | the item has `Components[SCItemWeaponComponentParams]` (ship weapons and FPS weapons) | `fireActions`: per element of `fireActions`, in stored order, with a sequence (`sequenceEntries`) flattened to its entries: `kind` (the struct, e.g. `SWeaponActionFireRapidParams`), `name`, `fireRate` (rounds per minute), `pelletCount` (as `pellets`; `pellets` where a Record states that instead) and `ammoCost` of `launchParams`, `heatPerShot`, `chargeTime`, `overchargeTime`, `cooldownTime` (each of the fire mode, when stated), and `damagePerSecond` (the damage types of the beam's `damagePerSecond`, the power of a mining laser; `null` for a mode without one), and `spread` (see below); a beam also has `hitType`, `fullDamageRange` and `zeroDamageRange` (the two ranges in metres); a parallel mode (`weaponActions`) is listed as its entries; a charged or wrapped mode reads `fireRate`, `launchParams` and `name` from its `weaponAction` when it has none of its own. `ammoCapacity`: `maxAmmoCount` of the ammo container, the magazine's capacity (see below). `ammo`: the `AmmoParams` Record that the container's `ammoParamsRecord` links to, `null` without a readable one: `speed`, `lifetime`, `damage` (the damage types of `projectileParams.damage`), `detonationDamage`, `detonationMinRadius` and `detonationMaxRadius` (from `explosionParams`) |
-| `shield` | `Components[SCItemShieldGeneratorParams]` | `maxHealth` (`MaxShieldHealth`), `maxRegen` (`MaxShieldRegen`), `decayRatio` (`DecayRatio`), `downedRegenDelay` (`DownedRegenDelay`), `damagedRegenDelay` (`DamagedRegenDelay`) |
 | `quantumDrive` | `Components[SCItemQuantumDriveParams]` | `fuelRequirement` (`quantumFuelRequirement`, as stored), `jumpRange`, `disconnectRange`, and of `params`: `driveSpeed`, `cooldownTime`, `spoolUpTime`, `stageOneAccelRate`, `stageTwoAccelRate`, `engageSpeed` |
 | `powerPlant` | `AttachDef.Type` is `PowerPlant`, ignoring case | `powerOutput`: the `amount` of the first `generation` flow of `resourceStates` whose resource is `Power`, and `unit`: the `unit` of that flow |
 | `cooler` | `AttachDef.Type` is `Cooler`, ignoring case | `coolingRate` and `unit`: as for the power plant, for the resource `Coolant` (a cooler's flow is an `ItemResourceDeltaConversion`) |
@@ -478,7 +478,7 @@ as the key into the stat-field table below. The table covers the 29 properties o
 `real_archive_gear_stats` checks that every catalogued `className.value` has a row. A multiplier-kind
 modifier scales the base value of the field; an additive one adds to it.
 
-| `className` | `stats` field the modifier changes | Items |
+| `className` | Catalog field the modifier changes | Items |
 |-------------|------------------------------------|-------|
 | `GPP_Armor_DamageMitigation` | `armor.damageResistance.<type>.multiplier` for all six types; the SC Wiki's physical value is `physical.multiplier` | armour |
 | `GPP_Armor_TemperatureMin` | `clothing.temperatureResistanceMin` | armour, clothing |
@@ -495,7 +495,7 @@ modifier scales the base value of the field; an additive one adds to it.
 | `GPP_Weapon_Spread` | `weapon.fireActions[].spread` | personal weapons |
 | `GPP_ItemResource_PowerGeneration` | `powerPlant.powerOutput` | power plants |
 | `GPP_ItemResource_CoolantGeneration` | `cooler.coolingRate` | coolers |
-| `GPP_Shield_MaxHealth` | `shield.maxHealth` | shields |
+| `GPP_Shield_MaxHealth` | `configurations.shieldGenerators.rows[].maxHealth` | shields |
 | `GPP_Radar_MinAimAssistDistance` | `radar.aimAssistDistanceMin` | radars |
 | `GPP_Radar_MaxAimAssistDistance` | `radar.aimAssistDistanceMax` | radars |
 | `GPP_Quantum_Speed` | `quantumDrive.driveSpeed` | quantum drives |
@@ -971,8 +971,8 @@ ungrouped, because equality cannot be shown.
 **Items** share a group when all of these are equal:
 
 - `type`, `subType`, `size`, `grade` and `manufacturerGuid` of the `AttachDef`;
-- the stat blocks (`stats`, ADR-0065), including `resourceStates`; a laser whose beam range, or a
-  module whose modifier, differs from another is therefore no variant of it;
+- the original compact stat data, including shield fields and `resourceStates` (ADR-0065,
+  ADR-0356). A different beam range, module modifier or shield value separates variant groups.
 - the components: every component of the Record is compared with all its fields, including
   `SAttachableComponentParams` (without its `Tags`), the physics, the default loadout of an item
   that has ports (`SEntityComponentDefaultLoadoutParams`, unlike ships) and the geometry, whose

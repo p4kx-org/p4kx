@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::time::SystemTime;
 
@@ -13,6 +13,11 @@ use p4kx_extraction::{
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::{Value, json};
+
+#[path = "real_archive_item_durability_values.rs"]
+mod values;
+
+pub(super) use self::values::{indexed, number, rows, text};
 
 type Result<T = ()> = std::result::Result<T, Box<dyn Error>>;
 
@@ -72,6 +77,15 @@ fn compare(
     let mut counts = BTreeMap::new();
     let items = indexed(catalog, "/items", "guid")?;
     let uses = indexed(catalog, "/provenance/uses", "id")?;
+    let shield_owners = rows(catalog, "/configurations/shieldGenerators/rows")?
+        .iter()
+        .map(|row| {
+            Ok((
+                u32::try_from(number(row, "/ownerRecordIndex/value")?)?,
+                text(row, "/ownerGuid/value")?,
+            ))
+        })
+        .collect::<Result<HashSet<_>>>()?;
     let DataForgeOrigin::Archive(entry) = origin else {
         return Err("the DCB must have an observed archive origin".into());
     };
@@ -88,13 +102,13 @@ fn compare(
         let item = items
             .get(guid)
             .ok_or("durability owner in the item table")?;
-        let Some(category) = category(item) else {
+        let owner = u32::try_from(number(row, "/ownerRecordIndex/value")?)?;
+        let Some(category) = category(item, shield_owners.contains(&(owner, guid))) else {
             continue;
         };
         if counts.contains_key(category) {
             continue;
         }
-        let owner = u32::try_from(number(row, "/ownerRecordIndex/value")?)?;
         let slot = usize::try_from(number(row, "/componentOrdinal/value")?)?;
         let record = forge.record(owner).ok_or("physical Health owner")?;
         assert!(record.guid().to_string() == guid, "the Record GUID matches");
@@ -121,10 +135,10 @@ fn compare(
     Ok(counts)
 }
 
-fn category(item: &Value) -> Option<&'static str> {
+fn category(item: &Value, shield_generator: bool) -> Option<&'static str> {
     if item["type"] == "Armor" {
         Some("armour")
-    } else if item.pointer("/stats/shield").is_some_and(Value::is_object) {
+    } else if shield_generator {
         Some("shield")
     } else if item["stats"].is_null() {
         Some("health-only")
@@ -364,40 +378,4 @@ impl<'read, 'source> Trace<'read, 'source> {
         );
         Ok(())
     }
-}
-
-pub(super) fn rows<'catalog>(value: &'catalog Value, path: &str) -> Result<&'catalog [Value]> {
-    value
-        .pointer(path)
-        .and_then(Value::as_array)
-        .map(Vec::as_slice)
-        .ok_or_else(|| format!("missing array at {path}").into())
-}
-
-pub(super) fn indexed<'catalog>(
-    value: &'catalog Value,
-    path: &str,
-    key: &str,
-) -> Result<HashMap<&'catalog str, &'catalog Value>> {
-    rows(value, path)?
-        .iter()
-        .map(|row| {
-            let id = row[key].as_str().ok_or("row identifier")?;
-            Ok((id, row))
-        })
-        .collect()
-}
-
-pub(super) fn text<'row>(value: &'row Value, path: &str) -> Result<&'row str> {
-    value
-        .pointer(path)
-        .and_then(Value::as_str)
-        .ok_or_else(|| format!("missing text at {path}").into())
-}
-
-pub(super) fn number(value: &Value, path: &str) -> Result<u64> {
-    value
-        .pointer(path)
-        .and_then(Value::as_u64)
-        .ok_or_else(|| format!("missing integer at {path}").into())
 }

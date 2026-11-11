@@ -49,7 +49,12 @@ fn database(builder: DataForgeBuilder) -> DataForgeBuilder {
             "WeaponGun",
             vec![weapon_component(None), container(MAGAZINE, 200)],
         ))
-        .record(entity(SHIELD, "shield", "Shield", vec![shield(), health()]))
+        .record(entity(
+            SHIELD,
+            "shield",
+            "Shield",
+            vec![shield(8_000.0), health()],
+        ))
         .record(entity(DRIVE, "drive", "QuantumDrive", vec![drive(5.0e10)]))
         .record(entity(
             UNBOUNDED_DRIVE,
@@ -82,21 +87,50 @@ fn english() -> TestEntry {
 
 /// Writes the fixture Archive into `dir` and returns its path.
 pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
-    write_archive_with_builder(dir, structures::builder())
+    write_archive_with_builder(dir, &database(structures::builder()))
 }
 
 /// Writes the fixture with a reachable ammo layout whose declared size is inconsistent.
 pub(crate) fn write_archive_with_invalid_ammo(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
-    write_archive_with_builder(dir, structures::with_invalid_loop_layout())
+    write_archive_with_builder(dir, &database(structures::with_invalid_loop_layout()))
+}
+
+pub(crate) fn write_shield_variant_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    let builder = structures::builder()
+        .record(entity(
+            SHIELD,
+            "shield_base",
+            "Shield",
+            vec![shield(8_000.0)],
+        ))
+        .record(entity(
+            SHIELD + 1,
+            "shield_base_twin",
+            "Shield",
+            vec![shield(8_000.0)],
+        ))
+        .record(entity(
+            SHIELD + 2,
+            "shield_different",
+            "Shield",
+            vec![shield(9_000.0)],
+        ))
+        .record(entity(
+            SHIELD + 3,
+            "shield_with_resources",
+            "Shield",
+            vec![shield(8_000.0), plant_resources(12.0)],
+        ));
+    write_archive_with_builder(dir, &builder)
 }
 
 fn write_archive_with_builder(
     dir: &Path,
-    builder: DataForgeBuilder,
+    builder: &DataForgeBuilder,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database(builder).build()).encrypted())
+        .entry(TestEntry::zstd("Data\\Game2.dcb", builder.build()).encrypted())
         .entry(english())
         .write_to(&path)?;
     Ok(path)

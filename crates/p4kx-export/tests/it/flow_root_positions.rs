@@ -118,7 +118,7 @@ pub(crate) fn at<'tree, 'source>(
     Ok(value)
 }
 
-fn enumerate(root: &StructValue<'_>) -> Vec<Vec<Step>> {
+pub(crate) fn enumerate(root: &StructValue<'_>) -> Vec<Vec<Step>> {
     let mut work: Vec<_> = root
         .fields()
         .iter()

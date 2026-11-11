@@ -11,12 +11,14 @@ use crate::catalog_v3_consumer;
 use super::accounting::{self, Counts, Projection};
 use super::audit_scope;
 use super::error::{self, Error, Kind};
-use super::inventory::{FieldKey, Inventory};
+use super::inventory::{Disposition, FieldKey, Inventory};
 use super::joins::{self, Index, Multiplicity};
 use super::path::Path;
 use super::schema::Schema;
 use super::source::{self, Observations};
 use super::source_scope;
+
+pub(super) const SHIELD_GENERATORS: &str = "shieldGenerators";
 
 fn observations(
     forge: &DataForge<'_>,
@@ -81,7 +83,38 @@ pub(super) fn projections<'a>(
             )?,
         );
     }
+    if inventory.fields.iter().any(|mapping| {
+        matches!(&mapping.disposition, Disposition::Exported { group, .. }
+            if group == SHIELD_GENERATORS)
+    }) {
+        projections.insert(
+            SHIELD_GENERATORS.to_owned(),
+            shield_projections(catalog, cancelled)?,
+        );
+    }
     Ok(projections)
+}
+
+fn shield_projections<'a>(
+    catalog: &'a Value,
+    cancelled: &impl Fn() -> bool,
+) -> super::Result<Index<'a>> {
+    let rows = catalog
+        .pointer("/configurations/shieldGenerators/rows")
+        .and_then(Value::as_array)
+        .ok_or_else(|| Error::new(Kind::Input, "missing canonical shield configuration rows"))?;
+    for row in rows {
+        error::check(cancelled)?;
+        if row.pointer("/ownerGuid/state").and_then(Value::as_str) != Some("present") {
+            return Err(Error::new(Kind::Identity, "shield owner GUID is not present").into());
+        }
+    }
+    joins::index(
+        rows,
+        &Path::fields(&["ownerGuid", "value"]),
+        Multiplicity::Many,
+        cancelled,
+    )
 }
 
 pub(crate) fn run(

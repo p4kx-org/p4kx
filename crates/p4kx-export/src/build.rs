@@ -43,7 +43,6 @@ use original_input::OriginalCatalogInput;
 #[path = "build_parts.rs"]
 mod parts;
 use parts::Parts;
-
 #[path = "build_source.rs"]
 mod metadata;
 pub(crate) use metadata::source;
@@ -317,6 +316,7 @@ fn assemble<R>(
             hacking_chips: components.hacking_chips,
             ammo_containers: components.ammo_containers,
             weapon_actions: components.weapon_actions,
+            shield_generators: components.shield_generators,
             contract_templates: CatalogTable::new(
                 &forge,
                 &["ContractTemplate"],

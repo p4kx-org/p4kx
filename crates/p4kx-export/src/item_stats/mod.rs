@@ -6,7 +6,7 @@ use std::convert::Infallible;
 use p4kx_extraction::{DataForge, Record, RecordTree, TreeBuilder};
 
 use crate::catalog_v3::catalog_durability;
-use crate::contract_stats::{AmmoStats, ItemStats};
+use crate::contract_stats::{AmmoStats, ItemStats, ItemStatsFields};
 use crate::record_fields::{component, structure, text};
 
 mod gear;
@@ -71,37 +71,28 @@ pub(crate) fn read_with_sources<'f, E>(
     let weapon_modifier = gear::weapon_modifier(tree);
     let mining_laser = mining::laser(tree);
     let mining_modifier = mining::modifier_block(tree);
-    if weapon.is_none()
-        && shield.is_none()
-        && quantum_drive.is_none()
-        && power_plant.is_none()
-        && cooler.is_none()
-        && missile.is_none()
-        && armor.is_none()
-        && clothing.is_none()
-        && radar.is_none()
-        && tractor_beam.is_none()
-        && weapon_modifier.is_none()
-        && mining_laser.is_none()
-        && mining_modifier.is_none()
-    {
-        return Ok(None);
-    }
-    Ok(Some(ItemStats {
+    let mut stats = ItemStats {
         weapon,
         shield,
-        quantum_drive,
-        power_plant,
-        cooler,
-        missile,
-        armor,
-        clothing,
-        radar,
-        tractor_beam,
-        weapon_modifier,
-        mining_laser,
-        mining_modifier,
-        health: health(),
-        resource_states,
-    }))
+        fields: ItemStatsFields {
+            quantum_drive,
+            power_plant,
+            cooler,
+            missile,
+            armor,
+            clothing,
+            radar,
+            tractor_beam,
+            weapon_modifier,
+            mining_laser,
+            mining_modifier,
+            health: None,
+            resource_states,
+        },
+    };
+    if !stats.has_specialist() {
+        return Ok(None);
+    }
+    stats.fields.health = health();
+    Ok(Some(stats))
 }

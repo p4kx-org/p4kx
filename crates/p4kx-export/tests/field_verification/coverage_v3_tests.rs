@@ -138,3 +138,44 @@ fn missing_canonical_groups_and_nonpresent_identity_states_fail_the_actual_audit
     }
     Ok(())
 }
+
+#[test]
+fn shield_field_audit_joins_multiple_physical_configurations_by_sourced_owner() -> super::Result<()>
+{
+    let mut catalog = catalog()?;
+    let path = "/configurations/shieldGenerators/rows";
+    let owner = "00000000-0000-0000-0000-000000000001";
+    *catalog.pointer_mut(path).ok_or("canonical shield table")? = json!([
+        {"ownerGuid":{"state":"present","value":owner},"componentOrdinal":{"value":1}},
+        {"ownerGuid":{"state":"present","value":owner},"componentOrdinal":{"value":2}}
+    ]);
+    let mut inventory = super::baseline::inventory();
+    inventory.fields.retain(|mapping| {
+        matches!(&mapping.disposition, Disposition::Exported { group, .. }
+            if group == super::coverage::SHIELD_GENERATORS)
+    });
+    assert_eq!(
+        super::audit_scope::kinds(&inventory)?,
+        [p4kx_export::Kind::Items],
+        "the configuration table is attributed to the original Items source kind"
+    );
+    let owner = super::joins::guid(owner)?;
+    let projections = super::coverage::projections(&catalog, &inventory, &|| false)?;
+    let rows = projections
+        .get(super::coverage::SHIELD_GENERATORS)
+        .and_then(|group| group.get(&owner))
+        .ok_or("canonical physical shield owners")?;
+    assert_eq!(
+        rows.len(),
+        2,
+        "repeated physical components keep their identities"
+    );
+    *catalog
+        .pointer_mut(&format!("{path}/1/ownerGuid/state"))
+        .ok_or("second owner")? = json!("unreadable");
+    assert!(
+        super::coverage::projections(&catalog, &inventory, &|| false).is_err(),
+        "a sourced owner without a present GUID cannot join to a Record"
+    );
+    Ok(())
+}

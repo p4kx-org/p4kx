@@ -26,6 +26,8 @@ mod ammo_definitions;
 mod ammo_source;
 #[path = "catalog_durability.rs"]
 mod durability;
+#[path = "catalog_shield.rs"]
+mod shield;
 
 fn catalog() -> Result<Value, Box<dyn Error>> {
     let (_directory, archive) = ammo_source::archive(ammo_source::AmmoSource::CyclicMembers)?;
@@ -193,17 +195,33 @@ fn an_unbounded_jump_range_is_exported_as_stored() -> TestResult {
 
 #[test]
 fn a_shield_carries_its_values_and_its_health() -> TestResult {
-    let shield = item(&catalog()?, SHIELD)?;
+    let catalog = catalog()?;
+    let shield = item(&catalog, SHIELD)?;
     let stats = &shield["stats"];
-    assert_eq!(
-        stats["shield"],
-        json!({
-            "maxHealth": 8000.0,
-            "maxRegen": 160.0,
-            "decayRatio": 0.25,
-            "downedRegenDelay": 5.0,
-            "damagedRegenDelay": 2.5
-        })
+    let rows = catalog
+        .pointer("/configurations/shieldGenerators/rows")
+        .and_then(Value::as_array)
+        .ok_or("canonical shield generators")?;
+    let generator = rows
+        .iter()
+        .find(|row| row.pointer("/ownerGuid/value") == shield.get("guid"))
+        .ok_or("shield generator for the selected item")?;
+    for (field, value) in [
+        ("maxHealth", 8000.0),
+        ("maxRegen", 160.0),
+        ("decayRatio", 0.25),
+        ("downedRegenDelay", 5.0),
+        ("damagedRegenDelay", 2.5),
+    ] {
+        assert_eq!(
+            generator.pointer(&format!("/{field}/value/finite")),
+            Some(&json!(value)),
+            "canonical shield field {field} keeps its meaning"
+        );
+    }
+    assert!(
+        stats.get("shield").is_none(),
+        "one canonical shield wire location"
     );
     assert!(stats.get("power").is_none() && stats.get("heat").is_none());
     assert_eq!(stats["health"], 450.0);

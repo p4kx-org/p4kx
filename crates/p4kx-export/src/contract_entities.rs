@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::contract::{LocalisedText, every_field_required};
 use crate::contract_insurance::ShipInsurance;
-use crate::contract_stats::ItemStats;
+use crate::contract_stats::PublishedItemStats;
 use crate::guid_text::CatalogGuid;
 use crate::item_variant::ItemKey;
 use crate::{ItemClass, MassBasis, Playability, VehicleKind};
@@ -62,9 +62,8 @@ pub(crate) struct Item<'a> {
     /// The GUID of the base of the variant group the item belongs to, `null` for a base and for an
     /// item that is alone in its group. It is the `guid` of an entry of `items`.
     pub(crate) variant_of: Option<CatalogGuid>,
-    /// The typed stat blocks of a weapon, shield, quantum drive, power plant, cooler or missile,
-    /// raw facts without derived values (ADR-0065); `null` for any other item.
-    pub(crate) stats: Option<Box<ItemStats<'a>>>,
+    /// Published stat blocks, health and resource states, when present.
+    pub(crate) stats: Option<Box<PublishedItemStats<'a>>>,
     #[serde(skip)]
     #[schemars(skip)]
     pub(crate) variant_key: Option<ItemKey<'a>>,

@@ -19,22 +19,42 @@ fn mapped(owner: &str, field: &str, block: &str, target: &str) -> Mapping {
     }
 }
 
-pub(crate) fn inventory() -> Inventory {
-    let mut fields = Vec::new();
-    for (source, target) in [
+fn shield_mappings() -> impl Iterator<Item = Mapping> {
+    [
         ("MaxShieldHealth", "maxHealth"),
         ("MaxShieldRegen", "maxRegen"),
         ("DecayRatio", "decayRatio"),
         ("DownedRegenDelay", "downedRegenDelay"),
         ("DamagedRegenDelay", "damagedRegenDelay"),
-    ] {
-        fields.push(mapped(
-            "SCItemShieldGeneratorParams",
-            source,
-            "shield",
-            target,
-        ));
-    }
+        (
+            "ReservePoolInitialHealthRatio",
+            "reservePoolInitialHealthRatio",
+        ),
+        ("ReservePoolMaxHealthRatio", "reservePoolMaxHealthRatio"),
+        ("ReservePoolRegenRateRatio", "reservePoolRegenRateRatio"),
+        ("ReservePoolDrainRateRatio", "reservePoolDrainRateRatio"),
+        (
+            "ElectricalChargeDamageResistance",
+            "electricalChargeDamageResistance",
+        ),
+        ("stunParams", "stunParams"),
+        ("ShieldResistance", "shieldResistance"),
+        ("ShieldAbsorption", "shieldAbsorption"),
+    ]
+    .into_iter()
+    .map(|(source, target)| Mapping {
+        source: FieldKey::new("SCItemShieldGeneratorParams", source),
+        declared_target: None,
+        disposition: Disposition::Exported {
+            group: super::coverage::SHIELD_GENERATORS.to_owned(),
+            path: Path::fields(&[target, "value"]),
+        },
+        previously_empty: false,
+    })
+}
+
+pub(crate) fn inventory() -> Inventory {
+    let mut fields: Vec<_> = shield_mappings().collect();
     for (source, target) in [
         ("quantumFuelRequirement", "fuelRequirement"),
         ("jumpRange", "jumpRange"),

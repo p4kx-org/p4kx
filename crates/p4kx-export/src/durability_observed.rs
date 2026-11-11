@@ -14,6 +14,7 @@ use crate::catalog_read::original::{
 };
 use crate::record_fields::number_value;
 use crate::resource_float::ResourceFloat32;
+use crate::resource_number::ResourceNumber;
 use crate::source_fields::{FieldCapture, FieldError, FieldViolation};
 use crate::{CatalogError, ExportAccountingError};
 
@@ -86,6 +87,20 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         notes: &mut Vec<FieldError>,
     ) -> Result<SourcedValue<ResourceFloat32>, CatalogError> {
         self.single_observed(name, notes, |_| {})
+    }
+
+    pub(super) fn authored_number(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<ResourceNumber>, CatalogError> {
+        self.scalar(name, "a nullable number", notes, |fact| {
+            let value = ResourceNumber::read(fact.value());
+            if let Some(number) = CapturedNumber::item_component_raw(self.originals, fact)? {
+                self.numbers.borrow_mut().push(number);
+            }
+            Ok(value)
+        })
     }
 
     pub(super) fn health(&self, notes: &mut Vec<FieldError>) -> Result<ReadHealth, CatalogError> {

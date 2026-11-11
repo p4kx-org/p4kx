@@ -3428,6 +3428,9 @@
         "missionProperties": {
           "$ref": "#/$defs/CatalogTableOfMissionPropertyConfiguration"
         },
+        "shieldGenerators": {
+          "$ref": "#/$defs/CatalogTableOfShieldGenerator"
+        },
         "weaponActions": {
           "$ref": "#/$defs/CatalogTableOfWeaponActions"
         }
@@ -3447,6 +3450,7 @@
         "missionBrokerEntries",
         "missionFlows",
         "missionProperties",
+        "shieldGenerators",
         "weaponActions"
       ],
       "type": "object"
@@ -4369,6 +4373,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ResourceType"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfShieldGenerator": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ShieldGenerator"
           },
           "type": "array"
         }
@@ -12398,7 +12421,7 @@
               "type": "null"
             }
           ],
-          "description": "The typed stat blocks of a weapon, shield, quantum drive, power plant, cooler or missile,\nraw facts without derived values (ADR-0065); `null` for any other item."
+          "description": "Published stat blocks, health and resource states, when present."
         },
         "subType": {
           "description": "The item subtype of `AttachDef.SubType`, e.g. `Power`, `null` without one.",
@@ -12539,7 +12562,7 @@
       "type": "object"
     },
     "ItemStats": {
-      "description": "The typed stat blocks of an item, raw facts of the Archive (ADR-0065, ADR-0072).\n\nEvery block is `null` for an item that does not have it; the item has `stats` only when it\nhas at least one block: `weapon`, `shield`, `quantumDrive`, `powerPlant`, `cooler`, `missile`,\n`armor`, `clothing`, `radar`, `tractorBeam`, `weaponModifier`, `miningLaser` or\n`miningModifier`. No value is derived: a number is what the Archive states, in the unit the\ngame stores it; a value that is not a finite number is `null`.",
+      "description": "Published item stat blocks, health and resource states.",
       "properties": {
         "armor": {
           "anyOf": [
@@ -12655,17 +12678,6 @@
           },
           "type": "array"
         },
-        "shield": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ShieldStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The shield generator block, from `SCItemShieldGeneratorParams`."
-        },
         "tractorBeam": {
           "anyOf": [
             {
@@ -12712,7 +12724,6 @@
         "quantumDrive",
         "radar",
         "resourceStates",
-        "shield",
         "tractorBeam",
         "weapon",
         "weaponModifier"
@@ -22471,56 +22482,139 @@
       ],
       "required": []
     },
-    "ShieldStats": {
-      "description": "A shield generator.",
+    "ShieldGenerator": {
+      "description": "The original configuration of one physical shield generator component.",
       "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
         "damagedRegenDelay": {
-          "description": "`DamagedRegenDelay`, in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "decayRatio": {
-          "description": "`DecayRatio`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "downedRegenDelay": {
-          "description": "`DownedRegenDelay`, in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "electricalChargeDamageResistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "maxHealth": {
-          "description": "`MaxShieldHealth`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "maxRegen": {
-          "description": "`MaxShieldRegen`, in hit points per second.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "reservePoolDrainRateRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "reservePoolInitialHealthRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "reservePoolMaxHealthRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "reservePoolRegenRateRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "shieldAbsorption": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfShieldRange"
+        },
+        "shieldResistance": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfShieldRange"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "stunParams": {
+          "$ref": "#/$defs/SourcedValueOfShieldStun"
         }
       },
       "required": [
+        "additionalFields",
+        "componentOrdinal",
         "damagedRegenDelay",
         "decayRatio",
         "downedRegenDelay",
+        "electricalChargeDamageResistance",
         "maxHealth",
-        "maxRegen"
+        "maxRegen",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "reservePoolDrainRateRatio",
+        "reservePoolInitialHealthRatio",
+        "reservePoolMaxHealthRatio",
+        "reservePoolRegenRateRatio",
+        "shieldAbsorption",
+        "shieldResistance",
+        "sourceType",
+        "stunParams"
+      ],
+      "type": "object"
+    },
+    "ShieldRange": {
+      "description": "One original resistance or absorption slot in authored array order.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "max": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "min": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "max",
+        "min",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "ShieldStun": {
+      "description": "The authored shield stun parameters and their original source type.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "maxAlphaDamageRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "maxStunTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "minAlphaDamageRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "minStunTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "maxAlphaDamageRatio",
+        "maxStunTime",
+        "minAlphaDamageRatio",
+        "minStunTime",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -31627,6 +31721,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfSequencerTask"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfShieldRange": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfShieldRange"
                 },
                 "type": "array"
               }
@@ -52653,6 +52880,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/SequencerTask"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfShieldRange": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ShieldRange"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfShieldStun": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ShieldStun"
               }
             }
           }
