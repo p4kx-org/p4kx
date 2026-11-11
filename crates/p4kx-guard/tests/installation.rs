@@ -90,13 +90,46 @@ fn dot_dot_does_not_hide_the_installation() -> TestResult {
     Ok(())
 }
 
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(windows)]
 #[test]
 fn letter_case_does_not_hide_the_installation() -> TestResult {
     let root = tempfile::tempdir()?;
     let installation = installation_in(root.path())?;
     let shouted = root.path().join("STARCITIZEN").join("live").join("x");
     assert!(installation.check(&shouted).is_err(), "other letter case");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn macos_installation_case_follows_the_actual_volume() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let mut installation = installation_in(root.path())?;
+    let alias = root.path().join("STARCITIZEN");
+    let same_directory = fs::exists(&alias)?;
+    assert_eq!(
+        installation.check(&alias.join("live/new/output")).is_err(),
+        same_directory,
+        "existing ancestor identity determines case behavior"
+    );
+    if !same_directory {
+        fs::create_dir_all(&alias)?;
+        assert!(
+            installation.check(&alias.join("output")).is_ok(),
+            "a distinct case-sensitive sibling remains writable"
+        );
+        installation.add(&alias);
+    }
+    assert!(
+        installation.check(&alias.join("output")).is_err(),
+        "the alias or separately admitted sibling is protected"
+    );
+    assert!(
+        installation
+            .check(&root.path().join("StarCitizen/output"))
+            .is_err(),
+        "the original folder remains protected"
+    );
     Ok(())
 }
 

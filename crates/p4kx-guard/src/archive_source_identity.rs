@@ -98,6 +98,13 @@ impl ArchiveSourceIdentity {
         if host == self.host || host == self.namespace {
             return Err(self.refusal(target));
         }
+        #[cfg(target_os = "macos")]
+        if canonical_namespace_entry(host, fs::Metadata::is_file)
+            .map_err(|error| target_error(target, error))?
+            .is_some_and(|entry| entry == self.host || entry == self.namespace)
+        {
+            return Err(self.refusal(target));
+        }
         Ok(())
     }
 
@@ -106,7 +113,17 @@ impl ArchiveSourceIdentity {
         target: &Path,
         host: &Path,
     ) -> Result<(), WriteProtectionError> {
-        if self.host.starts_with(host) || self.namespace.starts_with(host) {
+        let covers_source =
+            |entry: &Path| self.host.starts_with(entry) || self.namespace.starts_with(entry);
+        if covers_source(host) {
+            return Err(self.refusal(target));
+        }
+        #[cfg(target_os = "macos")]
+        if canonical_namespace_entry(host, fs::Metadata::is_dir)
+            .map_err(|error| target_error(target, error))?
+            .as_deref()
+            .is_some_and(covers_source)
+        {
             return Err(self.refusal(target));
         }
         Ok(())
@@ -220,6 +237,19 @@ fn unavailable_identity(target: &Path) -> WriteProtectionError {
     WriteProtectionError::TargetIdentity {
         target: target.to_path_buf(),
         cause: UnknownAlias::new(AliasUncertainty::HostFileIdentity),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn canonical_namespace_entry(
+    path: &Path,
+    matches_kind: fn(&fs::Metadata) -> bool,
+) -> io::Result<Option<PathBuf>> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if matches_kind(&metadata) => fs::canonicalize(path).map(Some),
+        Ok(_) => Ok(None),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
     }
 }
 

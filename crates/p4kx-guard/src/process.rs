@@ -44,7 +44,7 @@ pub fn process_count_lists_game(output: &str) -> bool {
 
 /// Returns whether the process list identifies a Star Citizen game process.
 ///
-/// Only process names are read, through Windows commands or Linux comm and cmdline files.
+/// Reads process image names through the platform process list.
 ///
 /// # Errors
 ///
@@ -61,7 +61,11 @@ pub fn game_process_status() -> io::Result<bool> {
             std::path::Path::new("/.flatpak-info").try_exists(),
         )
     }
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    {
+        crate::process_macos::game_process_status()
+    }
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     {
         Ok(false)
     }

@@ -39,6 +39,8 @@ mod portal_resolution;
 mod portal_socket;
 mod proc_tree;
 mod process;
+#[cfg(any(target_os = "macos", test))]
+mod process_macos;
 #[cfg(any(windows, test))]
 mod process_windows;
 mod registry;
