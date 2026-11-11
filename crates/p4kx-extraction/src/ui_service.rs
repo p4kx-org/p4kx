@@ -36,5 +36,5 @@ pub use ui_extract::{
 pub use ui_movie::{MAX_UI_MOVIE_LEN, UiMovie};
 pub use ui_movie_evidence::{UiMovieEvidence, UiSourceSite};
 pub use ui_render_bitmap_sources::{UiRenderBitmapSources, UiRenderedBitmap};
-pub use ui_render_glyph_sources::UiRenderedGlyph;
+pub use ui_render_glyph_sources::{UiRenderedFontMetrics, UiRenderedGlyph};
 pub use ui_render_localization::UiRenderedLocalization;

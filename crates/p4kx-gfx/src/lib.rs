@@ -111,7 +111,7 @@ pub use scene::{
 };
 pub use scene_compose::{
     ObservedScene, SceneDefinitionOrigin, SceneDrawOrigin, SceneGlyphOrigin, SceneMaskOrigin,
-    SceneOrigins, ScenePlacementOrigin,
+    SceneOrigins, ScenePlacementOrigin, SceneTextMeasureOrigin,
 };
 pub use scene_report::{MAX_SPRITE_DEPTH, SkipReason, Skipped};
 pub use scene_text::MAX_SCENE_GLYPHS;

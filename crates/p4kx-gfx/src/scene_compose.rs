@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use self::definitions::{Definition, definitions};
 pub use self::inputs::{
     ObservedScene, SceneDefinitionOrigin, SceneDrawOrigin, SceneGlyphOrigin, SceneMaskOrigin,
-    SceneOrigins, ScenePlacementOrigin,
+    SceneOrigins, ScenePlacementOrigin, SceneTextMeasureOrigin,
 };
 
 use crate::assets::Assets;
@@ -47,6 +47,7 @@ pub(crate) struct Context {
     placement: Option<usize>,
     declaration: Option<SceneDefinitionOrigin>,
     localised: bool,
+    layout_prefix: Option<usize>,
 }
 
 impl Context {
@@ -57,6 +58,20 @@ impl Context {
 
     pub(crate) const fn with_localisation(self, localised: bool) -> Self {
         Self { localised, ..self }
+    }
+
+    pub(crate) const fn with_layout_prefix(self, inspected: usize) -> Self {
+        Self {
+            layout_prefix: Some(inspected),
+            ..self
+        }
+    }
+
+    pub(crate) const fn edit_definition(self) -> Option<usize> {
+        match self.declaration {
+            Some(SceneDefinitionOrigin::EditText(ordinal)) => Some(ordinal),
+            _ => None,
+        }
     }
 }
 
@@ -160,6 +175,7 @@ impl<'b> Composer<'b> {
             placement: None,
             declaration: None,
             localised: false,
+            layout_prefix: None,
         };
         composer.timeline(&assets.timeline.first_frame, root);
         composer

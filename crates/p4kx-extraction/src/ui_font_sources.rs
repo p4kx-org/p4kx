@@ -53,6 +53,18 @@ pub(crate) struct ImportedFontSource<'archive> {
     pub(crate) route: FontRoute<'archive>,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum FontUse {
+    Outline {
+        glyph: usize,
+        by_code: bool,
+    },
+    Layout {
+        glyph: Option<usize>,
+        used_advance: bool,
+    },
+}
+
 pub(crate) struct FrameFonts<'archive> {
     local_count: usize,
     imported: Vec<Option<ImportedFontSource<'archive>>>,
@@ -69,14 +81,13 @@ impl<'archive> FrameFonts<'archive> {
         }
     }
 
-    pub(crate) fn glyph(
+    pub(crate) fn register(
         &self,
         uses: &SourceUses,
         primary: &UiMovieEvidence,
         origins: &AssetOrigins,
         font: usize,
-        glyph: usize,
-        by_code: bool,
+        input: FontUse,
     ) -> io::Result<(Vec<SourceUse>, bool)> {
         if let Some(index) = font.checked_sub(self.local_count) {
             let imported = self
@@ -84,11 +95,11 @@ impl<'archive> FrameFonts<'archive> {
                 .get(index)
                 .and_then(Option::as_ref)
                 .ok_or_else(inconsistent)?;
-            imported.glyph(uses, primary, origins, glyph, by_code)
+            imported.register(uses, primary, origins, input)
         } else {
             let font = origins.fonts.get(font).ok_or_else(inconsistent)?;
             let mut evidence = Vec::new();
-            glyph_uses(&mut evidence, primary, font, glyph, by_code)?;
+            font_uses(&mut evidence, primary, font, input)?;
             primary.append_decoding(&mut evidence);
             Ok((evidence, primary.is_bound()))
         }
@@ -96,13 +107,12 @@ impl<'archive> FrameFonts<'archive> {
 }
 
 impl ImportedFontSource<'_> {
-    fn glyph(
+    fn register(
         &self,
         uses: &SourceUses,
         primary: &UiMovieEvidence,
         origins: &AssetOrigins,
-        glyph: usize,
-        by_code: bool,
+        input: FontUse,
     ) -> io::Result<(Vec<SourceUse>, bool)> {
         let tag = *origins
             .imports
@@ -117,20 +127,19 @@ impl ImportedFontSource<'_> {
         primary.append_decoding(&mut evidence);
         let mut complete = primary.is_bound();
         for hop in self.route.hops.iter().rev() {
-            complete &= hop.glyph(&mut evidence, uses, self.route.font_index, glyph, by_code)?;
+            complete &= hop.register(&mut evidence, uses, self.route.font_index, input)?;
         }
         Ok((evidence, complete))
     }
 }
 
 impl FontHop<'_> {
-    fn glyph(
+    fn register(
         &self,
         evidence: &mut Vec<SourceUse>,
         uses: &SourceUses,
         font: usize,
-        glyph: usize,
-        by_code: bool,
+        input: FontUse,
     ) -> io::Result<bool> {
         let movie = UiMovieEvidence::of_input(
             self.movie.entry.map(SourceInput::ArchiveView),
@@ -159,27 +168,51 @@ impl FontHop<'_> {
             )?);
         } else {
             let font = self.movie.fonts.get(font).ok_or_else(inconsistent)?;
-            glyph_uses(evidence, &movie, font, glyph, by_code)?;
+            font_uses(evidence, &movie, font, input)?;
         }
         movie.append_decoding(evidence);
         Ok(movie.is_bound())
     }
 }
 
-fn glyph_uses(
+fn font_uses(
     evidence: &mut Vec<SourceUse>,
     movie: &UiMovieEvidence,
     font: &FontOrigins,
-    glyph: usize,
-    by_code: bool,
+    input: FontUse,
 ) -> io::Result<()> {
-    evidence.push(observe(
-        movie,
-        Site::Item(font.definition, glyph),
-        "glyphOutline",
-        Conversion,
-    )?);
-    if by_code && let Some(code) = font.glyph_code_override(glyph) {
+    let code = match input {
+        FontUse::Outline { glyph, by_code } => {
+            evidence.push(observe(
+                movie,
+                Site::Item(font.definition, glyph),
+                "glyphOutline",
+                Conversion,
+            )?);
+            by_code.then_some(glyph)
+        }
+        FontUse::Layout {
+            glyph,
+            used_advance,
+        } => {
+            evidence.push(observe(
+                movie,
+                Site::Body(font.definition),
+                "layoutFont",
+                Conversion,
+            )?);
+            if used_advance && let Some(glyph) = glyph {
+                evidence.push(observe(
+                    movie,
+                    Site::Item(font.definition, glyph),
+                    "glyphAdvance",
+                    Conversion,
+                )?);
+            }
+            glyph
+        }
+    };
+    if let Some(code) = code.and_then(|glyph| font.glyph_code_override(glyph)) {
         evidence.push(observe(
             movie,
             Site::Item(code.tag, code.ordinal),

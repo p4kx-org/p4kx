@@ -5,7 +5,7 @@ use std::io;
 
 use p4kx_gfx::{AssetOrigins, Background, RasterOptions};
 
-use super::ui_render_glyph_sources::{self, UiRenderedGlyph};
+use super::ui_render_glyph_sources::{self, UiRenderedFontMetrics, UiRenderedGlyph};
 use super::ui_render_localization::{self, UiRenderedLocalization};
 use super::{ui_bitmap_sources, ui_render_geometry};
 use crate::output_file::read_error;
@@ -36,6 +36,8 @@ pub struct UiRenderBitmapSources {
     pub movie_geometry: FieldOrigin,
     /// Actual font glyph outlines supplied to the rendered frame.
     pub glyphs: Vec<UiRenderedGlyph>,
+    /// Font measurements used to position the drawn text.
+    pub font_metrics: Vec<UiRenderedFontMetrics>,
     /// The resolved localisation values that supplied drawn text.
     pub localizations: Vec<UiRenderedLocalization>,
     /// The physical sources and uses referenced by the drawing origins.
@@ -72,6 +74,7 @@ impl UiMovie<'_> {
             bitmaps: evidence.bitmaps,
             movie_geometry: evidence.movie_geometry,
             glyphs: evidence.glyphs,
+            font_metrics: evidence.font_metrics,
             localizations: evidence.localizations,
             provenance: evidence.provenance,
         })
@@ -117,6 +120,7 @@ impl UiMovie<'_> {
             bitmaps,
             movie_geometry,
             glyphs: text.glyphs,
+            font_metrics: text.metrics,
             localizations,
             provenance,
         })
@@ -127,6 +131,7 @@ struct FrameEvidence {
     bitmaps: Vec<UiRenderedBitmap>,
     movie_geometry: FieldOrigin,
     glyphs: Vec<UiRenderedGlyph>,
+    font_metrics: Vec<UiRenderedFontMetrics>,
     localizations: Vec<UiRenderedLocalization>,
     provenance: SourceInventory,
 }

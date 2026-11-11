@@ -196,3 +196,56 @@ fn assert_localization_lookup(provenance: &SourceInventory) -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn a_space_uses_encrypted_font_metrics_without_drawing_an_encrypted_outline() -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let mut space = square();
+    space.code = u16::from(b' ');
+    space.advance = 16_000;
+    let wide = stage()
+        .tag(75, &font3_body(4, "Wide", &[space]))
+        .tag(56, &exports_body(&[(4, "$Wide")]))
+        .bytes();
+    let movie = stage()
+        .tag(75, &font3_body(4, "Base", &[square()]))
+        .tag(71, &import_assets_body("wide.gfx", 2, &[(9, "$Wide")]))
+        .tag(37, &html_edit(7, 4, "A<font face=\"Wide\">&#32;</font>A"))
+        .tag(37, &html_edit(8, 9, "A"))
+        .tag(26, &TestPlace::new(1, 7).body2())
+        .tag(26, &TestPlace::new(2, 8).at(10_000, 0).body2())
+        .tag(1, &[])
+        .bytes();
+    let archive = archive(
+        folder.path(),
+        vec![
+            TestEntry::zstd(CLIENT, movie),
+            TestEntry::zstd("Data\\UI\\Screens\\SWF\\wide.gfx", wide).encrypted(),
+        ],
+    )?;
+    let movie = UiMovie::from_archive(&archive, CLIENT)?;
+    let ordinary = movie.render(&options())?;
+    let observed = movie.render_with_bitmap_sources(&options())?;
+    assert_eq!(observed.render.image, ordinary.image, "identical layout");
+    let metric = observed
+        .font_metrics
+        .iter()
+        .find(|metric| metric.font == 1 && metric.glyph == Some(0))
+        .ok_or("space advance from the imported font")?;
+    assert_eq!(metric.origin.contains_encrypted_source(), Some(true));
+    assert!(metric.origin.source_set_complete());
+    assert!(
+        observed.glyphs.iter().all(|glyph| glyph.font == 0),
+        "the space shapes the layout while only the clear local glyph is painted"
+    );
+    Ok(())
+}
+
+fn html_edit(id: u16, font: u16, text: &str) -> Vec<u8> {
+    TestEditText::new(id, FIELD)
+        .text(text)
+        .font(font, 400)
+        .color(GREEN)
+        .html()
+        .body()
+}

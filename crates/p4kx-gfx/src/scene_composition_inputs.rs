@@ -28,6 +28,8 @@ pub struct SceneOrigins {
     pub masks: Vec<SceneMaskOrigin>,
     /// Actual glyph outlines indexed by the composed shape they supplied.
     pub glyphs: BTreeMap<usize, SceneGlyphOrigin>,
+    /// Font inputs measured by each editable text definition, in character order.
+    pub text_layouts: BTreeMap<usize, Vec<Option<SceneTextMeasureOrigin>>>,
 }
 
 /// A physical first-frame placement and the sprite context that instantiated it.
@@ -68,6 +70,8 @@ pub struct SceneDrawOrigin {
     pub shape: usize,
     /// Whether a successful localisation lookup supplied the drawn text.
     pub localised: bool,
+    /// Exclusive measured-character prefix used to lay out this glyph.
+    pub layout_prefix: Option<usize>,
 }
 
 /// A composed mask and the source references of the drawings that form it.
@@ -90,7 +94,29 @@ pub struct SceneGlyphOrigin {
     pub glyph: usize,
 }
 
+/// The font and glyph queried to measure one editable-text character.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct SceneTextMeasureOrigin {
+    /// Ordinal in the actual supplied font array.
+    pub font: usize,
+    /// Matched glyph ordinal when the font supplies a code.
+    pub glyph: Option<usize>,
+    /// Whether layout consumed the glyph's stored advance.
+    pub used_advance: bool,
+}
+
 impl SceneOrigins {
+    pub(crate) fn text_layout(
+        &mut self,
+        definition: usize,
+        measured: impl Iterator<Item = Option<SceneTextMeasureOrigin>>,
+    ) {
+        self.text_layouts
+            .entry(definition)
+            .or_insert_with(|| measured.collect());
+    }
+
     pub(super) fn place(
         &mut self,
         parent: Option<usize>,
@@ -134,6 +160,7 @@ impl SceneDrawOrigin {
             placement: context.placement,
             definition: context.declaration,
             localised: context.localised,
+            layout_prefix: context.layout_prefix,
             shape,
         }
     }
