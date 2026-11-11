@@ -2,6 +2,9 @@
 
 How to use the P4KX window. Terms follow [CONTEXT.md](../CONTEXT.md). The command line and the
 MCP server are described in [commands.md](commands.md).
+[Linux packages](linux-packages.md) explains choosing and starting a native package.
+[Profile folders](profile-folders.md) lists the Linux locations for settings, the stored Archive
+key, cache and application data.
 
 ## Flatpak startup and export protection
 

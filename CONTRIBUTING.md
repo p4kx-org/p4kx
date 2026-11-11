@@ -130,6 +130,10 @@ On Linux the audio preview builds against the ALSA headers: `sudo apt-get instal
 libasound2-dev` (Debian and Ubuntu; CI installs the same package). PipeWire and PulseAudio need
 nothing extra at build time; at run time they serve the ALSA `default` device through
 `pipewire-alsa` or `pulseaudio-alsa`, which desktop distributions install.
+The [native test workflow](.github/workflows/tests.yml) lists the Ubuntu 24.04 runtime
+libraries used for the Linux Xvfb and lavapipe checks on both CPUs. The
+[platform guide](docs/supported-platforms.md#build-and-test-contract) explains how CI records
+those results and the separate device checks.
 
 ```powershell
 cargo build --release
@@ -178,8 +182,8 @@ and how to run a single real-Archive test.
    request of their own.
 4. Fill in the [pull request template](.github/PULL_REQUEST_TEMPLATE.md) and link the issue with
    `Closes #<issue>`.
-5. CI runs the lints, `cargo xtask`, the tests on Windows and Linux, the schema and concurrency
-   tests, the Blender add-on tests, CodeQL and the DCO check. All must pass.
+5. CI runs lints, `cargo xtask`, the tests across the [native matrix](docs/supported-platforms.md),
+   schema and concurrency checks, Blender add-on tests, CodeQL and the DCO check. All must pass.
 6. A maintainer checks your [CLA](#contributor-license-agreement-cla), reviews and merges with a
    merge commit.
 
@@ -291,17 +295,19 @@ everything; nobody uploads assets by hand.
    <version>`) and merge that pull request. The version of `p4kx-gui` is the Release version.
 2. Push the tag `vMAJOR.MINOR.PATCH[-suffix]` on the merge commit. The workflow refuses any other
    tag name.
-3. The workflow builds and tests the packages on AMD64 and ARM64 for each operating system.
-   Windows ships MSI and portable ZIP packages. Native consumers exercise the release EXEs,
-   upgrades, blocked downgrades, rollback, explicit CPU replacement and profile preservation.
-   Linux ships tar.gz, AppImage, deb and Flatpak packages. Native consumers exercise all four
-   launchers, deb and Flatpak upgrades, profile preservation and Flatpak Documents portal grants.
+3. The workflow builds and tests packages for the [five native targets](docs/supported-platforms.md).
+   Windows AMD64 and ARM64 ship MSI and portable ZIP packages. Native consumers exercise the
+   release EXEs, upgrades, blocked downgrades, rollback, explicit CPU replacement and profile
+   preservation. Linux AMD64 and ARM64 ship tar.gz, AppImage, deb and Flatpak packages. Native
+   consumers exercise all three applications in each format, deb and Flatpak upgrades, profile
+   preservation and Flatpak Documents portal grants. macOS 26 and later use the Apple Silicon DMG and require
+   [matching device evidence](docs/macos-support.md#submit-the-native-device-receipt).
    CycloneDX SBOMs identify each target and shipped binary (`p4kx-gui`, `p4kx`, `p4kx-mcp`).
    The architecture-neutral Python add-on has its own provenance bundle.
-4. Tag publication requires a completed VirusTotal report for each of the twelve native
-   package digests. The release gate verifies the package bytes, source revision, version
-   and workflow run against the report receipt. Pending, missing or failed reports stop
-   publication. The release notes link the completed reports.
+4. Tag publication requires a completed VirusTotal report for every native package digest.
+   The release gate verifies the package bytes, source revision, version and workflow run against
+   the report receipt. Pending, missing or failed reports stop publication. The release notes link
+   the completed reports.
 5. The build provenance of every asset and each target's package SBOMs are attested
    (Sigstore, via GitHub Artifact Attestations). The bundles become Release assets.
 6. `SHA256SUMS.txt` and `SHA3-512SUMS.txt` list every other asset, as plain text files that open
@@ -314,10 +320,10 @@ attestations and publication run at their respective release gates. A full manua
 run can record VirusTotal availability. Operating-system-specific dry runs skip scanning
 and combined release assembly.
 
-The preflight requires twelve packages, twelve target-and-binary SBOMs and four native
-runtime proofs. Each proof binds the executed packages and binaries to the source revision.
-See [Windows package verification](docs/windows-packages.md) and
-[Linux package verification](docs/linux-packages.md).
+The [release preflight](docs/supported-platforms.md#release-preflight-and-evidence) checks the
+complete native package, SBOM and runtime evidence inventory. Each proof binds the executed
+packages and binaries to the source revision. See [Windows package verification](docs/windows-packages.md),
+[Linux package verification](docs/linux-packages.md) and [macOS support](docs/macos-support.md).
 
 Set the repository secret `VIRUSTOTAL_API_KEY` in the GitHub Actions settings before tagging.
 

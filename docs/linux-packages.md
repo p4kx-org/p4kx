@@ -14,8 +14,9 @@ corresponding GitHub run, rather than by a successful local Windows build.
 
 ## Install and start
 
-Select `x86_64-unknown-linux-gnu` for AMD64 or `aarch64-unknown-linux-gnu` for ARM64.
-Every package name starts with `P4KX-<version>-<target>`.
+Use `uname -m` to check the Linux host CPU. Select `x86_64-unknown-linux-gnu` for
+`x86_64` (AMD64 or Debian `amd64`) and `aarch64-unknown-linux-gnu` for `aarch64`
+(ARM64 or Debian `arm64`). Every package name starts with `P4KX-<version>-<target>`.
 
 | Suffix | Contents and start command |
 | --- | --- |

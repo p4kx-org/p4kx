@@ -147,11 +147,14 @@ milestone delivered.
 - Libraries are synchronous and parallelise with rayon; tokio only in `p4kx-mcp`.
 - Rust edition 2024, `rustfmt`, clippy `all`, `pedantic`, `nursery` and selected `restriction`
   lints as errors, `missing_docs`; suppressions only as `#[expect(lint, reason = "…")]`.
-- `unsafe_code = "forbid"` everywhere except the `cfg(windows)` DWM module in `p4kx-gui`.
+- `unsafe_code = "forbid"` with the bounded Windows module exceptions documented for the
+  [DWM integration](adr/0006-p4kx-theme-dark-and-lato-only.md) and the
+  [MSI environment notification](adr/0354-msi-path-ownership-and-bounded-environment-notification.md).
 - `thiserror` in libraries, `anyhow` only in binaries; no `unwrap` / `expect` outside tests.
 - Source files stay below about 400 lines; clippy `too_many_lines` and `cognitive_complexity`.
 - Tests: synthetic fixtures from own test writers (Archive, DataForge, CryXml, DDS / WEM headers)
   run in CI; tests against real Archives run locally when `P4KX_DATA_P4K` points to one.
-- CI on Windows and Linux: `fmt`, `clippy`, `test`, layer-direction and file-size checks.
+- CI uses the [five native targets](supported-platforms.md) for lints, tests and doctests.
+  Repository checks enforce formatting, layer direction and file sizes.
 - References: StarBreaker and unp4k (both MIT) and the observed behaviour of the owner's earlier reference tool;
   ported code keeps its copyright notice.

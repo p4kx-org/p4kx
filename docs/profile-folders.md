@@ -5,6 +5,19 @@ variables. macOS uses `~/Library/Application Support/P4KX` for settings, the sto
 and application data, and `~/Library/Caches/P4KX` for the cache.
 Changing `APPDATA` or `USERPROFILE` does not replace Windows known-folder resolution.
 
+Native Linux uses the following directories. An unset, empty or relative XDG variable
+uses the home-directory default.
+
+| Content | XDG location | Default |
+| --- | --- | --- |
+| Settings and stored Archive key | `$XDG_CONFIG_HOME/P4KX` | `~/.config/P4KX` |
+| Cache | `$XDG_CACHE_HOME/P4KX` | `~/.cache/P4KX` |
+| Application data | `$XDG_DATA_HOME/P4KX` | `~/.local/share/P4KX` |
+
+The settings and key files are `settings.toml` and `archive.key`. Flatpak sets the XDG
+directories for its own application profile. [Linux packages](linux-packages.md) covers
+the profile, Archive read grants and selected export directories.
+
 Set `P4KX_FOLDERS_ROOT` to an absolute directory before starting P4KX to isolate its application
 folders on any supported OS and CPU:
 
