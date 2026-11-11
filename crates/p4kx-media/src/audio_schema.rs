@@ -39,6 +39,8 @@ mod node_declarations;
 mod node_playback;
 #[path = "audio_schema_node_properties.rs"]
 mod node_properties;
+#[path = "audio_schema_random_sequence.rs"]
+mod random_sequence;
 #[path = "audio_schema_rtpc.rs"]
 mod rtpc;
 #[path = "audio_schema_state.rs"]
@@ -186,6 +188,7 @@ fn insert_audio_payloads(base: &mut Value) -> Result<(), MediaError> {
     node_declarations::insert_payload(base)?;
     node_playback::insert_payload(base)?;
     action_properties::insert_payload(base)?;
+    random_sequence::insert_payload(base)?;
     foreign::insert_payload(base)
 }
 
@@ -214,6 +217,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             .chain(node_declarations::bindings().iter())
             .chain(node_playback::bindings().iter())
             .chain(action_properties::bindings().iter())
+            .chain(random_sequence::bindings().iter())
             .chain(foreign::bindings().iter())
             .chain(std::iter::once(&BANK_FAILURE_BINDING))
             .chain(stid_bindings().iter())

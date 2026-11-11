@@ -10,7 +10,7 @@ use super::audio_bank_state_provider::row;
 use super::support::audio_provider::TestResult;
 
 #[path = "audio_bank_container_node_fixture.rs"]
-mod fixture;
+pub(super) mod fixture;
 
 use fixture::{Evidence, bank, export};
 

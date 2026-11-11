@@ -15,6 +15,7 @@ mod bank_node_property_rows;
 mod bank_object_fields;
 mod bank_parse;
 mod bank_positioning_rows;
+mod bank_random_sequence_rows;
 mod bank_reader;
 mod bank_rtpc_rows;
 mod bank_source;
@@ -57,6 +58,7 @@ mod hirc_node_positioning;
 mod hirc_node_property;
 mod hirc_node_state;
 mod hirc_plugin;
+mod hirc_random_sequence;
 mod hirc_rtpc;
 mod hirc_source;
 mod hirc_state;
@@ -91,6 +93,7 @@ pub use bank_object_fields::BankHircField;
 pub use bank_positioning_rows::{
     BankPositioningRow, BankPositioningRowFields, BankPositioningRows, BankPositioningVector,
 };
+pub use bank_random_sequence_rows::{BankRandomSequenceItem, BankRandomSequenceRows};
 pub use bank_rtpc_rows::{BankRtpcRow, BankRtpcRows};
 pub use bank_source::{
     BankObservedHeader, BankReadError, BankSectionCursor, BankSource, BankSourceSection,
@@ -160,6 +163,7 @@ pub use hirc_node_property::{
     BankNodePropertyExtent, BankNodePropertyExtents, BankNodePropertyKind,
 };
 pub use hirc_node_state::{BankStateBinding, BankStateGroup};
+pub use hirc_random_sequence::{BankRandomSequenceFields, BankRandomSequencePlaylist};
 pub use hirc_rtpc::{BankRtpcCurve, BankRtpcExtent, BankRtpcPoint};
 pub use hirc_source::{
     BankMediaSourceFields, BankSoundContinuation, BankSoundFields, BankSoundNodeBase,

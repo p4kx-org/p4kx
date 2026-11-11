@@ -9,13 +9,12 @@ use crate::hirc_node::{
     self, BankNodeParentFields, CURVE_POINT_LEN, Container, ContainerKind, ID_LEN,
 };
 use crate::hirc_node_parameters::BankNodeParameters;
+use crate::hirc_random_sequence::{self, BankRandomSequenceFields};
 use crate::{BankError, BankHircField, HircKind, SectionId};
 
-const RANDOM_SEQUENCE_BEFORE_MODE: u64 = 22;
 const SEQUENCE_MODE: u8 = 1;
 const SWITCH_GROUP_LEN: u64 = 10;
 const SWITCH_PARAMETERS_LEN: usize = 13;
-const PLAYLIST_ITEM_LEN: usize = 8;
 const LAYER_ASSOCIATION_LEN: u64 = 5;
 
 /// Original fields and checked extents of one container body.
@@ -30,6 +29,8 @@ pub struct BankContainerFields {
     pub node_range: Option<Range<u64>>,
     /// Raw Random/Sequence mode when present.
     pub mode: Option<BankHircField<u8>>,
+    /// Original Random/Sequence decision fields when reached.
+    pub random_sequence: Option<BankRandomSequenceFields>,
     /// The decoded container kind when selected.
     pub kind: Option<ContainerKind>,
     /// Original child count when readable.
@@ -119,7 +120,10 @@ fn container_kind<F: ObjectFields>(
         }
         Layout::Blend => ContainerKind::Blend,
         Layout::RandomSequence => {
-            fields.skip_bytes(RANDOM_SEQUENCE_BEFORE_MODE)?;
+            let decisions = observed
+                .random_sequence
+                .insert(BankRandomSequenceFields::new(fields.offset()));
+            hirc_random_sequence::before_mode(fields, decisions)?;
             let mode = fields.read_u8()?;
             let kind = if mode.value == SEQUENCE_MODE {
                 ContainerKind::Sequence
@@ -128,7 +132,7 @@ fn container_kind<F: ObjectFields>(
             };
             observed.mode = Some(mode);
             observed.kind = Some(kind);
-            fields.read_array::<1>()?;
+            decisions.flags = Some(fields.read_u8()?);
             kind
         }
     };
@@ -147,8 +151,13 @@ pub(crate) fn tail<F: ObjectFields>(
         Layout::Switch => switch_tail(fields)?,
         Layout::Blend => blend_tail(fields)?,
         Layout::RandomSequence => {
-            let items = fields.read_u16()?.value;
-            hirc_node::skip_items(fields, u32::from(items), PLAYLIST_ITEM_LEN)?;
+            let decisions = observed.random_sequence.as_mut().ok_or_else(|| {
+                BankError::invalid(
+                    SectionId::HIRC,
+                    "Random/Sequence playlist precedes its decision header",
+                )
+            })?;
+            hirc_random_sequence::playlist(fields, decisions)?;
         }
     }
     if fields.remaining_bytes() > 0 {

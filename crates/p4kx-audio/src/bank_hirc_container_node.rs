@@ -7,6 +7,7 @@ use crate::bank_inline_state_rows::BankInlineStateRows;
 use crate::bank_node_fx_slots::BankNodeFxSlots;
 use crate::bank_node_property_rows::BankNodePropertyRows;
 use crate::bank_positioning_rows::BankPositioningRows;
+use crate::bank_random_sequence_rows::BankRandomSequenceRows;
 use crate::bank_rtpc_rows::BankRtpcRows;
 use crate::hirc_container::{BankContainerFields, Layout};
 use crate::hirc_node_aux::{self, BankNodeUserAuxBuses};
@@ -50,6 +51,21 @@ impl<R> BankHircContainerNode<'_, R> {
         let fields = &self.observation.fields;
         let (range, count) = fields.children.as_ref().zip(fields.child_count.as_ref())?;
         Some(child_reader(self.input, self.stopped, range, count.value))
+    }
+
+    /// Borrows checked Random/Sequence playlist items in physical order.
+    pub fn playlist(&mut self) -> Option<BankRandomSequenceRows<'_, R>> {
+        let playlist = self
+            .observation
+            .fields
+            .random_sequence
+            .as_ref()?
+            .playlist
+            .as_ref()?;
+        Some(BankRandomSequenceRows::new(
+            self.input,
+            playlist.checked_range.clone(),
+        ))
     }
 
     /// Borrows the checked original property rows.

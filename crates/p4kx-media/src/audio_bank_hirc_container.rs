@@ -16,6 +16,7 @@ use crate::audio_bank_container_node;
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_payload::BankEntryRange;
 use crate::audio_bank_projection::BankProjection;
+use crate::audio_bank_random_sequence;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
 #[path = "audio_bank_hirc_container_origins.rs"]
@@ -92,7 +93,8 @@ pub(crate) fn project<R: Read + Seek>(
         writer,
     )?;
     children(projection, &sites, container.children(), writer)?;
-    audio_bank_container_node::project(projection, version, &mut container, writer)
+    audio_bank_container_node::project(projection, version, &mut container, writer)?;
+    audio_bank_random_sequence::project(projection, version, &mut container, writer)
 }
 
 fn header(

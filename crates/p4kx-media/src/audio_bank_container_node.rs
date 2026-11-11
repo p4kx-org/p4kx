@@ -10,6 +10,7 @@ use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_node_declarations::{self, Owner};
 use crate::audio_bank_node_properties;
 use crate::audio_bank_projection::BankProjection;
+use crate::audio_bank_random_sequence;
 use crate::audio_bank_rtpc;
 use crate::audio_bank_rtpc_payload::RtpcOwner;
 use crate::audio_bank_state::StateProjection;
@@ -55,5 +56,6 @@ pub(crate) fn unsupported(
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     audio_bank_node_properties::unsupported(projection, version, original, writer)?;
-    audio_bank_node_declarations::unsupported(projection, version, original, writer)
+    audio_bank_node_declarations::unsupported(projection, version, original, writer)?;
+    audio_bank_random_sequence::unsupported(projection, version, original, writer)
 }

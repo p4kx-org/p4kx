@@ -55,6 +55,10 @@ pub use p4kx_audio::{
     BankPositioningModes, BankPositioningRow, BankPositioningRowFields, BankPositioningRows,
     BankPositioningTableKind, BankPositioningVector,
 };
+pub use p4kx_audio::{
+    BankRandomSequenceFields, BankRandomSequenceItem, BankRandomSequencePlaylist,
+    BankRandomSequenceRows,
+};
 use rayon::prelude::*;
 
 use crate::entry_content::find_entry;

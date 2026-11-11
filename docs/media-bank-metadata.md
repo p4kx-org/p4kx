@@ -64,6 +64,8 @@ and fallback selection.
 | `audio-bank-hirc-node-advanced-settings` | `bank-hirc-node-advanced-settings` | HIRC section and owning Sound, ActorMixer or container object ordinals |
 | `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
+| `audio-bank-hirc-random-sequence` | `bank-hirc-random-sequence` | HIRC section and Random/Sequence object ordinals |
+| `audio-bank-hirc-random-sequence-playlist-item` | `bank-hirc-random-sequence-playlist-item` | HIRC section, Random/Sequence object and playlist item ordinals |
 | `audio-bank-hirc-container-rtpc` | `bank-hirc-container-rtpc` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-rtpc-curve` | `bank-hirc-container-rtpc-curve` | HIRC section, container object and curve ordinals |
 | `audio-bank-hirc-container-rtpc-point` | `bank-hirc-container-rtpc-point` | HIRC section, container object, curve and point ordinals |
@@ -251,6 +253,17 @@ and inline State records. Container RTPC curves and points have their own
 namespaces. Shared group rows can remain complete in diagnostics when later
 container-specific data is truncated. The original container row and child
 rows retain their existing layout and coverage.
+
+Version-154 Random/Sequence decision summaries preserve original loop counts and
+modifiers, transition binary32 words, avoid-repeat count, mode codes, flags and
+playlist count and checked range. Finite transition values retain their original
+numeric unit. Nonfinite transitions retain their complete original bits. Playlist
+rows are in authored order, with repeated play IDs, signed 32-bit weights and
+original weight bits. Play references carry unchecked resolution. A truncated
+item with a full play ID retains its ID and has a malformed layout. The summary
+reports unsupported versions and preserves the readable decision prefix when a
+supported body is truncated. Each original field and numeric conversion refers
+to its checked physical bytes in the owning bank.
 
 Version-154 Sound, ActorMixer and container node property summaries include the original override bus
 and direct parent words and the checked property and ranged modifier lists. Explicit zero

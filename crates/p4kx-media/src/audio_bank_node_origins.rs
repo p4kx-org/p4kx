@@ -26,6 +26,7 @@ pub(crate) enum NodeKind {
     Positioning,
     AdvancedSettings,
     ActionProperties,
+    RandomSequence,
 }
 
 impl NodeKind {
@@ -40,6 +41,7 @@ impl NodeKind {
             Self::Positioning => "bnkHircNodePositioning",
             Self::AdvancedSettings => "bnkHircNodeAdvancedSettings",
             Self::ActionProperties => "bnkHircActionProperties",
+            Self::RandomSequence => "bnkHircRandomSequence",
         }
     }
 
@@ -54,6 +56,7 @@ impl NodeKind {
             Self::Positioning => "nodePositioningRowPosition",
             Self::AdvancedSettings => "nodeAdvancedRowPosition",
             Self::ActionProperties => "actionPropertyPosition",
+            Self::RandomSequence => "randomSequencePlaylistPosition",
         }
     }
 
@@ -68,6 +71,7 @@ impl NodeKind {
             Self::Positioning => "nodePositioningExtent",
             Self::AdvancedSettings => "nodeAdvancedExtent",
             Self::ActionProperties => "actionPropertyExtent",
+            Self::RandomSequence => "randomSequenceExtent",
         }
     }
 }

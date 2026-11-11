@@ -4,7 +4,7 @@
 use p4kx_extraction::{Archive, HircLayout, OpenOptions};
 use p4kx_media::{ExportOutcome, MediaRecord};
 use p4kx_testkit::{ArchiveBuilder, TestBank, TestEntry, TestHircObject, test_key};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use super::super::audio_bank_state_provider::{
     check_retained, options, row, source_span, verify_layout,
@@ -14,7 +14,7 @@ use super::super::support::audio_provider::{Origins, Owner, TestResult};
 
 const PATH: &str = "container-node.bnk";
 
-pub(super) fn bank(version: u32, container: TestHircObject) -> Vec<u8> {
+pub(crate) fn bank(version: u32, container: TestHircObject) -> Vec<u8> {
     TestBank::new(5)
         .version(version)
         .object(container)
@@ -22,7 +22,7 @@ pub(super) fn bank(version: u32, container: TestHircObject) -> Vec<u8> {
         .bytes()
 }
 
-pub(super) fn export(
+pub(crate) fn export(
     source: &[u8],
     encrypted: bool,
     expected: HircLayout,
@@ -79,14 +79,14 @@ pub(super) fn export(
     Ok(())
 }
 
-pub(super) struct Evidence<'a> {
+pub(crate) struct Evidence<'a> {
     source: &'a [u8],
     origins: Origins,
     encrypted: bool,
 }
 
 impl Evidence<'_> {
-    pub(super) fn word(
+    pub(crate) fn word(
         &self,
         row: (usize, &MediaRecord),
         field: &str,
@@ -96,7 +96,7 @@ impl Evidence<'_> {
         self.scalar(row, field, label, value, &value.to_le_bytes())
     }
 
-    pub(super) fn byte(
+    pub(crate) fn byte(
         &self,
         row: (usize, &MediaRecord),
         field: &str,
@@ -104,6 +104,36 @@ impl Evidence<'_> {
         value: u8,
     ) -> TestResult {
         self.scalar(row, field, label, u32::from(value), &[value])
+    }
+
+    pub(crate) fn halfword(
+        &self,
+        row: (usize, &MediaRecord),
+        field: &str,
+        label: &str,
+        value: u16,
+    ) -> TestResult {
+        self.scalar(row, field, label, u32::from(value), &value.to_le_bytes())
+    }
+
+    pub(crate) fn conversion(
+        &self,
+        (position, record): (usize, &MediaRecord),
+        field: &str,
+        original: &str,
+        label: &str,
+    ) -> TestResult {
+        let span = record
+            .data
+            .pointer(&format!("/payload/{original}/range"))
+            .ok_or("original conversion span")?;
+        self.receipt(
+            position,
+            &format!("/data/payload/{field}"),
+            "conversion",
+            label,
+            span,
+        )
     }
 
     fn scalar(
@@ -127,13 +157,27 @@ impl Evidence<'_> {
             "{field} selects its exact original bytes"
         );
         let span = record.data.pointer(&range).ok_or("original scalar span")?;
-        let indices = json!([span.get("start"), span.get("end_exclusive")]);
-        let receipt = self.origins.field(
-            "records",
+        self.receipt(
             position,
             &format!("/data{field}/value"),
-            self.encrypted,
-        )?;
+            "payload",
+            label,
+            span,
+        )
+    }
+
+    fn receipt(
+        &self,
+        position: usize,
+        field: &str,
+        role: &str,
+        label: &str,
+        span: &Value,
+    ) -> TestResult {
+        let indices = json!([span.get("start"), span.get("end_exclusive")]);
+        let receipt = self
+            .origins
+            .field("records", position, field, self.encrypted)?;
         let uses = self.origins.require_owner(
             receipt,
             Owner {
@@ -151,7 +195,7 @@ impl Evidence<'_> {
         )?;
         assert!(
             uses.iter()
-                .any(|used| used.get("role") == Some(&json!("payload"))
+                .any(|used| used.get("role") == Some(&json!(role))
                     && used.pointer("/location/field") == Some(&json!(label))
                     && used.pointer("/location/indices") == Some(&indices)),
             "{field} receipt identifies the same physical container bank and scalar",

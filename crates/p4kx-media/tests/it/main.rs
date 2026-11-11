@@ -25,6 +25,7 @@ mod audio_bank_node_positioning_provider;
 mod audio_bank_node_properties_fixture;
 mod audio_bank_node_properties_provider;
 mod audio_bank_provider;
+mod audio_bank_random_sequence_provider;
 mod audio_bank_rtpc_provider;
 mod audio_bank_sound_candidate_provider;
 mod audio_bank_sound_loose_provider;
