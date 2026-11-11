@@ -12,6 +12,7 @@ pub(super) const BROKER_OBJECTIVE: u128 = BROKER + 16;
 pub(super) const MULTIPLE: &str = "MissionFlowAction_MultipleActions";
 pub(super) const PICK: &str = "MissionFlowAction_PickRandomAction";
 pub(super) const ENTRY: &str = "MissionRandomActionEntry";
+pub(super) const OTHER_ENTRY: &str = "FixtureFutureEntry";
 pub(super) const MYSTERY: &str = "MissionFlowAction_Mystery";
 pub(super) const NAN: u32 = 0x7fc0_1081;
 
@@ -34,6 +35,9 @@ pub(super) enum Case {
     WrongPickStorage,
     WrongEntry,
     WrongProbability,
+    WrongMultipleTarget,
+    WrongEmptyPickTarget,
+    WrongEntryActionTarget,
 }
 
 pub(super) fn open(case: Case, input: Input, both: bool) -> TestResult<Fixture> {
@@ -90,16 +94,16 @@ fn schema(case: Case) -> DataForgeBuilder {
 fn wrapper_schema(builder: DataForgeBuilder, case: Case) -> DataForgeBuilder {
     let mut multiple = TestStruct::new(MULTIPLE).parent(BASE);
     if !matches!(case, Case::AbsentActions) {
-        let storage = if matches!(case, Case::WrongMultipleStorage) {
-            TestType::Class(STATE.to_owned())
-        } else {
-            TestType::StrongPointer(BASE.to_owned())
+        let storage = match case {
+            Case::WrongMultipleStorage => TestType::Class(STATE.to_owned()),
+            Case::WrongMultipleTarget => TestType::StrongPointer(OTHER_ENTRY.to_owned()),
+            _ => TestType::StrongPointer(BASE.to_owned()),
         };
         multiple = multiple.array("actions", storage);
     }
     let pick_storage = match case {
         Case::WrongPickStorage => TestType::StrongPointer(ENTRY.to_owned()),
-        Case::WrongEntry => TestType::Class("FixtureFutureEntry".to_owned()),
+        Case::WrongEntry | Case::WrongEmptyPickTarget => TestType::Class(OTHER_ENTRY.to_owned()),
         _ => TestType::Class(ENTRY.to_owned()),
     };
     let probability = if matches!(case, Case::WrongProbability) {
@@ -109,7 +113,12 @@ fn wrapper_schema(builder: DataForgeBuilder, case: Case) -> DataForgeBuilder {
     };
     let mut entry = TestStruct::new(ENTRY).field("probability", probability);
     if !matches!(case, Case::AbsentAction) {
-        entry = entry.field("action", TestType::StrongPointer(BASE.to_owned()));
+        let target = if matches!(case, Case::WrongEntryActionTarget) {
+            OTHER_ENTRY
+        } else {
+            BASE
+        };
+        entry = entry.field("action", TestType::StrongPointer(target.to_owned()));
     }
     builder
         .structure(multiple)
@@ -119,7 +128,7 @@ fn wrapper_schema(builder: DataForgeBuilder, case: Case) -> DataForgeBuilder {
                 .array("actions", pick_storage),
         )
         .structure(entry)
-        .structure(TestStruct::new("FixtureFutureEntry").field("flag", TestType::Bool))
+        .structure(TestStruct::new(OTHER_ENTRY).field("flag", TestType::Bool))
 }
 
 fn record(kind: &str, guid: u128, owner: &str, case: Case) -> TestRecord {
@@ -166,10 +175,13 @@ fn root_action(case: Case, objective: &str) -> TestValue {
             let invalid = [u32::MAX.to_le_bytes(), 0_u32.to_le_bytes()].concat();
             multiple(vec![state(), TestValue::Raw(invalid), state()])
         }
-        Case::WrongMultipleStorage => multiple(vec![state()]),
-        Case::WrongPickStorage => pick(vec![entry(Some(state()), TestValue::Single(0.0))]),
+        Case::WrongMultipleStorage | Case::WrongMultipleTarget => multiple(vec![state()]),
+        Case::WrongPickStorage | Case::WrongEntryActionTarget => {
+            pick(vec![entry(Some(state()), TestValue::Single(0.0))])
+        }
+        Case::WrongEmptyPickTarget => pick(Vec::new()),
         Case::WrongEntry => pick(vec![TestValue::Struct(
-            TestInstance::new("FixtureFutureEntry").value("flag", TestValue::Bool(true)),
+            TestInstance::new(OTHER_ENTRY).value("flag", TestValue::Bool(true)),
         )]),
         Case::WrongProbability => pick(vec![entry(Some(state()), TestValue::Double(0.25))]),
     }

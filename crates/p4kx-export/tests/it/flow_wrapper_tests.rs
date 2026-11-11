@@ -10,6 +10,8 @@ use crate::health_origin_fixture::{self as source, Fixture, Input, TestResult};
 use crate::loot_v3_graph as raw;
 use crate::template_canonical_graph::Template;
 
+#[path = "flow_wrapper_declared_target_tests.rs"]
+mod declared_target;
 #[path = "flow_wrapper_fixture.rs"]
 mod fixture;
 #[path = "flow_wrapper_wire.rs"]

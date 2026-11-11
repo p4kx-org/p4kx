@@ -122,8 +122,13 @@ inline Class array and lists ordered `entries`. A declared entry includes the or
 probability binding refers to the original Single cell with its exact IEEE-754 bits and origin.
 The entry union distinguishes original null, unreadable, unsupported and invalid slots.
 An authored null child has a raw value reference. An absent child declaration is expressed
-through the action field's declaration survey. The same arena stores nested wrappers and
-all readable child actions.
+through the action field's declaration survey. The same arena stores nested wrappers and all readable child actions. The
+typed walk checks the original declared targets. MultipleActions and a
+weighted entry's action pointer require MissionFlowActionBase. The
+PickRandomAction Class array requires MissionRandomActionEntry, including
+when it is empty. A compatible pointer can still carry a supported concrete
+derived action. An incompatible declaration fails the required interpretation
+while its original target word and values remain in the source arena.
 
 The opt-in source comparison `selected_flow_action_wrappers_match_the_original_owner_graph`
 checks selected Template Records against their original action graphs. Set `P4KX_DATA_P4K`

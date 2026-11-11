@@ -8,6 +8,7 @@ use crate::record_read::ReadError;
 use crate::source_fields::{FieldCapture, FieldViolation};
 use crate::{CatalogError, ExportAccountingError};
 
+const ACTION_BASE: &str = "MissionFlowActionBase";
 pub(crate) const RANDOM_ENTRY_TYPE: &str = "MissionRandomActionEntry";
 
 #[derive(Clone, Copy)]
@@ -46,6 +47,7 @@ pub(crate) struct ActionField {
     name: &'static str,
     data_type: DataType,
     array: bool,
+    target: Option<&'static str>,
     expected: &'static str,
 }
 
@@ -53,6 +55,7 @@ const MULTIPLE_ACTIONS: ActionField = ActionField {
     name: "actions",
     data_type: DataType::StrongPointer,
     array: true,
+    target: Some(ACTION_BASE),
     expected: "an ordered StrongPointer action array",
 };
 
@@ -60,6 +63,7 @@ const RANDOM_ACTIONS: ActionField = ActionField {
     name: "actions",
     data_type: DataType::Class,
     array: true,
+    target: Some(RANDOM_ENTRY_TYPE),
     expected: "an ordered Class array of MissionRandomActionEntry",
 };
 
@@ -67,6 +71,7 @@ pub(crate) const ENTRY_ACTION: ActionField = ActionField {
     name: "action",
     data_type: DataType::StrongPointer,
     array: false,
+    target: Some(ACTION_BASE),
     expected: "a nullable StrongPointer action",
 };
 
@@ -74,6 +79,7 @@ pub(crate) const ENTRY_PROBABILITY: ActionField = ActionField {
     name: "probability",
     data_type: DataType::Single,
     array: false,
+    target: None,
     expected: "a Single probability",
 };
 
@@ -92,7 +98,26 @@ impl ActionField {
             .map(|(_, field)| field))
     }
 
-    pub(crate) fn allows(self, fact: &OriginalValueFact<'_, '_, '_>) -> bool {
+    pub(crate) fn allows<'scope, 'read, 'source>(
+        self,
+        fields: &OriginalFlowFields<'scope, 'read, 'source>,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+    ) -> Result<bool, CatalogError> {
+        Ok(self.storage_matches(fact) && self.target_matches(fields, fact)?)
+    }
+
+    fn target_matches<'scope, 'read, 'source>(
+        self,
+        fields: &OriginalFlowFields<'scope, 'read, 'source>,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+    ) -> Result<bool, CatalogError> {
+        self.target.map_or_else(
+            || Ok(true),
+            |expected| Ok(fields.declared_target_name(fact)? == Some(expected)),
+        )
+    }
+
+    fn storage_matches(self, fact: &OriginalValueFact<'_, '_, '_>) -> bool {
         let storage = fact.field().storage();
         storage.data_type() == self.data_type
             && storage.is_array() == self.array
@@ -118,16 +143,20 @@ impl ActionField {
         let Some(field) = self.original(fields, owner)? else {
             return Ok(None);
         };
-        if self.allows(field) {
+        let storage_matches = self.storage_matches(field);
+        if storage_matches && self.target_matches(fields, field)? {
             return Ok(None);
         }
         let Value::Struct(source) = owner.value() else {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         };
         let path = fields.logical_path(owner)?;
-        let invalid =
-            FieldViolation::invalid(source, &path, self.name, field.value(), self.expected);
-        let body = capture.field_failure(&invalid)?;
-        Ok(Some(Box::new(invalid.into_error().with_body(body))))
+        let violation = if storage_matches {
+            FieldViolation::unsupported(source, &path, field.field())
+        } else {
+            FieldViolation::invalid(source, &path, self.name, field.value(), self.expected)
+        };
+        let body = capture.field_failure(&violation)?;
+        Ok(Some(Box::new(violation.into_error().with_body(body))))
     }
 }

@@ -166,9 +166,10 @@ fn action_children<'fields, 'scope, 'read, 'source>(
             let declared = layout
                 .wrapper_field()
                 .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-            let array = declared
-                .original(fields, selected.fact)?
-                .filter(|fact| declared.allows(fact));
+            let array = match declared.original(fields, selected.fact)? {
+                Some(fact) if declared.allows(fields, fact)? => Some(fact),
+                _ => None,
+            };
             let role = if matches!(layout, ActionLayout::MultipleActions) {
                 FlowRole::Action
             } else {
@@ -202,7 +203,7 @@ fn entry_child<'fields, 'scope, 'read, 'source>(
 ) -> Result<(), CatalogError> {
     if type_name == RANDOM_ENTRY_TYPE
         && let Some(fact) = ENTRY_ACTION.original(fields, selected.fact)?
-        && ENTRY_ACTION.allows(fact)
+        && ENTRY_ACTION.allows(fields, fact)?
         && matches!(fact.value(), Value::Struct(_))
     {
         pending.push(RoleSelection {

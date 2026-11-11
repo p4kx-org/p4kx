@@ -60,11 +60,7 @@ impl<'read, 'source> OriginalCatalogInput<'read, 'source> {
         index: u16,
         role: SourceUseRole,
     ) -> Result<(Option<&str>, SourceUse), CatalogError> {
-        let name = self
-            .forge
-            .structs()
-            .nth(usize::from(index))
-            .and_then(|structure| structure.name().ok());
+        let name = self.struct_name(index);
         let role = if name.is_some() {
             role
         } else {
@@ -79,6 +75,13 @@ impl<'read, 'source> OriginalCatalogInput<'read, 'source> {
             role,
         )?;
         Ok((name, used))
+    }
+
+    pub(super) fn struct_name(&self, index: u16) -> Option<&str> {
+        self.forge
+            .structs()
+            .nth(usize::from(index))
+            .and_then(|structure| structure.name().ok())
     }
 
     fn check_record(&self, record: &Record<'_>) -> Result<(), CatalogError> {

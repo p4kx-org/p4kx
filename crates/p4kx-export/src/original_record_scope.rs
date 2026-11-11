@@ -10,25 +10,23 @@ use crate::CatalogError;
 pub(crate) struct OriginalRecordScope<'read, 'source> {
     record: &'read Record<'source>,
     tree: &'read RecordTree<'source>,
-    sources: &'read SourceUses,
-    dataforge: &'read SourceScope,
+    input: &'read OriginalCatalogInput<'read, 'read>,
 }
 
 impl<'read, 'source> OriginalRecordScope<'read, 'source> {
     pub(super) fn new(
-        input: &'read OriginalCatalogInput<'_, '_>,
+        input: &'read OriginalCatalogInput<'read, 'read>,
         record: &'read Record<'source>,
         tree: &'read RecordTree<'source>,
     ) -> Result<Self, CatalogError> {
-        let context = input.record_context(record)?;
+        input.record_context(record)?;
         if !tree.is_from(record) {
             return Err(SourceEvidenceError::ForeignEvidence.into());
         }
         Ok(Self {
             record,
             tree,
-            sources: context.sources(),
-            dataforge: context.dataforge(),
+            input,
         })
     }
 
@@ -41,10 +39,14 @@ impl<'read, 'source> OriginalRecordScope<'read, 'source> {
     }
 
     pub(crate) const fn sources(&self) -> &'read SourceUses {
-        self.sources
+        &self.input.origins().uses
     }
 
     pub(crate) const fn dataforge(&self) -> &'read SourceScope {
-        self.dataforge
+        &self.input.origins().dataforge
+    }
+
+    pub(crate) fn struct_name(&self, index: u16) -> Option<&str> {
+        self.input.struct_name(index)
     }
 }

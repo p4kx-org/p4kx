@@ -36,6 +36,16 @@ impl<'scope, 'read, 'source> OriginalFlowFields<'scope, 'read, 'source> {
         Ok(())
     }
 
+    /// Reads the exact Struct name declared by one original field occurrence.
+    pub(crate) fn declared_target_name(
+        &self,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+    ) -> Result<Option<&str>, CatalogError> {
+        self.check_cancel()?;
+        self.ensure(fact)?;
+        Ok(self.scope.struct_name(fact.field().storage().target()))
+    }
+
     pub(crate) const fn input_ref(&self) -> &PhysicalSourceRef {
         self.scope.dataforge().source_ref()
     }
