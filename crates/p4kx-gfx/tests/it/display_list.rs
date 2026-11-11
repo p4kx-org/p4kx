@@ -233,3 +233,53 @@ fn frame_lists_stop_at_the_placement_cap_with_one_typed_failure() {
         "all frames are still counted"
     );
 }
+
+#[test]
+fn first_frame_receipts_follow_effective_placement_properties_and_removals() {
+    let input = placements();
+    let parsed = movie(&input);
+    let observed = parsed.assets_observed();
+    let frame = &observed.origins.timeline.first_frame;
+    let depths: Vec<_> = frame.keys().copied().collect();
+    assert_eq!(depths, [1, 2], "removed and later placements are excluded");
+
+    let edited = &frame[&1];
+    let original = edited.character.expect("initial character");
+    let transform = edited.matrix.expect("last authored matrix");
+    assert_eq!(
+        input.get(original.body.offset..original.body.end()),
+        Some(TestPlace::new(1, 5).at(100, -40).body2().as_slice()),
+        "the initial tag owns the effective character selection"
+    );
+    assert_eq!(
+        input.get(transform.body.offset..transform.body.end()),
+        Some(TestPlace::modify(1).at(0, 60).body2().as_slice()),
+        "the move-only tag owns the effective transform"
+    );
+    assert_eq!(
+        frame[&2].filters, frame[&2].visible,
+        "the same PlaceObject3 tag supplied both authored effects"
+    );
+}
+
+#[test]
+fn replacing_a_character_without_move_drops_the_prior_property_origins() {
+    let new_character = TestPlace::new(1, 7).body2();
+    let replaced = TestMovie::new(TestSignature::Gfx)
+        .tag(26, &TestPlace::new(1, 5).at(100, -40).body2())
+        .tag(26, &new_character)
+        .bytes();
+    let parsed = movie(&replaced);
+    let observed = parsed.assets_observed();
+    let origin = &observed.origins.timeline.first_frame[&1];
+    let selected = origin.character.expect("replacement character");
+    assert_eq!(
+        replaced.get(selected.body.offset..selected.body.end()),
+        Some(new_character.as_slice()),
+        "the replacement tag selected the character"
+    );
+    assert_eq!(
+        origin.matrix, None,
+        "identity is implicit after a complete replacement"
+    );
+}

@@ -78,8 +78,8 @@ mod timeline;
 mod walker;
 
 pub use asset_origins::{
-    AssetOrigins, FailureOrigin, FontOrigins, LabelOrigin, SpanRun, SpanRuns, SpriteOrigins,
-    TimelineOrigins,
+    AssetOrigins, FailureOrigin, FontOrigins, LabelOrigin, PlacementOrigins, SpanRun, SpanRuns,
+    SpriteOrigins, TimelineOrigins,
 };
 pub use assets::{Assets, OtherDefinition, TagCount, TagFailure, UnknownTag};
 pub use bitmap::{

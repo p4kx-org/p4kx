@@ -206,3 +206,47 @@ fn deeply_nested_sprite_definitions_and_following_tags_are_all_read() {
         Some(u32::from(depth))
     );
 }
+
+#[test]
+fn shorter_font_info_overrides_only_the_glyph_code_prefix_it_supplies() {
+    let glyphs = [
+        glyph(u16::from(b'D'), 12_000, 10_000),
+        glyph(u16::from(b'E'), 12_000, 10_000),
+        glyph(u16::from(b'F'), 12_000, 10_000),
+    ];
+    let all_codes = b"\x04\0\x01a\0ABC";
+    let first_code = b"\x04\0\x01b\0Z";
+    let only_style = b"\x04\0\x01c\0";
+    let input = TestMovie::new(TestSignature::Gfx)
+        .tag(75, &font3_body(4, "Original", &glyphs))
+        .tag(13, all_codes)
+        .tag(13, first_code)
+        .tag(13, only_style)
+        .bytes();
+    let movie = Movie::parse(input.clone()).expect("synthetic movie");
+    let observed = movie.assets_observed();
+    let font = observed.assets.fonts.first().expect("one font");
+    let codes: Vec<_> = font.glyphs.iter().filter_map(|glyph| glyph.code).collect();
+    assert_eq!(codes, [90, 66, 67], "the effective codes use both tags");
+    assert_eq!(font.name, "c", "last info supplies the name");
+
+    let origins = observed.origins.fonts.first().expect("font origins");
+    let name = origins.info.expect("font name override");
+    assert_eq!(
+        input.get(name.body.offset..name.body.end()),
+        Some(only_style.as_slice()),
+        "the latest tag supplied the name independently of the codes"
+    );
+    for (index, body) in [first_code.as_slice(), all_codes, all_codes]
+        .into_iter()
+        .enumerate()
+    {
+        let site = origins.glyph_code_override(index).expect("code override");
+        assert_eq!(site.ordinal, index, "index inside the accepted tag");
+        assert_eq!(
+            input.get(site.tag.body.offset..site.tag.body.end()),
+            Some(body),
+            "the retained code source for glyph {index}"
+        );
+    }
+}

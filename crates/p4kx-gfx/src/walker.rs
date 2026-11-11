@@ -16,10 +16,14 @@ use crate::timeline::{DisplayList, MAX_FRAME_BYTES, MAX_FRAME_PLACEMENTS, Sprite
 use crate::{GfxError, MovieSpan, TagSite};
 
 /// Applies a `PlaceObject` or `RemoveObject` tag to its display list.
-fn read_display_tag(tag: &Tag<'_>, display_list: &mut DisplayList) -> Result<(), GfxError> {
+fn read_display_tag(
+    tag: &Tag<'_>,
+    display_list: &mut DisplayList,
+    origin: Option<&mut TimelineOrigins>,
+) -> Result<(), GfxError> {
     match tag.code {
-        4 | 26 | 70 => display_list.place(read_place(tag)?),
-        5 | 28 => display_list.remove(tag)?,
+        4 | 26 | 70 => display_list.place(read_place(tag)?, tag.site(), origin),
+        5 | 28 => display_list.remove(tag, origin)?,
         _ => {}
     }
     Ok(())
@@ -118,13 +122,13 @@ impl<'a, 'origin> Walker<'a, 'origin> {
             if let Some(&index) = fonts.get(&info.id)
                 && let Some(font) = self.assets.fonts.get_mut(index)
             {
-                info.apply(font);
+                let codes_written = info.apply(font);
                 if let Some(original) = self
                     .origin
                     .as_deref_mut()
                     .and_then(|o| o.fonts.get_mut(index))
                 {
-                    original.info = Some(site);
+                    original.observe_info(site, codes_written);
                 }
             }
         }
@@ -237,7 +241,11 @@ impl<'a, 'origin> Walker<'a, 'origin> {
                 if let (Some(origin), Some(timeline)) = (&mut self.origin, &mut current.origin) {
                     origin.accepted(tag.site(), accepted, &self.assets, timeline);
                 }
-                read_display_tag(tag, &mut current.display_list)
+                let first_frame = current
+                    .origin
+                    .as_mut()
+                    .filter(|_| current.timeline.frames == 0);
+                read_display_tag(tag, &mut current.display_list, first_frame)
             });
         if let Err(error) = result {
             self.fail(tag.code, tag.offset, error, FailureOrigin::Tag(tag.site()));

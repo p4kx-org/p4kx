@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
+use crate::place::PlaceCommand;
 use crate::{Assets, MovieSpan, TagItemSite, TagSite};
 
 /// Consecutive observed ranges of the same length at a fixed stride.
@@ -76,6 +77,57 @@ pub struct TimelineOrigins {
     pub labels: Vec<LabelOrigin>,
     /// Each accepted placement occurrence grouped by the ID emitted in the deduplicated list.
     pub placements: BTreeMap<u16, Vec<TagSite>>,
+    /// Actual source of the effective properties at each retained first-frame depth.
+    pub first_frame: BTreeMap<u16, PlacementOrigins>,
+}
+
+impl TimelineOrigins {
+    pub(crate) fn place(&mut self, command: &PlaceCommand, site: TagSite, retained: bool) {
+        let origins = self.first_frame.entry(command.depth).or_default();
+        if !retained {
+            *origins = PlacementOrigins::default();
+        }
+        origins.apply(command, site);
+    }
+}
+
+/// Physical tags that supplied the effective properties of a first-frame placement.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PlacementOrigins {
+    /// Tag selecting the effective character ID.
+    pub character: Option<TagSite>,
+    /// Tag supplying the effective matrix.
+    pub matrix: Option<TagSite>,
+    /// Tag supplying the effective colour transform.
+    pub color_transform: Option<TagSite>,
+    /// Tag supplying the effective morph ratio.
+    pub ratio: Option<TagSite>,
+    /// Tag supplying the effective name.
+    pub name: Option<TagSite>,
+    /// Tag supplying the effective clip depth.
+    pub clip_depth: Option<TagSite>,
+    /// Tag supplying the effective blend mode.
+    pub blend_mode: Option<TagSite>,
+    /// Tag supplying the effective filters.
+    pub filters: Option<TagSite>,
+    /// Tag supplying the effective visibility.
+    pub visible: Option<TagSite>,
+}
+
+impl PlacementOrigins {
+    fn apply(&mut self, command: &PlaceCommand, site: TagSite) {
+        let supplied = |authored, previous| if authored { Some(site) } else { previous };
+        self.character = supplied(command.id.is_some(), self.character);
+        self.matrix = supplied(command.matrix.is_some(), self.matrix);
+        self.color_transform = supplied(command.color_transform.is_some(), self.color_transform);
+        self.ratio = supplied(command.ratio.is_some(), self.ratio);
+        self.name = supplied(command.name.is_some(), self.name);
+        self.clip_depth = supplied(command.clip_depth.is_some(), self.clip_depth);
+        self.blend_mode = supplied(command.blend_mode.is_some(), self.blend_mode);
+        self.filters = supplied(command.filters.is_some(), self.filters);
+        self.visible = supplied(command.visible.is_some(), self.visible);
+    }
 }
 
 /// The physical defining tag and the tags that actually overrode its displayed font fields.
@@ -88,6 +140,35 @@ pub struct FontOrigins {
     pub info: Option<TagSite>,
     /// Last `FontName` applied to its full name, if any.
     pub full_name: Option<TagSite>,
+    code_overrides: VecDeque<(usize, TagSite)>,
+}
+
+impl FontOrigins {
+    pub(crate) fn observe_info(&mut self, site: TagSite, codes_written: usize) {
+        self.info = Some(site);
+        if codes_written == 0 {
+            return;
+        }
+        while self
+            .code_overrides
+            .front()
+            .is_some_and(|&(end, _)| end <= codes_written)
+        {
+            self.code_overrides.pop_front();
+        }
+        self.code_overrides.push_front((codes_written, site));
+    }
+
+    /// Returns the last accepted `FontInfo` item supplying this glyph's code.
+    #[must_use]
+    pub fn glyph_code_override(&self, glyph: usize) -> Option<TagItemSite> {
+        let range = self
+            .code_overrides
+            .partition_point(|&(end, _)| end <= glyph);
+        self.code_overrides
+            .get(range)
+            .map(|&(_, site)| TagItemSite::new(site, glyph))
+    }
 }
 
 /// Physical occurrence of a sprite and the survey of its own nested timeline.
@@ -141,6 +222,14 @@ pub struct AssetOrigins {
     pub sprites: Vec<SpriteOrigins>,
     /// The first accepted export record for each authored ID.
     pub exports: BTreeMap<u16, TagItemSite>,
+    /// Every physical export item in output order, including aliases and repeats.
+    pub export_items: Vec<TagItemSite>,
+    /// Physical static-text occurrences in output order.
+    pub static_texts: Vec<TagSite>,
+    /// Physical editable-text occurrences in output order.
+    pub edit_texts: Vec<TagSite>,
+    /// First accepted movie background declaration.
+    pub background: Option<TagSite>,
     /// Physical import occurrences in output order.
     pub imports: Vec<TagSite>,
     /// Physical symbol-class items in output order.
@@ -187,6 +276,11 @@ impl AssetOrigins {
                 frame_prefix: MovieSpan::new(timeline.scan.offset, tag.header.offset),
             }),
             AcceptedTag::Import => self.imports.push(tag),
+            AcceptedTag::StaticText => self.static_texts.push(tag),
+            AcceptedTag::EditText => self.edit_texts.push(tag),
+            AcceptedTag::Background => {
+                self.background.get_or_insert(tag);
+            }
             AcceptedTag::SymbolClasses(count) => {
                 self.symbol_classes
                     .extend((0..count).map(|ordinal| TagItemSite::new(tag, ordinal)));
@@ -202,12 +296,13 @@ impl AssetOrigins {
                 definition: tag,
                 info: None,
                 full_name: None,
+                code_overrides: VecDeque::new(),
             }),
             AcceptedTag::Exports(start) => {
                 for (ordinal, record) in assets.exports.iter().skip(start).enumerate() {
-                    self.exports
-                        .entry(record.id)
-                        .or_insert_with(|| TagItemSite::new(tag, ordinal));
+                    let item = TagItemSite::new(tag, ordinal);
+                    self.exports.entry(record.id).or_insert(item);
+                    self.export_items.push(item);
                 }
             }
             AcceptedTag::Exporter => self.exporter = Some(tag),
@@ -224,6 +319,9 @@ pub(crate) enum AcceptedTag {
     Placement(Option<u16>),
     Label,
     Import,
+    StaticText,
+    EditText,
+    Background,
     SymbolClasses(usize),
     ScalingGrid,
     Shape,

@@ -150,10 +150,7 @@ impl<'a> Walker<'a, '_> {
                 self.assets.jpeg_tables.get_or_insert(tag.body);
                 AcceptedTag::JpegTables
             }
-            0 | 5 | 9 | 11 | 28 | 33 | 37 => {
-                self.read_other(tag)?;
-                Other
-            }
+            0 | 5 | 9 | 11 | 28 | 33 | 37 => self.read_other(tag)?,
             code => {
                 *self.unread.entry(code).or_default() += 1;
                 Unread
@@ -161,20 +158,26 @@ impl<'a> Walker<'a, '_> {
         })
     }
 
-    fn read_other(&mut self, tag: &Tag<'a>) -> Result<(), GfxError> {
+    fn read_other(&mut self, tag: &Tag<'a>) -> Result<AcceptedTag, GfxError> {
         let assets = &mut self.assets;
-        match tag.code {
+        Ok(match tag.code {
             9 => {
                 assets.background.get_or_insert(tag.reader().rgb()?);
+                AcceptedTag::Background
             }
-            11 | 33 => assets.static_texts.push(read_static_text(
-                tag,
-                tag.code == 33,
-                &mut self.text_budget,
-            )?),
-            37 => assets.edit_texts.push(read_edit_text(tag)?),
-            _ => {}
-        }
-        Ok(())
+            11 | 33 => {
+                assets.static_texts.push(read_static_text(
+                    tag,
+                    tag.code == 33,
+                    &mut self.text_budget,
+                )?);
+                AcceptedTag::StaticText
+            }
+            37 => {
+                assets.edit_texts.push(read_edit_text(tag)?);
+                AcceptedTag::EditText
+            }
+            _ => AcceptedTag::Other,
+        })
     }
 }
