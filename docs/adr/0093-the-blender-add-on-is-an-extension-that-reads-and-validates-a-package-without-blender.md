@@ -10,8 +10,8 @@ File > Import > "P4KX Package (scene.json)". `blender_addon/build_zip.py` packs 
 `p4kx_importer-<version>.zip` with the files at the root of the zip, in a fixed order with fixed
 timestamps, which is what Blender installs from disk and what #164 attaches to every release.
 
-**Supported Blender.** The add-on targets Blender 5.2 LTS (Python 3.13): the manifest states
-`blender_version_min = "5.2.0"`, and the README and CI say the same. It uses only API that is
+**Supported Blender.** The add-on supports Blender 5.2 LTS and 5.3 (Python 3.13). The manifest states
+`blender_version_min = "5.2.0"`, and CI tests both Blender versions. It uses only API that is
 stable across 5.x: no `blend_method`, no `Material.use_nodes` on a material that already has a
 node tree, and the glTF importer that ships with Blender (`io_scene_gltf2`) for the GLB parts.
 Older Blender versions are not supported; the manifest, not code, keeps the add-on from being
@@ -63,7 +63,7 @@ tolerance of later minor versions, axis conversion, material pairing, the zip bu
 meshes and instances, the shared collection, the hierarchy, the converted transform, the node
 setup, the image colour spaces, the operator and the refusal of a newer package. A CI job runs
 both on Windows and Linux; Blender comes from the `bpy` wheel on PyPI, pinned to the supported
-version, so no Blender binary has to be downloaded.
+versions for each runner.
 
 ## Consequences
 

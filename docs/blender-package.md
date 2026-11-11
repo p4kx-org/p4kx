@@ -483,7 +483,7 @@ makes the package much smaller.
 ## Verifying a package in Blender
 
 `blender_addon/tests/import_real_package.py <package folder>...` imports packages in headless
-Blender (the `bpy` 5.2.3 wheel in a virtual environment, or
+Blender (the `bpy` 5.2.3 or 5.3.0 wheel in a virtual environment, or
 `blender --background --factory-startup --python blender_addon/tests/import_real_package.py -- <package folder>...`)
 and prints one JSON line per package: objects, collections, armatures, shape keys, actions,
 materials, node groups, images, warnings and the time. The exit status is 1 when no folder is

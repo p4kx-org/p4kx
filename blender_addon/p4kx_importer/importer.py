@@ -14,6 +14,7 @@ from mathutils import Quaternion, Vector
 
 from .glass_tint import drop_tint_without_colours
 from .lights import gltf_to_blender_light_quaternion, light_settings
+from .material_surface import GLTF_COLOUR_ATTRIBUTE
 from .materials import ImageCache, apply_materials
 from .light_model import Light
 from .package import (
@@ -221,28 +222,59 @@ def _gltf_context(context: bpy.types.Context) -> AbstractContextManager[object]:
 
 
 def _drop_vertex_colour_tint(material: bpy.types.Material) -> None:
-    """Takes the vertex colours, which are the engine's masks, out of the base colour."""
+    """Removes the glTF vertex-colour mask from a rigged material's base colour."""
     tree = material.node_tree
     if tree is None or "p4kx_family" in material:
         return
-    for link in list(tree.links):
-        mix = link.from_node
-        if link.to_socket.name != "Base Color" or mix.bl_idname != "ShaderNodeMix":
+    for shader in tree.nodes:
+        if shader.bl_idname == "ShaderNodeBsdfPrincipled":
+            _drop_base_colour_mask(tree, shader.inputs["Base Color"])
+
+
+def _drop_base_colour_mask(tree: bpy.types.NodeTree, base: bpy.types.NodeSocket) -> None:
+    pending = [base]
+    seen = set()
+    while pending:
+        target = pending.pop()
+        if target in seen or not target.is_linked:
             continue
-        colours = [s for s in mix.inputs if s.enabled and s.type == "RGBA"]
-        tinted = [
-            s
-            for s in colours
-            if s.is_linked and s.links[0].from_node.bl_idname == "ShaderNodeVertexColor"
-        ]
-        if len(colours) != 2 or len(tinted) != 1:
-            continue
-        other = colours[1] if tinted[0] == colours[0] else colours[0]
-        if other.is_linked:
-            tree.links.new(other.links[0].from_socket, link.to_socket)
-        else:
-            link.to_socket.default_value = other.default_value
+        seen.add(target)
+        link = target.links[0]
+        if _is_gltf_colour(link.from_socket):
+            target.default_value = (1.0, 1.0, 1.0, 1.0)
             tree.links.remove(link)
+            continue
+        mix = link.from_node
+        if mix.bl_idname != "ShaderNodeMix" or mix.data_type != "RGBA" or mix.blend_type != "MULTIPLY":
+            continue
+        factor = mix.inputs[0]
+        if factor.is_linked or factor.default_value != 1.0:
+            continue
+        colours = [socket for socket in mix.inputs if socket.enabled and socket.type == "RGBA"]
+        if len(colours) != 2:
+            continue
+        masks = [socket for socket in colours if socket.is_linked and _is_gltf_colour(socket.links[0].from_socket)]
+        if len(masks) != 1:
+            pending.extend(colours)
+            continue
+        other = colours[1] if masks[0] == colours[0] else colours[0]
+        if other.is_linked:
+            tree.links.new(other.links[0].from_socket, target)
+        else:
+            target.default_value = other.default_value
+            tree.links.remove(link)
+
+
+def _is_gltf_colour(socket: bpy.types.NodeSocket) -> bool:
+    node = socket.node
+    return socket.name == "Color" and (
+        node.bl_idname == "ShaderNodeVertexColor"
+        or (
+            node.bl_idname == "ShaderNodeAttribute"
+            and node.attribute_type == "GEOMETRY"
+            and node.attribute_name == GLTF_COLOUR_ATTRIBUTE
+        )
+    )
 
 
 def _create_object(

@@ -502,7 +502,7 @@ Windows releases provide AMD64 (`x86_64-pc-windows-msvc`) and ARM64
 - **`P4KX-<version>-<target>-portable.zip`** holds `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe`
   to run from any folder, without installing anything.
 - **`p4kx_importer-<version>.zip`** is the Blender add-on that imports a Blender package. In
-  Blender 5.2 LTS use Edit › Preferences › Get Extensions › Install from Disk. It needs no
+  Blender 5.2 LTS or 5.3 use Edit › Preferences › Get Extensions › Install from Disk. It needs no
   installer and has the same version as the Release.
 
 Both keep their settings in `%APPDATA%\P4KX\settings.toml`, so switching between them or

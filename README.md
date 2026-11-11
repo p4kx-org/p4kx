@@ -115,7 +115,7 @@ Claude Desktop.
 ## Blender add-on
 
 The add-on `p4kx_importer` imports the packages written by `entity package`,
-`interior package` and `character package` (package format 1.8) into Blender 5.2 LTS (File >
+`interior package` and `character package` (package format 1.8) into Blender 5.2 LTS or 5.3 (File >
 Import > P4KX Package (scene.json)). See [blender_addon/README.md](blender_addon/README.md) and
 [docs/blender-package.md](docs/blender-package.md).
 

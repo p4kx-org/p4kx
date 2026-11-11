@@ -100,11 +100,31 @@ def check_interior_alone(folder: Path) -> None:
     check(abs(room.matrix_world.translation.y - 6.0) < 1e-4, f"room at {tuple(room.matrix_world.translation)}")
 
 
-def check_character(folder: Path) -> None:
+def reads_gltf_vertex_colour(socket: bpy.types.NodeSocket) -> bool:
+    """Checks the live colour inputs between the shader and the imported vertex attribute."""
+    pending = [socket]
+    seen = set()
+    while pending:
+        current = pending.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        for link in current.links:
+            source = link.from_node
+            if source.type == "VERTEX_COLOR":
+                return True
+            if source.type == "ATTRIBUTE" and source.attribute_type == "GEOMETRY" and source.attribute_name == "Color":
+                return True
+            if source.type in ("MIX", "MIX_RGB"):
+                pending.extend(item for item in source.inputs if item.enabled and item.type == "RGBA")
+    return False
+
+
+def check_character(folder: Path, base_colour: tuple[float, ...]) -> None:
     """Imports ``synthetic_character.character_manifest()`` and checks armature, shapes, actions."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     addon_utils.enable("io_scene_gltf2", default_set=False)
-    scene = synthetic_character.write_character_package(folder)
+    scene = synthetic_character.write_character_package(folder, base_colour=base_colour)
     loaded = package.load_package(scene)
     check(not loaded.warnings, f"loaded: {loaded.warnings}")
     rigged = next(mesh for mesh in loaded.meshes.values() if mesh.rig is not None)
@@ -112,16 +132,13 @@ def check_character(folder: Path) -> None:
     importer._run_gltf(bpy.context, package.resolve_file(loaded.root, rigged.file))
     plain = [m for m in bpy.data.materials if m not in before["materials"] and m.node_tree]
     check(plain, "the plain glTF import creates a material")
-    wired = False
-    for material in plain:
-        base = next(n for n in material.node_tree.nodes if n.type == "BSDF_PRINCIPLED").inputs["Base Color"]
-        mix = base.links[0].from_node if base.is_linked else None
-        wired = wired or (
-            mix is not None
-            and mix.type in ("MIX", "MIX_RGB")
-            and any(s.is_linked and s.links[0].from_node.type == "VERTEX_COLOR" for s in mix.inputs)
-        )
-    check(wired, "the glTF importer wires COLOR_0 into the base colour before the add-on drops it")
+    base_sockets = [
+        node.inputs["Base Color"]
+        for material in plain
+        for node in material.node_tree.nodes
+        if node.type == "BSDF_PRINCIPLED"
+    ]
+    check(any(reads_gltf_vertex_colour(socket) for socket in base_sockets), "glTF uses the original COLOR_0")
     importer._discard_new(before)
     result = importer.import_package(bpy.context, loaded)
     check(not result.warnings, f"warnings: {result.warnings}")
@@ -150,8 +167,12 @@ def check_character(folder: Path) -> None:
     check(len(body.data.color_attributes) == 1, "the vertex colours are kept as an attribute")
     bsdf = next(n for n in body.data.materials[0].node_tree.nodes if n.type == "BSDF_PRINCIPLED")
     base = bsdf.inputs["Base Color"]
-    tinting = base.is_linked and base.links[0].from_node.type in ("MIX", "MIX_RGB")
-    check(not tinting, "the vertex colours do not tint the base colour")
+    check(not reads_gltf_vertex_colour(base), "the vertex colours do not tint the base colour")
+    check(not base.is_linked, "the plain material keeps its base factor directly on the shader")
+    check(
+        all(abs(actual - expected) < 1e-6 for actual, expected in zip(base.default_value, base_colour)),
+        f"the authored base factor is preserved: {tuple(base.default_value)}",
+    )
 
     waves = [action for action in bpy.data.actions if "wave" in action.name]
     check(len(waves) >= 1, f"actions: {[action.name for action in bpy.data.actions]}")
@@ -216,7 +237,8 @@ def main() -> None:
 
         check_interior(Path(folder) / "lit")
         check_interior_alone(Path(folder) / "interior_alone")
-        check_character(Path(folder) / "character")
+        check_character(Path(folder) / "character", synthetic_character.RIG_BASE_COLOUR)
+        check_character(Path(folder) / "character_white", (1.0, 1.0, 1.0, 1.0))
 
         bpy.ops.wm.read_factory_settings(use_empty=True)
         addon_utils.enable("io_scene_gltf2", default_set=False)
