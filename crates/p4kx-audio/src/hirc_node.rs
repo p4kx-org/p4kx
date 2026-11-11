@@ -5,6 +5,8 @@ use std::ops::Range;
 
 use crate::bank_object_fields::{self, BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
+use crate::hirc_node_aux::{self, BankNodeAuxFields};
+use crate::hirc_node_fx::{self, BankNodeFxFields, BankNodeFxKind, BankNodeFxList};
 use crate::hirc_node_property::{self, BankNodePropertyExtents};
 use crate::hirc_node_state;
 use crate::hirc_rtpc::{self, BankRtpcExtent};
@@ -13,21 +15,17 @@ pub(crate) use crate::hirc_rtpc::CURVE_POINT_LEN;
 use crate::{BankError, SectionId};
 
 pub(crate) const ID_LEN: usize = 4;
-const FX_LEN: usize = 6;
-const METADATA_FX_LEN: usize = 6;
 pub(crate) const PROP_LEN: usize = 5;
 pub(crate) const RANGED_PROP_LEN: usize = 9;
 const VERTEX_LEN: usize = 16;
 const PATH_ITEM_LEN: usize = 8;
 const AUTOMATION_LEN: usize = 12;
-const AUX_BUSES_LEN: usize = 16;
 const ADVANCED_SETTINGS_LEN: usize = 6;
 const PATH_HEADER_LEN: usize = 1 + 4;
 const HAS_POSITIONING: u8 = 0b0000_0001;
 const HAS_3D: u8 = 0b0000_0010;
 const POSITION_TYPE_SHIFT: u8 = 5;
 const POSITION_TYPE_MASK: u8 = 0b11;
-const HAS_AUX: u8 = 0b0000_1000;
 
 /// The kind of a container object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -61,8 +59,12 @@ pub struct Container {
 pub struct BankNodeParentFields {
     /// Original effect count when readable.
     pub effect_count: Option<BankHircField<u8>>,
+    /// Original initial effect declarations.
+    pub effects: BankNodeFxFields,
     /// Original metadata effect count when readable.
     pub metadata_count: Option<BankHircField<u8>>,
+    /// Original initial metadata effect declarations.
+    pub metadata: BankNodeFxFields,
     /// Original override bus ID immediately before the parent ID.
     pub pre_parent_word: Option<BankHircField<u32>>,
     /// Original parent ID, including zero, when readable.
@@ -70,6 +72,21 @@ pub struct BankNodeParentFields {
 }
 
 impl BankNodeParentFields {
+    /// Returns the original effect or metadata fields and checked extent.
+    #[must_use]
+    pub const fn fx(&self, kind: BankNodeFxKind) -> BankNodeFxList<'_> {
+        match kind {
+            BankNodeFxKind::Effects => BankNodeFxList {
+                declared_count: self.effect_count.as_ref(),
+                fields: &self.effects,
+            },
+            BankNodeFxKind::Metadata => BankNodeFxList {
+                declared_count: self.metadata_count.as_ref(),
+                fields: &self.metadata,
+            },
+        }
+    }
+
     /// Returns the original override bus ID, including explicit zero.
     #[must_use]
     pub const fn override_bus_id(&self) -> Option<&BankHircField<u32>> {
@@ -85,6 +102,7 @@ pub(crate) fn read_base<F: ObjectFields>(
         fields,
         observed,
         &mut BankNodePropertyExtents::default(),
+        &mut BankNodeAuxFields::default(),
         &mut None,
         &mut None,
     )
@@ -94,6 +112,7 @@ pub(crate) fn read_base_observed<F: ObjectFields>(
     fields: &mut F,
     observed: &mut BankNodeParentFields,
     properties: &mut BankNodePropertyExtents,
+    aux: &mut BankNodeAuxFields,
     state: &mut Option<Range<u64>>,
     rtpc: &mut Option<BankRtpcExtent>,
 ) -> Result<u32, F::Error> {
@@ -101,10 +120,7 @@ pub(crate) fn read_base_observed<F: ObjectFields>(
     fields.read_array::<1>()?;
     hirc_node_property::scan(fields, properties)?;
     skip_positioning(fields)?;
-    if fields.read_u8()?.value & HAS_AUX != 0 {
-        fields.skip_bytes(AUX_BUSES_LEN as u64)?;
-    }
-    fields.read_array::<4>()?;
+    hirc_node_aux::scan(fields, aux)?;
     fields.skip_bytes(ADVANCED_SETTINGS_LEN as u64)?;
     *state = Some(hirc_node_state::skip(fields)?);
     hirc_rtpc::scan(fields, rtpc)?;
@@ -115,19 +131,18 @@ fn read_parent<F: ObjectFields>(
     fields: &mut F,
     observed: &mut BankNodeParentFields,
 ) -> Result<u32, F::Error> {
-    fields.read_array::<1>()?;
-    let effects = fields.read_u8()?;
-    let count = u32::from(effects.value);
-    observed.effect_count = Some(effects);
-    if count > 0 {
-        fields.read_array::<1>()?;
-        skip_items(fields, count, FX_LEN)?;
-    }
-    fields.read_array::<1>()?;
-    let metadata = fields.read_u8()?;
-    let count = u32::from(metadata.value);
-    observed.metadata_count = Some(metadata);
-    skip_items(fields, count, METADATA_FX_LEN)?;
+    hirc_node_fx::scan(
+        fields,
+        BankNodeFxKind::Effects,
+        &mut observed.effects,
+        &mut observed.effect_count,
+    )?;
+    hirc_node_fx::scan(
+        fields,
+        BankNodeFxKind::Metadata,
+        &mut observed.metadata,
+        &mut observed.metadata_count,
+    )?;
     observed.pre_parent_word = Some(fields.read_u32()?);
     let parent = fields.read_u32()?;
     let id = parent.value;

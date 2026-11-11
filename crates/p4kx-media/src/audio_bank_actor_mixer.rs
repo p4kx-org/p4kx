@@ -14,6 +14,7 @@ use crate::audio_bank_actor_mixer_payload::{
 };
 use crate::audio_bank_inline_state::{self, InlineStateRead};
 use crate::audio_bank_inventory::VersionSite;
+use crate::audio_bank_node_declarations::{self, Owner};
 use crate::audio_bank_node_origins::{NodeKind, NodeSites};
 use crate::audio_bank_node_properties;
 use crate::audio_bank_origins::BankOrigins;
@@ -44,6 +45,7 @@ pub(crate) fn project<R: Read + Seek>(
         writer,
     )?;
     audio_bank_node_properties::actor_mixer(projection, version, &mut actor, writer)?;
+    audio_bank_node_declarations::emit(projection, version, Owner::ActorMixer(&mut actor), writer)?;
     if matches!(disposition.layout, Layout::Unsupported) {
         return Ok(());
     }

@@ -4,12 +4,15 @@
 use std::io::{Read, Seek};
 
 use crate::bank_inline_state_rows::BankInlineStateRows;
+use crate::bank_node_fx_slots::BankNodeFxSlots;
 use crate::bank_node_property_rows::BankNodePropertyRows;
 use crate::bank_object_fields::{ObjectFields, SeekObjectFields};
 use crate::bank_rtpc_rows::BankRtpcRows;
 use crate::bank_source_container::{self, BankContainerChildren, BankContainerRead};
 use crate::bank_structure::OBJECT_ID_LEN;
 use crate::hirc_actor_mixer::{self, BankActorMixerFields};
+use crate::hirc_node_aux::{self, BankNodeUserAuxBuses};
+use crate::hirc_node_fx::BankNodeFxKind;
 use crate::hirc_node_property::BankNodePropertyKind;
 use crate::read_at::SeekSource;
 use crate::{BankError, BankHircObject, BankReadError, HircKind};
@@ -40,6 +43,24 @@ impl<R> BankHircActorMixer<'_, R> {
     #[must_use]
     pub const fn fields(&self) -> &BankActorMixerFields {
         &self.fields
+    }
+
+    /// Borrows the checked original effect or metadata slot prefix.
+    pub fn fx_slots(&mut self, kind: BankNodeFxKind) -> Option<BankNodeFxSlots<'_, R>> {
+        let range = self.fields.node.fx(kind).fields.slots_range.clone()?;
+        Some(BankNodeFxSlots::new(self.input, range))
+    }
+
+    /// Reads the checked original user Aux send IDs by authored slot.
+    ///
+    /// # Errors
+    ///
+    /// Returns a read error if checked source bytes cannot be read.
+    pub fn user_aux_buses(&mut self) -> Result<Option<BankNodeUserAuxBuses>, BankReadError>
+    where
+        R: Read + Seek,
+    {
+        hirc_node_aux::user_buses(self.input, &self.fields.aux)
     }
 
     /// Borrows the original property list when its count was read.

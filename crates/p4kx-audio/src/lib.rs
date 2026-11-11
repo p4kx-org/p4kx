@@ -10,6 +10,7 @@
 mod adpcm;
 mod bank_error;
 mod bank_inline_state_rows;
+mod bank_node_fx_slots;
 mod bank_node_property_rows;
 mod bank_object_fields;
 mod bank_parse;
@@ -47,6 +48,8 @@ mod hirc_music_switch_traversal;
 mod hirc_music_track;
 mod hirc_music_transition;
 mod hirc_node;
+mod hirc_node_aux;
+mod hirc_node_fx;
 mod hirc_node_property;
 mod hirc_node_state;
 mod hirc_plugin;
@@ -76,6 +79,7 @@ mod wwise_id;
 
 pub use bank_error::{BankError, BankWarning, SectionId};
 pub use bank_inline_state_rows::{BankInlineStateRow, BankInlineStateRows};
+pub use bank_node_fx_slots::{BankNodeFxSlot, BankNodeFxSlots};
 pub use bank_node_property_rows::{
     BankNodePropertyRow, BankNodePropertyRows, BankNodePropertyValue,
 };
@@ -135,6 +139,8 @@ pub use hirc_music_track::{
 };
 pub use hirc_music_transition::BankMusicTransitionFields;
 pub use hirc_node::{BankNodeParentFields, Container, ContainerKind};
+pub use hirc_node_aux::{BankNodeAuxFields, BankNodeUserAuxBuses};
+pub use hirc_node_fx::{BankNodeFxFields, BankNodeFxKind, BankNodeFxList};
 pub use hirc_node_property::{
     BankNodePropertyExtent, BankNodePropertyExtents, BankNodePropertyKind,
 };

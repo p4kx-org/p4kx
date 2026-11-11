@@ -4,11 +4,12 @@
 use std::ops::Range;
 
 use p4kx_extraction::SourceUseRole;
-use p4kx_extraction::bank::BankHircObject;
+use p4kx_extraction::bank::{BankHircField, BankHircObject};
 
 use crate::audio_bank_hirc_origins::ObjectSites;
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_origins::{BankOrigins, section_routing};
+use crate::audio_bank_payload::BankField;
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
@@ -20,6 +21,8 @@ pub(crate) enum NodeKind {
     Rtpc,
     ActorMixer,
     Properties,
+    Fx,
+    Aux,
 }
 
 impl NodeKind {
@@ -29,6 +32,8 @@ impl NodeKind {
             Self::Rtpc => "bnkHircRtpc",
             Self::ActorMixer => "bnkHircActorMixer",
             Self::Properties => "bnkHircNodeProperties",
+            Self::Fx => "bnkHircNodeFx",
+            Self::Aux => "bnkHircNodeAux",
         }
     }
 
@@ -38,6 +43,8 @@ impl NodeKind {
             Self::Rtpc => "rtpcRowPosition",
             Self::ActorMixer => "actorMixerRowPosition",
             Self::Properties => "nodePropertyRowPosition",
+            Self::Fx => "nodeFxSlotPosition",
+            Self::Aux => "nodeAuxRowPosition",
         }
     }
 
@@ -47,6 +54,8 @@ impl NodeKind {
             Self::Rtpc => "rtpcExtent",
             Self::ActorMixer => "actorMixerExtent",
             Self::Properties => "nodePropertyExtent",
+            Self::Fx => "nodeFxExtent",
+            Self::Aux => "nodeAuxExtent",
         }
     }
 }
@@ -118,6 +127,15 @@ impl NodeSites {
         Ok(())
     }
 
+    pub(crate) fn issues(
+        &self,
+        prepared: &mut BankOrigins<'_, '_, '_>,
+        range: &Range<u64>,
+    ) -> Result<(), MediaError> {
+        let evidence = self.selection(prepared, Some(range))?;
+        prepared.subtree("/issues", evidence)
+    }
+
     pub(crate) fn field(
         &self,
         prepared: &mut BankOrigins<'_, '_, '_>,
@@ -127,6 +145,21 @@ impl NodeSites {
     ) -> Result<(), MediaError> {
         let receipt = self.observed(prepared, field, original, SourceUseRole::Payload)?;
         prepared.subtree(&format!("/data/payload/{name}"), receipt)
+    }
+
+    pub(crate) fn scalar<T: Copy>(
+        &self,
+        prepared: &mut BankOrigins<'_, '_, '_>,
+        name: &str,
+        field: Option<&BankHircField<T>>,
+        original: &'static str,
+    ) -> Result<Option<BankField<T>>, MediaError> {
+        field
+            .map(|field| {
+                self.field(prepared, name, &field.range, original)?;
+                Ok(field.into())
+            })
+            .transpose()
     }
 
     pub(crate) fn range(

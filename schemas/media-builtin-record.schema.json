@@ -3120,6 +3120,60 @@
       ],
       "title": "AudioSourceLanguage"
     },
+    "AuxObservations": {
+      "additionalProperties": false,
+      "properties": {
+        "flags": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reference_resolution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeReferenceStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reflections_bus_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "user_bus_ids": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/BankField_uint32"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "BankDataLink": {
       "oneOf": [
         {
@@ -5668,6 +5722,136 @@
       ],
       "type": "string"
     },
+    "FxObservations": {
+      "additionalProperties": false,
+      "properties": {
+        "bypass_all_bits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "declared_count": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "override_parent_bits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "slots_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "FxSlotRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "effect_id": {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "ordinal": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reference_resolution": {
+              "$ref": "#/$defs/NodeReferenceStatus"
+            },
+            "slot_bits": {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            "slot_index": {
+              "$ref": "#/$defs/BankField_uint8"
+            }
+          },
+          "required": [
+            "layout",
+            "ordinal",
+            "slot_index",
+            "effect_id",
+            "slot_bits",
+            "reference_resolution"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "effect_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BankField_uint32"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "ordinal": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reference_resolution": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NodeReferenceStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "slot_index": {
+              "$ref": "#/$defs/BankField_uint8"
+            }
+          },
+          "required": [
+            "layout",
+            "ordinal",
+            "slot_index"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "HircActorMixerLayout": {
       "enum": [
         "decoded",
@@ -8180,6 +8364,276 @@
       ],
       "type": "object"
     },
+    "NodeDeclarationPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/NodeDeclaration_FxObservations"
+            },
+            "record_type": {
+              "const": "bank-hirc-node-fx",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/FxSlotRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-node-fx-slot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/NodeDeclaration_AuxObservations"
+            },
+            "record_type": {
+              "const": "bank-hirc-node-aux",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "NodeDeclarationPayload"
+    },
+    "NodeDeclaration_AuxObservations": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/AuxObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/AuxObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "absent",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "NodeDeclaration_FxObservations": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/FxObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/FxObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "absent",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "NodePropertyListRecord": {
       "additionalProperties": false,
       "properties": {
@@ -8479,6 +8933,12 @@
           "type": "object"
         }
       ]
+    },
+    "NodeReferenceStatus": {
+      "enum": [
+        "unchecked"
+      ],
+      "type": "string"
     },
     "NotSelectedReason": {
       "description": "Why an existing target was outside the selected projection scope.",
@@ -20784,6 +21244,384 @@
               },
               "status": {
                 "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-node-fx"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/NodeDeclarationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-node-fx"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-node-fx-slot"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/NodeDeclarationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-node-fx-slot"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 4,
+                    "minItems": 4
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-node-aux"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/NodeDeclarationPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-node-aux"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
               }
             }
           }

@@ -54,6 +54,9 @@ and fallback selection.
 | `audio-bank-hirc-actor-mixer-rtpc-point` | `bank-hirc-actor-mixer-rtpc-point` | HIRC section, ActorMixer object, curve and point ordinals |
 | `audio-bank-hirc-node-properties` | `bank-hirc-node-properties` | HIRC section and Sound or ActorMixer object ordinals |
 | `audio-bank-hirc-node-property` | `bank-hirc-node-property` | HIRC section, owning object, property list and original property ordinals |
+| `audio-bank-hirc-node-fx` | `bank-hirc-node-fx` | HIRC section, owning Sound or ActorMixer object and effect list ordinals |
+| `audio-bank-hirc-node-fx-slot` | `bank-hirc-node-fx-slot` | HIRC section, owning object, effect list and physical slot ordinals |
+| `audio-bank-hirc-node-aux` | `bank-hirc-node-aux` | HIRC section and Sound or ActorMixer object ordinals |
 | `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
 | `audio-bank-music-segment` | `bank-music-segment` | HIRC section and segment object ordinals |
@@ -231,6 +234,26 @@ values remain present. Each list reports its declared count, the checked ID and 
 and original byte ranges. A malformed prefix retains independently readable IDs and words. An
 absent optional Sound node and an unsupported bank version each have their own layout status.
 A later State, RTPC or child failure leaves a completed property prefix available.
+
+Version-154 Sound and ActorMixer effect declarations use list index 0 for initial
+effects and 1 for metadata. A list records its original override byte, count and
+checked slot extent. A nonempty initial effect list also carries its bypass-all
+byte. Slot records follow authored order. Each preserves its original slot index,
+effect reference and flags or share-set byte as those fields become readable.
+Repeated indices, original zero references and unknown bits remain present.
+
+Aux declarations retain the original flag byte, up to four readable user bus IDs
+at their authored positions and the original reflections bus ID. A set user-bus
+flag establishes a four-position array. Null positions identify unreadable words
+in a truncated list. A cleared flag omits the array. A readable zero ID retains its
+value and receipt. The `reference_resolution` value `unchecked` denotes an authored
+reference whose target has not been inspected. Each ID receipt belongs to the
+physical owning bank.
+
+The summaries distinguish an absent optional Sound node, an unsupported bank
+version, a region unavailable because an earlier read failed and a malformed
+region with a checked prefix. Complete earlier declarations remain available when
+a later region, State, RTPC or child list is malformed.
 
 Property row index 2 selects list 0 for scalar properties and list 1 for ranged modifiers.
 Index 3 is the property's original position within that list. Each ID retains an individual

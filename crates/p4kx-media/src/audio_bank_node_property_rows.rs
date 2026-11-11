@@ -13,7 +13,6 @@ use crate::audio_bank_node_properties::{NodePropertyProjection, PROPERTY_NAMESPA
 use crate::audio_bank_node_property_payload::{
     NodePropertyPayload, NodePropertyRecord, NodePropertyWords,
 };
-use crate::audio_bank_node_property_summary;
 use crate::audio_bank_origins::BankOrigins;
 use crate::{MediaError, MediaWriter, Status, Subresource};
 
@@ -88,8 +87,7 @@ fn observed_words(
 ) -> Result<NodePropertyWords, MediaError> {
     Ok(match value {
         BankNodePropertyValue::Scalar(bits) => NodePropertyWords::Scalar {
-            scalar_bits: audio_bank_node_property_summary::word(
-                sites,
+            scalar_bits: sites.scalar(
                 prepared,
                 "words/scalar_bits",
                 bits.as_ref(),
@@ -99,15 +97,13 @@ fn observed_words(
         BankNodePropertyValue::Ranged {
             minimum, maximum, ..
         } => NodePropertyWords::Ranged {
-            minimum_bits: audio_bank_node_property_summary::word(
-                sites,
+            minimum_bits: sites.scalar(
                 prepared,
                 "words/minimum_bits",
                 minimum.as_ref(),
                 "nodePropertyMinimumBits",
             )?,
-            maximum_bits: audio_bank_node_property_summary::word(
-                sites,
+            maximum_bits: sites.scalar(
                 prepared,
                 "words/maximum_bits",
                 maximum.as_ref(),

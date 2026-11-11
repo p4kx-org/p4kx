@@ -26,9 +26,10 @@ pub use p4kx_audio::{
     StateProperties, StateProperty,
 };
 pub use p4kx_audio::{
-    BankActorMixerFields, BankHircActorMixer, BankHircSoundNode, BankNodePropertyExtent,
-    BankNodePropertyExtents, BankNodePropertyKind, BankNodePropertyRow, BankNodePropertyRows,
-    BankNodePropertyValue,
+    BankActorMixerFields, BankHircActorMixer, BankHircSoundNode, BankNodeAuxFields,
+    BankNodeFxFields, BankNodeFxKind, BankNodeFxList, BankNodeFxSlot, BankNodeFxSlots,
+    BankNodePropertyExtent, BankNodePropertyExtents, BankNodePropertyKind, BankNodePropertyRow,
+    BankNodePropertyRows, BankNodePropertyValue, BankNodeUserAuxBuses,
 };
 pub use p4kx_audio::{
     BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistItem,

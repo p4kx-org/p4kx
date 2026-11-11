@@ -5,8 +5,7 @@ use std::ops::Range;
 
 use p4kx_extraction::BankError;
 use p4kx_extraction::bank::{
-    BankHircField, BankNodeParentFields, BankNodePropertyExtent, BankNodePropertyExtents,
-    BankNodePropertyKind,
+    BankNodeParentFields, BankNodePropertyExtent, BankNodePropertyExtents, BankNodePropertyKind,
 };
 
 use crate::audio_bank_node_origins::NodeSites;
@@ -15,7 +14,6 @@ use crate::audio_bank_node_property_payload::{
     NodePropertyListRecord, NodePropertyObservations, NodePropertyPayload, NodePropertySummary,
 };
 use crate::audio_bank_origins::BankOrigins;
-use crate::audio_bank_payload::BankField;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
@@ -154,15 +152,13 @@ fn observations(
     source: &SourceNode<'_>,
 ) -> Result<NodePropertyObservations, MediaError> {
     Ok(NodePropertyObservations {
-        override_bus_id: word(
-            sites,
+        override_bus_id: sites.scalar(
             prepared,
             "observed/override_bus_id",
             source.routing.override_bus_id(),
             "nodeOverrideBusId",
         )?,
-        parent_id: word(
-            sites,
+        parent_id: sites.scalar(
             prepared,
             "observed/parent_id",
             source.routing.parent_id.as_ref(),
@@ -234,19 +230,4 @@ fn list(
         words_range: extent.words_range.as_ref().map(Into::into),
         complete: extent.is_complete(),
     }))
-}
-
-pub(crate) fn word<T: Copy>(
-    sites: &NodeSites,
-    prepared: &mut BankOrigins<'_, '_, '_>,
-    name: &str,
-    field: Option<&BankHircField<T>>,
-    original: &'static str,
-) -> Result<Option<BankField<T>>, MediaError> {
-    field
-        .map(|field| {
-            sites.field(prepared, name, &field.range, original)?;
-            Ok(field.into())
-        })
-        .transpose()
 }

@@ -195,7 +195,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-container-fields",
-            "Original HIRC container parent, kind, mode and ordered children, plus ActorMixer ordered children and checked node property, State and RTPC fields with exact byte ranges.",
+            "Original HIRC container parent, kind, mode and ordered children, plus ActorMixer ordered children and checked node property, FX, auxiliary routing, State and RTPC fields with exact byte ranges.",
         ),
         FieldGroup::new(
             "bank-music-playlist-fields",
@@ -215,7 +215,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-sound-fields",
-            "Original HIRC Sound source, node property and routing fields, physical DIDX candidates for embedded and prefetch media, and owning-directory loose WEM references for streamed and prefetch media.",
+            "Original HIRC Sound source, node property, FX and routing fields, physical DIDX candidates for embedded and prefetch media, and owning-directory loose WEM references for streamed and prefetch media.",
         ),
         FieldGroup::new(
             "bank-name-index",
