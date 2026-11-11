@@ -15,7 +15,7 @@ use crate::source::{EntrySource, SourceEntry, SourceReader};
 use crate::tracker::Tracker;
 use crate::{
     ArchiveWriteProtection, AudioConversion, CancelToken, ConflictPolicy, ExtractionError,
-    TextureConversion,
+    TextureConversion, WriteProtectionError,
 };
 
 /// How one Entry of an Extraction ended.
@@ -85,6 +85,16 @@ pub(crate) struct EntryWriter<'a> {
     pub(crate) audio: AudioConversion,
     pub(crate) verify: bool,
     pub(crate) tracker: &'a Tracker<'a>,
+}
+
+fn not_a_directory(error: &ExtractionError) -> bool {
+    let ExtractionError::Installation(WriteProtectionError::TargetIdentity { cause, .. }) = error
+    else {
+        return false;
+    };
+    std::error::Error::source(cause)
+        .and_then(|source| source.downcast_ref::<io::Error>())
+        .is_some_and(|source| source.kind() == io::ErrorKind::NotADirectory)
 }
 
 impl EntryWriter<'_> {
@@ -286,8 +296,14 @@ impl EntryWriter<'_> {
         entry: &SourceEntry<'_>,
     ) -> Result<Destination, ExtractionError> {
         let relative = self.relative_path(entry)?;
-        self.check_output(&self.target.join(&relative))?;
-        portable_name::check_path_length(&self.target.join(&relative))?;
+        let output = self.target.join(&relative);
+        if let Err(error) = self.check_output(&output) {
+            if not_a_directory(&error) {
+                self.case_collision(&relative, entry)?;
+            }
+            return Err(error);
+        }
+        portable_name::check_path_length(&output)?;
         self.case_collision(&relative, entry)?;
         let name = relative.file_name().ok_or(ExtractionError::UnsafePath)?;
         let folder = self.folder(relative.parent())?;

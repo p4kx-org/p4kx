@@ -77,7 +77,10 @@ candidate-inventory completeness and applicability are complementary two-state r
 the Google Rust guide's fixed-ontology/two-state exceptions. ExportOptions intentionally supports
 functional record update from Default under that guide's option-struct exception.
 
-One output-path module rejects redirected ancestors or leaves before output access. Windows checks
+One output-path module rejects redirected ancestors or leaves before output access. On macOS, it
+accepts the system aliases `/var` and `/tmp` when their targets are the plain directories
+`/private/var` and `/private/tmp`, respectively. Guard checks the resolved output for installation
+protection. Windows checks
 the FILE_ATTRIBUTE_REPARSE_POINT bit as well as symbolic links, including junctions and other
 reparse-point types. Output, staging, index, lock and artifact paths share that check. Installation
 protection remains the common Guard service's responsibility; source input aliases are not rejected

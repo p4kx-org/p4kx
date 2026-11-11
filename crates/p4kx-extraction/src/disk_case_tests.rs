@@ -60,15 +60,24 @@ fn a_listing_is_read_once_and_exact_new_names_still_win() -> io::Result<()> {
     let dir = tempfile::tempdir()?;
     fs::write(dir.path().join("Late.txt"), b"x")?;
     let mut index = CaseIndex::default();
-    assert!(index.variant(&dir.path().join("late.TXT"))?.is_some());
+    let initial = dir.path().join("late.TXT");
+    let native_case_match = initial.try_exists()?;
+    assert_eq!(
+        index.variant(&initial)?.is_some(),
+        native_case_match || !cfg!(windows)
+    );
     let fresh = dir.path().join("Newer.txt");
     fs::write(&fresh, b"x")?;
 
-    let seen = index.variant(&dir.path().join("newer.txt"))?;
+    let requested = dir.path().join("newer.txt");
+    let seen = index.variant(&requested)?;
 
-    assert!(seen.is_none() || cfg!(windows), "{seen:?}");
-    assert!(index.variant(&fresh)?.is_some());
-    assert_eq!(index.folders.len(), usize::from(!cfg!(windows)));
+    assert_eq!(seen, requested.try_exists()?.then_some(requested));
+    assert_eq!(index.variant(&fresh)?, Some(fresh));
+    assert_eq!(
+        index.folders.len(),
+        usize::from(!native_case_match && !cfg!(windows))
+    );
     Ok(())
 }
 
@@ -257,9 +266,20 @@ fn lossy_keys_never_make_distinct_non_ascii_names_equal() -> io::Result<()> {
     let dir = tempfile::tempdir()?;
     let actual = std::ffi::OsString::from_vec(vec![b'a', 0xff]);
     let asked = std::ffi::OsString::from_vec(vec![b'A', 0xfe]);
-    fs::write(dir.path().join(actual), b"x")?;
     let mut index = CaseIndex::default();
 
-    assert_eq!(index.variant(&dir.path().join(asked))?, None);
+    #[cfg(target_os = "macos")]
+    {
+        let folder = dir.path();
+        index
+            .folders
+            .insert(folder.to_path_buf(), collect_names([Ok(actual)]));
+        assert_eq!(index.unique_match(folder, &asked)?, None);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        fs::write(dir.path().join(actual), b"x")?;
+        assert_eq!(index.variant(&dir.path().join(asked))?, None);
+    }
     Ok(())
 }

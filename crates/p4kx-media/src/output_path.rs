@@ -76,11 +76,30 @@ fn existing(path: &Path) -> Result<Option<Metadata>, MediaError> {
 
 fn inspect(path: &Path) -> Result<Option<Metadata>, MediaError> {
     match fs::symlink_metadata(path) {
-        Ok(metadata) if redirected(&metadata) => Err(not_plain(path)),
+        Ok(metadata) if redirected(&metadata) => inspect_redirected(path),
         Ok(metadata) => Ok(Some(metadata)),
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(source) => Err(error::io(path, source)),
     }
+}
+
+fn inspect_redirected(path: &Path) -> Result<Option<Metadata>, MediaError> {
+    #[cfg(target_os = "macos")]
+    {
+        let target = match path.to_str() {
+            Some("/var") => Path::new("/private/var"),
+            Some("/tmp") => Path::new("/private/tmp"),
+            _ => return Err(not_plain(path)),
+        };
+        let link = fs::read_link(path).map_err(|source| error::io(path, source))?;
+        if Path::new("/").join(link) == target
+            && let Some(metadata) = existing(target)?
+            && metadata.is_dir()
+        {
+            return Ok(Some(metadata));
+        }
+    }
+    Err(not_plain(path))
 }
 
 fn not_plain(path: &Path) -> MediaError {

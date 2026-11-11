@@ -17,7 +17,7 @@ mod owned_file_token;
 mod owned_output_cleanup;
 mod owned_output_error;
 mod portal_alias;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(target_os = "linux")]
 mod portal_dbus;
 #[cfg(any(target_os = "linux", test))]
 mod portal_deadline;

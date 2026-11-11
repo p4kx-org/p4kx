@@ -176,6 +176,15 @@ mod tests {
         assert_ne!(default, Some(Backends::DX12), "not Direct3D 12 alone");
     }
 
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_default_backend_is_metal() {
+        let options = native_options_with(viewport(None, "title"), None, |_| false);
+
+        assert_eq!(instance_backends(&options), Some(Backends::METAL));
+    }
+
+    #[cfg(not(target_os = "macos"))]
     #[test]
     fn the_default_backends_hold_vulkan_with_a_gl_fallback() {
         let options = native_options_with(viewport(None, "title"), None, |_| false);
