@@ -97,7 +97,7 @@ fn write_rigged<'m>(
         .map(|instance| instance.model.nodes.len())
         .sum();
     let plans = plan_animations(skeleton, pieces, animations, &mut layout);
-    let images = match options.materials {
+    let mut images = match options.materials {
         MaterialMode::Textures => texture_set(&layout, &instances, options.texture_mip, textures),
         MaterialMode::Colours => TextureSet::default(),
     };
@@ -108,7 +108,11 @@ fn write_rigged<'m>(
     }
     let total = write_file(&root, &layout, &images, out)?;
     if let Some(emission) = emission {
-        *emission = RiggedGlbEmission::of(&instances, &layout);
+        *emission = RiggedGlbEmission::of(
+            &instances,
+            &layout,
+            std::mem::take(&mut images.image_sources),
+        );
     }
     let defaulted = instances
         .iter()

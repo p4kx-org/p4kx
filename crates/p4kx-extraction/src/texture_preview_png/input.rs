@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_archive::ObservedEntry;
+use p4kx_gltf::TextureComponents;
 use p4kx_texture::{DdsHeaderField, DdsRawHeader, MipByteSpans, MipPayloadLocation};
 
 use crate::source::SourceEntry;
@@ -136,6 +137,27 @@ impl<'a> PreviewInputs<'a, MipPayloadLocation> {
 }
 
 impl PreviewInputs<'_, MipByteSpans> {
+    pub(crate) fn glb_uses(
+        &self,
+        uses: &SourceUses,
+        level: u32,
+        components: TextureComponents,
+        alpha_limits_level: bool,
+    ) -> Result<Vec<SourceUse>, SourceEvidenceError> {
+        use TextureComponents::{Alpha, Color, ColorAndAlpha};
+        let mut fields = Vec::new();
+        let alpha = matches!(components, Alpha | ColorAndAlpha);
+        let color = matches!(components, Color | ColorAndAlpha) || (alpha && self.alpha.is_none());
+        self.color
+            .append_glb_uses(uses, level, color, &mut fields)?;
+        if let Some(tail) = &self.alpha
+            && (alpha || alpha_limits_level)
+        {
+            tail.append_glb_uses(uses, level, alpha, &mut fields)?;
+        }
+        Ok(fields)
+    }
+
     pub(crate) fn register(
         &self,
         uses: &SourceUses,
@@ -153,6 +175,30 @@ impl PreviewInputs<'_, MipByteSpans> {
 }
 
 impl TexturePreviewInput<'_, MipByteSpans> {
+    fn append_glb_uses(
+        &self,
+        uses: &SourceUses,
+        level: u32,
+        pixels: bool,
+        output: &mut Vec<SourceUse>,
+    ) -> Result<(), SourceEvidenceError> {
+        use DdsHeaderField::{ArraySize, Depth, Faces, Format, Height, MipCount, Prefix, Width};
+        let dimensions = [Width, Height, MipCount, Faces, ArraySize, Depth];
+        if pixels {
+            let decoded = self.register(uses, level)?;
+            let fields = [
+                Prefix, Format, Width, Height, MipCount, Faces, ArraySize, Depth,
+            ];
+            output.extend(decoded.header_uses(&fields, SourceUseRole::Conversion)?);
+            output.push(decoded.header_size_use()?);
+            output.push(decoded.mip().clone());
+        } else {
+            let header = PreviewHeaderEvidence::of_read(uses, self.header.input(), self.raw)?;
+            output.extend(header.header_uses(&dimensions, SourceUseRole::Selector)?);
+        }
+        Ok(())
+    }
+
     fn register(
         &self,
         uses: &SourceUses,

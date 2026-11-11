@@ -83,6 +83,8 @@ impl TextureSet {
         for (mut outcome, used) in outcomes.into_iter().zip(&used) {
             let index = outcome.image.take().filter(|_| *used).map(|image| {
                 set.images.push(image);
+                set.image_sources
+                    .push(std::mem::take(&mut outcome.texture_sources));
                 set.images.len() - 1
             });
             made.push((index, outcome));

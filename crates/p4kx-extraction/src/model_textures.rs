@@ -9,6 +9,11 @@ use p4kx_texture::TextureFormat;
 use crate::path_index::PathIndex;
 use crate::{ConversionError, Texture};
 
+#[path = "model_texture_origins.rs"]
+mod origin;
+
+pub use origin::ArchiveTextureReads;
+
 /// The most pixels one texture of a model may hold: 8192 × 8192.
 pub const MAX_MODEL_TEXTURE_PIXELS: u64 = 1 << 26;
 
@@ -30,14 +35,17 @@ impl<'i, 'a> ArchiveTextures<'i, 'a> {
     }
 }
 
-impl ArchiveTextures<'_, '_> {
+struct OpenTexture<'a> {
+    texture: Texture<'a>,
+    level: u32,
+    size: (u32, u32),
+    alpha_limits_level: bool,
+}
+
+impl<'a> ArchiveTextures<'_, 'a> {
     /// Opens the texture at `path` and returns it with the mip `mip` selects and that mip's
     /// size, after checking it is one image within the pixel limit.
-    fn open(
-        &self,
-        path: &str,
-        mip: u32,
-    ) -> Result<(Texture<'_>, u32, (u32, u32)), TextureLoadError> {
+    fn open(&self, path: &str, mip: u32) -> Result<OpenTexture<'a>, TextureLoadError> {
         let entry = format!("Data\\{}", path.replace('/', "\\"));
         let texture = Texture::from_index(self.index, &entry).map_err(|error| match error {
             ConversionError::UnknownEntry(_) => TextureLoadError::NotFound,
@@ -53,11 +61,13 @@ impl ArchiveTextures<'_, '_> {
             .alpha_tail()
             .transpose()
             .map_err(|error| TextureLoadError::Unreadable(describe(&error)))?;
-        let mut last = header.mip_count().saturating_sub(1);
-        if let Some(tail) = &tail {
-            last = last.min(tail.header().mip_count().saturating_sub(1));
-        }
+        let color_last = header.mip_count().saturating_sub(1);
+        let alpha_last = tail
+            .as_ref()
+            .map(|tail| tail.header().mip_count().saturating_sub(1));
+        let last = alpha_last.map_or(color_last, |alpha| color_last.min(alpha));
         let level = mip.min(last);
+        let alpha_limits_level = alpha_last.is_some_and(|alpha| alpha < color_last && mip > alpha);
         let halved = |full: u32| (full >> level).max(1);
         let size = (halved(header.width()), halved(header.height()));
         if let Some(tail) = &tail {
@@ -79,13 +89,18 @@ impl ArchiveTextures<'_, '_> {
                  {MAX_MODEL_TEXTURE_PIXELS}; use a higher --texture-mip"
             )));
         }
-        Ok((texture, level, size))
+        Ok(OpenTexture {
+            texture,
+            level,
+            size,
+            alpha_limits_level,
+        })
     }
 }
 
 impl TextureLoader for ArchiveTextures<'_, '_> {
     fn load(&self, path: &str, mip: u32) -> Result<LoadedTexture, TextureLoadError> {
-        let (texture, level, _) = self.open(path, mip)?;
+        let OpenTexture { texture, level, .. } = self.open(path, mip)?;
         let has_alpha = texture.has_alpha_tail() || format_has_alpha(texture.header().format());
         let image = texture
             .decode_mip(level)
@@ -94,7 +109,7 @@ impl TextureLoader for ArchiveTextures<'_, '_> {
     }
 
     fn dimensions(&self, path: &str, mip: u32) -> Result<Option<(u32, u32)>, TextureLoadError> {
-        self.open(path, mip).map(|(_, _, size)| Some(size))
+        self.open(path, mip).map(|opened| Some(opened.size))
     }
 }
 

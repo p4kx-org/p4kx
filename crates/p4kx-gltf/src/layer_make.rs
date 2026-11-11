@@ -10,6 +10,7 @@ use crate::layer_plan::Layered;
 use crate::texture_cache::Decoded;
 use crate::texture_loader::LoadedTexture;
 use crate::texture_make::{Made, Outcome, encode, load as load_texture};
+use crate::texture_origins::{TextureComponents, TextureReadUse};
 use crate::texture_plan::{Failure, Job};
 use crate::texture_report::TextureRole;
 use crate::texture_roles::Source;
@@ -67,13 +68,45 @@ fn loaded_maps(
         .collect()
 }
 
+pub(crate) struct LayerImage {
+    pub(crate) image: RgbaImage,
+    sources: Vec<TextureReadUse>,
+}
+
+fn uses(
+    sized_by: &LoadedTexture,
+    mask: Option<&LoadedTexture>,
+    own: Option<&LoadedTexture>,
+    layers: &[Option<Arc<LoadedTexture>>],
+    sampled_maps: usize,
+) -> Vec<TextureReadUse> {
+    let sampled = layers.iter().enumerate().filter_map(|(index, image)| {
+        if sampled_maps & (1 << index) == 0 {
+            return None;
+        }
+        image.as_deref()
+    });
+    let colors = mask.into_iter().chain(own).chain(sampled);
+    let mut size_used = false;
+    let mut sources: Vec<_> = colors
+        .map(|image| {
+            size_used |= std::ptr::eq(image, sized_by);
+            image.contribution(TextureComponents::Color)
+        })
+        .collect();
+    if !size_used {
+        sources.push(sized_by.contribution(TextureComponents::Dimensions));
+    }
+    sources
+}
+
 /// Blends the base colour image of a layered material from the diffuse maps of its layers; `None`
 /// when no map could be loaded, which `failures` records.
 pub(crate) fn bake_base(
     job: &Job,
     decoded: &Decoded,
     failures: &mut Vec<Failure>,
-) -> Option<Result<RgbaImage, TextureError>> {
+) -> Option<Result<LayerImage, TextureError>> {
     let layered = job.layered.as_ref()?;
     let mask = load(
         decoded,
@@ -82,18 +115,29 @@ pub(crate) fn bake_base(
         failures,
     );
     let loaded = loaded_maps(layered, decoded, false, failures);
-    let size = mask
-        .as_ref()
-        .map(|mask| side(&mask.image))
-        .or_else(|| loaded.iter().flatten().next().map(|map| side(&map.image)))?;
+    let sized_by = mask
+        .as_deref()
+        .or_else(|| loaded.iter().flatten().next().map(AsRef::as_ref))?;
+    let size = side(&sized_by.image);
     let images: Vec<Option<&RgbaImage>> = loaded
         .iter()
         .map(|map| map.as_ref().map(|map| &map.image))
         .collect();
     Some(
-        Maps::new(layered, &images, (size.0 as usize, size.1 as usize), false).and_then(|maps| {
-            base_colour(layered, &maps, mask.as_ref().map(|mask| &mask.image), size)
-        }),
+        Maps::new(layered, &images, (size.0 as usize, size.1 as usize), false)
+            .and_then(|maps| {
+                base_colour(layered, &maps, mask.as_ref().map(|mask| &mask.image), size)
+            })
+            .map(|pixels| LayerImage {
+                image: pixels.image,
+                sources: uses(
+                    sized_by,
+                    mask.as_deref(),
+                    None,
+                    &loaded,
+                    pixels.sampled_maps,
+                ),
+            }),
     )
 }
 
@@ -107,15 +151,20 @@ pub(crate) fn make_base(
     let made = bake_base(job, decoded, failures)?;
     outcome.tinted = true;
     outcome.layered = true;
-    Some(
-        made.map_err(|error| error.to_string())
-            .and_then(|image| encode(&image)),
-    )
+    Some(made.map_err(|error| error.to_string()).and_then(|baked| {
+        outcome.texture_sources = baked.sources;
+        encode(&baked.image)
+    }))
 }
 
 /// Makes the normal image of a layered material from the normal maps of its layers, with the
 /// material's own normal map added.
-pub(crate) fn make_normal(job: &Job, decoded: &Decoded, failures: &mut Vec<Failure>) -> Made {
+pub(crate) fn make_normal(
+    job: &Job,
+    decoded: &Decoded,
+    outcome: &mut Outcome,
+    failures: &mut Vec<Failure>,
+) -> Made {
     let layered = job.layered.as_ref()?;
     let mask = load(
         decoded,
@@ -125,11 +174,11 @@ pub(crate) fn make_normal(job: &Job, decoded: &Decoded, failures: &mut Vec<Failu
     );
     let own = load(decoded, TextureRole::Normal, job.normal.as_ref(), failures);
     let loaded = loaded_maps(layered, decoded, true, failures);
-    let size = mask
-        .as_ref()
-        .map(|mask| side(&mask.image))
-        .or_else(|| loaded.iter().flatten().next().map(|map| side(&map.image)))
-        .or_else(|| own.as_ref().map(|own| side(&own.image)))?;
+    let sized_by = mask
+        .as_deref()
+        .or_else(|| loaded.iter().flatten().next().map(AsRef::as_ref))
+        .or(own.as_deref())?;
+    let size = side(&sized_by.image);
     let images: Vec<Option<&RgbaImage>> = loaded
         .iter()
         .map(|map| map.as_ref().map(|map| &map.image))
@@ -146,6 +195,15 @@ pub(crate) fn make_normal(job: &Job, decoded: &Decoded, failures: &mut Vec<Failu
                 )
             })
             .map_err(|error| error.to_string())
-            .and_then(|image| encode(&image)),
+            .and_then(|pixels| {
+                outcome.texture_sources = uses(
+                    sized_by,
+                    mask.as_deref(),
+                    own.as_deref(),
+                    &loaded,
+                    pixels.sampled_maps,
+                );
+                encode(&pixels.image)
+            }),
     )
 }

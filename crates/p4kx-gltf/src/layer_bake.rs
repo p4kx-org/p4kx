@@ -3,6 +3,8 @@
 
 use std::borrow::Cow;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use p4kx_texture::{RgbaImage, TextureError};
 
 use crate::layer_plan::{LayerPlan, Layered, MAX_BAKED_LAYERS};
@@ -215,6 +217,11 @@ fn layer_colour(layer: &LayerPlan, tile: Option<&Tile<'_>>, uv: (f32, f32)) -> [
     mixed
 }
 
+pub(crate) struct LayerPixels {
+    pub(crate) image: RgbaImage,
+    pub(crate) sampled_maps: usize,
+}
+
 /// Returns the base colour image of `layered` of `size` texels: the layers' diffuse maps, tiled,
 /// multiplied by the layers' colours, moved towards their specular colour by their metalness
 /// and blended by the layers' shares, which `mask` (of that size) gives where the material has
@@ -224,17 +231,28 @@ pub(crate) fn base_colour(
     maps: &Maps<'_>,
     mask: Option<&RgbaImage>,
     (width, height): (u32, u32),
-) -> Result<RgbaImage, TextureError> {
+) -> Result<LayerPixels, TextureError> {
     let size = (width as usize, height as usize);
-    fill(width, height, |y, out| {
+    let sampled_maps = AtomicUsize::new(0);
+    let image = fill(width, height, |y, out| {
+        let mut sampled_row = 0;
         let mut shares = [0.0_f32; MAX_BAKED_LAYERS];
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
             let uv = (centre(x, size.0), centre(y, size.1));
             layered.shares(mask_at(mask, x, y), &mut shares);
             let mut sum = [0.0_f32; 3];
-            for ((layer, tile), share) in layered.layers.iter().zip(&maps.tiles).zip(shares) {
+            for (index, ((layer, tile), share)) in layered
+                .layers
+                .iter()
+                .zip(&maps.tiles)
+                .zip(shares)
+                .enumerate()
+            {
                 if share <= 0.0 {
                     continue;
+                }
+                if tile.is_some() {
+                    sampled_row |= 1 << index;
                 }
                 let colour = layer_colour(layer, tile.as_ref(), uv);
                 for (total, value) in sum.iter_mut().zip(colour) {
@@ -244,6 +262,11 @@ pub(crate) fn base_colour(
             let [red, green, blue] = sum;
             *target = [encode(red), encode(green), encode(blue), OPAQUE];
         }
+        sampled_maps.fetch_or(sampled_row, Ordering::Relaxed);
+    })?;
+    Ok(LayerPixels {
+        image,
+        sampled_maps: sampled_maps.into_inner(),
     })
 }
 
@@ -273,21 +296,30 @@ pub(crate) fn normal_colour(
     own: Option<&RgbaImage>,
     mask: Option<&RgbaImage>,
     (width, height): (u32, u32),
-) -> Result<RgbaImage, TextureError> {
+) -> Result<LayerPixels, TextureError> {
     let size = (width as usize, height as usize);
-    fill(width, height, |y, out| {
+    let sampled_maps = AtomicUsize::new(0);
+    let image = fill(width, height, |y, out| {
+        let mut sampled_row = 0;
         let mut shares = [0.0_f32; MAX_BAKED_LAYERS];
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
             let uv = (centre(x, size.0), centre(y, size.1));
             layered.shares(mask_at(mask, x, y), &mut shares);
             let mut slopes = own.map_or([0.0_f32; 2], |own| slope(sampled(own, (x, y), size)));
-            for ((layer, tile), share) in layered.layers.iter().zip(&maps.tiles).zip(shares) {
+            for (index, ((layer, tile), share)) in layered
+                .layers
+                .iter()
+                .zip(&maps.tiles)
+                .zip(shares)
+                .enumerate()
+            {
                 let (Some(tile), Some((_, repeats))) = (tile, &layer.normal) else {
                     continue;
                 };
                 if share <= 0.0 {
                     continue;
                 }
+                sampled_row |= 1 << index;
                 let [across, down, _] = sample(tile, *repeats, uv, decode_slope);
                 slopes[0] = across.mul_add(share, slopes[0]);
                 slopes[1] = down.mul_add(share, slopes[1]);
@@ -306,6 +338,11 @@ pub(crate) fn normal_colour(
                 OPAQUE,
             ];
         }
+        sampled_maps.fetch_or(sampled_row, Ordering::Relaxed);
+    })?;
+    Ok(LayerPixels {
+        image,
+        sampled_maps: sampled_maps.into_inner(),
     })
 }
 

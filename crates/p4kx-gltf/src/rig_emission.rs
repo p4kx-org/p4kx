@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use crate::instance::Instance;
 use crate::layout::Layout;
 use crate::materials::Slot;
+use crate::texture_origins::TextureReadUse;
 
 /// The geometry and material slots one supplied part wrote into a rigged GLB.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -45,10 +46,15 @@ impl RiggedPartEmission {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RiggedGlbEmission {
     parts: Vec<RiggedPartEmission>,
+    images: Vec<Vec<TextureReadUse>>,
 }
 
 impl RiggedGlbEmission {
-    pub(crate) fn of(instances: &[Instance<'_>], layout: &Layout<'_>) -> Self {
+    pub(crate) fn of(
+        instances: &[Instance<'_>],
+        layout: &Layout<'_>,
+        images: Vec<Vec<TextureReadUse>>,
+    ) -> Self {
         let mut parts = vec![RiggedPartEmission::default(); instances.len()];
         for mesh in &layout.meshes {
             let (Some(part), Some(instance)) = (parts.get_mut(mesh.part), instances.get(mesh.part))
@@ -66,7 +72,12 @@ impl RiggedGlbEmission {
                     }
                 }));
         }
-        Self { parts }
+        Self { parts, images }
+    }
+
+    /// Iterates the actual sources of each embedded image in its output order.
+    pub fn image_sources(&self) -> impl ExactSizeIterator<Item = &[TextureReadUse]> + '_ {
+        self.images.iter().map(Vec::as_slice)
     }
 
     /// Returns the emission result for each supplied part, including those without geometry.

@@ -4,6 +4,8 @@
 use p4kx_texture::RgbaImage;
 use thiserror::Error;
 
+use crate::texture_origins::{TextureComponents, TextureReadId, TextureReadUse};
+
 /// Why a texture could not be loaded.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
@@ -17,7 +19,7 @@ pub enum TextureLoadError {
 }
 
 /// A decoded texture.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct LoadedTexture {
     /// The pixels, 8-bit RGBA, any alpha tail merged into the alpha channel.
@@ -25,15 +27,42 @@ pub struct LoadedTexture {
     /// Whether the alpha channel holds data, from an alpha tail or from the texture's own format,
     /// rather than the opaque value a format without alpha decodes to.
     pub has_alpha: bool,
+    read: Option<TextureReadId>,
 }
 
 impl LoadedTexture {
     /// Creates a texture from `image`, whose alpha channel holds data when `has_alpha` is set.
     #[must_use]
     pub const fn new(image: RgbaImage, has_alpha: bool) -> Self {
-        Self { image, has_alpha }
+        Self {
+            image,
+            has_alpha,
+            read: None,
+        }
+    }
+
+    /// Binds the decoded value to the loader's physical read evidence.
+    #[must_use]
+    pub const fn with_read(mut self, read: TextureReadId) -> Self {
+        self.read = Some(read);
+        self
+    }
+
+    pub(crate) const fn contribution(&self, components: TextureComponents) -> TextureReadUse {
+        TextureReadUse {
+            read: self.read,
+            components,
+        }
     }
 }
+
+impl PartialEq for LoadedTexture {
+    fn eq(&self, other: &Self) -> bool {
+        self.image == other.image && self.has_alpha == other.has_alpha
+    }
+}
+
+impl Eq for LoadedTexture {}
 
 /// Gives the GLB writer the textures of the materials, wherever they are stored.
 pub trait TextureLoader: Sync {

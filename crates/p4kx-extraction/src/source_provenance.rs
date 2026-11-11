@@ -14,6 +14,7 @@ pub use crate::field_origins_seed::FieldOriginsSeed;
 pub use crate::field_path::{FieldPath, FieldPathError};
 pub use crate::field_path_seed::FieldPathSeed;
 pub use crate::file_receipt::{DirectoryCommit, DirectoryReceipt, FileReceipt, StdoutReceipt};
+pub use crate::model_textures::ArchiveTextureReads;
 pub use crate::observed_file_origin::read_observed_file_limit;
 pub use crate::origin_artifact::{OriginArtifactDigest, OriginArtifactName, OriginDigestWriter};
 pub use crate::origin_companion::{

@@ -13,6 +13,7 @@ use crate::shading::shading;
 use crate::texture_assemble::Wish;
 use crate::texture_loader::{TextureLoader, WithFallbacks};
 use crate::texture_make::{Budget, run_guarded};
+use crate::texture_origins::TextureReadUse;
 use crate::texture_pixels::Tints;
 use crate::texture_report::{TextureFallback, TextureRole};
 use crate::texture_roles::{Source, Sources, draws_by_opacity_map, sources_with};
@@ -161,6 +162,7 @@ pub(crate) struct SlotImages {
 #[derive(Debug, Default)]
 pub(crate) struct TextureSet {
     pub(crate) images: Vec<EncodedImage>,
+    pub(crate) image_sources: Vec<Vec<TextureReadUse>>,
     pub(crate) slots: BTreeMap<(usize, Slot), SlotImages>,
     pub(crate) fallbacks: Vec<TextureFallback>,
 }
