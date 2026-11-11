@@ -199,6 +199,7 @@ fn assemble<R>(
         collected.resource_groups,
         collected.resource_group_members,
     );
+    let durability = crate::catalog_v3::catalog_durability::tables(&forge, collected.durability);
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
         source: source(
@@ -294,6 +295,9 @@ fn assemble<R>(
         },
         configurations: crate::catalog_configurations::CatalogConfigurations {
             blueprint_tiers: blueprints.tiers,
+            durability: durability.health,
+            degradation: durability.degradation,
+            distortion: durability.distortion,
             contract_templates: CatalogTable::new(
                 &forge,
                 &["ContractTemplate"],

@@ -61,6 +61,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) tags: crate::catalog_v3::tag_catalog::TagRows<'f>,
     pub(crate) manufacturers: Vec<Manufacturer<'f>>,
     pub(crate) items: Vec<Item<'f>>,
+    pub(crate) durability: crate::catalog_v3::catalog_durability::DurabilityRows,
     pub(crate) ships: Vec<Ship<'f>>,
     pub(crate) commodities: Vec<Commodity<'f>>,
     pub(crate) blueprints: Vec<BlueprintRow<'f>>,
@@ -151,6 +152,7 @@ impl<'f> Collected<'f> {
             tags: crate::catalog_v3::tag_catalog::TagRows::default(),
             manufacturers: Vec::new(),
             items: Vec::new(),
+            durability: crate::catalog_v3::catalog_durability::DurabilityRows::default(),
             ships: Vec::new(),
             commodities: Vec::new(),
             blueprints: crafting.blueprints,
@@ -211,7 +213,12 @@ impl<'f> Collected<'f> {
     fn take(&mut self, pick: Picked<'f>, missing_categories: &mut HashSet<Guid>) {
         match pick {
             Picked::Manufacturer(entity) => self.manufacturers.push(*entity),
-            Picked::Item(entity, line, ports) => {
+            Picked::Item {
+                entity,
+                line,
+                ports,
+                durability,
+            } => {
                 self.item_classes.count(line);
                 if ports {
                     self.port_items.push(crate::loadout::Wanted {
@@ -222,6 +229,7 @@ impl<'f> Collected<'f> {
                 }
                 self.playability.items.count(entity.playability);
                 self.items.push(entity);
+                self.durability.extend(durability);
             }
             Picked::Ship(entity, vehicle) => {
                 self.playability.ships.count(entity.playability);

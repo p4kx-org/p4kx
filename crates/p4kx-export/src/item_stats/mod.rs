@@ -3,6 +3,7 @@
 
 use p4kx_extraction::{DataForge, RecordTree, TreeBuilder};
 
+use crate::catalog_v3::catalog_durability;
 use crate::contract_stats::ItemStats;
 use crate::record_fields::{component, structure, text};
 
@@ -27,6 +28,17 @@ pub(crate) fn read<'f>(
     tree: &RecordTree<'f>,
     forge: &'f DataForge<'f>,
     trees: &mut TreeBuilder<'f>,
+) -> Option<ItemStats<'f>> {
+    read_with_health(tree, forge, trees, || {
+        catalog_durability::legacy_health(tree)
+    })
+}
+
+pub(crate) fn read_with_health<'f>(
+    tree: &RecordTree<'f>,
+    forge: &'f DataForge<'f>,
+    trees: &mut TreeBuilder<'f>,
+    health: impl FnOnce() -> Option<f32>,
 ) -> Option<ItemStats<'f>> {
     let attach = structure(component(tree, "SAttachableComponentParams"), "AttachDef");
     let kind = text(attach, "Type");
@@ -75,7 +87,7 @@ pub(crate) fn read<'f>(
         weapon_modifier,
         mining_laser,
         mining_modifier,
-        health: parts::health(tree),
+        health: health(),
         resource_states,
     })
 }

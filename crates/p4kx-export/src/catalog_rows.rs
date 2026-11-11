@@ -209,5 +209,16 @@ fn numbers(collected: &Collected<'_>) -> Vec<EmittedNumber> {
                 .map(|value| EmittedNumber { kind, value }),
         );
     }
+    numbers.extend(
+        collected
+            .durability
+            .numbers
+            .iter()
+            .cloned()
+            .map(|value| EmittedNumber {
+                kind: Kind::Items,
+                value,
+            }),
+    );
     numbers
 }

@@ -4,6 +4,7 @@
 use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
 use super::Scan;
+use crate::catalog_v3::catalog_durability;
 use crate::commodity_resource::{self, CommodityResource};
 use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
 use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDiagnosis};
@@ -63,9 +64,25 @@ impl<'f> Scan<'_, '_, 'f> {
             ));
         }
         let mut picked = Picked::entity(kind, tree, self.texts);
-        if let Some(Picked::Item(item, _, _)) = &mut picked {
-            item.stats = item_stats::read(tree, self.forge, trees).map(Box::new);
-            item.variant_key = item_variant::key(tree, item.stats.as_deref());
+        if let Some(Picked::Item {
+            entity, durability, ..
+        }) = &mut picked
+        {
+            let read =
+                catalog_durability::read(tree, self.projection, admission, self.options.cancel)?;
+            crate::source_projection_notes::record(
+                Kind::Items,
+                ExportSourceRole::Selected,
+                admission,
+                tree,
+                read.notes,
+                ledger,
+            )?;
+            *durability = read.rows;
+            let legacy_health = read.legacy_health;
+            entity.stats = item_stats::read_with_health(tree, self.forge, trees, || legacy_health)
+                .map(Box::new);
+            entity.variant_key = item_variant::key(tree, entity.stats.as_deref());
         }
         Ok(picked.map(|picked| picked.crafted(tree)))
     }

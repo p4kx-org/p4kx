@@ -17,6 +17,8 @@ pub(crate) mod blueprint_category_list_read;
 
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
+#[path = "catalog_durability.rs"]
+pub(crate) mod catalog_durability;
 #[path = "tag_catalog.rs"]
 pub(crate) mod tag_catalog;
 

@@ -78,10 +78,14 @@ impl<'source> NumberCaptures<'source> {
         if let (Some(rows), Some(targets)) = (rows, targets) {
             for number in &rows.numbers {
                 let actual = &number.value;
-                if !targets
-                    .emitted
-                    .contains(&(number.kind, actual.record_index))
-                {
+                // Item component receipts come from the emitted component rows.
+                let emitted = match actual.occurrence {
+                    NumberOccurrence::ItemComponentValue { .. } => number.kind == Kind::Items,
+                    _ => targets
+                        .emitted
+                        .contains(&(number.kind, actual.record_index)),
+                };
+                if !emitted {
                     continue;
                 }
                 if matches!(actual.occurrence, NumberOccurrence::TemplateValue { .. }) {
@@ -103,7 +107,8 @@ impl<'source> NumberCaptures<'source> {
                     }
                     NumberOccurrence::TemplateValue { .. } => {}
                     NumberOccurrence::LootValue { ordinal }
-                    | NumberOccurrence::BlueprintValue { ordinal } => {
+                    | NumberOccurrence::BlueprintValue { ordinal }
+                    | NumberOccurrence::ItemComponentValue { ordinal } => {
                         if matches!(actual.occurrence, NumberOccurrence::BlueprintValue { .. })
                             && number.kind != Kind::Blueprints
                         {
@@ -192,7 +197,10 @@ impl Coverage<'_, '_> {
                     && self.consumed_owned.insert(required.original_ordinal)
             });
         }
-        if matches!(self.kind, Some(Kind::LootPoolFilters | Kind::Blueprints)) {
+        if matches!(
+            self.kind,
+            Some(Kind::LootPoolFilters | Kind::Blueprints | Kind::Items)
+        ) {
             return self.owned(required);
         }
         let Some(contract) = required.contract else {
@@ -216,18 +224,25 @@ impl Coverage<'_, '_> {
         else {
             return false;
         };
-        let occurrence = match self.kind {
-            Some(Kind::LootPoolFilters) => NumberOccurrence::LootValue {
-                ordinal: required.original_ordinal,
-            },
-            Some(Kind::Blueprints) => NumberOccurrence::BlueprintValue {
-                ordinal: required.original_ordinal,
-            },
+        let ordinal = required.original_ordinal;
+        let (occurrence, contract) = match self.kind {
+            Some(Kind::LootPoolFilters) => (
+                NumberOccurrence::LootValue { ordinal },
+                ResourceNumberContract::Number,
+            ),
+            Some(Kind::Blueprints) => (
+                NumberOccurrence::BlueprintValue { ordinal },
+                ResourceNumberContract::Number,
+            ),
+            Some(Kind::Items) => (
+                NumberOccurrence::ItemComponentValue { ordinal },
+                ResourceNumberContract::Single,
+            ),
             _ => return false,
         };
         scalar_matches(required, actual)
             && actual.occurrence == occurrence
-            && actual.contract == ResourceNumberContract::Number
+            && actual.contract == contract
             && self.consumed_owned.insert(required.original_ordinal)
     }
 }

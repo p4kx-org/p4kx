@@ -32,8 +32,13 @@ use crate::texts::Texts;
 pub(crate) enum Picked<'f> {
     /// A manufacturer.
     Manufacturer(Box<Manufacturer<'f>>),
-    /// An item, the `Class:` line of its English description and whether it may have ports.
-    Item(Item<'f>, ClassLine, bool),
+    /// An item and the configurations read from its original Record.
+    Item {
+        entity: Item<'f>,
+        line: ClassLine,
+        ports: bool,
+        durability: crate::catalog_v3::catalog_durability::DurabilityRows,
+    },
     /// A ship and the vehicle facts its paints are derived from.
     Ship(Ship<'f>, VehicleFacts),
     /// A commodity.
@@ -146,7 +151,12 @@ impl<'f> Picked<'f> {
 
     fn item_entity(tree: &RecordTree<'f>, texts: &Texts<'f>) -> Self {
         let (item, line) = item(tree, texts);
-        Self::Item(item, line, carries_ports(tree))
+        Self::Item {
+            entity: item,
+            line,
+            ports: carries_ports(tree),
+            durability: crate::catalog_v3::catalog_durability::DurabilityRows::default(),
+        }
     }
 
     /// Returns `self` joined with the crafting station `tree` describes when `self` is an item,
@@ -154,7 +164,7 @@ impl<'f> Picked<'f> {
     pub(crate) fn crafted(self, tree: &RecordTree<'f>) -> Self {
         if !matches!(
             self,
-            Self::Item(..) | Self::Ship(..) | Self::Commodity(_) | Self::MineableEntity(_)
+            Self::Item { .. } | Self::Ship(..) | Self::Commodity(_) | Self::MineableEntity(_)
         ) {
             return self;
         }

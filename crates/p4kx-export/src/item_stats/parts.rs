@@ -80,7 +80,3 @@ pub(super) fn missile<'f>(tree: &RecordTree<'f>) -> Option<MissileStats<'f>> {
         linear_speed: number(guidance, "linearSpeed"),
     })
 }
-
-pub(super) fn health(tree: &RecordTree<'_>) -> Option<f32> {
-    number(component(tree, "SHealthComponentParams"), "Health")
-}

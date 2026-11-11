@@ -6,7 +6,8 @@ use std::collections::BTreeMap;
 
 use p4kx_extraction::Value;
 
-use crate::catalog_read::original::OriginalValueSite;
+use crate::CatalogError;
+use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact, OriginalValueSite};
 use crate::resource_raw_policy::ResourceNumberContract;
 
 /// Exact scalar storage of one nonfinite source number.
@@ -33,6 +34,7 @@ pub(crate) enum NumberOccurrence {
     LootValue { ordinal: u64 },
     BlueprintValue { ordinal: u64 },
     TemplateValue { ordinal: u64 },
+    ItemComponentValue { ordinal: u64 },
 }
 
 /// A lossless numeric token retained by the actual raw-field reader.
@@ -44,6 +46,28 @@ pub(crate) struct CapturedNumber {
     pub(crate) token: FloatToken,
     pub(crate) source_type: String,
     pub(crate) contract: ResourceNumberContract,
+}
+
+impl CapturedNumber {
+    /// Retains the original Single only when the selected component reader emits its exact bits.
+    pub(crate) fn item_component<'scope, 'read, 'source>(
+        originals: &OriginalFlowFields<'scope, 'read, 'source>,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+    ) -> Result<Option<Self>, CatalogError> {
+        let Some(token @ FloatToken::Single(_)) = FloatToken::read(fact.value()) else {
+            return Ok(None);
+        };
+        Ok(Some(Self {
+            record_index: originals.record_index(),
+            occurrence: NumberOccurrence::ItemComponentValue {
+                ordinal: fact.ordinal(),
+            },
+            field: originals.logical_path(fact)?,
+            token,
+            source_type: fact.owner_type().to_owned(),
+            contract: ResourceNumberContract::Single,
+        }))
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]

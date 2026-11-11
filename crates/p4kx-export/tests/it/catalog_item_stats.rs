@@ -20,6 +20,8 @@ type TestResult = Result<(), Box<dyn Error>>;
 
 #[path = "catalog_item_ammo_source.rs"]
 mod ammo_source;
+#[path = "catalog_durability.rs"]
+mod durability;
 
 fn catalog() -> Result<Value, Box<dyn Error>> {
     let (_directory, archive) = ammo_source::archive(ammo_source::AmmoSource::CyclicMembers)?;
