@@ -19,6 +19,7 @@ pub(crate) enum NodeKind {
     State,
     Rtpc,
     ActorMixer,
+    Properties,
 }
 
 impl NodeKind {
@@ -27,6 +28,7 @@ impl NodeKind {
             Self::State => "bnkHircState",
             Self::Rtpc => "bnkHircRtpc",
             Self::ActorMixer => "bnkHircActorMixer",
+            Self::Properties => "bnkHircNodeProperties",
         }
     }
 
@@ -35,6 +37,7 @@ impl NodeKind {
             Self::State => "stateRowPosition",
             Self::Rtpc => "rtpcRowPosition",
             Self::ActorMixer => "actorMixerRowPosition",
+            Self::Properties => "nodePropertyRowPosition",
         }
     }
 
@@ -43,6 +46,7 @@ impl NodeKind {
             Self::State => "stateExtent",
             Self::Rtpc => "rtpcExtent",
             Self::ActorMixer => "actorMixerExtent",
+            Self::Properties => "nodePropertyExtent",
         }
     }
 }

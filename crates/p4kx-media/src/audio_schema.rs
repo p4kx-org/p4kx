@@ -31,6 +31,8 @@ mod foreign;
 mod hirc;
 #[path = "audio_schema_music.rs"]
 mod music;
+#[path = "audio_schema_node_properties.rs"]
+mod node_properties;
 #[path = "audio_schema_rtpc.rs"]
 mod rtpc;
 #[path = "audio_schema_state.rs"]
@@ -174,6 +176,7 @@ fn insert_audio_payloads(base: &mut Value) -> Result<(), MediaError> {
     state::insert_payload(base)?;
     rtpc::insert_payload(base)?;
     actor_mixer::insert_payload(base)?;
+    node_properties::insert_payload(base)?;
     foreign::insert_payload(base)
 }
 
@@ -198,6 +201,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             .chain(state::bindings().iter())
             .chain(rtpc::bindings().iter())
             .chain(actor_mixer::bindings().iter())
+            .chain(node_properties::bindings().iter())
             .chain(foreign::bindings().iter())
             .chain(std::iter::once(&BANK_FAILURE_BINDING))
             .chain(stid_bindings().iter())

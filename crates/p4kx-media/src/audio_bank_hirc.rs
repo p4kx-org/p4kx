@@ -5,13 +5,16 @@ use std::io::{Read, Seek};
 use std::ops::Range;
 
 use p4kx_extraction::DecimalU64;
+use p4kx_extraction::HircKind;
 use p4kx_extraction::bank::{
-    BankHircObject, BankHircSemantic, BankHircSoundNode, BankSource, BankSourceSection,
+    BankHircObject, BankHircSemantic, BankHircSound, BankHircSoundNode, BankSource,
+    BankSourceSection,
 };
 
 use crate::audio_bank_actor_mixer;
 use crate::audio_bank_failure::BankPhase;
 use crate::audio_bank_inventory::{BankInventory, VersionSite};
+use crate::audio_bank_node_properties;
 use crate::audio_bank_payload::{BankEntryRange, BankHircRecord, BankObjectRecord, BankPayload};
 use crate::audio_bank_projection::BankProjection;
 use crate::audio_bank_rtpc;
@@ -85,7 +88,7 @@ fn emit_semantic<R: Read + Seek>(
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     match (semantic, version) {
-        (BankHircSemantic::Raw(_), _) => Ok(()),
+        (BankHircSemantic::Raw(object), version) => emit_raw(projection, &object, version, writer),
         (BankHircSemantic::ActorMixer(actor), Some(version)) => {
             audio_bank_actor_mixer::project(projection, version, *actor, writer)
         }
@@ -119,13 +122,9 @@ fn emit_semantic<R: Read + Seek>(
             &inventory.hirc_objects,
             writer,
         ),
-        (BankHircSemantic::Sound(sound), Some(version)) => audio_bank_hirc_sound::project(
-            projection,
-            version,
-            &sound,
-            &inventory.didx_entries,
-            writer,
-        ),
+        (BankHircSemantic::Sound(sound), Some(version)) => {
+            emit_unscoped_sound(projection, version, &sound, inventory, writer)
+        }
         (BankHircSemantic::SoundWithNode(node), Some(version)) => {
             emit_sound_node(projection, version, node, inventory, writer)
         }
@@ -138,6 +137,29 @@ fn emit_semantic<R: Read + Seek>(
     }
 }
 
+fn emit_raw(
+    projection: &BankProjection<'_>,
+    original: &BankHircObject,
+    version: Option<VersionSite>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    if let Some(version) = version.filter(|site| original.kind(site.version) == HircKind::Sound) {
+        audio_bank_node_properties::unsupported(projection, version, original, writer)?;
+    }
+    Ok(())
+}
+
+fn emit_unscoped_sound(
+    projection: &BankProjection<'_>,
+    version: VersionSite,
+    sound: &BankHircSound,
+    inventory: &BankInventory,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    audio_bank_hirc_sound::project(projection, version, sound, &inventory.didx_entries, writer)?;
+    audio_bank_node_properties::unsupported(projection, version, &sound.object, writer)
+}
+
 fn emit_sound_node<R: Read + Seek>(
     projection: &BankProjection<'_>,
     version: VersionSite,
@@ -148,6 +170,7 @@ fn emit_sound_node<R: Read + Seek>(
     let sound = node.sound();
     audio_bank_hirc_sound::project(projection, version, sound, &inventory.didx_entries, writer)?;
     let original = sound.object;
+    audio_bank_node_properties::sound(projection, version, &mut node, writer)?;
     let state = StateProjection::new(projection.input, &original, version);
     audio_bank_inline_state::project(projection, &state, node.states().try_into()?, writer)?;
     audio_bank_rtpc::project(

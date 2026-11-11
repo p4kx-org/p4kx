@@ -52,6 +52,8 @@ and fallback selection.
 | `audio-bank-hirc-actor-mixer-rtpc` | `bank-hirc-actor-mixer-rtpc` | HIRC section and ActorMixer object ordinals |
 | `audio-bank-hirc-actor-mixer-rtpc-curve` | `bank-hirc-actor-mixer-rtpc-curve` | HIRC section, ActorMixer object and curve ordinals |
 | `audio-bank-hirc-actor-mixer-rtpc-point` | `bank-hirc-actor-mixer-rtpc-point` | HIRC section, ActorMixer object, curve and point ordinals |
+| `audio-bank-hirc-node-properties` | `bank-hirc-node-properties` | HIRC section and Sound or ActorMixer object ordinals |
+| `audio-bank-hirc-node-property` | `bank-hirc-node-property` | HIRC section, owning object, property list and original property ordinals |
 | `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
 | `audio-bank-music-segment` | `bank-music-segment` | HIRC section and segment object ordinals |
@@ -222,6 +224,20 @@ marks the ActorMixer malformed, while complete child words and earlier State and
 observations remain available. Unsupported bank versions retain the original bank and
 an explicit unsupported layout. Child IDs are authored references. Their receipts use the
 owning bank bytes and do not attribute target payloads to the original word.
+
+Version-154 Sound and ActorMixer node property summaries include the original override bus
+and direct parent words and the checked property and ranged modifier lists. Explicit zero
+values remain present. Each list reports its declared count, the checked ID and raw word counts,
+and original byte ranges. A malformed prefix retains independently readable IDs and words. An
+absent optional Sound node and an unsupported bank version each have their own layout status.
+A later State, RTPC or child failure leaves a completed property prefix available.
+
+Property row index 2 selects list 0 for scalar properties and list 1 for ranged modifiers.
+Index 3 is the property's original position within that list. Each ID retains an individual
+row, including unknown and repeated IDs. Scalar, minimum and maximum words are original
+unsigned 32-bit values with individual ranges and source receipts. Missing words are omitted.
+The list summary carries the coverage status. These fields make no numeric unit or float
+interpretation and use only the original owning bank as their payload source.
 
 Container rows preserve the version 154 Random, Sequence, Switch and Blend layout, original
 parent ID and declared child count. The Random/Sequence row carries the original mode byte.
