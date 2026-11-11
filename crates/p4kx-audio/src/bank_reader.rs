@@ -31,10 +31,6 @@ impl<'a> SectionReader<'a> {
         Ok(byte)
     }
 
-    pub(crate) fn u16(&mut self) -> Result<u16, BankError> {
-        Ok(u16::from_le_bytes(self.array()?))
-    }
-
     pub(crate) fn u32(&mut self) -> Result<u32, BankError> {
         Ok(u32::from_le_bytes(self.array()?))
     }
@@ -54,10 +50,6 @@ impl<'a> SectionReader<'a> {
     pub(crate) fn bytes(&mut self, len: usize) -> Result<&'a [u8], BankError> {
         let range = self.skip(len)?;
         Ok(self.body.get(range).unwrap_or_default())
-    }
-
-    pub(crate) fn i16(&mut self) -> Result<i16, BankError> {
-        Ok(i16::from_le_bytes(self.array()?))
     }
 
     /// Takes the bytes up to the next zero byte and skips that byte.

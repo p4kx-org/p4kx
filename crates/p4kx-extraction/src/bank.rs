@@ -24,6 +24,10 @@ pub use p4kx_audio::{
     BankSource, BankSourceSection, BankStid, BankStidName, ContainerKind, MediaStorage,
     MusicTrackKind, SoundSource,
 };
+pub use p4kx_audio::{
+    BankHircMusicPlaylist, BankMusicPlaylistFields, BankMusicPlaylistItem, BankMusicPlaylistRead,
+    BankMusicPlaylistRow, BankMusicPlaylistRows, BankMusicTransitionFields, MusicPlayMode,
+};
 use rayon::prelude::*;
 
 use crate::entry_content::find_entry;

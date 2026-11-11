@@ -11,6 +11,7 @@ use p4kx_extraction::bank::{
 };
 
 use crate::audio_bank_inventory::VersionSite;
+use crate::audio_bank_music_value::MusicStingerRecord;
 use crate::audio_bank_projection::BankProjection;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource, error};
 
@@ -19,11 +20,11 @@ mod origins;
 #[path = "audio_bank_music_segment_payload.rs"]
 mod payload;
 
-use self::origins::MusicSites;
+pub(crate) use self::origins::{MusicChildField, MusicSites};
 pub(crate) use self::payload::MusicSegmentPayload;
 use self::payload::{
-    MusicChildRecord, MusicMarkerEncoding, MusicMarkerRecord, MusicSegmentLayout,
-    MusicStingerRecord, SegmentRecord, entry_range,
+    MusicChildRecord, MusicMarkerEncoding, MusicMarkerRecord, MusicSegmentLayout, SegmentRecord,
+    entry_range,
 };
 
 pub(crate) const NAMESPACE: &str = "audio-bank-music-segment";
@@ -73,7 +74,13 @@ fn emit<R: Read + Seek>(
                 id_range: entry_range(&id.range),
             });
             sites
-                .child(projection.input, ordinal, &id.range, writer)?
+                .child(
+                    projection.input,
+                    ordinal,
+                    &id.range,
+                    MusicChildField::Track,
+                    writer,
+                )?
                 .write(
                     writer,
                     &sites.subresource(CHILD, ordinal),
@@ -84,12 +91,7 @@ fn emit<R: Read + Seek>(
         }
         BankMusicSegmentRow::Stinger { ordinal, value } => {
             let ordinal = u64::from(ordinal);
-            let data = MusicSegmentPayload::Stinger(MusicStingerRecord {
-                ordinal: DecimalU64::new(ordinal),
-                trigger_id: value.trigger_id.value,
-                segment_id: value.segment_id.value,
-                opaque_range: entry_range(&value.opaque_range),
-            });
+            let data = MusicSegmentPayload::Stinger(MusicStingerRecord::new(ordinal, &value));
             sites
                 .stinger(projection.input, ordinal, &value, writer)?
                 .write(

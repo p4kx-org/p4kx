@@ -48,6 +48,48 @@ pub struct BankMusicStinger {
     pub opaque_range: Range<u64>,
 }
 
+#[derive(Clone, Copy, Default)]
+pub(crate) struct MusicList {
+    pub(crate) start: u64,
+    pub(crate) length: u64,
+    pub(crate) count: u32,
+}
+
+impl MusicList {
+    pub(crate) const fn record(&mut self, offset: u64) {
+        self.length = offset - self.start;
+        self.count += 1;
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct MusicNodeLists {
+    pub(crate) children: MusicList,
+    pub(crate) stingers: MusicList,
+}
+
+pub(crate) fn scan<F: ObjectFields>(
+    reader: &mut F,
+    fields: &mut BankMusicNodeFields,
+    lists: &mut MusicNodeLists,
+) -> Result<(), F::Error> {
+    let (_, count, length) = head(reader, fields)?;
+    lists.children = MusicList {
+        start: reader.offset(),
+        count,
+        length,
+    };
+    reader.skip_bytes(length)?;
+    meter(reader, fields)?;
+    let stingers = stinger_count(reader, fields)?;
+    lists.stingers.start = reader.offset();
+    for _ in 0..stingers {
+        stinger(reader)?;
+        lists.stingers.record(reader.offset());
+    }
+    Ok(())
+}
+
 pub(crate) fn head<F: ObjectFields>(
     reader: &mut F,
     fields: &mut BankMusicNodeFields,

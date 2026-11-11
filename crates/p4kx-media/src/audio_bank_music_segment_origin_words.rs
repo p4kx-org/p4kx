@@ -37,7 +37,7 @@ impl HeaderWord {
 }
 
 impl MusicSites<'_> {
-    pub(super) fn header_words(
+    pub(super) fn node_words(
         &self,
         prepared: &mut BankOrigins<'_, '_, '_>,
     ) -> Result<(), MediaError> {
@@ -53,17 +53,28 @@ impl MusicSites<'_> {
         self.write_words(prepared, self.meter_words())?;
         self.write_words(
             prepared,
+            [HeaderWord::new(
+                Target::Field("stinger_count"),
+                "musicStingerCount",
+                self.stingers,
+                Some(List::Children),
+            )],
+        )
+    }
+
+    pub(super) fn segment_words(
+        &self,
+        prepared: &mut BankOrigins<'_, '_, '_>,
+    ) -> Result<(), MediaError> {
+        self.write_words(
+            prepared,
             [
-                HeaderWord::new(
-                    Target::Field("stinger_count"),
-                    "musicStingerCount",
-                    self.stingers,
-                    Some(List::Children),
-                ),
                 HeaderWord::new(
                     Target::Numeric("duration"),
                     "musicDuration",
-                    self.fields.duration.as_ref().map(word),
+                    self.segment
+                        .and_then(|segment| segment.duration.as_ref())
+                        .map(word),
                     Some(List::Stingers),
                 ),
                 HeaderWord::new(
@@ -77,7 +88,7 @@ impl MusicSites<'_> {
     }
 
     fn meter_words(&self) -> [HeaderWord; 5] {
-        let node = &self.fields.node;
+        let node = self.node_fields;
         let before = Some(List::Children);
         [
             HeaderWord::new(

@@ -7,7 +7,7 @@ use std::ops::Range;
 use crate::bank_object_fields::{ObjectFields, SeekObjectFields};
 use crate::bank_structure::OBJECT_ID_LEN;
 use crate::hirc::CONTAINER_VERSION;
-use crate::hirc_music_node::{self, STINGER_LEN};
+use crate::hirc_music_node::{self, MusicList, MusicNodeLists, STINGER_LEN};
 use crate::hirc_music_segment;
 use crate::hirc_node::ID_LEN;
 use crate::read_at::SeekSource;
@@ -82,25 +82,10 @@ pub struct BankMusicMarker {
     pub terminator: u64,
 }
 
-#[derive(Clone, Copy, Default)]
-struct List {
-    start: u64,
-    length: u64,
-    count: u32,
-}
-
-impl List {
-    const fn record(&mut self, offset: u64) {
-        self.length = offset - self.start;
-        self.count += 1;
-    }
-}
-
 #[derive(Default)]
 struct Lists {
-    children: List,
-    stingers: List,
-    markers: List,
+    node: MusicNodeLists,
+    markers: MusicList,
 }
 
 #[derive(Clone, Copy)]
@@ -164,7 +149,7 @@ impl<R: Read + Seek> BankMusicSegmentRows<'_, R> {
         read.map_err(BankReadError::Io)
     }
 
-    fn read_row(&mut self, list: List) -> Result<BankMusicSegmentRow, BankReadError> {
+    fn read_row(&mut self, list: MusicList) -> Result<BankMusicSegmentRow, BankReadError> {
         let ordinal = self.next;
         match self.phase {
             Phase::Children => {
@@ -216,8 +201,8 @@ impl<R: Read + Seek> Iterator for BankMusicSegmentRows<'_, R> {
         }
         loop {
             let (list, following) = match self.phase {
-                Phase::Children => (self.lists.children, Phase::Stingers),
-                Phase::Stingers => (self.lists.stingers, Phase::Markers),
+                Phase::Children => (self.lists.node.children, Phase::Stingers),
+                Phase::Stingers => (self.lists.node.stingers, Phase::Markers),
                 Phase::Markers => (self.lists.markers, Phase::End),
                 Phase::End => return None,
             };
@@ -280,20 +265,7 @@ fn scan<R: Read + Seek>(
         object.body_len(),
         OBJECT_ID_LEN as u64,
     );
-    let (_, count, length) = hirc_music_node::head(&mut reader, &mut fields.node)?;
-    lists.children = List {
-        start: reader.offset(),
-        count,
-        length,
-    };
-    reader.skip_bytes(length)?;
-    hirc_music_node::meter(&mut reader, &mut fields.node)?;
-    let stingers = hirc_music_node::stinger_count(&mut reader, &mut fields.node)?;
-    lists.stingers.start = reader.offset();
-    for _ in 0..stingers {
-        hirc_music_node::stinger(&mut reader)?;
-        lists.stingers.record(reader.offset());
-    }
+    hirc_music_node::scan(&mut reader, &mut fields.node, &mut lists.node)?;
     let (_, markers) = hirc_music_segment::header(&mut reader, fields)?;
     lists.markers.start = reader.offset();
     for _ in 0..markers {

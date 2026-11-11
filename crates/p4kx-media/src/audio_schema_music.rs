@@ -3,6 +3,7 @@
 
 use serde_json::Value;
 
+use crate::audio_bank_music_playlist::{self, MusicPlaylistPayload};
 use crate::audio_bank_music_segment::{self, MusicSegmentPayload};
 use crate::audio_bank_music_track::{self, MusicTrackPayload};
 use crate::audio_schema_status::StatusRule;
@@ -10,6 +11,7 @@ use crate::{MediaError, schema_merge};
 
 use super::Binding;
 
+const MUSIC_PLAYLIST_PAYLOAD: &str = "MusicPlaylistPayload";
 const MUSIC_SEGMENT_PAYLOAD: &str = "MusicSegmentPayload";
 const MUSIC_TRACK_PAYLOAD: &str = "MusicTrackPayload";
 
@@ -23,10 +25,35 @@ pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
         base,
         MUSIC_TRACK_PAYLOAD,
         schema_merge::serialized_payload::<MusicTrackPayload>(),
+    )?;
+    schema_merge::insert_payload(
+        base,
+        MUSIC_PLAYLIST_PAYLOAD,
+        schema_merge::serialized_payload::<MusicPlaylistPayload>(),
     )
 }
 
-pub(super) const fn bindings() -> [Binding; 8] {
+pub(super) const fn bindings() -> [Binding; 12] {
+    let [segment, track_id, segment_stinger, marker] = segment_bindings();
+    let [track, source, clip, switch_member] = track_bindings();
+    let [playlist, child, playlist_stinger, item] = playlist_bindings();
+    [
+        segment,
+        track_id,
+        segment_stinger,
+        marker,
+        track,
+        source,
+        clip,
+        switch_member,
+        playlist,
+        child,
+        playlist_stinger,
+        item,
+    ]
+}
+
+const fn segment_bindings() -> [Binding; 4] {
     [
         Binding::exact(
             MUSIC_SEGMENT_PAYLOAD,
@@ -56,6 +83,11 @@ pub(super) const fn bindings() -> [Binding; 8] {
             3,
             StatusRule::Complete,
         ),
+    ]
+}
+
+const fn track_bindings() -> [Binding; 4] {
+    [
         Binding::exact(
             MUSIC_TRACK_PAYLOAD,
             audio_bank_music_track::NAMESPACE,
@@ -81,6 +113,39 @@ pub(super) const fn bindings() -> [Binding; 8] {
             MUSIC_TRACK_PAYLOAD,
             audio_bank_music_track::SWITCH_MEMBER,
             "bank-music-track-switch-member",
+            3,
+            StatusRule::Complete,
+        ),
+    ]
+}
+
+const fn playlist_bindings() -> [Binding; 4] {
+    [
+        Binding::exact(
+            MUSIC_PLAYLIST_PAYLOAD,
+            audio_bank_music_playlist::NAMESPACE,
+            "bank-music-playlist",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            MUSIC_PLAYLIST_PAYLOAD,
+            audio_bank_music_playlist::CHILD,
+            "bank-music-playlist-child",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            MUSIC_PLAYLIST_PAYLOAD,
+            audio_bank_music_playlist::STINGER,
+            "bank-music-playlist-stinger",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            MUSIC_PLAYLIST_PAYLOAD,
+            audio_bank_music_playlist::ITEM,
+            "bank-music-playlist-item",
             3,
             StatusRule::Complete,
         ),

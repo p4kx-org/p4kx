@@ -5704,6 +5704,79 @@
       ],
       "type": "object"
     },
+    "MusicPlaylistPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PlaylistRecord"
+            },
+            "record_type": {
+              "const": "bank-music-playlist",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PlaylistChildRecord"
+            },
+            "record_type": {
+              "const": "bank-music-playlist-child",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MusicStingerRecord"
+            },
+            "record_type": {
+              "const": "bank-music-playlist-stinger",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PlaylistItemRecord"
+            },
+            "record_type": {
+              "const": "bank-music-playlist-item",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "MusicPlaylistPayload"
+    },
     "MusicSegmentLayout": {
       "enum": [
         "decoded",
@@ -6095,6 +6168,267 @@
       "required": [
         "bank_id",
         "bank_type"
+      ],
+      "type": "object"
+    },
+    "PlaylistChildRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "child_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "ordinal",
+        "child_id",
+        "id_range"
+      ],
+      "type": "object"
+    },
+    "PlaylistItemRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "avoid_repeat_count": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "children": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "item_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "item_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "loop_max": {
+          "format": "int16",
+          "maximum": 32767,
+          "minimum": -32768,
+          "type": "integer"
+        },
+        "loop_min": {
+          "format": "int16",
+          "maximum": 32767,
+          "minimum": -32768,
+          "type": "integer"
+        },
+        "loops": {
+          "format": "int16",
+          "maximum": 32767,
+          "minimum": -32768,
+          "type": "integer"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "play_mode": {
+          "$ref": "#/$defs/PlaylistMode"
+        },
+        "play_mode_code": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "segment_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "shuffle": {
+          "type": "boolean"
+        },
+        "shuffle_code": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "uses_weight": {
+          "type": "boolean"
+        },
+        "uses_weight_code": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "weight": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ordinal",
+        "segment_id",
+        "item_id",
+        "children",
+        "play_mode_code",
+        "play_mode",
+        "loops",
+        "loop_min",
+        "loop_max",
+        "weight",
+        "avoid_repeat_count",
+        "uses_weight_code",
+        "uses_weight",
+        "shuffle_code",
+        "shuffle",
+        "item_range"
+      ],
+      "type": "object"
+    },
+    "PlaylistLayout": {
+      "enum": [
+        "decoded",
+        "malformed",
+        "unsupported"
+      ],
+      "type": "string"
+    },
+    "PlaylistMode": {
+      "enum": [
+        "random",
+        "sequence-continuous",
+        "random-step",
+        "sequence-step",
+        "other"
+      ],
+      "type": "string"
+    },
+    "PlaylistRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "beat_value": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "beats_per_bar": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "child_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "grid_offset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MusicFloat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "grid_period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MusicFloat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "item_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "layout": {
+          "$ref": "#/$defs/PlaylistLayout"
+        },
+        "parent_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "stinger_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tempo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MusicFloat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transition_rule_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "transition_rules_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "layout",
+        "parent_id",
+        "child_count",
+        "grid_period",
+        "grid_offset",
+        "tempo",
+        "beats_per_bar",
+        "beat_value",
+        "stinger_count",
+        "transition_rule_count",
+        "transition_rules_range",
+        "item_count"
       ],
       "type": "object"
     },
@@ -13213,6 +13547,366 @@
                     "properties": {
                       "record_type": {
                         "const": "bank-music-track-switch-member"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-playlist"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicPlaylistPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-playlist"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-playlist-child"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicPlaylistPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-playlist-child"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-playlist-stinger"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicPlaylistPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-playlist-stinger"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-playlist-item"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicPlaylistPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-playlist-item"
                       }
                     },
                     "required": [

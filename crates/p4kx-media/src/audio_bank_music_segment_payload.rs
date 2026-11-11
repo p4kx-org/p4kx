@@ -4,11 +4,11 @@
 use std::ops::Range;
 
 use p4kx_extraction::DecimalU64;
-use p4kx_extraction::bank::{BankHircField, BankMusicSegmentFields};
+use p4kx_extraction::bank::BankMusicSegmentFields;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::audio_bank_music_value::MusicFloat;
+use crate::audio_bank_music_value::{MusicFloat, MusicNodeValues, MusicStingerRecord};
 use crate::audio_bank_payload::BankEntryRange;
 
 #[derive(Serialize, JsonSchema)]
@@ -55,39 +55,33 @@ pub(crate) struct SegmentRecord {
 
 impl SegmentRecord {
     pub(super) fn read(fields: &BankMusicSegmentFields, layout: MusicSegmentLayout) -> Self {
+        let MusicNodeValues {
+            parent_id,
+            child_count,
+            grid_period,
+            grid_offset,
+            tempo,
+            beats_per_bar,
+            beat_value,
+            stinger_count,
+        } = MusicNodeValues::new(&fields.node);
         Self {
             layout,
-            parent_id: fields.node.parent.parent_id.as_ref().map(word),
-            child_count: fields.node.child_count.as_ref().map(word),
-            grid_period: fields
-                .node
-                .grid_period
+            parent_id,
+            child_count,
+            grid_period,
+            grid_offset,
+            tempo,
+            beats_per_bar,
+            beat_value,
+            stinger_count,
+            duration: fields
+                .duration
                 .as_ref()
-                .map(word)
-                .map(MusicFloat::from_f64),
-            grid_offset: fields
-                .node
-                .grid_offset
-                .as_ref()
-                .map(word)
-                .map(MusicFloat::from_f64),
-            tempo: fields
-                .node
-                .tempo
-                .as_ref()
-                .map(word)
-                .map(MusicFloat::from_f32),
-            beats_per_bar: fields.node.beats_per_bar.as_ref().map(word),
-            beat_value: fields.node.beat_value.as_ref().map(word),
-            stinger_count: fields.node.stinger_count.as_ref().map(word),
-            duration: fields.duration.as_ref().map(word).map(MusicFloat::from_f64),
-            marker_count: fields.marker_count.as_ref().map(word),
+                .map(|word| MusicFloat::from_f64(word.value)),
+            marker_count: fields.marker_count.as_ref().map(|word| word.value),
         }
     }
-}
-
-const fn word<T: Copy>(field: &BankHircField<T>) -> T {
-    field.value
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -96,15 +90,6 @@ pub(crate) struct MusicChildRecord {
     pub(super) ordinal: DecimalU64,
     pub(super) track_id: u32,
     pub(super) id_range: BankEntryRange,
-}
-
-#[derive(Serialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct MusicStingerRecord {
-    pub(super) ordinal: DecimalU64,
-    pub(super) trigger_id: u32,
-    pub(super) segment_id: u32,
-    pub(super) opaque_range: BankEntryRange,
 }
 
 #[derive(Serialize, JsonSchema)]

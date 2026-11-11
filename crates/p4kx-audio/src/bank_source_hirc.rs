@@ -6,21 +6,18 @@ use std::ops::Range;
 
 use crate::bank_object_fields::SeekObjectFields;
 use crate::bank_reader::SectionReader;
-use crate::bank_source_container::{self, BankHircContainer};
-use crate::bank_source_event;
-use crate::bank_source_music_segment::{self, BankHircMusicSegment};
-use crate::bank_source_music_track::{self, BankHircMusicTrack};
-use crate::bank_source_sound::{self, BankHircSound};
 use crate::bank_structure::{HircEnvelope, OBJECT_HEADER_LEN, OBJECT_ID_LEN};
-use crate::hirc::{self, CONTAINER_VERSION};
+use crate::hirc;
 use crate::hirc_action;
-use crate::hirc_container::Layout as ContainerLayout;
-use crate::hirc_source;
 use crate::read_at::SeekSource;
 use crate::{
-    ActionTarget, BankActionFields, BankError, BankHircEvent, BankObservedHeader, BankReadError,
+    ActionTarget, BankActionFields, BankError, BankObservedHeader, BankReadError,
     BankSourceSection, HircKind, SectionId,
 };
+
+#[path = "bank_source_hirc_semantic.rs"]
+mod semantic;
+pub use self::semantic::BankHircSemantic;
 
 const COUNT_LEN: u64 = size_of::<u32>() as u64;
 
@@ -128,41 +125,6 @@ pub enum BankActionRead {
     },
 }
 
-/// A physical HIRC occurrence and any selected bounded interpretation.
-#[non_exhaustive]
-pub enum BankHircSemantic<'input, R> {
-    /// Physical object whose semantic fields are outside this iterator's coverage.
-    Raw(BankHircObject),
-    /// Owner-bound Action interpretation.
-    Action(BankHircAction),
-    /// Owner-bound Event interpretation.
-    Event(BankHircEvent<'input, R>),
-    /// Owner-bound Sound interpretation.
-    Sound(Box<BankHircSound>),
-    /// Owner-bound container interpretation and ordered children.
-    Container(Box<BankHircContainer<'input, R>>),
-    /// Owner-bound music segment interpretation and ordered values.
-    MusicSegment(Box<BankHircMusicSegment<'input, R>>),
-    /// Owner-bound music track interpretation and ordered source rows.
-    MusicTrack(Box<BankHircMusicTrack<'input, R>>),
-}
-
-impl<R> BankHircSemantic<'_, R> {
-    /// Returns the original physical object envelope.
-    #[must_use]
-    pub const fn object(&self) -> &BankHircObject {
-        match self {
-            Self::Raw(object) => object,
-            Self::Action(action) => &action.object,
-            Self::Event(event) => &event.object,
-            Self::Sound(sound) => &sound.object,
-            Self::Container(container) => &container.object,
-            Self::MusicSegment(segment) => &segment.object,
-            Self::MusicTrack(track) => &track.object,
-        }
-    }
-}
-
 /// Fixed-memory iterator over the physical HIRC objects of one section.
 pub struct BankHirc<'input, R> {
     input: &'input mut SeekSource<R>,
@@ -244,69 +206,6 @@ impl<R: Read + Seek> BankHirc<'_, R> {
             Err(error) => return Some(Err(error)),
         };
         let result = self.action(object, version);
-        if result.is_err() {
-            self.stopped = true;
-        }
-        Some(result)
-    }
-
-    /// Reads the next physical occurrence and its supported semantic fields.
-    ///
-    /// The applicable BKHD observation must belong to this source.
-    pub fn next_semantic(
-        &mut self,
-        header: &BankObservedHeader,
-    ) -> Option<Result<BankHircSemantic<'_, R>, BankReadError>> {
-        let version = match self.observed_version(header) {
-            Ok(version) => version,
-            Err(cause) => return Some(Err(cause)),
-        };
-        let object = match self.next()? {
-            Ok(object) => object,
-            Err(cause) => return Some(Err(cause)),
-        };
-        let kind = object.kind(version);
-        if version >= CONTAINER_VERSION && kind == HircKind::MusicTrack {
-            return Some(
-                bank_source_music_track::observe(self.input, &mut self.stopped, object, version)
-                    .map(|track| BankHircSemantic::MusicTrack(Box::new(track))),
-            );
-        }
-        if version >= CONTAINER_VERSION && kind == HircKind::MusicSegment {
-            return Some(
-                bank_source_music_segment::observe(self.input, &mut self.stopped, object, version)
-                    .map(|segment| BankHircSemantic::MusicSegment(Box::new(segment))),
-            );
-        }
-        if version >= CONTAINER_VERSION
-            && let Some(layout) = ContainerLayout::of(kind)
-        {
-            return Some(
-                bank_source_container::observe(
-                    self.input,
-                    &mut self.stopped,
-                    object,
-                    version,
-                    kind,
-                    layout,
-                )
-                .map(|container| BankHircSemantic::Container(Box::new(container))),
-            );
-        }
-        let result = match kind {
-            HircKind::Event => {
-                return Some(
-                    bank_source_event::observe(self.input, &mut self.stopped, object, version)
-                        .map(BankHircSemantic::Event),
-                );
-            }
-            HircKind::Action => self.action(object, version).map(BankHircSemantic::Action),
-            HircKind::Sound if hirc_source::has_sound_layout(version) => {
-                bank_source_sound::observe(self.input, object, version)
-                    .map(|sound| BankHircSemantic::Sound(Box::new(sound)))
-            }
-            _ => Ok(BankHircSemantic::Raw(object)),
-        };
         if result.is_err() {
             self.stopped = true;
         }

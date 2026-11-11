@@ -3,20 +3,16 @@
 
 use crate::bank_reader::SectionReader;
 use crate::hirc_music::{
-    MusicMarker, MusicNode, MusicPlaylist, MusicPlaylistItem, MusicSegment, MusicStinger,
-    MusicSwitch,
+    MusicMarker, MusicNode, MusicPlaylist, MusicSegment, MusicStinger, MusicSwitch,
 };
 use crate::hirc_music_node::{self, BankMusicNodeFields, STINGER_LEN};
+use crate::hirc_music_playlist::{self, PLAYLIST_ITEM_LEN};
 use crate::hirc_music_segment::{self, BankMusicSegmentFields, finish};
+use crate::hirc_music_transition::{self, BankMusicTransitionFields};
 use crate::hirc_node::{self, ID_LEN, skip_items};
 use crate::{BankError, SectionId};
 
-const RULE_SOURCE_LEN: usize = 21;
-const RULE_DESTINATION_LEN: usize = 26;
-const RULE_OBJECT_LEN: usize = 30;
-const MIN_RULE_LEN: usize = 2 * ID_LEN + RULE_SOURCE_LEN + RULE_DESTINATION_LEN + 1;
 const TREE_NODE_LEN: usize = 12;
-const PLAYLIST_ITEM_LEN: usize = 30;
 
 pub(crate) fn segment(fields: &mut SectionReader<'_>) -> Result<MusicSegment, BankError> {
     let node = node(fields)?;
@@ -110,19 +106,7 @@ pub(crate) fn playlist(fields: &mut SectionReader<'_>) -> Result<MusicPlaylist, 
     let count = fields.u32()?;
     let mut items = Vec::with_capacity(capacity(fields, count, PLAYLIST_ITEM_LEN));
     for _ in 0..count {
-        items.push(MusicPlaylistItem {
-            segment_id: fields.u32()?,
-            item_id: fields.u32()?,
-            children: fields.u32()?,
-            play_mode: fields.u32()?,
-            loops: fields.i16()?,
-            loop_min: fields.i16()?,
-            loop_max: fields.i16()?,
-            weight: fields.u32()?,
-            avoid_repeat_count: fields.u16()?,
-            uses_weight: fields.u8()? != 0,
-            shuffle: fields.u8()? != 0,
-        });
+        items.push(hirc_music_playlist::item(fields)?.value());
     }
     finish(fields)?;
     Ok(MusicPlaylist {
@@ -156,26 +140,7 @@ fn node(fields: &mut SectionReader<'_>) -> Result<MusicNode, BankError> {
 
 fn transition_node(fields: &mut SectionReader<'_>) -> Result<(MusicNode, u32), BankError> {
     let node = node(fields)?;
-    let rules = fields.u32()?;
-    if usize::try_from(rules)
-        .ok()
-        .is_none_or(|rules| rules > fields.remaining() / MIN_RULE_LEN)
-    {
-        return Err(BankError::invalid(
-            SectionId::HIRC,
-            "a music node lists more transition rules than its body holds",
-        ));
-    }
-    for _ in 0..rules {
-        for _ in 0..2 {
-            let ids = fields.u32()?;
-            skip_items(fields, ids, ID_LEN)?;
-        }
-        fields.skip(RULE_SOURCE_LEN + RULE_DESTINATION_LEN)?;
-        if fields.u8()? != 0 {
-            fields.skip(RULE_OBJECT_LEN)?;
-        }
-    }
+    let rules = hirc_music_transition::read(fields, &mut BankMusicTransitionFields::default())?;
     Ok((node, rules))
 }
 

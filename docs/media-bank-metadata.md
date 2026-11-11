@@ -98,6 +98,14 @@ parameter, automation and switch transition ranges refer to the retained bank. C
 carry their original IEEE-754 words and a finite JSON value when available. A malformed tail
 keeps the preceding complete rows. Other layouts retain the physical HIRC object.
 
+Version 154 MusicPlaylist rows retain the music node, ordered children and stingers, and
+items in their original order. Each item preserves its original segment and item IDs,
+following child count, play mode code, signed loop counts, weight, avoid-repeat count and
+raw weight and shuffle selector bytes. The play mode and selector interpretations are also
+available. The transition rule count and checked complete-rule prefix locate the original
+scheduling bytes in the retained bank. A truncated item leaves earlier complete rows
+available and reports the malformed layout.
+
 STID header rows retain the authored string type and name count. Each name row carries its
 original ID and byte count, exact header and name ranges, original bytes and UTF-8 result.
 Repeated IDs and empty names retain their ordinals. Valid UTF-8 preserves whitespace and NUL
