@@ -79,6 +79,9 @@ pub(crate) struct Cli {
 /// The subcommands of `p4kx`.
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
+    /// Checks GitHub for a newer release and prints a compatible link.
+    #[command(after_help = EXIT_CODES_HELP)]
+    CheckUpdate,
     /// Lists every Entry of an Archive, a split texture as one Entry.
     #[command(after_help = EXIT_CODES_HELP)]
     List(ListArgs),

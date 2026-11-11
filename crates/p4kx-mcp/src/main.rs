@@ -86,6 +86,9 @@ const KEY_FILE: &str = "archive.key";
     before_help = notice::BEFORE_HELP
 )]
 struct Args {
+    /// Checks GitHub for a newer release and prints its link instead of starting a session.
+    #[arg(long, exclusive = true)]
+    check_update: bool,
     /// The Archive tools use when a call names none: a Channel name such as `LIVE` or the
     /// absolute path of a `.p4k` file.
     #[arg(long)]
@@ -113,6 +116,9 @@ struct Args {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    if args.check_update {
+        return write_update_link();
+    }
     p4kx_extraction::check_runtime_prerequisites()?;
     let settings_file = args
         .config_dir
@@ -147,4 +153,12 @@ fn main() -> Result<()> {
         service.waiting().await.context("the MCP session failed")?;
         Ok(())
     })
+}
+
+fn write_update_link() -> Result<()> {
+    let release = p4kx_update::ReleaseCheck::github().newer_than(env!("CARGO_PKG_VERSION"))?;
+    if let Some(release) = release {
+        writeln!(io::stdout().lock(), "{}", release.link())?;
+    }
+    Ok(())
 }

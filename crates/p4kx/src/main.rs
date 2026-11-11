@@ -142,6 +142,7 @@ mod ui_json;
 mod ui_render;
 mod ui_screen_render;
 mod ui_screens;
+mod update_status;
 mod verify;
 mod wwise;
 mod wwise_events;
@@ -158,19 +159,12 @@ use crate::cli::{Cli, Command};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    if let Err(error) = p4kx_extraction::check_runtime_prerequisites() {
-        report(&anyhow::Error::new(error));
-        return ExitCode::from(exit::PARTIAL_FAILURE);
+    if !matches!(cli.command, Command::CheckUpdate)
+        && let Err(code) = prepare_archive_command(&cli)
+    {
+        return code;
     }
     let json = cli.json;
-    guard::protect_installations();
-    if !matches!(cli.command, Command::Key(_)) {
-        guard::start_game_check();
-    }
-    if let Err(error) = key::init(&cli) {
-        report(&error);
-        return exit::for_error(&error);
-    }
     let given = key::Given {
         key: cli.archive_key.clone(),
         file: cli.key_file.clone(),
@@ -186,6 +180,21 @@ fn main() -> ExitCode {
     };
     key_note::print();
     code
+}
+
+fn prepare_archive_command(cli: &Cli) -> Result<(), ExitCode> {
+    if let Err(error) = p4kx_extraction::check_runtime_prerequisites() {
+        report(&anyhow::Error::new(error));
+        return Err(ExitCode::from(exit::PARTIAL_FAILURE));
+    }
+    guard::protect_installations();
+    if !matches!(cli.command, Command::Key(_)) {
+        guard::start_game_check();
+    }
+    key::init(cli).map_err(|error| {
+        report(&error);
+        exit::for_error(&error)
+    })
 }
 
 fn report(error: &anyhow::Error) {
@@ -213,6 +222,7 @@ fn is_broken_pipe(error: &anyhow::Error) -> bool {
 fn dispatch(command: Command, json: bool, given: &key::Given) -> anyhow::Result<ExitCode> {
     let success = |()| ExitCode::from(exit::SUCCESS);
     match command {
+        Command::CheckUpdate => update_status::write(json).map(success),
         Command::List(args) => list::run(&args, json).map(success),
         Command::Search(args) => list::search(&args, json).map(success),
         Command::Extract(args) => extract::run(&args, json),

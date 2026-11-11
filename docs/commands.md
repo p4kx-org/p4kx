@@ -27,6 +27,11 @@ alone do not prove that an existing target is a different host file.
 The first argument of nearly every command is the path of a `Data.p4k` Archive, written
 `<archive>` below.
 
+- `p4kx check-update` makes one anonymous request for the latest GitHub Release. It prints the
+  compatible package link for the running application, or the Release page if the distribution
+  identity or package is unavailable. `--json` writes `{ "update": { "version": "…", "url": "…" } }`
+  for a newer release and `{ "update": null }` otherwise. The command downloads and installs no
+  software.
 - `p4kx list <archive>` lists every Entry of an Archive: compression method, encryption flag,
   compressed size, size and path. Archives in the v1 (ZIP64) and the v2 (`Jiji` trailer) layout
   are recognised automatically; any other layout version is rejected with its number. A split
@@ -762,6 +767,10 @@ stdio, so an AI client can look into the Archives. It is built with the official
 (`rmcp`) and speaks every protocol version the SDK negotiates, up to `2026-07-28`. Its tools never
 write a file.
 
+Run `p4kx-mcp --check-update` separately to query GitHub and print a newer Release link if one is
+available. The command exits without starting a session. Normal MCP sessions do not check for
+updates.
+
 What the tools return is the content of the Star Citizen Archive. The AI client may forward it to
 third parties, for example the cloud model provider behind the client. Game texts and media must
 not be redistributed. You remain responsible for complying with the Star Citizen EULA and Terms of
@@ -861,6 +870,9 @@ name:
   }
 }
 ```
+
+On macOS, set the MCP client command to `/Applications/P4KX.app/Contents/MacOS/p4kx-mcp` or the
+corresponding path inside the installed app bundle. The arguments are the same as on Windows.
 
 ## Related documents
 

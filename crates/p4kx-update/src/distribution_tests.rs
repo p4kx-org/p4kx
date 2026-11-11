@@ -38,3 +38,50 @@ fn unknown_malformed_and_oversized_identity_uses_the_page_fallback() {
         assert_eq!(Distribution::parse(&bytes, platform), None);
     }
 }
+
+#[test]
+fn a_relocated_macos_bundle_uses_resources_for_every_application()
+-> Result<(), Box<dyn std::error::Error>> {
+    use std::fs;
+
+    let temporary = tempfile::tempdir()?;
+    let contents = temporary.path().join("Relocated P4KX.app/Contents");
+    let macos = contents.join("MacOS");
+    let resources = contents.join("Resources");
+    fs::create_dir_all(&macos)?;
+    fs::create_dir_all(&resources)?;
+    let platform = Platform {
+        os: OperatingSystem::Macos,
+        arch: Architecture::Arm64,
+    };
+    let expected = Some(Distribution {
+        platform,
+        package: crate::PackageKind::Dmg,
+    });
+    let identity = resources.join("p4kx-distribution.json");
+    fs::write(
+        &identity,
+        br#"{"target":"aarch64-apple-darwin","package":"dmg"}"#,
+    )?;
+    for name in ["p4kx", "p4kx-gui", "p4kx-mcp"] {
+        let executable = macos.join(name);
+        fs::write(&executable, b"synthetic executable")?;
+        assert_eq!(
+            Distribution::for_executable(&executable, platform),
+            expected
+        );
+        #[cfg(unix)]
+        {
+            let alias = temporary.path().join(name);
+            std::os::unix::fs::symlink(&executable, &alias)?;
+            assert_eq!(Distribution::for_executable(&alias, platform), expected);
+        }
+    }
+
+    fs::rename(&identity, macos.join("p4kx-distribution.json"))?;
+    assert_eq!(
+        Distribution::for_executable(&macos.join("p4kx"), platform),
+        None
+    );
+    Ok(())
+}

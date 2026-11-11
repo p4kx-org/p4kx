@@ -215,11 +215,11 @@ fn a_package_check_keeps_the_page_and_selects_only_a_compatible_asset() -> TestR
 #[test]
 fn malformed_package_metadata_retains_the_release_page_fallback() -> TestResult {
     let platform = p4kx_update::Platform::current().ok_or("unsupported test platform")?;
-    let package = if platform.os == p4kx_update::OperatingSystem::Windows {
-        p4kx_update::PackageKind::Msi
-    } else {
-        p4kx_update::PackageKind::TarGz
-    };
+    let row = p4kx_update::supported_targets()?
+        .into_iter()
+        .find(|row| row.platform() == platform)
+        .ok_or("missing native target")?;
+    let package = *row.packages.first().ok_or("missing native package")?;
     for assets in [
         serde_json::Value::Null,
         serde_json::json!({"malformed":true}),

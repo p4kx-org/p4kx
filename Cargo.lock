@@ -3521,6 +3521,7 @@ dependencies = [
  "p4kx-search",
  "p4kx-settings",
  "p4kx-testkit",
+ "p4kx-update",
  "png",
  "predicates",
  "roxmltree",
@@ -3868,6 +3869,7 @@ dependencies = [
  "p4kx-extraction",
  "p4kx-settings",
  "p4kx-testkit",
+ "p4kx-update",
  "rayon",
  "rmcp",
  "schemars",
@@ -4029,6 +4031,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.21",
  "ureq",
 ]
