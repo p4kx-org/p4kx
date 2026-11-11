@@ -25,8 +25,8 @@ if ($files.Count -ne 1 -or $files[0].LinkType -or
 }
 Invoke-P4kxMacTool /bin/chmod @('755', $files[0].FullName) | Out-Null
 $actual = @(Invoke-P4kxMacTool $files[0].FullName @('cyclonedx', '--version'))
-if ($actual.Count -ne 1 -or $actual[0] -cnotmatch ('^(?:cargo[- ]cyclonedx|cyclonedx) ' + [regex]::Escape($version) + '$')) {
-    throw 'Unexpected CycloneDX host tool version.'
+if ($actual.Count -ne 1 -or $actual[0] -cne "cargo-cyclonedx-cyclonedx $version") {
+    throw "Unexpected CycloneDX host tool version: $($actual -join ' | ')"
 }
 if (-not $env:GITHUB_PATH) { throw 'The macOS packaging tool requires a GitHub path file.' }
 $files[0].DirectoryName | Add-Content -LiteralPath $env:GITHUB_PATH -Encoding utf8NoBOM
