@@ -27,8 +27,6 @@ pub const MAX_IMPORTED_FONTS: usize = 256;
 /// Entry size and the uncompressed length its header declares, checked before it is decompressed.
 pub const MAX_IMPORT_BYTES: u64 = 256 << 20;
 
-const MAX_CANDIDATES: usize = 2;
-
 /// Why an import of a font could not be resolved.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ImportIssue {
@@ -246,7 +244,7 @@ impl Resolver<'_> {
         if let Some(found) = self.found.get(&key) {
             return found.clone();
         }
-        let found = candidates(self.archive, url, folder, self.language, MAX_CANDIDATES);
+        let found: Vec<_> = candidates(self.archive, url, folder, self.language).collect();
         self.found.insert(key, found.clone());
         found
     }
@@ -338,9 +336,9 @@ impl UiMovie<'_> {
         match self.origin() {
             Origin::Entry(archive) => {
                 let language = self.font_language();
-                let entry = candidates(archive, url, folder_of(self.name()), language, 1)
-                    .first()
-                    .and_then(|&at| archive.entries().get(at))
+                let entry = candidates(archive, url, folder_of(self.name()), language)
+                    .next()
+                    .and_then(|at| archive.entries().get(at))
                     .ok_or_else(|| UnknownEntries(vec![url.to_owned()]))?;
                 UiMovie::from_archive(archive, entry.path())
             }
