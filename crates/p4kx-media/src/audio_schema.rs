@@ -27,6 +27,8 @@ use crate::{MediaError, schema_merge};
 mod hirc;
 #[path = "audio_schema_music.rs"]
 mod music;
+#[path = "audio_schema_state.rs"]
+mod state;
 #[path = "audio_schema_wem.rs"]
 mod wem;
 
@@ -162,7 +164,8 @@ fn insert_audio_payloads(base: &mut Value) -> Result<(), MediaError> {
         LOOSE_INVENTORY,
         schema_merge::serialized_payload::<LooseInventoryPayload<'static>>(),
     )?;
-    music::insert_payload(base)
+    music::insert_payload(base)?;
+    state::insert_payload(base)
 }
 
 pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
@@ -183,6 +186,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             .chain(bank_bindings().iter())
             .chain(hirc::bindings().iter())
             .chain(music::bindings().iter())
+            .chain(state::bindings().iter())
             .chain(std::iter::once(&BANK_FAILURE_BINDING))
             .chain(stid_bindings().iter())
             .chain(event_bindings().iter())

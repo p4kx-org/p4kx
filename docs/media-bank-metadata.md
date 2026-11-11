@@ -30,6 +30,15 @@ and fallback selection.
 | `audio-bank-hirc-sound-media-candidate` | `bank-hirc-sound-media-candidate` | HIRC section, Sound object and candidate ordinals |
 | `audio-bank-hirc-sound-loose-wem-resolution` | `bank-hirc-sound-loose-wem-resolution` | Physical loose WEM candidates in the Sound's owning Archive |
 | `audio-bank-hirc-sound-loose-wem-candidate` | `bank-hirc-sound-loose-wem-candidate` | Physical Entry ordinal of one canonical loose WEM observation |
+| `audio-bank-hirc-state` | `bank-hirc-state` | HIRC section and standalone State object ordinals |
+| `audio-bank-hirc-state-property` | `bank-hirc-state-property` | HIRC section, State object and property ordinals |
+| `audio-bank-hirc-inline-state` | `bank-hirc-inline-state` | HIRC section and Sound object ordinals |
+| `audio-bank-hirc-inline-state-binding-count` | `bank-hirc-inline-state-binding-count` | HIRC section and Sound object ordinals |
+| `audio-bank-hirc-inline-state-binding` | `bank-hirc-inline-state-binding` | HIRC section, Sound object and binding ordinals |
+| `audio-bank-hirc-inline-state-group-count` | `bank-hirc-inline-state-group-count` | HIRC section and Sound object ordinals |
+| `audio-bank-hirc-inline-state-group` | `bank-hirc-inline-state-group` | HIRC section, Sound object and group ordinals |
+| `audio-bank-hirc-inline-state-entry` | `bank-hirc-inline-state-entry` | HIRC section, Sound object, group and State ordinals |
+| `audio-bank-hirc-inline-state-property` | `bank-hirc-inline-state-property` | HIRC section, Sound object, group, State and property ordinals |
 | `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
 | `audio-bank-music-segment` | `bank-music-segment` | HIRC section and segment object ordinals |
@@ -128,6 +137,21 @@ Candidate rows preserve directory order and duplicate paths. The inventory row p
 path and language placement, export selection and payload access. The reference describes
 physical candidates. A playback choice depends on the selected language and fallback rule.
 
+
+Standalone State layouts are decoded for versions 128 through 145. The summary reports the
+checked property bundle and the remaining opaque body range. Each property retains its
+original ordinal, raw ID and IEEE-754 word with separate source ranges. The optional numeric
+interpretation is null for non-finite words. Repeated and unknown IDs retain their own rows.
+Other standalone versions report `unsupported` and retain the original body. A malformed
+supported bundle reports `malformed` in diagnostics.
+
+Version 154 Sound inline State reports a checked State region when present. Binding and group
+counts have their own original variable-length field ranges. Ordered rows preserve authored
+binding IDs and raw flags, group IDs and synchronization bytes, State IDs and property
+bundles. A Sound with no node reports `absent`. A malformed earlier region reports
+`unavailable`. A checked State region remains available in diagnostics if a following
+Sound field is malformed. The separate Sound and raw object rows retain their own
+coverage. RTPC data and inline State outside this Sound layout remain outside these typed rows.
 
 Container rows preserve the version 154 Random, Sequence, Switch and Blend layout, original
 parent ID and declared child count. The Random/Sequence row carries the original mode byte.

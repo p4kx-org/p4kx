@@ -11,10 +11,11 @@ use crate::audio_bank_failure::BankPhase;
 use crate::audio_bank_inventory::{BankInventory, VersionSite};
 use crate::audio_bank_payload::{BankEntryRange, BankHircRecord, BankObjectRecord, BankPayload};
 use crate::audio_bank_projection::BankProjection;
+use crate::audio_bank_state::{self, StateProjection};
 use crate::{
     MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource, audio_bank_hirc_action,
     audio_bank_hirc_container, audio_bank_hirc_event, audio_bank_hirc_origins,
-    audio_bank_hirc_sound,
+    audio_bank_hirc_sound, audio_bank_inline_state,
 };
 use crate::{
     audio_bank_music_playlist, audio_bank_music_segment, audio_bank_music_switch,
@@ -44,7 +45,7 @@ pub(crate) fn project<R: Read + Seek>(
     });
     loop {
         let next = match header {
-            Some(header) => hierarchy.next_semantic(header),
+            Some(header) => hierarchy.next_semantic_with_states(header),
             None => hierarchy
                 .next()
                 .map(|result| result.map(BankHircSemantic::Raw)),
@@ -116,6 +117,20 @@ fn emit_semantic<R: Read + Seek>(
             &inventory.didx_entries,
             writer,
         ),
+        (BankHircSemantic::SoundWithStates { sound, states }, Some(version)) => {
+            audio_bank_hirc_sound::project(
+                projection,
+                version,
+                &sound,
+                &inventory.didx_entries,
+                writer,
+            )?;
+            let state = StateProjection::new(projection.input, &sound.object, version);
+            audio_bank_inline_state::project(projection, &state, states, writer)
+        }
+        (BankHircSemantic::State(state), Some(version)) => {
+            audio_bank_state::project(projection.input, version, state, writer)
+        }
         _ => Err(MediaError::Contract(
             "HIRC semantics have no observed bank version".into(),
         )),

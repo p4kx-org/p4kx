@@ -4,7 +4,7 @@
 use std::io::{Read, Seek};
 
 use crate::bank_inline_state_rows::BankInlineStateRows;
-use crate::bank_source_sound::{self, BankSoundRead};
+use crate::bank_source_sound::{self, BankHircSound, BankSoundRead};
 use crate::hirc_source::NODE_BASE_VERSION;
 use crate::{BankError, BankObservedHeader, BankReadError, HircKind};
 
@@ -65,21 +65,26 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                     return Some(Err(cause));
                 }
             };
-            let extent = sound
-                .fields
-                .node
-                .and_then(|node| node.base)
-                .and_then(|base| base.state_chunk);
-            match (extent, sound.status) {
-                (Some(range), _) => {
-                    BankSoundStateRead::Readable(BankInlineStateRows::new(self.input, range))
-                }
-                (None, BankSoundRead::Decoded(_)) => BankSoundStateRead::Absent,
-                (None, BankSoundRead::Malformed(error) | BankSoundRead::Unsupported(error)) => {
-                    BankSoundStateRead::Unavailable(error)
-                }
-            }
+            self.sound_state_read(&sound)
         };
         Some(Ok(BankHircSoundStates { object, status }))
+    }
+
+    pub(super) fn sound_state_read(&mut self, sound: &BankHircSound) -> BankSoundStateRead<'_, R> {
+        let extent = sound
+            .fields
+            .node
+            .as_ref()
+            .and_then(|node| node.base.as_ref())
+            .and_then(|base| base.state_chunk.as_ref());
+        match (extent, &sound.status) {
+            (Some(range), _) => {
+                BankSoundStateRead::Readable(BankInlineStateRows::new(self.input, range.clone()))
+            }
+            (None, BankSoundRead::Decoded(_)) => BankSoundStateRead::Absent,
+            (None, BankSoundRead::Malformed(error) | BankSoundRead::Unsupported(error)) => {
+                BankSoundStateRead::Unavailable(error.clone())
+            }
+        }
     }
 }

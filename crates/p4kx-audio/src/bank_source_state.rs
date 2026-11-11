@@ -53,6 +53,18 @@ impl<R: Read + Seek> BankHirc<'_, R> {
             Ok(object) => object,
             Err(cause) => return Some(Err(cause)),
         };
+        let result = self.state(object, version);
+        if result.is_err() {
+            self.stopped = true;
+        }
+        Some(result)
+    }
+
+    pub(super) fn state(
+        &mut self,
+        object: BankHircObject,
+        version: u32,
+    ) -> Result<BankHircState, BankReadError> {
         let status = if object.kind(version) != HircKind::State {
             BankStateRead::NotState
         } else if !hirc_state::supports_standalone(version) {
@@ -67,12 +79,9 @@ impl<R: Read + Seek> BankHirc<'_, R> {
             match hirc_state::read_object(&mut fields, 0) {
                 Ok(state) => BankStateRead::Decoded(state),
                 Err(BankReadError::Format(cause)) => BankStateRead::Malformed(cause),
-                Err(cause) => {
-                    self.stopped = true;
-                    return Some(Err(cause));
-                }
+                Err(cause) => return Err(cause),
             }
         };
-        Some(Ok(BankHircState { object, status }))
+        Ok(BankHircState { object, status })
     }
 }
