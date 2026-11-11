@@ -169,8 +169,23 @@ $env:P4KX_DATA_P4K_B = 'C:\Program Files\Roberts Space Industries\StarCitizen\PT
 cargo test --release --workspace --locked -- --ignored
 ```
 
-The Archive is only read. The extracted subset goes to a temporary folder below `TMP`, which is
-removed afterwards. `CLAUDE.md` describes the test layout, the differential tests against unp4k,
+On Linux, set the Archive path to the actual host path of `Data.p4k`, including any Wine or
+Proton prefix components. Use an absolute private directory for temporary files. This PowerShell
+example runs the Extraction crate's ignored Archive suite on the native Linux host.
+
+```powershell
+$env:P4KX_DATA_P4K = '/path/to/prefix/drive_c/Games/StarCitizen/LIVE/Data.p4k'
+$env:TMPDIR = '/absolute/path/to/private/test-scratch'
+New-Item -ItemType Directory -Force -Path $env:TMPDIR | Out-Null
+cargo test --release --locked -p p4kx-extraction --test real_archive -- --ignored
+```
+
+The stored key follows the [platform profile](docs/profile-folders.md), including an explicit
+`P4KX_FOLDERS_ROOT`. This command also accepts the named key-file and key environment sources
+described above.
+
+The Archive is only read. The extracted subset goes below `TMP` on Windows or `TMPDIR` on Linux
+and is removed afterwards. `CLAUDE.md` describes the test layout, the differential tests against unp4k,
 unforge and StarBreaker ([docs/differential-verification.md](docs/differential-verification.md))
 and how to run a single real-Archive test.
 

@@ -11,7 +11,11 @@ publish.workspace = true
 [package.metadata.p4kx]
 layer = "foundation"
 
+[features]
+platform-folders = ["dep:dirs"]
+
 [dependencies]
+dirs = { workspace = true, optional = true }
 thiserror.workspace = true
 
 [lints]

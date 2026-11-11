@@ -17,13 +17,12 @@ assert_cmd.workspace = true
 cbc.workspace = true
 crc32c.workspace = true
 crc32fast.workspace = true
-dirs.workspace = true
 flate2.workspace = true
 gltf = { workspace = true, features = ["KHR_lights_punctual", "names"] }
 half.workspace = true
 lzma-rs.workspace = true
 opus-pure.workspace = true
-p4kx-foundation.workspace = true
+p4kx-foundation = { workspace = true, features = ["platform-folders"] }
 png.workspace = true
 ruzstd.workspace = true
 sha2.workspace = true

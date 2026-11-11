@@ -3753,6 +3753,7 @@ dependencies = [
 name = "p4kx-foundation"
 version = "0.4.2"
 dependencies = [
+ "dirs",
  "thiserror 2.0.21",
 ]
 
@@ -3995,7 +3996,6 @@ dependencies = [
  "cbc",
  "crc32c",
  "crc32fast",
- "dirs",
  "flate2",
  "gltf",
  "half",

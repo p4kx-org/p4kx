@@ -5,12 +5,16 @@
 
 use std::error::Error;
 use std::fs;
+use std::io::Read as _;
 use std::path::Path;
 
+use p4kx_archive::Archive;
 use p4kx_channels::{DiscoveryLimits, SearchPaths, SearchRecipe, WineEnvironment};
-use p4kx_testkit::write_build_manifest;
+use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key, write_build_manifest};
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+const PAYLOAD: &[u8] = b"synthetic Wine Archive Entry";
 
 #[test]
 fn a_mixed_case_wine_profile_yields_the_real_channel_and_same_scan_patch() -> TestResult {
@@ -22,7 +26,7 @@ fn a_mixed_case_wine_profile_yields_the_real_channel_and_same_scan_patch() -> Te
     let logs = prefix.join("DrIvE_C/UsErS/Tester/AppDaTa/RoAmInG/RSILauncher/LoGs");
     fs::create_dir_all(&channel)?;
     fs::create_dir_all(&logs)?;
-    fs::write(channel.join("Data.p4k"), b"")?;
+    write_archive(&channel.join("Data.p4k"))?;
     write_build_manifest(
         &channel,
         "sc-alpha-5.0.0",
@@ -58,6 +62,7 @@ fn a_mixed_case_wine_profile_yields_the_real_channel_and_same_scan_patch() -> Te
         &channel.join("Data.p4k"),
         &prefix.join("drive_c/Games/StarCitizen/PTU/Data.p4k"),
     )?;
+    assert_archive_payload(found.archive())?;
     assert_eq!(
         found.build().ok_or("PTU build")?.public_patch(),
         Some("5.0.0"),
@@ -68,6 +73,23 @@ fn a_mixed_case_wine_profile_yields_the_real_channel_and_same_scan_patch() -> Te
         Some("5.0.0"),
         "all consumers receive the same map"
     );
+    Ok(())
+}
+
+fn write_archive(path: &Path) -> TestResult {
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data\\fixture.bin", PAYLOAD.to_vec()).encrypted())
+        .write_to(path)?;
+    Ok(())
+}
+
+fn assert_archive_payload(path: &Path) -> TestResult {
+    let archive = Archive::open_with_key(path, Some(test_key()))?;
+    let entry = archive.entries().first().ok_or("synthetic Archive Entry")?;
+    assert!(entry.is_encrypted(), "the fixture exercises key use");
+    let mut payload = Vec::new();
+    archive.open_entry(entry)?.read_to_end(&mut payload)?;
+    assert_eq!(payload, PAYLOAD, "the detected Archive can be decoded");
     Ok(())
 }
 
