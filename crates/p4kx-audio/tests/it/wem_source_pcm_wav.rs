@@ -148,6 +148,68 @@ fn seekable_pcm_wav_keeps_codec_and_physical_io_failures_distinct() -> TestResul
     Ok(())
 }
 
+#[test]
+fn seekable_adpcm_wav_keeps_legacy_output_and_reads_only_decodable_blocks() -> TestResult {
+    const IMA_BLOCK: usize = 0x48;
+    const IMA_BLOCKS: usize = 1_024;
+    const PT_BLOCK: usize = 0x104;
+    for (codec, channels, block, original, consumed, frames) in [
+        (
+            TestCodec::Tag(0x0002),
+            2,
+            IMA_BLOCK,
+            IMA_BLOCK * IMA_BLOCKS + 33,
+            IMA_BLOCK * IMA_BLOCKS + 32,
+            64 * IMA_BLOCKS + 24,
+        ),
+        (
+            TestCodec::Tag(0x8311),
+            1,
+            PT_BLOCK,
+            PT_BLOCK * 2 + 0x80,
+            PT_BLOCK * 2,
+            1_024,
+        ),
+    ] {
+        let input = TestWem::encoded(codec, channels, SAMPLE_RATE, 0)
+            .block_align(u16::try_from(block)?)
+            .data(vec![0; original])
+            .smpl_loop(0, 1, 2)
+            .tail_chunk(*b"data", [0xca, 0xfe])
+            .bytes();
+        let original = Wem::parse(input.as_slice())?;
+        let start = original.metadata().data_chunk().body_offset;
+        let mut source =
+            WemSource::open(MaxRead(Cursor::new(&input)), u64::try_from(input.len())?)?;
+        let mut inspected = source.inspect()?;
+        let planned = inspected.wav()?;
+        assert_eq!(
+            planned.source_range(),
+            start..start + u64::try_from(consumed)?,
+            "range includes every decoded block byte and excludes the unused tail"
+        );
+        let report = planned.report();
+        let mut actual = Vec::new();
+        planned.write(&mut actual)?;
+        let mut legacy = Vec::new();
+        assert_eq!(
+            original.write_wav(&mut legacy)?,
+            report,
+            "shared canonical WAV report"
+        );
+        assert_eq!(
+            actual, legacy,
+            "seekable conversion produces the same samples and metadata"
+        );
+        assert_eq!(
+            report.sample_count,
+            u64::try_from(frames)?,
+            "known complete and partial frame count"
+        );
+    }
+    Ok(())
+}
+
 struct MaxRead<R>(R);
 
 impl<R: Read> Read for MaxRead<R> {

@@ -77,27 +77,30 @@ retained BNK Entry. Counts and trailing lengths describe the individual WEM. In 
 receipts, WEM coordinates follow the two DIDX ordinals and keep their original WEM-local
 interpretation. Separate receipts identify the actual triplet, DATA extent and RIFF selection.
 
-## Optional PCM WAV output
+## Optional WAV output
 
 By default, the Audio provider retains the original bytes and writes the metadata above.
-Request PCM WAV conversion with the following command.
+Request 16-bit PCM WAV output with the following command.
 
     p4kx media export ARCHIVE --out DIR --kind audio --audio-format wav
 
-The provider writes 16-bit little-endian WAV from complete frames in the first selected
-PCM DATA chunk. It handles standalone WEMs and complete WEMs in an unambiguously resolved
-BNK DATA range. The WAV preserves the channel count, playback rate and applicable loop.
-Partial input frames and extra chunks stay in the raw artifact.
+The provider writes 16-bit little-endian WAV from PCM, IMA ADPCM and PTADPCM in the first
+selected DATA chunk. It handles standalone WEMs and complete WEMs in an unambiguously resolved
+BNK DATA range. The WAV preserves the channel count, playback rate and applicable loop. PCM
+uses complete frames. IMA ADPCM also decodes a final block whose channel sub-blocks fit the
+original bytes. PTADPCM uses complete blocks. Unused tail bytes and extra chunks stay in the
+raw artifact.
 
 The `audio-wem-conversion` and `audio-bank-wem-conversion` namespaces contain one
 `wem-conversion` record per eligible occurrence. The `written` outcome records the
 requested and actual formats, source codec, decoded dimensions and loop, original
-half-open frame byte range, and verified artifact path, length and SHA-256. Embedded
+half-open range of consumed PCM frames or coded ADPCM blocks, and verified artifact path,
+length and SHA-256. Embedded
 ranges are absolute within the retained bank, with the DIDX section and triplet as
 subresource indices. Equal WAV bytes can share one file, while the conversion rows and
 artifact-manifest occurrences retain their own physical source uses and encryption markers.
 
-A complete WEM whose codec cannot produce WAV receives an `unsupported-codec` conversion
+A complete WEM outside the provider's WAV codec coverage receives an `unsupported-codec` conversion
 outcome. Normal export reports projection loss. A diagnostic generation retains the
 original source and the failure. Prefetch and opaque media retain their raw metadata.
 
@@ -115,7 +118,7 @@ budget failures still follow the shared generation error rules.
 
 Each record's immediate origin fields are in the generation's field-origin companion.
 Format values identify the selected original `fmt ` body. Derived frame counts identify
-the actual codec and count inputs, including the first `data` length for PCM.
+the actual codec and count inputs, including the first `data` length for PCM and supported ADPCM.
 Chunk positions and tags refer to the original traversed positions. Directory metadata
 such as `source.identity.entry.path` has independent provenance from the WEM payload.
 A malformed read may identify the physical input without a complete source-coordinate set.

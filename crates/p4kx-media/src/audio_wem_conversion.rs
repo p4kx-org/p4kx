@@ -37,7 +37,7 @@ pub(super) fn wav<R: Read + Seek>(
     inspected: &mut WemInspection<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let converted = match inspected.pcm_wav() {
+    let converted = match inspected.wav() {
         Ok(conversion) => Ok(Completed::write(projection, conversion, writer)?),
         Err(cause) => Err(cause),
     };
@@ -314,14 +314,23 @@ impl ArtifactEvidence {
         capture.include(&header, writer)?;
         if !source.is_empty() {
             let indices = [source.start, source.end];
-            let pcm = projection.capture(
+            let (namespace, field) = match metadata.codec() {
+                Codec::Pcm => ("wemPcmFrames", "originalSamples"),
+                Codec::ImaAdpcm | Codec::PtAdpcm => ("wemAdpcmBlocks", "originalBlocks"),
+                _ => {
+                    return Err(MediaError::Contract(
+                        "WAV preparation has no source encoding".into(),
+                    ));
+                }
+            };
+            let decoded = projection.capture(
                 [(
-                    OriginSite::new("wemPcmFrames", &indices, "originalSamples"),
+                    OriginSite::new(namespace, &indices, field),
                     SourceUseRole::Conversion,
                 )],
                 writer,
             )?;
-            capture.include(&pcm, writer)?;
+            capture.include(&decoded, writer)?;
         }
         Ok(Self {
             bytes: capture.finish(),

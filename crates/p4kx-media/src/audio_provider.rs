@@ -61,9 +61,13 @@ fn field_groups() -> Vec<FieldGroup> {
                 "pcm-wav-conversion",
                 "Requested WAV output from complete PCM WEMs, with source frame ranges and verified artifact mappings.",
             ),
+            FieldGroup::new(
+                "adpcm-wav-conversion",
+                "Requested WAV output from IMA ADPCM and PTADPCM, with exact consumed coded blocks and verified artifact mappings.",
+            ),
             FieldGroup::new_with_unsupported_projection(
                 "compressed-audio-conversion",
-                "Compressed WEM payloads remain available through exact retained ranges.",
+                "Other encoded WEM payloads remain available through exact retained ranges.",
             ),
         ])
         .collect()

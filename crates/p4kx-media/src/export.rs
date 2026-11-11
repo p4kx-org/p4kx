@@ -17,7 +17,7 @@ pub enum AudioOutput {
     /// Retains original bytes and metadata.
     #[default]
     Raw,
-    /// Writes complete 16-bit PCM WEM frames as WAV.
+    /// Writes 16-bit PCM WAV from PCM, IMA ADPCM or PTADPCM WEM data.
     Wav,
 }
 

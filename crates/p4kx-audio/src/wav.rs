@@ -71,7 +71,9 @@ impl<B: AsRef<[u8]>> Wem<B> {
         )?;
         let (header, report) = self.decoded_wav_header(layout.frames(self.data().len() as u64))?;
         out.write_all(&header).map_err(AudioError::Write)?;
-        layout.write_pcm(self.data(), self.byte_order(), out)?;
+        layout
+            .write_pcm(self.data(), self.byte_order(), &mut Vec::new(), out)
+            .map_err(AudioError::Write)?;
         Ok(report)
     }
 

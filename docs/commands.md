@@ -411,8 +411,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   original RIFF chunk ranges, cue and LIST annotations, and [soundbank metadata](media-bank-metadata.md)
   including typed Action, Event, Sound, container and music fields. Raw bytes and immediate
   field origins stay available.
-  Use `--audio-format wav` to add WAV artifacts for complete 16-bit PCM WEMs. The default
-  `raw` retains metadata and source bytes. Unsupported codec conversions prevent complete
+  Use `--audio-format wav` to add 16-bit PCM WAV artifacts from PCM, IMA ADPCM and PTADPCM
+  WEMs. The default `raw` retains metadata and source bytes. Unsupported codec conversions prevent complete
   publication. A diagnostic generation can retain the original source and conversion failure.
   A known kind without a provider
   fails explicitly. Incomplete diagnostic generations remain separate from the complete root

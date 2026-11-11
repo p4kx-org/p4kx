@@ -14,6 +14,8 @@ use serde_json::json;
 
 use super::{layout_health, support};
 
+#[path = "audio_wem_adpcm_conversion.rs"]
+mod adpcm_conversion;
 #[path = "audio_bank_embedded_wem.rs"]
 mod embedded;
 #[path = "audio_wem_annotations_fixture.rs"]

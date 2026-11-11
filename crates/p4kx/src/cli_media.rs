@@ -75,7 +75,7 @@ pub(crate) struct MediaExportArgs {
     /// Retains incomplete projections as diagnostic generations; they never replace a complete index.
     #[arg(long)]
     pub(crate) diagnostic: bool,
-    /// Keep raw audio metadata or add WAV artifacts from complete PCM WEMs.
+    /// Keep raw audio metadata or add WAV artifacts from PCM, IMA ADPCM and PTADPCM WEMs.
     #[arg(long = "audio-format", value_enum, default_value_t = MediaAudioFormat::Raw)]
     pub(crate) audio_format: MediaAudioFormat,
     /// Resource limits applied before the next unit of work.
