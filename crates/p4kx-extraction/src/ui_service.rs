@@ -11,6 +11,8 @@ pub(crate) mod ui_extract;
 mod ui_extract_diagnostics;
 #[path = "ui_extract_evidence.rs"]
 pub(crate) mod ui_extract_evidence;
+#[path = "ui_font_sources.rs"]
+pub(crate) mod ui_font_sources;
 #[path = "ui_jobs.rs"]
 pub(crate) mod ui_jobs;
 #[path = "ui_json_fields.rs"]
@@ -23,6 +25,10 @@ pub(crate) mod ui_movie_evidence;
 mod ui_render_bitmap_sources;
 #[path = "ui_render_geometry.rs"]
 mod ui_render_geometry;
+#[path = "ui_render_glyph_sources.rs"]
+mod ui_render_glyph_sources;
+#[path = "ui_render_localization.rs"]
+mod ui_render_localization;
 
 pub use ui_extract::{
     ObservedUiExtraction, UiAssetFailure, UiAssetKind, UiExtraction, WrittenUiAsset,
@@ -30,3 +36,5 @@ pub use ui_extract::{
 pub use ui_movie::{MAX_UI_MOVIE_LEN, UiMovie};
 pub use ui_movie_evidence::{UiMovieEvidence, UiSourceSite};
 pub use ui_render_bitmap_sources::{UiRenderBitmapSources, UiRenderedBitmap};
+pub use ui_render_glyph_sources::UiRenderedGlyph;
+pub use ui_render_localization::UiRenderedLocalization;

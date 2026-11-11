@@ -66,6 +66,8 @@ pub struct SceneDrawOrigin {
     pub definition: Option<SceneDefinitionOrigin>,
     /// The shape in the composed scene, including glyph shapes.
     pub shape: usize,
+    /// Whether a successful localisation lookup supplied the drawn text.
+    pub localised: bool,
 }
 
 /// A composed mask and the source references of the drawings that form it.
@@ -131,6 +133,7 @@ impl SceneDrawOrigin {
         Self {
             placement: context.placement,
             definition: context.declaration,
+            localised: context.localised,
             shape,
         }
     }

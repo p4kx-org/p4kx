@@ -83,6 +83,7 @@ mod ui_import_support;
 mod ui_imports;
 mod ui_movie;
 mod ui_render;
+mod ui_render_text_sources;
 mod verification;
 
 mod texture_topology_complete;

@@ -100,7 +100,14 @@ impl UiMovieEvidence {
     ///
     /// Returns a source-evidence registration error.
     pub fn observe(movie: &UiMovie<'_>, uses: &SourceUses) -> Result<Self, SourceEvidenceError> {
-        let input = movie.source_input();
+        Self::of_input(movie.source_input(), *movie.movie().read_source(), uses)
+    }
+
+    pub(crate) fn of_input(
+        input: Option<SourceInput<'_>>,
+        read: MovieSource,
+        uses: &SourceUses,
+    ) -> Result<Self, SourceEvidenceError> {
         let source = uses.observe(input.unwrap_or(SourceInput::Unknown), InputScope::Payload)?;
         let mut result = Self {
             source,
@@ -111,7 +118,7 @@ impl UiMovieEvidence {
                 }
                 _ => InputScope::FileMetadata,
             },
-            read: *movie.movie().read_source(),
+            read,
             decoded_from: Vec::new(),
         };
         let read = result.read;

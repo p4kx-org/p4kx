@@ -32,6 +32,7 @@ const PASSWORD_CHAR: char = '*';
 pub(crate) struct Prepared {
     parsed: Parsed,
     issues: Vec<SkipReason>,
+    localised: bool,
 }
 
 /// The metrics and the drawing of one character.
@@ -69,6 +70,7 @@ impl Composer<'_> {
             plain(source)
         };
         let mut issues = Vec::new();
+        let mut localised = false;
         if parsed.truncated {
             issues.push(SkipReason::TextTruncated);
         }
@@ -76,6 +78,7 @@ impl Composer<'_> {
             let plain_text: String = parsed.cells.iter().map(|cell| cell.ch).collect();
             if let Some(found) = reference(&plain_text) {
                 if let Some(template) = localise(found.key) {
+                    localised = true;
                     let style = parsed.cells.first().map_or(0, |cell| cell.style);
                     let replaced = plain(&fill(&template, &found.parameters));
                     if replaced.truncated && !issues.contains(&SkipReason::TextTruncated) {
@@ -101,7 +104,11 @@ impl Composer<'_> {
         if !self.charge_chars(placement, context, parsed.cells.len()) {
             return None;
         }
-        let prepared = Rc::new(Prepared { parsed, issues });
+        let prepared = Rc::new(Prepared {
+            parsed,
+            issues,
+            localised,
+        });
         self.text.prepared.insert(text.id, Rc::clone(&prepared));
         Some(prepared)
     }
@@ -129,7 +136,13 @@ impl Composer<'_> {
         let (items, resolved) = self.items(text, &prepared.parsed, &mut missing);
         let mut placed = Vec::new();
         layout(&items, &area(text), &mut placed);
-        self.draw_placed(placement, context, inner, &resolved, &placed);
+        self.draw_placed(
+            placement,
+            context,
+            inner.with_localisation(prepared.localised),
+            &resolved,
+            &placed,
+        );
         self.report_missing(placement, context, missing);
     }
 

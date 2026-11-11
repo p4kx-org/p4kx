@@ -46,12 +46,17 @@ pub(crate) struct Context {
     timeline: Option<usize>,
     placement: Option<usize>,
     declaration: Option<SceneDefinitionOrigin>,
+    localised: bool,
 }
 
 impl Context {
     /// Returns the context with another transform.
     pub(crate) const fn with_transform(self, transform: Affine) -> Self {
         Self { transform, ..self }
+    }
+
+    pub(crate) const fn with_localisation(self, localised: bool) -> Self {
+        Self { localised, ..self }
     }
 }
 
@@ -154,6 +159,7 @@ impl<'b> Composer<'b> {
             timeline: None,
             placement: None,
             declaration: None,
+            localised: false,
         };
         composer.timeline(&assets.timeline.first_frame, root);
         composer

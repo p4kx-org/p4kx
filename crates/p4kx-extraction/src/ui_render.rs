@@ -14,6 +14,7 @@ use crate::texture_parts::is_same_file;
 use crate::ui_imports::{ImportReport, ImportedFonts, resolve_fonts};
 use crate::ui_movie::Origin;
 use crate::ui_render_bitmaps::FrameBitmaps;
+use crate::ui_service::ui_font_sources::FrameFonts;
 use crate::{ConversionError, UiMovie};
 
 /// The pixels the decoded bitmaps of one rendered frame may hold together, granted in ascending
@@ -48,6 +49,7 @@ pub struct UiRender {
 pub(crate) struct ComposedFrame<'archive> {
     pub(crate) scene: Scene,
     pub(crate) origins: Option<SceneOrigins>,
+    pub(crate) fonts: FrameFonts<'archive>,
     pub(crate) bitmaps: FrameBitmaps<'archive>,
     pub(crate) tag_failures: Vec<TagFailure>,
     pub(crate) imports: ImportReport,
@@ -114,7 +116,7 @@ impl<'archive> UiMovie<'archive> {
         };
         let imported = match self.origin() {
             Origin::Entry(archive) => {
-                resolve_fonts(archive, self.name(), &assets, self.font_language())
+                resolve_fonts(archive, self.name(), &assets, self.font_language(), observe)
             }
             Origin::File(_) => ImportedFonts::default(),
         };
@@ -138,6 +140,7 @@ impl<'archive> UiMovie<'archive> {
         Ok(ComposedFrame {
             scene,
             origins,
+            fonts: FrameFonts::new(assets.fonts.len(), imported.sources),
             bitmaps,
             tag_failures: std::mem::take(&mut assets.failures),
             imports: imported.report,
