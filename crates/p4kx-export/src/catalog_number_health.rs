@@ -8,7 +8,8 @@ use crate::catalog_number_capture::{CapturedNumber, FloatToken, NumberOccurrence
 use crate::catalog_read::original::ExampleBodyReceipt;
 use crate::catalog_row::CatalogRows;
 use crate::catalog_target_index::TargetIndex;
-use crate::export_ledger::SourceObservation;
+use crate::export_diagnostic::ExportSourceRole;
+use crate::export_ledger::{SourceDisposition, SourceObservation};
 use crate::resource_raw_policy::ResourceNumberContract;
 use crate::selection::Kind;
 use crate::template_number_capture::TemplateNumbers;
@@ -69,12 +70,12 @@ struct RecordNumbers<'source> {
 pub(crate) struct NumberCaptures<'source> {
     records: BTreeMap<u32, RecordNumbers<'source>>,
     templates: BTreeMap<u32, Vec<&'source TemplateNumbers>>,
+    recovery: BTreeMap<u32, BTreeMap<&'source str, &'source CapturedNumber>>,
 }
 
 impl<'source> NumberCaptures<'source> {
     pub(crate) fn new(rows: Option<&'source CatalogRows>, targets: Option<&TargetIndex>) -> Self {
         let mut records = BTreeMap::<u32, RecordNumbers<'source>>::new();
-        let mut templates = BTreeMap::<u32, Vec<&TemplateNumbers>>::new();
         if let (Some(rows), Some(targets)) = (rows, targets) {
             for number in &rows.numbers {
                 let actual = &number.value;
@@ -124,16 +125,16 @@ impl<'source> NumberCaptures<'source> {
                     }
                 }
             }
-            for template in &rows.template_numbers {
-                if let (Some(index), Some(kind)) =
-                    (template.record_index(), template.emitted_kind())
-                    && targets.emitted.contains(&(kind, index))
-                {
-                    templates.entry(index).or_default().push(template);
-                }
-            }
         }
-        Self { records, templates }
+        Self {
+            records,
+            templates: rows
+                .zip(targets)
+                .map_or_else(BTreeMap::new, |(rows, targets)| {
+                    emitted_templates(rows, targets)
+                }),
+            recovery: recovery_numbers(rows),
+        }
     }
 
     pub(crate) fn for_source(
@@ -141,6 +142,12 @@ impl<'source> NumberCaptures<'source> {
         source: &SourceObservation,
     ) -> Result<Coverage<'_, 'source>, ExportAccountingError> {
         let mut coverage = self.for_record(source.record_index, source.kind);
+        if source.kind.is_none()
+            && source.role == ExportSourceRole::Dependency
+            && source.disposition == SourceDisposition::Projected
+        {
+            coverage.recovery = self.recovery.get(&source.record_index);
+        }
         for template in self
             .templates
             .get(&source.record_index)
@@ -165,10 +172,37 @@ impl<'source> NumberCaptures<'source> {
             kind,
             available: self.records.get(&record_index),
             template: None,
+            recovery: None,
             consumed_named: BTreeSet::new(),
             consumed_owned: BTreeSet::new(),
         }
     }
+}
+
+fn emitted_templates<'source>(
+    rows: &'source CatalogRows,
+    targets: &TargetIndex,
+) -> BTreeMap<u32, Vec<&'source TemplateNumbers>> {
+    let mut templates = BTreeMap::<u32, Vec<&TemplateNumbers>>::new();
+    for template in &rows.template_numbers {
+        if let (Some(index), Some(kind)) = (template.record_index(), template.emitted_kind())
+            && targets.emitted.contains(&(kind, index))
+        {
+            templates.entry(index).or_default().push(template);
+        }
+    }
+    templates
+}
+
+fn recovery_numbers(rows: Option<&CatalogRows>) -> BTreeMap<u32, BTreeMap<&str, &CapturedNumber>> {
+    let mut records = BTreeMap::<u32, BTreeMap<&str, &CapturedNumber>>::new();
+    for number in rows.into_iter().flat_map(|rows| &rows.recovery_numbers) {
+        records
+            .entry(number.record_index)
+            .or_default()
+            .insert(&number.field, number);
+    }
+    records
 }
 
 /// Fresh consumption state for one actual source role and physical Record.
@@ -177,6 +211,7 @@ pub(crate) struct Coverage<'index, 'source> {
     kind: Option<Kind>,
     available: Option<&'index RecordNumbers<'source>>,
     template: Option<&'source BTreeMap<u64, CapturedNumber>>,
+    recovery: Option<&'index BTreeMap<&'source str, &'source CapturedNumber>>,
     consumed_named: BTreeSet<&'source str>,
     consumed_owned: BTreeSet<u64>,
 }
@@ -185,6 +220,15 @@ impl Coverage<'_, '_> {
     pub(crate) fn take(&mut self, required: &NumberRequirement) -> bool {
         if required.record_index != self.record_index {
             return false;
+        }
+        if let Some(values) = self.recovery {
+            return values
+                .get_key_value(required.field.as_str())
+                .is_some_and(|(field, actual)| {
+                    scalar_matches(required, actual)
+                        && matches!(actual.occurrence, NumberOccurrence::NamedField)
+                        && self.consumed_named.insert(*field)
+                });
         }
         if let Some(values) = self.template {
             let actual = values.get(&required.original_ordinal);

@@ -136,14 +136,18 @@ fn assemble<R>(
     )?);
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
     let Recovery {
-        rules,
+        economy: item_recovery_economy,
+        overrides: item_recovery_overrides,
+        policy: item_recovery_policy,
+        numbers: recovery_numbers,
         failures,
         ledger,
-    } = read_recovery(&forge, &input, options.filter, options.cancel)?;
+    } = read_recovery(&forge, &projection, options.filter, options.cancel)?;
     collected.ledger.merge(ledger);
     collected.add_failures(failures);
     let kinds = collected.summary(options.filter.is_none());
-    let catalog_rows = crate::catalog_rows::snapshot(&collected, options.filter);
+    let mut catalog_rows = crate::catalog_rows::snapshot(&collected, options.filter);
+    catalog_rows.recovery_numbers = recovery_numbers;
     if collected
         .ledger
         .catalog_rows
@@ -299,6 +303,9 @@ fn assemble<R>(
         },
         configurations: crate::catalog_configurations::CatalogConfigurations {
             blueprint_tiers: blueprints.tiers,
+            item_recovery_economy,
+            item_recovery_overrides,
+            item_recovery_policy,
             durability: durability.health,
             degradation: durability.degradation,
             distortion: durability.distortion,
@@ -361,7 +368,6 @@ fn assemble<R>(
         contract_entity_spawns: collected.contract_entity_spawns,
         mission_property_sets: collected.mission_property_sets,
         ship_store_slugs: resolved.exported,
-        item_recovery: rules,
     };
     let output = emit(&catalog)?;
     Ok((

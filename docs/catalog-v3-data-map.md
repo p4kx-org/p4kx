@@ -60,7 +60,7 @@ dataforgeRecordHeader; genuine body paths, identity, selection and counts retain
 | #1077 | C.emp, C.quantumInterdiction, C.jumpDrives | all device modes/timing/state/trigger/resource fields, jammer/pulse distinct, jump-drive tuning/tunnel forces; separate quantum-drive/world endpoint owners |
 | #1078 | C.countermeasureEmitters, C.explosives, C.hackingChips | source signature profiles, capacity/restock, arming/fuse/sensors/triggers; damage/physics shared with Ammo; ordered duplicate chip values/tags/modifiers |
 | #1079 | T.publicNames, T.gameTexts, T.languageSources | all available supported languages once, exact keys, resolution policy/per-kind/per-key/per-language states and counters, separate public/protected reference domains with x-gameText closure; canonical maps replace duplicate old wire fields |
-| #1080 | C.itemRecoveryEconomy | distinct legacy direct-source and nested cooldown/delivery/repair fields, absent removed override stays absent; no aliases/baseTime formula |
+| #1080 | C.itemRecoveryEconomy, C.itemRecoveryOverrides, C.itemRecoveryPolicy | independent direct and nested economy fields, authored overrides and condition arrays, protected notification text |
 | #1081 | C.missionFlows[].actions | typed recursive MultipleActions and PickRandomAction, ordered entries/raw probability/ownerlocal weak links, strict unknown failure/depth/node cancellation |
 | #1082 | C.missionProperties[].value.autoSpawns | AutoSpawns target + Tags or schema-backed EntityDeclaration closet options, positive/negative lists, no legacy NPCSpawnDescriptions flattening |
 | #1083 | D.geologySets, D.geologyTextureSets, D.soils, D.soilTextureSets, D.shadingClasses, D.ecosystems | all listed layer/scalar/texture/audio blocks and declared graph, Entry identity/path; empty RTPC/switch arrays only establish presence/count, populated unknown diagnosed |
@@ -129,7 +129,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | contractEntitySpawns | V.entitySpawnPools; A.spawnOccurrences | source/content identities, no active spawned Entity claim |
 | missionPropertySets | A.missionPropertySets; A.contractPropertySetLinks | exact owner/location hash, all source declarations and selected Generator scope |
 | shipStoreSlugs | V.shipStoreSlugs | explicitly curated source, slugs/retired mapping, not Archive-authored |
-| itemRecovery | C.itemRecoveryEconomy; C.itemRecoveryOverrides | true global/override source generations, no nested/legacy alias |
+| itemRecovery | C.itemRecoveryEconomy, C.itemRecoveryOverrides, C.itemRecoveryPolicy | original economy generations, override groups, policy conditions and notification fields |
 | LocalisedText nested everywhere | source Locale/String at owner + T.publicNames/T.gameTexts | all languages and existing normalization rules without permanent duplicates |
 | ItemStats specialist blocks | family C tables | Weapon/Shield/Quantum/PowerPlant/Cooler/Missile/SuitArmor/Clothing/Radar/Tractor/WeaponModifier/MiningLaser/MiningModifier; exact old values move, no loss |
 | ItemStats shared Health/ResourceStates | C.durability/C.resourceComponents | independently available, old gate not transferred |

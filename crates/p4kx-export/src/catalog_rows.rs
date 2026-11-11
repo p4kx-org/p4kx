@@ -62,6 +62,7 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
         filter: filter.cloned(),
         numbers: numbers(collected),
         template_numbers: template_numbers(collected),
+        recovery_numbers: Vec::new(),
     }
 }
 

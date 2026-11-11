@@ -28,7 +28,6 @@ pub(crate) use crate::contract_mining::{
 pub(crate) use crate::contract_mining_params::MiningGlobalParams;
 pub(crate) use crate::contract_mission_data::{ContractScenario, MissionLocality, MissionType};
 pub(crate) use crate::contract_missions::ContractEntry;
-pub(crate) use crate::contract_recovery::ItemRecovery;
 pub(crate) use crate::contract_reputation::{
     FactionReputation, ReputationContext, ReputationScope, ReputationStanding,
 };
@@ -160,9 +159,6 @@ pub(crate) struct Catalog<'a> {
     /// The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered
     /// by `slug`. A curated list, not read from the Archive.
     pub(crate) ship_store_slugs: Vec<ShipStoreSlug<'a>>,
-    /// The item recovery rules, the multipliers the game applies to claims, `null` when the
-    /// Archive has no such Record. Not a kind.
-    pub(crate) item_recovery: Option<ItemRecovery<'a>>,
 }
 
 /// A text the game localises: its localisation key and the resolved English and German texts,

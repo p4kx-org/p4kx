@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The `itemRecovery` object of the Basetool catalog: which Record it takes, what an unreadable
-//! Record and a Filter do, and how odd values read.
+//! Selection, source state and link behavior of the canonical item-recovery tables.
 
 use crate::insurance_fixture::{
     BARE, INSURED, RECOVERY, RECOVERY_PATH, build_from, database, diagnostic_from, entity,
@@ -15,7 +14,9 @@ use p4kx_export::Filter;
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 use serde_json::{Value, json};
 
-type TestResult = Result<(), Box<dyn Error>>;
+use crate::health_origin_assertions as proof;
+
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const OTHER: u128 = 0x6000_0000_0000_4000_8000_0000_0000_0006;
 const BROKEN: u128 = 0x6000_0000_0000_4000_8000_0000_0000_0007;
@@ -35,7 +36,11 @@ fn failure_guids(built: &p4kx_export::BuiltCatalog) -> Vec<String> {
 fn an_archive_without_the_record_has_null_and_no_failure() -> TestResult {
     let forge = structures(DataForgeBuilder::new().version(8));
     let (built, catalog) = build_from(&forge, None)?;
-    assert_eq!(catalog["itemRecovery"], Value::Null);
+    assert_eq!(
+        economy_rows(&catalog)?,
+        &json!([]),
+        "no selected readable recovery row"
+    );
     assert_eq!(failure_guids(&built).len(), 0);
     Ok(())
 }
@@ -50,7 +55,11 @@ fn a_record_of_the_type_outside_the_policy_folder_is_not_selected() -> TestResul
         Vec::new(),
     ));
     let (_, catalog) = build_from(&forge, None)?;
-    assert_eq!(catalog["itemRecovery"], Value::Null);
+    assert_eq!(
+        economy_rows(&catalog)?,
+        &json!([]),
+        "no selected readable recovery row"
+    );
     Ok(())
 }
 
@@ -58,11 +67,19 @@ fn a_record_of_the_type_outside_the_policy_folder_is_not_selected() -> TestResul
 fn a_filter_that_excludes_the_record_gives_null_without_a_failure() -> TestResult {
     let excluding = Filter::new("*/spaceships/*");
     let (built, catalog) = build_from(&database(), Some(&excluding))?;
-    assert_eq!(catalog["itemRecovery"], Value::Null);
+    assert_eq!(
+        economy_rows(&catalog)?,
+        &json!([]),
+        "no selected readable recovery row"
+    );
     assert_eq!(failure_guids(&built).len(), 0);
     let including = Filter::new("*/entitlementpolicies/*");
     let (_, catalog) = build_from(&database(), Some(&including))?;
-    assert_eq!(catalog["itemRecovery"]["recordPath"], RECOVERY_PATH);
+    assert_eq!(
+        proof::at(recovery_row(&catalog)?, "/source/recordPath/value")?,
+        RECOVERY_PATH,
+        "the matching policy folder exposes its original recovery path"
+    );
     Ok(())
 }
 
@@ -84,9 +101,16 @@ fn of_several_records_the_smallest_record_path_wins() -> TestResult {
             Vec::new(),
         ));
     let (_, catalog) = build_from(&forge, None)?;
-    let recovery = &catalog["itemRecovery"];
-    assert_eq!(recovery["className"], "Alpha");
-    assert_eq!(recovery["claimCostMultiplier"].as_f64(), Some(0.25));
+    assert_eq!(
+        proof::at(recovery_row(&catalog)?, "/source/className/value")?,
+        "Alpha",
+        "record path order selects Alpha"
+    );
+    assert_eq!(
+        proof::at(legacy(&catalog)?, "/claimCostMultiplier/value/finite")?.as_f64(),
+        Some(0.25),
+        "selected Alpha multiplier remains exact"
+    );
     Ok(())
 }
 
@@ -109,7 +133,11 @@ fn broken_forge() -> DataForgeBuilder {
 #[test]
 fn an_unreadable_record_is_listed_as_a_failure_and_gives_null() -> TestResult {
     let (built, catalog) = diagnostic_from(&broken_forge(), None)?;
-    assert_eq!(catalog["itemRecovery"], Value::Null);
+    assert_eq!(
+        economy_rows(&catalog)?,
+        &json!([]),
+        "no selected readable recovery row"
+    );
     assert_eq!(
         failure_guids(&built),
         ["60000000-0000-4000-8000-000000000007"]
@@ -121,7 +149,11 @@ fn an_unreadable_record_is_listed_as_a_failure_and_gives_null() -> TestResult {
 fn an_unreadable_record_outside_the_filter_is_no_failure() -> TestResult {
     let filter = Filter::new("*/spaceships/*");
     let (built, catalog) = build_from(&broken_forge(), Some(&filter))?;
-    assert_eq!(catalog["itemRecovery"], Value::Null);
+    assert_eq!(
+        economy_rows(&catalog)?,
+        &json!([]),
+        "no selected readable recovery row"
+    );
     assert_eq!(failure_guids(&built).len(), 0);
     Ok(())
 }
@@ -163,22 +195,58 @@ fn odd_economy() -> DataForgeBuilder {
 }
 
 #[test]
-fn wrong_typed_and_missing_fields_of_the_economy_read_as_null() -> TestResult {
+fn invalid_missing_and_nonfinite_economy_fields_remain_distinct() -> TestResult {
+    assert!(
+        build_from(&odd_economy(), None).is_err(),
+        "invalid populated fields prevent normal publication"
+    );
     let (_, catalog) = diagnostic_from(&odd_economy(), None)?;
-    let recovery = &catalog["itemRecovery"];
-    assert_eq!(recovery["claimCostMultiplier"], Value::Null, "a text");
-    assert_eq!(recovery["globalBrickTimer"], Value::Null, "a boolean");
-    assert_eq!(recovery["scalingPriceFloor"], Value::Null, "not finite");
-    assert_eq!(recovery["maxExpeditedClaimCostMultiplier"], Value::Null);
-    assert_eq!(recovery["baseDeliveryTime"].as_f64(), Some(7.0), "integer");
-    assert_eq!(recovery["aUECperSecond"].as_f64(), Some(0.5), "double");
-    assert_eq!(recovery["escalatingClaimsParams"], Value::Null);
-    assert_eq!(recovery["overrides"], json!([]));
+    let recovery = legacy(&catalog)?;
+    assert_eq!(
+        recovery["claimCostMultiplier"]["state"], "invalid",
+        "a text"
+    );
+    assert_eq!(
+        recovery["globalBrickTimer"]["state"], "invalid",
+        "a boolean"
+    );
+    assert_eq!(
+        recovery["scalingPriceFloor"]["state"], "present",
+        "legal IEEE NaN"
+    );
+    assert_eq!(
+        recovery["scalingPriceFloor"]["value"]["finite"],
+        Value::Null,
+        "no finite projection"
+    );
+    assert_eq!(
+        recovery["maxExpeditedClaimCostMultiplier"]["state"],
+        "absent"
+    );
+    assert_eq!(
+        recovery["baseDeliveryTime"]["value"]["value"], 7,
+        "exact integer"
+    );
+    assert_eq!(
+        recovery["aUECperSecond"]["value"]["finite"].as_f64(),
+        Some(0.5),
+        "double"
+    );
+    assert_eq!(
+        proof::at(economy(&catalog)?, "/escalatingClaimsParams/state")?,
+        "absent",
+        "no declaration adds escalating claims"
+    );
+    assert_eq!(
+        proof::at(overrides(&catalog)?, "/state")?,
+        "absent",
+        "undeclared overrides remain absent"
+    );
     Ok(())
 }
 
 #[test]
-fn a_record_without_economy_params_has_every_number_null() -> TestResult {
+fn a_record_without_economy_params_keeps_explicit_absence() -> TestResult {
     let forge = DataForgeBuilder::new()
         .version(8)
         .structure(TestStruct::new("ItemRecoveryConfigurationParams"))
@@ -189,15 +257,19 @@ fn a_record_without_economy_params_has_every_number_null() -> TestResult {
             format!("{RECOVERY_PATH}.xml"),
         ));
     let (_, catalog) = build_from(&forge, None)?;
-    let recovery = &catalog["itemRecovery"];
-    assert_eq!(recovery["className"], "Bare");
-    assert_eq!(recovery["claimCostMultiplier"], Value::Null);
-    assert_eq!(recovery["overrides"], json!([]));
+    let recovery = recovery_row(&catalog)?;
+    assert_eq!(recovery["source"]["className"]["value"], "Bare");
+    assert_eq!(recovery["economyParams"]["state"], "absent");
+    assert_eq!(
+        proof::at(overrides(&catalog)?, "/state")?,
+        "absent",
+        "undeclared overrides remain absent"
+    );
     Ok(())
 }
 
 #[test]
-fn a_null_or_dangling_class_reference_is_left_out_of_its_group() -> TestResult {
+fn original_class_links_retain_null_and_dangling_slots() -> TestResult {
     let group = override_group(
         1.0,
         vec![
@@ -215,13 +287,20 @@ fn a_null_or_dangling_class_reference_is_left_out_of_its_group() -> TestResult {
         vec![group],
     ));
     let (_, catalog) = build_from(&forge, Some(&Filter::new("*/zzz")))?;
-    let classes = &catalog["itemRecovery"]["overrides"][0]["classGuids"];
+    let classes = proof::at(overrides(&catalog)?, "/value/0/value/classes/value")?;
     assert_eq!(
-        classes,
-        &json!([
-            "60000000-0000-4000-8000-000000000001",
-            "60000000-0000-4000-8000-000000000003"
-        ])
+        classes[0]["value"]["guid"]["value"],
+        "60000000-0000-4000-8000-000000000001"
+    );
+    assert_eq!(classes[1]["state"], "null");
+    assert_eq!(classes[2]["value"]["status"], "dangling");
+    assert_eq!(
+        classes[2]["value"]["guid"]["value"],
+        "60000000-0000-4000-8000-0000000000ff"
+    );
+    assert_eq!(
+        classes[3]["value"]["guid"]["value"],
+        "60000000-0000-4000-8000-000000000003"
     );
     Ok(())
 }
@@ -257,3 +336,31 @@ fn a_ship_without_insurance_parameters_has_every_field_null() -> TestResult {
     );
     Ok(())
 }
+
+fn economy_rows(catalog: &Value) -> TestResult<&Value> {
+    proof::at(catalog, "/configurations/itemRecoveryEconomy/rows")
+}
+
+pub(super) fn recovery_row(catalog: &Value) -> TestResult<&Value> {
+    proof::at(economy_rows(catalog)?, "/0")
+}
+
+pub(super) fn economy(catalog: &Value) -> TestResult<&Value> {
+    proof::at(recovery_row(catalog)?, "/economyParams/value")
+}
+
+pub(super) fn legacy(catalog: &Value) -> TestResult<&Value> {
+    proof::at(economy(catalog)?, "/legacy")
+}
+
+pub(super) fn overrides(catalog: &Value) -> TestResult<&Value> {
+    proof::at(
+        catalog,
+        "/configurations/itemRecoveryOverrides/rows/0/overrides",
+    )
+}
+
+#[path = "catalog_recovery_nested.rs"]
+mod nested;
+#[path = "catalog_recovery_policy.rs"]
+mod policy;

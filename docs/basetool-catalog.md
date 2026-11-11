@@ -253,7 +253,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `crafters` | The crafting stations (entities with a `CrafterComponentParams`) with the limits and accepted categories of their job queues, their crafting-time modifiers and the attach definition a port is matched against, ordered by GUID |
 | `shipStoreSlugs` | The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered by `slug` (curated data, ADR-0117) |
 | `craftingGlobal` | Not a kind: the global crafting parameters that apply to every dismantle |
-| `itemRecovery` | Not a kind: the item recovery multipliers and rates behind claims, with the override groups of entity classes, `null` without the Record; see "Item recovery rules" below |
+| `configurations.itemRecoveryEconomy`, `configurations.itemRecoveryOverrides` and `configurations.itemRecoveryPolicy` | The selected recovery policy's economy parameters and original override declarations. See [Item recovery rules](#item-recovery-rules). |
 
 An unfiltered kind with complete catalog-wide `exportHealth` lists its successfully read sources,
 so an import can use absence as removal evidence within that kind's selection policy. A partial
@@ -619,7 +619,7 @@ the Record, unchanged; the Basetool applies any scaling or rule of its own. The 
 placeholders, and are not exported.
 
 `expediteFee` is the only fee in aUEC the Archive holds for a ship; the multipliers that relate to
-claims are in `itemRecovery` (see "Item recovery rules"), which also states what the data does and
+claims are in the [item recovery configuration tables](#item-recovery-rules), which also state what the data does and
 does not say about a claim fee.
 
 On LIVE all 1,066 catalog ships carry `insurance`, each with a fee;
@@ -2512,44 +2512,73 @@ committed.
 
 ### Item recovery rules
 
-`itemRecovery` is one object, not a kind and not in `completeness`: the
-`ItemRecoveryConfigurationParams` Record `entitlementpolicies/globalitemrecovery` (LIVE has
-exactly one), its `economyParams` (ADR-0218, #323). The Record is selected by the rule of a kind:
-the type `ItemRecoveryConfigurationParams` under `libs/foundry/records/entitlementpolicies/`, and,
-with a Filter, a record path the Filter matches. `itemRecovery` is `null` when no Record is
-selected or none can be read. With several readable Records the one with the smallest record path
-is taken. A selected Record that cannot be read is left out and listed in the failures of the
-summary, like any other Record, so `null` with a failure means an unreadable Record and `null`
-without one means there is none. `guid`, `className` and `recordPath` name the Record. Every other
-field carries the data name of the `economyParams` field, as the Record states it, as a number;
-it is `null` when the Record states none or states a value that is no number:
+`configurations.itemRecoveryEconomy` and `configurations.itemRecoveryOverrides` contain the
+economy and override declarations of the selected physical policy. A policy is a readable
+`ItemRecoveryConfigurationParams` Record under `libs/foundry/records/entitlementpolicies/`
+whose Record path matches the Filter when one is set. When several readable policies qualify,
+the smallest Record path wins. Rows are empty when none qualifies, with unreadable selected
+Records listed in export health. Dataset availability measures the declared Record family.
+The economy row has a canonical Record header. The override and policy rows identify the
+same physical owner by Record index and GUID.
 
-| Field | LIVE |
-|-------|------|
-| `globalBrickTimer`, `baseReclaimTime`, `baseDeliveryTime`, `scalingPriceFloor` | 10, 0, 0, 0 |
-| `aUECperSecond`, `deliverySecondsPerAUEC`, `expeditedDeliverySecondsPerAUEC` | 1e-6, 1e-6, 5e-7 |
-| `claimCostMultiplier`, `maxExpeditedClaimCostMultiplier` | 0.003, 0.0003 |
-| `defaultLoadoutCooldownMultiplier`, `defaultLoadoutDeliveryTimeMultiplier`, `defaultLoadoutExpeditedDeliveryTimeMultiplier` | 200, 200, 100 |
-| `vehicleChassisRepairCostMultiplier`, `vehicleComponentRepairCostMultiplier`, `vehicleRepairMissingItemCostMultiplier` | 1, 1, 1 |
-| `flatMinimumDeliveryTimerSeconds` | 10 |
-| `escalatingClaimsParams` | `escalatingClaimChainLimit` 1 and the multipliers `escalationTimerMultiplier`, `escalatingClaimCostMultiplier`, `escalatingDeliveryTimerMultiplier`, all 1 |
-| `overrides` | 7 groups, see below |
+The economy row's `economyParams` holds sourced values with exact original coordinates.
+The `legacy` object retains the following fields only where they are authored directly in the
+economy source.
 
-An override (`overrides[]`, an `ItemRecoveryOverrideGroupDef`) holds `classGuids`, the `guid` of
-each `EntityClassDefinition` in the group's `classes` (a ship is an entry of `ships`; on LIVE the 7
-groups hold 27, 7, 9, 29, 7, 10 and 10 classes, 99 in all, every one a ship of the catalog; a
-Reference that links to no Record is left out), and the group's multipliers
-`claimCooldownMultiplier`, `claimCostMultiplier`, `deliveryTimeMultiplier`,
-`maxExpediteCostMultiplier`, `expeditedDeliveryTimeMultiplier`,
-`flatMinimumDeliveryTimerSecondsMultiplier`, `escalationTimerMultiplier`,
-`escalatingClaimCostMultiplier` and `escalatingDeliveryTimerMultiplier`. The groups keep the order
-of the Record. That a class in no group uses the defaults of `economyParams` is an inference; the
-Record does not say so.
+| Direct source fields |
+|----------------------|
+| `globalBrickTimer`, `baseReclaimTime`, `baseDeliveryTime`, `scalingPriceFloor` |
+| `aUECperSecond`, `deliverySecondsPerAUEC`, `expeditedDeliverySecondsPerAUEC` |
+| `claimCostMultiplier`, `maxExpeditedClaimCostMultiplier` |
+| `defaultLoadoutCooldownMultiplier`, `defaultLoadoutDeliveryTimeMultiplier`, `defaultLoadoutExpeditedDeliveryTimeMultiplier` |
+| `vehicleChassisRepairCostMultiplier`, `vehicleComponentRepairCostMultiplier`, `vehicleRepairMissingItemCostMultiplier` |
+| `flatMinimumDeliveryTimerSeconds` |
 
-No fee in aUEC. The Record holds multipliers and rates and no fee in aUEC, and no field named
-like a price was found in the `EntityClassDefinition` Records of ships and items. The only fee in
-aUEC next to it is `insurance.expediteFee`. The catalog therefore exports no claim fee, and no
-formula over the exported facts is documented as one (ADR-0218).
+The nested groups remain independent even where their source member names match.
+
+| Sourced group | Original members |
+|---------------|------------------|
+| `cooldownParams` | `baseTime`, `scalingPriceFloor`, `aUECperSecond`, `defaultLoadoutMultiplier` |
+| `deliveryParams` | `baseTime`, `scalingPriceFloor`, `aUECperSecond`, `defaultLoadoutMultiplier`, `expeditedTimeMultiplier`, `expeditedDefaultTimeMultiplier` |
+| `repairParams` | `vehicleChassisRepairCostMultiplier`, `vehicleComponentRepairCostMultiplier`, `vehicleRepairMissingItemCostMultiplier` |
+| `escalatingClaimsParams` | `escalatingClaimChainLimit`, `escalationTimerMultiplier`, `escalatingClaimCostMultiplier`, `escalatingDeliveryTimerMultiplier` |
+
+The first three groups retain original Single bits and a nullable finite number. Older direct,
+escalating and override scalars retain their authored numeric storage. Missing, explicit null,
+unreadable, unsupported and invalid source values have separate states. Invalid known fields and
+unsupported concrete groups appear in diagnostic exports with their original field receipts.
+
+The sourced `overrides` array retains each `ItemRecoveryOverrideGroupDef` in authored order.
+Its sourced `classes` links keep their original positions, including explicit null and
+unresolved references. The remaining members are `claimCooldownMultiplier`,
+`claimCostMultiplier`, `deliveryTimeMultiplier`, `maxExpediteCostMultiplier`,
+`expeditedDeliveryTimeMultiplier`, `flatMinimumDeliveryTimerSecondsMultiplier`,
+`escalationTimerMultiplier`, `escalatingClaimCostMultiplier` and
+`escalatingDeliveryTimerMultiplier`. A source that removed the flat minimum multiplier has
+an absent cell. The catalog preserves source rates and multipliers as authored. The fee stated
+directly in ship source data remains `insurance.expediteFee`.
+
+The policy row retains the seven independent ordered condition arrays `Insurable`,
+`ReplenishOnRearm`, `ReplenishOnClaimAndRepair`, `NeverRepair`, `NeverLTP`, `ForceLTP` and
+`DontEquipWhenBricked`. Each original slot has its own source state and preserves its concrete
+condition type. An entity-class condition contains its authored class reference. An entity-tag
+condition retains the original `TagList` and its ordered tag links. An item-type condition
+retains both original enum names. A fieldless base condition remains explicit.
+
+The sourced `notificationParams` block preserves all ten authored locale-key fields as
+protected game-text references. These are `itemBricked_Title`, `itemBricked_Body`,
+`vehicleBrickedWithItems_Body`, `itemBricking_Title`, `itemBricking_Body`,
+`vehicleBrickingWithItems_Body`, `onBrickedItemUsed_Title`, `onBrickedItemUsed_CannotEquip`,
+`onBrickedItemUsed_CannotFire` and `onBrickedItemUsed_CannotUse`. The keys and available
+translations use the canonical
+`texts.gameTexts` table. The original `onBrickedItemUseNotificationBuffer` Single retains
+its own exact bits and source receipt. Source arrays and notification values are preserved
+without evaluating a policy.
+
+The ignored `item_recovery_cooldown_delivery_and_repair_match_original_source_fields` check
+opens the selected Archive and compares the filtered catalog against the original DataForge
+source. Set `P4KX_EXPECT_NESTED_RECOVERY=1` for an Archive that must exercise all three
+nested groups. The legacy and nested source generations can be checked in separate runs.
 
 ### Texts
 

@@ -105,33 +105,50 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
     } in properties
     {
         let carries = field.get("x-gameText") == Some(&Value::Bool(true));
-        let expected = match (owner, name) {
-            ("BlueprintPresentation", "name")
-            | ("TemplateLocalization", "text")
-            | ("ProjectedMissionText", "key" | "translations") => true,
-            ("BrokerProjection" | "TemplateProjection", "title") => {
-                assert!(
-                    references(
-                        field,
-                        &schema,
-                        "#/$defs/SourceValueRef",
-                        &mut BTreeSet::new()
-                    ),
-                    "{owner}.{name} is navigation to the actual source occurrence"
-                );
-                false
-            }
-            _ => GAME_TEXT.contains(&name) && !is_only_public_name(&schema, field),
-        };
+        let expected = expected_annotation(owner, name, field, &schema);
         assert_eq!(carries, expected, "x-gameText on {owner}.{name}: {field}");
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 42,
+        marked, 52,
         "every protected field in the canonical schema is accounted for"
     );
 
     assert_starmap_annotations(starmap);
+}
+
+fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -> bool {
+    match (owner, name) {
+        (
+            "RecoveryNotifications",
+            "itemBricked_Title"
+            | "itemBricked_Body"
+            | "vehicleBrickedWithItems_Body"
+            | "itemBricking_Title"
+            | "itemBricking_Body"
+            | "vehicleBrickingWithItems_Body"
+            | "onBrickedItemUsed_Title"
+            | "onBrickedItemUsed_CannotEquip"
+            | "onBrickedItemUsed_CannotFire"
+            | "onBrickedItemUsed_CannotUse",
+        )
+        | ("BlueprintPresentation", "name")
+        | ("TemplateLocalization", "text")
+        | ("ProjectedMissionText", "key" | "translations") => true,
+        ("BrokerProjection" | "TemplateProjection", "title") => {
+            assert!(
+                references(
+                    field,
+                    schema,
+                    "#/$defs/SourceValueRef",
+                    &mut BTreeSet::new()
+                ),
+                "{owner}.{name} is navigation to the actual source occurrence"
+            );
+            false
+        }
+        _ => GAME_TEXT.contains(&name) && !is_only_public_name(schema, field),
+    }
 }
 
 fn assert_starmap_annotations(starmap: &Value) {

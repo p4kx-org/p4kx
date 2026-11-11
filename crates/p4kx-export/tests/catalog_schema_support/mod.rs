@@ -30,8 +30,6 @@ mod source_values;
 mod spawns;
 mod tags;
 
-use recovery::item_recovery;
-
 pub(crate) fn minimal_catalog() -> Value {
     let mut catalog = json!({
         "schemaVersion": p4kx_export::SCHEMA_VERSION,
@@ -155,6 +153,9 @@ pub(crate) fn minimal_catalog() -> Value {
             "shopInventories": {"availability": "absent", "meaning": "offlineDesignTime", "rows": []}},
         "configurations": {
             "blueprintTiers": blueprints::tiers(),
+            "itemRecoveryEconomy": recovery::economy(),
+            "itemRecoveryOverrides": recovery::overrides(),
+            "itemRecoveryPolicy": recovery::policy(),
             "durability": absent_table(),
             "degradation": absent_table(),
             "distortion": absent_table(),
@@ -257,8 +258,7 @@ pub(crate) fn minimal_catalog() -> Value {
         "mineableEntities": harvest::mineable_entities(),
         "crafters": crafters::crafters(),
         "cargoManifests": contracts::manifests(),
-        "shipStoreSlugs": slugs::ship_store_slugs(),
-        "itemRecovery": item_recovery()
+        "shipStoreSlugs": slugs::ship_store_slugs()
     });
     let export_health = health::fixture(&catalog);
     let Value::Object(fields) = &mut catalog else {

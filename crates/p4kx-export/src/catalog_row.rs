@@ -34,4 +34,5 @@ pub(crate) struct CatalogRows {
     pub(crate) filter: Option<Filter>,
     pub(crate) numbers: Vec<crate::catalog_number_health::EmittedNumber>,
     pub(crate) template_numbers: Vec<crate::template_number_capture::TemplateNumbers>,
+    pub(crate) recovery_numbers: Vec<crate::catalog_number_capture::CapturedNumber>,
 }

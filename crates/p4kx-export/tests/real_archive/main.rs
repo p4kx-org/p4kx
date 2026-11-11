@@ -34,6 +34,7 @@ mod real_archive_grade;
 mod real_archive_hauling;
 mod real_archive_insurance;
 mod real_archive_item_durability;
+mod real_archive_item_recovery;
 mod real_archive_item_stats;
 mod real_archive_items;
 mod real_archive_leftovers;

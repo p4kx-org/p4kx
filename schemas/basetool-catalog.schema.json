@@ -1819,6 +1819,46 @@
       ],
       "type": "object"
     },
+    "CanonicalRecordHeader": {
+      "description": "Independently sourced original metadata and stable convenience values of one physical Record.",
+      "properties": {
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "CanonicalTextOfGameTextRef": {
       "description": "One canonical text key and its actually available language projections.",
       "properties": {
@@ -2099,6 +2139,15 @@
         "durability": {
           "$ref": "#/$defs/CatalogTableOfDurability"
         },
+        "itemRecoveryEconomy": {
+          "$ref": "#/$defs/CatalogTableOfItemRecoveryEconomy"
+        },
+        "itemRecoveryOverrides": {
+          "$ref": "#/$defs/CatalogTableOfItemRecoveryOverrides"
+        },
+        "itemRecoveryPolicy": {
+          "$ref": "#/$defs/CatalogTableOfItemRecoveryPolicy"
+        },
         "missionBrokerEntries": {
           "$ref": "#/$defs/CatalogTableOfBrokerProjection"
         },
@@ -2115,6 +2164,9 @@
         "degradation",
         "distortion",
         "durability",
+        "itemRecoveryEconomy",
+        "itemRecoveryOverrides",
+        "itemRecoveryPolicy",
         "missionBrokerEntries",
         "missionFlows",
         "missionProperties"
@@ -2647,6 +2699,63 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/GeneratorDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfItemRecoveryEconomy": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ItemRecoveryEconomy"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfItemRecoveryOverrides": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ItemRecoveryOverrides"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfItemRecoveryPolicy": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ItemRecoveryPolicy"
           },
           "type": "array"
         }
@@ -6169,50 +6278,6 @@
           "value": "vehiclePatch"
         }
       ]
-    },
-    "EscalatingClaims": {
-      "description": "The `escalatingClaimsParams` of the item recovery rules.",
-      "properties": {
-        "escalatingClaimChainLimit": {
-          "description": "`escalatingClaimChainLimit`.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "escalatingClaimCostMultiplier": {
-          "description": "`escalatingClaimCostMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "escalatingDeliveryTimerMultiplier": {
-          "description": "`escalatingDeliveryTimerMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "escalationTimerMultiplier": {
-          "description": "`escalationTimerMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "escalatingClaimChainLimit",
-        "escalatingClaimCostMultiplier",
-        "escalatingDeliveryTimerMultiplier",
-        "escalationTimerMultiplier"
-      ],
-      "type": "object"
     },
     "ExplosionDefinition": {
       "description": "One independent physical definition and its authored `ExplosionParams` class.",
@@ -9805,190 +9870,87 @@
       ],
       "type": "object"
     },
-    "ItemRecovery": {
-      "description": "The item recovery rules: an `ItemRecoveryConfigurationParams` Record, its `economyParams`.\n\nThe multipliers and rates of the Record under their data names. The Record holds no fee in\naUEC, so the catalog states none. Every number is that of the Record, `null` when the Record\nstates none or a value that is no number.",
+    "ItemRecoveryEconomy": {
+      "description": "The selected physical item-recovery policy and its authored economy.",
       "properties": {
-        "aUECperSecond": {
-          "description": "`aUECperSecond`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "economyParams": {
+          "$ref": "#/$defs/SourcedValueOfRecoveryEconomy"
         },
-        "baseDeliveryTime": {
-          "description": "`baseDeliveryTime`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "baseReclaimTime": {
-          "description": "`baseReclaimTime`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "claimCostMultiplier": {
-          "description": "`claimCostMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "className": {
-          "description": "The Record name without its type, e.g. `GlobalItemRecovery`.",
-          "type": "string"
-        },
-        "defaultLoadoutCooldownMultiplier": {
-          "description": "`defaultLoadoutCooldownMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "defaultLoadoutDeliveryTimeMultiplier": {
-          "description": "`defaultLoadoutDeliveryTimeMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "defaultLoadoutExpeditedDeliveryTimeMultiplier": {
-          "description": "`defaultLoadoutExpeditedDeliveryTimeMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "deliverySecondsPerAUEC": {
-          "description": "`deliverySecondsPerAUEC`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "escalatingClaimsParams": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EscalatingClaims"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`escalatingClaimsParams`, `null` when the Record has none."
-        },
-        "expeditedDeliverySecondsPerAUEC": {
-          "description": "`expeditedDeliverySecondsPerAUEC`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "flatMinimumDeliveryTimerSeconds": {
-          "description": "`flatMinimumDeliveryTimerSeconds`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "globalBrickTimer": {
-          "description": "`globalBrickTimer`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
-        },
-        "maxExpeditedClaimCostMultiplier": {
-          "description": "`maxExpeditedClaimCostMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "overrides": {
-          "description": "The `overrides`: groups of entity classes whose multipliers replace the defaults, in the\norder of the Record.",
-          "items": {
-            "$ref": "#/$defs/RecoveryOverride"
-          },
-          "type": "array"
-        },
-        "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
-        },
-        "scalingPriceFloor": {
-          "description": "`scalingPriceFloor`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "vehicleChassisRepairCostMultiplier": {
-          "description": "`vehicleChassisRepairCostMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "vehicleComponentRepairCostMultiplier": {
-          "description": "`vehicleComponentRepairCostMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "vehicleRepairMissingItemCostMultiplier": {
-          "description": "`vehicleRepairMissingItemCostMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
         }
       },
       "required": [
-        "aUECperSecond",
-        "baseDeliveryTime",
-        "baseReclaimTime",
-        "claimCostMultiplier",
-        "className",
-        "defaultLoadoutCooldownMultiplier",
-        "defaultLoadoutDeliveryTimeMultiplier",
-        "defaultLoadoutExpeditedDeliveryTimeMultiplier",
-        "deliverySecondsPerAUEC",
-        "escalatingClaimsParams",
-        "expeditedDeliverySecondsPerAUEC",
-        "flatMinimumDeliveryTimerSeconds",
-        "globalBrickTimer",
-        "guid",
-        "maxExpeditedClaimCostMultiplier",
+        "economyParams",
+        "source"
+      ],
+      "type": "object"
+    },
+    "ItemRecoveryOverrides": {
+      "description": "The selected physical policy's original override array, in source order.",
+      "properties": {
+        "overrides": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryOverride"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
         "overrides",
-        "recordPath",
-        "scalingPriceFloor",
-        "vehicleChassisRepairCostMultiplier",
-        "vehicleComponentRepairCostMultiplier",
-        "vehicleRepairMissingItemCostMultiplier"
+        "ownerGuid",
+        "ownerRecordIndex"
+      ],
+      "type": "object"
+    },
+    "ItemRecoveryPolicy": {
+      "description": "Authored set conditions and notification settings of the selected physical policy.",
+      "properties": {
+        "DontEquipWhenBricked": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+        },
+        "ForceLTP": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+        },
+        "Insurable": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+        },
+        "NeverLTP": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+        },
+        "NeverRepair": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+        },
+        "ReplenishOnClaimAndRepair": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+        },
+        "ReplenishOnRearm": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+        },
+        "notificationParams": {
+          "$ref": "#/$defs/SourcedValueOfRecoveryNotifications"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "DontEquipWhenBricked",
+        "ForceLTP",
+        "Insurable",
+        "NeverLTP",
+        "NeverRepair",
+        "ReplenishOnClaimAndRepair",
+        "ReplenishOnRearm",
+        "notificationParams",
+        "ownerGuid",
+        "ownerRecordIndex"
       ],
       "type": "object"
     },
@@ -16567,93 +16529,379 @@
         }
       ]
     },
-    "RecoveryOverride": {
-      "description": "An `ItemRecoveryOverrideGroupDef`: the multipliers of a group of entity classes.",
+    "RecoveryCondition": {
+      "description": "One condition occurrence and its selected concrete payload.",
       "properties": {
-        "claimCooldownMultiplier": {
-          "description": "`claimCooldownMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "payload": {
+          "$ref": "#/$defs/RecoveryConditionPayload"
         },
-        "claimCostMultiplier": {
-          "description": "`claimCostMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "classGuids": {
-          "description": "The GUIDs of the entity classes the group applies to (`classes`), in the order of the\nRecord. Each is the GUID of an `EntityClassDefinition` Record, an entry of `ships` for a\nship; a Reference to no Record reads as null and is left out.",
-          "items": {
-            "$ref": "#/$defs/Guid"
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "payload",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "RecoveryConditionPayload": {
+      "description": "Known concrete recovery conditions with their original enum or link values.",
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "base",
+              "type": "string"
+            }
           },
-          "type": "array"
+          "required": [
+            "kind"
+          ],
+          "type": "object"
         },
-        "deliveryTimeMultiplier": {
-          "description": "`deliveryTimeMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        {
+          "properties": {
+            "classDef": {
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+            },
+            "kind": {
+              "const": "entityClass",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "classDef"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "entityTag",
+              "type": "string"
+            },
+            "tags": {
+              "$ref": "#/$defs/SourcedValueOfRecoveryConditionTags"
+            }
+          },
+          "required": [
+            "kind",
+            "tags"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "itemType",
+              "type": "string"
+            },
+            "subType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "type": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "type",
+            "subType"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "RecoveryConditionTags": {
+      "description": "An original `TagList` with all ordered reference slots.",
+      "properties": {
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "tags"
+      ],
+      "type": "object"
+    },
+    "RecoveryCooldown": {
+      "properties": {
+        "aUECperSecond": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "baseTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "defaultLoadoutMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "scalingPriceFloor": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "aUECperSecond",
+        "baseTime",
+        "defaultLoadoutMultiplier",
+        "scalingPriceFloor"
+      ],
+      "type": "object"
+    },
+    "RecoveryDelivery": {
+      "properties": {
+        "aUECperSecond": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "baseTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "defaultLoadoutMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "expeditedDefaultTimeMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "expeditedTimeMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "scalingPriceFloor": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "aUECperSecond",
+        "baseTime",
+        "defaultLoadoutMultiplier",
+        "expeditedDefaultTimeMultiplier",
+        "expeditedTimeMultiplier",
+        "scalingPriceFloor"
+      ],
+      "type": "object"
+    },
+    "RecoveryEconomy": {
+      "description": "Distinct source layouts and independent global economy settings.",
+      "properties": {
+        "cooldownParams": {
+          "$ref": "#/$defs/SourcedValueOfRecoveryCooldown"
+        },
+        "deliveryParams": {
+          "$ref": "#/$defs/SourcedValueOfRecoveryDelivery"
+        },
+        "escalatingClaimsParams": {
+          "$ref": "#/$defs/SourcedValueOfRecoveryEscalating"
+        },
+        "legacy": {
+          "$ref": "#/$defs/RecoveryLegacy"
+        },
+        "repairParams": {
+          "$ref": "#/$defs/SourcedValueOfRecoveryRepair"
+        }
+      },
+      "required": [
+        "cooldownParams",
+        "deliveryParams",
+        "escalatingClaimsParams",
+        "legacy",
+        "repairParams"
+      ],
+      "type": "object"
+    },
+    "RecoveryEscalating": {
+      "properties": {
+        "escalatingClaimChainLimit": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "escalatingClaimCostMultiplier": {
-          "description": "`escalatingClaimCostMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "escalatingDeliveryTimerMultiplier": {
-          "description": "`escalatingDeliveryTimerMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "escalationTimerMultiplier": {
-          "description": "`escalationTimerMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
+        "escalatingClaimChainLimit",
+        "escalatingClaimCostMultiplier",
+        "escalatingDeliveryTimerMultiplier",
+        "escalationTimerMultiplier"
+      ],
+      "type": "object"
+    },
+    "RecoveryLegacy": {
+      "properties": {
+        "aUECperSecond": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "baseDeliveryTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "baseReclaimTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "claimCostMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "defaultLoadoutCooldownMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "defaultLoadoutDeliveryTimeMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "defaultLoadoutExpeditedDeliveryTimeMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "deliverySecondsPerAUEC": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "expeditedDeliverySecondsPerAUEC": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "flatMinimumDeliveryTimerSeconds": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "globalBrickTimer": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "maxExpeditedClaimCostMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "scalingPriceFloor": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "vehicleChassisRepairCostMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "vehicleComponentRepairCostMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "vehicleRepairMissingItemCostMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
+        "aUECperSecond",
+        "baseDeliveryTime",
+        "baseReclaimTime",
+        "claimCostMultiplier",
+        "defaultLoadoutCooldownMultiplier",
+        "defaultLoadoutDeliveryTimeMultiplier",
+        "defaultLoadoutExpeditedDeliveryTimeMultiplier",
+        "deliverySecondsPerAUEC",
+        "expeditedDeliverySecondsPerAUEC",
+        "flatMinimumDeliveryTimerSeconds",
+        "globalBrickTimer",
+        "maxExpeditedClaimCostMultiplier",
+        "scalingPriceFloor",
+        "vehicleChassisRepairCostMultiplier",
+        "vehicleComponentRepairCostMultiplier",
+        "vehicleRepairMissingItemCostMultiplier"
+      ],
+      "type": "object"
+    },
+    "RecoveryNotifications": {
+      "description": "Authored notification text references and the original notification-buffer scalar.",
+      "properties": {
+        "itemBricked_Body": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "itemBricked_Title": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "itemBricking_Body": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "itemBricking_Title": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "onBrickedItemUseNotificationBuffer": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "onBrickedItemUsed_CannotEquip": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "onBrickedItemUsed_CannotFire": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "onBrickedItemUsed_CannotUse": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "onBrickedItemUsed_Title": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "vehicleBrickedWithItems_Body": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "vehicleBrickingWithItems_Body": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        }
+      },
+      "required": [
+        "itemBricked_Body",
+        "itemBricked_Title",
+        "itemBricking_Body",
+        "itemBricking_Title",
+        "onBrickedItemUseNotificationBuffer",
+        "onBrickedItemUsed_CannotEquip",
+        "onBrickedItemUsed_CannotFire",
+        "onBrickedItemUsed_CannotUse",
+        "onBrickedItemUsed_Title",
+        "vehicleBrickedWithItems_Body",
+        "vehicleBrickingWithItems_Body"
+      ],
+      "type": "object"
+    },
+    "RecoveryOverride": {
+      "properties": {
+        "claimCooldownMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "claimCostMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "classes": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "deliveryTimeMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "escalatingClaimCostMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "escalatingDeliveryTimerMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "escalationTimerMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "expeditedDeliveryTimeMultiplier": {
-          "description": "`expeditedDeliveryTimeMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "flatMinimumDeliveryTimerSecondsMultiplier": {
-          "description": "`flatMinimumDeliveryTimerSecondsMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "maxExpediteCostMultiplier": {
-          "description": "`maxExpediteCostMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         }
       },
       "required": [
         "claimCooldownMultiplier",
         "claimCostMultiplier",
-        "classGuids",
+        "classes",
         "deliveryTimeMultiplier",
         "escalatingClaimCostMultiplier",
         "escalatingDeliveryTimerMultiplier",
@@ -16661,6 +16909,25 @@
         "expeditedDeliveryTimeMultiplier",
         "flatMinimumDeliveryTimerSecondsMultiplier",
         "maxExpediteCostMultiplier"
+      ],
+      "type": "object"
+    },
+    "RecoveryRepair": {
+      "properties": {
+        "vehicleChassisRepairCostMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "vehicleComponentRepairCostMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "vehicleRepairMissingItemCostMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "vehicleChassisRepairCostMultiplier",
+        "vehicleComponentRepairCostMultiplier",
+        "vehicleRepairMissingItemCostMultiplier"
       ],
       "type": "object"
     },
@@ -23276,6 +23543,272 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfQualityOverrideSource"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfRecoveryCondition": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfRecoveryCondition"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfRecoveryOverride": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfRecoveryOverride"
                 },
                 "type": "array"
               }
@@ -34715,6 +35248,1176 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfRecoveryCondition": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RecoveryCondition"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRecoveryConditionTags": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RecoveryConditionTags"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRecoveryCooldown": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RecoveryCooldown"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRecoveryDelivery": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RecoveryDelivery"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRecoveryEconomy": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RecoveryEconomy"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRecoveryEscalating": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RecoveryEscalating"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRecoveryNotifications": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RecoveryNotifications"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRecoveryOverride": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RecoveryOverride"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRecoveryRepair": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RecoveryRepair"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfResolutionStatus": {
       "allOf": [
         {
@@ -41660,17 +43363,6 @@
       },
       "type": "array"
     },
-    "itemRecovery": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/ItemRecovery"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "The item recovery rules, the multipliers the game applies to claims, `null` when the\nArchive has no such Record. Not a kind."
-    },
     "items": {
       "description": "The items, ordered by GUID.",
       "items": {
@@ -41889,7 +43581,6 @@
     "factionReputations",
     "harvestableLocations",
     "harvestableProviderPresets",
-    "itemRecovery",
     "items",
     "legacyLootArchetypes",
     "legacyLootTables",

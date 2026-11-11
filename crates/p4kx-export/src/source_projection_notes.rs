@@ -22,6 +22,34 @@ pub(crate) fn record(
     notes: Vec<FieldError>,
     ledger: &mut ExportLedger,
 ) -> Result<(), CatalogError> {
+    record_notes(Some(kind), role, admission, tree, notes, ledger)
+}
+
+/// Retains projected-field diagnoses for a selected configuration without a Catalog kind.
+pub(crate) fn record_dependency(
+    admission: &RecordObservation<'_, '_>,
+    tree: &RecordTree<'_>,
+    notes: Vec<FieldError>,
+    ledger: &mut ExportLedger,
+) -> Result<(), CatalogError> {
+    record_notes(
+        None,
+        ExportSourceRole::Dependency,
+        admission,
+        tree,
+        notes,
+        ledger,
+    )
+}
+
+fn record_notes(
+    kind: Option<Kind>,
+    role: ExportSourceRole,
+    admission: &RecordObservation<'_, '_>,
+    tree: &RecordTree<'_>,
+    notes: Vec<FieldError>,
+    ledger: &mut ExportLedger,
+) -> Result<(), CatalogError> {
     admission.check_tree(tree)?;
     for note in notes {
         let description = note.description();
@@ -29,7 +57,7 @@ pub(crate) fn record(
         let diagnosis = crate::export_projection_fields::field(&description, note.body());
         let example = diagnosis.example(admission.subject().clone())?;
         ledger.field_diagnostic(DiagnosticObservation {
-            kind: Some(kind),
+            kind,
             stage: ExportDiagnosticStage::Projection,
             code,
             severity: ExportDiagnosticSeverity::Error,
