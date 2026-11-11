@@ -9,6 +9,7 @@ use p4kx_extraction::bank::{BankSource, BankSourceSection};
 use crate::audio_bank_failure::BankPhase;
 use crate::audio_bank_inventory::BankInventory;
 use crate::audio_bank_projection::BankProjection;
+use crate::audio_foreign::{Blocker, HeaderRead};
 use crate::origin_input::MediaOriginInput;
 use crate::{
     DirectoryLookup, MediaError, MediaWriter, audio_bank_hirc, audio_bank_media, audio_bank_stid,
@@ -30,9 +31,19 @@ pub(crate) fn project<R: Read + Seek>(
     };
     let mut source = match BankSource::open(reader, length) {
         Ok(source) => source,
-        Err(cause) => return projection.failure(BankPhase::Signature, None, cause, writer),
+        Err(cause) => {
+            directory_lookup
+                .index
+                .foreign_banks
+                .observe(HeaderRead::Unavailable(Blocker::MalformedBank), writer)?;
+            return projection.failure(BankPhase::Signature, None, cause, writer);
+        }
     };
     let inventory = directory(&projection, &mut source, writer)?;
+    directory_lookup
+        .index
+        .foreign_banks
+        .observe(inventory.foreign_header(), writer)?;
     subresources(&projection, &mut source, &inventory, writer)
 }
 

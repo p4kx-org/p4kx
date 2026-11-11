@@ -16,6 +16,10 @@ use crate::{
 
 pub(crate) struct AudioProvider;
 
+pub(crate) fn is_bank(path: &str) -> bool {
+    matches!(AudioSource::from_path(path), Some(AudioSource::Bank))
+}
+
 impl Provider for AudioProvider {
     fn capability(&self) -> Capability {
         let mut capability = Capability::new(
@@ -34,6 +38,14 @@ impl Provider for AudioProvider {
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
         audio_loose_inventory::project(context, writer)
+    }
+
+    fn directory_complete(
+        &self,
+        context: &mut DirectoryContext<'_, '_, '_>,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        crate::audio_foreign::project(context, writer)
     }
 
     fn source(
@@ -175,7 +187,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-action-fields",
-            "HIRC Action type and target, original PlayBank words, local Play and PlayEvent candidates, and foreign lookup availability.",
+            "HIRC Action type and target, original PlayBank words, local Play and PlayEvent candidates, and checked foreign candidates in their owning Archive.",
         ),
         FieldGroup::new(
             "bank-event-fields",

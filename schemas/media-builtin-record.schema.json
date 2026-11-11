@@ -2753,6 +2753,22 @@
       ],
       "type": "object"
     },
+    "Blocker": {
+      "enum": [
+        "filtered",
+        "key-required",
+        "unproved-path",
+        "unopened",
+        "malformed-bank",
+        "incomplete-bank-directory",
+        "missing-bank-header",
+        "malformed-bank-header",
+        "ambiguous-bank-header",
+        "unsupported-bank-version",
+        "incomplete-hirc"
+      ],
+      "type": "string"
+    },
     "ByteOrder": {
       "description": "Byte order used inside each numeric element.",
       "oneOf": [
@@ -4139,6 +4155,65 @@
       ],
       "type": "object"
     },
+    "ForeignBlockerRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "filtered": {
+          "type": "boolean"
+        },
+        "key_required": {
+          "type": "boolean"
+        },
+        "reason": {
+          "$ref": "#/$defs/Blocker"
+        },
+        "target_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "target_entry_index",
+        "reason",
+        "filtered",
+        "key_required"
+      ],
+      "type": "object"
+    },
+    "ForeignCandidateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "matches_target_kind": {
+          "type": "boolean"
+        },
+        "target_bkhd_section_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_hirc_section_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_object_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_type_code": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "target_entry_index",
+        "target_bkhd_section_ordinal",
+        "target_hirc_section_ordinal",
+        "target_object_ordinal",
+        "target_type_code",
+        "matches_target_kind"
+      ],
+      "type": "object"
+    },
     "ForeignLookup": {
       "oneOf": [
         {
@@ -4191,8 +4266,131 @@
             "reason"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "query_index": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "status": {
+              "const": "directory-search",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/ForeignTarget"
+            }
+          },
+          "required": [
+            "status",
+            "target",
+            "query_index"
+          ],
+          "type": "object"
         }
       ]
+    },
+    "ForeignPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ForeignSearchRecord"
+            },
+            "record_type": {
+              "const": "bank-foreign-target-resolution",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ForeignCandidateRecord"
+            },
+            "record_type": {
+              "const": "bank-foreign-target-candidate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ForeignBlockerRecord"
+            },
+            "record_type": {
+              "const": "bank-foreign-target-blocker",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ForeignPayload"
+    },
+    "ForeignSearchRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "blocked_banks": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "candidates_complete": {
+          "type": "boolean"
+        },
+        "directory_complete": {
+          "type": "boolean"
+        },
+        "matching_candidates": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "observed_candidates": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "owner_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "resolution": {
+          "$ref": "#/$defs/Resolution"
+        },
+        "selector": {
+          "$ref": "#/$defs/ForeignTarget"
+        },
+        "target_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner_entry_index",
+        "selector",
+        "target_id",
+        "directory_complete",
+        "candidates_complete",
+        "observed_candidates",
+        "matching_candidates",
+        "blocked_banks",
+        "resolution"
+      ],
+      "type": "object"
     },
     "ForeignTarget": {
       "oneOf": [
@@ -4232,7 +4430,6 @@
     },
     "ForeignUnavailable": {
       "enum": [
-        "target-not-read",
         "incomplete-local-inventory"
       ],
       "type": "string"
@@ -18195,6 +18392,240 @@
                   "indices": {
                     "maxItems": 4,
                     "minItems": 4
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-foreign-target-resolution"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ForeignPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-foreign-target-resolution"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 1,
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-foreign-target-candidate"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ForeignPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-foreign-target-candidate"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-foreign-target-blocker"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ForeignPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-foreign-target-blocker"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
                   }
                 }
               }

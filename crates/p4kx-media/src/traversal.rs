@@ -93,7 +93,9 @@ impl Traversal<'_> {
                 crate::error::finish(result, restored)?;
             }
         }
-        Ok(())
+        let lookup = DirectoryLookup::new_with_inputs(&index, self.root, chain, selection, &inputs)
+            .with_shaders(self.shaders);
+        visit.directory_complete(archive, &lookup, writer)
     }
 
     fn admit(

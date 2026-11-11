@@ -22,6 +22,9 @@ and fallback selection.
 | `audio-bank-hirc-action` | `bank-hirc-action` | HIRC section and object ordinals |
 | `audio-bank-hirc-action-target-resolution` | `bank-hirc-action-target-resolution` | Local Play or PlayEvent target inventory and foreign lookup availability |
 | `audio-bank-hirc-action-target-candidate` | `bank-hirc-action-target-candidate` | One same-ID local HIRC object with its physical type and match flag |
+| `audio-bank-foreign-target-resolution` | `bank-foreign-target-resolution` | Directory-local query index |
+| `audio-bank-foreign-target-candidate` | `bank-foreign-target-candidate` | Query index and candidate ordinal |
+| `audio-bank-foreign-target-blocker` | `bank-foreign-target-blocker` | Query index and blocker ordinal |
 | `audio-bank-hirc-event` | `bank-hirc-event` | HIRC section and Event object ordinals |
 | `audio-bank-hirc-event-action` | `bank-hirc-event-action` | HIRC section, Event object and action ordinals |
 | `audio-bank-hirc-event-action-resolution` | `bank-hirc-event-action-resolution` | Same HIRC section, Event object and action ordinals |
@@ -107,11 +110,34 @@ Candidate rows keep every occurrence in physical HIRC order. Each points to its 
 
 The `foreign` status is `local-only` for Play without a nonzero bank ID. A matching local
 object takes precedence over a named bank or a remote Event search and produces `local-match`.
-A foreign selector with no observed local match produces `unavailable`. The reason is
-`target-not-read` after a complete local scan or `incomplete-local-inventory` when the local
-scan cannot establish absence. The selector retains the authored bank ID or Event route.
-The candidate rows record physical possibilities. Playback applies its own bank and language
-selection.
+A foreign selector with a complete local miss produces `directory-search` with a
+`query_index`. When the local scan cannot establish absence, the status is `unavailable`
+with reason `incomplete-local-inventory`. The selector retains the authored bank ID or Event
+route in either case.
+
+Join `query_index` to `audio-bank-foreign-target-resolution` within the Action bank's
+owning Archive. Use the Action source's root digest and containing Entry chain to find
+the directory row's source. A root directory row has source identity `root`. A nested
+directory row has the containing Archive Entry as its source. The resolution records the
+referring bank's physical Entry ordinal, selector and target ID. Actions from the same bank
+with the same selector and target share a query. Candidate and blocker rows join to the
+same directory and query index.
+
+Play considers foreign banks with the authored BKHD bank ID. PlayEvent considers Event
+objects in the owning Archive and includes other same-ID HIRC kinds with
+`matches_target_kind: false`. Physical candidates keep duplicate Entry paths and HIRC
+IDs in directory and section/object order. Each row supplies the target Entry and BKHD,
+HIRC section and HIRC object ordinals. It links to the original bank and object records,
+which retain the raw payload and physical language placement.
+
+The exporter scans selected banks' checked retained headers and HIRC envelopes. A
+filtered, unreadable or ambiguous bank has a blocker when it could affect the query.
+A bank with a proved different BKHD ID cannot affect explicit Play. Incomplete HIRC
+retains the readable object prefix with a blocker. `directory_complete` describes the
+observed directory, while `candidates_complete` additionally requires a complete search
+for this query. Incomplete coverage gives `unavailable` even if candidates were observed.
+A complete query gives `missing`, `resolved` or `ambiguous` by its count of matching
+physical objects. Runtime playback applies its own bank and language selection.
 
 Event rows preserve the original action count and its byte range. Versions through 122 use a
 little-endian unsigned 32-bit count. Versions 123 through 154 use a Wwise variable-length count.

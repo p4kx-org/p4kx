@@ -4,6 +4,7 @@
 use p4kx_extraction::{Archive, Entry};
 
 use crate::directory_lookup::DirectoryLookup;
+use crate::directory_run::{self, Phase};
 use crate::input_budget::InputBudget;
 use crate::required_input;
 use crate::source_selection::EntrySelection;
@@ -26,7 +27,30 @@ impl TraversalVisit for ProjectionVisit<'_> {
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
-        crate::directory_run::run(archive, lookup, self.providers, self.budget, writer)
+        directory_run::run(
+            archive,
+            lookup,
+            self.providers,
+            self.budget,
+            Phase::Open,
+            writer,
+        )
+    }
+
+    fn directory_complete(
+        &mut self,
+        archive: &Archive,
+        lookup: &DirectoryLookup<'_>,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        directory_run::run(
+            archive,
+            lookup,
+            self.providers,
+            self.budget,
+            Phase::Complete,
+            writer,
+        )
     }
 
     fn entry(

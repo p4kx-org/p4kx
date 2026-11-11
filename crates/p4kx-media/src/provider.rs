@@ -133,6 +133,18 @@ pub trait Provider: Send + Sync {
         Ok(())
     }
 
+    /// Projects closing observations of one owning Archive after its physical source callbacks.
+    ///
+    /// # Errors
+    /// Returns an original input, budget or output failure.
+    fn directory_complete(
+        &self,
+        _context: &mut crate::DirectoryContext<'_, '_, '_>,
+        _writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        Ok(())
+    }
+
     /// Streams records for one exact retained source.
     ///
     /// # Errors

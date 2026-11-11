@@ -93,7 +93,7 @@ impl<T> BankCandidateIndex<T> {
         self.candidates.get(&id).map_or(&[], Vec::as_slice)
     }
 
-    fn insert(&mut self, observation: Observation<T>) -> Result<(), MediaError> {
+    pub(crate) fn insert(&mut self, observation: Observation<T>) -> Result<(), MediaError> {
         let Observation { id, candidate } = observation;
         if let Some(candidates) = self.candidates.get_mut(&id) {
             candidates

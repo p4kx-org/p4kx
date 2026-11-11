@@ -27,5 +27,14 @@ pub(crate) trait TraversalVisit {
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError>;
 
+    fn directory_complete(
+        &mut self,
+        _archive: &Archive,
+        _lookup: &DirectoryLookup<'_>,
+        _writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        Ok(())
+    }
+
     fn excluded_container(&mut self);
 }

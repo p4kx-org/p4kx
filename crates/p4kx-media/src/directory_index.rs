@@ -15,6 +15,7 @@ use crate::{CandidateInventory, MediaError, ReferenceUnavailable};
 
 pub(crate) struct DirectoryIndex<'a> {
     pub(crate) archive: &'a Archive,
+    pub(crate) foreign_banks: crate::audio_foreign::Scope,
     keys: OnceCell<PathKeys>,
     members: OnceCell<TextureMemberKeys>,
     loose_wems: OnceCell<LooseWemKeys>,
@@ -30,9 +31,10 @@ struct Registration {
 }
 
 impl<'a> DirectoryIndex<'a> {
-    pub(crate) const fn new(archive: &'a Archive, live_entries: &'a Cell<u64>) -> Self {
+    pub(crate) fn new(archive: &'a Archive, live_entries: &'a Cell<u64>) -> Self {
         Self {
             archive,
+            foreign_banks: crate::audio_foreign::Scope::default(),
             keys: OnceCell::new(),
             members: OnceCell::new(),
             loose_wems: OnceCell::new(),

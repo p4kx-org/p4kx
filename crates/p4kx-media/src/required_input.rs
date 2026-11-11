@@ -177,6 +177,42 @@ pub(crate) fn with_reference_input<T>(
     result.map_err(|cause| error::at(&declared, cause))
 }
 
+pub(crate) fn with_retained_reference_input<T>(
+    lookup: &DirectoryLookup<'_>,
+    entry: &Entry,
+    use_at: &Subresource,
+    writer: &mut MediaWriter<'_>,
+    consume: impl FnOnce(&mut RequiredInput<'_>, &mut MediaWriter<'_>) -> Result<T, MediaError>,
+) -> Result<Option<T>, MediaError> {
+    writer.require_output_callback()?;
+    writer.require_source(&lookup.owning_source(0))?;
+    if use_at.namespace.is_empty()
+        || lookup.index.archive.entry_origin(entry).is_none()
+        || lookup.selection.classify(lookup.chain, entry.path()) != EntrySelection::Included
+    {
+        return Err(MediaError::Contract(
+            "retained reference input is outside its selected Archive scope".into(),
+        ));
+    }
+    let mut source = source::entry(lookup.root, lookup.index.archive, entry, lookup.chain)?;
+    let state = lookup.input_state()?;
+    let Some(raw) = state.begin_retained(entry.index(), writer)? else {
+        return Ok(None);
+    };
+    let payload = writer.root.join(&raw.path);
+    let digest = raw.digest.clone();
+    source::retained(&mut source, entry, raw);
+    let receipt = InputReceipt {
+        source,
+        digest,
+        omission: None,
+        use_at: use_at.clone(),
+        origin: None,
+    };
+    let result = use_payload(lookup, entry, &payload, receipt, writer, consume);
+    error::finish(result.map(Some), state.end(entry.index(), None))
+}
+
 fn with_private_input<T>(
     lookup: &DirectoryLookup<'_>,
     entry: &Entry,

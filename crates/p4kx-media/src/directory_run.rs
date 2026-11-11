@@ -9,11 +9,18 @@ use crate::input_budget::InputBudget;
 
 use crate::{DirectoryContext, DirectoryLookup, MediaError, MediaWriter, Provider};
 
+#[derive(Clone, Copy)]
+pub(crate) enum Phase {
+    Open,
+    Complete,
+}
+
 pub(crate) fn run(
     archive: &Archive,
     lookup: &DirectoryLookup<'_>,
     providers: &[&dyn Provider],
     budget: &InputBudget,
+    phase: Phase,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let view = archive.metadata_view();
@@ -32,18 +39,18 @@ pub(crate) fn run(
             MediaError::Contract("directory callback has no original input".into())
         })?;
         writer.begin_with_input(index, source.clone(), input)?;
-        provider
-            .directory(
-                &mut DirectoryContext {
-                    source: &source,
-                    view,
-                    entries: archive.entries(),
-                    lookup,
-                    access: &mut access,
-                },
-                writer,
-            )
-            .map_err(|cause| crate::error::at(&source, cause))?;
+        let mut context = DirectoryContext {
+            source: &source,
+            view,
+            entries: archive.entries(),
+            lookup,
+            access: &mut access,
+        };
+        match phase {
+            Phase::Open => provider.directory(&mut context, writer),
+            Phase::Complete => provider.directory_complete(&mut context, writer),
+        }
+        .map_err(|cause| crate::error::at(&source, cause))?;
         writer.end_directory()?;
     }
     checkpoint.check()

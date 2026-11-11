@@ -243,6 +243,19 @@ impl<'a> DirectoryLookup<'a> {
         Ok(self.index.inventory())
     }
 
+    pub(crate) fn scan_inventory(
+        &self,
+        writer: &MediaWriter<'_>,
+    ) -> Result<CandidateInventory, MediaError> {
+        let work = LookupWork {
+            checkpoint: writer.checkpoint,
+            limits: writer.limits(),
+            current: self.work,
+            source_allowance: self.allowance(writer.limits().sources),
+        };
+        self.index.scan_inventory(&work)
+    }
+
     pub(crate) fn find_loose_wems(
         &self,
         media_id: u32,

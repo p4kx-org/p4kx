@@ -92,6 +92,29 @@ impl<'run> DirectoryInputs<'run> {
         Ok(slot.raw.clone())
     }
 
+    pub(crate) fn begin_retained(
+        &self,
+        position: usize,
+        writer: &MediaWriter<'_>,
+    ) -> Result<Option<RawReference>, MediaError> {
+        writer.checkpoint()?;
+        if position >= self.count {
+            return Err(invalid_position());
+        }
+        let mut slots = self.slots.try_borrow_mut().map_err(|_| busy())?;
+        let Some(slot) = slots.get_mut(&position) else {
+            return Ok(None);
+        };
+        if slot.busy {
+            return Err(busy());
+        }
+        let Some(raw) = slot.raw.clone() else {
+            return Ok(None);
+        };
+        slot.busy = true;
+        Ok(Some(raw))
+    }
+
     pub(crate) fn end(&self, position: usize, raw: Option<RawReference>) -> Result<(), MediaError> {
         let mut slots = self.slots.try_borrow_mut().map_err(|_| busy())?;
         let slot = slots.get_mut(&position).ok_or_else(invalid_position)?;

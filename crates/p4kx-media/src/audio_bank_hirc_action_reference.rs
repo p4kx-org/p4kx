@@ -7,8 +7,10 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::audio_bank_projection::BankProjection;
+use crate::audio_foreign::Selector as ForeignTarget;
 use crate::bank_candidate_index::Resolution;
 use crate::hirc_object_index::HircObjectIndex;
+use crate::origin_input::MediaOriginInput;
 use crate::{MediaError, MediaWriter, Status, Subresource};
 
 use super::ActionPayload;
@@ -48,19 +50,15 @@ enum ForeignLookup {
         target: ForeignTarget,
         reason: ForeignUnavailable,
     },
-}
-
-#[derive(Clone, Copy, Serialize, JsonSchema)]
-#[serde(tag = "type", rename_all = "kebab-case", deny_unknown_fields)]
-enum ForeignTarget {
-    Bank { bank_id: u32 },
-    Event,
+    DirectorySearch {
+        target: ForeignTarget,
+        query_index: DecimalU64,
+    },
 }
 
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 enum ForeignUnavailable {
-    TargetNotRead,
     IncompleteLocalInventory,
 }
 
@@ -104,7 +102,15 @@ pub(super) fn project(
         matching += u64::from(matches(candidate));
     }
     let complete = objects.is_complete();
-    let foreign = foreign_lookup(foreign, matching, complete);
+    let foreign = foreign_lookup(
+        projection,
+        sites,
+        target.target_id,
+        foreign,
+        matching,
+        complete,
+        writer,
+    )?;
     let indices = sites.indices();
     origins::resolution(projection.input, sites, complete, &foreign, writer)?.write(
         writer,
@@ -122,10 +128,20 @@ pub(super) fn project(
         }),
         &[],
     )?;
+    write_candidates(projection.input, sites, candidates, matches, writer)
+}
+
+fn write_candidates(
+    input: &MediaOriginInput,
+    sites: &Sites,
+    candidates: &[BankHircObject],
+    matches: impl Fn(&BankHircObject) -> bool,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let [section, action] = sites.indices();
     for (ordinal, candidate) in candidates.iter().enumerate() {
         writer.checkpoint()?;
-        let [section, action] = indices;
-        origins::candidate(projection.input, sites, candidate, writer)?.write(
+        origins::candidate(input, sites, candidate, writer)?.write(
             writer,
             &Subresource::new(CANDIDATE_NAMESPACE, vec![section, action, ordinal as u64]),
             Status::Complete,
@@ -141,21 +157,33 @@ pub(super) fn project(
     Ok(())
 }
 
-const fn foreign_lookup(
+fn foreign_lookup(
+    projection: &BankProjection<'_>,
+    sites: &Sites,
+    target_id: u32,
     target: Option<ForeignTarget>,
     matching: u64,
     complete: bool,
-) -> ForeignLookup {
-    match (target, matching, complete) {
+    writer: &MediaWriter<'_>,
+) -> Result<ForeignLookup, MediaError> {
+    Ok(match (target, matching, complete) {
         (None, _, _) => ForeignLookup::LocalOnly,
-        (Some(target), 0, true) => ForeignLookup::Unavailable {
-            target,
-            reason: ForeignUnavailable::TargetNotRead,
-        },
+        (Some(target), 0, true) => {
+            let evidence = origins::request(projection.input, sites, writer)?;
+            let query_index = projection
+                .directory
+                .index
+                .foreign_banks
+                .request(target_id, target, evidence, writer)?;
+            ForeignLookup::DirectorySearch {
+                target,
+                query_index,
+            }
+        }
         (Some(target), 0, false) => ForeignLookup::Unavailable {
             target,
             reason: ForeignUnavailable::IncompleteLocalInventory,
         },
         (Some(target), _, _) => ForeignLookup::LocalMatch { target },
-    }
+    })
 }

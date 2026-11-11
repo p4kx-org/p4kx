@@ -13,6 +13,18 @@ use crate::{MediaError, MediaWriter};
 use super::super::origins::Sites;
 use super::ForeignLookup;
 
+pub(super) fn request(
+    input: &MediaOriginInput,
+    sites: &Sites,
+    writer: &MediaWriter<'_>,
+) -> Result<OriginContributions, MediaError> {
+    BankOrigins::new(input, writer)?.capture(
+        selectors(sites)?
+            .chain(sites.bank_selectors())
+            .chain(inventory_sites()),
+    )
+}
+
 pub(super) fn resolution(
     input: &MediaOriginInput,
     sites: &Sites,
@@ -58,8 +70,14 @@ fn foreign_fields(
     }
     let status = prepared.capture(selector.chain(inventory_sites()))?;
     prepared.field("/data/payload/foreign/status", status.clone())?;
-    if matches!(foreign, ForeignLookup::Unavailable { .. }) {
-        prepared.field("/data/payload/foreign/reason", status)?;
+    match foreign {
+        ForeignLookup::Unavailable { .. } => {
+            prepared.field("/data/payload/foreign/reason", status)?;
+        }
+        ForeignLookup::DirectorySearch { .. } => {
+            prepared.field("/data/payload/foreign/query_index", status)?;
+        }
+        _ => {}
     }
     prepared.subtree(
         "/data/payload/foreign/target",

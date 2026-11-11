@@ -6,6 +6,7 @@ use p4kx_extraction::bank::{BankObservedHeader, BankSourceSection};
 
 use crate::MediaError;
 use crate::audio_bank_didx_index::DidxIndex;
+use crate::audio_foreign::{Blocker, Header, HeaderRead};
 use crate::hirc_object_index::HircObjectIndex;
 
 pub(crate) struct BankInventory {
@@ -59,11 +60,7 @@ impl BankInventory {
             .headers
             .checked_add(1)
             .ok_or_else(crate::origin_error::counter)?;
-        self.header = if self.headers == 1 {
-            header.filter(|header| header.header().is_supported_version())
-        } else {
-            None
-        };
+        self.header = if self.headers == 1 { header } else { None };
         Ok(())
     }
 
@@ -81,10 +78,21 @@ impl BankInventory {
     }
 
     pub(crate) const fn observed_header(&self) -> Option<&BankObservedHeader> {
-        if self.complete {
-            self.header.as_ref()
-        } else {
-            None
+        match self.header.as_ref() {
+            Some(header) if self.complete && header.header().is_supported_version() => Some(header),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn foreign_header(&self) -> HeaderRead {
+        if !self.complete {
+            return HeaderRead::Unavailable(Blocker::IncompleteBankDirectory);
+        }
+        match (self.headers, self.header.as_ref()) {
+            (0, _) => HeaderRead::Unavailable(Blocker::MissingBankHeader),
+            (1, Some(header)) => HeaderRead::Known(Header::new(header)),
+            (1, None) => HeaderRead::Unavailable(Blocker::MalformedBankHeader),
+            (_, _) => HeaderRead::Unavailable(Blocker::AmbiguousBankHeader),
         }
     }
 

@@ -85,7 +85,7 @@ fn check_complete_summaries(rows: &[MediaRecord]) -> TestResult {
             "missing",
             0,
             0,
-            unavailable(&bank, "target-not-read"),
+            json!({"status":"directory-search","target":bank,"query_index":"0"}),
         ),
         (
             3,
@@ -93,7 +93,7 @@ fn check_complete_summaries(rows: &[MediaRecord]) -> TestResult {
             "missing",
             1,
             0,
-            unavailable(&event, "target-not-read"),
+            json!({"status":"directory-search","target":event,"query_index":"1"}),
         ),
         (4, REMOTE, "missing", 0, 0, json!({"status":"local-only"})),
     ];
