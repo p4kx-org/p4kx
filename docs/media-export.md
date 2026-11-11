@@ -189,7 +189,7 @@ real Archives and can be lowered or raised explicitly:
 | `--max-container-depth` | 8 | Ordered physical container chain |
 | `--max-value-depth` | 128 | JSON value nesting including its envelope; maximum 512 |
 | `--max-references` | 10,000,000 | Reference queries across all provider callbacks |
-| `--max-reference-candidates` | 128 | Candidate identities retained for one lookup; metadata bytes also use the record bound |
+| `--max-reference-candidates` | 128 | Candidate identities retained in one inline reference result; metadata bytes also use the record bound |
 
 Byte and count limits must be positive; depth cannot exceed the reader's hard limit. A selected
 container payload and its subsequent container-opening work are charged separately. Container

@@ -141,7 +141,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-event-fields",
-            "HIRC Event count encoding and original words, ordered action IDs, and exact residual ranges.",
+            "HIRC Event count encoding, ordered original action IDs, physical Action candidates and resolution, and exact residual ranges.",
         ),
         FieldGroup::new(
             "bank-container-fields",

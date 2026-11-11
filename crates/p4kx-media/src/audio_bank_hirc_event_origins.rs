@@ -28,6 +28,7 @@ pub(super) struct EventSites {
     object: [u64; 2],
     body: [u64; 1],
     bkhd: [u64; 1],
+    version: u32,
 }
 
 impl EventSites {
@@ -37,6 +38,7 @@ impl EventSites {
             object: [object.section_ordinal(), object.ordinal()],
             body: [object.body_offset()],
             bkhd: [version.body_offset],
+            version: version.version,
         }
     }
 
@@ -192,7 +194,11 @@ impl EventSites {
         )
     }
 
-    const fn base(&self) -> [EvidenceSite<'_>; 4] {
+    pub(super) const fn version(&self) -> u32 {
+        self.version
+    }
+
+    pub(super) const fn base(&self) -> [EvidenceSite<'_>; 4] {
         [
             self.route(),
             complete_directory("bankVersionSelection"),

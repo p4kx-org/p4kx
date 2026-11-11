@@ -5,10 +5,12 @@ use p4kx_extraction::SectionId;
 use p4kx_extraction::bank::{BankObservedHeader, BankSourceSection};
 
 use crate::MediaError;
+use crate::hirc_object_index::HircObjectIndex;
 
 pub(crate) struct BankInventory {
     pub(crate) last_child_section: Option<u64>,
     pub(crate) complete: bool,
+    pub(crate) hirc_objects: HircObjectIndex,
     headers: u64,
     header: Option<BankObservedHeader>,
     data: DataInventory,
@@ -29,10 +31,11 @@ pub(crate) enum DataInventory {
 }
 
 impl BankInventory {
-    pub(crate) const fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             last_child_section: None,
             complete: true,
+            hirc_objects: HircObjectIndex::default(),
             headers: 0,
             header: None,
             data: DataInventory::Missing,

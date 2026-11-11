@@ -12,15 +12,19 @@ use p4kx_extraction::bank::{
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_payload::BankEntryRange;
 use crate::audio_bank_projection::BankProjection;
+use crate::hirc_object_index::HircObjectIndex;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
 #[path = "audio_bank_hirc_event_origins.rs"]
 mod origins;
 #[path = "audio_bank_hirc_event_payload.rs"]
 mod payload;
+#[path = "audio_bank_hirc_event_reference.rs"]
+mod reference;
 
 pub(crate) use self::payload::EventPayload;
 use self::payload::{EventActionRecord, EventRecord, EventTail};
+pub(crate) use self::reference::{CANDIDATE_NAMESPACE, RESOLUTION_NAMESPACE};
 
 pub(crate) const EVENT_NAMESPACE: &str = "audio-bank-hirc-event";
 pub(crate) const ACTION_NAMESPACE: &str = "audio-bank-hirc-event-action";
@@ -30,12 +34,13 @@ pub(crate) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,
     version: VersionSite,
     event: BankHircEvent<'_, R>,
+    objects: &HircObjectIndex,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let original = &event.object;
     let sites = origins::EventSites::new(original, version);
     match event.status {
-        BankEventRead::Decoded(actions) => decoded(projection, &sites, actions, writer),
+        BankEventRead::Decoded(actions) => decoded(projection, &sites, actions, objects, writer),
         BankEventRead::Malformed {
             encoding,
             count,
@@ -92,6 +97,7 @@ fn decoded<R: Read + Seek>(
     projection: &BankProjection<'_>,
     sites: &origins::EventSites,
     mut actions: BankEvent<'_, R>,
+    objects: &HircObjectIndex,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let count = actions.declared_count().clone();
@@ -113,6 +119,7 @@ fn decoded<R: Read + Seek>(
     for action in actions.by_ref() {
         let action = action.map_err(|cause| projection.replay_failure(cause))?;
         emit_action(projection, sites, &count, &action, writer)?;
+        reference::project(projection, sites, &action, objects, writer)?;
     }
     let trailing = actions.trailing_range().ok_or_else(|| {
         MediaError::Contract("completed HIRC Event cursor has no trailing range".into())

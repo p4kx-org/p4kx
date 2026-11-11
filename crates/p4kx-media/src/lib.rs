@@ -91,6 +91,7 @@ mod generation_lock;
 mod generation_tests;
 mod generation_validation;
 mod hashing;
+mod hirc_object_index;
 mod identifier;
 mod index_destination;
 mod index_file;

@@ -2654,6 +2654,33 @@
         }
       ]
     },
+    "CandidateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "action_candidate": {
+          "type": "boolean"
+        },
+        "target_object_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_section_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_type_code": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "target_section_ordinal",
+        "target_object_ordinal",
+        "target_type_code",
+        "action_candidate"
+      ],
+      "type": "object"
+    },
     "CandidateState": {
       "description": "A reader's known selection or availability state of a proven candidate.",
       "oneOf": [
@@ -3736,6 +3763,40 @@
             },
             "record_type": {
               "const": "bank-hirc-event-action",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ResolutionRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-event-action-resolution",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/CandidateRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-event-action-candidate",
               "type": "string"
             }
           },
@@ -6958,6 +7019,39 @@
           "type": "object"
         }
       ]
+    },
+    "Resolution": {
+      "enum": [
+        "resolved",
+        "missing",
+        "ambiguous",
+        "unavailable"
+      ],
+      "type": "string"
+    },
+    "ResolutionRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates_complete": {
+          "type": "boolean"
+        },
+        "matching_candidates": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "observed_candidates": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "resolution": {
+          "$ref": "#/$defs/Resolution"
+        }
+      },
+      "required": [
+        "resolution",
+        "observed_candidates",
+        "matching_candidates",
+        "candidates_complete"
+      ],
+      "type": "object"
     },
     "SegmentRecord": {
       "additionalProperties": false,
@@ -15648,6 +15742,162 @@
                   "indices": {
                     "maxItems": 3,
                     "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-event-action-resolution"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/EventPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-event-action-resolution"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-event-action-candidate"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/EventPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-event-action-candidate"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 4,
+                    "minItems": 4
                   }
                 }
               }

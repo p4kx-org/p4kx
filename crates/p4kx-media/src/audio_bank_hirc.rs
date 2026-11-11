@@ -13,6 +13,7 @@ use crate::audio_bank_failure::BankPhase;
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_payload::{BankEntryRange, BankHircRecord, BankObjectRecord, BankPayload};
 use crate::audio_bank_projection::BankProjection;
+use crate::hirc_object_index::HircObjectIndex;
 use crate::{
     MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource, audio_bank_hirc_action,
     audio_bank_hirc_container, audio_bank_hirc_event, audio_bank_hirc_origins,
@@ -31,6 +32,7 @@ pub(crate) fn project<R: Read + Seek>(
     source: &mut BankSource<R>,
     section: &BankSourceSection,
     header: Option<&BankObservedHeader>,
+    objects: &HircObjectIndex,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let mut hierarchy = match source.hirc(section) {
@@ -58,7 +60,7 @@ pub(crate) fn project<R: Read + Seek>(
             }
         };
         emit_object(projection, semantic.object(), version, writer)?;
-        emit_semantic(projection, semantic, version, writer)?;
+        emit_semantic(projection, semantic, version, objects, writer)?;
     }
     let trailing = hierarchy.trailing_range().ok_or_else(|| {
         MediaError::Contract("completed HIRC cursor has no trailing range".into())
@@ -76,6 +78,7 @@ fn emit_semantic<R: Read + Seek>(
     projection: &BankProjection<'_>,
     semantic: BankHircSemantic<'_, R>,
     version: Option<VersionSite>,
+    objects: &HircObjectIndex,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     match (semantic, version) {
@@ -103,7 +106,7 @@ fn emit_semantic<R: Read + Seek>(
             audio_bank_music_track::project(projection, version, *track, writer)
         }
         (BankHircSemantic::Event(event), Some(version)) => {
-            audio_bank_hirc_event::project(projection, version, event, writer)
+            audio_bank_hirc_event::project(projection, version, event, objects, writer)
         }
         (BankHircSemantic::Sound(sound), Some(version)) => {
             audio_bank_hirc_sound::project(projection, version, &sound, writer)

@@ -9,6 +9,8 @@ use serde::Serialize;
 use crate::MediaError;
 use crate::audio_bank_payload::BankEntryRange;
 
+use super::reference::{CandidateRecord, ResolutionRecord};
+
 #[derive(Serialize, JsonSchema)]
 #[serde(
     tag = "record_type",
@@ -21,6 +23,10 @@ pub(crate) enum EventPayload {
     Event(EventRecord),
     #[serde(rename = "bank-hirc-event-action")]
     Action(EventActionRecord),
+    #[serde(rename = "bank-hirc-event-action-resolution")]
+    Resolution(ResolutionRecord),
+    #[serde(rename = "bank-hirc-event-action-candidate")]
+    Candidate(CandidateRecord),
     #[serde(rename = "bank-hirc-event-tail")]
     Tail(EventTail),
 }

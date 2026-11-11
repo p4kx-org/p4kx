@@ -45,6 +45,7 @@ fn directory<R: Read + Seek>(
             Err(cause) => {
                 projection.failure(BankPhase::Directory, None, cause, writer)?;
                 inventory.complete = false;
+                inventory.hirc_objects.mark_incomplete();
                 break;
             }
         };
@@ -55,6 +56,9 @@ fn directory<R: Read + Seek>(
                 observe_header(projection, source, &section, &mut inventory, writer)?;
             }
             SectionId::DATA => inventory.observe_data(section)?,
+            SectionId::HIRC => inventory
+                .hirc_objects
+                .observe(projection, source, &section)?,
             _ => {}
         }
     }
@@ -108,6 +112,7 @@ fn subresources<R: Read + Seek>(
                     source,
                     &section,
                     inventory.observed_header(),
+                    &inventory.hirc_objects,
                     writer,
                 )?;
             }

@@ -282,7 +282,7 @@ const BANK_FAILURE_BINDING: Binding = Binding {
     status: StatusRule::Failed,
 };
 
-const fn event_bindings() -> [Binding; 3] {
+const fn event_bindings() -> [Binding; 5] {
     [
         Binding::exact(
             EVENT_PAYLOAD,
@@ -296,6 +296,20 @@ const fn event_bindings() -> [Binding; 3] {
             audio_bank_hirc_event::ACTION_NAMESPACE,
             "bank-hirc-event-action",
             3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            EVENT_PAYLOAD,
+            audio_bank_hirc_event::RESOLUTION_NAMESPACE,
+            "bank-hirc-event-action-resolution",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            EVENT_PAYLOAD,
+            audio_bank_hirc_event::CANDIDATE_NAMESPACE,
+            "bank-hirc-event-action-candidate",
+            4,
             StatusRule::Complete,
         ),
         Binding::exact(

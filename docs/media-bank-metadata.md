@@ -22,6 +22,8 @@ and fallback selection.
 | `audio-bank-hirc-action` | `bank-hirc-action` | HIRC section and object ordinals |
 | `audio-bank-hirc-event` | `bank-hirc-event` | HIRC section and Event object ordinals |
 | `audio-bank-hirc-event-action` | `bank-hirc-event-action` | HIRC section, Event object and action ordinals |
+| `audio-bank-hirc-event-action-resolution` | `bank-hirc-event-action-resolution` | Same HIRC section, Event object and action ordinals |
+| `audio-bank-hirc-event-action-candidate` | `bank-hirc-event-action-candidate` | HIRC section, Event object, action and candidate ordinals |
 | `audio-bank-hirc-event-tail` | `bank-hirc-event-tail` | HIRC section and Event object ordinals |
 | `audio-bank-hirc-sound` | `bank-hirc-sound` | HIRC section and Sound object ordinals |
 | `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
@@ -80,6 +82,12 @@ A malformed Action contributes the fields read before the failure to diagnostic 
 Event rows preserve the original action count and its byte range. Versions through 122 use a
 little-endian unsigned 32-bit count. Versions 123 through 154 use a Wwise variable-length count.
 Each action ID is emitted in original order with its exact word range, including repeated IDs.
+The resolution row reports the number of observed same-ID objects and the number of Action
+matches in that bank. Its result is `resolved`, `ambiguous`, `missing`, or `unavailable`.
+Each candidate row names the original section and object ordinals and type byte. A same-ID
+object of a different kind remains visible with `action_candidate: false`. A malformed HIRC
+inventory leaves observed candidates readable and resolution unavailable. Candidate rows retain
+physical section and object order, with no per-reference inline candidate array.
 A complete Event emits the exact residual body range. Diagnostic Event rows preserve readable
 count fields and the actual count-prefix range. An unsupported layout retains its original body
 and reports the version-dependent status explicitly.
