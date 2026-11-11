@@ -140,6 +140,7 @@ impl Inputs<'_> {
         let part = |part: usize| self.parts.individual.get(part);
         let origin = match source {
             Source::Geometry(index) => part(index).map(|value| &value.geometry),
+            Source::Surface(index) => return self.surface(index),
             Source::Skin(index) => {
                 return self
                     .combined(part(index).map(|value| (&value.geometry, &self.parts.bones)));
@@ -166,6 +167,19 @@ impl Inputs<'_> {
             _ => None,
         };
         self.measured(origin)
+    }
+
+    fn surface(&self, index: usize) -> FieldOrigin {
+        let Some(part) = self.parts.individual.get(index) else {
+            return self.uses.origin(&[], false);
+        };
+        let mut surface = Contributors::default();
+        surface.extend(&part.geometry);
+        surface.extend(&part.shaping);
+        if part.shaped {
+            surface.extend(&self.parts.shape);
+        }
+        surface.origin(self.uses)
     }
 
     fn combined(&self, sources: Option<(&Contributors, &Contributors)>) -> FieldOrigin {

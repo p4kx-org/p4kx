@@ -16,7 +16,7 @@ fn check_receipt(
     out: &Path,
     report: &Value,
     expected: &Value,
-    positions_encrypted: bool,
+    positions_encrypted: Option<bool>,
 ) -> TestResult {
     let name = report
         .get("originReceipt")
@@ -76,7 +76,7 @@ fn check_receipt(
     check_head_positions(&bytes, &rows, positions_encrypted)
 }
 
-fn check_head_positions(bytes: &[u8], rows: &[Value], encrypted: bool) -> TestResult {
+fn check_head_positions(bytes: &[u8], rows: &[Value], encrypted: Option<bool>) -> TestResult {
     let checked = check_glb(bytes)?;
     let positions = checked
         .document
@@ -100,9 +100,34 @@ fn check_head_positions(bytes: &[u8], rows: &[Value], encrypted: bool) -> TestRe
             .ok_or("exact head positions origin")?;
         assert_eq!(
             row.get("containsEncryptedSource").and_then(Value::as_bool),
-            Some(encrypted),
-            "{kind} classifies only the selected head geometry source"
+            encrypted,
+            "{kind} carries the selected archive inputs and original CHF blend"
         );
+        check_blend_origins(rows, row)?;
+    }
+    Ok(())
+}
+
+fn check_blend_origins(rows: &[Value], field: &Value) -> TestResult {
+    let references = field
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("position source references")?;
+    let uses: Vec<_> = rows
+        .iter()
+        .filter_map(|row| row.get("sourceUse"))
+        .filter(|source| source.get("id").is_some_and(|id| references.contains(id)))
+        .collect();
+    for leaf in ["value", "head_id"] {
+        let selected = format!("/character/dna/face_parts/3/blends/0/{leaf}");
+        let zero = format!("/character/dna/face_parts/3/blends/1/{leaf}");
+        let has = |path: &str| {
+            uses.iter().any(|source| {
+                source.pointer("/location/field").and_then(Value::as_str) == Some(path)
+            })
+        };
+        assert!(has(&selected), "actual CHF blend input {selected}");
+        assert!(!has(&zero), "the zero-weight blend {zero} is ignored");
     }
     Ok(())
 }
@@ -146,7 +171,7 @@ fn an_equal_byte_replacement_updates_the_glb_receipt_and_keeps_field_origins_dis
         true
     );
     assert!(report["fieldOrigins"]["/body"]["containsEncryptedSource"].is_null());
-    check_receipt(&out, &report, &Value::Bool(true), true)?;
+    check_receipt(&out, &report, &Value::Bool(true), Some(true))?;
     let bytes = fs::read(&out)?;
 
     let plain_run = glb(&plain, &file, &out, true)?;
@@ -157,7 +182,7 @@ fn an_equal_byte_replacement_updates_the_glb_receipt_and_keeps_field_origins_dis
         report["fieldOrigins"]["/vertices"]["containsEncryptedSource"],
         false
     );
-    check_receipt(&out, &report, &Value::Null, false)?;
+    check_receipt(&out, &report, &Value::Null, None)?;
     Ok(())
 }
 

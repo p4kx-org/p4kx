@@ -5,6 +5,7 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use anyhow::{Context as _, Result, ensure};
+use p4kx_assembly::character::Dna;
 use p4kx_assembly::{Armour, CharacterAnimations};
 use p4kx_extraction::RiggedGlbEmission;
 use p4kx_extraction::{
@@ -21,6 +22,9 @@ use crate::file_receipt::FileReceipt;
 
 #[path = "chf_glb_artifact_origins.rs"]
 mod artifact;
+
+#[path = "chf_glb_character_origins.rs"]
+mod character;
 
 #[path = "chf_glb_part_origins.rs"]
 mod parts;
@@ -138,7 +142,7 @@ impl Contributors {
 }
 
 pub(super) fn project(
-    input: &ObservedFileRead,
+    (input, dna): (&ObservedFileRead, Option<&Dna>),
     forge: &DataForgeOrigin,
     armour: &Armour,
     (prepared, found): (&CharacterAnimations<'_>, &ArchiveAnimationRead),
@@ -158,8 +162,9 @@ pub(super) fn project(
         "GLB texture evidence count differs"
     );
     let uses = SourceUses::new();
-    let character = character(&uses, input)?;
-    let parts = Parts::read(&uses, armour, emission, summary.bones > 0, forge)?;
+    let character = character::whole(&uses, input)?;
+    let shape = character::shape(&uses, input, dna, armour, emission, summary.bones > 0)?;
+    let parts = Parts::read(&uses, armour, emission, summary.bones > 0, forge, shape)?;
     let images = images(&uses, textures, emission, armour, forge)?;
     let clips = animations(&uses, prepared, found, summary, &parts.bones)?;
     let mut payload = Contributors::default();
@@ -183,26 +188,6 @@ pub(super) fn project(
         fields,
         images: images.fields,
         inventory: uses.freeze()?,
-    })
-}
-
-fn character(uses: &SourceUses, input: &ObservedFileRead) -> Result<Contributors> {
-    let scope = uses.observe(
-        input
-            .origin()
-            .map_or(SourceInput::Unknown, SourceInput::File),
-        InputScope::Payload,
-    )?;
-    Ok(Contributors {
-        values: vec![scope.at(
-            SourceLocation::Subresource {
-                namespace: "chf".into(),
-                indices: Vec::new(),
-                field: "character".into(),
-            },
-            SourceUseRole::Conversion,
-        )?],
-        complete: input.origin().is_some(),
     })
 }
 
@@ -309,6 +294,7 @@ pub(super) struct Export<'a, 'archive> {
     pub(super) options: &'a GlbOptions,
     pub(super) textures: &'a ArchiveTextureReads<'a, 'archive>,
     pub(super) input: &'a ObservedFileRead,
+    pub(super) dna: Option<&'a Dna>,
     pub(super) forge: &'a DataForgeOrigin,
 }
 
@@ -340,7 +326,7 @@ pub(super) fn publish(
                         source => io::Error::other(source),
                     })?;
                 let projection = project(
-                    export.input,
+                    (export.input, export.dna),
                     export.forge,
                     export.armour,
                     (export.animated, export.found),

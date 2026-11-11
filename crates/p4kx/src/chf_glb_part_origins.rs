@@ -16,6 +16,7 @@ use super::Contributors;
 
 #[derive(Default)]
 pub(super) struct Parts {
+    pub(super) shape: Contributors,
     pub(super) nodes: Contributors,
     pub(super) bones: Contributors,
     pub(super) geometry: Contributors,
@@ -30,6 +31,8 @@ pub(super) struct Part {
     pub(super) path: Contributors,
     face: Contributors,
     pub(super) geometry: Contributors,
+    pub(super) shaping: Contributors,
+    pub(super) shaped: bool,
     pub(super) morphs: Contributors,
     pub(super) materials: Contributors,
     pub(super) material_slots: BTreeMap<usize, Contributors>,
@@ -42,13 +45,17 @@ impl Parts {
         emission: &RiggedGlbEmission,
         bones_written: bool,
         forge: &DataForgeOrigin,
+        shape: Contributors,
     ) -> Result<Self> {
-        let mut found = Self::default();
+        let mut found = Self {
+            shape,
+            ..Self::default()
+        };
         if bones_written {
             add_model(uses, &mut found.bones, armour.skeleton_archive_source())?;
         }
         for (part, emitted) in armour.parts().iter().zip(emission.parts()) {
-            let origins = Part::read(uses, part, emitted, forge)?;
+            let origins = Part::read(uses, part, emitted, forge, &found.shape)?;
             if !part.model().nodes.is_empty() {
                 found.nodes.extend(&origins.selection);
             }
@@ -56,6 +63,7 @@ impl Parts {
                 found.bones.extend(&origins.face);
             }
             found.geometry.extend(&origins.geometry);
+            found.geometry.extend(&origins.shaping);
             found.morphs.extend(&origins.morphs);
             found.materials.extend(&origins.materials);
             found.individual.push(origins);
@@ -70,8 +78,12 @@ impl Part {
         part: &ArmourPart,
         emitted: &RiggedPartEmission,
         forge: &DataForgeOrigin,
+        shape_choice: &Contributors,
     ) -> Result<Self> {
-        let mut found = Self::default();
+        let mut found = Self {
+            shaped: !part.shape_archive_sources().is_empty(),
+            ..Self::default()
+        };
         let files = part.model_archive_sources();
         (found.selection, found.path) = selected_part(uses, part, forge)?;
         if emitted.geometry() {
@@ -85,20 +97,27 @@ impl Part {
                 }
             }
             for shape in part.shape_archive_sources() {
-                rig(uses, &mut found.geometry, &shape.rig)?;
+                rig(uses, &mut found.shaping, &shape.rig)?;
                 for model in shape.model.iter() {
-                    add_model(uses, &mut found.geometry, Some(model))?;
+                    add_model(uses, &mut found.shaping, Some(model))?;
                 }
             }
         }
         if part.has_facial_rig() {
             found.face.extend(&found.selection);
+            if found.shaped {
+                found.face.extend(shape_choice);
+            }
             for shape in part.shape_archive_sources() {
                 rig(uses, &mut found.face, &shape.rig)?;
             }
         }
         if emitted.morphs() {
             found.morphs.extend(&found.geometry);
+            found.morphs.extend(&found.shaping);
+            if found.shaped {
+                found.morphs.extend(shape_choice);
+            }
             for source in part
                 .shape_archive_sources()
                 .iter()

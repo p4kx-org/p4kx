@@ -17,6 +17,8 @@ use crate::materials::Slot;
 pub enum RiggedBufferSource {
     /// A model's mesh attributes and triangles.
     Geometry(usize),
+    /// The positions and tangent frame of a model's surface.
+    Surface(usize),
     /// A model's weights and remapped joint indices.
     Skin(usize),
     /// A model's sparse morph target data.
@@ -219,14 +221,18 @@ fn owners(layout: &Layout<'_>, instances: &[Instance<'_>], plans: &[AnimationPla
 }
 
 fn mesh_owners(owners: &mut Owners, layout: &Layout<'_>, mesh: &MeshLayout) {
-    let attributes = [
-        Some(mesh.positions),
-        mesh.normals,
-        mesh.uvs,
-        mesh.tangents,
-        mesh.colours,
-    ];
-    for index in attributes
+    for index in [Some(mesh.positions), mesh.normals, mesh.tangents]
+        .into_iter()
+        .flatten()
+    {
+        add_block(
+            owners,
+            layout,
+            index,
+            RiggedBufferSource::Surface(mesh.part),
+        );
+    }
+    for index in [mesh.uvs, mesh.colours]
         .into_iter()
         .flatten()
         .chain(mesh.primitives.iter().map(|primitive| primitive.indices))

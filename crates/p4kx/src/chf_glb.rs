@@ -141,6 +141,7 @@ pub(crate) fn run(args: &ChfGlbArgs, as_json: bool) -> Result<()> {
         options: &glb,
         textures: &textures,
         input: &input,
+        dna: chf.character.dna.as_ref(),
         forge: entry.origin(),
     };
     let (summary, projection, receipt) = origin::publish(args, &write_guard, &cancel, &export)?;

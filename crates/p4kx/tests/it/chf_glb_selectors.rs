@@ -42,7 +42,7 @@ fn the_encrypted_dataforge_marks_only_values_that_use_its_selected_paths() -> Te
         field.ends_with(".Geometry.SubGeometry[0].Geometry.Material.path")
     })?;
     let receipt = out.with_file_name("selector.glb.p4kx-origin.jsonl");
-    check_unrelated_positions(&glb, &fs::read_to_string(receipt)?)?;
+    check_unrelated_geometry(&glb, &fs::read_to_string(receipt)?)?;
 
     let hair = report
         .get("parts")
@@ -85,29 +85,38 @@ fn image_origin<'a>(
         .ok_or_else(|| format!("missing rendered image origin for {name}").into())
 }
 
-fn check_unrelated_positions(glb: &CheckedGlb, receipt: &str) -> TestResult {
-    let positions = glb
+fn check_unrelated_geometry(glb: &CheckedGlb, receipt: &str) -> TestResult {
+    let primitive = glb
         .document
         .nodes()
         .find(|node| node.name() == Some("head") && node.mesh().is_some())
         .and_then(|node| node.mesh())
         .and_then(|mesh| mesh.primitives().next())
-        .and_then(|primitive| primitive.get(&Semantic::Positions))
-        .and_then(|positions| positions.view())
-        .ok_or("head position view")?;
-    let path = format!("/bufferViews/{}", positions.index());
-    for row in receipt.lines().map(serde_json::from_str::<Value>) {
-        let row = row?;
-        if row.pointer("/address/path").and_then(Value::as_str) == Some(path.as_str()) {
-            assert_eq!(
-                row.get("containsEncryptedSource").and_then(Value::as_bool),
-                Some(false),
-                "the head's position data does not consume the encrypted material selection"
-            );
-            return Ok(());
-        }
+        .ok_or("head primitive")?;
+    let views = [
+        (primitive.get(&Semantic::Positions), Value::Null),
+        (primitive.indices(), Value::Bool(false)),
+    ];
+    let rows = receipt
+        .lines()
+        .map(serde_json::from_str::<Value>)
+        .collect::<Result<Vec<_>, _>>()?;
+    for (accessor, expected) in views {
+        let view = accessor
+            .and_then(|accessor| accessor.view())
+            .ok_or("head buffer view")?;
+        let path = format!("/bufferViews/{}", view.index());
+        let row = rows
+            .iter()
+            .find(|row| row.pointer("/address/path").and_then(Value::as_str) == Some(path.as_str()))
+            .ok_or("addressed head geometry")?;
+        assert_eq!(
+            row.get("containsEncryptedSource"),
+            Some(&expected),
+            "the unrelated encrypted material selector does not mark geometry at {path}"
+        );
     }
-    Err("missing addressed head geometry".into())
+    Ok(())
 }
 
 fn report_field<'a>(report: &'a Value, field: &str) -> Result<&'a Value, Box<dyn Error>> {
