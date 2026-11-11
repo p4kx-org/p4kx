@@ -127,7 +127,8 @@ pub use opus::{OpusError, WemOpusOgg, WemOpusRanges, WemOpusWav, WemOpusWriteErr
 pub use riff::{ByteOrder, WemSourceChunk};
 pub use soundbank::{BankHeader, EmbeddedWem, Section, Soundbank};
 pub use vorbis::{
-    Codebooks, OggReport, VorbisError, WemVorbisOgg, WemVorbisRanges, WemVorbisWriteError,
+    Codebooks, OggReport, VorbisError, WemVorbisOgg, WemVorbisRanges, WemVorbisWav,
+    WemVorbisWriteError,
 };
 pub use wav::WavReport;
 pub use wem::{Wem, WemChunk};

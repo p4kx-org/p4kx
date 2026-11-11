@@ -18,6 +18,16 @@ fn media_cli_ogg_matches_standalone_vorbis() -> TestResult {
 }
 
 #[test]
+fn media_cli_wav_matches_standalone_vorbis() -> TestResult {
+    let original = TestVorbis::new(2, 48_000, &[false; 5])
+        .tone(3)
+        .sample_count(3 * 128)
+        .wem()
+        .bytes();
+    assert_audio_parity("audio/vorbis.wem", Codec::Vorbis, Container::Wav, original)
+}
+
+#[test]
 fn media_cli_ogg_matches_standalone_opus() -> TestResult {
     assert_audio_parity(
         "audio/opus.wem",
@@ -152,6 +162,14 @@ fn checked_artifact_path(mapping: &Value, codec: Codec, format: Container) -> Te
                 .pointer("/data/payload/outcome/payload/opus_inputs/checked_data")
                 .is_some(),
             "Opus conversion keeps the checked source packet range"
+        );
+    }
+    if matches!((codec, format), (Codec::Vorbis, Container::Wav)) {
+        assert!(
+            mapping
+                .pointer("/data/payload/outcome/payload/vorbis_inputs/checked_audio_packets")
+                .is_some(),
+            "Vorbis WAV keeps the checked source packet range"
         );
     }
     mapping

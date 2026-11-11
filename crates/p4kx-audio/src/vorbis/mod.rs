@@ -19,8 +19,8 @@ use std::time::Duration;
 
 pub use codebook::Codebooks;
 pub use error::VorbisError;
-pub(crate) use seek::prepare as prepare_ogg;
-pub use seek::{WemVorbisOgg, WemVorbisRanges, WemVorbisWriteError};
+pub use seek::{WemVorbisOgg, WemVorbisRanges, WemVorbisWav, WemVorbisWriteError};
+pub(crate) use seek::{prepare_ogg, prepare_wav};
 
 use self::header::Header;
 use self::packets::{AudioPackets, Packets, Rebuilt};
@@ -180,10 +180,6 @@ impl<'a> Stream<'a> {
             data: self.data,
             order: self.order,
         }
-    }
-
-    fn audio<'borrow>(&'borrow self, setup: &'borrow Setup) -> AudioPackets<'borrow> {
-        AudioPackets::new(self.data, self.order, &self.header, &setup.long_modes)
     }
 }
 

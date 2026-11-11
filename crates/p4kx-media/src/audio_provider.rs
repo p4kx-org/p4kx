@@ -99,6 +99,10 @@ fn field_groups() -> Vec<FieldGroup> {
                 "Requested Ogg output from Wwise Vorbis, with original packet extents and verified artifact mappings.",
             ),
             FieldGroup::new(
+                "vorbis-wav-conversion",
+                "Requested WAV output from Wwise Vorbis, with separate checked and decoded original packet ranges.",
+            ),
+            FieldGroup::new(
                 "opus-ogg-conversion",
                 "Requested Ogg output from Wwise, Switch and embedded Ogg Opus layouts, with checked and emitted input ranges.",
             ),

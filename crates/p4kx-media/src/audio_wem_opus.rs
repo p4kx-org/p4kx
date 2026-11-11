@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{self, Read, Seek};
+use std::io::{Read, Seek};
 use std::ops::Range;
 use std::path::Path;
 
@@ -16,10 +16,10 @@ use super::ogg_artifact::{self, OggArtifact};
 use super::wav_artifact::{self, WavArtifact};
 use super::{
     ArtifactEvidence, CompletedConversion, ConversionOrigins, SOURCE_RANGE, WemProjection,
-    capture_fields,
+    capture_fields, format_write_error, recover_format_write,
 };
 use crate::audio_payload::{
-    EncodedAudioFormat, OpusInputs, WrittenAudio, WrittenOggFormat, WrittenWavFormat,
+    EncodedAudioFormat, OpusInputs, PcmInputs, WrittenAudio, WrittenOggFormat, WrittenWavFormat,
 };
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
@@ -110,15 +110,8 @@ pub(super) fn convert<R: Read + Seek>(
     };
     let ranges = conversion.ranges().clone();
     let origins = OpusOrigins::capture(projection, conversion.metadata(), &ranges, writer)?;
-    let output = match conversion.write(input, &origins.artifact, writer) {
-        Ok(output) => output,
-        Err(MediaError::Io { path, source }) => match source.downcast::<AudioError>() {
-            Ok(cause) => return Ok(Err(cause)),
-            Err(source) => return Err(MediaError::Io { path, source }),
-        },
-        Err(cause) => return Err(cause),
-    };
-    Ok(Ok(CompletedOpus {
+    let result = recover_format_write(conversion.write(input, &origins.artifact, writer))?;
+    Ok(result.map(|output| CompletedOpus {
         output,
         ranges,
         origins,
@@ -128,9 +121,7 @@ pub(super) fn convert<R: Read + Seek>(
 fn write_error(input: &Path, output: &str, cause: WemOpusWriteError) -> MediaError {
     match cause {
         WemOpusWriteError::Input(WemReadError::Io(cause)) => error::io(input, cause),
-        WemOpusWriteError::Input(WemReadError::Format(cause)) => {
-            error::io(input, io::Error::new(io::ErrorKind::InvalidData, cause))
-        }
+        WemOpusWriteError::Input(WemReadError::Format(cause)) => format_write_error(input, cause),
         WemOpusWriteError::Output(cause) => error::io(Path::new(output), cause),
         other => MediaError::Contract(other.to_string()),
     }
@@ -174,7 +165,9 @@ impl CompletedConversion for CompletedOpus {
                 actual_format: WrittenWavFormat::Wav,
                 signal: output.signal(),
                 source_range,
-                opus_inputs: Some(inputs),
+                inputs: PcmInputs::Opus {
+                    opus_inputs: inputs,
+                },
             },
         })
     }

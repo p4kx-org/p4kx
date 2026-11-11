@@ -13,6 +13,7 @@ use super::{TestResult, audio_export as export, jsonl_rows as rows, wem_conversi
 const TONE: &str = "audio/tone.wem";
 const UNSUPPORTED: &str = "audio/compressed.wem";
 const RATE: u32 = 22_050;
+const XMA2_FORMAT_TAG: u16 = 0x0166;
 const SAMPLES: [i16; 4] = [0, -123, 456, i16::MAX];
 const INDEX: &str = "media-index.json";
 const ARTIFACT_DIGEST: &str = "/data/payload/outcome/payload/artifact/digest/hex";
@@ -22,10 +23,10 @@ fn media_cli_wav_is_explicit_sourced_and_atomic() -> TestResult {
     let folder = tempfile::tempdir()?;
     let source = folder.path().join("Data.p4k");
     let original = TestWem::pcm(TestCodec::Pcm, 1, RATE, &SAMPLES).bytes();
-    let compressed = TestWem::encoded(TestCodec::Vorbis, 1, RATE, 8).bytes();
+    let xma2 = TestWem::encoded(TestCodec::Tag(XMA2_FORMAT_TAG), 1, RATE, 8).bytes();
     ArchiveBuilder::new()
         .entry(TestEntry::zstd(TONE, original.as_slice()).encrypted())
-        .entry(TestEntry::stored(UNSUPPORTED, compressed))
+        .entry(TestEntry::stored(UNSUPPORTED, xma2))
         .write_to(&source)?;
 
     let raw = folder.path().join("raw");

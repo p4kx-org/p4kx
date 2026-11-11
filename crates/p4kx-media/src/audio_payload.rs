@@ -108,8 +108,8 @@ pub(crate) enum WrittenAudio {
         #[serde(flatten)]
         signal: WrittenSignal,
         source_range: SourceRange,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        opus_inputs: Option<Box<OpusInputs>>,
+        #[serde(flatten)]
+        inputs: PcmInputs,
     },
     Vorbis {
         actual_format: WrittenOggFormat,
@@ -125,6 +125,15 @@ pub(crate) enum WrittenAudio {
         source_range: SourceRange,
         opus_inputs: Box<OpusInputs>,
     },
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(untagged, deny_unknown_fields)]
+#[schemars(extend("not" = {"required": ["opus_inputs", "vorbis_inputs"]}))]
+pub(crate) enum PcmInputs {
+    Direct {},
+    Opus { opus_inputs: Box<OpusInputs> },
+    Vorbis { vorbis_inputs: Box<VorbisWavInputs> },
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -154,6 +163,14 @@ pub(crate) struct VorbisInputs {
     pub(crate) average_byte_rate: SourceRange,
     pub(crate) header: SourceRange,
     pub(crate) setup_packet: SourceRange,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct VorbisWavInputs {
+    #[serde(flatten)]
+    pub(crate) setup: VorbisInputs,
+    pub(crate) checked_audio_packets: SourceRange,
 }
 
 #[derive(Serialize, JsonSchema)]

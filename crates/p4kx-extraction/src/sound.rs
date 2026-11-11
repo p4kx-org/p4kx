@@ -17,7 +17,7 @@ pub use p4kx_audio::{
     WemCueTextRegion, WemInfoSource, WemInspection, WemList, WemListItem, WemListPayload,
     WemLoopEnd, WemLoopSource, WemMetadata, WemOpusOgg, WemOpusRanges, WemOpusWav,
     WemOpusWriteError, WemPcmWav, WemPcmWriteError, WemReadError, WemSampleCountSource, WemSource,
-    WemSourceChunk, WemTextUtf8, WemVorbisOgg, WemVorbisRanges, WemVorbisWriteError,
+    WemSourceChunk, WemTextUtf8, WemVorbisOgg, WemVorbisRanges, WemVorbisWav, WemVorbisWriteError,
 };
 
 #[path = "wem_origin_plan.rs"]

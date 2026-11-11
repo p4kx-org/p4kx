@@ -15,6 +15,12 @@ use crate::riff::RiffHeader;
 use crate::wem_metadata_read::selected_chunks;
 use crate::{AudioError, Codec, WemMetadata, WemReadError};
 
+#[path = "seek_wav.rs"]
+mod wav;
+
+pub use wav::WemVorbisWav;
+pub(crate) use wav::prepare as prepare_wav;
+
 /// Physical input extents for one prepared Wwise Vorbis conversion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -29,7 +35,7 @@ pub struct WemVorbisRanges {
     pub audio_packets: Range<u64>,
 }
 
-/// Failure during a prepared seekable Vorbis Ogg write.
+/// Failure during a prepared seekable Vorbis write.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum WemVorbisWriteError {
@@ -40,12 +46,32 @@ pub enum WemVorbisWriteError {
     #[error(transparent)]
     Format(#[from] AudioError),
     /// The converted bytes could not be written.
-    #[error("cannot write the converted Ogg Vorbis")]
+    #[error("cannot write the converted Vorbis audio")]
     Output(#[source] io::Error),
+    /// PCM replay used a different packet range from the prepared source.
+    #[error("Vorbis replay ended at WEM byte {actual}, expected {expected}")]
+    ReplayRangeChanged {
+        /// Expected exclusive end in source-relative bytes.
+        expected: u64,
+        /// Actual exclusive end in source-relative bytes.
+        actual: u64,
+    },
+}
+
+impl From<StreamError<io::Error>> for WemVorbisWriteError {
+    fn from(error: StreamError<io::Error>) -> Self {
+        match error {
+            StreamError::Input(error) => Self::Input(error),
+            StreamError::Audio(AudioError::Write(error)) => Self::Output(error),
+            StreamError::Audio(error) => Self::Format(error),
+        }
+    }
 }
 
 /// Prepared Ogg Vorbis output over a checked original Wwise Vorbis source.
-pub struct WemVorbisOgg<'source, R> {
+pub struct WemVorbisOgg<'source, R>(PreparedVorbis<'source, R>);
+
+struct PreparedVorbis<'source, R> {
     source: SeekAudio<'source, R>,
     metadata: &'source WemMetadata,
     header: Header,
@@ -57,19 +83,19 @@ impl<R> WemVorbisOgg<'_, R> {
     /// Returns the source metadata used to prepare the conversion.
     #[must_use]
     pub const fn metadata(&self) -> &WemMetadata {
-        self.metadata
+        self.0.metadata
     }
 
     /// Returns the original conversion input extents relative to the start of the WEM.
     #[must_use]
     pub const fn ranges(&self) -> &WemVorbisRanges {
-        &self.ranges
+        &self.0.ranges
     }
 
     /// Returns the number of output frames after applying the authored sample count.
     #[must_use]
     pub const fn sample_count(&self) -> u64 {
-        self.headers.sample_count
+        self.0.headers.sample_count
     }
 }
 
@@ -82,17 +108,14 @@ impl<R: Read + Seek> WemVorbisOgg<'_, R> {
         mut self,
         output: &mut (impl Write + ?Sized),
     ) -> Result<OggReport, WemVorbisWriteError> {
-        self.headers
-            .write(&mut self.source, &self.header, output)
-            .map_err(|error| match error {
-                StreamError::Input(error) => WemVorbisWriteError::Input(error),
-                StreamError::Audio(AudioError::Write(error)) => WemVorbisWriteError::Output(error),
-                StreamError::Audio(error) => WemVorbisWriteError::Format(error),
-            })
+        let prepared = &mut self.0;
+        Ok(prepared
+            .headers
+            .write(&mut prepared.source, &prepared.header, output)?)
     }
 }
 
-pub(crate) fn prepare<'source, R: Read + Seek>(
+pub(crate) fn prepare_ogg<'source, R: Read + Seek>(
     input: &'source mut SeekSource<R>,
     riff: RiffHeader,
     metadata: &'source WemMetadata,
@@ -100,6 +123,14 @@ pub(crate) fn prepare<'source, R: Read + Seek>(
     if metadata.codec() != Codec::Vorbis {
         return Err(AudioError::UnsupportedOggCodec(metadata.codec()).into());
     }
+    prepare(input, riff, metadata).map(WemVorbisOgg)
+}
+
+fn prepare<'source, R: Read + Seek>(
+    input: &'source mut SeekSource<R>,
+    riff: RiffHeader,
+    metadata: &'source WemMetadata,
+) -> Result<PreparedVorbis<'source, R>, WemReadError> {
     let HeaderRead {
         header,
         average_byte_rate,
@@ -121,7 +152,7 @@ pub(crate) fn prepare<'source, R: Read + Seek>(
         setup_packet,
         audio_packets: source.data.start + header.audio_offset as u64..source.data.end,
     };
-    Ok(WemVorbisOgg {
+    Ok(PreparedVorbis {
         source,
         metadata,
         header,

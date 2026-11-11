@@ -76,11 +76,11 @@ impl<'a> Iterator for Packets<'a> {
 type Item<'a> = Result<Packet<'a>, VorbisError>;
 type NonEmpty<'a> = Peekable<Filter<Packets<'a>, fn(&Item<'a>) -> bool>>;
 
-/// A rebuilt audio packet: its offset in the `data` chunk, its granule position and whether it
-/// is the last one.
+/// A rebuilt audio packet and its original range, granule position and final-packet flag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Rebuilt {
     pub(crate) offset: usize,
+    pub(crate) end: usize,
     pub(crate) granule: u64,
     pub(crate) last: bool,
 }
@@ -199,6 +199,7 @@ impl<'a> PacketRebuild<'a> {
         self.previous = Some(long);
         Ok(Rebuilt {
             offset: packet.offset,
+            end: packet.offset + PACKET_HEADER_LEN + packet.payload.len(),
             granule: self.granule,
             last,
         })

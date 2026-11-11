@@ -6,123 +6,193 @@ use std::ops::Range;
 use std::path::Path;
 
 use p4kx_extraction::sound::{
-    WemInspection, WemMetadata, WemOriginField, WemOriginPlan, WemReadError, WemVorbisRanges,
-    WemVorbisWriteError,
+    WemInspection, WemMetadata, WemOriginField, WemOriginPlan, WemReadError, WemVorbisOgg,
+    WemVorbisRanges, WemVorbisWav, WemVorbisWriteError,
 };
 use p4kx_extraction::{AudioError, Codec, SourceUseRole};
 
 use super::evidence::{join, prove_framed};
 use super::ogg_artifact::{self, OggArtifact};
+use super::wav_artifact::{self, WavArtifact};
 use super::{
     ArtifactEvidence, CompletedConversion, ConversionOrigins, SOURCE_RANGE, WemProjection,
-    capture_fields,
+    capture_fields, format_write_error, recover_format_write,
 };
-use crate::audio_payload::{VorbisInputs, WrittenAudio, WrittenOggFormat};
+use crate::audio_payload::{
+    EncodedAudioFormat, PcmInputs, VorbisInputs, VorbisWavInputs, WrittenAudio, WrittenOggFormat,
+    WrittenWavFormat,
+};
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
 use crate::{MediaError, MediaWriter, error};
 
 const INPUTS: &str = "/data/payload/outcome/payload/vorbis_inputs";
 
-pub(super) struct CompletedOgg {
-    output: OggArtifact,
+pub(super) struct CompletedVorbis {
+    output: VorbisArtifact,
     ranges: WemVorbisRanges,
     origins: VorbisOrigins,
+}
+
+enum VorbisArtifact {
+    Ogg(OggArtifact),
+    Wav {
+        output: WavArtifact,
+        decoded: Range<u64>,
+    },
+}
+
+enum PreparedVorbis<'source, R> {
+    Ogg(WemVorbisOgg<'source, R>),
+    Wav(WemVorbisWav<'source, R>),
+}
+
+impl<R> PreparedVorbis<'_, R> {
+    const fn metadata(&self) -> &WemMetadata {
+        match self {
+            Self::Ogg(plan) => plan.metadata(),
+            Self::Wav(plan) => plan.metadata(),
+        }
+    }
+
+    const fn ranges(&self) -> &WemVorbisRanges {
+        match self {
+            Self::Ogg(plan) => plan.ranges(),
+            Self::Wav(plan) => plan.ranges(),
+        }
+    }
+
+    const fn decoded(&self) -> Option<&Range<u64>> {
+        match self {
+            Self::Ogg(_) => None,
+            Self::Wav(plan) => Some(plan.decoded_audio_packets()),
+        }
+    }
+}
+
+impl<R: Read + Seek> PreparedVorbis<'_, R> {
+    fn write(
+        self,
+        input: &Path,
+        evidence: &ArtifactEvidence,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<VorbisArtifact, MediaError> {
+        match self {
+            Self::Ogg(plan) => {
+                let output = ogg_artifact::write(
+                    Codec::Vorbis,
+                    plan.sample_count(),
+                    evidence,
+                    writer,
+                    |sink| {
+                        plan.write(sink)
+                            .map_err(|cause| write_error(input, EncodedAudioFormat::Ogg, cause))
+                    },
+                )?;
+                Ok(VorbisArtifact::Ogg(output))
+            }
+            Self::Wav(plan) => {
+                let decoded = plan.decoded_audio_packets().clone();
+                let output = wav_artifact::write(plan.report(), evidence, writer, |sink| {
+                    plan.write(sink)
+                        .map_err(|cause| write_error(input, EncodedAudioFormat::Wav, cause))
+                })?;
+                Ok(VorbisArtifact::Wav { output, decoded })
+            }
+        }
+    }
 }
 
 pub(super) fn convert<R: Read + Seek>(
     projection: &WemProjection<'_>,
     inspected: &mut WemInspection<'_, R>,
+    format: EncodedAudioFormat,
     writer: &mut MediaWriter<'_>,
-) -> Result<Result<CompletedOgg, AudioError>, MediaError> {
+) -> Result<Result<CompletedVorbis, AudioError>, MediaError> {
     let input = Path::new(projection.path);
-    let conversion = match inspected.vorbis_ogg() {
+    let conversion = match format {
+        EncodedAudioFormat::Ogg => inspected.vorbis_ogg().map(PreparedVorbis::Ogg),
+        EncodedAudioFormat::Wav => inspected.vorbis_wav().map(PreparedVorbis::Wav),
+    };
+    let conversion = match conversion {
         Ok(conversion) => conversion,
         Err(WemReadError::Format(cause)) => return Ok(Err(cause)),
         Err(WemReadError::Io(cause)) => return Err(error::io(input, cause)),
         Err(cause) => return Err(MediaError::Contract(cause.to_string())),
     };
     let ranges = conversion.ranges().clone();
-    let frames = conversion.sample_count();
-    let origins = VorbisOrigins::capture(projection, conversion.metadata(), &ranges, writer)?;
-    let output = ogg_artifact::write(Codec::Vorbis, frames, &origins.artifact, writer, |sink| {
-        conversion.write(sink).map_err(|cause| match cause {
-            WemVorbisWriteError::Input(cause) => error::io(input, cause),
-            WemVorbisWriteError::Output(cause) => error::io(Path::new("Ogg encoder"), cause),
-            other => MediaError::Contract(other.to_string()),
-        })
-    })?;
-    Ok(Ok(CompletedOgg {
+    let decoded = conversion.decoded();
+    let origins =
+        VorbisOrigins::capture(projection, conversion.metadata(), &ranges, decoded, writer)?;
+    let result = recover_format_write(conversion.write(input, &origins.artifact, writer))?;
+    Ok(result.map(|output| CompletedVorbis {
         output,
         ranges,
         origins,
     }))
 }
 
-impl CompletedConversion for CompletedOgg {
+fn write_error(input: &Path, output: EncodedAudioFormat, cause: WemVorbisWriteError) -> MediaError {
+    match (output, cause) {
+        (_, WemVorbisWriteError::Input(cause)) => error::io(input, cause),
+        (EncodedAudioFormat::Wav, WemVorbisWriteError::Format(cause)) => {
+            format_write_error(input, cause)
+        }
+        (EncodedAudioFormat::Wav, WemVorbisWriteError::Output(cause)) => {
+            error::io(Path::new("WAV encoder"), cause)
+        }
+        (EncodedAudioFormat::Ogg, WemVorbisWriteError::Output(cause)) => {
+            error::io(Path::new("Ogg encoder"), cause)
+        }
+        (_, cause) => MediaError::Contract(cause.to_string()),
+    }
+}
+
+impl CompletedConversion for CompletedVorbis {
     fn into_record(
         self,
         proof: &mut ConversionOrigins<'_, '_, '_, '_>,
         projection: &WemProjection<'_>,
     ) -> Result<WrittenAudio, MediaError> {
-        self.prove(proof)?;
-        self.payload(projection)
-    }
-}
-
-impl CompletedOgg {
-    fn payload(self, projection: &WemProjection<'_>) -> Result<WrittenAudio, MediaError> {
+        let has_loop = match &self.output {
+            VorbisArtifact::Ogg(output) => output.report.loop_points.is_some(),
+            VorbisArtifact::Wav { output, .. } => output.report.loop_points.is_some(),
+        };
+        self.origins.prove(proof, has_loop)?;
+        let range = |extent: Range<u64>| projection.range(extent.start, extent.end);
         let ranges = self.ranges;
-        Ok(WrittenAudio::Vorbis {
-            actual_format: WrittenOggFormat::Ogg,
-            signal: self.output.signal(),
-            source_range: projection.range(ranges.audio_packets.start, ranges.audio_packets.end)?,
-            vorbis_inputs: Box::new(VorbisInputs {
-                average_byte_rate: projection
-                    .range(ranges.average_byte_rate.start, ranges.average_byte_rate.end)?,
-                header: projection.range(ranges.header.start, ranges.header.end)?,
-                setup_packet: projection
-                    .range(ranges.setup_packet.start, ranges.setup_packet.end)?,
-            }),
+        let setup = VorbisInputs {
+            average_byte_rate: range(ranges.average_byte_rate)?,
+            header: range(ranges.header)?,
+            setup_packet: range(ranges.setup_packet)?,
+        };
+        Ok(match self.output {
+            VorbisArtifact::Ogg(output) => WrittenAudio::Vorbis {
+                actual_format: WrittenOggFormat::Ogg,
+                signal: output.signal(),
+                source_range: range(ranges.audio_packets)?,
+                vorbis_inputs: Box::new(setup),
+            },
+            VorbisArtifact::Wav { output, decoded } => WrittenAudio::Pcm {
+                actual_format: WrittenWavFormat::Wav,
+                signal: output.signal(),
+                source_range: range(decoded)?,
+                inputs: PcmInputs::Vorbis {
+                    vorbis_inputs: Box::new(VorbisWavInputs {
+                        setup,
+                        checked_audio_packets: range(ranges.audio_packets)?,
+                    }),
+                },
+            },
         })
     }
-
-    fn prove(&self, proof: &mut ConversionOrigins<'_, '_, '_, '_>) -> Result<(), MediaError> {
-        prove_framed(
-            proof,
-            proof.combine([WemOriginField::Channels])?,
-            &self.origins.frames,
-            &self.origins.artifact,
-            self.output.report.loop_points.is_some(),
-        )?;
-        proof.range_at(SOURCE_RANGE, &self.origins.audio)?;
-        proof.field(
-            INPUTS,
-            join(
-                proof.writer,
-                [
-                    &self.origins.rate,
-                    &self.origins.header,
-                    &self.origins.setup,
-                ],
-            )?,
-        )?;
-        for (field, origin) in [
-            ("average_byte_rate", &self.origins.rate),
-            ("header", &self.origins.header),
-            ("setup_packet", &self.origins.setup),
-        ] {
-            proof.range_at(&format!("{INPUTS}/{field}"), origin)?;
-        }
-        Ok(())
-    }
 }
-
 struct VorbisOrigins {
     rate: OriginContributions,
     header: OriginContributions,
     setup: OriginContributions,
     audio: OriginContributions,
+    checked: Option<OriginContributions>,
     frames: OriginContributions,
     artifact: ArtifactEvidence,
 }
@@ -132,6 +202,7 @@ impl VorbisOrigins {
         projection: &WemProjection<'_>,
         metadata: &WemMetadata,
         ranges: &WemVorbisRanges,
+        decoded: Option<&Range<u64>>,
         writer: &MediaWriter<'_>,
     ) -> Result<Self, MediaError> {
         let capture = |range, field| Self::range(projection, range, field, writer);
@@ -139,7 +210,10 @@ impl VorbisOrigins {
         let header = capture(&ranges.header, "configuration")?;
         let setup = capture(&ranges.setup_packet, "setupPacket")?;
         let audio_bytes = capture(&ranges.audio_packets, "audioPackets")?;
-        let audio = join(writer, [&audio_bytes, &header])?;
+        let decoded = decoded
+            .map(|range| capture(range, "decodedAudioPackets"))
+            .transpose()?;
+        let audio = join(writer, [decoded.as_ref().unwrap_or(&audio_bytes), &header])?;
         let plan = WemOriginPlan::new(
             metadata.info_source(),
             metadata.codec(),
@@ -164,6 +238,7 @@ impl VorbisOrigins {
             header,
             setup,
             audio,
+            checked: decoded.map(|_| audio_bytes),
             frames,
             artifact: ArtifactEvidence {
                 shape: bytes.clone(),
@@ -172,6 +247,38 @@ impl VorbisOrigins {
         })
     }
 
+    fn prove(
+        &self,
+        proof: &mut ConversionOrigins<'_, '_, '_, '_>,
+        has_loop: bool,
+    ) -> Result<(), MediaError> {
+        prove_framed(
+            proof,
+            proof.combine([WemOriginField::Channels])?,
+            &self.frames,
+            &self.artifact,
+            has_loop,
+        )?;
+        proof.range_at(SOURCE_RANGE, &self.audio)?;
+        let fields = [
+            ("average_byte_rate", &self.rate),
+            ("header", &self.header),
+            ("setup_packet", &self.setup),
+        ];
+        let fields = fields.into_iter().chain(
+            self.checked
+                .as_ref()
+                .map(|origin| ("checked_audio_packets", origin)),
+        );
+        proof.field(
+            INPUTS,
+            join(proof.writer, fields.clone().map(|(_, origin)| origin))?,
+        )?;
+        for (field, origin) in fields {
+            proof.range_at(&format!("{INPUTS}/{field}"), origin)?;
+        }
+        Ok(())
+    }
     fn range(
         projection: &WemProjection<'_>,
         range: &Range<u64>,

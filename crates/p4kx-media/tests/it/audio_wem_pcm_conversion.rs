@@ -83,7 +83,7 @@ fn requested_pcm_wav_streams_loose_and_banked_sources_with_exact_artifact_origin
 #[test]
 fn requested_wav_refuses_unsupported_codec_and_preserves_the_raw_generation() -> TestResult {
     let folder = tempfile::tempdir()?;
-    let bytes = TestWem::encoded(TestCodec::Vorbis, 1, RATE, 8).bytes();
+    let bytes = TestWem::encoded(TestCodec::Tag(0x0166), 1, RATE, 8).bytes();
     let archive =
         support::archive_with(folder.path(), [TestEntry::stored(LOOSE, bytes.as_slice())])?;
     let [entry] = archive.entries() else {
@@ -96,7 +96,7 @@ fn requested_wav_refuses_unsupported_codec_and_preserves_the_raw_generation() ->
     );
     assert_eq!(
         Wem::parse(&original)?.codec(),
-        Codec::Vorbis,
+        Codec::Xma2,
         "known compressed source"
     );
     let output = folder.path().join("out");

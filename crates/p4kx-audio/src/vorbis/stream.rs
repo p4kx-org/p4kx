@@ -57,6 +57,7 @@ pub(super) struct Headers {
     pub(super) decoder: Decoder,
     codebooks: Codebooks,
     pub(super) sample_count: u64,
+    pub(super) decoded_end: usize,
 }
 
 impl Headers {
@@ -85,7 +86,8 @@ impl Headers {
             )?;
             Ok((setup, fit, decoder))
         })?;
-        let sample_count = sample_count(header, source.audio(header, &setup))?;
+        let extent = audio_extent(header, source.audio(header, &setup))?;
+        let sample_count = extent.sample_count;
         let loop_points = loop_points.filter(|points| points.fits(sample_count));
         if loop_points.is_some() {
             header::comment_packet(loop_points, &mut comment);
@@ -99,6 +101,7 @@ impl Headers {
             decoder,
             codebooks,
             sample_count,
+            decoded_end: extent.decoded_end,
         })
     }
 
@@ -179,14 +182,28 @@ fn choose_codebooks<E>(
     }
 }
 
-fn sample_count<E>(header: &Header, mut audio: impl AudioRead<E>) -> Result<u64, StreamError<E>> {
+struct AudioExtent {
+    sample_count: u64,
+    decoded_end: usize,
+}
+
+fn audio_extent<E>(
+    header: &Header,
+    mut audio: impl AudioRead<E>,
+) -> Result<AudioExtent, StreamError<E>> {
     let mut packet = Vec::new();
-    let (mut previous, mut granule) = (0, 0);
+    let mut extent = AudioExtent {
+        sample_count: 0,
+        decoded_end: header.audio_offset,
+    };
     while let Some(rebuilt) = audio.next_packet(&mut packet)? {
-        granule = trimmed(header, previous, rebuilt);
-        previous = rebuilt.granule;
+        let count = trimmed(header, extent.sample_count, rebuilt);
+        if count > extent.sample_count {
+            extent.decoded_end = rebuilt.end;
+        }
+        extent.sample_count = count;
     }
-    Ok(granule)
+    Ok(extent)
 }
 
 fn trimmed(header: &Header, previous: u64, rebuilt: Rebuilt) -> u64 {

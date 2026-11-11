@@ -17,7 +17,7 @@ pub enum AudioOutput {
     /// Retains original bytes and metadata.
     #[default]
     Raw,
-    /// Writes 16-bit PCM WAV from PCM, ADPCM or supported Opus WEM data.
+    /// Writes 16-bit PCM WAV from PCM, ADPCM, Vorbis or Opus WEM data.
     Wav,
     /// Writes Ogg Vorbis or Ogg Opus from supported original packets.
     Ogg,

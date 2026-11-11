@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cell::Cell;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::ops::Range;
 
-use p4kx_audio::{AudioError, ByteOrder, Wem, WemReadError, WemSource};
+use p4kx_audio::{AudioError, ByteOrder, Wem, WemReadError, WemSource, WemVorbisWriteError};
 use p4kx_testkit::{TestCodebook, TestVorbis};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -61,6 +62,7 @@ fn assert_seek_parity(bytes: &[u8], separate: bool) -> TestResult {
     let reader = BoundedRead {
         inner: Cursor::new(bytes),
         unreadable: None,
+        probe: None,
     };
     let mut source = WemSource::open(reader, bytes.len() as u64)?;
     let chunks = source.chunks().collect::<Result<Vec<_>, _>>()?;
@@ -116,6 +118,7 @@ fn seekable_vorbis_ogg_preserves_a_physical_packet_read_failure() -> TestResult 
     let reader = BoundedRead {
         inner: Cursor::new(bytes.as_slice()),
         unreadable: Some(audio_start + 2..audio_start + 3),
+        probe: None,
     };
     let mut source = WemSource::open(reader, bytes.len() as u64)?;
     let mut inspected = source.inspect()?;
@@ -157,9 +160,116 @@ fn seekable_vorbis_ogg_rejects_a_truncated_packet_before_writing() -> TestResult
     Ok(())
 }
 
+#[test]
+fn seekable_vorbis_wav_keeps_decode_and_lookahead_ranges_separate() -> TestResult {
+    let exact_boundary = TestVorbis::new(2, 48_000, &[false; 40])
+        .tone(7)
+        .sample_count(38 * 128);
+    let native = TestVorbis::new(1, 22_050, &[false, true, true, false])
+        .codebook(TestCodebook::Library(97))
+        .native_packets()
+        .big_endian()
+        .vorb_chunk();
+    let zero_frames = TestVorbis::new(2, 44_100, &[false; 2])
+        .codebook(TestCodebook::Inline)
+        .sample_count(0);
+    for (fixture, decoded_packets) in [(exact_boundary, 39), (native, 4), (zero_frames, 0)] {
+        assert_wav_parity(&fixture, decoded_packets)?;
+    }
+    Ok(())
+}
+
+fn assert_wav_parity(fixture: &TestVorbis, decoded_packets: usize) -> TestResult {
+    let bytes = fixture
+        .wem()
+        .smpl_loop(0, 1, 2)
+        .tail_chunk(*b"data", [0xde, 0xad])
+        .bytes();
+    let original = Wem::parse(bytes.as_slice())?;
+    let mut expected = Vec::new();
+    let report = original.write_wav(&mut expected)?;
+    let data = original.metadata().data_chunk();
+    let audio_start = data.body_offset + 2 + fixture.setup().len() as u64;
+    let decoded_end = audio_start
+        + fixture
+            .packets()
+            .iter()
+            .take(decoded_packets)
+            .map(|packet| 2 + packet.len() as u64)
+            .sum::<u64>();
+
+    let probe = ReadProbe::default();
+    let reader = BoundedRead {
+        inner: Cursor::new(bytes.as_slice()),
+        unreadable: None,
+        probe: Some(&probe),
+    };
+    let mut source = WemSource::open(reader, bytes.len() as u64)?;
+    let mut inspected = source.inspect()?;
+    let planned = inspected.vorbis_wav()?;
+    let checked_end = data.body_end_exclusive();
+    assert_eq!(planned.report(), report, "standalone WAV report");
+    assert_eq!(
+        planned.ranges().audio_packets,
+        audio_start..checked_end,
+        "all packet framing is checked"
+    );
+    assert_eq!(
+        planned.decoded_audio_packets(),
+        &(audio_start..decoded_end),
+        "only packets supplied to the decoder"
+    );
+    probe.furthest.set(0);
+    let mut actual = Vec::new();
+    planned.write(&mut actual)?;
+    assert_eq!(actual, expected, "standalone WAV bytes");
+    let expected_read_end = if decoded_packets == 0 { 0 } else { checked_end };
+    assert_eq!(probe.furthest.get(), expected_read_end, "bounded lookahead");
+    Ok(())
+}
+
+#[test]
+fn seekable_vorbis_wav_preserves_replay_read_and_sink_errors() -> TestResult {
+    let bytes = TestVorbis::new(1, 48_000, &[false, true, false])
+        .wem()
+        .bytes();
+    let probe = ReadProbe::default();
+    let reader = BoundedRead {
+        inner: Cursor::new(bytes.as_slice()),
+        unreadable: None,
+        probe: Some(&probe),
+    };
+    let mut source = WemSource::open(reader, bytes.len() as u64)?;
+    let mut inspected = source.inspect()?;
+    let planned = inspected.vorbis_wav()?;
+    probe
+        .deny_from
+        .set(Some(planned.ranges().audio_packets.start));
+    assert!(
+        matches!(planned.write(&mut Vec::new()), Err(WemVorbisWriteError::Input(error))
+            if error.kind() == io::ErrorKind::PermissionDenied),
+        "physical packet replay failures retain the source error"
+    );
+    probe.deny_from.set(None);
+    let planned = inspected.vorbis_wav()?;
+    let mut empty_output: &mut [u8] = &mut [];
+    assert!(
+        matches!(planned.write(&mut empty_output), Err(WemVorbisWriteError::Output(error))
+            if error.kind() == io::ErrorKind::WriteZero),
+        "sink failures retain the output error"
+    );
+    Ok(())
+}
+
+#[derive(Default)]
+struct ReadProbe {
+    furthest: Cell<u64>,
+    deny_from: Cell<Option<u64>>,
+}
 struct BoundedRead<'a> {
     inner: Cursor<&'a [u8]>,
     unreadable: Option<Range<u64>>,
+    probe: Option<&'a ReadProbe>,
 }
 
 impl Read for BoundedRead<'_> {
@@ -181,6 +291,19 @@ impl Read for BoundedRead<'_> {
                 io::ErrorKind::PermissionDenied,
                 "packet payload denied",
             ));
+        }
+        if let Some(probe) = self.probe {
+            if probe.deny_from.get().is_some_and(|start| end > start) {
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "packet replay denied",
+                ));
+            }
+            let count = self.inner.read(out)?;
+            probe
+                .furthest
+                .set(probe.furthest.get().max(position + count as u64));
+            return Ok(count);
         }
         self.inner.read(out)
     }

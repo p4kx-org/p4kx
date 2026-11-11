@@ -12,8 +12,8 @@ use p4kx_extraction::{AudioError, Codec};
 
 use super::WemProjection;
 use crate::audio_payload::{
-    AudioPayload, ConversionFailure, ConversionOutcome, EncodedAudioFormat, WemConversion,
-    WrittenAudio, WrittenWavFormat,
+    AudioPayload, ConversionFailure, ConversionOutcome, EncodedAudioFormat, PcmInputs,
+    WemConversion, WrittenAudio, WrittenWavFormat,
 };
 use crate::audio_record_origins as origins;
 use crate::origin_contributions::OriginContributions;
@@ -53,20 +53,20 @@ pub(super) fn project<R: Read + Seek>(
     format: EncodedAudioFormat,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    if inspected.metadata().codec() == Codec::Opus {
-        let converted = opus::convert(projection, inspected, format, writer)?;
-        return publish(projection, inspected.metadata(), format, converted, writer);
-    }
-    match format {
-        EncodedAudioFormat::Wav => {
+    match (inspected.metadata().codec(), format) {
+        (Codec::Opus, _) => {
+            let converted = opus::convert(projection, inspected, format, writer)?;
+            publish(projection, inspected.metadata(), format, converted, writer)
+        }
+        (Codec::Vorbis, _) | (_, EncodedAudioFormat::Ogg) => {
+            let converted = vorbis::convert(projection, inspected, format, writer)?;
+            publish(projection, inspected.metadata(), format, converted, writer)
+        }
+        (_, EncodedAudioFormat::Wav) => {
             let converted = match inspected.wav() {
                 Ok(conversion) => Ok(Completed::write(projection, conversion, writer)?),
                 Err(cause) => Err(cause),
             };
-            publish(projection, inspected.metadata(), format, converted, writer)
-        }
-        EncodedAudioFormat::Ogg => {
-            let converted = vorbis::convert(projection, inspected, writer)?;
             publish(projection, inspected.metadata(), format, converted, writer)
         }
     }
@@ -167,8 +167,25 @@ impl Completed {
             actual_format: WrittenWavFormat::Wav,
             signal: self.output.signal(),
             source_range: projection.range(self.source.start, self.source.end)?,
-            opus_inputs: None,
+            inputs: PcmInputs::Direct {},
         })
+    }
+}
+
+fn format_write_error(input: &Path, cause: AudioError) -> MediaError {
+    error::io(input, io::Error::new(io::ErrorKind::InvalidData, cause))
+}
+
+fn recover_format_write<T>(
+    result: Result<T, MediaError>,
+) -> Result<Result<T, AudioError>, MediaError> {
+    match result {
+        Ok(output) => Ok(Ok(output)),
+        Err(MediaError::Io { path, source }) => match source.downcast::<AudioError>() {
+            Ok(cause) => Ok(Err(cause)),
+            Err(source) => Err(MediaError::Io { path, source }),
+        },
+        Err(cause) => Err(cause),
     }
 }
 

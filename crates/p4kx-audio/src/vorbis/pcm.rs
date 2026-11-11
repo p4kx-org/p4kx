@@ -7,7 +7,9 @@ use std::panic::{self, AssertUnwindSafe};
 use lewton::audio::{PreviousWindowRight, read_audio_packet_generic};
 use lewton::samples::InterleavedSamples;
 
-use super::{RebuiltSound, VorbisError};
+use super::VorbisError;
+use super::header::Header;
+use super::stream::{AudioRead, AudioSource, Headers, StreamError};
 use crate::{AudioError, WavReport, Wem};
 
 const PANICKED: &str = "the decoder failed";
@@ -18,28 +20,36 @@ impl<B: AsRef<[u8]>> Wem<B> {
         let sound = self.rebuild_vorbis()?;
         let (header, report) = self.decoded_wav_header(sound.headers.sample_count)?;
         out.write_all(&header).map_err(AudioError::Write)?;
-        sound.write_pcm(usize::from(self.channels()).max(1), out)?;
+        sound
+            .headers
+            .write_pcm(&mut sound.stream.source(), &sound.stream.header, out)
+            .map_err(StreamError::into_audio)?;
         Ok(report)
     }
 }
 
-impl RebuiltSound<'_> {
+impl Headers {
     /// Decodes the audio packets and writes the sample count's frames of interleaved
     /// little-endian 16-bit samples.
-    fn write_pcm(&self, channels: usize, out: &mut impl Write) -> Result<(), AudioError> {
-        let decoder = &self.headers.decoder;
-        let mut audio = self.stream.audio(&self.headers.setup);
+    pub(super) fn write_pcm<S: AudioSource>(
+        &self,
+        source: &mut S,
+        header: &Header,
+        out: &mut (impl Write + ?Sized),
+    ) -> Result<usize, StreamError<S::InputError>> {
+        let channels = usize::from(header.channels).max(1);
+        let decoder = &self.decoder;
+        let mut audio = source.audio(header, &self.setup);
         let mut window = PreviousWindowRight::new();
         let mut packet = Vec::new();
         let mut bytes = Vec::new();
-        let mut remaining = self.headers.sample_count;
+        let mut remaining = self.sample_count;
+        let mut decoded_end = header.audio_offset;
         while remaining > 0
-            && let Some(rebuilt) = audio.next_into(&mut packet)
+            && let Some(rebuilt) = audio.next_packet(&mut packet)?
         {
-            let offset = rebuilt.map_err(AudioError::InvalidVorbis)?.offset as u64;
-            let undecodable = |reason: String| {
-                AudioError::InvalidVorbis(VorbisError::Undecodable { offset, reason })
-            };
+            let offset = rebuilt.offset as u64;
+            let undecodable = |reason| VorbisError::Undecodable { offset, reason };
             let pcm: InterleavedSamples<i16> = panic::catch_unwind(AssertUnwindSafe(|| {
                 read_audio_packet_generic(&decoder.ident, &decoder.setup, &packet, &mut window)
                     .map_err(|error| error.to_string())
@@ -54,15 +64,18 @@ impl RebuiltSound<'_> {
                     bytes.extend_from_slice(&sample.to_le_bytes());
                 }
             }
-            out.write_all(&bytes).map_err(AudioError::Write)?;
+            out.write_all(&bytes)
+                .map_err(|error| StreamError::Audio(AudioError::Write(error)))?;
             remaining -= take as u64;
+            decoded_end = rebuilt.end;
         }
         if remaining > 0 {
-            return Err(AudioError::InvalidVorbis(VorbisError::MissingSamples {
-                expected: self.headers.sample_count,
-                decoded: self.headers.sample_count - remaining,
-            }));
+            return Err(VorbisError::MissingSamples {
+                expected: self.sample_count,
+                decoded: self.sample_count - remaining,
+            }
+            .into());
         }
-        Ok(())
+        Ok(decoded_end)
     }
 }

@@ -4,7 +4,7 @@
 use std::fs;
 use std::path::Path;
 
-use p4kx_extraction::{ByteOrder, Checksum, Wem};
+use p4kx_extraction::{ByteOrder, Checksum, Codec, Wem};
 use p4kx_media::{Artifact, Index, MediaRecord, Status};
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
@@ -187,7 +187,7 @@ pub(super) fn check_refusal(rows: &[MediaRecord], directory: &Path, original: &[
     );
     assert_eq!(
         conversion.data.pointer("/payload/source_codec"),
-        Some(&json!("vorbis")),
+        Some(&json!(Codec::Xma2.id())),
         "actual codec"
     );
     assert_eq!(

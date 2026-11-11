@@ -9461,6 +9461,30 @@
       ],
       "type": "object"
     },
+    "VorbisWavInputs": {
+      "additionalProperties": false,
+      "properties": {
+        "average_byte_rate": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "checked_audio_packets": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "header": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "setup_packet": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "average_byte_rate",
+        "header",
+        "setup_packet",
+        "checked_audio_packets"
+      ],
+      "type": "object"
+    },
     "WemChunk": {
       "additionalProperties": false,
       "properties": {
@@ -9819,7 +9843,39 @@
     "WrittenAudio": {
       "oneOf": [
         {
-          "additionalProperties": false,
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "properties": {
+                "opus_inputs": {
+                  "$ref": "#/$defs/OpusInputs"
+                }
+              },
+              "required": [
+                "opus_inputs"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "vorbis_inputs": {
+                  "$ref": "#/$defs/VorbisWavInputs"
+                }
+              },
+              "required": [
+                "vorbis_inputs"
+              ],
+              "type": "object"
+            }
+          ],
+          "not": {
+            "required": [
+              "opus_inputs",
+              "vorbis_inputs"
+            ]
+          },
           "properties": {
             "actual_codec": {
               "const": "pcm",
@@ -9841,16 +9897,6 @@
               "anyOf": [
                 {
                   "$ref": "#/$defs/WemLoop"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "opus_inputs": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/OpusInputs"
                 },
                 {
                   "type": "null"
@@ -9879,7 +9925,8 @@
             "loop_points",
             "source_range"
           ],
-          "type": "object"
+          "type": "object",
+          "unevaluatedProperties": false
         },
         {
           "additionalProperties": false,
