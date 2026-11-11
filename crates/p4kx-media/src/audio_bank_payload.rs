@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_extraction::DecimalU64;
+use p4kx_extraction::bank::BankHircField;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -117,6 +120,28 @@ impl BankEntryRange {
             basis: OffsetBasis::Entry,
             start: DecimalU64::new(start),
             end_exclusive: DecimalU64::new(end_exclusive),
+        }
+    }
+}
+
+impl From<&Range<u64>> for BankEntryRange {
+    fn from(range: &Range<u64>) -> Self {
+        Self::new(range.start, range.end)
+    }
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct BankField<T> {
+    value: T,
+    range: BankEntryRange,
+}
+
+impl<T: Copy> From<&BankHircField<T>> for BankField<T> {
+    fn from(field: &BankHircField<T>) -> Self {
+        Self {
+            value: field.value,
+            range: (&field.range).into(),
         }
     }
 }

@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use super::support;
 use super::support::audio_provider::{Origins, Owner, TestResult};
 
-const PATH: &str = "state.bnk";
+pub(super) const PATH: &str = "state.bnk";
 const STANDALONE: &str = "audio-bank-hirc-state";
 const STANDALONE_PROPERTY: &str = "audio-bank-hirc-state-property";
 const INLINE: &str = "audio-bank-hirc-inline-state";
@@ -71,7 +71,7 @@ fn standalone_state_rows_preserve_bits_ranges_and_opaque_tail() -> TestResult {
 #[test]
 fn inline_states_preserve_order_and_raw_words_in_a_checked_sound_region() -> TestResult {
     let folder = tempfile::tempdir()?;
-    let bytes = inline_bank(false);
+    let bytes = inline_bank_with_rtpc(&[0, 0]);
     verify_layout(&bytes, HircLayout::Decoded)?;
     let archive = archive(folder.path(), &bytes)?;
     let output = folder.path().join("out");
@@ -157,7 +157,7 @@ fn unproved_standalone_state_keeps_raw_bytes_without_property_rows() -> TestResu
 #[test]
 fn later_rtpc_failure_keeps_checked_inline_state_rows_in_diagnostics() -> TestResult {
     let folder = tempfile::tempdir()?;
-    let bytes = inline_bank(true);
+    let bytes = inline_bank_with_rtpc(&[1]);
     verify_layout(&bytes, HircLayout::Malformed)?;
     let archive = archive(folder.path(), &bytes)?;
     let output = folder.path().join("out");
@@ -209,7 +209,7 @@ fn standalone(version: u32, body: &[u8]) -> Vec<u8> {
         .bytes()
 }
 
-fn inline_chunk() -> Vec<u8> {
+pub(super) fn inline_chunk() -> Vec<u8> {
     let mut body = vec![1, 0x82, 0x02, 0xF0, 0x81, 1];
     body.extend(0xF0_0102_u32.to_le_bytes());
     body.extend([0xE1, 1]);
@@ -220,7 +220,7 @@ fn inline_chunk() -> Vec<u8> {
     body
 }
 
-fn inline_bank(bad_rtpc: bool) -> Vec<u8> {
+pub(super) fn inline_bank_with_rtpc(rtpc: &[u8]) -> Vec<u8> {
     let mut body = 0x0004_0001_u32.to_le_bytes().to_vec();
     body.push(2);
     body.extend([1_u32, 2, 0].into_iter().flat_map(u32::to_le_bytes));
@@ -231,17 +231,13 @@ fn inline_bank(bad_rtpc: bool) -> Vec<u8> {
     body.extend(0_u32.to_le_bytes());
     body.extend([0, 1, 0, 0, 3, 0x0C]);
     body.extend(inline_chunk());
-    if bad_rtpc {
-        body.push(1);
-    } else {
-        body.extend([0, 0]);
-    }
+    body.extend(rtpc);
     TestBank::new(7)
         .object(TestHircObject::raw(2, 77, body))
         .bytes()
 }
 
-fn verify_layout(bytes: &[u8], expected: HircLayout) -> TestResult {
+pub(super) fn verify_layout(bytes: &[u8], expected: HircLayout) -> TestResult {
     let bank = Soundbank::parse(bytes)?;
     let object = bank
         .objects()
@@ -279,7 +275,11 @@ fn check_property(source: &[u8], record: &MediaRecord, id: u16, bits: u32) -> Te
     Ok(())
 }
 
-fn source_span<'a>(source: &'a [u8], value: &Value, pointer: &str) -> TestResult<&'a [u8]> {
+pub(super) fn source_span<'a>(
+    source: &'a [u8],
+    value: &Value,
+    pointer: &str,
+) -> TestResult<&'a [u8]> {
     let range = value.pointer(pointer).ok_or("source range")?;
     let number = |key| -> TestResult<usize> {
         Ok(range
@@ -293,7 +293,7 @@ fn source_span<'a>(source: &'a [u8], value: &Value, pointer: &str) -> TestResult
         .ok_or_else(|| "bank-relative extent".into())
 }
 
-fn check_retained(base: &Path, record: &MediaRecord, original: &[u8]) -> TestResult {
+pub(super) fn check_retained(base: &Path, record: &MediaRecord, original: &[u8]) -> TestResult {
     let raw = record
         .source
         .raw
@@ -327,7 +327,7 @@ fn check_origin(base: &Path, position: usize, field: &str, source_field: &str) -
     Ok(())
 }
 
-fn row<'a>(
+pub(super) fn row<'a>(
     rows: &'a [MediaRecord],
     namespace: &str,
     indices: &[u64],
@@ -354,14 +354,14 @@ fn validate(rows: &[MediaRecord]) -> TestResult {
     Ok(())
 }
 
-fn options() -> ExportOptions {
+pub(super) fn options() -> ExportOptions {
     ExportOptions {
         kinds: vec![MediaKind::Audio],
         ..ExportOptions::default()
     }
 }
 
-fn archive(folder: &Path, bytes: &[u8]) -> TestResult<Archive> {
+pub(super) fn archive(folder: &Path, bytes: &[u8]) -> TestResult<Archive> {
     let path = folder.join("Data.p4k");
     ArchiveBuilder::new()
         .entry(TestEntry::zstd(PATH, bytes).encrypted())

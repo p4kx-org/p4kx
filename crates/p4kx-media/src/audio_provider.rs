@@ -79,6 +79,7 @@ fn field_groups() -> Vec<FieldGroup> {
     wem_field_groups()
         .into_iter()
         .chain(bank_field_groups())
+        .chain(bank_node_field_groups())
         .chain([
             FieldGroup::new(
                 "loose-wem-inventory",
@@ -141,6 +142,19 @@ fn wem_field_groups() -> [FieldGroup; 5] {
         FieldGroup::new_with_unsupported_projection(
             "wem-chunk-content",
             "Opaque RIFF bodies, text regions with original encoding declarations and encoded samples remain available in retained ranges.",
+        ),
+    ]
+}
+
+fn bank_node_field_groups() -> [FieldGroup; 2] {
+    [
+        FieldGroup::new(
+            "bank-state-fields",
+            "Standalone State properties for versions 128 through 145 and version 154 Sound inline State bindings, groups and values with exact source ranges.",
+        ),
+        FieldGroup::new(
+            "bank-rtpc-fields",
+            "Version 154 Sound RTPC curve and point fields, original float words and interpolation codes with exact source ranges.",
         ),
     ]
 }

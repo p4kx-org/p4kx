@@ -81,6 +81,7 @@ pub use bank_source_container::{
 };
 pub use bank_source_didx::{BankDidx, BankDidxEntry, BankMediaInfo};
 pub use bank_source_event::{BankEvent, BankEventAction, BankEventRead, BankHircEvent};
+pub use bank_source_hirc::BankHircSoundNode;
 pub use bank_source_hirc::{
     BankActionRead, BankHirc, BankHircAction, BankHircObject, BankHircRtpc, BankHircSemantic,
     BankHircSoundStates, BankHircState, BankRtpcRead, BankSoundStateRead, BankStateRead,

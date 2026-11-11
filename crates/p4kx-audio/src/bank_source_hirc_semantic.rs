@@ -17,7 +17,8 @@ use crate::hirc_container::Layout as ContainerLayout;
 use crate::hirc_source;
 use crate::{BankHircEvent, BankObservedHeader, BankReadError, HircKind};
 
-use super::{BankHirc, BankHircAction, BankHircObject};
+use super::sound_states;
+use super::{BankHirc, BankHircAction, BankHircObject, BankHircSoundNode};
 
 /// A physical HIRC occurrence and any selected bounded interpretation.
 #[non_exhaustive]
@@ -37,6 +38,8 @@ pub enum BankHircSemantic<'input, R> {
         /// Disposition of the checked inline State region.
         states: BankSoundStateRead<'input, R>,
     },
+    /// Owner-bound Sound and sequential source cursors for its node chunks.
+    SoundWithNode(BankHircSoundNode<'input, R>),
     /// Owner-bound standalone State interpretation.
     State(BankHircState),
     /// Owner-bound container interpretation and ordered children.
@@ -60,6 +63,7 @@ impl<R> BankHircSemantic<'_, R> {
             Self::Action(action) => &action.object,
             Self::Event(event) => &event.object,
             Self::Sound(sound) | Self::SoundWithStates { sound, .. } => &sound.object,
+            Self::SoundWithNode(node) => &node.sound().object,
             Self::State(state) => &state.object,
             Self::Container(container) => &container.object,
             Self::MusicPlaylist(playlist) => &playlist.object,
@@ -71,9 +75,10 @@ impl<R> BankHircSemantic<'_, R> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum StateMode {
+enum NodeMode {
     Raw,
-    Project,
+    States,
+    StatesAndRtpc,
 }
 
 impl<R: Read + Seek> BankHirc<'_, R> {
@@ -84,7 +89,7 @@ impl<R: Read + Seek> BankHirc<'_, R> {
         &mut self,
         header: &BankObservedHeader,
     ) -> Option<Result<BankHircSemantic<'_, R>, BankReadError>> {
-        self.next_semantic_in(header, StateMode::Raw)
+        self.next_semantic_in(header, NodeMode::Raw)
     }
 
     /// Reads semantic fields including standalone and inline State observations.
@@ -94,13 +99,23 @@ impl<R: Read + Seek> BankHirc<'_, R> {
         &mut self,
         header: &BankObservedHeader,
     ) -> Option<Result<BankHircSemantic<'_, R>, BankReadError>> {
-        self.next_semantic_in(header, StateMode::Project)
+        self.next_semantic_in(header, NodeMode::States)
+    }
+
+    /// Reads semantic fields with standalone State and checked Sound node regions.
+    ///
+    /// The observed bank header must belong to the same input.
+    pub fn next_semantic_with_node_fields(
+        &mut self,
+        header: &BankObservedHeader,
+    ) -> Option<Result<BankHircSemantic<'_, R>, BankReadError>> {
+        self.next_semantic_in(header, NodeMode::StatesAndRtpc)
     }
 
     fn next_semantic_in(
         &mut self,
         header: &BankObservedHeader,
-        mode: StateMode,
+        mode: NodeMode,
     ) -> Option<Result<BankHircSemantic<'_, R>, BankReadError>> {
         let version = match self.observed_version(header) {
             Ok(version) => version,
@@ -117,7 +132,7 @@ impl<R: Read + Seek> BankHirc<'_, R> {
         &mut self,
         object: BankHircObject,
         version: u32,
-        mode: StateMode,
+        mode: NodeMode,
     ) -> Result<BankHircSemantic<'_, R>, BankReadError> {
         let kind = object.kind(version);
         if version >= CONTAINER_VERSION {
@@ -181,7 +196,7 @@ impl<R: Read + Seek> BankHirc<'_, R> {
         object: BankHircObject,
         kind: HircKind,
         version: u32,
-        mode: StateMode,
+        mode: NodeMode,
     ) -> Result<BankHircSemantic<'_, R>, BankReadError> {
         let result = match kind {
             HircKind::Event => {
@@ -189,7 +204,7 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                     .map(BankHircSemantic::Event);
             }
             HircKind::Action => self.action(object, version).map(BankHircSemantic::Action),
-            HircKind::State if mode == StateMode::Project => {
+            HircKind::State if mode != NodeMode::Raw => {
                 self.state(object, version).map(BankHircSemantic::State)
             }
             HircKind::Sound if hirc_source::has_sound_layout(version) => {
@@ -207,7 +222,7 @@ impl<R: Read + Seek> BankHirc<'_, R> {
         &mut self,
         object: BankHircObject,
         version: u32,
-        mode: StateMode,
+        mode: NodeMode,
     ) -> Result<BankHircSemantic<'_, R>, BankReadError> {
         let sound = match bank_source_sound::observe(self.input, object, version) {
             Ok(sound) => Box::new(sound),
@@ -216,11 +231,15 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                 return Err(cause);
             }
         };
-        if mode == StateMode::Project && version == hirc_source::NODE_BASE_VERSION {
-            let states = self.sound_state_read(&sound);
-            Ok(BankHircSemantic::SoundWithStates { sound, states })
-        } else {
-            Ok(BankHircSemantic::Sound(sound))
+        match (mode, version) {
+            (NodeMode::States, hirc_source::NODE_BASE_VERSION) => {
+                let states = sound_states::read(self.input, &sound);
+                Ok(BankHircSemantic::SoundWithStates { sound, states })
+            }
+            (NodeMode::StatesAndRtpc, hirc_source::NODE_BASE_VERSION) => Ok(
+                BankHircSemantic::SoundWithNode(BankHircSoundNode::new(self.input, sound)),
+            ),
+            _ => Ok(BankHircSemantic::Sound(sound)),
         }
     }
 }

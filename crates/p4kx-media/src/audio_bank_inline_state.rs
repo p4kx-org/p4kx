@@ -9,7 +9,7 @@ use p4kx_extraction::bank::{
 };
 
 use crate::audio_bank_projection::BankProjection;
-use crate::audio_bank_state::{PropertyScope, StateProjection, entry_range};
+use crate::audio_bank_state::{PropertyScope, StateProjection};
 use crate::audio_bank_state_payload::{
     InlineStateRecord, StateBindingRecord, StateCountRecord, StateEntryRecord, StateGroupRecord,
     StatePayload,
@@ -39,7 +39,7 @@ pub(crate) fn project<R: Read + Seek>(
             (
                 InlineStateRecord::Decoded {
                     version,
-                    checked_range: entry_range(extent),
+                    checked_range: extent.into(),
                 },
                 Some(rows),
             )
@@ -260,7 +260,7 @@ fn emit_entry(
     let payload = StatePayload::InlineEntry(StateEntryRecord {
         state_id: (&member.state_id).into(),
         property_count: member.properties.count().into(),
-        consumed_range: entry_range(&extent),
+        consumed_range: (&extent).into(),
     });
     let [section, object] = state.indices;
     prepared.finish().write(

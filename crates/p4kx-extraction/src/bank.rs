@@ -8,6 +8,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use p4kx_archive::Archive;
+pub use p4kx_audio::BankHircSoundNode;
 use p4kx_audio::{AudioError, EmbeddedWem, MediaClass, Soundbank};
 pub use p4kx_audio::{
     BankActionFields, BankActionRead, BankContainerChild, BankContainerChildren,

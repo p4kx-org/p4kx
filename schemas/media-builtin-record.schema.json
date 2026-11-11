@@ -2197,6 +2197,62 @@
       ],
       "type": "object"
     },
+    "BankField": {
+      "additionalProperties": false,
+      "properties": {
+        "range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "value": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "value",
+        "range"
+      ],
+      "type": "object"
+    },
+    "BankField2": {
+      "additionalProperties": false,
+      "properties": {
+        "range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "value": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "value",
+        "range"
+      ],
+      "type": "object"
+    },
+    "BankField3": {
+      "additionalProperties": false,
+      "properties": {
+        "range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "value": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "value",
+        "range"
+      ],
+      "type": "object"
+    },
     "BankHeaderRecord": {
       "additionalProperties": false,
       "properties": {
@@ -7536,6 +7592,244 @@
       ],
       "type": "object"
     },
+    "RtpcCurveRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "accumulation": {
+          "$ref": "#/$defs/BankField3"
+        },
+        "curve_id": {
+          "$ref": "#/$defs/BankField2"
+        },
+        "parameter_id": {
+          "$ref": "#/$defs/BankField2"
+        },
+        "point_count": {
+          "$ref": "#/$defs/BankField"
+        },
+        "rtpc_id": {
+          "$ref": "#/$defs/BankField2"
+        },
+        "rtpc_type": {
+          "$ref": "#/$defs/BankField3"
+        },
+        "scaling": {
+          "$ref": "#/$defs/BankField3"
+        }
+      },
+      "required": [
+        "rtpc_id",
+        "rtpc_type",
+        "accumulation",
+        "parameter_id",
+        "curve_id",
+        "scaling",
+        "point_count"
+      ],
+      "type": "object"
+    },
+    "RtpcPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-sound-rtpc",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcCurveRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-sound-rtpc-curve",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcPointRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-sound-rtpc-point",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "RtpcPayload"
+    },
+    "RtpcPointRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "from_bits": {
+          "$ref": "#/$defs/BankField2"
+        },
+        "input": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "interpolation": {
+          "$ref": "#/$defs/BankField2"
+        },
+        "output": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "to_bits": {
+          "$ref": "#/$defs/BankField2"
+        }
+      },
+      "required": [
+        "from_bits",
+        "to_bits",
+        "interpolation",
+        "input",
+        "output"
+      ],
+      "type": "object"
+    },
+    "RtpcRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "checked_curves": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "checked_range": {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            "curve_count": {
+              "$ref": "#/$defs/BankField"
+            },
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "curve_count",
+            "checked_curves",
+            "checked_range"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "checked_curves": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "checked_range": {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            "curve_count": {
+              "$ref": "#/$defs/BankField"
+            },
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "curve_count",
+            "checked_curves",
+            "checked_range"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "absent",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "SegmentRecord": {
       "additionalProperties": false,
       "properties": {
@@ -9108,7 +9402,7 @@
               "type": "string"
             },
             "property_count": {
-              "$ref": "#/$defs/StateField"
+              "$ref": "#/$defs/BankField"
             },
             "trailing_range": {
               "$ref": "#/$defs/BankEntryRange"
@@ -9172,13 +9466,13 @@
       "additionalProperties": false,
       "properties": {
         "accumulation": {
-          "$ref": "#/$defs/StateField3"
+          "$ref": "#/$defs/BankField3"
         },
         "in_db": {
-          "$ref": "#/$defs/StateField3"
+          "$ref": "#/$defs/BankField3"
         },
         "property_id": {
-          "$ref": "#/$defs/StateField2"
+          "$ref": "#/$defs/BankField2"
         }
       },
       "required": [
@@ -9192,7 +9486,7 @@
       "additionalProperties": false,
       "properties": {
         "count": {
-          "$ref": "#/$defs/StateField2"
+          "$ref": "#/$defs/BankField2"
         }
       },
       "required": [
@@ -9207,10 +9501,10 @@
           "$ref": "#/$defs/BankEntryRange"
         },
         "property_count": {
-          "$ref": "#/$defs/StateField"
+          "$ref": "#/$defs/BankField"
         },
         "state_id": {
-          "$ref": "#/$defs/StateField2"
+          "$ref": "#/$defs/BankField2"
         }
       },
       "required": [
@@ -9220,73 +9514,17 @@
       ],
       "type": "object"
     },
-    "StateField": {
-      "additionalProperties": false,
-      "properties": {
-        "range": {
-          "$ref": "#/$defs/BankEntryRange"
-        },
-        "value": {
-          "format": "uint16",
-          "maximum": 65535,
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "required": [
-        "value",
-        "range"
-      ],
-      "type": "object"
-    },
-    "StateField2": {
-      "additionalProperties": false,
-      "properties": {
-        "range": {
-          "$ref": "#/$defs/BankEntryRange"
-        },
-        "value": {
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "required": [
-        "value",
-        "range"
-      ],
-      "type": "object"
-    },
-    "StateField3": {
-      "additionalProperties": false,
-      "properties": {
-        "range": {
-          "$ref": "#/$defs/BankEntryRange"
-        },
-        "value": {
-          "format": "uint8",
-          "maximum": 255,
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "required": [
-        "value",
-        "range"
-      ],
-      "type": "object"
-    },
     "StateGroupRecord": {
       "additionalProperties": false,
       "properties": {
         "group_id": {
-          "$ref": "#/$defs/StateField2"
+          "$ref": "#/$defs/BankField2"
         },
         "state_count": {
-          "$ref": "#/$defs/StateField2"
+          "$ref": "#/$defs/BankField2"
         },
         "synchronization": {
-          "$ref": "#/$defs/StateField3"
+          "$ref": "#/$defs/BankField3"
         }
       },
       "required": [
@@ -9458,7 +9696,7 @@
       "additionalProperties": false,
       "properties": {
         "property_id": {
-          "$ref": "#/$defs/StateField"
+          "$ref": "#/$defs/BankField"
         },
         "value": {
           "format": "float",
@@ -9468,7 +9706,7 @@
           ]
         },
         "value_bits": {
-          "$ref": "#/$defs/StateField2"
+          "$ref": "#/$defs/BankField2"
         }
       },
       "required": [
@@ -17675,6 +17913,288 @@
                   "indices": {
                     "maxItems": 5,
                     "minItems": 5
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-sound-rtpc"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/RtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-sound-rtpc"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-sound-rtpc-curve"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/RtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-sound-rtpc-curve"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-sound-rtpc-point"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/RtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-sound-rtpc-point"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 4,
+                    "minItems": 4
                   }
                 }
               }

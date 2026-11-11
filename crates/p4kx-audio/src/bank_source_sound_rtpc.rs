@@ -6,6 +6,7 @@ use std::io::{Read, Seek};
 use crate::bank_rtpc_rows::BankRtpcRows;
 use crate::bank_source_sound::{self, BankHircSound, BankSoundRead};
 use crate::hirc_source::NODE_BASE_VERSION;
+use crate::read_at::SeekSource;
 use crate::{BankError, BankObservedHeader, BankReadError, HircKind};
 
 use super::{BankHirc, BankHircObject};
@@ -72,32 +73,35 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                     return Some(Err(cause));
                 }
             };
-            self.sound_rtpc_read(&sound)
+            read(self.input, &sound)
         };
         Some(Ok(BankHircRtpc { object, status }))
     }
+}
 
-    fn sound_rtpc_read(&mut self, sound: &BankHircSound) -> BankRtpcRead<'_, R> {
-        let extent = sound
-            .fields
-            .node
-            .as_ref()
-            .and_then(|node| node.base.as_ref())
-            .and_then(|base| base.rtpc_chunk.as_ref());
-        match (extent, &sound.status) {
-            (Some(extent), BankSoundRead::Malformed(error))
-                if extent.checked_curves != extent.curve_count.value =>
-            {
-                BankRtpcRead::Malformed {
-                    rows: BankRtpcRows::new(self.input, extent),
-                    error: error.clone(),
-                }
+pub(super) fn read<'input, R>(
+    input: &'input mut SeekSource<R>,
+    sound: &BankHircSound,
+) -> BankRtpcRead<'input, R> {
+    let extent = sound
+        .fields
+        .node
+        .as_ref()
+        .and_then(|node| node.base.as_ref())
+        .and_then(|base| base.rtpc_chunk.as_ref());
+    match (extent, &sound.status) {
+        (Some(extent), BankSoundRead::Malformed(error))
+            if extent.checked_curves != extent.curve_count.value =>
+        {
+            BankRtpcRead::Malformed {
+                rows: BankRtpcRows::new(input, extent),
+                error: error.clone(),
             }
-            (Some(extent), _) => BankRtpcRead::Readable(BankRtpcRows::new(self.input, extent)),
-            (None, BankSoundRead::Decoded(_)) => BankRtpcRead::Absent,
-            (None, BankSoundRead::Malformed(error) | BankSoundRead::Unsupported(error)) => {
-                BankRtpcRead::Unavailable(error.clone())
-            }
+        }
+        (Some(extent), _) => BankRtpcRead::Readable(BankRtpcRows::new(input, extent)),
+        (None, BankSoundRead::Decoded(_)) => BankRtpcRead::Absent,
+        (None, BankSoundRead::Malformed(error) | BankSoundRead::Unsupported(error)) => {
+            BankRtpcRead::Unavailable(error.clone())
         }
     }
 }

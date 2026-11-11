@@ -32,6 +32,9 @@ and fallback selection.
 | `audio-bank-hirc-sound-media-candidate` | `bank-hirc-sound-media-candidate` | HIRC section, Sound object and candidate ordinals |
 | `audio-bank-hirc-sound-loose-wem-resolution` | `bank-hirc-sound-loose-wem-resolution` | Physical loose WEM candidates in the Sound's owning Archive |
 | `audio-bank-hirc-sound-loose-wem-candidate` | `bank-hirc-sound-loose-wem-candidate` | Physical Entry ordinal of one canonical loose WEM observation |
+| `audio-bank-hirc-sound-rtpc` | `bank-hirc-sound-rtpc` | HIRC section and Sound object ordinals |
+| `audio-bank-hirc-sound-rtpc-curve` | `bank-hirc-sound-rtpc-curve` | HIRC section, Sound object and curve ordinals |
+| `audio-bank-hirc-sound-rtpc-point` | `bank-hirc-sound-rtpc-point` | HIRC section, Sound object, curve and point ordinals |
 | `audio-bank-hirc-state` | `bank-hirc-state` | HIRC section and standalone State object ordinals |
 | `audio-bank-hirc-state-property` | `bank-hirc-state-property` | HIRC section, State object and property ordinals |
 | `audio-bank-hirc-inline-state` | `bank-hirc-inline-state` | HIRC section and Sound object ordinals |
@@ -169,7 +172,17 @@ binding IDs and raw flags, group IDs and synchronization bytes, State IDs and pr
 bundles. A Sound with no node reports `absent`. A malformed earlier region reports
 `unavailable`. A checked State region remains available in diagnostics if a following
 Sound field is malformed. The separate Sound and raw object rows retain their own
-coverage. RTPC data and inline State outside this Sound layout remain outside these typed rows.
+coverage. Inline State outside this Sound layout remains outside these typed rows.
+
+The version 154 Sound RTPC summary reports the original curve count, the checked curve count
+and the exact admitted range. Each curve row retains its IDs, original type, accumulation and
+scaling bytes, and its original point count. Point rows preserve the input and output
+binary32 words, their finite numeric interpretations and the original interpolation word.
+Repeated curve IDs and unknown numeric codes retain their physical ordinals. An explicit
+zero count describes a present empty chunk. A Sound without a node reports `absent`.
+If the count is unreadable, the summary reports `unavailable`. If a later curve is malformed,
+diagnostics retain the declared count and every complete earlier curve and point.
+The RTPC cursor reads only version 154 Sound node bytes within the checked extent.
 
 Container rows preserve the version 154 Random, Sequence, Switch and Blend layout, original
 parent ID and declared child count. The Random/Sequence row carries the original mode byte.

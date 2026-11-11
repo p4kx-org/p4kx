@@ -14,17 +14,52 @@ use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
 use crate::{MediaError, MediaWriter};
 
-pub(crate) struct StateSites {
-    object: ObjectSites,
-    header: [u64; 1],
+#[derive(Clone, Copy)]
+pub(crate) enum NodeKind {
+    State,
+    Rtpc,
 }
 
-impl StateSites {
-    pub(crate) const fn new(object: &BankHircObject, version: VersionSite) -> Self {
+impl NodeKind {
+    const fn namespace(self) -> &'static str {
+        match self {
+            Self::State => "bnkHircState",
+            Self::Rtpc => "bnkHircRtpc",
+        }
+    }
+
+    const fn position(self) -> &'static str {
+        match self {
+            Self::State => "stateRowPosition",
+            Self::Rtpc => "rtpcRowPosition",
+        }
+    }
+
+    const fn extent(self) -> &'static str {
+        match self {
+            Self::State => "stateExtent",
+            Self::Rtpc => "rtpcExtent",
+        }
+    }
+}
+
+pub(crate) struct NodeSites {
+    object: ObjectSites,
+    header: [u64; 1],
+    kind: NodeKind,
+}
+
+impl NodeSites {
+    pub(crate) const fn new(object: &BankHircObject, version: VersionSite, kind: NodeKind) -> Self {
         Self {
             object: ObjectSites::new(object),
             header: [version.body_offset],
+            kind,
         }
+    }
+
+    pub(crate) const fn indices(&self) -> [u64; 2] {
+        self.object.indices()
     }
 
     pub(crate) fn record<'source, 'writer, 'run>(
@@ -38,7 +73,7 @@ impl StateSites {
             self.observed(
                 &prepared,
                 range,
-                "stateRowPosition",
+                self.kind.position(),
                 SourceUseRole::Selector,
             )?
         } else {
@@ -92,18 +127,24 @@ impl StateSites {
         name: &str,
         extent: &Range<u64>,
     ) -> Result<(), MediaError> {
-        let evidence = self.observed(prepared, extent, "stateExtent", SourceUseRole::Selector)?;
+        let evidence = self.observed(
+            prepared,
+            extent,
+            self.kind.extent(),
+            SourceUseRole::Selector,
+        )?;
         prepared.subtree(&format!("/data/payload/{name}"), evidence)
     }
 
-    pub(crate) fn property_value(
+    pub(crate) fn converted(
         &self,
         prepared: &mut BankOrigins<'_, '_, '_>,
+        name: &str,
         range: &Range<u64>,
+        original: &'static str,
     ) -> Result<(), MediaError> {
-        let evidence =
-            self.observed(prepared, range, "stateValueBits", SourceUseRole::Conversion)?;
-        prepared.field("/data/payload/value", evidence)
+        let evidence = self.observed(prepared, range, original, SourceUseRole::Conversion)?;
+        prepared.field(&format!("/data/payload/{name}"), evidence)
     }
 
     fn selection(
@@ -113,7 +154,7 @@ impl StateSites {
     ) -> Result<OriginContributions, MediaError> {
         extent.map_or_else(
             || prepared.capture(self.object.versioned(&self.header)),
-            |range| self.observed(prepared, range, "stateExtent", SourceUseRole::Selector),
+            |range| self.observed(prepared, range, self.kind.extent(), SourceUseRole::Selector),
         )
     }
 
@@ -125,11 +166,9 @@ impl StateSites {
         role: SourceUseRole,
     ) -> Result<OriginContributions, MediaError> {
         let indices = [range.start, range.end];
-        prepared.capture(
-            self.object
-                .versioned(&self.header)
-                .into_iter()
-                .chain([(OriginSite::new("bnkHircState", &indices, original), role)]),
-        )
+        prepared.capture(self.object.versioned(&self.header).into_iter().chain([(
+            OriginSite::new(self.kind.namespace(), &indices, original),
+            role,
+        )]))
     }
 }

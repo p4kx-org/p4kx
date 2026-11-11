@@ -11,6 +11,7 @@ use crate::audio_bank_failure::BankPhase;
 use crate::audio_bank_inventory::{BankInventory, VersionSite};
 use crate::audio_bank_payload::{BankEntryRange, BankHircRecord, BankObjectRecord, BankPayload};
 use crate::audio_bank_projection::BankProjection;
+use crate::audio_bank_rtpc;
 use crate::audio_bank_state::{self, StateProjection};
 use crate::{
     MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource, audio_bank_hirc_action,
@@ -45,7 +46,7 @@ pub(crate) fn project<R: Read + Seek>(
     });
     loop {
         let next = match header {
-            Some(header) => hierarchy.next_semantic_with_states(header),
+            Some(header) => hierarchy.next_semantic_with_node_fields(header),
             None => hierarchy
                 .next()
                 .map(|result| result.map(BankHircSemantic::Raw)),
@@ -118,16 +119,19 @@ fn emit_semantic<R: Read + Seek>(
             &inventory.didx_entries,
             writer,
         ),
-        (BankHircSemantic::SoundWithStates { sound, states }, Some(version)) => {
+        (BankHircSemantic::SoundWithNode(mut node), Some(version)) => {
+            let sound = node.sound();
             audio_bank_hirc_sound::project(
                 projection,
                 version,
-                &sound,
+                sound,
                 &inventory.didx_entries,
                 writer,
             )?;
-            let state = StateProjection::new(projection.input, &sound.object, version);
-            audio_bank_inline_state::project(projection, &state, states, writer)
+            let original = sound.object;
+            let state = StateProjection::new(projection.input, &original, version);
+            audio_bank_inline_state::project(projection, &state, node.states(), writer)?;
+            audio_bank_rtpc::project(projection, version, &original, node.rtpc(), writer)
         }
         (BankHircSemantic::State(state), Some(version)) => {
             audio_bank_state::project(projection.input, version, state, writer)

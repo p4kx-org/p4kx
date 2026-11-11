@@ -8,9 +8,8 @@ use p4kx_extraction::bank::{
 };
 
 use crate::audio_bank_inventory::VersionSite;
+use crate::audio_bank_node_origins::{NodeKind, NodeSites};
 use crate::audio_bank_origins::BankOrigins;
-use crate::audio_bank_payload::BankEntryRange;
-use crate::audio_bank_state_origins::StateSites;
 use crate::audio_bank_state_payload::{StandaloneStateRecord, StatePayload, StatePropertyRecord};
 use crate::origin_input::MediaOriginInput;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
@@ -91,8 +90,8 @@ fn decoded_record(
     Ok(StandaloneStateRecord::Decoded {
         version: projection.version,
         property_count: state.properties.count().into(),
-        consumed_range: entry_range(&extent),
-        trailing_range: entry_range(&state.trailing_range),
+        consumed_range: (&extent).into(),
+        trailing_range: (&state.trailing_range).into(),
     })
 }
 
@@ -104,7 +103,7 @@ pub(crate) enum PropertyScope {
 
 pub(crate) struct StateProjection<'source> {
     input: &'source MediaOriginInput,
-    pub(crate) sites: StateSites,
+    pub(crate) sites: NodeSites,
     pub(crate) indices: [u64; 2],
     pub(crate) version: u32,
     pub(crate) body_range: Range<u64>,
@@ -118,7 +117,7 @@ impl<'source> StateProjection<'source> {
     ) -> Self {
         Self {
             input,
-            sites: StateSites::new(object, version),
+            sites: NodeSites::new(object, version, NodeKind::State),
             indices: [object.section_ordinal(), object.ordinal()],
             version: version.version,
             body_range: object.body_offset()..object.body_end_exclusive(),
@@ -169,8 +168,12 @@ impl<'source> StateProjection<'source> {
                 &property.value_bits.range,
                 "stateValueBits",
             )?;
-            self.sites
-                .property_value(&mut prepared, &property.value_bits.range)?;
+            self.sites.converted(
+                &mut prepared,
+                "value",
+                &property.value_bits.range,
+                "stateValueBits",
+            )?;
             let value = property.value();
             let record = StatePropertyRecord {
                 property_id: (&property.id).into(),
@@ -196,8 +199,4 @@ impl<'source> StateProjection<'source> {
         }
         Ok(())
     }
-}
-
-pub(crate) const fn entry_range(range: &Range<u64>) -> BankEntryRange {
-    BankEntryRange::new(range.start, range.end)
 }

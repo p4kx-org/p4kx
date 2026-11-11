@@ -17,6 +17,8 @@ use crate::{
 
 #[path = "bank_source_hirc_semantic.rs"]
 mod semantic;
+#[path = "bank_hirc_sound_node.rs"]
+mod sound_node;
 #[path = "bank_source_sound_rtpc.rs"]
 mod sound_rtpc;
 #[path = "bank_source_sound_states.rs"]
@@ -24,6 +26,7 @@ mod sound_states;
 #[path = "bank_source_state.rs"]
 mod state;
 pub use self::semantic::BankHircSemantic;
+pub use self::sound_node::BankHircSoundNode;
 pub use self::sound_rtpc::{BankHircRtpc, BankRtpcRead};
 pub use self::sound_states::{BankHircSoundStates, BankSoundStateRead};
 pub use self::state::{BankHircState, BankStateRead};
