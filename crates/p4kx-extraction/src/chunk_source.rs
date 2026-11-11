@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use p4kx_archive::{Archive, Entry};
+use p4kx_archive::{Archive, Entry, EntryOrigin};
 use p4kx_chunks::{Chunk, ChunkFile, crch};
 use p4kx_cryxml as cryxml;
 
@@ -27,6 +27,7 @@ pub struct ChunkSource {
     name: String,
     path: Option<PathBuf>,
     file: ChunkFile<Vec<u8>>,
+    archive_origin: Option<EntryOrigin>,
 }
 
 impl ChunkSource {
@@ -80,7 +81,9 @@ impl ChunkSource {
                 source,
             }
         })?;
-        Self::parse(name, None, bytes, limit, protection)
+        let mut source = Self::parse(name, None, bytes, limit, protection)?;
+        source.archive_origin = archive.entry_origin(entry);
+        Ok(source)
     }
 
     /// Reads the chunk file at `path`.
@@ -132,6 +135,7 @@ impl ChunkSource {
                 name,
                 path,
                 file,
+                archive_origin: None,
             }),
             Err(source) => Err(ConversionError::ChunkFile { file: name, source }),
         }
@@ -147,6 +151,12 @@ impl ChunkSource {
     #[must_use]
     pub const fn file(&self) -> &ChunkFile<Vec<u8>> {
         &self.file
+    }
+
+    /// Returns the physical Archive Entry admitted for this chunk read.
+    #[must_use]
+    pub const fn archive_origin(&self) -> Option<&EntryOrigin> {
+        self.archive_origin.as_ref()
     }
 
     pub(crate) fn into_protection(self) -> SourceProtection {

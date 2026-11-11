@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use p4kx_model::{CompanionError, CompanionPath, CompanionResolver, MaterialRequest};
+use p4kx_model::{CompanionError, CompanionPath, CompanionResolver, MaterialRequest, ModelFile};
 use thiserror::Error;
 
 use crate::archive_material_reference;
@@ -14,6 +14,7 @@ use crate::disk_case::CaseIndex;
 use crate::entry_path::relative_path;
 use crate::path_index::PathIndex;
 use crate::sound::read_capped;
+use crate::source_provenance::ModelArchiveSource;
 use crate::texture_grey::TextureVerdicts;
 
 /// The largest `.mtl` file a model's material library is read from, in bytes.
@@ -34,6 +35,7 @@ pub(crate) struct ArchiveCompanions<'i, 'a> {
     pub(crate) index: &'i PathIndex<'a>,
     pub(crate) folder: &'i str,
     pub(crate) verdicts: &'i TextureVerdicts,
+    pub(crate) model_sources: Option<&'i mut Vec<ModelArchiveSource>>,
 }
 
 impl CompanionResolver for ArchiveCompanions<'_, '_> {
@@ -44,6 +46,28 @@ impl CompanionResolver for ArchiveCompanions<'_, '_> {
     }
 
     fn resolve(&mut self, path: CompanionPath<'_>) -> Result<Option<Vec<u8>>, CompanionError> {
+        self.read_companion(path, None)
+    }
+
+    fn resolve_model_file(
+        &mut self,
+        file: ModelFile,
+        name: &str,
+    ) -> Result<Option<Vec<u8>>, CompanionError> {
+        self.read_companion(CompanionPath::Sibling(name), Some(file))
+    }
+
+    fn texture_is_grey(&mut self, file: &str) -> Option<bool> {
+        self.verdicts.is_grey(self.index, file)
+    }
+}
+
+impl ArchiveCompanions<'_, '_> {
+    fn read_companion(
+        &mut self,
+        path: CompanionPath<'_>,
+        model_file: Option<ModelFile>,
+    ) -> Result<Option<Vec<u8>>, CompanionError> {
         let (entry_path, limit) = match path {
             CompanionPath::Sibling(name) => {
                 let name = plain_name(name)?;
@@ -69,14 +93,14 @@ impl CompanionResolver for ArchiveCompanions<'_, '_> {
         let Some(entry) = entry else {
             return Ok(None);
         };
-        let reader = self.index.archive().open_entry(entry)?;
-        read_capped(reader, entry.uncompressed_size(), limit)?
-            .map(Some)
-            .ok_or_else(|| too_large(entry.path(), limit))
-    }
-
-    fn texture_is_grey(&mut self, file: &str) -> Option<bool> {
-        self.verdicts.is_grey(self.index, file)
+        let archive = self.index.archive();
+        let reader = archive.open_entry(entry)?;
+        let bytes = read_capped(reader, entry.uncompressed_size(), limit)?
+            .ok_or_else(|| too_large(entry.path(), limit))?;
+        if let (Some(file), Some(sources)) = (model_file, self.model_sources.as_mut()) {
+            sources.push(ModelArchiveSource::new(file, archive.entry_origin(entry)));
+        }
+        Ok(Some(bytes))
     }
 }
 

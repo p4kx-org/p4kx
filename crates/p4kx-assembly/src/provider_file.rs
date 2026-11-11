@@ -44,3 +44,17 @@ impl ArchiveModels<'_> {
         Ok(bytes)
     }
 }
+
+impl super::ProvidedModel {
+    /// Returns the admitted definition that selected this model, if one was read.
+    #[must_use]
+    pub const fn definition_origin(&self) -> Option<&EntryOrigin> {
+        self.definition_origin.as_ref()
+    }
+
+    /// Returns the Archive inputs selected for the retained model level.
+    #[must_use]
+    pub fn archive_sources(&self) -> &[p4kx_extraction::ModelArchiveSource] {
+        &self.archive_sources
+    }
+}

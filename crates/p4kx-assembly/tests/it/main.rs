@@ -3,6 +3,7 @@
 
 //! Integration tests of `p4kx-assembly`, built as one test binary.
 
+mod armour_archive_sources;
 mod armour_build;
 mod armour_mount;
 mod armour_natural_hair;
@@ -112,6 +113,7 @@ mod loadout_request_authorship_support;
 mod loadout_request_cache_diamond;
 mod loadout_stop;
 mod loadout_tree;
+mod model_archive_sources;
 mod model_cache;
 mod npc_body_followups;
 mod npc_body_zones;

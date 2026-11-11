@@ -6,7 +6,8 @@ use std::sync::Arc;
 
 use p4kx_archive::Archive;
 use p4kx_model::{
-    LayerBudget, LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, PositionBox,
+    LayerBudget, LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, ModelFile,
+    PositionBox,
 };
 
 use crate::ConversionError;
@@ -15,6 +16,7 @@ use crate::disk_case::CaseIndex;
 use crate::model_companions::{ArchiveCompanions, DiskCompanions};
 use crate::path_index::PathIndex;
 use crate::source_protection::SourceProtection;
+use crate::source_provenance::{ArchiveModelRead, ModelArchiveSource};
 use crate::texture_grey::TextureVerdicts;
 
 /// A model read from a chunk file Entry of an Archive or from a file on disk, with the
@@ -25,6 +27,7 @@ pub struct ModelSource {
     name: String,
     inputs: Vec<PathBuf>,
     model: Model,
+    archive_sources: Vec<ModelArchiveSource>,
 }
 
 impl ModelSource {
@@ -102,10 +105,15 @@ impl ModelSource {
         let source = ChunkSource::from_index(index, path)?;
         let name = source.name().to_owned();
         let (folder, file_name) = split_entry_path(&name);
+        let mut archive_sources = vec![ModelArchiveSource::new(
+            ModelFile::Model,
+            source.archive_origin().cloned(),
+        )];
         let mut companions = ArchiveCompanions {
             index,
             folder,
             verdicts,
+            model_sources: Some(&mut archive_sources),
         };
         let read = Model::read_with_materials(
             file_name,
@@ -124,6 +132,7 @@ impl ModelSource {
             name,
             inputs: vec![index.archive().path().to_path_buf()],
             model,
+            archive_sources,
         })
     }
 
@@ -146,6 +155,7 @@ impl ModelSource {
             index,
             folder,
             verdicts,
+            model_sources: None,
         };
         MaterialStatus::load_with(
             Some(library),
@@ -169,6 +179,7 @@ impl ModelSource {
             index,
             folder: "",
             verdicts,
+            model_sources: None,
         };
         cache.library(path, &mut companions, budget)
     }
@@ -177,6 +188,15 @@ impl ModelSource {
     #[must_use]
     pub fn into_model(self) -> Model {
         self.model
+    }
+
+    /// Returns the model and its Archive reads, with an empty source list for a disk read.
+    #[must_use]
+    pub fn into_model_with_archive_sources(self) -> ArchiveModelRead {
+        ArchiveModelRead {
+            model: self.model,
+            sources: self.archive_sources,
+        }
     }
 
     /// Reads the model Entry at `path` of `archive`; see [`Self::from_index`].
@@ -265,6 +285,7 @@ impl ModelSource {
             name: path.display().to_string(),
             inputs: companions.read,
             model,
+            archive_sources: Vec::new(),
         })
     }
 

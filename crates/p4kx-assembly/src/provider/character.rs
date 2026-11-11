@@ -6,9 +6,7 @@ use std::sync::Arc;
 
 use p4kx_extraction::model::Model;
 
-use super::{
-    ArchiveModels, ModelFailure, ModelProvider, ProvidedAttachment, ProvidedModel, without_mtl,
-};
+use super::{ArchiveModels, ModelFailure, ProvidedAttachment, ProvidedModel, without_mtl};
 use crate::build_models::vertices;
 use crate::cdf::{self, MAX_CDF_BYTES};
 use crate::cdf_bone::BoneAttachment;
@@ -19,7 +17,8 @@ impl ArchiveModels<'_> {
     /// Reads the character definition at `entry`: its skin as the model, its bone attachments as
     /// models of their own, and the files of what it cannot draw.
     pub(super) fn character(&self, entry: &str, lod: u32) -> Result<ProvidedModel, ModelFailure> {
-        let bytes = self.file(entry, MAX_CDF_BYTES)?;
+        let (definition_origin, read) = self.observed_file(entry, MAX_CDF_BYTES);
+        let bytes = read?;
         let unreadable = |reason: String| ModelFailure::Unreadable {
             reason: format!("{entry}: {reason}"),
         };
@@ -28,6 +27,7 @@ impl ArchiveModels<'_> {
             .entry_of(&character.model)
             .ok_or_else(|| unreadable(format!("{} does not exist", character.model)))?;
         let mut provided = self.read_model(model_entry, lod, Vec::new())?;
+        provided.definition_origin = definition_origin;
         let mut remaining = self
             .max_attachment_vertices
             .saturating_sub(vertices(&provided.model));

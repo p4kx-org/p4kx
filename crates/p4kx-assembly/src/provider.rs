@@ -9,8 +9,8 @@ use p4kx_extraction::model::{
     PositionBox,
 };
 use p4kx_extraction::{
-    AnimationChoice, AnimationSet, Archive, ArchiveTextures, ConversionError, ModelSource,
-    PathIndex, TextureVerdicts, archive_error_in,
+    AnimationChoice, AnimationSet, Archive, ArchiveModelRead, ArchiveTextures, ConversionError,
+    ModelArchiveSource, ModelSource, PathIndex, TextureVerdicts, archive_error_in,
 };
 use thiserror::Error;
 
@@ -42,6 +42,8 @@ pub struct ProvidedModel {
     /// What is wrong with the skeleton file a character definition (`.cdf`) names; `None` when
     /// the file is fine, the definition names none, or the file is no character definition.
     pub skeleton: Option<SkeletonProblem>,
+    pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) definition_origin: Option<p4kx_extraction::EntryOrigin>,
 }
 
 /// A rigid model a character definition binds to a bone of its skeleton.
@@ -359,19 +361,26 @@ impl ArchiveModels<'_> {
             other => other,
         }
         .map_err(failure)?;
-        let mut model = source.into_model();
+        let ArchiveModelRead {
+            mut model,
+            mut sources,
+            ..
+        } = source.into_model_with_archive_sources();
         keep_nearest_lod(&mut model, lod);
         if model.lods.is_empty() {
             return Err(ModelFailure::Unreadable {
                 reason: "the model has no level of detail".to_owned(),
             });
         }
+        sources.retain(|source| source.supplies(&model));
         Ok(ProvidedModel {
             entry,
             model,
             left_out,
             attachments: Vec::new(),
             skeleton: None,
+            archive_sources: sources.into(),
+            definition_origin: None,
         })
     }
 }

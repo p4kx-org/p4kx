@@ -27,6 +27,7 @@ mod loadout;
 mod lod_morphs;
 mod look;
 mod materials;
+mod model_origins;
 mod mount;
 mod normals;
 mod npc;
@@ -46,6 +47,7 @@ mod zones;
 use std::io::Write;
 use std::sync::Arc;
 
+use p4kx_extraction::{EntryOrigin, ModelArchiveSource};
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, MorphTarget, RigMount, RigPiece, TextureLoader,
     write_rigged_glb, write_rigged_glb_with,
@@ -86,6 +88,8 @@ pub struct ArmourPart {
     pub(crate) origin: PartOrigin,
     pub(crate) file: String,
     pub(crate) model: Arc<Model>,
+    pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) definition_origin: Option<EntryOrigin>,
     pub(crate) materials: Arc<MaterialStatus>,
     pub(crate) morphs: Vec<MorphTarget>,
     pub(crate) follows: Vec<usize>,
@@ -148,6 +152,7 @@ pub struct Armour {
     pub(crate) variant: BodyVariant,
     pub(crate) skeleton: Arc<Model>,
     pub(crate) skeleton_file: String,
+    pub(crate) skeleton_archive_source: Option<ModelArchiveSource>,
     pub(crate) parts: Vec<ArmourPart>,
     pub(crate) issues: Vec<Issue>,
     pub(crate) lod: u32,

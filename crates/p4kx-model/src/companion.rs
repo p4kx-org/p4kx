@@ -3,8 +3,8 @@
 
 use std::error::Error;
 
-use crate::MaterialRequest;
 use crate::build::MAX_LOD;
+use crate::{MaterialRequest, ModelFile};
 
 /// Returns the names of the files next to the model file `name` that reading it can fetch: the
 /// geometry companion `<name>m`, and for every level of detail from 1 on its model file and its
@@ -68,6 +68,18 @@ pub trait CompanionResolver {
     ///
     /// Returns the failure to read a companion that exists.
     fn resolve(&mut self, path: CompanionPath<'_>) -> Result<Option<Vec<u8>>, CompanionError>;
+
+    /// Returns the bytes of a sibling requested for a specific model file role.
+    ///
+    /// # Errors
+    /// Returns the failure to read a sibling that exists.
+    fn resolve_model_file(
+        &mut self,
+        _file: ModelFile,
+        name: &str,
+    ) -> Result<Option<Vec<u8>>, CompanionError> {
+        self.resolve(CompanionPath::Sibling(name))
+    }
 
     /// Returns whether the texture `file`, as a material file names it, holds no colour of its own,
     /// or `None` when the resolver cannot tell, as the default does.

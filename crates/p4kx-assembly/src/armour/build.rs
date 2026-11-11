@@ -4,8 +4,9 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use p4kx_extraction::ModelArchiveSource;
 use p4kx_gltf::MorphTarget;
-use p4kx_model::{MaterialStatus, Model};
+use p4kx_model::{MaterialStatus, Model, ModelFile};
 
 use super::face_build::{Face, Found, settled};
 use super::head_move::{HeadMove, Worn, check_follows, first_mesh_note, followed};
@@ -28,6 +29,7 @@ const HEAD: &str = "head";
 struct Body {
     skeleton: Model,
     skeleton_file: String,
+    archive_source: Option<ModelArchiveSource>,
 }
 
 impl Armour {
@@ -115,6 +117,7 @@ impl Armour {
             );
             parts.push(part_of(
                 job,
+                found,
                 (model, materials),
                 dressed.morphs,
                 dressed.follows,
@@ -133,6 +136,7 @@ impl Armour {
             variant,
             skeleton: Arc::new(skeleton),
             skeleton_file: body.skeleton_file,
+            skeleton_archive_source: body.archive_source,
             parts,
             issues,
             lod: options.lod,
@@ -144,6 +148,7 @@ impl Armour {
 /// with and the vertices that follow the head.
 fn part_of(
     job: &Job,
+    found: &Loaded,
     (model, materials): (Arc<Model>, Arc<MaterialStatus>),
     morphs: Vec<MorphTarget>,
     follows: Vec<usize>,
@@ -153,6 +158,8 @@ fn part_of(
         origin: job.origin,
         file: job.path.clone(),
         model,
+        archive_sources: Arc::clone(&found.archive_sources),
+        definition_origin: found.definition_origin.clone(),
         materials,
         morphs,
         follows,
@@ -276,11 +283,19 @@ fn load_body(
     lod: u32,
 ) -> Result<Body, AssemblyError> {
     let skeleton_file = variant.skeleton();
-    let ProvidedModel { model, .. } = models
+    let ProvidedModel {
+        model,
+        archive_sources,
+        ..
+    } = models
         .model(skeleton_file, lod)
         .map_err(|failure| provider_failure(skeleton_file, variant, failure))?;
     Ok(Body {
         skeleton: model,
         skeleton_file: skeleton_file.to_owned(),
+        archive_source: archive_sources
+            .iter()
+            .find(|source| source.file() == ModelFile::Model)
+            .cloned(),
     })
 }

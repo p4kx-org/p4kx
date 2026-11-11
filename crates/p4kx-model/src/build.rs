@@ -13,9 +13,9 @@ use crate::nmc::read_nodes;
 use crate::skeleton::{read_bones, read_compact_bones};
 use crate::skin::read_skin;
 use crate::{
-    Bone, ChunkUsage, CompanionPath, CompanionResolver, CorruptChunk, LayerCache, Lod,
-    LodSelection, LodSkeletonOrigin, MaterialReading, Mesh, Model, ModelChunk, ModelChunkLayout,
-    ModelError, ModelFile, ModelIssue, Node, PositionBox, RigLogicBytes, Transform,
+    Bone, ChunkUsage, CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection,
+    LodSkeletonOrigin, MaterialReading, Mesh, Model, ModelChunk, ModelChunkLayout, ModelError,
+    ModelFile, ModelIssue, Node, PositionBox, RigLogicBytes, Transform,
 };
 
 const MATERIAL_TYPES: [ChunkType; 2] = [ivo::MTL_NAME_320, ivo::MTL_NAME];
@@ -285,7 +285,7 @@ fn geometry_companion<B: AsRef<[u8]>>(
 ) -> Result<Option<Companion>, ModelError> {
     let companion_name = format!("{name}m");
     let announced = file.chunks_of(ivo::MESH_INFO).next().is_some();
-    match fetch(companions, &companion_name)? {
+    match fetch(companions, ModelFile::Geometry, &companion_name)? {
         Some(companion) => Ok(Some((companion_name, companion))),
         None if announced && selection.is_lenient() => {
             issues.push(ModelIssue::MissingGeometry {
@@ -318,10 +318,11 @@ pub(crate) fn read_meshes(
 
 pub(crate) fn fetch(
     companions: &mut dyn CompanionResolver,
+    file: ModelFile,
     name: &str,
 ) -> Result<Option<ChunkFile<Vec<u8>>>, ModelError> {
     let bytes = companions
-        .resolve(CompanionPath::Sibling(name))
+        .resolve_model_file(file, name)
         .map_err(|source| ModelError::Companion {
             file: name.to_owned(),
             source,

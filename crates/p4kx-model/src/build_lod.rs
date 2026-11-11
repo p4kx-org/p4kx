@@ -27,13 +27,13 @@ fn level_skeleton(
     chunks: &mut Vec<ModelChunk>,
 ) -> Result<LevelSkeleton, ModelError> {
     let file_name = lod_file_name(name, level);
-    let Some(file) = fetch(companions, &file_name)? else {
+    let which = ModelFile::LodModel(level);
+    let Some(file) = fetch(companions, which, &file_name)? else {
         return Ok(LevelSkeleton {
             bones: None,
             origin: LodSkeletonOrigin::MissingFile,
         });
     };
-    let which = ModelFile::LodModel(level);
     let mut read = Vec::new();
     let bones = read_skeleton(&file_name, &file, which, &mut read)?;
     chunks.extend(build::usage(&file, which, &read));
@@ -64,7 +64,8 @@ pub(crate) fn read_lod_companions(
 ) -> Result<(), ModelError> {
     for level in (1..=MAX_LOD).filter(|&level| selection.wants(level)) {
         let companion_name = format!("{}m", lod_file_name(name, level));
-        let Some(companion) = fetch(companions, &companion_name)? else {
+        let Some(companion) = fetch(companions, ModelFile::LodGeometry(level), &companion_name)?
+        else {
             continue;
         };
         let Some(index) = first_of(&companion, &MESH_TYPES) else {
