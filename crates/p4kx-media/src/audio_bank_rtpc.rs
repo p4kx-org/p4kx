@@ -4,6 +4,7 @@
 use std::io::{Read, Seek};
 use std::ops::Range;
 
+use p4kx_extraction::BankError;
 use p4kx_extraction::bank::{BankHircObject, BankRtpcRead, BankRtpcRows};
 
 use crate::audio_bank_inventory::VersionSite;
@@ -13,6 +14,22 @@ use crate::audio_bank_projection::BankProjection;
 use crate::audio_bank_rtpc_payload::{RtpcOwner, RtpcRecord};
 use crate::audio_bank_rtpc_rows;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
+
+pub(crate) fn node_rows<R>(
+    rows: Option<BankRtpcRows<'_, R>>,
+    error: Option<BankError>,
+) -> Result<BankRtpcRead<'_, R>, MediaError> {
+    match (rows, error) {
+        (Some(rows), _) if rows.checked_curve_count() == rows.declared_curve_count().value => {
+            Ok(BankRtpcRead::Readable(rows))
+        }
+        (Some(rows), Some(error)) => Ok(BankRtpcRead::Malformed { rows, error }),
+        (None, Some(error)) => Ok(BankRtpcRead::Unavailable(error)),
+        _ => Err(MediaError::Contract(
+            "inconsistent shared node RTPC observation".into(),
+        )),
+    }
+}
 
 pub(crate) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,

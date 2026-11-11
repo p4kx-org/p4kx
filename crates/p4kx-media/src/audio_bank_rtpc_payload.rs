@@ -23,10 +23,29 @@ pub(crate) enum RtpcPayload<'row> {
     ActorMixerPoint(&'row RtpcPointRecord),
 }
 
+#[derive(Serialize, JsonSchema)]
+#[serde(tag = "record_type", content = "payload", deny_unknown_fields)]
+pub(crate) enum ContainerRtpcPayload<'row> {
+    #[serde(rename = "bank-hirc-container-rtpc")]
+    Summary(&'row RtpcRecord),
+    #[serde(rename = "bank-hirc-container-rtpc-curve")]
+    Curve(&'row RtpcCurveRecord),
+    #[serde(rename = "bank-hirc-container-rtpc-point")]
+    Point(&'row RtpcPointRecord),
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+pub(crate) enum RtpcExport<'row> {
+    Shared(RtpcPayload<'row>),
+    Container(ContainerRtpcPayload<'row>),
+}
+
 #[derive(Clone, Copy)]
 pub(crate) enum RtpcOwner {
     Sound,
     ActorMixer,
+    Container,
 }
 
 impl RtpcOwner {
@@ -34,6 +53,7 @@ impl RtpcOwner {
         match self {
             Self::Sound => "audio-bank-hirc-sound-rtpc",
             Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc",
+            Self::Container => "audio-bank-hirc-container-rtpc",
         }
     }
 
@@ -41,6 +61,7 @@ impl RtpcOwner {
         match self {
             Self::Sound => "audio-bank-hirc-sound-rtpc-curve",
             Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc-curve",
+            Self::Container => "audio-bank-hirc-container-rtpc-curve",
         }
     }
 
@@ -48,27 +69,31 @@ impl RtpcOwner {
         match self {
             Self::Sound => "audio-bank-hirc-sound-rtpc-point",
             Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc-point",
+            Self::Container => "audio-bank-hirc-container-rtpc-point",
         }
     }
 
-    pub(crate) const fn summary(self, value: &RtpcRecord) -> RtpcPayload<'_> {
+    pub(crate) const fn summary(self, value: &RtpcRecord) -> RtpcExport<'_> {
         match self {
-            Self::Sound => RtpcPayload::SoundSummary(value),
-            Self::ActorMixer => RtpcPayload::ActorMixerSummary(value),
+            Self::Sound => RtpcExport::Shared(RtpcPayload::SoundSummary(value)),
+            Self::ActorMixer => RtpcExport::Shared(RtpcPayload::ActorMixerSummary(value)),
+            Self::Container => RtpcExport::Container(ContainerRtpcPayload::Summary(value)),
         }
     }
 
-    pub(crate) const fn curve(self, value: &RtpcCurveRecord) -> RtpcPayload<'_> {
+    pub(crate) const fn curve(self, value: &RtpcCurveRecord) -> RtpcExport<'_> {
         match self {
-            Self::Sound => RtpcPayload::SoundCurve(value),
-            Self::ActorMixer => RtpcPayload::ActorMixerCurve(value),
+            Self::Sound => RtpcExport::Shared(RtpcPayload::SoundCurve(value)),
+            Self::ActorMixer => RtpcExport::Shared(RtpcPayload::ActorMixerCurve(value)),
+            Self::Container => RtpcExport::Container(ContainerRtpcPayload::Curve(value)),
         }
     }
 
-    pub(crate) const fn point(self, value: &RtpcPointRecord) -> RtpcPayload<'_> {
+    pub(crate) const fn point(self, value: &RtpcPointRecord) -> RtpcExport<'_> {
         match self {
-            Self::Sound => RtpcPayload::SoundPoint(value),
-            Self::ActorMixer => RtpcPayload::ActorMixerPoint(value),
+            Self::Sound => RtpcExport::Shared(RtpcPayload::SoundPoint(value)),
+            Self::ActorMixer => RtpcExport::Shared(RtpcPayload::ActorMixerPoint(value)),
+            Self::Container => RtpcExport::Container(ContainerRtpcPayload::Point(value)),
         }
     }
 }

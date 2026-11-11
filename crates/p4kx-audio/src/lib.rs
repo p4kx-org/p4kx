@@ -51,6 +51,7 @@ mod hirc_music_transition;
 mod hirc_node;
 mod hirc_node_aux;
 mod hirc_node_fx;
+mod hirc_node_parameters;
 mod hirc_node_playback;
 mod hirc_node_positioning;
 mod hirc_node_property;
@@ -97,6 +98,7 @@ pub use bank_source::{
 pub use bank_source_actor_mixer::BankHircActorMixer;
 pub use bank_source_container::{
     BankContainerChild, BankContainerChildren, BankContainerRead, BankHircContainer,
+    BankHircContainerNode,
 };
 pub use bank_source_didx::{BankDidx, BankDidxEntry, BankMediaInfo};
 pub use bank_source_event::{BankEvent, BankEventAction, BankEventRead, BankHircEvent};
@@ -149,6 +151,7 @@ pub use hirc_music_transition::BankMusicTransitionFields;
 pub use hirc_node::{BankNodeParentFields, Container, ContainerKind};
 pub use hirc_node_aux::{BankNodeAuxFields, BankNodeUserAuxBuses};
 pub use hirc_node_fx::{BankNodeFxFields, BankNodeFxKind, BankNodeFxList};
+pub use hirc_node_parameters::BankNodeParameters;
 pub use hirc_node_playback::{BankNodeAdvancedFields, BankNodePlaybackFields};
 pub use hirc_node_positioning::{
     BankNodePositioningFields, BankPositioningModes, BankPositioningTableKind,

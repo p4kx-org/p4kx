@@ -8,6 +8,7 @@ use crate::bank_reader::SectionReader;
 use crate::hirc_node::{
     self, BankNodeParentFields, CURVE_POINT_LEN, Container, ContainerKind, ID_LEN,
 };
+use crate::hirc_node_parameters::BankNodeParameters;
 use crate::{BankError, BankHircField, HircKind, SectionId};
 
 const RANDOM_SEQUENCE_BEFORE_MODE: u64 = 22;
@@ -23,6 +24,8 @@ const LAYER_ASSOCIATION_LEN: u64 = 5;
 pub struct BankContainerFields {
     /// Original fields read by the shared node parser.
     pub node: BankNodeParentFields,
+    /// Checked shared node fields before the container-specific continuation.
+    pub parameters: BankNodeParameters,
     /// Traversed node prefix, including checked opaque bytes.
     pub node_range: Option<Range<u64>>,
     /// Raw Random/Sequence mode when present.
@@ -85,7 +88,8 @@ pub(crate) fn head<F: ObjectFields>(
     observed: &mut BankContainerFields,
 ) -> Result<Head, F::Error> {
     let start = fields.offset();
-    let parent = hirc_node::read_base(fields, &mut observed.node);
+    let parent =
+        hirc_node::read_base_parameters(fields, &mut observed.node, &mut observed.parameters);
     observed.node_range = Some(start..fields.offset());
     let parent_id = parent?;
     let kind = container_kind(layout, fields, observed)?;

@@ -7,6 +7,7 @@ use crate::bank_object_fields::{self, BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
 use crate::hirc_node_aux::{self, BankNodeAuxFields};
 use crate::hirc_node_fx::{self, BankNodeFxFields, BankNodeFxKind, BankNodeFxList};
+use crate::hirc_node_parameters::BankNodeParameters;
 use crate::hirc_node_playback::{self, BankNodePlaybackFields};
 use crate::hirc_node_positioning;
 use crate::hirc_node_property::{self, BankNodePropertyExtents};
@@ -97,6 +98,22 @@ pub(crate) fn read_base<F: ObjectFields>(
         &mut BankNodePlaybackFields::default(),
         &mut None,
         &mut None,
+    )
+}
+
+pub(crate) fn read_base_parameters<F: ObjectFields>(
+    fields: &mut F,
+    parent: &mut BankNodeParentFields,
+    parameters: &mut BankNodeParameters,
+) -> Result<u32, F::Error> {
+    read_base_observed(
+        fields,
+        parent,
+        &mut parameters.properties,
+        &mut parameters.aux,
+        &mut parameters.playback,
+        &mut parameters.state_chunk,
+        &mut parameters.rtpc_chunk,
     )
 }
 

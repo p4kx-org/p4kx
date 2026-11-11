@@ -9,6 +9,7 @@ mod audio_bank_action_properties_provider;
 mod audio_bank_action_target_provider;
 mod audio_bank_actor_mixer_provider;
 mod audio_bank_actor_mixer_raw;
+mod audio_bank_container_node_provider;
 mod audio_bank_event_candidate_provider;
 mod audio_bank_hirc_action_origins;
 mod audio_bank_hirc_action_provider;

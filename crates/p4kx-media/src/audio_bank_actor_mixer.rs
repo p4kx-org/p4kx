@@ -6,7 +6,7 @@ use std::io::{Read, Seek};
 use p4kx_extraction::DecimalU64;
 use p4kx_extraction::bank::{
     BankActorMixerFields, BankContainerChild, BankContainerRead, BankHircActorMixer, BankHircField,
-    BankHircObject, BankRtpcRead,
+    BankHircObject,
 };
 
 use crate::audio_bank_actor_mixer_payload::{
@@ -197,18 +197,7 @@ fn project_node<R: Read + Seek>(
         BankContainerRead::Malformed(error) => Some(error.clone()),
         _ => None,
     };
-    let read = match (actor.rtpc(), error) {
-        (Some(rows), _) if rows.checked_curve_count() == rows.declared_curve_count().value => {
-            BankRtpcRead::Readable(rows)
-        }
-        (Some(rows), Some(error)) => BankRtpcRead::Malformed { rows, error },
-        (None, Some(error)) => BankRtpcRead::Unavailable(error),
-        _ => {
-            return Err(MediaError::Contract(
-                "inconsistent ActorMixer RTPC observation".into(),
-            ));
-        }
-    };
+    let read = audio_bank_rtpc::node_rows(actor.rtpc(), error)?;
     audio_bank_rtpc::project(
         projection,
         version,

@@ -6,10 +6,10 @@ use std::ops::Range;
 
 use p4kx_extraction::BankError;
 use p4kx_extraction::bank::{
-    BankContainerRead, BankHircActorMixer, BankHircObject, BankHircSoundNode, BankNodeAuxFields,
-    BankNodeFxKind, BankNodeFxSlots, BankNodeParentFields, BankNodePlaybackFields,
-    BankNodeUserAuxBuses, BankPositioningRows, BankPositioningTableKind, BankSoundContinuation,
-    BankSoundRead,
+    BankContainerRead, BankHircActorMixer, BankHircContainerNode, BankHircObject,
+    BankHircSoundNode, BankNodeAuxFields, BankNodeFxKind, BankNodeFxSlots, BankNodeParentFields,
+    BankNodePlaybackFields, BankNodeUserAuxBuses, BankPositioningRows, BankPositioningTableKind,
+    BankSoundContinuation, BankSoundRead,
 };
 
 use crate::audio_bank_inventory::VersionSite;
@@ -29,6 +29,7 @@ pub(crate) const LISTS: [BankNodeFxKind; 2] = [BankNodeFxKind::Effects, BankNode
 pub(crate) enum Owner<'node, 'input, R> {
     Sound(&'node mut BankHircSoundNode<'input, R>),
     ActorMixer(&'node mut BankHircActorMixer<'input, R>),
+    Container(&'node mut BankHircContainerNode<'input, R>),
 }
 
 pub(crate) struct Declarations<'context, 'source> {
@@ -72,6 +73,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
         match self {
             Self::Sound(node) => node.sound().object,
             Self::ActorMixer(node) => *node.object(),
+            Self::Container(node) => *node.object(),
         }
     }
 
@@ -80,21 +82,21 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
             Self::Sound(node) => sound_source(node),
             Self::ActorMixer(node) => {
                 let fields = node.fields();
-                let disposition = match node.status() {
-                    BankContainerRead::Decoded => Disposition::Observed(None),
-                    BankContainerRead::Malformed(error) => Disposition::Observed(Some(error)),
-                    BankContainerRead::Unsupported(_) => Disposition::Unsupported,
-                    _ => {
-                        return Err(MediaError::Contract(
-                            "unexpected ActorMixer disposition".into(),
-                        ));
-                    }
-                };
+                let disposition = container_disposition(node.status())?;
                 Ok(Source {
                     fields: Some(&fields.node),
                     aux: Some(&fields.aux),
                     playback: Some(&fields.playback),
                     disposition,
+                })
+            }
+            Self::Container(node) => {
+                let fields = node.fields();
+                Ok(Source {
+                    fields: Some(&fields.node),
+                    aux: Some(&fields.parameters.aux),
+                    playback: Some(&fields.parameters.playback),
+                    disposition: container_disposition(node.status())?,
                 })
             }
         }
@@ -107,6 +109,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
         match self {
             Self::Sound(node) => node.user_aux_buses(),
             Self::ActorMixer(node) => node.user_aux_buses(),
+            Self::Container(node) => node.user_aux_buses(),
         }
         .map_err(|cause| bank.replay_failure(cause))
     }
@@ -118,6 +121,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
         match self {
             Self::Sound(node) => node.positioning_rows(kind),
             Self::ActorMixer(node) => node.positioning_rows(kind),
+            Self::Container(node) => node.positioning_rows(kind),
         }
     }
 
@@ -125,7 +129,19 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
         match self {
             Self::Sound(node) => node.fx_slots(kind),
             Self::ActorMixer(node) => node.fx_slots(kind),
+            Self::Container(node) => node.fx_slots(kind),
         }
+    }
+}
+
+fn container_disposition(status: &BankContainerRead) -> Result<Disposition<'_>, MediaError> {
+    match status {
+        BankContainerRead::Decoded => Ok(Disposition::Observed(None)),
+        BankContainerRead::Malformed(error) => Ok(Disposition::Observed(Some(error))),
+        BankContainerRead::Unsupported(_) => Ok(Disposition::Unsupported),
+        _ => Err(MediaError::Contract(
+            "unexpected shared container disposition".into(),
+        )),
     }
 }
 

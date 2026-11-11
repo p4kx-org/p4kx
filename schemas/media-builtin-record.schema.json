@@ -4620,6 +4620,62 @@
       ],
       "type": "object"
     },
+    "ContainerRtpcPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-container-rtpc",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcCurveRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-container-rtpc-curve",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcPointRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-container-rtpc-point",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ContainerRtpcPayload"
+    },
     "Continuation": {
       "oneOf": [
         {
@@ -21633,6 +21689,288 @@
                     "properties": {
                       "record_type": {
                         "const": "bank-hirc-actor-mixer-rtpc-point"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 4,
+                    "minItems": 4
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-container-rtpc"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ContainerRtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-container-rtpc"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-container-rtpc-curve"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ContainerRtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-container-rtpc-curve"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-container-rtpc-point"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ContainerRtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-container-rtpc-point"
                       }
                     },
                     "required": [

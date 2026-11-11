@@ -5,8 +5,8 @@ use std::io::{Read, Seek};
 use std::ops::Range;
 
 use p4kx_extraction::bank::{
-    BankContainerRead, BankHircActorMixer, BankHircObject, BankHircSoundNode, BankNodePropertyKind,
-    BankSoundContinuation, BankSoundRead,
+    BankContainerRead, BankHircActorMixer, BankHircContainerNode, BankHircObject,
+    BankHircSoundNode, BankNodePropertyKind, BankSoundContinuation, BankSoundRead,
 };
 
 use crate::audio_bank_inventory::VersionSite;
@@ -116,6 +116,40 @@ pub(crate) fn actor_mixer<R: Read + Seek>(
     for kind in LISTS {
         if let Some(rows) = actor.properties(kind) {
             let properties = PropertyRows::new(bank, &projection.sites, PropertyScope::Node);
+            audio_bank_node_property_rows::emit(&properties, kind, rows, writer)?;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn container<R: Read + Seek>(
+    bank: &BankProjection<'_>,
+    version: VersionSite,
+    container: &mut BankHircContainerNode<'_, R>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let projection = NodePropertyProjection::new(bank, container.object(), version);
+    let error = match container.status() {
+        BankContainerRead::Decoded => None,
+        BankContainerRead::Malformed(error) => Some(error),
+        BankContainerRead::Unsupported(_) => {
+            return audio_bank_node_property_summary::unsupported(&projection, writer);
+        }
+        _ => {
+            return Err(MediaError::Contract(
+                "unexpected Container property source disposition".into(),
+            ));
+        }
+    };
+    let fields = container.fields();
+    let original = SourceNode {
+        routing: &fields.node,
+        properties: &fields.parameters.properties,
+    };
+    audio_bank_node_property_summary::supported(&projection, Some(&original), error, writer)?;
+    let properties = PropertyRows::new(bank, &projection.sites, PropertyScope::Node);
+    for kind in LISTS {
+        if let Some(rows) = container.properties(kind) {
             audio_bank_node_property_rows::emit(&properties, kind, rows, writer)?;
         }
     }

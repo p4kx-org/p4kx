@@ -54,16 +54,19 @@ and fallback selection.
 | `audio-bank-hirc-actor-mixer-rtpc` | `bank-hirc-actor-mixer-rtpc` | HIRC section and ActorMixer object ordinals |
 | `audio-bank-hirc-actor-mixer-rtpc-curve` | `bank-hirc-actor-mixer-rtpc-curve` | HIRC section, ActorMixer object and curve ordinals |
 | `audio-bank-hirc-actor-mixer-rtpc-point` | `bank-hirc-actor-mixer-rtpc-point` | HIRC section, ActorMixer object, curve and point ordinals |
-| `audio-bank-hirc-node-properties` | `bank-hirc-node-properties` | HIRC section and Sound or ActorMixer object ordinals |
+| `audio-bank-hirc-node-properties` | `bank-hirc-node-properties` | HIRC section and owning Sound, ActorMixer or container object ordinals |
 | `audio-bank-hirc-node-property` | `bank-hirc-node-property` | HIRC section, owning object, property list and original property ordinals |
-| `audio-bank-hirc-node-fx` | `bank-hirc-node-fx` | HIRC section, owning Sound or ActorMixer object and effect list ordinals |
+| `audio-bank-hirc-node-fx` | `bank-hirc-node-fx` | HIRC section, owning Sound, ActorMixer or container object and effect list ordinals |
 | `audio-bank-hirc-node-fx-slot` | `bank-hirc-node-fx-slot` | HIRC section, owning object, effect list and physical slot ordinals |
-| `audio-bank-hirc-node-aux` | `bank-hirc-node-aux` | HIRC section and Sound or ActorMixer object ordinals |
-| `audio-bank-hirc-node-positioning` | `bank-hirc-node-positioning` | HIRC section and Sound or ActorMixer object ordinals |
+| `audio-bank-hirc-node-aux` | `bank-hirc-node-aux` | HIRC section and owning Sound, ActorMixer or container object ordinals |
+| `audio-bank-hirc-node-positioning` | `bank-hirc-node-positioning` | HIRC section and owning Sound, ActorMixer or container object ordinals |
 | `audio-bank-hirc-node-positioning-path` | `bank-hirc-node-positioning-path` | HIRC section, owning object, physical positioning table and row ordinals |
-| `audio-bank-hirc-node-advanced-settings` | `bank-hirc-node-advanced-settings` | HIRC section and Sound or ActorMixer object ordinals |
+| `audio-bank-hirc-node-advanced-settings` | `bank-hirc-node-advanced-settings` | HIRC section and owning Sound, ActorMixer or container object ordinals |
 | `audio-bank-hirc-container` | `bank-hirc-container` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-child` | `bank-hirc-container-child` | HIRC section, container object and child ordinals |
+| `audio-bank-hirc-container-rtpc` | `bank-hirc-container-rtpc` | HIRC section and container object ordinals |
+| `audio-bank-hirc-container-rtpc-curve` | `bank-hirc-container-rtpc-curve` | HIRC section, container object and curve ordinals |
+| `audio-bank-hirc-container-rtpc-point` | `bank-hirc-container-rtpc-point` | HIRC section, container object, curve and point ordinals |
 | `audio-bank-music-segment` | `bank-music-segment` | HIRC section and segment object ordinals |
 | `audio-bank-music-segment-child` | `bank-music-segment-child` | HIRC section, segment and child ordinals |
 | `audio-bank-music-segment-stinger` | `bank-music-segment-stinger` | HIRC section, segment and stinger ordinals |
@@ -207,7 +210,7 @@ interpretation is null for non-finite words. Repeated and unknown IDs retain the
 Other standalone versions report `unsupported` and retain the original body. A malformed
 supported bundle reports `malformed` in diagnostics.
 
-Version 154 Sound and ActorMixer inline State reports a checked region when present. Binding and group
+Version 154 Sound, ActorMixer and container inline State reports a checked region when present. Binding and group
 counts have their own original variable-length field ranges. Ordered rows preserve authored
 binding IDs and raw flags, group IDs and synchronization bytes, State IDs and property
 bundles. A Sound with no node reports `absent`. A malformed earlier region reports
@@ -215,7 +218,7 @@ bundles. A Sound with no node reports `absent`. A malformed earlier region repor
 Sound field is malformed. The separate Sound and raw object rows retain their own
 coverage. These inline State layouts are qualified to version 154.
 
-The version 154 Sound and ActorMixer RTPC summaries report the original curve count, the checked curve count
+The version 154 Sound, ActorMixer and container RTPC summaries report the original curve count, the checked curve count
 and the exact admitted range. Each curve row retains its IDs, original type, accumulation and
 scaling bytes, and its original point count. Point rows preserve the input and output
 binary32 words, their finite numeric interpretations and the original interpolation word.
@@ -242,14 +245,21 @@ is truncated. Other Action groups report absent Play properties. Other bank
 versions report unsupported property coverage. The Action target, PlayBank
 and CLI/MCP inspection fields keep their established meanings.
 
-Version-154 Sound and ActorMixer node property summaries include the original override bus
+Version-154 Random/Sequence, Switch and Blend containers use the same shared
+node property, effect, auxiliary routing, positioning, advanced settings
+and inline State records. Container RTPC curves and points have their own
+namespaces. Shared group rows can remain complete in diagnostics when later
+container-specific data is truncated. The original container row and child
+rows retain their existing layout and coverage.
+
+Version-154 Sound, ActorMixer and container node property summaries include the original override bus
 and direct parent words and the checked property and ranged modifier lists. Explicit zero
 values remain present. Each list reports its declared count, the checked ID and raw word counts,
 and original byte ranges. A malformed prefix retains independently readable IDs and words. An
 absent optional Sound node and an unsupported bank version each have their own layout status.
 A later State, RTPC or child failure leaves a completed property prefix available.
 
-Version-154 Sound and ActorMixer effect declarations use list index 0 for initial
+Version-154 Sound, ActorMixer and container effect declarations use list index 0 for initial
 effects and 1 for metadata. A list records its original override byte, count and
 checked slot extent. A nonempty initial effect list also carries its bypass-all
 byte. Slot records follow authored order. Each preserves its original slot index,
@@ -269,7 +279,7 @@ version, a region unavailable because an earlier read failed and a malformed
 region with a checked prefix. Complete earlier declarations remain available when
 a later region, State, RTPC or child list is malformed.
 
-Version-154 Sound and ActorMixer positioning summaries include the original
+Version-154 Sound, ActorMixer and container positioning summaries include the original
 positioning flags, panner and 3D position codes, the parent override and any
 separate 3D flags. A selected automation block records its original path mode,
 signed transition time, vertex and playlist counts, and checked table ranges.

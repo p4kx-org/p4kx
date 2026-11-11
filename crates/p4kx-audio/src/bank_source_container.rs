@@ -11,6 +11,12 @@ use crate::hirc_container::{self, BankContainerFields, Layout};
 use crate::read_at::SeekSource;
 use crate::{BankError, BankHircField, BankHircObject, BankReadError, HircKind};
 
+#[path = "bank_hirc_container_node.rs"]
+mod node;
+
+pub use self::node::BankHircContainerNode;
+pub(crate) use self::node::observe_node;
+
 /// One original container occurrence with its bounded child reader.
 #[non_exhaustive]
 pub struct BankHircContainer<'input, R> {
@@ -82,24 +88,7 @@ pub(crate) fn observe<'input, R: Read + Seek>(
     kind: HircKind,
     layout: Layout,
 ) -> Result<BankHircContainer<'input, R>, BankReadError> {
-    let mut fields = BankContainerFields::default();
-    let status = if hirc::has_unknown_layout(kind, version) {
-        BankContainerRead::Unsupported(BankError::UnsupportedObjectLayout { kind, version })
-    } else {
-        debug_assert_eq!(
-            version, CONTAINER_VERSION,
-            "the scanner reads the admitted container layout"
-        );
-        let result = scan(input, &object, layout, &mut fields);
-        match result {
-            Ok(()) => BankContainerRead::Decoded,
-            Err(BankReadError::Format(error)) => BankContainerRead::Malformed(error),
-            Err(error) => {
-                *stopped = true;
-                return Err(error);
-            }
-        }
-    };
+    let Observation { fields, status } = observed(input, stopped, &object, version, kind, layout)?;
     let children = fields
         .children
         .as_ref()
@@ -111,6 +100,40 @@ pub(crate) fn observe<'input, R: Read + Seek>(
         fields,
         children,
     })
+}
+
+struct Observation {
+    status: BankContainerRead,
+    fields: BankContainerFields,
+}
+
+fn observed<R: Read + Seek>(
+    input: &mut SeekSource<R>,
+    stopped: &mut bool,
+    object: &BankHircObject,
+    version: u32,
+    kind: HircKind,
+    layout: Layout,
+) -> Result<Observation, BankReadError> {
+    let mut fields = BankContainerFields::default();
+    let status = if hirc::has_unknown_layout(kind, version) {
+        BankContainerRead::Unsupported(BankError::UnsupportedObjectLayout { kind, version })
+    } else {
+        debug_assert_eq!(
+            version, CONTAINER_VERSION,
+            "the scanner reads the admitted container layout"
+        );
+        let result = scan(input, object, layout, &mut fields);
+        match result {
+            Ok(()) => BankContainerRead::Decoded,
+            Err(BankReadError::Format(error)) => BankContainerRead::Malformed(error),
+            Err(error) => {
+                *stopped = true;
+                return Err(error);
+            }
+        }
+    };
+    Ok(Observation { status, fields })
 }
 
 fn scan<R: Read + Seek>(

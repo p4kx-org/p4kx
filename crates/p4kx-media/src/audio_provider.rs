@@ -166,7 +166,7 @@ fn bank_node_field_groups() -> [FieldGroup; 2] {
         ),
         FieldGroup::new(
             "bank-rtpc-fields",
-            "Version 154 Sound RTPC curve and point fields, original float words and interpolation codes with exact source ranges.",
+            "Version-154 Sound, ActorMixer and container RTPC curves and points, original float words and interpolation codes with exact source ranges.",
         ),
     ]
 }
@@ -195,7 +195,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-container-fields",
-            "Original HIRC container parent, kind, mode and ordered children, plus ActorMixer ordered children and checked node property, FX, auxiliary routing, positioning, advanced playback, State and RTPC fields with exact byte ranges.",
+            "Original HIRC container parent, kind, mode and ordered children, ActorMixer children, and version-154 shared node properties, FX, auxiliary routing, positioning, advanced settings, State and RTPC fields for containers and ActorMixer.",
         ),
         FieldGroup::new(
             "bank-music-playlist-fields",

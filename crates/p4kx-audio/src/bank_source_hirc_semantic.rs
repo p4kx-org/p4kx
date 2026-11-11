@@ -6,7 +6,7 @@ use std::io::{Read, Seek};
 use crate::BankHircState;
 use crate::BankSoundStateRead;
 use crate::bank_source_actor_mixer::{self, BankHircActorMixer};
-use crate::bank_source_container::{self, BankHircContainer};
+use crate::bank_source_container::{self, BankHircContainer, BankHircContainerNode};
 use crate::bank_source_event;
 use crate::bank_source_music_playlist::{self, BankHircMusicPlaylist};
 use crate::bank_source_music_segment::{self, BankHircMusicSegment};
@@ -49,6 +49,8 @@ pub enum BankHircSemantic<'input, R> {
     State(BankHircState),
     /// Owner-bound container interpretation and ordered children.
     Container(Box<BankHircContainer<'input, R>>),
+    /// Owner-bound container with checked shared node regions and ordered children.
+    ContainerWithNode(Box<BankHircContainerNode<'input, R>>),
     /// Owner-bound `ActorMixer` node regions and ordered children.
     ActorMixer(Box<BankHircActorMixer<'input, R>>),
     /// Owner-bound music playlist interpretation and ordered values.
@@ -74,6 +76,7 @@ impl<R> BankHircSemantic<'_, R> {
             Self::SoundWithNode(node) => &node.sound().object,
             Self::State(state) => &state.object,
             Self::Container(container) => &container.object,
+            Self::ContainerWithNode(container) => container.object(),
             Self::ActorMixer(actor) => actor.object(),
             Self::MusicPlaylist(playlist) => &playlist.object,
             Self::MusicSegment(segment) => &segment.object,
@@ -122,7 +125,7 @@ impl<R: Read + Seek> BankHirc<'_, R> {
         self.next_semantic_in(header, NodeMode::StatesAndRtpc)
     }
 
-    /// Reads semantic fields with Sound node regions and Play action property rows.
+    /// Reads semantic fields with checked node regions and Play action property rows.
     ///
     /// The observed bank header must belong to the same input.
     pub fn next_semantic_with_source_fields(
@@ -188,18 +191,33 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                 _ => {}
             }
             if let Some(layout) = ContainerLayout::of(kind) {
-                return bank_source_container::observe(
-                    self.input,
-                    &mut self.stopped,
-                    object,
-                    version,
-                    kind,
-                    layout,
-                )
-                .map(|container| BankHircSemantic::Container(Box::new(container)));
+                return self.container_semantic(object, version, kind, layout, mode);
             }
         }
         self.primitive(object, kind, version, mode)
+    }
+
+    fn container_semantic(
+        &mut self,
+        object: BankHircObject,
+        version: u32,
+        kind: HircKind,
+        layout: ContainerLayout,
+        mode: NodeMode,
+    ) -> Result<BankHircSemantic<'_, R>, BankReadError> {
+        if mode == NodeMode::SourceFields {
+            return bank_source_container::observe_node(
+                self.input,
+                &mut self.stopped,
+                object,
+                version,
+                kind,
+                layout,
+            )
+            .map(|container| BankHircSemantic::ContainerWithNode(Box::new(container)));
+        }
+        bank_source_container::observe(self.input, &mut self.stopped, object, version, kind, layout)
+            .map(|container| BankHircSemantic::Container(Box::new(container)))
     }
 
     fn music_switch(

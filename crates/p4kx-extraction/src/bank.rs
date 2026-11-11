@@ -26,10 +26,11 @@ pub use p4kx_audio::{
     SoundSource, StateObject, StateProperties, StateProperty,
 };
 pub use p4kx_audio::{
-    BankActorMixerFields, BankHircActionProperties, BankHircActorMixer, BankHircSoundNode,
-    BankNodeAuxFields, BankNodeFxFields, BankNodeFxKind, BankNodeFxList, BankNodeFxSlot,
-    BankNodeFxSlots, BankNodePropertyExtent, BankNodePropertyExtents, BankNodePropertyKind,
-    BankNodePropertyRow, BankNodePropertyRows, BankNodePropertyValue, BankNodeUserAuxBuses,
+    BankActorMixerFields, BankHircActionProperties, BankHircActorMixer, BankHircContainerNode,
+    BankHircSoundNode, BankNodeAuxFields, BankNodeFxFields, BankNodeFxKind, BankNodeFxList,
+    BankNodeFxSlot, BankNodeFxSlots, BankNodePropertyExtent, BankNodePropertyExtents,
+    BankNodePropertyKind, BankNodePropertyRow, BankNodePropertyRows, BankNodePropertyValue,
+    BankNodeUserAuxBuses,
 };
 pub use p4kx_audio::{
     BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistItem,
@@ -50,7 +51,7 @@ pub use p4kx_audio::{
     BankStateBinding, BankStateGroup,
 };
 pub use p4kx_audio::{
-    BankNodeAdvancedFields, BankNodePlaybackFields, BankNodePositioningFields,
+    BankNodeAdvancedFields, BankNodeParameters, BankNodePlaybackFields, BankNodePositioningFields,
     BankPositioningModes, BankPositioningRow, BankPositioningRowFields, BankPositioningRows,
     BankPositioningTableKind, BankPositioningVector,
 };

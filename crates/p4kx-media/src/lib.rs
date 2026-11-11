@@ -26,6 +26,7 @@ mod audio_bank_action_properties;
 mod audio_bank_action_property_payload;
 mod audio_bank_actor_mixer;
 mod audio_bank_actor_mixer_payload;
+mod audio_bank_container_node;
 mod audio_bank_didx_index;
 mod audio_bank_failure;
 mod audio_bank_hirc;

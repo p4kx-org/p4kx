@@ -12,6 +12,7 @@ use p4kx_extraction::bank::{
 };
 
 use crate::audio_bank_actor_mixer;
+use crate::audio_bank_container_node;
 use crate::audio_bank_failure::BankPhase;
 use crate::audio_bank_inventory::{BankInventory, VersionSite};
 use crate::audio_bank_node_declarations::{self, Owner};
@@ -111,7 +112,7 @@ fn emit_semantic<R: Read + Seek>(
                 writer,
             )
         }
-        (BankHircSemantic::Container(container), Some(version)) => {
+        (BankHircSemantic::ContainerWithNode(container), Some(version)) => {
             audio_bank_hirc_container::project(projection, version, *container, writer)
         }
         (BankHircSemantic::MusicPlaylist(playlist), Some(version)) => {
@@ -154,11 +155,21 @@ fn emit_raw(
     version: Option<VersionSite>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    if let Some(version) = version.filter(|site| original.kind(site.version) == HircKind::Sound) {
-        audio_bank_node_properties::unsupported(projection, version, original, writer)?;
-        audio_bank_node_declarations::unsupported(projection, version, original, writer)?;
+    let Some(version) = version else {
+        return Ok(());
+    };
+    match original.kind(version.version) {
+        HircKind::Sound => {
+            audio_bank_node_properties::unsupported(projection, version, original, writer)?;
+            audio_bank_node_declarations::unsupported(projection, version, original, writer)
+        }
+        HircKind::RandomSequenceContainer
+        | HircKind::SwitchContainer
+        | HircKind::LayerContainer => {
+            audio_bank_container_node::unsupported(projection, version, original, writer)
+        }
+        _ => Ok(()),
     }
-    Ok(())
 }
 
 fn emit_unscoped_sound(

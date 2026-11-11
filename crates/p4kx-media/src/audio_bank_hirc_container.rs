@@ -6,11 +6,13 @@ use std::ops::Range;
 
 use p4kx_extraction::DecimalU64;
 use p4kx_extraction::bank::{
-    BankContainerFields, BankContainerRead, BankHircContainer, ContainerKind,
+    BankContainerChildren, BankContainerFields, BankContainerRead, BankHircContainerNode,
+    ContainerKind,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::audio_bank_container_node;
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_payload::BankEntryRange;
 use crate::audio_bank_projection::BankProjection;
@@ -78,12 +80,30 @@ pub(crate) struct ChildRecord {
 pub(crate) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,
     version: VersionSite,
-    container: BankHircContainer<'_, R>,
+    mut container: BankHircContainerNode<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let sites = origins::ContainerSites::new(&container.object, version, &container.fields);
-    let (layout, status, issue) = interpretation(&container.status)?;
-    let payload = ContainerRecord::read(layout, &container.fields)?;
+    let sites = origins::ContainerSites::new(container.object(), version, container.fields());
+    header(
+        projection,
+        &sites,
+        container.status(),
+        container.fields(),
+        writer,
+    )?;
+    children(projection, &sites, container.children(), writer)?;
+    audio_bank_container_node::project(projection, version, &mut container, writer)
+}
+
+fn header(
+    projection: &BankProjection<'_>,
+    sites: &origins::ContainerSites,
+    disposition: &BankContainerRead,
+    fields: &BankContainerFields,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let (layout, status, issue) = interpretation(disposition)?;
+    let payload = ContainerRecord::read(layout, fields)?;
     sites
         .header(projection.input, issue.is_some(), writer)?
         .write(
@@ -92,8 +112,16 @@ pub(crate) fn project<R: Read + Seek>(
             status,
             &ContainerPayload::BankHircContainer(payload),
             issue.as_slice(),
-        )?;
-    if let Some(children) = container.children {
+        )
+}
+
+fn children<R: Read + Seek>(
+    projection: &BankProjection<'_>,
+    sites: &origins::ContainerSites,
+    observed: Option<BankContainerChildren<'_, R>>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    if let Some(children) = observed {
         for child in children {
             let child = child.map_err(|cause| projection.replay_failure(cause))?;
             let ordinal = u64::from(child.ordinal);
