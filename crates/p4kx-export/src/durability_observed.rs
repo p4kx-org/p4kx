@@ -3,7 +3,9 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value};
+use p4kx_extraction::{
+    DecimalU64, SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value,
+};
 
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::{AuthoredNumberOwner, CapturedNumber};
@@ -191,6 +193,18 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
 
     pub(super) fn source_type(&self) -> Result<&'source str, CatalogError> {
         self.structure().map(StructValue::type_name)
+    }
+
+    pub(super) fn owner_ordinal(&self) -> Result<SourcedValue<DecimalU64>, CatalogError> {
+        let owner = self
+            .owner
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        self.bind_field(
+            owner,
+            OriginalValuePart::Value,
+            SourceValue::Present(DecimalU64::new(owner.ordinal())),
+            SourceUseRole::Conversion,
+        )
     }
 
     pub(super) fn source_type_value(&self) -> Result<SourcedValue<&'source str>, CatalogError> {

@@ -46,16 +46,18 @@ fn weapons(loop_shape: TestStruct) -> Vec<TestStruct> {
         TestStruct::new("SWeaponActionFireRapidParams")
             .parent("SWeaponActionParams")
             .field("name", TestType::String)
-            .field("fireRate", TestType::Single)
+            .field("fireRate", TestType::Int32)
             .field("heatPerShot", TestType::Single)
-            .field("launchParams", class("SProjectileLauncher")),
+            .field("launchParams", pointer("SLauncherBase")),
         TestStruct::new("SWeaponActionFireChargedParams")
             .parent("SWeaponActionParams")
             .field("chargeTime", TestType::Single)
             .field("overchargeTime", TestType::Single)
             .field("cooldownTime", TestType::Single)
             .field("weaponAction", pointer("SWeaponActionParams")),
+        TestStruct::new("SLauncherBase"),
         TestStruct::new("SProjectileLauncher")
+            .parent("SLauncherBase")
             .field("pelletCount", TestType::Int32)
             .field("pellets", TestType::Int32)
             .field("ammoCost", TestType::Int32)

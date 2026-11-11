@@ -53,6 +53,8 @@ pub(crate) mod catalog_explosives;
 pub(crate) mod catalog_hacking_chips;
 #[path = "catalog_item_components.rs"]
 pub(crate) mod catalog_item_components;
+#[path = "catalog_weapon_actions.rs"]
+pub(crate) mod catalog_weapon_actions;
 #[path = "catalog_weapon_magazine_slots.rs"]
 mod catalog_weapon_magazine_slots;
 #[path = "item_component_owner.rs"]

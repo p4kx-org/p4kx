@@ -182,7 +182,9 @@ impl DataForge<'_> {
         self.enums.iter().map(|def| Enum { forge: self, def })
     }
 
-    pub(crate) fn struct_at(&self, index: u32) -> Option<Struct<'_>> {
+    /// Returns the definition at the given physical struct index, when present.
+    #[must_use]
+    pub fn struct_at(&self, index: u32) -> Option<Struct<'_>> {
         let def = self.structs.get(usize::try_from(index).ok()?)?;
         Some(Struct {
             forge: self,

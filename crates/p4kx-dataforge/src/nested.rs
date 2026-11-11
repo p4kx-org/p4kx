@@ -12,6 +12,7 @@ use crate::{Field, Guid, Location, Value};
 /// pointer, or the root of a [`RecordTree`](crate::RecordTree).
 pub struct StructValue<'f> {
     pub(crate) type_name: &'f str,
+    pub(crate) struct_index: u32,
     pub(crate) fields: Vec<Field<'f>>,
 }
 
@@ -24,6 +25,12 @@ impl<'f> StructValue<'f> {
     #[must_use]
     pub const fn type_name(&self) -> &'f str {
         self.type_name
+    }
+
+    /// Returns the physical definition index in the source struct table.
+    #[must_use]
+    pub const fn struct_index(&self) -> u32 {
+        self.struct_index
     }
 
     /// Returns the fields in declaration order, the inherited ones first.

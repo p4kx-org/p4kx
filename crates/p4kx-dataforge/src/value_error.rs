@@ -23,7 +23,7 @@ pub enum ValueError {
         /// The enum index the property gives.
         index: u16,
     },
-    /// A class array names a struct that does not exist.
+    /// A field declaration names a struct that does not exist.
     #[error("the field refers to struct {index}, which does not exist")]
     UnknownStruct {
         /// The struct index the property gives.

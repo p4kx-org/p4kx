@@ -1,14 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataType, SourceUseRole, SourceValue, SourcedValue, Value};
+use p4kx_extraction::{
+    DataType, SourceUse, SourceUseRole, SourceValue, SourceValueState, SourcedValue, Value,
+    ValueError,
+};
 
 use super::{Fact, Observed};
-use crate::CatalogError;
 use crate::catalog_number_capture::CapturedNumber;
-use crate::catalog_read::original::OriginalValuePart;
+use crate::catalog_read::original::{OriginalDatum, OriginalValuePart};
 use crate::source_fields::{FieldError, FieldViolation};
 use crate::source_value_catalog::{self, SourceArenaOutput};
+use crate::{CatalogError, ExportAccountingError};
+
+#[path = "authored_owned_family.rs"]
+mod family;
 
 impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
     /// Retains the actual contents of a scalar `StrongPointer` to the declared base.
@@ -18,39 +24,90 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         declared_base: &str,
         notes: &mut Vec<FieldError>,
     ) -> Result<SourcedValue<SourceArenaOutput<'source>>, CatalogError> {
+        self.strong_pointer_family_to(name, declared_base, notes, |source, _| {
+            let owner = source
+                .owner
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            source_value_catalog::read_subtree(source.originals, owner, |original| {
+                source.retain_raw_number(original)
+            })
+        })
+    }
+
+    pub(in crate::catalog_v3) fn authored_members(
+        &self,
+    ) -> Result<SourceArenaOutput<'source>, CatalogError> {
+        self.authored_members_except([])
+    }
+
+    /// Retains original members outside the first occurrences represented by typed cells.
+    pub(in crate::catalog_v3) fn authored_members_except(
+        &self,
+        projected: impl IntoIterator<Item = (&'static str, SourceValueState)>,
+    ) -> Result<SourceArenaOutput<'source>, CatalogError> {
+        let owner = self
+            .owner
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let projected = projected.into_iter();
+        let mut consumed = Vec::with_capacity(projected.size_hint().0);
+        for (name, state) in projected {
+            if matches!(state, SourceValueState::Present | SourceValueState::Null)
+                && let Some((_, member)) = self.originals.field(self.owner, name)?
+            {
+                consumed.push(member.ordinal());
+            }
+        }
+        source_value_catalog::read_members(self.originals, owner, &consumed, |original| {
+            self.retain_raw_number(original)
+        })
+    }
+
+    fn retain_raw_number(
+        &self,
+        original: &Fact<'scope, 'read, 'source>,
+    ) -> Result<(), CatalogError> {
+        if let Some(number) = CapturedNumber::item_component_raw(self.originals, original)? {
+            self.numbers.borrow_mut().push(number);
+        }
+        Ok(())
+    }
+
+    /// Reads the stored label of a scalar Enum with the expected original declaration.
+    pub(in crate::catalog_v3) fn borrowed_enum_to(
+        &self,
+        name: &str,
+        target: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<&'source str>, CatalogError> {
         let Some((_, fact)) = self.originals.field(self.owner, name)? else {
             return self.absent();
         };
         let storage = fact.field().storage();
-        if storage.data_type() != DataType::StrongPointer || storage.is_array() {
-            let state =
-                self.failure(name, fact.value(), "a nullable scalar StrongPointer", notes)?;
+        if storage.data_type() != DataType::Enum || storage.is_array() {
+            let state = self.failure(name, fact.value(), "a nullable scalar Enum", notes)?;
             return self.bind_storage(fact, state);
         }
-        self.read_declared_owned(fact, &[declared_base], notes, |notes| {
-            Ok(match fact.value() {
-                Value::Struct(_) => (
-                    OriginalValuePart::ConcreteType,
-                    SourceValue::Present(source_value_catalog::read_subtree(
-                        self.originals,
-                        fact,
-                        |original| {
-                            if let Some(number) =
-                                CapturedNumber::item_component_raw(self.originals, original)?
-                            {
-                                self.numbers.borrow_mut().push(number);
-                            }
-                            Ok(())
-                        },
-                    )?),
-                ),
-                Value::Null => (OriginalValuePart::Value, SourceValue::Null),
-                other => (
-                    OriginalValuePart::Value,
-                    self.failure(name, other, "an owned Struct", notes)?,
-                ),
-            })
-        })
+        fact.check_input(self.input)?;
+        let (declared, declaration) = self.input.declared_enum_name(storage.target())?;
+        self.read_declared_value(
+            fact,
+            &[target],
+            (declared, fact.declaration_selectors(declaration)?),
+            notes,
+            |notes| {
+                let state = match fact.value() {
+                    Value::Enum(label) => SourceValue::Present(*label),
+                    Value::Null => SourceValue::Null,
+                    other => self.failure(name, other, "a nullable Enum", notes)?,
+                };
+                let role = if matches!(state, SourceValue::Present(_)) {
+                    SourceUseRole::Payload
+                } else {
+                    SourceUseRole::Selector
+                };
+                fact.bind(OriginalValuePart::Value, state, role, true)
+            },
+        )
     }
 
     pub(super) fn read_declared_owned<T>(
@@ -62,50 +119,66 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
             &mut Vec<FieldError>,
         ) -> Result<(OriginalValuePart, SourceValue<T>), CatalogError>,
     ) -> Result<SourcedValue<T>, CatalogError> {
-        fact.check_input(self.input)?;
-        let (declared, declaration) = self
-            .input
-            .declared_struct_name(fact.field().storage().target(), SourceUseRole::Selector)?;
+        let declared = fact.observe_declared_target(self.input)?;
+        self.read_declared_value(fact, expected, declared, notes, |notes| {
+            let (part, state) = read(notes)?;
+            fact.bind(part, state, SourceUseRole::Selector, true)
+        })
+    }
+
+    fn read_declared_value<T>(
+        &self,
+        fact: &Fact<'scope, 'read, 'source>,
+        expected: &[&str],
+        (declared, [field, data_type, is_array, target, declaration]): (
+            Result<&str, ValueError>,
+            [SourceUse; 5],
+        ),
+        notes: &mut Vec<FieldError>,
+        read: impl FnOnce(&mut Vec<FieldError>) -> Result<OriginalDatum<T>, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
         let selectors = [
             self.kind()?,
-            fact.observe(OriginalValuePart::FieldName, SourceUseRole::Selector)?,
-            fact.observe(OriginalValuePart::DataType, SourceUseRole::Selector)?,
-            fact.observe(OriginalValuePart::IsArray, SourceUseRole::Selector)?,
-            fact.observe(OriginalValuePart::Target, SourceUseRole::Selector)?,
+            field,
+            data_type,
+            is_array,
+            target,
             declaration,
         ];
         let sources = self.originals.sources();
         match declared {
-            Some(name) if expected.contains(&name) => {
-                let (part, state) = read(notes)?;
-                let mut value = fact.bind(part, state, SourceUseRole::Selector, true)?;
+            Ok(name) if expected.contains(&name) => {
+                let mut value = read(notes)?;
                 for selector in selectors {
                     value.contribute(selector);
                 }
                 Ok(value.into_cell(sources))
             }
             other => {
-                self.unsupported_declaration(fact, notes)?;
-                let state = if other.is_some() {
+                let error = other.err();
+                self.rejected_declaration(fact, error, notes)?;
+                let state = if error.is_none() {
                     SourceValue::Unsupported
                 } else {
                     SourceValue::Unreadable
                 };
-                Ok(sources.value(state, &selectors, other.is_some()))
+                Ok(sources.value(state, &selectors, error.is_none()))
             }
         }
     }
 
-    fn unsupported_declaration(
+    fn rejected_declaration(
         &self,
         fact: &Fact<'scope, 'read, 'source>,
+        error: Option<ValueError>,
         notes: &mut Vec<FieldError>,
     ) -> Result<(), CatalogError> {
         let path = self.owner.map_or_else(
             || Ok(String::new()),
             |owner| self.originals.logical_path(owner),
         )?;
-        let violation = FieldViolation::unsupported(self.structure()?, &path, fact.field());
+        let violation =
+            FieldViolation::rejected_declaration(self.structure()?, &path, fact.field(), error);
         let body = self.capture.field_failure(&violation)?;
         notes.push(violation.into_error().with_body(body));
         Ok(())

@@ -55,6 +55,8 @@ mod original_instance_location;
 mod original_reference_admission;
 #[path = "original_reference_capture.rs"]
 mod original_reference_capture;
+#[path = "original_struct_ancestry.rs"]
+mod original_struct_ancestry;
 #[path = "original_target_shape.rs"]
 mod original_target_shape;
 #[path = "original_value_capture.rs"]

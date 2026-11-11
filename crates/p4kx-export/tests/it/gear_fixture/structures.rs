@@ -86,7 +86,7 @@ fn weapons() -> Vec<TestStruct> {
             ],
         )
         .parent("SWeaponActionParams"),
-        TestStruct::new("SWeaponActionWrapParams")
+        TestStruct::new("SWeaponActionToggleParams")
             .parent("SWeaponActionParams")
             .field("weaponAction", pointer("SWeaponActionParams")),
         TestStruct::new("SWeaponActionParallelParams")

@@ -390,3 +390,6 @@ fn finish(
             .value("economyParams", TestValue::Struct(economy)),
         )
 }
+
+#[path = "catalog_recovery_declared_targets.rs"]
+mod declared_targets;

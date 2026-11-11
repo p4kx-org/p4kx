@@ -1803,6 +1803,50 @@
       ],
       "required": []
     },
+    "BeamAction": {
+      "description": "Stored beam inputs with independent heat-cost and heat fields.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "chargeDownTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "chargeUpTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "fireDuringChargeUp": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "heatCostPerSecond": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "heatPerSecond": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxEnergyDraw": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minEnergyDraw": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "wearPerSecond": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "authored",
+        "chargeDownTime",
+        "chargeUpTime",
+        "fireDuringChargeUp",
+        "heatCostPerSecond",
+        "heatPerSecond",
+        "maxEnergyDraw",
+        "minEnergyDraw",
+        "wearPerSecond"
+      ],
+      "type": "object"
+    },
     "BlueprintCategoryDefinition": {
       "description": "One physical fieldless `BlueprintCategoryRecord` definition with directly sourced metadata.",
       "properties": {
@@ -3001,6 +3045,42 @@
       ],
       "type": "object"
     },
+    "BurstAction": {
+      "description": "The original per-shot, count and cooldown inputs of a burst action.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "cooldownTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "fireRate": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "heatPerShot": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "launchParams": {
+          "$ref": "#/$defs/SourcedValueOfWeaponLauncher"
+        },
+        "shotCount": {
+          "$ref": "#/$defs/SourcedValueOfuint8"
+        },
+        "wearPerShot": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "authored",
+        "cooldownTime",
+        "fireRate",
+        "heatPerShot",
+        "launchParams",
+        "shotCount",
+        "wearPerShot"
+      ],
+      "type": "object"
+    },
     "CanonicalRecordHeader": {
       "description": "Independently sourced original metadata and stable convenience values of one physical Record.",
       "properties": {
@@ -3347,6 +3427,9 @@
         },
         "missionProperties": {
           "$ref": "#/$defs/CatalogTableOfMissionPropertyConfiguration"
+        },
+        "weaponActions": {
+          "$ref": "#/$defs/CatalogTableOfWeaponActions"
         }
       },
       "required": [
@@ -3363,7 +3446,8 @@
         "itemRecoveryPolicy",
         "missionBrokerEntries",
         "missionFlows",
-        "missionProperties"
+        "missionProperties",
+        "weaponActions"
       ],
       "type": "object"
     },
@@ -4409,6 +4493,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfWeaponActions": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/WeaponActions"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfWeaponMagazineResolution": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -4488,6 +4591,62 @@
       },
       "required": [
         "maxCharges"
+      ],
+      "type": "object"
+    },
+    "ChargedAction": {
+      "description": "The original charged wrapper, its modifier and its separate child action.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "chargeAutomatically": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "chargeTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "cooldownTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "fireAutomaticallyOnFullCharge": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "fireOnlyOnFullCharge": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "interpolateChargeBonus": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "maxChargeModifier": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "maxGlow": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "overchargeTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "overchargedTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "weaponAction": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "authored",
+        "chargeAutomatically",
+        "chargeTime",
+        "cooldownTime",
+        "fireAutomaticallyOnFullCharge",
+        "fireOnlyOnFullCharge",
+        "interpolateChargeBonus",
+        "maxChargeModifier",
+        "maxGlow",
+        "overchargeTime",
+        "overchargedTime",
+        "weaponAction"
       ],
       "type": "object"
     },
@@ -5574,6 +5733,46 @@
         }
       ],
       "required": []
+    },
+    "ConditionalAction": {
+      "description": "Original conditional slots and the separately authored default action.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "conditionalWeaponActions": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfConditionalActionEntry"
+        },
+        "defaultWeaponAction": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "authored",
+        "conditionalWeaponActions",
+        "defaultWeaponAction"
+      ],
+      "type": "object"
+    },
+    "ConditionalActionEntry": {
+      "description": "An original unevaluated condition and its action slot.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "condition": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "weaponAction": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "authored",
+        "condition",
+        "weaponAction"
+      ],
+      "type": "object"
     },
     "ContainerAmmoSlots": {
       "description": "The two ordered source roles owned by one container.",
@@ -13059,6 +13258,38 @@
       ],
       "type": "object"
     },
+    "LauncherSpread": {
+      "description": "The original spread words.",
+      "properties": {
+        "attack": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "decay": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "firstAttack": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "max": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "min": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "attack",
+        "authored",
+        "decay",
+        "firstAttack",
+        "max",
+        "min"
+      ],
+      "type": "object"
+    },
     "LegacyLootArchetype": {
       "description": "An older loot archetype: a `LootArchetype` Record under `lootgeneration/lootarchetypes`, the\nweighted tags of item a table entry stands for.",
       "properties": {
@@ -17168,6 +17399,22 @@
       ],
       "type": "object"
     },
+    "ParallelAction": {
+      "description": "The ordered original slots of a parallel action.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "weaponActions": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "authored",
+        "weaponActions"
+      ],
+      "type": "object"
+    },
     "ParticleResource": {
       "properties": {
         "path": {
@@ -19767,6 +20014,54 @@
       ],
       "type": "object"
     },
+    "RapidAction": {
+      "description": "The original per-shot and spin inputs of a rapid-fire action.",
+      "properties": {
+        "audioLoopTimeBetweenFirstShots": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "fireDuringSpinUp": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "fireRate": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "heatPerShot": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "launchParams": {
+          "$ref": "#/$defs/SourcedValueOfWeaponLauncher"
+        },
+        "spinDownTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "spinParam": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "spinUpTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "wearPerShot": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "audioLoopTimeBetweenFirstShots",
+        "authored",
+        "fireDuringSpinUp",
+        "fireRate",
+        "heatPerShot",
+        "launchParams",
+        "spinDownTime",
+        "spinParam",
+        "spinUpTime",
+        "wearPerShot"
+      ],
+      "type": "object"
+    },
     "Reaction": {
       "description": "How a faction reacts to the other in a `FactionHostility` modifier. A value the catalog does\nnot know is `null`.",
       "type": "string",
@@ -22094,6 +22389,54 @@
       ],
       "required": []
     },
+    "SequenceAction": {
+      "description": "The original mode and ordered sequence entries.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "mode": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sequenceEntries": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSequenceActionEntry"
+        }
+      },
+      "required": [
+        "authored",
+        "mode",
+        "sequenceEntries"
+      ],
+      "type": "object"
+    },
+    "SequenceActionEntry": {
+      "description": "The exact timing and repetitions owned by an original sequence entry.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "delay": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "repetitions": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "unit": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "weaponAction": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "authored",
+        "delay",
+        "repetitions",
+        "unit",
+        "weaponAction"
+      ],
+      "type": "object"
+    },
     "SequencerTask": {
       "description": "The concrete sequencer task authored by a Health component.",
       "oneOf": [
@@ -22903,6 +23246,34 @@
         "availability",
         "meaning",
         "rows"
+      ],
+      "type": "object"
+    },
+    "ShotInputs": {
+      "description": "Stored per-shot values and the actual owned launcher.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "fireRate": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "heatPerShot": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "launchParams": {
+          "$ref": "#/$defs/SourcedValueOfWeaponLauncher"
+        },
+        "wearPerShot": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "authored",
+        "fireRate",
+        "heatPerShot",
+        "launchParams",
+        "wearPerShot"
       ],
       "type": "object"
     },
@@ -27038,6 +27409,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfConditionalActionEntry": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfConditionalActionEntry"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfCurvePoint": {
       "allOf": [
         {
@@ -30895,6 +31399,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfSequenceActionEntry": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfSequenceActionEntry"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfSequencerTask": {
       "allOf": [
         {
@@ -34396,6 +35033,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/CommoditySelection"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfConditionalActionEntry": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ConditionalActionEntry"
               }
             }
           }
@@ -40896,6 +41663,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/JsonValue"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfLauncherSpread": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/LauncherSpread"
               }
             }
           }
@@ -51532,6 +52429,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfSequenceActionEntry": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SequenceActionEntry"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfSequencerTask": {
       "allOf": [
         {
@@ -53706,6 +54733,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/TemplateVocabulary"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfWeaponLauncher": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/WeaponLauncher"
               }
             }
           }
@@ -57375,6 +58532,22 @@
       ],
       "type": "object"
     },
+    "ToggleAction": {
+      "description": "The child of an original toggle action.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "weaponAction": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "authored",
+        "weaponAction"
+      ],
+      "type": "object"
+    },
     "TractorBeamStats": {
       "description": "A tractor beam, from its `SWeaponActionFireTractorBeamParams`.",
       "properties": {
@@ -57535,6 +58708,428 @@
         "noteInterpretation"
       ],
       "type": "object"
+    },
+    "WeaponAction": {
+      "description": "An action node and its stable original occurrence within the physical Record.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/WeaponActionKind"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceValueOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+        }
+      },
+      "required": [
+        "kind",
+        "sourceType",
+        "sourceValueOrdinal"
+      ],
+      "type": "object"
+    },
+    "WeaponActionKind": {
+      "description": "Typed action inputs and the original bodies of other admitted action declarations.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "single",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ShotInputs"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "rapid",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/RapidAction"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "burst",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/BurstAction"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "beam",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/BeamAction"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "sequence",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SequenceAction"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "parallel",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ParallelAction"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "conditional",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ConditionalAction"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "dynamicConditional",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ConditionalAction"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "toggle",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ToggleAction"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "charged",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ChargedAction"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "authored",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "WeaponActions": {
+      "description": "Authored fire-action slots and local action nodes of one physical weapon component.",
+      "properties": {
+        "actionNodes": {
+          "items": {
+            "$ref": "#/$defs/WeaponAction"
+          },
+          "type": "array"
+        },
+        "aimAction": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "fireActions": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "actionNodes",
+        "aimAction",
+        "componentOrdinal",
+        "fireActions",
+        "ownerGuid",
+        "ownerRecordIndex"
+      ],
+      "type": "object"
+    },
+    "WeaponLauncher": {
+      "description": "The original launcher alternative and its authored settings.",
+      "oneOf": [
+        {
+          "properties": {
+            "authored": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "type": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "authored"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "authored": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "type": {
+              "const": "dummy",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "authored"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Projectile launcher costs, selectors and other stored inputs.",
+          "properties": {
+            "ammoCost": {
+              "$ref": "#/$defs/SourcedValueOfint32"
+            },
+            "authored": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "damageMultiplier": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "fireHelper": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "heatCost": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "muzzleHelper": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "pelletCount": {
+              "$ref": "#/$defs/SourcedValueOfint32"
+            },
+            "projectileType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "soundRadius": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "spreadParams": {
+              "$ref": "#/$defs/SourcedValueOfLauncherSpread"
+            },
+            "type": {
+              "const": "projectile",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "ammoCost",
+            "authored",
+            "damageMultiplier",
+            "fireHelper",
+            "heatCost",
+            "muzzleHelper",
+            "pelletCount",
+            "projectileType",
+            "soundRadius",
+            "spreadParams"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The original missile-launch settings.",
+          "properties": {
+            "authored": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "canFireWithoutLock": {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            },
+            "detachVelocityForward": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "detachVelocityRight": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "detachVelocityRoll": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "detachVelocityUp": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "igniteOnPylon": {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            },
+            "showHitIndicator": {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            },
+            "soundRadius": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "type": {
+              "const": "missile",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "authored",
+            "canFireWithoutLock",
+            "detachVelocityForward",
+            "detachVelocityRight",
+            "detachVelocityRoll",
+            "detachVelocityUp",
+            "igniteOnPylon",
+            "showHitIndicator",
+            "soundRadius"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The original throw mode and sound radius.",
+          "properties": {
+            "authored": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "soundRadius": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "throwMode": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "type": {
+              "const": "throwable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "authored",
+            "soundRadius",
+            "throwMode"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "original": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "type": {
+              "const": "authored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "sourceType",
+            "original"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
     },
     "WeaponMagazineResolution": {
       "description": "The legacy primary selection actually attempted for one physical weapon component.",

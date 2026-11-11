@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Field, StructValue, Value};
+use p4kx_extraction::{Field, StructValue, Value, ValueError};
 
 use super::{FieldCapture, FieldError};
 use crate::record_read::ReadError;
@@ -19,8 +19,9 @@ enum ViolationKind<'view, 'source> {
         value: &'view Value<'source>,
         expected: &'static str,
     },
-    Unsupported {
+    Declaration {
         declaration: &'view Field<'source>,
+        error: Option<ValueError>,
     },
 }
 
@@ -45,11 +46,20 @@ impl<'view, 'source> FieldViolation<'view, 'source> {
         path: &'view str,
         declaration: &'view Field<'source>,
     ) -> Self {
+        Self::rejected_declaration(parent, path, declaration, None)
+    }
+
+    pub(crate) const fn rejected_declaration(
+        parent: &'view StructValue<'source>,
+        path: &'view str,
+        declaration: &'view Field<'source>,
+        error: Option<ValueError>,
+    ) -> Self {
         Self {
             parent,
             path,
             name: declaration.name(),
-            kind: ViolationKind::Unsupported { declaration },
+            kind: ViolationKind::Declaration { declaration, error },
         }
     }
 
@@ -60,13 +70,13 @@ impl<'view, 'source> FieldViolation<'view, 'source> {
     pub(crate) const fn value(&self) -> Option<&'view Value<'source>> {
         match self.kind {
             ViolationKind::Invalid { value, .. } => Some(value),
-            ViolationKind::Unsupported { .. } => None,
+            ViolationKind::Declaration { .. } => None,
         }
     }
 
     pub(crate) const fn declaration(&self) -> Option<&'view Field<'source>> {
         match self.kind {
-            ViolationKind::Unsupported { declaration } => Some(declaration),
+            ViolationKind::Declaration { declaration, .. } => Some(declaration),
             ViolationKind::Invalid { .. } => None,
         }
     }
@@ -103,7 +113,17 @@ impl<'view, 'source> FieldViolation<'view, 'source> {
                 field,
                 expected,
             },
-            ViolationKind::Unsupported { .. } => FieldError::Unsupported { source_type, field },
+            ViolationKind::Declaration {
+                error: Some(source),
+                ..
+            } => FieldError::Unreadable {
+                source_type,
+                field,
+                source,
+            },
+            ViolationKind::Declaration { error: None, .. } => {
+                FieldError::Unsupported { source_type, field }
+            }
         }
     }
 }

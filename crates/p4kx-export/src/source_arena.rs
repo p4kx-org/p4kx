@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, DecimalU64, SourceUses};
+use std::ops::Range;
+
+use p4kx_extraction::{CancelToken, DecimalU64, SourceUses, Value};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -81,17 +83,64 @@ pub(crate) fn read_indexed<'scope, 'read, 'source>(
 pub(crate) fn read_subtree<'scope, 'read, 'source>(
     fields: &OriginalFlowFields<'scope, 'read, 'source>,
     root: &OriginalValueFact<'scope, 'read, 'source>,
-    mut retain: impl FnMut(&OriginalValueFact<'scope, 'read, 'source>) -> Result<(), CatalogError>,
+    retain: impl FnMut(&OriginalValueFact<'scope, 'read, 'source>) -> Result<(), CatalogError>,
 ) -> Result<SourceArenaOutput<'source>, CatalogError> {
     let span = fields.span(root)?;
     if !matches!(root.edge(), OriginalValueEdge::Field { .. }) {
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
     }
-    let mut arena = SourceArena {
-        next_ordinal: root.ordinal(),
-        selected_root: Some(root.ordinal()),
-        ..SourceArena::default()
-    };
+    let mut arena = SourceArena::default();
+    read_member(fields, root, span, &mut arena, retain)?;
+    arena.finish()
+}
+
+/// Retains the original Struct fields outside the consumed original occurrences.
+pub(crate) fn read_members<'scope, 'read, 'source>(
+    fields: &OriginalFlowFields<'scope, 'read, 'source>,
+    owner: &OriginalValueFact<'scope, 'read, 'source>,
+    consumed: &[u64],
+    mut retain: impl FnMut(&OriginalValueFact<'scope, 'read, 'source>) -> Result<(), CatalogError>,
+) -> Result<SourceArenaOutput<'source>, CatalogError> {
+    let span = fields.span(owner)?;
+    if !matches!(owner.value(), Value::Struct(_)) {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    }
+    let mut next = span
+        .start
+        .checked_add(1)
+        .ok_or(ExportAccountingError::CounterOverflow)?;
+    let mut arena = SourceArena::default();
+    while next < span.end {
+        fields.check_cancel()?;
+        let member = fields
+            .facts()
+            .get(next)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let member_span = fields.span(member)?;
+        if member.parent_ordinal() != Some(owner.ordinal())
+            || !matches!(member.edge(), OriginalValueEdge::Field { .. })
+            || member_span.start != next
+            || member_span.end > span.end
+        {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        next = member_span.end;
+        if !consumed.contains(&member.ordinal()) {
+            read_member(fields, member, member_span, &mut arena, &mut retain)?;
+        }
+    }
+    arena.finish()
+}
+
+fn read_member<'scope, 'read, 'source>(
+    fields: &OriginalFlowFields<'scope, 'read, 'source>,
+    member: &OriginalValueFact<'scope, 'read, 'source>,
+    span: Range<usize>,
+    arena: &mut SourceArena<'source>,
+    mut retain: impl FnMut(&OriginalValueFact<'scope, 'read, 'source>) -> Result<(), CatalogError>,
+) -> Result<(), CatalogError> {
+    arena.next_ordinal = member.ordinal();
+    arena.selected_root = Some(member.ordinal());
     let facts = fields
         .facts()
         .get(span)
@@ -101,8 +150,7 @@ pub(crate) fn read_subtree<'scope, 'read, 'source>(
         arena.close_to_parent(fact.parent_ordinal(), fields.sources())?;
         arena.visit(fact, fields.sources(), || retain(fact))?;
     }
-    arena.close_to_parent(None, fields.sources())?;
-    arena.finish()
+    arena.close_to_parent(None, fields.sources())
 }
 
 impl<'source> SourceArena<'source> {
@@ -170,10 +218,8 @@ impl<'source> SourceArena<'source> {
         scalar: impl FnOnce() -> Result<(), CatalogError>,
     ) -> Result<(), CatalogError> {
         let root = self.selected_root == Some(fact.ordinal());
-        if fact.ordinal() != self.next_ordinal
-            || (!root
-                && fact.parent_ordinal() != self.open.last().map(|container| container.ordinal))
-        {
+        let parent = self.open.last().map(|container| container.ordinal);
+        if fact.ordinal() != self.next_ordinal || (!root && fact.parent_ordinal() != parent) {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
         self.next_ordinal = self

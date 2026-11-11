@@ -98,9 +98,16 @@ pub(crate) fn open(
     database: &DataForgeBuilder,
     origin: DcbOrigin,
 ) -> TestResult<(tempfile::TempDir, Archive)> {
+    open_bytes(database.build(), origin)
+}
+
+pub(crate) fn open_bytes(
+    bytes: Vec<u8>,
+    origin: DcbOrigin,
+) -> TestResult<(tempfile::TempDir, Archive)> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("fixture.p4k");
-    let dcb = TestEntry::stored("Data\\Game2.dcb", database.build());
+    let dcb = TestEntry::stored("Data\\Game2.dcb", bytes);
     let dcb = match origin {
         DcbOrigin::Plain => dcb,
         DcbOrigin::Encrypted => dcb.encrypted(),

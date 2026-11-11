@@ -11,6 +11,8 @@ use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 use crate::health_reference_origins as origins;
 
+#[path = "catalog_weapon_action_selectors.rs"]
+mod action_selectors;
 #[path = "catalog_weapon_magazine_condition_assertions.rs"]
 mod condition;
 #[path = "catalog_weapon_magazine_condition_numbers.rs"]

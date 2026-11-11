@@ -140,6 +140,7 @@ impl<'source> Frame<'source> {
             Self::Structure(frame) => Completed {
                 value: Value::Struct(StructValue {
                     type_name: frame.type_name,
+                    struct_index: frame.struct_index,
                     fields: frame.fields,
                 }),
                 inline: Some((frame.group, frame.struct_index)),

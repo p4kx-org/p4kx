@@ -11,26 +11,30 @@ use crate::catalog_record_reference::CatalogRecordReference;
 use crate::contract_recovery::RecoveryOverride;
 use crate::source_fields::FieldError;
 
+const OVERRIDE_TYPE: &str = "ItemRecoveryOverrideGroupDef";
+
 pub(crate) fn read<'source>(
     reader: &RecoveryReader<'_, 'source, '_>,
     economy: &CatalogFields<'_, 'source, '_>,
     notes: &mut Vec<FieldError>,
 ) -> Result<SourcedValue<Vec<SourcedValue<RecoveryOverride>>>, CatalogError> {
-    economy.array("overrides", notes)?.try_map(|groups| {
-        groups
-            .iter()
-            .enumerate()
-            .map(|(ordinal, value)| {
-                if reader.cancel.is_some_and(CancelToken::is_cancelled) {
-                    return Err(CatalogError::Cancelled);
-                }
-                let name = format!("overrides[{ordinal}]");
-                let path = economy.location(&name);
-                let value = economy.structure_element(&name, value, notes)?;
-                reader.typed(value, &path, "ItemRecoveryOverrideGroupDef", notes, group)
-            })
-            .collect()
-    })
+    reader
+        .empty_class_target(economy, "overrides", OVERRIDE_TYPE, notes)?
+        .try_map(|groups| {
+            groups
+                .iter()
+                .enumerate()
+                .map(|(ordinal, value)| {
+                    if reader.cancel.is_some_and(CancelToken::is_cancelled) {
+                        return Err(CatalogError::Cancelled);
+                    }
+                    let name = format!("overrides[{ordinal}]");
+                    let path = economy.location(&name);
+                    let value = economy.structure_element(&name, value, notes)?;
+                    reader.typed(value, &path, OVERRIDE_TYPE, notes, group)
+                })
+                .collect()
+        })
 }
 
 fn group(

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Field, SourceLocation, Value};
+use p4kx_extraction::{Field, SourceLocation, SourceUse, SourceUseRole, Value, ValueError};
 
 use super::super::tokens::{OriginalValueEdge, OriginalValuePart};
 use super::OriginalValueSite;
@@ -77,6 +77,29 @@ impl<'scope, 'read, 'source> OriginalValueFact<'scope, 'read, 'source> {
         Ok(())
     }
 
+    /// Observes the exact nominal Struct target and its original declaration selectors.
+    pub(crate) fn observe_declared_target<'input>(
+        &self,
+        input: &'input crate::build::original_input::OriginalCatalogInput<'_, '_>,
+    ) -> Result<(Result<&'input str, ValueError>, [SourceUse; 5]), crate::CatalogError> {
+        self.check_input(input)?;
+        let (target, declaration) =
+            input.declared_struct_name(self.field().storage().target(), SourceUseRole::Selector)?;
+        Ok((target, self.declaration_selectors(declaration)?))
+    }
+
+    pub(crate) fn declaration_selectors(
+        &self,
+        declaration: SourceUse,
+    ) -> Result<[SourceUse; 5], crate::CatalogError> {
+        Ok([
+            self.observe(OriginalValuePart::FieldName, SourceUseRole::Selector)?,
+            self.observe(OriginalValuePart::DataType, SourceUseRole::Selector)?,
+            self.observe(OriginalValuePart::IsArray, SourceUseRole::Selector)?,
+            self.observe(OriginalValuePart::Target, SourceUseRole::Selector)?,
+            declaration,
+        ])
+    }
     pub(crate) fn location(&self, part: OriginalValuePart) -> SourceLocation {
         let ordinal = if part.is_declaration() {
             self.declaration_ordinal

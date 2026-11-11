@@ -11,6 +11,7 @@ use super::catalog_ammo_containers::{self, AmmoContainer};
 use super::catalog_durability::{self, DurabilityComponent, DurabilityRows, DurabilityTables};
 use super::catalog_explosives::{self, Explosive, ExplosiveComponent};
 use super::catalog_hacking_chips::{self, HackingChip, HackingComponent};
+use super::catalog_weapon_actions::{self, WeaponActions};
 use super::catalog_weapon_magazine_slots::{self, WeaponMagazineSlots};
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
@@ -34,6 +35,7 @@ pub(crate) struct ItemComponentRows<'source> {
     pub(crate) hacking_chips: Vec<HackingChip<'source>>,
     pub(crate) ammo_containers: Vec<AmmoContainer<'source>>,
     pub(crate) ammo_bindings: Vec<AmmoBinding<'source>>,
+    pub(crate) weapon_actions: Vec<WeaponActions<'source>>,
     pub(crate) magazine_resolutions: Vec<WeaponMagazineResolution>,
     pub(crate) numbers: Vec<CapturedNumber>,
 }
@@ -45,6 +47,7 @@ impl<'source> ItemComponentRows<'source> {
         self.hacking_chips.extend(other.hacking_chips);
         self.ammo_containers.extend(other.ammo_containers);
         self.ammo_bindings.extend(other.ammo_bindings);
+        self.weapon_actions.extend(other.weapon_actions);
         self.magazine_resolutions.extend(other.magazine_resolutions);
         self.numbers.extend(other.numbers);
     }
@@ -56,6 +59,7 @@ impl<'source> ItemComponentRows<'source> {
             hacking_chips: catalog_hacking_chips::table(forge, self.hacking_chips),
             ammo_containers: catalog_ammo_containers::table(forge, self.ammo_containers),
             ammo_bindings: catalog_ammo_bindings::table(forge, self.ammo_bindings),
+            weapon_actions: catalog_weapon_actions::table(forge, self.weapon_actions),
             magazine_resolutions: resolution::table(forge, self.magazine_resolutions),
         }
     }
@@ -67,6 +71,7 @@ pub(crate) struct ItemComponentTables<'source> {
     pub(crate) hacking_chips: CatalogTable<HackingChip<'source>>,
     pub(crate) ammo_containers: CatalogTable<AmmoContainer<'source>>,
     pub(crate) ammo_bindings: CatalogTable<AmmoBinding<'source>>,
+    pub(crate) weapon_actions: CatalogTable<WeaponActions<'source>>,
     pub(crate) magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
 }
 
@@ -111,7 +116,12 @@ impl<'source> ItemComponentsRead<'source> {
                     &mut self.notes,
                 )?);
             }
-            Component::WeaponMagazine => {
+            Component::Weapon => {
+                self.rows.weapon_actions.push(WeaponActions::read(
+                    owner.clone(),
+                    observed,
+                    &mut self.notes,
+                )?);
                 self.rows
                     .ammo_bindings
                     .push(AmmoBinding::WeaponMagazineSlots {
@@ -141,7 +151,7 @@ enum Component {
     Explosive(ExplosiveComponent),
     Hacking(HackingComponent),
     AmmoContainer,
-    WeaponMagazine,
+    Weapon,
 }
 
 impl Component {
@@ -153,7 +163,7 @@ impl Component {
         match name {
             catalog_ammo_containers::SOURCE_TYPE => return Some((value, Self::AmmoContainer)),
             catalog_weapon_magazine_slots::SOURCE_TYPE => {
-                return Some((value, Self::WeaponMagazine));
+                return Some((value, Self::Weapon));
             }
             _ => {}
         }

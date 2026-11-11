@@ -206,6 +206,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.ammoDefinitions` | Physical `AmmoParams` definitions with original projectile, physics and conversion fields and per-value source origin. [Ammunition definitions](catalog-ammo-definitions.md) |
 | `configurations.ammoContainers`, `declarations.ammoBindings` | Physical container settings and authored ammunition and magazine slots, including ordered secondary conditions. [Ammunition definitions](catalog-ammo-definitions.md) |
 | `projections.weaponMagazineResolutions` | Observed legacy primary selections, original magazine Record and container indices, and distinct target-read outcomes. [Ammunition definitions](catalog-ammo-definitions.md) |
+| `configurations.weaponActions` | Physical weapon component owners, ordered authored action slots, stored launcher selectors and independent heat fields. [Authored weapon actions and launchers](catalog-ammo-definitions.md#authored-weapon-actions-and-launchers) |
 | `definitions.blueprints` | Physical Blueprint Records and their complete original value arenas in GUID order |
 | `configurations.durability`, `configurations.degradation`, `configurations.distortion` | Original item component occurrences, raw values and provenance. [Item durability](catalog-durability.md) |
 | `configurations.explosives` | Original sensor mine triggers and explosive ordnance settings by physical Item and component position. [Explosive components](catalog-explosives.md) |
@@ -2547,7 +2548,8 @@ The nested groups remain independent even where their source member names match.
 The first three groups retain original Single bits and a nullable finite number. Older direct,
 escalating and override scalars retain their authored numeric storage. Missing, explicit null,
 unreadable, unsupported and invalid source values have separate states. Invalid known fields and
-unsupported concrete groups appear in diagnostic exports with their original field receipts.
+unsupported concrete groups appear in diagnostic exports with their original field receipts. The
+nominal source declaration is checked for owned recovery blocks and empty override arrays.
 
 The sourced `overrides` array retains each `ItemRecoveryOverrideGroupDef` in authored order.
 Its sourced `classes` links keep their original positions, including explicit null and

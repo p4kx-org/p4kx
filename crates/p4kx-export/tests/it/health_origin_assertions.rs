@@ -249,3 +249,6 @@ pub(crate) fn independent(carrier: &Value) -> TestResult {
 pub(crate) fn closure(catalog: &Value) -> TestResult {
     crate::commodity_v3_source_inventory::reference_closure(catalog)
 }
+
+#[path = "catalog_declaration_fixture.rs"]
+pub(crate) mod declaration_fixture;

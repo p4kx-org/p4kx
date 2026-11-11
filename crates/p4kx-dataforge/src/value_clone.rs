@@ -32,6 +32,7 @@ impl Clone for StructValue<'_> {
     fn clone(&self) -> Self {
         let mut target = Self {
             type_name: self.type_name,
+            struct_index: self.struct_index,
             fields: shallow_fields(&self.fields),
         };
         complete_frames(vec![Frame::Fields(
@@ -107,6 +108,7 @@ fn shallow<'source>(value: &Value<'source>) -> Value<'source> {
         Value::Enum(v) => Value::Enum(v),
         Value::Struct(v) => Value::Struct(StructValue {
             type_name: v.type_name,
+            struct_index: v.struct_index,
             fields: Vec::new(),
         }),
         Value::Array(_) => Value::Array(Box::default()),

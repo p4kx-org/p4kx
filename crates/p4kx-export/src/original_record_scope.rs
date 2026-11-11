@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Record, RecordTree, SourceEvidenceError, SourceScope, SourceUses};
+use p4kx_extraction::{Record, RecordTree, SourceEvidenceError, SourceScope, SourceUses, Struct};
 
 use super::OriginalCatalogInput;
 use crate::CatalogError;
@@ -48,5 +48,9 @@ impl<'read, 'source> OriginalRecordScope<'read, 'source> {
 
     pub(crate) fn struct_name(&self, index: u16) -> Option<&str> {
         self.input.struct_name(index)
+    }
+
+    pub(crate) fn struct_at(&self, index: u32) -> Option<Struct<'_>> {
+        self.input.struct_at(index)
     }
 }

@@ -10,6 +10,7 @@ use crate::catalog_v3::catalog_ammo_containers::AmmoContainer;
 use crate::catalog_v3::catalog_durability::{Degradation, Distortion, Durability};
 use crate::catalog_v3::catalog_explosives::Explosive;
 use crate::catalog_v3::catalog_hacking_chips::HackingChip;
+use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
 use crate::contract_recovery::{ItemRecoveryEconomy, ItemRecoveryOverrides};
 use crate::recovery::ItemRecoveryPolicy;
 use crate::schema_fields::every_field_required;
@@ -29,6 +30,7 @@ pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) explosives: CatalogTable<Explosive<'source>>,
     pub(crate) hacking_chips: CatalogTable<HackingChip<'source>>,
     pub(crate) ammo_containers: CatalogTable<AmmoContainer<'source>>,
+    pub(crate) weapon_actions: CatalogTable<WeaponActions<'source>>,
     pub(crate) mission_broker_entries: CatalogTable<BrokerProjection<'source>>,
     pub(crate) item_recovery_economy: CatalogTable<ItemRecoveryEconomy<'source>>,
     pub(crate) item_recovery_overrides: CatalogTable<ItemRecoveryOverrides>,

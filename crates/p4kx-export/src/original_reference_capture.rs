@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashSet;
-
 use p4kx_extraction::{
-    DataForgeError, DataType, Guid, Record, Reference, ReferenceOrigin, SourceLocation, SourceUse,
-    SourceUseRole, SourceValue,
+    DataType, Guid, Record, Reference, ReferenceOrigin, SourceUse, SourceUseRole, SourceValue,
 };
 
 use super::original_instance_capture;
@@ -106,37 +103,12 @@ impl<'fact, 'scope, 'read, 'source> OriginalReferenceObservation<'fact, 'scope, 
             RecordHeaderField::SourceType.location(self.record_index()),
             SourceUseRole::Selector,
         )?);
-        let expected = u32::from(expected);
-        let mut current = self
+        let current = self
             .record()?
             .struct_type()
             .map_err(CatalogError::DataForge)?;
-        let start = current.index();
-        let mut seen = HashSet::new();
-        loop {
-            check_cancel()?;
-            let index = current.index();
-            if index == expected {
-                return Ok(true);
-            }
-            if !seen.insert(index) {
-                return Err(CatalogError::DataForge(DataForgeError::StructCycle {
-                    struct_index: start,
-                }));
-            }
-            selectors.push(scope.at(
-                SourceLocation::Subresource {
-                    namespace: "dataforgeStructDeclaration".to_owned(),
-                    indices: vec![u64::from(index)],
-                    field: "parent".to_owned(),
-                },
-                SourceUseRole::Selector,
-            )?);
-            let Some(parent) = current.parent() else {
-                return Ok(false);
-            };
-            current = parent;
-        }
+        self.caller
+            .observe_struct_ancestry(current, u32::from(expected), selectors, check_cancel)
     }
 
     pub(crate) fn capture(self) -> Result<OriginalReferenceCapture<'source>, CatalogError> {

@@ -34,7 +34,8 @@ mod text;
 mod value;
 
 pub(crate) use arena::{
-    SourceArenaOutput, read as read_arena, read_indexed as read_indexed_arena, read_subtree,
+    SourceArenaOutput, read as read_arena, read_indexed as read_indexed_arena, read_members,
+    read_subtree,
 };
 pub(crate) use field::SourceField;
 pub(crate) use field_read::read as read_field;

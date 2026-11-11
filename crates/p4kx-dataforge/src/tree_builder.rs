@@ -137,7 +137,11 @@ impl<'source> TreeBuilder<'source> {
             record_path: strings::strip_xml(metadata.file_name()),
             name: metadata.legacy_name(),
             tag: metadata.legacy_tag(),
-            root: StructValue { type_name, fields },
+            root: StructValue {
+                type_name,
+                struct_index: def.struct_index,
+                fields,
+            },
             owner: TreeOwner::new(forge),
         };
         self.resolve_weak(forge, &mut tree)?;

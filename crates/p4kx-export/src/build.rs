@@ -316,6 +316,7 @@ fn assemble<R>(
             explosives: components.explosives,
             hacking_chips: components.hacking_chips,
             ammo_containers: components.ammo_containers,
+            weapon_actions: components.weapon_actions,
             contract_templates: CatalogTable::new(
                 &forge,
                 &["ContractTemplate"],

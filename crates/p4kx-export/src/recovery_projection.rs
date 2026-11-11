@@ -8,6 +8,7 @@ use super::overrides;
 use super::policy_contract::ItemRecoveryPolicy;
 use super::policy_read;
 use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::{CapturedNumber, NumberCapture};
 use crate::catalog_projection::CatalogProjection;
@@ -19,6 +20,9 @@ use crate::contract_recovery::{
 use crate::record_observation::RecordObservation;
 use crate::source_fields::{FieldCapture, FieldError};
 use crate::template_field_capture::TemplateFieldCapture;
+
+#[path = "recovery_declared_read.rs"]
+mod declared_read;
 
 pub(crate) struct RecoveryProjection<'source> {
     pub(crate) economy: ItemRecoveryEconomy<'source>,
@@ -32,6 +36,8 @@ pub(crate) struct RecoveryReader<'read, 'source, 'context> {
     pub(crate) context: &'read CatalogRecordContext<'context>,
     pub(crate) capture: &'read dyn FieldCapture<'source>,
     pub(crate) cancel: Option<&'read CancelToken>,
+    original: &'read OriginalFlowFields<'read, 'read, 'source>,
+    input: &'read OriginalCatalogInput<'read, 'source>,
 }
 
 /// Projects the selected policy's economy and override declarations from the same original read.
@@ -54,6 +60,8 @@ pub(crate) fn read<'source>(
         context: &context,
         capture: &capture,
         cancel,
+        original: &original,
+        input,
     };
     let root = CatalogFields::observed(tree.root(), "", &context, &capture)?;
     let mut notes = Vec::new();
@@ -88,7 +96,7 @@ impl<'source> RecoveryReader<'_, 'source, '_> {
         root: &CatalogFields<'_, 'source, '_>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Policy, CatalogError> {
-        let input = root.structure(ECONOMY, notes)?;
+        let input = self.owned_structure(root, ECONOMY, ECONOMY_TYPE, notes)?;
         let Some(source) = input.value().copied() else {
             return Ok(Policy {
                 economy: input.clone().try_map(|_| absent())?,
@@ -122,7 +130,7 @@ impl<'source> RecoveryReader<'_, 'source, '_> {
         ) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<T>, CatalogError> {
         let path = parent.location(name);
-        let value = parent.structure(name, notes)?;
+        let value = self.owned_structure(parent, name, expected, notes)?;
         self.typed(value, &path, expected, notes, project)
     }
 

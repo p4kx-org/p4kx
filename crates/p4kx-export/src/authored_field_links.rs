@@ -134,7 +134,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         for part in [OriginalValuePart::DataType, OriginalValuePart::IsArray] {
             selectors.push(fact.observe(part, SourceUseRole::Selector)?);
         }
-        let mut complete = true;
+        let mut declaration_error = None;
         if storage.data_type() == DataType::Reference
             && storage.is_array() == (cardinality == ReferenceCardinality::Array)
         {
@@ -145,10 +145,10 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
                     .input
                     .declared_struct_name(storage.target(), SourceUseRole::Selector)?;
                 selectors.push(declaration);
-                if declared_type == Some(expected_type) {
+                if declared_type == Ok(expected_type) {
                     return Ok(None);
                 }
-                complete = declared_type.is_some();
+                declaration_error = declared_type.err();
             }
         }
 
@@ -156,12 +156,18 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
             || Ok(String::new()),
             |owner| self.originals.logical_path(owner),
         )?;
-        let violation = FieldViolation::unsupported(self.structure()?, &path, fact.field());
+        let violation = FieldViolation::rejected_declaration(
+            self.structure()?,
+            &path,
+            fact.field(),
+            declaration_error,
+        );
         let body = self.capture.field_failure(&violation)?;
         notes.push(violation.into_error().with_body(body));
 
         selectors.push(self.kind()?);
         selectors.push(fact.observe(OriginalValuePart::FieldName, SourceUseRole::Selector)?);
+        let complete = declaration_error.is_none();
         let state = if complete {
             SourceValue::Unsupported
         } else {

@@ -114,3 +114,45 @@ is indeterminate, and an unreadable target body have distinct outcomes.
 The unreadable result retains the original magazine header identity and
 the source-read failure code. The consulted dependency is visible in the
 health report even if the catalog selection excludes its own Item row.
+
+## Authored weapon actions and launchers
+
+`configurations.weaponActions` contains one row for each physical
+`SCItemWeaponComponentParams` on a selected Item. Join the row to
+`declarations.ammoBindings` by `ownerRecordIndex` and `componentOrdinal`.
+The sourced `fireActions` array preserves the original slots, including
+null entries. The separately sourced `aimAction` keeps its own slot.
+Each admitted slot indexes its row's `actionNodes` array. Ordered child
+slots in sequences, parallel actions and conditional actions use the
+same row-local indices. Sequence entries retain their original delay,
+unit and repetition count. Conditional entries retain unevaluated
+conditions and the separately declared default action. A charged action
+retains its own timing, flags, modifier and child action. Toggle actions
+retain their separate child slot. The `authored` arenas on typed actions, launchers and entries retain
+the remaining original fields in source order. A typed field that cannot
+represent its original value keeps that value in the arena, alongside
+the typed field's source state.
+Action and launcher slots validate the concrete type's physical parent
+chain against the field's declared base. An unrelated concrete type
+produces an `unsupported` cell. A node retains its concrete `sourceType`
+and original `sourceValueOrdinal` as a decimal string scoped to the
+owning Record.
+
+Single, rapid and burst actions expose their stored per-shot inputs and
+owned `launchParams`. Rapid and burst inputs retain their own spin and
+count fields. Beam actions retain `heatCostPerSecond` separately from
+`heatPerSecond`. A projectile launcher's `heatCost` and the action's
+`heatPerShot` remain independent Single values. The other admitted action
+declarations retain their original fields and local value links under the
+`authored` alternative. Other admitted launchers retain their concrete
+`sourceType` and original field arena under the same alternative. The
+legacy `items[].stats.weapon.fireActions` list
+retains its existing flattening and precedence.
+
+A projectile launcher's `projectileType` is the stored label of the
+declared `EProjectileType` Enum. A readable different declaration is
+`unsupported`. A failed declaration or label read is `unreadable`. The ammunition
+Reference receipts stay in the authored container slots. Use their physical
+target indices to join selected Ammo definitions. The launcher label and
+the owning component relationship provide source inputs for selection. The
+existing legacy primary resolution remains a separate projection.
